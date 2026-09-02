@@ -129,22 +129,35 @@
 *                  comment is present when the sample is later promoted (`s`), it's also written as
 *                  a leading comment in the generated optimal_solutions test stub. Has no effect on
 *                  a real test case or a git-commit-sourced case, same as `R`
-*   o              open a different test case: lists every directory under
-*                  src/test/data/diffs/{handmade,small,full,stratified}/, j/k to move, Enter to
-*                  open, Esc to cancel. Press `d` inside this picker to cycle which folder it's
-*                  narrowed down to (all -> handmade -> small -> full -> stratified -> all - see
-*                  DIFF_DATASETS). `H` toggles hiding cases whose tree mapping is already complete
-*                  (incomplete-only), `X` toggles hiding cases that already have a text painting
-*                  (unpainted-only), `Y` toggles hiding cases where the tree mapping and the text
-*                  painting agree (disagreements-only) - the three combine as an AND when more than
-*                  one is on, since a tree mapping, a text painting, and whether they agree with
-*                  each other are three independent questions (see `App::diff_hide_painted`'s own
-*                  doc comment). `s` cycles this picker's own sort order: alphabetical, reverse
-*                  alphabetical, least disagreement first, most disagreement first (see
-*                  `DiffSortOrder`) - unlike `H`/`X`/`Y`, changing it always jumps selection to the
-*                  first entry in the new order. All four states persist across closing and
-*                  reopening this picker (they live on `App`, not just this modal instance), same
-*                  as the `O` picker's own hide/sort state below.
+*   o              open a different test case: a table of every directory under
+*                  src/test/data/diffs/{handmade,small,full,stratified}/, one row per case and one
+*                  column per thing worth triaging on - Name, Dataset, Cmpl, Unmarked, Paint,
+*                  Disagree (see `DiffColumn`). j/k move between rows, Enter opens, Esc cancels.
+*                  h/l move a cursor between *columns* (the current one is highlighted in the
+*                  header), and the two keys that act on it are the same for every column:
+*                    `s`  sort by the cursor column; pressing it again on the column that already
+*                         owns the sort flips ascending/descending. Only ever one column sorts -
+*                         the last one `s` was pressed on - with the case name as a stable
+*                         tiebreak.
+*                    `f`  filter on the cursor column: a substring prompt on Name (Enter applies,
+*                         empty clears, Esc cancels - while it is open every key is text, not a
+*                         command), the dataset cycle on Dataset (all -> handmade -> small -> full
+*                         -> stratified -> all, see DIFF_DATASETS), and an off -> yes -> no cycle
+*                         on each of the other four (e.g. Paint: all, painted only, unpainted
+*                         only). Filters on different columns combine as an AND: every active one
+*                         must match for a row to show. A row whose value for a column isn't known
+*                         - the scan behind it hasn't been run, or the case failed to load - stays
+*                         visible under either direction of that column's filter (see
+*                         `FlagFilter::keeps`).
+*                  Cmpl/Unmarked, Paint and Disagree each need a corpus-wide scan that only runs
+*                  when `s` or `f` is first pressed on them (tens of seconds for Cmpl/Unmarked and
+*                  Disagree, and it blocks; h/l alone never triggers one), so those columns read
+*                  `?` until then. Cursor column, sort and
+*                  every filter persist across closing and reopening this picker (they live on
+*                  `App::diff_view`, not just this modal instance), same as the `O` picker's own
+*                  hide/sort state below. Every filter and sort change re-anchors the selection on
+*                  the row it was already on, falling back to the first row when that row is
+*                  filtered out.
 *                  If the current mapping has unsaved changes, asks first whether to save (only
 *                  offered for a real test case; see `s` above) or discard them before switching
 *   O              like `o`, but lists sampled candidates under src/test/data/samples/ instead --
@@ -307,11 +320,16 @@ e              on a diff, enter/edit its description.md (written on Enter, empty
                  free-form comment (recorded in sample.csv,
                  works regardless of status; carried into the generated test stub
                  if present when later promoted)
-o              open a different test case (src/test/data/diffs/); inside, d cycles
-                 the dataset (all, handmade, small, full, stratified), H narrows
-                 to cases with an unmarked node left (first press scans the whole
-                 corpus, a few seconds), X narrows to cases with no text painting
-                 yet -- H and X are separate queues, AND-ed; all persist across o
+o              open a different test case (src/test/data/diffs/) as a table:
+                 Name, Dataset, Cmpl, Unmarked, Paint, Disagree. j/k pick a row,
+                 h/l pick a column, s sorts by that column (again to reverse),
+                 f filters on it -- substring on Name, dataset cycle on Dataset,
+                 off/yes/no on the rest. Filters AND together across columns.
+                 The scans behind Cmpl/Unmarked, Paint and Disagree run on the
+                 first s or f on that column (Cmpl/Unmarked and Disagree block
+                 for tens of seconds on the full corpus); until then those
+                 columns read ?, and a ? row survives either filter direction.
+                 Cursor, sort and filters persist across o
 O              open a sampled candidate (src/test/data/samples/); already-promoted
                  samples are marked \" - SOLVED\", rejected ones \" - REJECTED\" --
                  press H inside this picker to hide/show both, or s to cycle its
@@ -439,108 +457,118 @@ fn list_available_cases() -> Result<Vec<(String, &'static str)>> {
     Ok(names)
 }
 
-/// `options` (`list_available_cases`'s output) narrowed to just `filter`'s dataset - or every
-/// entry's name, unsorted-relative-to-each-other-again since `options` is already alphabetical,
-/// when `filter` is `None` ("all") - and, if `hide_complete` is set, further narrowed to cases
-/// `completeness` marks as having at least one `NodeStatus::Unmarked` node left (see
-/// `diff_case_is_incomplete`). A case missing from `completeness` (not yet scanned, or
-/// `compute_diff_completeness` couldn't load it) is kept visible under `hide_complete` too - fail
-/// open, since hiding something the scan never actually confirmed as done would be misleading.
+/// The case names the `o` picker actually shows, in the order it shows them: `options`
+/// (`list_available_cases`'s output) narrowed by every active filter in `view`, then ordered by
+/// `view.sort`.
 ///
-/// `hide_agreement`/`disagreement` are the `Y` counterpart: narrows to cases
-/// `diff_case_disagreement_bytes` reports as nonzero (or not yet in the map at all - not painted,
-/// or unloadable - since a case with nothing to compare has nothing to show under "disagreements
-/// only" either). Same fail-open contract at the whole-map level: `disagreement` being `None`
-/// (never scanned this session) hides nothing regardless of `hide_agreement`.
+/// **Filters combine as an AND** (see `DiffFilters`), and a row whose value for a column isn't
+/// known survives that column's filter in either direction (see `FlagFilter::keeps` for the full
+/// argument - in short, "not scanned yet" and "couldn't be measured" are not evidence a fixture
+/// needs no attention).
 ///
-/// Sorted last, by `sort_order` - `Alphabetical`/`ReverseAlphabetical` re-sort explicitly rather
-/// than relying on `options` already being alphabetical, so this function's output is correct on
-/// its own rather than depending on a caller's ordering.
-#[allow(clippy::too_many_arguments)]
+/// **The order is total.** The primary key is `view.sort.column`, reversed when
+/// `view.sort.descending`; the name is always the tiebreak, always ascending, so two rows that
+/// tie on an unscanned column (every row ties, in that case) still come out in a stable, readable
+/// order rather than whatever order `options` happened to arrive in. Unknown values sort after
+/// known ones ascending, and the reversal moves them to the front - `sort_rank`/`bool_rank` carry
+/// that as an explicit leading flag rather than leaving it to a sentinel value that a real
+/// measurement could collide with.
 fn visible_diff_options(
     options: &[(String, &'static str)],
-    filter: Option<&'static str>,
-    hide_complete: bool,
-    completeness: Option<&std::collections::HashMap<String, bool>>,
-    hide_painted: bool,
-    text_painted: Option<&std::collections::HashMap<String, bool>>,
-    hide_agreement: bool,
-    disagreement: Option<&std::collections::HashMap<String, usize>>,
-    sort_order: DiffSortOrder,
+    view: &DiffPickerView,
+    data: DiffPickerData<'_>,
 ) -> Vec<String> {
-    let mut visible: Vec<String> = options
+    let filters = &view.filters;
+    let mut visible: Vec<&str> = options
         .iter()
-        .filter(|(_, dataset)| filter.is_none_or(|f| *dataset == f))
+        .filter(|(_, dataset)| filters.dataset.is_none_or(|wanted| *dataset == wanted))
         .filter(|(name, _)| {
-            !hide_complete
-                || completeness
-                    .and_then(|m| m.get(name))
-                    .copied()
-                    .unwrap_or(true)
-        })
-        // Fails open the same way `hide_complete` does, but toward the opposite default: a case
-        // the scan never reached is treated as *unpainted* and stays visible, since hiding
-        // something never confirmed as done would quietly drop it out of the work queue.
-        .filter(|(name, _)| {
-            !hide_painted
-                || !text_painted
-                    .and_then(|m| m.get(name))
-                    .copied()
-                    .unwrap_or(false)
+            filters
+                .name
+                .as_ref()
+                .is_none_or(|needle| name.to_lowercase().contains(needle))
         })
         .filter(|(name, _)| {
-            !hide_agreement || disagreement.is_none_or(|m| m.get(name).copied().unwrap_or(0) > 0)
+            filters
+                .cmpl
+                .keeps(data.unmarked_of(name).map(|count| count > 0))
         })
-        .map(|(name, _)| name.clone())
+        .filter(|(name, _)| {
+            filters
+                .unmarked
+                .keeps(data.unmarked_of(name).map(|count| count > 0))
+        })
+        .filter(|(name, _)| filters.paint.keeps(data.painted_of(name)))
+        .filter(|(name, _)| {
+            filters
+                .disagree
+                .keeps(data.disagreement_of(name).map(|bytes| bytes > 0))
+        })
+        .map(|(name, _)| name.as_str())
         .collect();
 
-    match sort_order {
-        DiffSortOrder::Alphabetical => visible.sort(),
-        DiffSortOrder::ReverseAlphabetical => {
-            visible.sort();
-            visible.reverse();
-        }
-        DiffSortOrder::LeastDisagreementFirst => {
-            visible.sort_by_key(|name| disagreement.and_then(|m| m.get(name)).copied().unwrap_or(0))
-        }
-        DiffSortOrder::MostDisagreementFirst => visible.sort_by_key(|name| {
-            std::cmp::Reverse(disagreement.and_then(|m| m.get(name)).copied().unwrap_or(0))
-        }),
-    }
+    // `options`, not `visible`, is what carries each name's dataset; looked up per comparison
+    // rather than materialized into a parallel list, since only the `Dataset` sort ever asks.
+    let dataset_of = |name: &str| -> &'static str {
+        options
+            .iter()
+            .find(|(candidate, _)| candidate == name)
+            .map(|(_, dataset)| *dataset)
+            .unwrap_or("")
+    };
 
-    visible
+    visible.sort_by(|a, b| {
+        let primary = match view.sort.column {
+            DiffColumn::Name => std::cmp::Ordering::Equal,
+            DiffColumn::Dataset => dataset_of(a).cmp(dataset_of(b)),
+            DiffColumn::Cmpl => bool_rank(data.unmarked_of(a).map(|count| count > 0))
+                .cmp(&bool_rank(data.unmarked_of(b).map(|count| count > 0))),
+            DiffColumn::Unmarked => {
+                sort_rank(data.unmarked_of(a)).cmp(&sort_rank(data.unmarked_of(b)))
+            }
+            DiffColumn::Paint => bool_rank(data.painted_of(a)).cmp(&bool_rank(data.painted_of(b))),
+            DiffColumn::Disagree => {
+                sort_rank(data.disagreement_of(a)).cmp(&sort_rank(data.disagreement_of(b)))
+            }
+        };
+        let primary = if view.sort.descending {
+            primary.reverse()
+        } else {
+            primary
+        };
+        primary.then_with(|| a.cmp(b))
+    });
+
+    visible.into_iter().map(str::to_string).collect()
 }
 
-/// Builds the `o` picker's modal from a freshly-listed `options`, `current_name` (the case
-/// already open, so it starts selected if it's still visible under `dataset_filter`/
-/// `hide_complete`), and the persisted `dataset_filter`/`hide_complete` (`App::diff_dataset_filter`/
-/// `diff_hide_complete`) - same shape as `open_sample_picker_modal` for `O`, and for the same
-/// reason: keeping the real logic here, not in the `KeyCode::Char('o')`/`'d'`/`'H'` handlers,
-/// makes it unit-testable without real files under src/test/data/diffs/.
-#[allow(clippy::too_many_arguments)]
+/// Sort key for a numeric column: the leading `false`/`true` puts every known value ahead of every
+/// unknown one under an ascending sort, without pretending an unknown row measured any particular
+/// number.
+fn sort_rank(value: Option<usize>) -> (bool, usize) {
+    (value.is_none(), value.unwrap_or(0))
+}
+
+/// `sort_rank` for a yes/no column - `false` (the condition doesn't hold) sorts before `true`, and
+/// unknown after both.
+fn bool_rank(value: Option<bool>) -> (bool, bool) {
+    (value.is_none(), value.unwrap_or(false))
+}
+
+/// Builds the `o` picker's modal from a freshly-listed `options`, `current_name` (the case already
+/// open - or, when reopening after a filter/sort change, the row that was selected - so the
+/// selection follows the row it was on rather than jumping to the top), and the persisted `view`
+/// (`App::diff_view`). Falls back to the first visible row when that name isn't in the filtered
+/// view at all. Keeping the real logic here, rather than in the `KeyCode::Char('o')`/`'s'`/`'f'`
+/// handlers, makes it unit-testable without real files under src/test/data/diffs/ - same shape as
+/// `open_sample_picker_modal` for `O`, and for the same reason.
 fn open_diff_picker_modal(
     options: Vec<(String, &'static str)>,
     current_name: &str,
-    dataset_filter: Option<&'static str>,
-    hide_complete: bool,
-    completeness: Option<&std::collections::HashMap<String, bool>>,
-    hide_painted: bool,
-    text_painted: Option<&std::collections::HashMap<String, bool>>,
-    hide_agreement: bool,
-    disagreement: Option<&std::collections::HashMap<String, usize>>,
-    sort_order: DiffSortOrder,
+    view: DiffPickerView,
+    data: DiffPickerData<'_>,
 ) -> Modal {
-    let visible = visible_diff_options(
-        &options,
-        dataset_filter,
-        hide_complete,
-        completeness,
-        hide_painted,
-        text_painted,
-        hide_agreement,
-        disagreement,
-        sort_order,
-    );
+    let visible = visible_diff_options(&options, &view, data);
     let selected = visible
         .iter()
         .position(|name| name == current_name)
@@ -549,16 +577,14 @@ fn open_diff_picker_modal(
     Modal::OpenDiffPicker {
         options,
         selected,
-        dataset_filter,
-        hide_complete,
-        hide_painted,
-        hide_agreement,
-        sort_order,
+        view,
+        name_input: None,
     }
 }
 
 /// Cycles the `o` picker's dataset filter, in `DIFF_DATASETS` order, wrapping back to "all"
-/// (`None`) after the last one - `d`'s handler, same convention as `SampleSortOrder::next`.
+/// (`None`) after the last one - what `f` does on the `Dataset` column, same convention as
+/// `SampleSortOrder::next`.
 fn next_dataset_filter(current: Option<&'static str>) -> Option<&'static str> {
     match current {
         None => Some(DIFF_DATASETS[0]),
@@ -570,36 +596,74 @@ fn next_dataset_filter(current: Option<&'static str>) -> Option<&'static str> {
     }
 }
 
-/// Whether any node in `root`'s subtree has `NodeStatus::Unmarked` under `caches` - short-circuits
-/// on the first one found, so only a fully-annotated ("complete") fixture pays for a full walk.
-fn tree_has_unmarked_node(
+/// Runs, if it hasn't already this session, whichever corpus-wide scan `column` reads - so `s` and
+/// `f` on a column show a real ranking or a real filter rather than a table of `?`.
+///
+/// Called only from those two keys, never from `h`/`l`: the scans take real wall-clock time the
+/// first time (tens of seconds for `Cmpl`/`Unmarked` and `Disagree` - see `compute_diff_unmarked`
+/// for the measurement), and stalling on plain
+/// cursor movement across the header would make the picker feel broken. Pressing `s`/`f` is a
+/// deliberate request for that column's data, which is exactly when paying for it is reasonable -
+/// the same bargain the `H`/`X`/`Y` keys this replaces each struck on their own.
+fn ensure_diff_column_data(app: &mut App, column: DiffColumn) {
+    match column {
+        DiffColumn::Cmpl | DiffColumn::Unmarked => {
+            if app.diff_unmarked.is_none() {
+                app.diff_unmarked = Some(compute_diff_unmarked());
+            }
+        }
+        DiffColumn::Paint => {
+            if app.diff_text_painted.is_none() {
+                app.diff_text_painted = Some(compute_diff_text_painted());
+            }
+        }
+        DiffColumn::Disagree => {
+            if app.diff_disagreement.is_none() {
+                app.diff_disagreement = Some(compute_diff_disagreement());
+            }
+        }
+        // Both are read straight off `list_available_cases`' own output - nothing to scan.
+        DiffColumn::Name | DiffColumn::Dataset => {}
+    }
+}
+
+/// How many nodes in `root`'s subtree are still `NodeStatus::Unmarked` under `caches` - the
+/// whole-tree counterpart of `count_unmarked` (which counts only the rows currently *visible* in
+/// a panel, for the status line). The `o` picker's `Unmarked` column needs the count rather than
+/// the "is any left?" boolean this replaced, because how much work a fixture still needs is what
+/// orders a triage queue; the lost short-circuit costs an unfinished fixture a full walk, which is
+/// a rounding error next to the tree-sitter parse and mapping rebuild `diff_case_unmarked_count`
+/// already does per case.
+fn count_unmarked_nodes_in_tree(
     root: Node,
     caches: &Caches,
     status_fn: fn(Node, &Caches) -> NodeStatus,
-) -> bool {
+) -> usize {
+    let mut count = 0;
     let mut stack = vec![root];
     while let Some(node) = stack.pop() {
         if status_fn(node, caches) == NodeStatus::Unmarked {
-            return true;
+            count += 1;
         }
         let mut cursor = node.walk();
         for child in node.children(&mut cursor) {
             stack.push(child);
         }
     }
-    false
+    count
 }
 
-/// Whether `name`'s current human-authored mapping leaves any node, in either its before or after
-/// tree, `NodeStatus::Unmarked` - i.e. whether there's still annotation work left on it. `None` if
+/// How many nodes `name`'s current human-authored mapping still leaves `NodeStatus::Unmarked`,
+/// across both its before and after trees - i.e. how much annotation work is left on it. `None` if
 /// the case's code or mapping couldn't be loaded at all - no `human_mapping.json` yet, a directory
-/// that doesn't parse as a valid case, or (rarer) source that no longer parses. `compute_diff_completeness`
-/// treats every one of those the same as `Some(true)` ("needs attention"), rather than silently
-/// excluding a broken case from the incomplete-only view - a case that fails to load is exactly
-/// the kind of thing this filter should surface, not hide. Pressing Enter on it in the picker
-/// still goes through `load_case`'s own error handling as normal; this function doesn't change
-/// what opening it does, only whether `H` shows it.
-fn diff_case_is_incomplete(name: &str) -> Option<bool> {
+/// that doesn't parse as a valid case, or (rarer) source that no longer parses. That `None` is
+/// carried all the way through to the picker as an unknown (`?`) rather than being flattened into
+/// a number: a case that fails to load must not read as "0 left to do", and under
+/// `FlagFilter::keeps` an unknown row stays visible under either direction of the filter, so a
+/// broken case is surfaced rather than hidden. Pressing Enter on it in the picker still goes
+/// through `load_case`'s own error handling as normal; this function doesn't change what opening
+/// it does, only what the `Cmpl`/`Unmarked` columns say about it.
+fn diff_case_unmarked_count(name: &str) -> Option<usize> {
     let dir = diffs_case_dir(name)?;
     let (before, after) = code_pair_from_dir(&dir).ok().flatten()?;
     let mapping = human_mapping::load(name).ok()?;
@@ -607,45 +671,51 @@ fn diff_case_is_incomplete(name: &str) -> Option<bool> {
     let after_root = after.ast.as_ref()?.root_node();
     let caches = rebuild_caches_for_mapping(&mapping, before_root, after_root);
     Some(
-        tree_has_unmarked_node(before_root, &caches, status_before)
-            || tree_has_unmarked_node(after_root, &caches, status_after),
+        count_unmarked_nodes_in_tree(before_root, &caches, status_before)
+            + count_unmarked_nodes_in_tree(after_root, &caches, status_after),
     )
 }
 
-/// Refreshes just `name`'s entry in `App::diff_completeness`, if the cache has been built at all
-/// this session - called after a save, since that's the only way a case's completeness can change
+/// Refreshes just `name`'s entry in `App::diff_unmarked`, if the cache has been built at all this
+/// session - called after a save, since that's the only way a case's unmarked count can change
 /// mid-session, and a targeted single-fixture refresh is cheap, unlike rebuilding the whole cache
 /// (see that field's own doc comment for why that's worth avoiding).
-fn refresh_diff_completeness(app: &mut App, name: &str) {
-    if let Some(map) = &mut app.diff_completeness
-        && let Some(incomplete) = diff_case_is_incomplete(name)
+fn refresh_diff_unmarked(app: &mut App, name: &str) {
+    if let Some(map) = &mut app.diff_unmarked
+        && let Some(count) = diff_case_unmarked_count(name)
     {
-        map.insert(name.to_string(), incomplete);
+        map.insert(name.to_string(), count);
     }
 }
 
-/// Builds `App::diff_completeness` for every case `list_available_cases` currently lists - the
-/// `o` picker's `H` toggle needs this for the whole corpus before it can filter, unlike `O`'s
-/// `hide_solved` (a cheap lookup against sample.csv, no parsing involved). Practical to run across
-/// this repo's whole ~230-fixture corpus (roughly 10s, most of it parsing rather than the
-/// unmarked-node check itself) specifically because `rebuild_caches_for_mapping` resolves every
-/// entry's path through a `PathCache` rather than rescanning siblings per entry - see
-/// `rebuild_caches`'s own doc comment for the very different cost that used to be.
-fn compute_diff_completeness() -> std::collections::HashMap<String, bool> {
+/// Builds `App::diff_unmarked` for every case `list_available_cases` currently lists - the `o`
+/// picker's `Cmpl` and `Unmarked` columns need this for the whole corpus before either can filter
+/// or sort, unlike `O`'s `hide_solved` (a cheap lookup against sample.csv, no parsing involved).
+///
+/// **Measured at ~42s across this repo's 513 fixtures** (release build, 2026-09-02) - not the
+/// "roughly 10s" an older comment here claimed, which dated from a ~230-fixture corpus. Nearly all
+/// of it - ~34s of the ~42s, measured the same day - is `code_pair_from_dir` (tree-sitter, both
+/// sides) plus `human_mapping::load` (the corpus' mapping JSON runs to over a gigabyte); the two
+/// tree walks are the remaining ~8s. That is what made counting affordable in place of the
+/// short-circuiting "is any node unmarked?" predicate this replaced: dropping the early bail costs
+/// a fraction of that ~8s (only unfinished fixtures ever bailed early), against a fixed ~34s of
+/// loading that neither form avoids. It is
+/// bearable at all only because `rebuild_caches_for_mapping` resolves every entry's path through a
+/// `PathCache` rather than rescanning siblings per entry - see `rebuild_caches`'s own doc comment
+/// for the very different cost that used to be. Still: this is a single blocking keypress with no
+/// progress indication, and it is the obvious thing to parallelize if it starts to hurt.
+fn compute_diff_unmarked() -> std::collections::HashMap<String, usize> {
     let Ok(options) = list_available_cases() else {
         return std::collections::HashMap::new();
     };
     options
         .into_iter()
-        .map(|(name, _)| {
-            let incomplete = diff_case_is_incomplete(&name).unwrap_or(true);
-            (name, incomplete)
-        })
+        .filter_map(|(name, _)| diff_case_unmarked_count(&name).map(|count| (name, count)))
         .collect()
 }
 
 /// Whether `name`'s human mapping already carries a painted text-range mapping (see
-/// `HumanTextMapping`) - the text-painting counterpart of `diff_case_is_incomplete`.
+/// `HumanTextMapping`) - the text-painting counterpart of `diff_case_unmarked_count`.
 ///
 /// **A substring scan, not a JSON parse, and that is not a micro-optimization.** The corpus's 500
 /// `human_mapping.json` files come to ~1.4 GB (one is ~29,600 lines on its own), and parsing them
@@ -660,7 +730,7 @@ fn compute_diff_completeness() -> std::collections::HashMap<String, bool> {
 /// is still found.
 ///
 /// `None` if the file can't be read, which `compute_diff_text_painted` treats as "not painted" for
-/// the same fail-open reason `compute_diff_completeness` treats its failures as "needs attention":
+/// the same fail-open reason `compute_diff_unmarked` leaves a case it cannot measure out of its map:
 /// a case this can't read is exactly what the filter should surface, not hide.
 ///
 /// Deliberately keyed on presence, not on emptiness. A fixture whose two files are identical has
@@ -674,7 +744,7 @@ fn diff_case_has_text_mapping(name: &str) -> Option<bool> {
 }
 
 /// Refreshes just `name`'s entry in `App::diff_text_painted`, for the same reason (and at the same
-/// call sites) as `refresh_diff_completeness`: saving is the only thing that can change a case's
+/// call sites) as `refresh_diff_unmarked`: saving is the only thing that can change a case's
 /// painted-ness mid-session.
 fn refresh_diff_text_painted(app: &mut App, name: &str) {
     if let Some(map) = &mut app.diff_text_painted
@@ -687,7 +757,7 @@ fn refresh_diff_text_painted(app: &mut App, name: &str) {
 /// Builds `App::diff_text_painted` for every case `list_available_cases` lists - the `o` picker's
 /// `X` toggle needs the whole corpus before it can filter.
 ///
-/// Much cheaper than `compute_diff_completeness`, which it otherwise mirrors: this scans bytes,
+/// Much cheaper than `compute_diff_unmarked`, which it otherwise mirrors: this scans bytes,
 /// where that one parses both source files with tree-sitter and walks two trees. Still done lazily
 /// on first `X` rather than eagerly on every `o`, both to match `H`'s behaviour and because 1.4 GB
 /// of mapping files is not free to read however cheap the per-file test is.
@@ -729,7 +799,7 @@ fn diff_case_disagreement_bytes(name: &str) -> Option<usize> {
 }
 
 /// Refreshes just `name`'s entry in `App::diff_disagreement`, for the same reason (and at the same
-/// call sites) as `refresh_diff_completeness`/`refresh_diff_text_painted`: saving is the only
+/// call sites) as `refresh_diff_unmarked`/`refresh_diff_text_painted`: saving is the only
 /// thing that can change a case's disagreement score mid-session.
 fn refresh_diff_disagreement(app: &mut App, name: &str) {
     if let Some(map) = &mut app.diff_disagreement {
@@ -750,7 +820,7 @@ fn refresh_diff_disagreement(app: &mut App, name: &str) {
 /// Builds `App::diff_disagreement` for every case `list_available_cases` lists that already has a
 /// text painting - the `o` picker's `s` disagreement-sort and `Y` filter need this for the whole
 /// corpus before they can rank/hide by it. The most expensive of the four lazy `o`-picker scans:
-/// unlike `compute_diff_completeness` (parses both sides once), this also builds a synthetic
+/// unlike `compute_diff_unmarked` (parses both sides once), this also builds a synthetic
 /// `ASTDiff` from the tree mapping and renders it through `TextDiff::from` per fixture - still
 /// bounded by the same corpus size, just a heavier constant per fixture.
 fn compute_diff_disagreement() -> std::collections::HashMap<String, usize> {
@@ -767,7 +837,7 @@ fn compute_diff_disagreement() -> std::collections::HashMap<String, usize> {
 /// absent.
 ///
 /// The cheapest of the three picker scans by a wide margin: a few hundred bytes per fixture where
-/// `compute_diff_text_painted` reads 1.4 GB of JSON and `compute_diff_completeness` parses both
+/// `compute_diff_text_painted` reads 1.4 GB of JSON and `compute_diff_unmarked` parses both
 /// sides with tree-sitter. Most fixtures have no `description.md` at all, so most of this is a
 /// failed `stat`.
 fn compute_diff_comments() -> std::collections::HashMap<String, String> {
@@ -1044,41 +1114,284 @@ fn sample_diff_line_count(name: &str) -> usize {
         .count()
 }
 
-/// Sort order for the `o` (open diff) picker's list, cycled by pressing `s` while it's open (see
-/// `Modal::OpenDiffPicker`). `Least`/`MostDisagreementFirst` rank by `diff_case_disagreement_bytes`,
-/// the same "human tree mapping vs. human painting" byte count `text_mapping_disagreements`
-/// computes (see that function's own doc comment for why it's pure ground-truth-vs-ground-truth,
-/// with `diff_code`'s own algorithm never in the loop) - so fixtures worth a second look sort to
-/// the top without needing to open each one to find out. A separate enum from `SampleSortOrder`,
-/// not a shared one, even though the shape is identical: the two pickers rank by unrelated
-/// quantities (a sample's raw diff size vs. a solved fixture's ground-truth disagreement), and
-/// conflating them would make either picker's `s` key harder to reason about from its own modal
-/// alone.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum DiffSortOrder {
-    Alphabetical,
-    ReverseAlphabetical,
-    LeastDisagreementFirst,
-    MostDisagreementFirst,
+/// One column of the `o` picker's table, left to right - the unit `h`/`l` move the cursor
+/// between, and the thing both `s` (sort) and `f` (filter) act on. Every column supports both, so
+/// there is one pair of keys to remember rather than one letter per dimension (this picker used to
+/// bind `d`/`H`/`X`/`Y` for four separate filters and `s` for a fixed four-way sort cycle, which
+/// did not extend to a fifth column and gave no way to sort by anything but disagreement).
+///
+/// `Cmpl` and `Unmarked` are two readings of one number (`App::diff_unmarked`): a yes/no glyph for
+/// glancing down the column, and the count itself for ranking how much annotation a fixture still
+/// needs. Their filters therefore select exactly the same rows by construction - kept as two
+/// columns anyway because their *sorts* differ in the way that matters when triaging: `Cmpl`
+/// splits the corpus in two, `Unmarked` orders it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+enum DiffColumn {
+    #[default]
+    Name,
+    Dataset,
+    Cmpl,
+    Unmarked,
+    Paint,
+    Disagree,
 }
 
-impl DiffSortOrder {
-    fn next(self) -> Self {
+impl DiffColumn {
+    /// Left-to-right order, shared by the header row, the cursor movement below, and the width
+    /// list in `render_open_diff_picker` - so a column can only ever be added in one place.
+    const ALL: [DiffColumn; 6] = [
+        DiffColumn::Name,
+        DiffColumn::Dataset,
+        DiffColumn::Cmpl,
+        DiffColumn::Unmarked,
+        DiffColumn::Paint,
+        DiffColumn::Disagree,
+    ];
+
+    fn index(self) -> usize {
+        DiffColumn::ALL
+            .iter()
+            .position(|column| *column == self)
+            .unwrap_or(0)
+    }
+
+    /// Clamped at both ends rather than wrapping: the header row highlights the cursor column, so
+    /// a press that jumps from one edge of the table to the other reads as a glitch, not a move.
+    fn left(self) -> Self {
+        DiffColumn::ALL[self.index().saturating_sub(1)]
+    }
+
+    fn right(self) -> Self {
+        DiffColumn::ALL[(self.index() + 1).min(DiffColumn::ALL.len() - 1)]
+    }
+
+    fn header(self) -> &'static str {
         match self {
-            DiffSortOrder::Alphabetical => DiffSortOrder::ReverseAlphabetical,
-            DiffSortOrder::ReverseAlphabetical => DiffSortOrder::LeastDisagreementFirst,
-            DiffSortOrder::LeastDisagreementFirst => DiffSortOrder::MostDisagreementFirst,
-            DiffSortOrder::MostDisagreementFirst => DiffSortOrder::Alphabetical,
+            DiffColumn::Name => "Name",
+            DiffColumn::Dataset => "Dataset",
+            DiffColumn::Cmpl => "Cmpl",
+            DiffColumn::Unmarked => "Unmarked",
+            DiffColumn::Paint => "Paint",
+            DiffColumn::Disagree => "Disagree",
         }
     }
 
-    fn label(self) -> &'static str {
+    /// What `f` on this column reads as, per `FlagFilter` state - `None` for the two columns
+    /// (`Name`, `Dataset`) that carry their own filter shape instead of a yes/no one.
+    fn flag_labels(self) -> Option<(&'static str, &'static str)> {
         match self {
-            DiffSortOrder::Alphabetical => "A-Z",
-            DiffSortOrder::ReverseAlphabetical => "Z-A",
-            DiffSortOrder::LeastDisagreementFirst => "least disagreement first",
-            DiffSortOrder::MostDisagreementFirst => "most disagreement first",
+            DiffColumn::Cmpl => Some(("incomplete only", "complete only")),
+            DiffColumn::Unmarked => Some(("has unmarked", "none unmarked")),
+            DiffColumn::Paint => Some(("painted only", "unpainted only")),
+            DiffColumn::Disagree => Some(("disagreements only", "agreeing only")),
+            DiffColumn::Name | DiffColumn::Dataset => None,
         }
+    }
+}
+
+/// The `f` state of one yes/no column: off, or narrowed to the rows where the column's condition
+/// does (`Yes`) or does not (`No`) hold. Cycles `Off -> Yes -> No -> Off`.
+///
+/// **A row whose value is unknown survives either direction.** Every one of these columns is
+/// backed by a corpus-wide scan that is only run on demand (see `App::diff_unmarked` and
+/// friends), and a fixture the scan couldn't load reads as unknown too - so "unknown" covers both
+/// "not measured yet" and "failed to measure", and neither is evidence the row should be dropped.
+/// The picker's whole job is surfacing fixtures that need attention; silently hiding the ones it
+/// could not measure would hide exactly the wrong rows. This replaces the three separate,
+/// individually-argued fail-open rules the `H`/`X`/`Y` filters used to have (one treated a missing
+/// entry as "needs attention", one as "unpainted", one as "agrees") with a single rule that reads
+/// the same in both directions.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+enum FlagFilter {
+    #[default]
+    Off,
+    Yes,
+    No,
+}
+
+impl FlagFilter {
+    fn next(self) -> Self {
+        match self {
+            FlagFilter::Off => FlagFilter::Yes,
+            FlagFilter::Yes => FlagFilter::No,
+            FlagFilter::No => FlagFilter::Off,
+        }
+    }
+
+    /// `value` is this column's yes/no reading for one row, `None` when it isn't known.
+    fn keeps(self, value: Option<bool>) -> bool {
+        match (self, value) {
+            (FlagFilter::Off, _) | (_, None) => true,
+            (FlagFilter::Yes, Some(value)) => value,
+            (FlagFilter::No, Some(value)) => !value,
+        }
+    }
+}
+
+/// Every column's filter at once. They combine as an AND: a row is shown only if it passes all of
+/// them, so narrowing on two columns asks for rows matching both ("still has unmarked nodes AND
+/// disagrees with its own painting"), never either.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+struct DiffFilters {
+    /// Case-insensitive substring of the case name, stored already lowercased (`f` on `Name`
+    /// prompts for it - see `Modal::OpenDiffPicker::name_input`). `None` when off; the prompt
+    /// never stores an empty string, since that would filter nothing while still reading as on.
+    name: Option<String>,
+    /// Which of `DIFF_DATASETS` to show, cycled through by `f` on `Dataset` and wrapping back to
+    /// `None` ("all") - the filter the old `d` key used to own.
+    dataset: Option<&'static str>,
+    cmpl: FlagFilter,
+    unmarked: FlagFilter,
+    paint: FlagFilter,
+    disagree: FlagFilter,
+}
+
+impl DiffFilters {
+    fn flag_mut(&mut self, column: DiffColumn) -> Option<&mut FlagFilter> {
+        match column {
+            DiffColumn::Cmpl => Some(&mut self.cmpl),
+            DiffColumn::Unmarked => Some(&mut self.unmarked),
+            DiffColumn::Paint => Some(&mut self.paint),
+            DiffColumn::Disagree => Some(&mut self.disagree),
+            DiffColumn::Name | DiffColumn::Dataset => None,
+        }
+    }
+
+    fn flag(&self, column: DiffColumn) -> FlagFilter {
+        match column {
+            DiffColumn::Cmpl => self.cmpl,
+            DiffColumn::Unmarked => self.unmarked,
+            DiffColumn::Paint => self.paint,
+            DiffColumn::Disagree => self.disagree,
+            DiffColumn::Name | DiffColumn::Dataset => FlagFilter::Off,
+        }
+    }
+
+    fn is_active(&self, column: DiffColumn) -> bool {
+        match column {
+            DiffColumn::Name => self.name.is_some(),
+            DiffColumn::Dataset => self.dataset.is_some(),
+            _ => self.flag(column) != FlagFilter::Off,
+        }
+    }
+
+    /// One human-readable clause per active filter, for the picker's title bar - empty when
+    /// nothing is filtered.
+    fn labels(&self) -> Vec<String> {
+        let mut labels = Vec::new();
+        if let Some(name) = &self.name {
+            labels.push(format!("name~{name}"));
+        }
+        if let Some(dataset) = self.dataset {
+            labels.push(dataset.to_string());
+        }
+        for column in DiffColumn::ALL {
+            // `Cmpl` and `Unmarked` are one predicate read two ways, so setting both to the same
+            // direction narrows nothing further - listing it twice would read as a compound
+            // constraint that isn't one. The `Cmpl` wording wins; opposite directions are a real
+            // (if empty) compound query and are both shown.
+            if column == DiffColumn::Unmarked && self.unmarked == self.cmpl {
+                continue;
+            }
+            if let Some((yes, no)) = column.flag_labels() {
+                match self.flag(column) {
+                    FlagFilter::Off => {}
+                    FlagFilter::Yes => labels.push(yes.to_string()),
+                    FlagFilter::No => labels.push(no.to_string()),
+                }
+            }
+        }
+        labels
+    }
+}
+
+/// Which single column the `o` picker's rows are ordered by, and in which direction - `s` on the
+/// cursor column takes over the sort (ascending), and `s` again on the column that already owns it
+/// flips the direction. Deliberately one column, not a stack: the user asked for the last column
+/// selected to be the one that sorts, and a hidden secondary key would make two identical-looking
+/// tables order differently.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct DiffSort {
+    column: DiffColumn,
+    descending: bool,
+}
+
+impl Default for DiffSort {
+    fn default() -> Self {
+        DiffSort {
+            column: DiffColumn::Name,
+            descending: false,
+        }
+    }
+}
+
+impl DiffSort {
+    fn toggled(self, column: DiffColumn) -> Self {
+        if self.column == column {
+            DiffSort {
+                column,
+                descending: !self.descending,
+            }
+        } else {
+            DiffSort {
+                column,
+                descending: false,
+            }
+        }
+    }
+
+    fn arrow(self) -> &'static str {
+        if self.descending { "v" } else { "^" }
+    }
+}
+
+/// The `o` picker's whole cursor/sort/filter state, carried on `Modal::OpenDiffPicker` and
+/// persisted on `App::diff_view` so it survives closing and reopening the picker - the same
+/// contract the five separate `diff_*` fields this replaces each had on their own.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+struct DiffPickerView {
+    /// The column `h`/`l` last moved to: what `s` and `f` act on, and the one highlighted in the
+    /// header row.
+    column: DiffColumn,
+    sort: DiffSort,
+    filters: DiffFilters,
+}
+
+/// The three corpus-wide scans the `o` picker's columns read, borrowed rather than owned - `None`
+/// for a scan not run yet this session (see `App::diff_unmarked`/`diff_text_painted`/
+/// `diff_disagreement` for the lazy-once contract, and `FlagFilter::keeps` for why a `None` here
+/// hides nothing). Bundled into one struct because filtering, sorting and rendering all need the
+/// same three maps, and threading them as six positional arguments through four functions is how
+/// the previous shape of this picker ended up at ten.
+#[derive(Clone, Copy, Default)]
+struct DiffPickerData<'a> {
+    unmarked: Option<&'a HashMap<String, usize>>,
+    text_painted: Option<&'a HashMap<String, bool>>,
+    disagreement: Option<&'a HashMap<String, usize>>,
+}
+
+impl<'a> DiffPickerData<'a> {
+    fn from_app(app: &'a App) -> Self {
+        DiffPickerData {
+            unmarked: app.diff_unmarked.as_ref(),
+            text_painted: app.diff_text_painted.as_ref(),
+            disagreement: app.diff_disagreement.as_ref(),
+        }
+    }
+
+    fn unmarked_of(&self, name: &str) -> Option<usize> {
+        self.unmarked.and_then(|map| map.get(name)).copied()
+    }
+
+    fn painted_of(&self, name: &str) -> Option<bool> {
+        self.text_painted.and_then(|map| map.get(name)).copied()
+    }
+
+    /// `None` both when the disagreement scan hasn't run and when it ran but the case has no text
+    /// painting to compare against at all - the two are the same "not known" for this picker's
+    /// purposes, and `compute_diff_disagreement` already leaves the latter out of its map.
+    fn disagreement_of(&self, name: &str) -> Option<usize> {
+        self.disagreement.and_then(|map| map.get(name)).copied()
     }
 }
 
@@ -2287,30 +2600,27 @@ enum Modal {
         kinds: Vec<String>,
     },
     /// Raised by `o`: pick a test case (a directory under src/test/data/diffs/) to open. Each
-    /// option is paired with which of `DIFF_DATASETS` it lives under; `d` cycles `dataset_filter`
-    /// (all -> handmade -> small -> full -> all) to narrow the list down to one at a time, and `H`
-    /// toggles `hide_complete` (narrowing to cases with at least one unmarked node left - see
-    /// `diff_case_is_incomplete`/`App::diff_completeness`). Like `OpenSamplePicker`, `selected`
-    /// indexes into the filtered view (`visible_diff_options`), not `options` itself. Rendered as
-    /// a table (`render_open_diff_picker`), one status column per filterable dimension, so
-    /// `hide_complete`/`hide_painted`/`hide_agreement` can be combined into compound filters
-    /// ("still needs nodes marked AND disagrees with its own painting", say) with each column's
-    /// state visible at a glance rather than only inferable from the title bar.
+    /// option is paired with which of `DIFF_DATASETS` it lives under.
+    ///
+    /// Rendered as a table (`render_open_diff_picker`), one column per dimension of the corpus a
+    /// reader might want to triage on (see `DiffColumn`). `h`/`l` move a cursor between columns,
+    /// `s` sorts by the cursor column (again to flip direction), and `f` filters on it; filters
+    /// combine as an AND across columns, so compound queries ("still needs nodes marked AND
+    /// disagrees with its own painting") are expressible without a key per combination. All of
+    /// that lives in `view`, persisted on `App::diff_view` so it survives closing and reopening.
+    ///
+    /// Like `OpenSamplePicker`, `selected` indexes into the filtered view
+    /// (`visible_diff_options`), not `options` itself.
     OpenDiffPicker {
         options: Vec<(String, &'static str)>,
         selected: usize,
-        dataset_filter: Option<&'static str>,
-        hide_complete: bool,
-        /// The `X` filter: narrow to cases with no painted text mapping yet (see
-        /// `App::diff_hide_painted`).
-        hide_painted: bool,
-        /// The `Y` filter: narrow to cases where the tree mapping and the text painting actually
-        /// disagree (see `diff_case_disagreement_bytes`/`App::diff_hide_agreement`) - a case with
-        /// no painting yet has nothing to compare, so it is hidden under this filter too, the same
-        /// way `hide_painted` hides a painted case under itself.
-        hide_agreement: bool,
-        /// Cycled by `s` (see `DiffSortOrder`), persisted the same way `App::diff_sort_order` is.
-        sort_order: DiffSortOrder,
+        view: DiffPickerView,
+        /// `Some` while `f` on the `Name` column is collecting its substring. While it is, the
+        /// picker's key handler routes *every* key into this buffer rather than treating it as a
+        /// command - otherwise typing a name containing `j`, `s` or `f` would move the selection
+        /// and re-sort the table mid-word. Enter commits (an empty or blank entry clears the
+        /// filter rather than matching nothing), Esc abandons it and leaves the filter as it was.
+        name_input: Option<String>,
     },
     /// Raised by `O`: pick a sampled candidate (a directory under src/test/data/samples/) to
     /// open. Each option is paired with its `SampleTriageStatus` (per the matching sample.csv
@@ -2495,39 +2805,23 @@ struct App {
     /// all every time.
     sample_hide_solved: bool,
     sample_sort_order: SampleSortOrder,
-    /// The `o` picker's dataset filter (cycled by `d` - see `DIFF_DATASETS`), persisted here for
-    /// the same reason as `sample_hide_solved`/`sample_sort_order` above: so filtering down to
-    /// e.g. just `handmade` sticks across closing and reopening the picker. `None` shows every
-    /// dataset.
-    diff_dataset_filter: Option<&'static str>,
-    /// The `o` picker's "incomplete only" filter (toggled by `H` inside it), persisted here for
-    /// the same reason as `diff_dataset_filter` above.
-    diff_hide_complete: bool,
-    /// The `o` picker's "unpainted only" filter (toggled by `X` inside it), persisted for the same
-    /// reason. Independent of `diff_hide_complete`: a fixture's tree mapping and its text-range
-    /// painting are two separate ground truths (see `HumanTextMapping`), so "still needs nodes
-    /// marked" and "still needs text painted" are different queues and combine as an AND when both
-    /// are on.
-    diff_hide_painted: bool,
-    /// The `o` picker's "disagreements only" filter (toggled by `Y` inside it), persisted for the
-    /// same reason as `diff_hide_painted` above. A third, independent queue: whether the tree
-    /// mapping and the text painting actually agree with *each other* is a different question from
-    /// whether either one is finished (see `diff_case_disagreement_bytes`).
-    diff_hide_agreement: bool,
-    /// The `o` picker's sort order (cycled by `s` inside it - see `DiffSortOrder`), persisted for
-    /// the same reason as `diff_dataset_filter` above.
-    diff_sort_order: DiffSortOrder,
+    /// The `o` picker's cursor column, sort and per-column filters (see `DiffPickerView`),
+    /// persisted here rather than rebuilt from scratch on every `o`, for the same reason as
+    /// `sample_hide_solved`/`sample_sort_order` above: narrowing to e.g. just `handmade` fixtures
+    /// that still have unmarked nodes, ordered by how many, should stick across closing the picker
+    /// to work through a few of them.
+    diff_view: DiffPickerView,
     /// Cache of, for every case `list_available_cases` lists that already has a text painting, how
     /// many bytes its tree mapping and painting disagree about (see
-    /// `diff_case_disagreement_bytes`). `None` until the first `Y` press or `s` sort-cycle past
-    /// `Alphabetical`/`ReverseAlphabetical`, the same lazy-once-per-session contract
-    /// `diff_completeness` has - and the most expensive of the three scans (see that function's
-    /// own doc comment).
+    /// `diff_case_disagreement_bytes`). `None` until the first `s`/`f` on the picker's `Disagree`
+    /// column, the same lazy-once-per-session contract `diff_unmarked` has - and the most
+    /// expensive of the three scans (see that function's own doc comment).
     diff_disagreement: Option<std::collections::HashMap<String, usize>>,
     /// Cache of, for every case `list_available_cases` lists, whether it already has a painted
-    /// text mapping (see `diff_case_has_text_mapping`). `None` until the first `X` press, the same
-    /// lazy-once-per-session contract `diff_completeness` has - though this scan is much cheaper,
-    /// since it skims JSON rather than parsing source with tree-sitter.
+    /// text mapping (see `diff_case_has_text_mapping`). `None` until the first `s`/`f` on the
+    /// picker's `Paint` column, the same lazy-once-per-session contract `diff_unmarked` has -
+    /// though this scan is much cheaper, since it skims JSON rather than parsing source with
+    /// tree-sitter.
     diff_text_painted: Option<std::collections::HashMap<String, bool>>,
     /// Every case's `description.md`, for the `o` picker's note marker and footer. `None` until
     /// the first `o` press, the same lazy-once-per-session contract its two neighbours have - but
@@ -2551,15 +2845,19 @@ struct App {
     /// at the fixture's first existing painting, or `SUGGESTED_SOLUTION_NAMES[0]` when it has
     /// none, and is changed by `s` (save-as) / `L` (load) inside that view.
     text_solution: String,
-    /// Cache of, for every case `list_available_cases` lists, whether it has at least one
-    /// `NodeStatus::Unmarked` node left (see `diff_case_is_incomplete`) - `None` until the first
-    /// time `H` is pressed inside the `o` picker, since scanning the whole corpus (parsing every
+    /// Cache of, for every case `list_available_cases` lists, how many `NodeStatus::Unmarked`
+    /// nodes it still has across both trees (see `diff_case_unmarked_count`) - what the `o`
+    /// picker's `Unmarked` column shows and its `Cmpl` column reduces to a glyph. `None` until the
+    /// first `s`/`f` on either of those columns, since scanning the whole corpus (parsing every
     /// case's before/after code, not just listing directory names) takes real wall-clock time -
-    /// roughly 10s across this repo's own ~230 fixtures as of this writing. Kept for the rest of
-    /// the session once built; refreshed for just the current case's own entry after `s` saves it,
-    /// rather than dropped and rebuilt from scratch, so repeated saves while triaging incomplete
-    /// cases don't each cost a fresh full scan.
-    diff_completeness: Option<std::collections::HashMap<String, bool>>,
+    /// ~42s across this repo's 513 fixtures, measured 2026-09-02; see `compute_diff_unmarked` for
+    /// where that goes. Cases that fail to load are absent from
+    /// the map rather than present with a made-up count, which is what makes them read as `?`
+    /// rather than as finished. Kept for the rest of the session once built; refreshed for just
+    /// the current case's own entry after `s` saves it, rather than dropped and rebuilt from
+    /// scratch, so repeated saves while triaging incomplete cases don't each cost a fresh full
+    /// scan.
+    diff_unmarked: Option<std::collections::HashMap<String, usize>>,
     /// The last text searched for with `/` (`Modal::PromptSearch`), if any - pre-fills the prompt
     /// next time, so `/` then `Enter` repeats the same search from wherever the cursor landed,
     /// without retyping it.
@@ -2604,11 +2902,7 @@ impl App {
             show_reason: false,
             sample_hide_solved: false,
             sample_sort_order: SampleSortOrder::Alphabetical,
-            diff_dataset_filter: None,
-            diff_hide_complete: false,
-            diff_hide_painted: false,
-            diff_hide_agreement: false,
-            diff_sort_order: DiffSortOrder::Alphabetical,
+            diff_view: DiffPickerView::default(),
             diff_disagreement: None,
             diff_text_painted: None,
             diff_comments: None,
@@ -2616,7 +2910,7 @@ impl App {
             text_overlay: TextOverlay::default(),
             algo_text_spans: None,
             tree_text_spans: None,
-            diff_completeness: None,
+            diff_unmarked: None,
             last_search: None,
             before_multi_select: std::collections::BTreeSet::new(),
             after_multi_select: std::collections::BTreeSet::new(),
@@ -4741,9 +5035,7 @@ fn draw_ui(
             app.text_overlay,
             app.algo_text_spans.as_ref(),
             app.tree_text_spans.as_ref(),
-            app.diff_completeness.as_ref(),
-            app.diff_text_painted.as_ref(),
-            app.diff_disagreement.as_ref(),
+            DiffPickerData::from_app(app),
             app.diff_comments.as_ref(),
         );
     }
@@ -4809,9 +5101,7 @@ fn render_modal(
     text_overlay: TextOverlay,
     algo_text_spans: Option<&[Vec<(HumanTextSpan, HumanTextVerdict)>; 2]>,
     tree_text_spans: Option<&[Vec<(HumanTextSpan, HumanTextVerdict)>; 2]>,
-    diff_completeness: Option<&std::collections::HashMap<String, bool>>,
-    diff_text_painted: Option<&std::collections::HashMap<String, bool>>,
-    diff_disagreement: Option<&std::collections::HashMap<String, usize>>,
+    diff_data: DiffPickerData<'_>,
     diff_comments: Option<&std::collections::HashMap<String, String>>,
 ) {
     match modal {
@@ -4850,25 +5140,17 @@ fn render_modal(
         Modal::OpenDiffPicker {
             options,
             selected,
-            dataset_filter,
-            hide_complete,
-            hide_painted,
-            hide_agreement,
-            sort_order,
+            view,
+            name_input,
         } => {
             render_open_diff_picker(
                 frame,
                 area,
                 options,
                 *selected,
-                *dataset_filter,
-                *hide_complete,
-                diff_completeness,
-                *hide_painted,
-                diff_text_painted,
-                *hide_agreement,
-                diff_disagreement,
-                *sort_order,
+                view,
+                name_input.as_deref(),
+                diff_data,
                 diff_comments,
             );
         }
@@ -5523,43 +5805,33 @@ fn render_help_modal(frame: &mut Frame, area: Rect, scroll: u16) {
     );
 }
 
-/// Renders the `o` picker as a table, one row per case and one column per filterable/sortable
-/// dimension (`Dataset`/`Cmpl`/`Paint`/`Disagree`), so `H`/`X`/`Y`'s combined effect and `s`'s sort
-/// key are both visible at a glance instead of only inferable from the title bar - the corpus has
-/// three independent per-case questions (tree mapping finished? text painted? do the two ground
-/// truths agree?), and a plain name list can only show which cases survived every filter, not why
-/// a given case did or didn't. Like `render_open_sample_picker`, the filtered/sorted view
-/// (`visible_diff_options`) is recomputed here from `options`/`dataset_filter`/... rather than
-/// carried on the modal itself, so the two can never drift out of sync. Scroll position is
-/// recomputed fresh each frame from `selected` (no persisted state needed) by roughly centering it
-/// in the viewport, clamped to the list's extent.
+/// Renders the `o` picker as a table, one row per case and one column per dimension of the corpus
+/// worth triaging on (see `DiffColumn`) - so what a filter is doing, and what the sort is ranking
+/// by, are both readable off the table itself rather than only inferable from the title bar. The
+/// header row carries the interaction state: the cursor column (what `s`/`f` act on) is shown in
+/// reverse video, the sorted column gets a `^`/`v` arrow, and a filtered column is marked with `*`
+/// and coloured, with the filters spelled out in full in the title.
+///
+/// Like `render_open_sample_picker`, the filtered/sorted view (`visible_diff_options`) is
+/// recomputed here from `options`/`view` rather than carried on the modal itself, so the two can
+/// never drift out of sync. Scroll position is recomputed fresh each frame from `selected` (no
+/// persisted state needed) by roughly centering it in the viewport, clamped to the list's extent.
+///
+/// `name_input` being `Some` means `f` on the `Name` column is mid-prompt: the title is replaced
+/// by the prompt, since that is where the reader's attention is and the table underneath still
+/// shows the pre-prompt filter until Enter commits.
 #[allow(clippy::too_many_arguments)]
 fn render_open_diff_picker(
     frame: &mut Frame,
     area: Rect,
     options: &[(String, &'static str)],
     selected: usize,
-    dataset_filter: Option<&'static str>,
-    hide_complete: bool,
-    completeness: Option<&std::collections::HashMap<String, bool>>,
-    hide_painted: bool,
-    text_painted: Option<&std::collections::HashMap<String, bool>>,
-    hide_agreement: bool,
-    disagreement: Option<&std::collections::HashMap<String, usize>>,
-    sort_order: DiffSortOrder,
+    view: &DiffPickerView,
+    name_input: Option<&str>,
+    data: DiffPickerData<'_>,
     comments: Option<&std::collections::HashMap<String, String>>,
 ) {
-    let visible = visible_diff_options(
-        options,
-        dataset_filter,
-        hide_complete,
-        completeness,
-        hide_painted,
-        text_painted,
-        hide_agreement,
-        disagreement,
-        sort_order,
-    );
+    let visible = visible_diff_options(options, view, data);
 
     let popup_area = centered_rect(80, 70, area);
     frame.render_widget(Clear, popup_area);
@@ -5592,8 +5864,8 @@ fn render_open_diff_picker(
     let dataset_of = |name: &str| -> &'static str {
         options
             .iter()
-            .find(|(n, _)| n == name)
-            .map(|(_, d)| *d)
+            .find(|(candidate, _)| candidate == name)
+            .map(|(_, dataset)| *dataset)
             .unwrap_or("?")
     };
 
@@ -5609,20 +5881,24 @@ fn render_open_diff_picker(
                 Style::default()
             };
             let noted = comments.is_some_and(|map| map.contains_key(name));
-            let complete_mark = match completeness.and_then(|m| m.get(name)) {
-                Some(true) => "•",
-                Some(false) => "✓",
+            let unmarked = data.unmarked_of(name);
+            let complete_mark = match unmarked {
+                Some(0) => "✓",
+                Some(_) => "•",
                 None => "?",
             };
-            let painted_mark = match text_painted.and_then(|m| m.get(name)) {
+            let unmarked_cell = match unmarked {
+                Some(count) => count.to_string(),
+                None => "?".to_string(),
+            };
+            let painted_mark = match data.painted_of(name) {
                 Some(true) => "✓",
                 Some(false) => "•",
                 None => "?",
             };
-            let disagree_cell = match disagreement.and_then(|m| m.get(name)) {
-                Some(0) => "0".to_string(),
+            let disagree_cell = match data.disagreement_of(name) {
                 Some(bytes) => bytes.to_string(),
-                None => "—".to_string(),
+                None => "?".to_string(),
             };
             Row::new(vec![
                 Cell::from(if noted {
@@ -5632,6 +5908,7 @@ fn render_open_diff_picker(
                 }),
                 Cell::from(dataset_of(name)),
                 Cell::from(complete_mark),
+                Cell::from(unmarked_cell),
                 Cell::from(painted_mark),
                 Cell::from(disagree_cell),
             ])
@@ -5639,35 +5916,66 @@ fn render_open_diff_picker(
         })
         .collect();
 
-    let header = Row::new(vec!["Name", "Dataset", "Cmpl", "Paint", "Disagree"])
-        .style(Style::default().add_modifier(Modifier::BOLD));
+    let header = Row::new(DiffColumn::ALL.map(|column| {
+        let mut label = column.header().to_string();
+        if view.sort.column == column {
+            label.push_str(view.sort.arrow());
+        }
+        if view.filters.is_active(column) {
+            label.push('*');
+        }
+        let mut style = Style::default().add_modifier(Modifier::BOLD);
+        if view.filters.is_active(column) {
+            style = style.fg(Color::Cyan);
+        }
+        if view.column == column {
+            style = style.add_modifier(Modifier::REVERSED);
+        }
+        Cell::from(label).style(style)
+    }))
+    .style(Style::default().add_modifier(Modifier::BOLD));
+
+    let title = if let Some(input) = name_input {
+        format!("Filter Name by substring: {input}_ — [Enter] apply (empty clears), [Esc] cancel")
+    } else {
+        let filters = view.filters.labels();
+        format!(
+            // Abbreviated deliberately: the popup is 80% of the terminal, so a fuller legend gets
+            // truncated by ratatui at ordinary widths - and the filter list on the left, which is
+            // the part that changes, is what must survive the truncation.
+            "Open diff [{}] sort:{}{} ({}/{}) — h/l col, j/k row, s sort, f filter, Esc",
+            if filters.is_empty() {
+                "no filters".to_string()
+            } else {
+                filters.join(" AND ")
+            },
+            view.sort.column.header(),
+            view.sort.arrow(),
+            selected + 1,
+            visible.len()
+        )
+    };
 
     let block = Block::default()
         .borders(Borders::ALL)
-        .title(format!(
-            "Open diff [{}]{}{}{} sort:{} ({}/{}) — j/k, d dataset, H incomplete-only, X unpainted-only, Y disagreements-only, s sort, Enter, Esc",
-            dataset_filter.unwrap_or("all"),
-            if hide_complete { " [incomplete only]" } else { "" },
-            if hide_painted { " [unpainted only]" } else { "" },
-            if hide_agreement { " [disagreements only]" } else { "" },
-            sort_order.label(),
-            selected + 1,
-            visible.len()
-        ))
+        .title(title)
         .border_style(
             Style::default()
                 .fg(Color::Yellow)
                 .add_modifier(Modifier::BOLD),
         );
 
+    // Same left-to-right order as `DiffColumn::ALL`, one width per column. Each is wide enough for
+    // its header plus the sort arrow and filter marker the header row can append to it.
     let table = Table::new(
         rows,
         [
             Constraint::Min(20),
             Constraint::Length(9),
-            Constraint::Length(4),
-            Constraint::Length(5),
-            Constraint::Length(8),
+            Constraint::Length(6),
+            Constraint::Length(10),
+            Constraint::Length(7),
+            Constraint::Length(10),
         ],
     )
     .header(header)
@@ -6653,7 +6961,7 @@ fn handle_key(
             CaseOrigin::Diffs => {
                 let result = action_save(&mut app.mapping, &mut app.dirty, &app.name, None);
                 if result.is_ok() {
-                    refresh_diff_completeness(app, &app.name.clone());
+                    refresh_diff_unmarked(app, &app.name.clone());
                     refresh_diff_text_painted(app, &app.name.clone());
                     refresh_diff_disagreement(app, &app.name.clone());
                 }
@@ -6716,27 +7024,22 @@ fn handle_key(
             None
         }
         KeyCode::Char('o') => {
-            // Loaded here, unlike the completeness and painted maps which wait for the key that
-            // filters by them: notes are *displayed*, so they have to be present the first time
-            // the list is drawn. Affordable exactly because this scan is the cheap one - a stat
-            // and a short read per fixture, and most have no note at all.
+            // Loaded here, unlike the unmarked/painted/disagreement maps which wait for the key
+            // that sorts or filters by them: notes are *displayed*, so they have to be present the
+            // first time the list is drawn. Affordable exactly because this scan is the cheap one
+            // - a stat and a short read per fixture, and most have no note at all.
             if app.diff_comments.is_none() {
                 app.diff_comments = Some(compute_diff_comments());
             }
             match list_available_cases() {
                 Ok(options) if !options.is_empty() => {
-                    app.modal = Some(open_diff_picker_modal(
+                    let modal = open_diff_picker_modal(
                         options,
                         &app.name,
-                        app.diff_dataset_filter,
-                        app.diff_hide_complete,
-                        app.diff_completeness.as_ref(),
-                        app.diff_hide_painted,
-                        app.diff_text_painted.as_ref(),
-                        app.diff_hide_agreement,
-                        app.diff_disagreement.as_ref(),
-                        app.diff_sort_order,
-                    ));
+                        app.diff_view.clone(),
+                        DiffPickerData::from_app(app),
+                    );
+                    app.modal = Some(modal);
                 }
                 Ok(_) => {
                     app.status = Some("No test cases found in src/test/data/diffs".to_string());
@@ -6921,174 +7224,154 @@ fn handle_modal_key(
         Modal::OpenDiffPicker {
             options,
             selected,
-            dataset_filter,
-            hide_complete,
-            hide_painted,
-            hide_agreement,
-            sort_order,
+            view,
+            name_input,
         } => {
-            let visible = visible_diff_options(
-                &options,
-                dataset_filter,
-                hide_complete,
-                app.diff_completeness.as_ref(),
-                hide_painted,
-                app.diff_text_painted.as_ref(),
-                hide_agreement,
-                app.diff_disagreement.as_ref(),
-                sort_order,
-            );
+            let mut view = view;
+            let mut selected = selected;
+
+            // The `Name` filter's prompt takes every keystroke while it is open, so a name
+            // containing `j`, `s` or `f` types those characters instead of moving the selection
+            // and re-sorting the table mid-word. Same posture as the text view's `:` line prompt.
+            if let Some(mut typed) = name_input {
+                match code {
+                    KeyCode::Char(c) => {
+                        typed.push(c);
+                        app.modal = Some(Modal::OpenDiffPicker {
+                            options,
+                            selected,
+                            view,
+                            name_input: Some(typed),
+                        });
+                    }
+                    KeyCode::Backspace => {
+                        typed.pop();
+                        app.modal = Some(Modal::OpenDiffPicker {
+                            options,
+                            selected,
+                            view,
+                            name_input: Some(typed),
+                        });
+                    }
+                    KeyCode::Enter => {
+                        // Which row the selection was on *before* the new filter narrows the list,
+                        // so it can follow that row rather than resetting to the top - same
+                        // re-anchoring every other filter/sort key here does.
+                        let current =
+                            visible_diff_options(&options, &view, DiffPickerData::from_app(app))
+                                .get(selected)
+                                .cloned();
+                        // Lowercased once here rather than per row per frame; blank clears the
+                        // filter rather than being stored as a needle that matches everything
+                        // while still reading as "filtered" in the header.
+                        let needle = typed.trim().to_lowercase();
+                        view.filters.name = if needle.is_empty() {
+                            None
+                        } else {
+                            Some(needle)
+                        };
+                        app.diff_view = view.clone();
+                        let modal = open_diff_picker_modal(
+                            options,
+                            current.as_deref().unwrap_or(&app.name),
+                            view,
+                            DiffPickerData::from_app(app),
+                        );
+                        app.modal = Some(modal);
+                    }
+                    KeyCode::Esc => {
+                        app.status = Some("Name filter cancelled".to_string());
+                        app.modal = Some(Modal::OpenDiffPicker {
+                            options,
+                            selected,
+                            view,
+                            name_input: None,
+                        });
+                    }
+                    _ => {
+                        app.modal = Some(Modal::OpenDiffPicker {
+                            options,
+                            selected,
+                            view,
+                            name_input: Some(typed),
+                        });
+                    }
+                }
+                return None;
+            }
+
+            let visible = visible_diff_options(&options, &view, DiffPickerData::from_app(app));
             match code {
                 KeyCode::Up | KeyCode::Char('k') => {
-                    app.modal = Some(Modal::OpenDiffPicker {
-                        selected: selected.saturating_sub(1),
-                        options,
-                        dataset_filter,
-                        hide_complete,
-                        hide_painted,
-                        hide_agreement,
-                        sort_order,
-                    });
+                    selected = selected.saturating_sub(1);
                 }
                 KeyCode::Down | KeyCode::Char('j') => {
-                    app.modal = Some(Modal::OpenDiffPicker {
-                        selected: (selected + 1).min(visible.len().saturating_sub(1)),
-                        options,
-                        dataset_filter,
-                        hide_complete,
-                        hide_painted,
-                        hide_agreement,
-                        sort_order,
-                    });
+                    selected = (selected + 1).min(visible.len().saturating_sub(1));
                 }
-                KeyCode::Char('d') | KeyCode::Char('D') => {
-                    let current_name = visible.get(selected).cloned();
-                    let new_filter = next_dataset_filter(dataset_filter);
-                    // Persisted on App too (not just this modal instance) - see the sample
-                    // picker's `H`/`S` handlers for why: the next `o` should reopen with the same
-                    // filter instead of reverting to "all".
-                    app.diff_dataset_filter = new_filter;
-                    app.modal = Some(open_diff_picker_modal(
-                        options,
-                        current_name.as_deref().unwrap_or(&app.name),
-                        new_filter,
-                        hide_complete,
-                        app.diff_completeness.as_ref(),
-                        hide_painted,
-                        app.diff_text_painted.as_ref(),
-                        hide_agreement,
-                        app.diff_disagreement.as_ref(),
-                        sort_order,
-                    ));
+                // Column movement never triggers a scan: `s`/`f` are deliberate presses that can
+                // afford to stall for several seconds the first time (see
+                // `ensure_diff_column_data`), but walking the cursor across the header to reach
+                // one of them must stay instant.
+                KeyCode::Left | KeyCode::Char('h') => {
+                    view.column = view.column.left();
                 }
-                // Deliberately `H` only, not `h`/`H` the way `O`'s sample picker binds its own
-                // (cheap, instant) hide-solved toggle: this one can take several real seconds the
-                // first time it's pressed in a session (see the comment below), so an accidental
-                // lowercase `h` - reached for as `Left`/`collapse` muscle memory from the main
-                // view - shouldn't be able to trigger it.
-                KeyCode::Char('H') => {
-                    let current_name = visible.get(selected).cloned();
-                    // Computed lazily, once per session (see `App::diff_completeness`'s own doc
-                    // comment for why this isn't done eagerly on every `o` press) - scanning the
-                    // whole corpus takes real wall-clock time, so this key press can take a few
-                    // seconds the first time it's pressed in a session.
-                    if app.diff_completeness.is_none() {
-                        app.diff_completeness = Some(compute_diff_completeness());
-                    }
-                    let new_hide_complete = !hide_complete;
-                    // Persisted on App too - see the `d`/`D` arm just above for why.
-                    app.diff_hide_complete = new_hide_complete;
-                    app.modal = Some(open_diff_picker_modal(
-                        options,
-                        current_name.as_deref().unwrap_or(&app.name),
-                        dataset_filter,
-                        new_hide_complete,
-                        app.diff_completeness.as_ref(),
-                        hide_painted,
-                        app.diff_text_painted.as_ref(),
-                        hide_agreement,
-                        app.diff_disagreement.as_ref(),
-                        sort_order,
-                    ));
+                KeyCode::Right | KeyCode::Char('l') => {
+                    view.column = view.column.right();
                 }
-                // `X`, not `x`: same reasoning as `H` just above, and the two are neighbours in
-                // spirit - one narrows to fixtures whose *tree* mapping is unfinished, this one to
-                // fixtures whose *text* painting hasn't been started. They are separate ground
-                // truths (see `HumanTextMapping`), so these are separate queues; turning both on
-                // shows only cases that need work on both.
-                KeyCode::Char('X') => {
-                    let current_name = visible.get(selected).cloned();
-                    // Lazily once per session, like `H`'s scan - much cheaper than that one (JSON
-                    // skim, no tree-sitter), but not free across the whole corpus.
-                    if app.diff_text_painted.is_none() {
-                        app.diff_text_painted = Some(compute_diff_text_painted());
-                    }
-                    let new_hide_painted = !hide_painted;
-                    app.diff_hide_painted = new_hide_painted;
-                    app.modal = Some(open_diff_picker_modal(
-                        options,
-                        current_name.as_deref().unwrap_or(&app.name),
-                        dataset_filter,
-                        hide_complete,
-                        app.diff_completeness.as_ref(),
-                        new_hide_painted,
-                        app.diff_text_painted.as_ref(),
-                        hide_agreement,
-                        app.diff_disagreement.as_ref(),
-                        sort_order,
-                    ));
-                }
-                // `Y`: a third, independent queue from `H`/`X` - whether the tree mapping and text
-                // painting actually agree with *each other*, not whether either is finished. Same
-                // lazy-scan/persist-on-App contract as `H`/`X`, and the most expensive of the three
-                // (see `compute_diff_disagreement`'s own doc comment).
-                KeyCode::Char('Y') => {
-                    let current_name = visible.get(selected).cloned();
-                    if app.diff_disagreement.is_none() {
-                        app.diff_disagreement = Some(compute_diff_disagreement());
-                    }
-                    let new_hide_agreement = !hide_agreement;
-                    app.diff_hide_agreement = new_hide_agreement;
-                    app.modal = Some(open_diff_picker_modal(
-                        options,
-                        current_name.as_deref().unwrap_or(&app.name),
-                        dataset_filter,
-                        hide_complete,
-                        app.diff_completeness.as_ref(),
-                        hide_painted,
-                        app.diff_text_painted.as_ref(),
-                        new_hide_agreement,
-                        app.diff_disagreement.as_ref(),
-                        sort_order,
-                    ));
-                }
-                // `s`: cycles `sort_order` (see `DiffSortOrder`), same key/convention as `O`'s
-                // sample picker. Sorting by disagreement needs the same corpus-wide scan `Y` does,
-                // so this lazily triggers it too rather than showing an empty ranking.
+                // `s` takes the sort over to the cursor column, or flips the direction if it is
+                // already the sorted one. The selection follows the row it was on rather than
+                // jumping to the top, which is the whole point of re-sorting while looking at a
+                // particular fixture.
                 KeyCode::Char('s') => {
-                    let current_name = visible.get(selected).cloned();
-                    let new_sort_order = sort_order.next();
-                    if matches!(
-                        new_sort_order,
-                        DiffSortOrder::LeastDisagreementFirst
-                            | DiffSortOrder::MostDisagreementFirst
-                    ) && app.diff_disagreement.is_none()
-                    {
-                        app.diff_disagreement = Some(compute_diff_disagreement());
-                    }
-                    app.diff_sort_order = new_sort_order;
-                    app.modal = Some(open_diff_picker_modal(
+                    let current = visible.get(selected).cloned();
+                    ensure_diff_column_data(app, view.column);
+                    view.sort = view.sort.toggled(view.column);
+                    app.diff_view = view.clone();
+                    let modal = open_diff_picker_modal(
                         options,
-                        current_name.as_deref().unwrap_or(&app.name),
-                        dataset_filter,
-                        hide_complete,
-                        app.diff_completeness.as_ref(),
-                        hide_painted,
-                        app.diff_text_painted.as_ref(),
-                        hide_agreement,
-                        app.diff_disagreement.as_ref(),
-                        new_sort_order,
-                    ));
+                        current.as_deref().unwrap_or(&app.name),
+                        view,
+                        DiffPickerData::from_app(app),
+                    );
+                    app.modal = Some(modal);
+                    return None;
+                }
+                // `f` cycles the cursor column's own filter - a dataset for `Dataset`, a
+                // three-state off/yes/no for each yes-no column, and a typed substring for `Name`
+                // (which opens `name_input` above instead of taking effect immediately).
+                KeyCode::Char('f') => {
+                    let current = visible.get(selected).cloned();
+                    if view.column == DiffColumn::Name {
+                        app.status = Some(
+                            "Filter by name: type a substring, Enter to apply, Esc to cancel"
+                                .to_string(),
+                        );
+                        // Pre-filled with the filter already in force, so `f` is an edit rather
+                        // than a blind overwrite - same idea as `PromptComment`.
+                        let name_input = view.filters.name.clone().unwrap_or_default();
+                        app.modal = Some(Modal::OpenDiffPicker {
+                            options,
+                            selected,
+                            view,
+                            name_input: Some(name_input),
+                        });
+                        return None;
+                    }
+                    ensure_diff_column_data(app, view.column);
+                    if view.column == DiffColumn::Dataset {
+                        view.filters.dataset = next_dataset_filter(view.filters.dataset);
+                    } else if let Some(flag) = view.filters.flag_mut(view.column) {
+                        *flag = flag.next();
+                    }
+                    app.diff_view = view.clone();
+                    let modal = open_diff_picker_modal(
+                        options,
+                        current.as_deref().unwrap_or(&app.name),
+                        view,
+                        DiffPickerData::from_app(app),
+                    );
+                    app.modal = Some(modal);
+                    return None;
                 }
                 KeyCode::Enter => {
                     if let Some(name) = visible.get(selected) {
@@ -7099,33 +7382,26 @@ fn handle_modal_key(
                         } else {
                             return Some(target);
                         }
-                    } else {
-                        app.modal = Some(Modal::OpenDiffPicker {
-                            options,
-                            selected,
-                            dataset_filter,
-                            hide_complete,
-                            hide_painted,
-                            hide_agreement,
-                            sort_order,
-                        });
+                        return None;
                     }
                 }
                 KeyCode::Esc => {
                     app.status = Some("Cancelled".to_string());
+                    return None;
                 }
-                _ => {
-                    app.modal = Some(Modal::OpenDiffPicker {
-                        options,
-                        selected,
-                        dataset_filter,
-                        hide_complete,
-                        hide_painted,
-                        hide_agreement,
-                        sort_order,
-                    });
-                }
+                _ => {}
             }
+            // Covers `h`/`l`: the cursor column persists across closing and reopening the picker
+            // the same way the sort and filters `s`/`f` set do, so reopening lands back on the
+            // column that was being worked with. The other keys reaching here leave `view`
+            // untouched, so this is a no-op for them.
+            app.diff_view = view.clone();
+            app.modal = Some(Modal::OpenDiffPicker {
+                options,
+                selected,
+                view,
+                name_input: None,
+            });
         }
         Modal::OpenSamplePicker {
             options,
@@ -7329,7 +7605,7 @@ fn handle_modal_key(
             KeyCode::Char('s') | KeyCode::Char('S') if can_save => {
                 match action_save(&mut app.mapping, &mut app.dirty, &app.name, None) {
                     Ok(_) => {
-                        refresh_diff_completeness(app, &app.name.clone());
+                        refresh_diff_unmarked(app, &app.name.clone());
                         refresh_diff_text_painted(app, &app.name.clone());
                         refresh_diff_disagreement(app, &app.name.clone());
                         return Some(target);
@@ -8093,7 +8369,7 @@ fn action_promote(
         Some(comment) => write_note(new_name, comment).is_ok(),
         None => false,
     };
-    refresh_diff_completeness(app, new_name);
+    refresh_diff_unmarked(app, new_name);
     refresh_diff_text_painted(app, new_name);
     refresh_diff_disagreement(app, new_name);
     refresh_diff_comment(app, new_name);
@@ -9532,9 +9808,7 @@ mod tests {
                     TextOverlay::Human,
                     None,
                     None,
-                    None,
-                    None,
-                    None,
+                    DiffPickerData::default(),
                     None,
                 )
             })
@@ -9576,9 +9850,7 @@ mod tests {
                     TextOverlay::Human,
                     None,
                     None,
-                    None,
-                    None,
-                    None,
+                    DiffPickerData::default(),
                     None,
                 )
             })
@@ -9689,11 +9961,59 @@ mod tests {
 
     /// Concatenates every cell's symbol in a `TestBackend`'s buffer, so a rendered frame's
     /// content can be checked with a plain `contains`.
-    /// The `X` filter narrows to cases with no painted text mapping, and fails *open* on a case
-    /// the scan never reached - the opposite default from `hide_complete`, and deliberately so:
-    /// hiding something never confirmed as painted would silently drop it out of the work queue.
+    /// Builds a view with the cursor on `column`, everything else default.
+    fn column_view(column: DiffColumn) -> DiffPickerView {
+        DiffPickerView {
+            column,
+            ..DiffPickerView::default()
+        }
+    }
+
+    /// Builds a view sorted ascending by `column`, everything else default.
+    fn sort_view(column: DiffColumn) -> DiffPickerView {
+        DiffPickerView {
+            sort: DiffSort::default().toggled(column),
+            ..DiffPickerView::default()
+        }
+    }
+
+    /// Builds a view with only the `Dataset` filter set.
+    fn dataset_view(dataset: Option<&'static str>) -> DiffPickerView {
+        DiffPickerView {
+            filters: DiffFilters {
+                dataset,
+                ..DiffFilters::default()
+            },
+            ..DiffPickerView::default()
+        }
+    }
+
+    /// Builds a view with only the `Name` substring filter set.
+    fn name_view(needle: &str) -> DiffPickerView {
+        DiffPickerView {
+            filters: DiffFilters {
+                name: Some(needle.to_string()),
+                ..DiffFilters::default()
+            },
+            ..DiffPickerView::default()
+        }
+    }
+
+    /// Builds a view with one flag filter set, everything else default.
+    fn flag_view(column: DiffColumn, filter: FlagFilter) -> DiffPickerView {
+        let mut view = DiffPickerView::default();
+        *view
+            .filters
+            .flag_mut(column)
+            .expect("column has a flag filter") = filter;
+        view
+    }
+
+    /// The `Paint` column's filter narrows in both directions, and a case the scan never reached
+    /// survives *either* of them - see `FlagFilter::keeps` for why that fail-open rule is uniform
+    /// across columns and directions rather than argued per filter.
     #[test]
-    fn visible_diff_options_can_narrow_to_unpainted_cases() {
+    fn visible_diff_options_can_narrow_to_painted_or_unpainted_cases() {
         let options = vec![
             ("painted".to_string(), "handmade"),
             ("unpainted".to_string(), "handmade"),
@@ -9703,54 +10023,51 @@ mod tests {
             ("painted".to_string(), true),
             ("unpainted".to_string(), false),
         ]);
+        let data = DiffPickerData {
+            text_painted: Some(&painted),
+            ..DiffPickerData::default()
+        };
 
         assert_eq!(
-            visible_diff_options(
-                &options,
-                None,
-                false,
-                None,
-                false,
-                Some(&painted),
-                false,
-                None,
-                DiffSortOrder::Alphabetical,
-            ),
+            visible_diff_options(&options, &DiffPickerView::default(), data),
             vec!["never-scanned", "painted", "unpainted"],
             "the filter off shows everything"
         );
         assert_eq!(
             visible_diff_options(
                 &options,
-                None,
-                false,
-                None,
-                true,
-                Some(&painted),
-                false,
-                None,
-                DiffSortOrder::Alphabetical,
+                &flag_view(DiffColumn::Paint, FlagFilter::No),
+                data
             ),
             vec!["never-scanned", "unpainted"],
-            "on, it hides only cases confirmed painted"
+            "'unpainted only' hides only cases confirmed painted"
+        );
+        assert_eq!(
+            visible_diff_options(
+                &options,
+                &flag_view(DiffColumn::Paint, FlagFilter::Yes),
+                data
+            ),
+            vec!["never-scanned", "painted"],
+            "'painted only' hides only cases confirmed unpainted"
         );
     }
 
-    /// The two filters are separate queues over separate ground truths, so turning both on shows
-    /// only what needs work on both.
+    /// Two columns' filters are separate queues over separate ground truths, so turning both on
+    /// shows only what matches both - the AND the picker's whole compound-query story rests on.
     #[test]
-    fn the_incomplete_and_unpainted_filters_combine_as_an_and() {
+    fn filters_on_different_columns_combine_as_an_and() {
         let options = vec![
             ("both".to_string(), "handmade"),
             ("tree-only".to_string(), "handmade"),
             ("text-only".to_string(), "handmade"),
             ("done".to_string(), "handmade"),
         ];
-        let incomplete = std::collections::HashMap::from([
-            ("both".to_string(), true),
-            ("tree-only".to_string(), true),
-            ("text-only".to_string(), false),
-            ("done".to_string(), false),
+        let unmarked = std::collections::HashMap::from([
+            ("both".to_string(), 3),
+            ("tree-only".to_string(), 7),
+            ("text-only".to_string(), 0),
+            ("done".to_string(), 0),
         ]);
         let painted = std::collections::HashMap::from([
             ("both".to_string(), false),
@@ -9758,21 +10075,82 @@ mod tests {
             ("text-only".to_string(), false),
             ("done".to_string(), true),
         ]);
+        let data = DiffPickerData {
+            unmarked: Some(&unmarked),
+            text_painted: Some(&painted),
+            ..DiffPickerData::default()
+        };
+
+        let mut view = flag_view(DiffColumn::Cmpl, FlagFilter::Yes);
+        view.filters.paint = FlagFilter::No;
 
         assert_eq!(
-            visible_diff_options(
-                &options,
-                None,
-                true,
-                Some(&incomplete),
-                true,
-                Some(&painted),
-                false,
-                None,
-                DiffSortOrder::Alphabetical,
-            ),
+            visible_diff_options(&options, &view, data),
             vec!["both"],
             "only the case needing both an unmarked node and a painting survives"
+        );
+    }
+
+    /// `s` on a column takes the sort over and orders by it; pressing it again flips the
+    /// direction. The name is always the tiebreak, so rows that tie on the sorted column - every
+    /// row, when its scan hasn't run - still come out alphabetically rather than in whatever
+    /// order `options` happened to arrive in.
+    #[test]
+    fn visible_diff_options_sorts_by_the_selected_column_with_a_name_tiebreak() {
+        let options = vec![
+            ("charlie".to_string(), "handmade"),
+            ("alpha".to_string(), "handmade"),
+            ("bravo".to_string(), "handmade"),
+            ("delta".to_string(), "handmade"),
+        ];
+        // `delta` is deliberately absent: an unscanned/unloadable case sorts after every known
+        // one ascending, and to the front when the direction flips.
+        let unmarked = std::collections::HashMap::from([
+            ("charlie".to_string(), 1),
+            ("alpha".to_string(), 9),
+            ("bravo".to_string(), 1),
+        ]);
+        let data = DiffPickerData {
+            unmarked: Some(&unmarked),
+            ..DiffPickerData::default()
+        };
+
+        let mut view = sort_view(DiffColumn::Unmarked);
+        assert_eq!(
+            visible_diff_options(&options, &view, data),
+            vec!["bravo", "charlie", "alpha", "delta"],
+            "ascending by count, ties broken by name, unknown last"
+        );
+
+        view.sort = view.sort.toggled(DiffColumn::Unmarked);
+        assert_eq!(
+            visible_diff_options(&options, &view, data),
+            vec!["delta", "alpha", "bravo", "charlie"],
+            "pressing s again reverses the column, but ties still break by name ascending"
+        );
+
+        let name_sorted = DiffPickerView::default();
+        assert_eq!(
+            visible_diff_options(&options, &name_sorted, data),
+            vec!["alpha", "bravo", "charlie", "delta"],
+            "the default sort is the Name column, A-Z"
+        );
+    }
+
+    /// The `Name` filter is a case-insensitive substring over the case name, and is the one filter
+    /// that needs no corpus scan at all.
+    #[test]
+    fn visible_diff_options_narrows_by_a_name_substring() {
+        let options = vec![
+            ("rust-add-if".to_string(), "handmade"),
+            ("java-add-exception".to_string(), "small"),
+            ("rust-hash".to_string(), "handmade"),
+        ];
+        let view = name_view("rust-");
+
+        assert_eq!(
+            visible_diff_options(&options, &view, DiffPickerData::default()),
+            vec!["rust-add-if", "rust-hash"]
         );
     }
 
@@ -11206,6 +11584,114 @@ mod tests {
             .collect()
     }
 
+    /// The picker's header row is where its whole interaction state lives: the `Unmarked` count
+    /// column exists, the sorted column carries a direction arrow, and a filtered column is
+    /// marked - with the filters spelled out in the title so a compound one is readable.
+    #[test]
+    fn render_open_diff_picker_shows_the_unmarked_column_and_the_sort_and_filter_markers() {
+        // Wide enough that the block title isn't truncated: this asserts on the title's contents,
+        // so a narrower backend would be testing ratatui's truncation rather than the picker.
+        let backend = ratatui::backend::TestBackend::new(160, 14);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let area = Rect::new(0, 0, 160, 14);
+        let options = vec![
+            ("alpha".to_string(), "handmade"),
+            ("bravo".to_string(), "handmade"),
+        ];
+        let unmarked =
+            std::collections::HashMap::from([("alpha".to_string(), 42), ("bravo".to_string(), 0)]);
+        let mut view = sort_view(DiffColumn::Unmarked);
+        view.column = DiffColumn::Unmarked;
+        view.filters.paint = FlagFilter::No;
+        let modal = Modal::OpenDiffPicker {
+            options,
+            selected: 0,
+            view,
+            name_input: None,
+        };
+
+        terminal
+            .draw(|f| {
+                render_modal(
+                    f,
+                    area,
+                    &modal,
+                    "alpha",
+                    None,
+                    "",
+                    "",
+                    &HumanMapping::default(),
+                    "Minimal",
+                    TextOverlay::Human,
+                    None,
+                    None,
+                    DiffPickerData {
+                        unmarked: Some(&unmarked),
+                        ..DiffPickerData::default()
+                    },
+                    None,
+                )
+            })
+            .unwrap();
+
+        let text = rendered_text(&terminal);
+        assert!(text.contains("Unmarked^"), "sorted column header: {text}");
+        assert!(text.contains("Paint*"), "filtered column marker: {text}");
+        assert!(text.contains("42"), "the unmarked count itself: {text}");
+        assert!(
+            text.contains("unpainted only"),
+            "the active filter spelled out in the title: {text}"
+        );
+        assert!(text.contains("s sort, f filter"), "the key legend: {text}");
+    }
+
+    /// The title is longer than the popup at ordinary terminal widths, so ratatui truncates it -
+    /// and what has to survive that truncation is the filter list, the part that actually changes
+    /// as the reader works. Guards the abbreviation in `render_open_diff_picker`'s title: at 110
+    /// columns the key legend is expected to be cut, the filters are not.
+    #[test]
+    fn the_diff_picker_title_keeps_its_filter_list_when_the_terminal_truncates_it() {
+        let backend = ratatui::backend::TestBackend::new(110, 12);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let area = Rect::new(0, 0, 110, 12);
+        let mut view = DiffPickerView::default();
+        view.filters.paint = FlagFilter::No;
+        view.filters.disagree = FlagFilter::Yes;
+        let modal = Modal::OpenDiffPicker {
+            options: vec![("alpha".to_string(), "handmade")],
+            selected: 0,
+            view,
+            name_input: None,
+        };
+
+        terminal
+            .draw(|f| {
+                render_modal(
+                    f,
+                    area,
+                    &modal,
+                    "alpha",
+                    None,
+                    "",
+                    "",
+                    &HumanMapping::default(),
+                    "Minimal",
+                    TextOverlay::Human,
+                    None,
+                    None,
+                    DiffPickerData::default(),
+                    None,
+                )
+            })
+            .unwrap();
+
+        let text = rendered_text(&terminal);
+        assert!(
+            text.contains("unpainted only AND disagreements only"),
+            "both active filters must survive truncation at 110 columns: {text}"
+        );
+    }
+
     #[test]
     fn text_view_modal_renders_both_sides_content() {
         let backend = ratatui::backend::TestBackend::new(80, 24);
@@ -11988,94 +12474,106 @@ mod tests {
             ("charlie".to_string(), "handmade"),
             ("delta".to_string(), "full"),
         ];
-
         assert_eq!(
-            visible_diff_options(
-                &options,
-                None,
-                false,
-                None,
-                false,
-                None,
-                false,
-                None,
-                DiffSortOrder::Alphabetical,
-            ),
+            visible_diff_options(&options, &dataset_view(None), DiffPickerData::default()),
             vec!["alpha", "bravo", "charlie", "delta"],
             "no filter should show every dataset"
         );
         assert_eq!(
             visible_diff_options(
                 &options,
-                Some("handmade"),
-                false,
-                None,
-                false,
-                None,
-                false,
-                None,
-                DiffSortOrder::Alphabetical,
+                &dataset_view(Some("handmade")),
+                DiffPickerData::default()
             ),
             vec!["alpha", "charlie"]
         );
         assert_eq!(
             visible_diff_options(
                 &options,
-                Some("full"),
-                false,
-                None,
-                false,
-                None,
-                false,
-                None,
-                DiffSortOrder::Alphabetical,
+                &dataset_view(Some("full")),
+                DiffPickerData::default()
             ),
             vec!["delta"]
         );
     }
 
     #[test]
-    fn visible_diff_options_hide_complete_excludes_only_cases_the_map_marks_complete() {
+    fn visible_diff_options_cmpl_filter_excludes_only_cases_the_map_measured() {
         let options = vec![
             ("alpha".to_string(), "handmade"),
             ("bravo".to_string(), "handmade"),
             ("charlie".to_string(), "handmade"),
         ];
-        let mut completeness = std::collections::HashMap::new();
-        completeness.insert("alpha".to_string(), true); // incomplete
-        completeness.insert("bravo".to_string(), false); // complete
-        // "charlie" deliberately absent - not yet scanned.
+        let mut unmarked = std::collections::HashMap::new();
+        unmarked.insert("alpha".to_string(), 4); // incomplete
+        unmarked.insert("bravo".to_string(), 0); // complete
+        // "charlie" deliberately absent - not yet scanned, or failed to load.
+        let data = DiffPickerData {
+            unmarked: Some(&unmarked),
+            ..DiffPickerData::default()
+        };
 
         assert_eq!(
             visible_diff_options(
                 &options,
-                None,
-                true,
-                Some(&completeness),
-                false,
-                None,
-                false,
-                None,
-                DiffSortOrder::Alphabetical,
+                &flag_view(DiffColumn::Cmpl, FlagFilter::Yes),
+                data
             ),
             vec!["alpha", "charlie"],
-            "complete should be hidden, incomplete and unscanned should both stay"
+            "'incomplete only' hides complete, and keeps incomplete and unscanned alike"
         );
         assert_eq!(
-            visible_diff_options(
-                &options,
-                None,
-                false,
-                Some(&completeness),
-                false,
-                None,
-                false,
-                None,
-                DiffSortOrder::Alphabetical,
-            ),
-            vec!["alpha", "bravo", "charlie"],
-            "hide_complete=false should show everything regardless of the map"
+            visible_diff_options(&options, &flag_view(DiffColumn::Cmpl, FlagFilter::No), data),
+            vec!["bravo", "charlie"],
+            "'complete only' hides incomplete, and still keeps the unscanned one"
         );
+        assert_eq!(
+            visible_diff_options(&options, &DiffPickerView::default(), data),
+            vec!["alpha", "bravo", "charlie"],
+            "the filter off should show everything regardless of the map"
+        );
+    }
+
+    /// Setting both `Cmpl` and `Unmarked` the same way narrows nothing further, so the title bar
+    /// must not read as two constraints - see `DiffFilters::labels`.
+    #[test]
+    fn the_title_lists_a_matching_cmpl_and_unmarked_filter_once() {
+        let mut filters = DiffFilters {
+            cmpl: FlagFilter::Yes,
+            unmarked: FlagFilter::Yes,
+            ..DiffFilters::default()
+        };
+        assert_eq!(filters.labels(), vec!["incomplete only"]);
+
+        // Opposite directions really are two constraints (an unsatisfiable pair, but the reader
+        // should be able to see that), so both are listed.
+        filters.unmarked = FlagFilter::No;
+        assert_eq!(filters.labels(), vec!["incomplete only", "none unmarked"]);
+    }
+
+    /// `Cmpl` and `Unmarked` read one map (`App::diff_unmarked`), so their filters must select
+    /// exactly the same rows - the two columns differ in how they *sort*, not in what they hide.
+    #[test]
+    fn the_cmpl_and_unmarked_filters_select_the_same_rows() {
+        let options = vec![
+            ("alpha".to_string(), "handmade"),
+            ("bravo".to_string(), "handmade"),
+            ("charlie".to_string(), "handmade"),
+        ];
+        let unmarked =
+            std::collections::HashMap::from([("alpha".to_string(), 4), ("bravo".to_string(), 0)]);
+        let data = DiffPickerData {
+            unmarked: Some(&unmarked),
+            ..DiffPickerData::default()
+        };
+
+        for filter in [FlagFilter::Yes, FlagFilter::No] {
+            assert_eq!(
+                visible_diff_options(&options, &flag_view(DiffColumn::Cmpl, filter), data),
+                visible_diff_options(&options, &flag_view(DiffColumn::Unmarked, filter), data),
+                "{filter:?} must mean the same thing on both columns"
+            );
+        }
     }
 
     #[test]
@@ -12098,30 +12596,16 @@ mod tests {
             ("bravo".to_string(), "small"),
             ("charlie".to_string(), "handmade"),
         ];
+        let view = dataset_view(Some("handmade"));
 
         // "charlie" is index 2 in `options`' own order, but index 1 once filtered to just
         // "handmade" - proves `selected` is computed against the filtered view, not raw options.
-        let modal = open_diff_picker_modal(
-            options,
-            "charlie",
-            Some("handmade"),
-            false,
-            None,
-            false,
-            None,
-            false,
-            None,
-            DiffSortOrder::Alphabetical,
-        );
+        let modal = open_diff_picker_modal(options, "charlie", view, DiffPickerData::default());
 
         match modal {
-            Modal::OpenDiffPicker {
-                selected,
-                dataset_filter,
-                ..
-            } => {
+            Modal::OpenDiffPicker { selected, view, .. } => {
                 assert_eq!(selected, 1);
-                assert_eq!(dataset_filter, Some("handmade"));
+                assert_eq!(view.filters.dataset, Some("handmade"));
             }
             other => panic!("expected Modal::OpenDiffPicker, got {other:?}"),
         }
@@ -12134,29 +12618,25 @@ mod tests {
             ("alpha".to_string(), "handmade"),
             ("bravo".to_string(), "small"),
         ];
-        // "alpha" is the currently open case, but it's a "handmade" fixture and the filter below
+        let view = dataset_view(Some("small"));
+        // "alpha" is the currently open case, but it's a "handmade" fixture and the filter above
         // is "small" - alpha isn't in the filtered view at all, so this must fall back to the
         // first visible entry instead of panicking or landing out of bounds.
-        let modal = open_diff_picker_modal(
-            options,
-            "alpha",
-            Some("small"),
-            false,
-            None,
-            false,
-            None,
-            false,
-            None,
-            DiffSortOrder::Alphabetical,
-        );
+        let modal = open_diff_picker_modal(options, "alpha", view, DiffPickerData::default());
         match modal {
             Modal::OpenDiffPicker { selected, .. } => assert_eq!(selected, 0),
             other => panic!("expected Modal::OpenDiffPicker, got {other:?}"),
         }
     }
 
-    #[test]
-    fn open_diff_picker_d_persists_dataset_filter_on_app() {
+    /// Opens the `o` picker over `options` with `view` in force and feeds it `keys` in order,
+    /// handing back the App - the shared body of every picker key test below, so each says only
+    /// what it is actually about.
+    fn press_in_diff_picker(
+        options: Vec<(String, &'static str)>,
+        view: DiffPickerView,
+        keys: &[KeyCode],
+    ) -> App {
         let source = "fn main() {}\n";
         let tree = parse_rust(source);
         let root = tree.root_node();
@@ -12168,36 +12648,233 @@ mod tests {
             HumanMapping::default(),
         );
         let flat = FlatIndex::new(flatten_visible(root, &app.before.collapsed, None));
-        app.modal = Some(Modal::OpenDiffPicker {
-            options: vec![("alpha".to_string(), "handmade")],
-            selected: 0,
-            dataset_filter: None,
-            hide_complete: false,
-            hide_painted: false,
-            hide_agreement: false,
-            sort_order: DiffSortOrder::Alphabetical,
-        });
         let caches = rebuild_caches(&app.mapping.entries, root, root);
+        app.modal = Some(Modal::OpenDiffPicker {
+            options,
+            selected: 0,
+            view,
+            name_input: None,
+        });
 
-        handle_modal_key(
-            &mut app,
-            KeyCode::Char('d'),
-            &flat,
-            &flat,
-            root,
-            root,
-            &caches,
-            source.as_bytes(),
-            source.as_bytes(),
-            &Code::from_string(source, &Language::Rust),
-            &Code::from_string(source, &Language::Rust),
+        for key in keys {
+            handle_modal_key(
+                &mut app,
+                *key,
+                &flat,
+                &flat,
+                root,
+                root,
+                &caches,
+                source.as_bytes(),
+                source.as_bytes(),
+                &Code::from_string(source, &Language::Rust),
+                &Code::from_string(source, &Language::Rust),
+            );
+        }
+        app
+    }
+
+    fn picker_view(app: &App) -> DiffPickerView {
+        match &app.modal {
+            Some(Modal::OpenDiffPicker { view, .. }) => view.clone(),
+            other => panic!("expected Modal::OpenDiffPicker to stay open, got {other:?}"),
+        }
+    }
+
+    /// `h`/`l` walk the cursor across the header and clamp at both ends rather than wrapping.
+    #[test]
+    fn open_diff_picker_h_and_l_move_the_column_cursor_and_clamp_at_the_ends() {
+        let options = vec![("alpha".to_string(), "handmade")];
+
+        let app = press_in_diff_picker(
+            options.clone(),
+            DiffPickerView::default(),
+            &[KeyCode::Char('l'), KeyCode::Char('l')],
+        );
+        assert_eq!(picker_view(&app).column, DiffColumn::Cmpl);
+        assert_eq!(
+            app.diff_view.column,
+            DiffColumn::Cmpl,
+            "the cursor column persists on App too, so the next o reopens on it"
+        );
+
+        // Six presses from the far left overshoots the six-column table by one.
+        let app = press_in_diff_picker(
+            options.clone(),
+            DiffPickerView::default(),
+            &[
+                KeyCode::Char('l'),
+                KeyCode::Char('l'),
+                KeyCode::Char('l'),
+                KeyCode::Char('l'),
+                KeyCode::Char('l'),
+                KeyCode::Char('l'),
+            ],
+        );
+        assert_eq!(
+            picker_view(&app).column,
+            DiffColumn::Disagree,
+            "l must clamp at the last column, not wrap round to Name"
+        );
+
+        let app = press_in_diff_picker(options, DiffPickerView::default(), &[KeyCode::Char('h')]);
+        assert_eq!(
+            picker_view(&app).column,
+            DiffColumn::Name,
+            "h must clamp at the first column"
+        );
+    }
+
+    /// `f` on `Dataset` is the old `d` key: it cycles the dataset filter, and - like every other
+    /// filter and sort change here - persists the result on `App` so the next `o` reopens with it.
+    #[test]
+    fn open_diff_picker_f_on_the_dataset_column_persists_the_filter_on_app() {
+        let app = press_in_diff_picker(
+            vec![("alpha".to_string(), "handmade")],
+            column_view(DiffColumn::Dataset),
+            &[KeyCode::Char('f')],
         );
 
         assert_eq!(
-            app.diff_dataset_filter,
+            app.diff_view.filters.dataset,
             Some(DIFF_DATASETS[0]),
-            "d's new filter must persist on App too, so the next o reopens with it"
+            "f's new filter must persist on App too, so the next o reopens with it"
         );
+        assert_eq!(picker_view(&app).filters.dataset, Some(DIFF_DATASETS[0]));
+    }
+
+    /// `s` takes the sort over to the cursor column ascending, and flips direction when pressed
+    /// again on the column that already owns it - the "last column selected sorts" rule.
+    #[test]
+    fn open_diff_picker_s_sorts_by_the_cursor_column_and_flips_on_a_second_press() {
+        let view = column_view(DiffColumn::Dataset);
+        let options = vec![("alpha".to_string(), "handmade")];
+
+        let app = press_in_diff_picker(options.clone(), view.clone(), &[KeyCode::Char('s')]);
+        assert_eq!(
+            app.diff_view.sort,
+            DiffSort {
+                column: DiffColumn::Dataset,
+                descending: false
+            }
+        );
+
+        let app = press_in_diff_picker(options, view, &[KeyCode::Char('s'), KeyCode::Char('s')]);
+        assert_eq!(
+            app.diff_view.sort,
+            DiffSort {
+                column: DiffColumn::Dataset,
+                descending: true
+            },
+            "a second s on the same column reverses it rather than moving on"
+        );
+    }
+
+    /// While the `Name` filter's prompt is open it takes every keystroke - so a name containing
+    /// `j`, `s` or `f` is typed rather than moving the selection and re-sorting mid-word.
+    #[test]
+    fn open_diff_picker_name_filter_prompt_swallows_command_keys_until_enter() {
+        let options = vec![
+            ("rust-add-if".to_string(), "handmade"),
+            ("java-fix".to_string(), "handmade"),
+        ];
+
+        let app = press_in_diff_picker(
+            options.clone(),
+            DiffPickerView::default(),
+            &[KeyCode::Char('f'), KeyCode::Char('j'), KeyCode::Char('s')],
+        );
+        match &app.modal {
+            Some(Modal::OpenDiffPicker {
+                name_input, view, ..
+            }) => {
+                assert_eq!(name_input.as_deref(), Some("js"));
+                assert_eq!(
+                    view.sort,
+                    DiffSort::default(),
+                    "the s typed into the prompt must not have re-sorted the table"
+                );
+            }
+            other => panic!("expected Modal::OpenDiffPicker to stay open, got {other:?}"),
+        }
+
+        // Enter commits it, lowercased, and it narrows the list.
+        let app = press_in_diff_picker(
+            options.clone(),
+            DiffPickerView::default(),
+            &[
+                KeyCode::Char('f'),
+                KeyCode::Char('R'),
+                KeyCode::Char('u'),
+                KeyCode::Enter,
+            ],
+        );
+        assert_eq!(app.diff_view.filters.name.as_deref(), Some("ru"));
+        assert_eq!(
+            visible_diff_options(&options, &app.diff_view, DiffPickerData::from_app(&app)),
+            vec!["rust-add-if"]
+        );
+
+        // Esc abandons the prompt and leaves the filter exactly as it was.
+        let app = press_in_diff_picker(
+            options,
+            DiffPickerView::default(),
+            &[KeyCode::Char('f'), KeyCode::Char('r'), KeyCode::Esc],
+        );
+        assert_eq!(picker_view(&app).filters.name, None);
+        assert!(
+            matches!(
+                &app.modal,
+                Some(Modal::OpenDiffPicker {
+                    name_input: None,
+                    ..
+                })
+            ),
+            "Esc must close the prompt but leave the picker open"
+        );
+    }
+
+    /// An empty submission clears the filter rather than being stored as a needle that matches
+    /// everything while the header still reads as filtered.
+    #[test]
+    fn open_diff_picker_name_filter_prompt_clears_on_an_empty_submission() {
+        let app = press_in_diff_picker(
+            vec![("rust-add-if".to_string(), "handmade")],
+            name_view("rust"),
+            &[
+                KeyCode::Char('f'),
+                KeyCode::Backspace,
+                KeyCode::Backspace,
+                KeyCode::Backspace,
+                KeyCode::Backspace,
+                KeyCode::Enter,
+            ],
+        );
+
+        assert_eq!(app.diff_view.filters.name, None);
+    }
+
+    /// Moving the cursor must never kick off one of the corpus-wide scans - only `s`/`f` do, and
+    /// those are deliberate presses that can afford the seconds it costs (see
+    /// `ensure_diff_column_data`).
+    #[test]
+    fn open_diff_picker_column_movement_does_not_trigger_a_corpus_scan() {
+        let app = press_in_diff_picker(
+            vec![("alpha".to_string(), "handmade")],
+            DiffPickerView::default(),
+            &[
+                KeyCode::Char('l'),
+                KeyCode::Char('l'),
+                KeyCode::Char('l'),
+                KeyCode::Char('l'),
+                KeyCode::Char('l'),
+            ],
+        );
+
+        assert_eq!(picker_view(&app).column, DiffColumn::Disagree);
+        assert!(app.diff_unmarked.is_none());
+        assert!(app.diff_text_painted.is_none());
+        assert!(app.diff_disagreement.is_none());
     }
 
     #[test]
@@ -12405,35 +13082,39 @@ mod tests {
     }
 
     #[test]
-    fn tree_has_unmarked_node_is_false_only_once_every_node_is_marked() {
+    fn count_unmarked_nodes_in_tree_counts_every_hole_not_just_the_first() {
         let tree = parse_rust("fn main() {\n    a();\n}\n");
         let root = tree.root_node();
 
+        let total = count_unmarked_nodes_in_tree(root, &Caches::default(), status_before);
         assert!(
-            tree_has_unmarked_node(root, &Caches::default(), status_before),
-            "nothing marked at all should be reported as having an unmarked node"
+            total > 1,
+            "nothing marked at all should count every node in the tree, got {total}"
         );
 
         let mut caches = Caches::default();
         mark_subtree_matched(root, &mut caches);
-        assert!(
-            !tree_has_unmarked_node(root, &caches, status_before),
+        assert_eq!(
+            count_unmarked_nodes_in_tree(root, &caches, status_before),
+            0,
             "every node (including unnamed tokens) is marked, so none should be left unmarked"
         );
 
-        // Unmark just the deepest leaf again - a single hole anywhere should be enough to flip
-        // the result back.
+        // Unmark two nodes again. The boolean predicate this replaced would have stopped at the
+        // first; the count is what the picker's `Unmarked` column ranks by, so it has to see both.
         let stmt = find_first(root, "expression_statement").unwrap();
         let call = find_first(stmt, "call_expression").unwrap();
         caches.before_match.remove(&call.id());
-        assert!(
-            tree_has_unmarked_node(root, &caches, status_before),
-            "one unmarked node anywhere in the tree should be enough"
+        caches.before_match.remove(&stmt.id());
+        assert_eq!(
+            count_unmarked_nodes_in_tree(root, &caches, status_before),
+            2,
+            "two holes anywhere in the tree should count as two, not as one"
         );
     }
 
     #[test]
-    fn diff_case_is_incomplete_returns_some_for_a_real_case_on_disk() {
+    fn diff_case_unmarked_count_returns_some_for_a_real_case_on_disk() {
         // Full integrated path (`diffs_case_dir`/`code_pair_from_dir`/`human_mapping::load`, not
         // crafted temp files) against whatever's actually checked in under src/test/data/diffs/ -
         // skips rather than fails if none exist yet, same convention
@@ -12446,13 +13127,15 @@ mod tests {
             return;
         };
         assert!(
-            diff_case_is_incomplete(name).is_some(),
+            diff_case_unmarked_count(name).is_some(),
             "a real, on-disk case should always resolve to Some(_), not None"
         );
     }
 
     #[test]
-    fn open_diff_picker_h_toggles_hide_complete_using_the_cached_completeness_map() {
+    fn open_diff_picker_f_on_cmpl_uses_the_cached_unmarked_map_without_recomputing_it() {
+        let view = column_view(DiffColumn::Cmpl);
+
         let source = "fn main() {}\n";
         let tree = parse_rust(source);
         let root = tree.root_node();
@@ -12463,31 +13146,27 @@ mod tests {
             root.id(),
             HumanMapping::default(),
         );
-        // Pre-seeded, so this exercises only the toggle - not the lazy full-corpus scan (see
-        // `open_diff_picker_h_computes_completeness_lazily_when_not_yet_cached` for that).
-        let mut completeness = std::collections::HashMap::new();
-        completeness.insert("alpha".to_string(), true);
-        completeness.insert("bravo".to_string(), false);
-        app.diff_completeness = Some(completeness);
-
+        // Pre-seeded, so this exercises only the filter - not the lazy full-corpus scan (see
+        // `open_diff_picker_f_computes_the_unmarked_map_lazily_when_not_yet_cached` for that).
+        app.diff_unmarked = Some(std::collections::HashMap::from([
+            ("alpha".to_string(), 3),
+            ("bravo".to_string(), 0),
+        ]));
         app.modal = Some(Modal::OpenDiffPicker {
             options: vec![
                 ("alpha".to_string(), "handmade"),
                 ("bravo".to_string(), "handmade"),
             ],
             selected: 0,
-            dataset_filter: None,
-            hide_complete: false,
-            hide_painted: false,
-            hide_agreement: false,
-            sort_order: DiffSortOrder::Alphabetical,
+            view,
+            name_input: None,
         });
         let flat = FlatIndex::new(flatten_visible(root, &app.before.collapsed, None));
         let caches = rebuild_caches(&app.mapping.entries, root, root);
 
         handle_modal_key(
             &mut app,
-            KeyCode::Char('H'),
+            KeyCode::Char('f'),
             &flat,
             &flat,
             root,
@@ -12499,17 +13178,14 @@ mod tests {
             &Code::from_string(source, &Language::Rust),
         );
 
-        assert!(
-            app.diff_hide_complete,
-            "H should persist hide_complete on App too, so the next o reopens with it"
+        assert_eq!(
+            app.diff_view.filters.cmpl,
+            FlagFilter::Yes,
+            "f should persist the new filter on App too, so the next o reopens with it"
         );
         match &app.modal {
-            Some(Modal::OpenDiffPicker {
-                hide_complete,
-                options,
-                ..
-            }) => {
-                assert!(*hide_complete);
+            Some(Modal::OpenDiffPicker { view, options, .. }) => {
+                assert_eq!(view.filters.cmpl, FlagFilter::Yes);
                 assert_eq!(
                     options.len(),
                     2,
@@ -12519,17 +13195,17 @@ mod tests {
             other => panic!("expected Modal::OpenDiffPicker to stay open, got {other:?}"),
         }
         assert_eq!(
-            app.diff_completeness.as_ref().unwrap().len(),
+            app.diff_unmarked.as_ref().unwrap().len(),
             2,
             "an already-cached map should not be recomputed"
         );
     }
 
     #[test]
-    fn open_diff_picker_h_computes_completeness_lazily_when_not_yet_cached() {
+    fn open_diff_picker_f_computes_the_unmarked_map_lazily_when_not_yet_cached() {
         // Full integrated path against whatever's actually under src/test/data/diffs/ - skips if
         // there's nothing to scan, same convention as
-        // `diff_case_is_incomplete_returns_some_for_a_real_case_on_disk` above.
+        // `diff_case_unmarked_count_returns_some_for_a_real_case_on_disk` above.
         let Ok(options) = list_available_cases() else {
             return;
         };
@@ -12547,23 +13223,21 @@ mod tests {
             root.id(),
             HumanMapping::default(),
         );
-        assert!(app.diff_completeness.is_none());
+        assert!(app.diff_unmarked.is_none());
 
+        let view = column_view(DiffColumn::Unmarked);
         app.modal = Some(Modal::OpenDiffPicker {
             options: options.clone(),
             selected: 0,
-            dataset_filter: None,
-            hide_complete: false,
-            hide_painted: false,
-            hide_agreement: false,
-            sort_order: DiffSortOrder::Alphabetical,
+            view,
+            name_input: None,
         });
         let flat = FlatIndex::new(flatten_visible(root, &app.before.collapsed, None));
         let caches = rebuild_caches(&app.mapping.entries, root, root);
 
         handle_modal_key(
             &mut app,
-            KeyCode::Char('H'),
+            KeyCode::Char('s'),
             &flat,
             &flat,
             root,
@@ -12576,10 +13250,12 @@ mod tests {
         );
 
         let map = app
-            .diff_completeness
+            .diff_unmarked
             .as_ref()
-            .expect("H should compute completeness lazily when it wasn't cached yet");
-        assert_eq!(map.len(), options.len());
+            .expect("s on Unmarked should compute the map lazily when it wasn't cached yet");
+        // Cases that fail to load are deliberately absent rather than present with a made-up
+        // count, so this is an upper bound, not an equality.
+        assert!(map.len() <= options.len());
     }
 
     #[test]
