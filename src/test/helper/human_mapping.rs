@@ -2096,9 +2096,32 @@ fn check_group_entry<'b, 'a>(
         }
     );
 
-    let expected_op = match group.operation {
-        HumanOperation::Identical => ASTMappingOperation::Identical,
-        HumanOperation::MatchButNotIdentical => ASTMappingOperation::MatchButNotIdentical,
+    // The operations a realized pair may legitimately carry - a *set*, not one value, because a
+    // group exists precisely to leave the pairing open, and which operation is correct depends on
+    // which pairing the algorithm realized.
+    //
+    // An `Identical` group is annotated that way only when every member hashes equal, so whichever
+    // pair is realized must be `Identical`; that stays strict.
+    //
+    // A `MatchButNotIdentical` group means "not all members are equal", which says nothing about
+    // the specific pair realized: a pairing may land on two byte-identical members (`Identical`) or
+    // two differing ones. Demanding literal `MatchButNotIdentical` was unsatisfiable for the common
+    // case of same-kind leaves - `classify_match` returns only `Identical`/`Update` for a childless
+    // pair (`apted/common.rs`, the `children.is_empty()` arm) while `human_solver`'s
+    // `multi_map_group_operation` only ever emits `Identical`/`MatchButNotIdentical`, so such a
+    // group could never be satisfied by any algorithm output. That was 67 false mismatches over 25
+    // fixtures, five of which had no other mismatch at all (2026-09-02 audit).
+    //
+    // The listed set is exactly what `classify_match` can return for a *matched* pair; delete and
+    // insert cannot appear here because `matched_pairs` is built from realized pairings only, and
+    // the group's cardinality is already checked separately above.
+    let accepted_ops: &[ASTMappingOperation] = match group.operation {
+        HumanOperation::Identical => &[ASTMappingOperation::Identical],
+        HumanOperation::MatchButNotIdentical => &[
+            ASTMappingOperation::Identical,
+            ASTMappingOperation::Update,
+            ASTMappingOperation::MatchButNotIdentical,
+        ],
         other => {
             mismatches.push(Mismatch {
                 message: format!(
@@ -2188,10 +2211,10 @@ fn check_group_entry<'b, 'a>(
 
     for &(b, a) in &matched_pairs {
         match diff_ast.mapping.get(&(b.id(), a.id())) {
-            Some(actual_mapping) if actual_mapping.operation == expected_op => {}
+            Some(actual_mapping) if accepted_ops.contains(&actual_mapping.operation) => {}
             Some(actual_mapping) => mismatches.push(Mismatch {
                 message: format!(
-                    "{context}: pair '{}' <-> '{}' expected codediff operation {expected_op:?}, but it chose {:?}",
+                    "{context}: pair '{}' <-> '{}' expected codediff operation {accepted_ops:?}, but it chose {:?}",
                     b.kind(),
                     a.kind(),
                     actual_mapping.operation
@@ -2416,6 +2439,101 @@ pub fn compute_visible_mismatches_with_config(
 pub fn total_node_count_for(before: &crate::code::Code, after: &crate::code::Code) -> usize {
     let node_cache = NodeCache::build(before, after);
     node_cache.before.len() + node_cache.after.len()
+}
+
+/**
+* How many node slots the human mapping actually *grades*, in the same "before nodes + after
+* nodes" unit as [`total_node_count_for`].
+*
+* This exists because the two are not the same number, and the mismatch percentage divides one by
+* the other. A mismatch can only ever arise on a node the annotation names, but the denominator is
+* every node in both trees - and the ground-truth vocabulary grades its two ends asymmetrically:
+* `DeleteWithChildren`/`InsertWithChildren` are validated across the whole subtree
+* (`check_subtree_maps_to_zero`), while `Identical`/`Update`/`MatchButNotIdentical` check only the
+* single pair named, no descendants. So one depth-1 `identical` entry over a 5,000-node function
+* grades one pair and puts 10,000 nodes into the denominator.
+*
+* The effect is large and uneven: on 2026-09-02, `rust-real-logic-change-in-a-huge-75k-node-file`
+* named 462 entries against 153,129 nodes and reported 0.01%, while its own row showed an
+* algorithm cost of 6506 against a human cost of 7. 42 of 512 fixtures grade under 90%. Reporting
+* this alongside the percentage is what makes a low rate readable as "barely graded" rather than
+* "nearly perfect" - notably for `VISIBLE_RATE_GOAL`, which such a fixture passes for free.
+*
+* Counted per entry the same way the grading does, so the two stay in step:
+* `Identical`/`Update`/`MatchButNotIdentical` grade one node on each side (2 slots); `Delete` and
+* `Insert` grade one; the `*WithChildren` forms grade their whole subtree. Groups arrive already
+* expanded into representative entries, exactly as in [`human_mapping_cost`].
+*
+* This is a coverage measure, not a validator: an unresolvable path contributes what it can rather
+* than failing, since `check_entry` is what rejects a malformed mapping.
+*/
+pub fn graded_node_count(
+    mapping: &HumanMapping,
+    before_root: Node,
+    after_root: Node,
+    before_metadata: &ASTMetadata,
+    after_metadata: &ASTMetadata,
+) -> Result<usize> {
+    let mut before_cache = PathCache::new();
+    let mut after_cache = PathCache::new();
+    let entries = representative_entries(mapping, before_root, after_root)?;
+
+    let mut graded = 0usize;
+    for entry in &entries {
+        graded += match entry.operation {
+            HumanOperation::Identical
+            | HumanOperation::Update
+            | HumanOperation::MatchButNotIdentical => 2,
+            HumanOperation::Delete | HumanOperation::Insert => 1,
+            // Inlined rather than shared through a helper: `PathCache` is invariant over its tree
+            // lifetime, so a closure taking both a `&mut PathCache` and a `Node` cannot tie the
+            // two without threading the lifetime by hand for two call sites.
+            HumanOperation::DeleteWithChildren => match entry.before_path.as_ref() {
+                None => 1,
+                Some(path) => match before_cache.resolve(before_root, &path_refs(path)) {
+                    Ok(node) => before_metadata
+                        .node_to_subtree_size
+                        .get(&node.id())
+                        .copied()
+                        .unwrap_or(1),
+                    Err(_) => 1,
+                },
+            },
+            HumanOperation::InsertWithChildren => match entry.after_path.as_ref() {
+                None => 1,
+                Some(path) => match after_cache.resolve(after_root, &path_refs(path)) {
+                    Ok(node) => after_metadata
+                        .node_to_subtree_size
+                        .get(&node.id())
+                        .copied()
+                        .unwrap_or(1),
+                    Err(_) => 1,
+                },
+            },
+        };
+    }
+    Ok(graded)
+}
+
+/// [`graded_node_count`] for a caller that has only a fixture name and a `Code` pair - same
+/// convenience wrapper shape as [`human_mapping_cost_for`].
+pub fn graded_node_count_for(
+    name: &str,
+    before: &crate::code::Code,
+    after: &crate::code::Code,
+) -> Result<usize> {
+    let mapping = load(name)?;
+    let before_ast = before.ast.as_ref().context("Before code has no AST")?;
+    let after_ast = after.ast.as_ref().context("After code has no AST")?;
+    let before_metadata = crate::code::metadata::metadata_of(before);
+    let after_metadata = crate::code::metadata::metadata_of(after);
+    graded_node_count(
+        &mapping,
+        before_ast.root_node(),
+        after_ast.root_node(),
+        &before_metadata,
+        &after_metadata,
+    )
 }
 
 /// Reduces one side's `TextOperation`s to "touched or not" - the only signal comparable against a

@@ -42,6 +42,24 @@ use csv::Writer;
 /// Kept as an explicit list (rather than deriving one) so the table's column order stays stable
 /// even if variants are reordered in `diff.rs`. `APTED` is deliberately excluded: unlike every
 /// other variant, it doesn't map to one fixed column - see `reason_column_label`.
+///
+/// **This list must cover every label `ASTMappingReason::bucket_label` can return**, and
+/// `non_apted_reason_labels_covers_every_bucket_label` enforces it. An explicit list is only safe
+/// with that test: `bucket_label`'s match is exhaustive, so adding a variant fails to compile
+/// *there*, but nothing previously forced this list to follow. It had drifted by eight labels -
+/// `LeadSib`, `BottomUpProp`, `UniqueType`, `Unresolved`, `MutualAnc`, `CondCollapse`,
+/// `HeritageGrowth` and `WrapGrowth` had no column at all, so every mapping entry those passes
+/// produced was silently dropped from the CSV and from the reason table's TOTAL (measured
+/// 2026-09-02: `rust-add-if` produced 81 mapping entries and recorded 79). Since the attribution
+/// table is what "which pass owns this fixture's mismatches?" is answered from, a pass that fired
+/// reading as absent is the worst shape that failure could take.
+///
+/// The first sixteen are kept in their original order, and the eight are appended rather than
+/// slotted in, so existing column positions are unchanged for anything reading the CSV.
+///
+/// Seven entries below are dead - `Comment`, `BottomUp` and the five `Norm*` variants name passes
+/// deleted in 2026-08-14/16 - and are retained deliberately: `matching_reasons_report.py` indexes
+/// `Comment` and `BottomUp` by name, so dropping them is a separate, consumer-breaking change.
 const NON_APTED_REASON_LABELS: &[&str] = &[
     "IdHash",
     "IdHashAnc",
@@ -59,6 +77,15 @@ const NON_APTED_REASON_LABELS: &[&str] = &[
     "NormNoLit",
     "NormNoId",
     "NormNoPunctLit",
+    // Appended 2026-09-02 - live passes that had no column until then.
+    "LeadSib",
+    "BottomUpProp",
+    "UniqueType",
+    "Unresolved",
+    "MutualAnc",
+    "CondCollapse",
+    "HeritageGrowth",
+    "WrapGrowth",
 ];
 
 /// Column label for one `ASTMappingReason`. For every variant except `APTED` this is
@@ -102,7 +129,7 @@ fn reason_counts_for(
     counts
 }
 
-/// Every reason column that exists at all: the fixed `NON_APTED_REASON_LABELS` (all 16,
+/// Every reason column that exists at all: the fixed `NON_APTED_REASON_LABELS` (all of them,
 /// unconditionally - a column being zero for every fixture in the corpus doesn't mean the
 /// `ASTMappingReason` variant it names stopped existing), followed by every distinct
 /// `"APTED:<source>"` column observed across all rows, sorted alphabetically by provenance for a
@@ -286,6 +313,15 @@ struct Row {
     /// the denominator for the visible-mismatch percentage - same `(count, denominator)` shape as
     /// `mismatches`, and `None` under the same "unsolved" convention.
     visible_mismatches: Option<(usize, usize)>,
+    /// How many node slots this fixture's human mapping actually grades, in the same unit as
+    /// `mismatches`' denominator - see `human_mapping::graded_node_count`. `None` for an unsolved
+    /// fixture, same convention as the fields above.
+    ///
+    /// Reported because the mismatch percentage divides by *every* node in both trees while a
+    /// mismatch can only arise on a graded one, so a thinly-annotated fixture reports a rate far
+    /// below what it actually demonstrates. Without this column a 0.01% is unreadable: it may mean
+    /// "nearly perfect" or "0.3% of the tree was ever checked."
+    graded_nodes: Option<usize>,
 }
 
 /// Prints every mapping codediff produces for one fixture, with human-readable paths, sorted by
@@ -399,9 +435,19 @@ fn main() -> Result<()> {
     let cases = helper::handmade_test_case_dirs()?;
 
     let started = std::time::Instant::now();
+    // Fixture load+parse is timed separately and subtracted from the reported figure below. Before
+    // this binary streamed the corpus, the whole corpus was loaded *before* `started`, so the
+    // reported runtime covered scoring only; loading per fixture moved that cost inside the timed
+    // span and silently changed what the number meant (measured 2026-09-02: 294.5 -> 302.7
+    // ms/fixture across the change, while total wall clock actually fell). Subtracting it keeps
+    // the figure comparable to every value recorded before the switch.
+    let mut load_time = std::time::Duration::ZERO;
     let mut rows = Vec::with_capacity(cases.len());
     for (name, dir) in &cases {
-        let Some((before, after)) = helper::code_pair_from_dir(dir)? else {
+        let load_started = std::time::Instant::now();
+        let pair = helper::code_pair_from_dir(dir)?;
+        load_time += load_started.elapsed();
+        let Some((before, after)) = pair else {
             continue;
         };
         let (before, after) = (&before, &after);
@@ -418,6 +464,7 @@ fn main() -> Result<()> {
                 human_cost: None,
                 elapsed_ms,
                 visible_mismatches: None,
+                graded_nodes: None,
             });
             continue;
         }
@@ -427,6 +474,7 @@ fn main() -> Result<()> {
         let mismatch_count = visible.visible.len() + visible.invisible.len();
         let total_nodes = human_mapping::total_node_count_for(before, after);
         let human_cost = human_mapping::human_mapping_cost_for(name, before, after)?;
+        let graded_nodes = human_mapping::graded_node_count_for(name, before, after)?;
         rows.push(Row {
             name: name.clone(),
             mismatches: Some((mismatch_count, total_nodes)),
@@ -438,6 +486,7 @@ fn main() -> Result<()> {
                 visible.visible.len(),
                 visible.before_visible_node_count + visible.after_visible_node_count,
             )),
+            graded_nodes: Some(graded_nodes),
         });
     }
 
@@ -450,7 +499,7 @@ fn main() -> Result<()> {
         (None, None) => a.name.cmp(&b.name),
     });
 
-    let elapsed = started.elapsed();
+    let elapsed = started.elapsed().saturating_sub(load_time);
 
     if let Some(csv_path) = args.csv {
         let path = csv_path.unwrap_or_else(|| {
@@ -544,7 +593,38 @@ fn print_goal_progress(rows: &[Row]) {
         VISIBLE_RATE_GOAL * 100.0,
         within_gap
     );
+
+    // The rate goal above is only as meaningful as the annotation it divides into: a mismatch can
+    // only arise on a node the human mapping grades, but the denominator is every node in both
+    // trees, so a thinly-annotated fixture clears the bar for free (see
+    // `human_mapping::graded_node_count`). Reported as a caveat on the goal rather than a
+    // correction to it, because the fix is to finish annotating those fixtures, not to rescale the
+    // metric - and a silent free pass is the failure mode worth surfacing.
+    let thin = rows
+        .iter()
+        .filter_map(|r| match (r.mismatches, r.graded_nodes) {
+            (Some((_, total_nodes)), Some(graded)) if total_nodes > 0 => {
+                Some((graded as f64) / (total_nodes as f64))
+            }
+            _ => None,
+        })
+        .filter(|coverage| *coverage < THIN_ANNOTATION_COVERAGE)
+        .count();
+    if thin > 0 {
+        println!(
+            "  note: {thin} fixture(s) grade under {:.0}% of their nodes - they clear the rate bar \
+             largely by not being annotated, not by being diffed well (see the graded_nodes column)",
+            THIN_ANNOTATION_COVERAGE * 100.0
+        );
+    }
 }
+
+/// Below this share of its nodes graded by the human mapping, a fixture's mismatch *rate* says
+/// more about how much of it was annotated than about how well it was diffed, so
+/// `print_goal_progress` calls it out rather than letting it silently pad the goal. Set at 90%
+/// because that is where the corpus actually separates: on 2026-09-02, 42 of 512 fixtures fell
+/// below it and the rest sat far above.
+const THIN_ANNOTATION_COVERAGE: f64 = 0.9;
 
 fn print_table(rows: &[Row]) {
     let name_width = rows
@@ -580,15 +660,17 @@ fn print_table(rows: &[Row]) {
     let mut total_visible_mismatches = 0usize;
     let mut total_visible_nodes = 0usize;
     let mut total_unsolved = 0usize;
-    let mut total_algorithm_cost = 0u64;
     // Only summed over fixtures that also have a human cost, so `total_cost_diff` below compares
     // like for like - an "unsolved" fixture's algorithm cost would otherwise inflate the TOTAL
-    // algorithm side against nothing on the human side.
+    // algorithm side against nothing on the human side. This is also the figure the TOTAL row
+    // *prints*: it used to print an all-rows sum beside a solved-only human cost and a solved-only
+    // difference, so `Alg Cost - Hum Cost` did not equal the `Cost Diff` column next to it (off by
+    // 9819 on the 2026-09-02 corpus, exactly the one unsolved fixture's algorithm cost, and
+    // growing with every unsolved fixture added).
     let mut total_algorithm_cost_where_solved = 0u64;
     let mut total_human_cost = 0u64;
     let mut total_elapsed_ms = 0.0f64;
     for row in rows {
-        total_algorithm_cost += row.algorithm_cost;
         total_elapsed_ms += row.elapsed_ms;
         match (row.mismatches, row.human_cost) {
             (Some((count, nodes)), Some(human_cost)) => {
@@ -670,7 +752,7 @@ fn print_table(rows: &[Row]) {
         total_visible_mismatches,
         total_visible_pct,
         total_unsolved,
-        total_algorithm_cost,
+        total_algorithm_cost_where_solved,
         total_human_cost,
         total_cost_diff,
         total_elapsed_ms,
@@ -792,13 +874,61 @@ struct GateReport {
     /// Every fixture present in both, for the latency section. Separate from `regressed`/`improved`
     /// because latency is reported and never gated - see [`print_gate_report`].
     latency: Vec<GateChange>,
+    /// How many of the baseline's fixtures this run actually scored. The denominator for
+    /// [`GateReport::lost_too_much_of_the_corpus`], which is the only thing it exists for.
+    covered: usize,
 }
 
 impl GateReport {
     fn failed(&self) -> bool {
-        !self.regressed.is_empty()
+        !self.regressed.is_empty() || self.lost_too_much_of_the_corpus()
+    }
+
+    /// Did this run cover so little of the baseline that its verdict is meaningless?
+    ///
+    /// `removed` on its own is deliberately not a failure - a fixture can legitimately be renamed
+    /// or dropped - but "not a failure per fixture" silently became "no lower bound at all": every
+    /// path that loses fixtures is quiet. A dataset directory that fails to check out is skipped
+    /// without a word (`helper::handmade_test_case_dirs`), and so is any fixture missing its
+    /// `before.*.test` (`code_pair_from_dir` returns `Ok(None)`). Lose `diffs/full/` and 232 of 512
+    /// baseline rows move to `removed`, `regressed` is empty, and the gate passes green over a
+    /// corpus less than half its size. At zero rows it is worse still: the runtime figure divides
+    /// by zero, the Makefile's `grep` finds no `ms/fixture` to warn about, and an empty run reports
+    /// success in every channel it has.
+    ///
+    /// Proportional rather than any-missing, so that deleting one fixture stays the routine,
+    /// non-gating operation it is meant to be, while losing a whole dataset cannot pass.
+    fn lost_too_much_of_the_corpus(&self) -> bool {
+        let baseline_size = self.covered + self.removed.len();
+        // A share is not a meaningful quantity over a handful of rows: on a two-fixture baseline,
+        // dropping the one fixture that is legitimately allowed to go missing is a 50% loss. The
+        // floor is aimed at "a dataset directory failed to check out" on a corpus of hundreds, so
+        // it stays out of the way below a size where a proportion means anything - see
+        // `a_fixture_missing_from_the_run_is_named_rather_than_silently_ignored`, which encodes
+        // the behaviour this must not break.
+        //
+        // Guarding on the *baseline's* size rather than the run's keeps the case that matters
+        // most: a run that scores nothing at all against a real baseline is still 0% covered, and
+        // still fails.
+        if baseline_size < MIN_BASELINE_FOR_COVERAGE_CHECK {
+            return false;
+        }
+        (self.covered as f64) / (baseline_size as f64) < MIN_BASELINE_COVERAGE
     }
 }
+
+/// A run must still score at least this share of the fixtures its baseline names, or
+/// [`GateReport::failed`] fails it regardless of whether anything regressed - see
+/// [`GateReport::lost_too_much_of_the_corpus`]. Set well below any plausible intentional churn
+/// (the corpus grows by a handful of fixtures at a time and rarely shrinks at all) and well above
+/// the "lost an entire dataset directory" case that motivates it: the smallest of the four
+/// datasets is 61 of 513 fixtures, i.e. a 12% loss.
+const MIN_BASELINE_COVERAGE: f64 = 0.95;
+
+/// Baselines smaller than this are exempt from [`MIN_BASELINE_COVERAGE`] entirely: a percentage of
+/// a handful of fixtures says nothing, and every such baseline in practice is a unit test's. The
+/// real corpus is two orders of magnitude above this.
+const MIN_BASELINE_FOR_COVERAGE_CHECK: usize = 20;
 
 /// The scored fixtures of a run, in baseline form. Fixtures with no human mapping are skipped:
 /// there is nothing to be right or wrong about yet.
@@ -833,10 +963,16 @@ fn read_baseline(path: &std::path::Path) -> Result<BTreeMap<String, BaselineEntr
                 .parse()
                 .with_context(|| format!("the baseline's '{key}' column is not a number"))
         };
+        // `.trim()`, like every numeric field above. Without it a hand-edited row carrying a
+        // stray space (`rust-add-if , 4, 2`) keys as `"rust-add-if "`, so the live fixture finds
+        // no baseline and is exempted as "new" while the stale key is exempted as "removed" -
+        // both non-gating by design, so that fixture could regress without limit at exit 0, and
+        // nothing in either list would show the two are the same fixture.
         let name = record
             .get("solution")
             .context("the baseline has no 'solution' column")?
-            .clone();
+            .trim()
+            .to_string();
         out.insert(
             name,
             BaselineEntry {
@@ -890,6 +1026,7 @@ fn compare_to_baseline(rows: &[Row], baseline: &BTreeMap<String, BaselineEntry>)
             report.added.push(name.clone());
             continue;
         };
+        report.covered += 1;
         let change = GateChange {
             name: name.clone(),
             before: *before,
@@ -970,14 +1107,30 @@ fn print_gate_report(report: &GateReport, baseline_path: &std::path::Path) {
 
     print_latency_report(&report.latency);
 
-    if report.failed() {
+    if report.lost_too_much_of_the_corpus() {
+        // Reported before, and separately from, any regression list: a run this incomplete has no
+        // verdict to give, and reading it as "N fixtures regressed" would send someone hunting an
+        // algorithm change when the corpus itself is what went missing.
+        println!(
+            "\nerror: this run scored only {} of the baseline's {} fixtures ({:.1}%, floor is \
+             {:.0}%). A missing dataset directory or an unreadable fixture is skipped silently, so \
+             an incomplete corpus would otherwise pass green - the gate cannot certify fixtures it \
+             never ran. Check that src/test/data/diffs/ is fully checked out.",
+            report.covered,
+            report.covered + report.removed.len(),
+            100.0 * report.covered as f64 / (report.covered + report.removed.len()).max(1) as f64,
+            MIN_BASELINE_COVERAGE * 100.0,
+        );
+    }
+    if !report.regressed.is_empty() {
         println!(
             "\nerror: {} fixture(s) regressed against the baseline. Fix the regression, or - if \
              this is a reviewed, deliberate trade - re-baseline with `make \
              update-quality-baseline`.",
             report.regressed.len()
         );
-    } else {
+    }
+    if !report.failed() {
         println!("\nQuality gate passed: no fixture is worse than its baseline.");
     }
 }
@@ -1088,6 +1241,7 @@ fn write_csv(rows: &[Row], path: &std::path::Path) -> Result<()> {
         "human_cost",
         "cost_diff",
         "elapsed_ms",
+        "graded_nodes",
     ];
     header.extend(columns.iter().map(String::as_str));
     wtr.write_record(&header)?;
@@ -1130,6 +1284,8 @@ fn write_csv(rows: &[Row], path: &std::path::Path) -> Result<()> {
                     human_cost.to_string(),
                     cost_diff.to_string(),
                     format!("{:.3}", row.elapsed_ms),
+                    row.graded_nodes
+                        .map_or_else(|| "-".to_string(), |g| g.to_string()),
                 ];
                 record.extend(reason_fields);
                 wtr.write_record(&record)?;
@@ -1148,6 +1304,8 @@ fn write_csv(rows: &[Row], path: &std::path::Path) -> Result<()> {
                     "-".to_string(),
                     "-".to_string(),
                     format!("{:.3}", row.elapsed_ms),
+                    row.graded_nodes
+                        .map_or_else(|| "-".to_string(), |g| g.to_string()),
                 ];
                 record.extend(reason_fields);
                 wtr.write_record(&record)?;
@@ -1163,6 +1321,56 @@ fn write_csv(rows: &[Row], path: &std::path::Path) -> Result<()> {
 mod tests {
     use super::*;
 
+    /// Every label `ASTMappingReason::bucket_label` can return must have a column in
+    /// `NON_APTED_REASON_LABELS`, or the mapping entries that pass produces are silently dropped
+    /// from the CSV and from the reason table - which is exactly what happened to eight passes
+    /// until 2026-09-02 (see `NON_APTED_REASON_LABELS`' own doc comment).
+    ///
+    /// The variant list below is written out rather than derived because Rust cannot enumerate a
+    /// plain enum without a helper crate. It does not need to be exhaustive to be useful: adding a
+    /// variant already fails to compile in `bucket_label`'s match, and this test is what turns
+    /// "forgot the column too" from silent data loss into a failure that names the missing label.
+    #[test]
+    fn non_apted_reason_labels_covers_every_bucket_label() {
+        let every_variant = [
+            ASTMappingReason::IdenticalHash,
+            ASTMappingReason::IdenticalHashOfAncestor,
+            ASTMappingReason::FullyMappingSubtrees,
+            ASTMappingReason::StructurallyIdenticalSubtrees,
+            ASTMappingReason::StructurallyIdenticalAncestor,
+            ASTMappingReason::OptimalIDU,
+            ASTMappingReason::FlatSequenceDiff,
+            ASTMappingReason::MovedSubtree,
+            ASTMappingReason::LeadingSibling,
+            ASTMappingReason::GreedyAnchorBlock,
+            ASTMappingReason::BottomUpPropagation,
+            ASTMappingReason::UniqueTypeMatching,
+            ASTMappingReason::UnresolvedNode,
+            ASTMappingReason::MutualAncestor,
+            ASTMappingReason::NestedConditionCollapse,
+            ASTMappingReason::HeritageClauseGrowth,
+            ASTMappingReason::WrapGrowth,
+        ];
+
+        for reason in every_variant {
+            let label = reason.bucket_label();
+            assert!(
+                NON_APTED_REASON_LABELS.contains(&label),
+                "{reason:?} buckets to the label {label:?}, which has no column in \
+                 NON_APTED_REASON_LABELS - every mapping entry that pass produces would be \
+                 silently dropped from the CSV and the reason table. Append {label:?} to that list."
+            );
+        }
+    }
+
+    /// `APTED` is the one variant deliberately absent from `NON_APTED_REASON_LABELS`: it fans out
+    /// into one `APTED:<source>` column per call site rather than bucketing into a single column,
+    /// so the test above must not be "read" as requiring it.
+    #[test]
+    fn apted_is_deliberately_not_a_fixed_column() {
+        assert!(!NON_APTED_REASON_LABELS.contains(&ASTMappingReason::APTED("any").bucket_label()));
+    }
+
     /// A scored fixture. `elapsed_ms`/`algorithm_cost` and friends play no part in the gate, so
     /// they are whatever compiles.
     fn row(name: &str, mismatches: usize, visible: usize) -> Row {
@@ -1170,6 +1378,7 @@ mod tests {
             name: name.to_string(),
             mismatches: Some((mismatches, 1000)),
             visible_mismatches: Some((visible, 700)),
+            graded_nodes: Some(700),
             reason_counts: HashMap::new(),
             algorithm_cost: 0,
             human_cost: Some(0),
@@ -1184,6 +1393,7 @@ mod tests {
             name: name.to_string(),
             mismatches: None,
             visible_mismatches: None,
+            graded_nodes: None,
             reason_counts: HashMap::new(),
             algorithm_cost: 0,
             human_cost: None,
@@ -1258,6 +1468,62 @@ mod tests {
         assert!(!report.failed(), "a new fixture must never fail the gate");
         assert_eq!(report.added, vec!["brand-new-and-hard".to_string()]);
         assert!(report.regressed.is_empty());
+    }
+
+    /// Losing a whole dataset directory must not pass green. `removed` is non-gating per fixture,
+    /// which had silently become "no lower bound at all" - see
+    /// `GateReport::lost_too_much_of_the_corpus`.
+    #[test]
+    fn a_run_that_lost_most_of_the_corpus_fails_even_with_no_regression() {
+        let baseline_rows: Vec<(&str, usize, usize)> =
+            (0..100).map(|_| ("placeholder", 3, 1)).collect();
+        let named: Vec<(String, usize, usize)> = baseline_rows
+            .iter()
+            .enumerate()
+            .map(|(i, (_, m, v))| (format!("fixture-{i:03}"), *m, *v))
+            .collect();
+        let full: Vec<(&str, usize, usize)> =
+            named.iter().map(|(n, m, v)| (n.as_str(), *m, *v)).collect();
+
+        // Only the first 50 of 100 fixtures were scored, and every one of them matches its
+        // baseline exactly: nothing regressed, and half the corpus is simply absent.
+        let scored: Vec<Row> = named
+            .iter()
+            .take(50)
+            .map(|(n, m, v)| row(n, *m, *v))
+            .collect();
+        let report = compare_to_baseline(&scored, &baseline(&full));
+
+        assert!(report.regressed.is_empty(), "nothing actually got worse");
+        assert_eq!(report.removed.len(), 50);
+        assert!(
+            report.failed(),
+            "a run covering half its baseline must not report success"
+        );
+    }
+
+    /// The other half of the floor: routine churn stays non-gating. Dropping or renaming one
+    /// fixture out of 100 is an ordinary corpus operation and must not turn the gate red.
+    #[test]
+    fn dropping_a_single_fixture_still_passes() {
+        let named: Vec<(String, usize, usize)> = (0..100)
+            .map(|i| (format!("fixture-{i:03}"), 3, 1))
+            .collect();
+        let full: Vec<(&str, usize, usize)> =
+            named.iter().map(|(n, m, v)| (n.as_str(), *m, *v)).collect();
+        let scored: Vec<Row> = named
+            .iter()
+            .take(99)
+            .map(|(n, m, v)| row(n, *m, *v))
+            .collect();
+
+        let report = compare_to_baseline(&scored, &baseline(&full));
+
+        assert_eq!(report.removed.len(), 1);
+        assert!(
+            !report.failed(),
+            "one dropped fixture is routine and must stay non-gating"
+        );
     }
 
     /// Deleting an inconvenient fixture is the one way to make every number improve without
