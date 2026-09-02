@@ -24132,6 +24132,37 @@
         "class_body:1",
         "}:1"
       ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "class_declaration:3",
+        "class_body:1",
+        "function_declaration:1",
+        "function_body:1",
+        "statements:1",
+        "class_declaration:1",
+        "class_body:1",
+        "property_declaration:1",
+        "modifiers:1",
+        "property_modifier:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "class_declaration:3",
+        "class_body:1",
+        "function_declaration:1",
+        "function_body:1",
+        "statements:1",
+        "class_declaration:1",
+        "class_body:1",
+        "property_declaration:1",
+        "modifiers:1",
+        "property_modifier:1",
+        "static:1"
+      ]
     }
   ],
   "groups": [
@@ -24227,56 +24258,6 @@
           "property_declaration:1",
           "line_string_literal:1",
           "\":1"
-        ]
-      ],
-      "operation": "identical",
-      "with_children": false
-    },
-    {
-      "before_paths": [
-        [
-          "class_declaration:3",
-          "class_body:1",
-          "function_declaration:1",
-          "function_body:1",
-          "statements:1",
-          "class_declaration:1",
-          "class_body:1",
-          "property_declaration:1",
-          "call_expression:1",
-          "call_suffix:1",
-          "value_arguments:1",
-          "value_argument:3",
-          "dictionary_literal:1",
-          "line_string_literal:1",
-          "line_str_text:1"
-        ],
-        [
-          "class_declaration:3",
-          "class_body:1",
-          "function_declaration:1",
-          "function_body:1",
-          "statements:1",
-          "call_expression:2",
-          "call_suffix:1",
-          "value_arguments:1",
-          "value_argument:2",
-          "line_string_literal:1",
-          "line_str_text:1"
-        ]
-      ],
-      "after_paths": [
-        [
-          "class_declaration:3",
-          "class_body:1",
-          "function_declaration:1",
-          "function_body:1",
-          "statements:1",
-          "class_declaration:1",
-          "class_body:1",
-          "property_declaration:1",
-          "line_string_literal:1",
-          "line_str_text:1"
         ]
       ],
       "operation": "identical",

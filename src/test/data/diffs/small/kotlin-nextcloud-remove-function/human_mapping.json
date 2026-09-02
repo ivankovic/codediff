@@ -115827,41 +115827,6 @@
       ]
     },
     {
-      "operation": "identical",
-      "before_path": [
-        "class_declaration:1",
-        "class_body:1",
-        "function_declaration:21",
-        "function_body:1",
-        "block:1",
-        "property_declaration:4",
-        "call_expression:1",
-        "navigation_expression:1",
-        "call_expression:1",
-        "navigation_expression:1",
-        "call_expression:1",
-        "navigation_expression:1",
-        ".:1"
-      ],
-      "after_path": [
-        "class_declaration:1",
-        "class_body:1",
-        "function_declaration:20",
-        "function_body:1",
-        "block:1",
-        "property_declaration:4",
-        "call_expression:1",
-        "navigation_expression:1",
-        "call_expression:1",
-        "navigation_expression:1",
-        "call_expression:1",
-        "navigation_expression:1",
-        "call_expression:1",
-        "navigation_expression:1",
-        ".:1"
-      ]
-    },
-    {
       "operation": "insert",
       "after_path": [
         "class_declaration:1",
@@ -180115,6 +180080,63 @@
         "class_body:1",
         "}:1"
       ]
+    }
+  ],
+  "groups": [
+    {
+      "before_paths": [
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "function_declaration:21",
+          "function_body:1",
+          "block:1",
+          "property_declaration:4",
+          "call_expression:1",
+          "navigation_expression:1",
+          "call_expression:1",
+          "navigation_expression:1",
+          "call_expression:1",
+          "navigation_expression:1",
+          ".:1"
+        ]
+      ],
+      "after_paths": [
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "function_declaration:20",
+          "function_body:1",
+          "block:1",
+          "property_declaration:4",
+          "call_expression:1",
+          "navigation_expression:1",
+          "call_expression:1",
+          "navigation_expression:1",
+          "call_expression:1",
+          "navigation_expression:1",
+          "call_expression:1",
+          "navigation_expression:1",
+          ".:1"
+        ],
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "function_declaration:20",
+          "function_body:1",
+          "block:1",
+          "property_declaration:4",
+          "call_expression:1",
+          "navigation_expression:1",
+          "call_expression:1",
+          "navigation_expression:1",
+          "call_expression:1",
+          "navigation_expression:1",
+          ".:1"
+        ]
+      ],
+      "operation": "identical",
+      "with_children": false
     }
   ]
 }

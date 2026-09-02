@@ -93061,6 +93061,88 @@
         "property_declaration:3",
         "type_annotation:1"
       ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "class_declaration:1",
+        "class_body:1",
+        "init_declaration:1",
+        "function_body:1",
+        "statements:1",
+        "assignment:3",
+        "call_expression:1",
+        "call_suffix:1",
+        "lambda_literal:1",
+        "}:1"
+      ],
+      "after_path": [
+        "class_declaration:1",
+        "class_body:1",
+        "init_declaration:1",
+        "function_body:1",
+        "statements:1",
+        "if_statement:1",
+        "}:1"
+      ]
+    },
+    {
+      "operation": "delete",
+      "before_path": [
+        "class_declaration:1",
+        "class_body:1",
+        "function_declaration:3",
+        "function_body:1",
+        "statements:1",
+        "guard_statement:1",
+        "statements:1",
+        "control_transfer_statement:1",
+        "nil:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "class_declaration:1",
+        "class_body:1",
+        "function_declaration:3",
+        "function_body:1",
+        "statements:1",
+        "guard_statement:1",
+        "statements:1",
+        "control_transfer_statement:1",
+        "array_literal:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "class_declaration:1",
+        "class_body:1",
+        "function_declaration:3",
+        "function_body:1",
+        "statements:1",
+        "guard_statement:1",
+        "statements:1",
+        "control_transfer_statement:1",
+        "array_literal:1",
+        "[:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "class_declaration:1",
+        "class_body:1",
+        "function_declaration:3",
+        "function_body:1",
+        "statements:1",
+        "guard_statement:1",
+        "statements:1",
+        "control_transfer_statement:1",
+        "array_literal:1",
+        "]:1"
+      ]
     }
   ],
   "groups": [

@@ -4338,6 +4338,26 @@
         "template_body:1",
         "}:1"
       ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "object_definition:2",
+        "template_body:1",
+        "val_definition:1",
+        "infix_expression:1",
+        "operator_identifier:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "object_definition:2",
+        "template_body:1",
+        "val_definition:1",
+        "infix_expression:1",
+        "string:1"
+      ]
     }
   ],
   "groups": [
@@ -4382,6 +4402,218 @@
       ],
       "operation": "match_but_not_identical",
       "with_children": false
+    }
+  ],
+  "text_mappings": [
+    {
+      "name": "Minimal",
+      "entries": [
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 24,
+              "start_column": 46,
+              "end_row": 24,
+              "end_column": 51
+            }
+          ]
+        },
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 24,
+              "start_column": 63,
+              "end_row": 24,
+              "end_column": 71
+            }
+          ]
+        },
+        {
+          "operation": "Match",
+          "before": [
+            {
+              "start_row": 24,
+              "start_column": 54,
+              "end_row": 24,
+              "end_column": 55
+            }
+          ],
+          "after": [
+            {
+              "start_row": 24,
+              "start_column": 58,
+              "end_row": 24,
+              "end_column": 59
+            }
+          ]
+        },
+        {
+          "operation": "Delete",
+          "before": [
+            {
+              "start_row": 25,
+              "start_column": 2,
+              "end_row": 25,
+              "end_column": 39
+            }
+          ]
+        },
+        {
+          "operation": "Delete",
+          "before": [
+            {
+              "start_row": 26,
+              "start_column": 2,
+              "end_row": 26,
+              "end_column": 66
+            }
+          ]
+        },
+        {
+          "operation": "Delete",
+          "before": [
+            {
+              "start_row": 29,
+              "start_column": 13,
+              "end_row": 29,
+              "end_column": 37
+            }
+          ]
+        },
+        {
+          "operation": "Delete",
+          "before": [
+            {
+              "start_row": 24,
+              "start_column": 35,
+              "end_row": 24,
+              "end_column": 36
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Full",
+      "entries": [
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 24,
+              "start_column": 63,
+              "end_row": 24,
+              "end_column": 71
+            }
+          ]
+        },
+        {
+          "operation": "Delete",
+          "before": [
+            {
+              "start_row": 25,
+              "start_column": 2,
+              "end_row": 25,
+              "end_column": 39
+            }
+          ]
+        },
+        {
+          "operation": "Delete",
+          "before": [
+            {
+              "start_row": 26,
+              "start_column": 2,
+              "end_row": 26,
+              "end_column": 66
+            }
+          ]
+        },
+        {
+          "operation": "Delete",
+          "before": [
+            {
+              "start_row": 29,
+              "start_column": 13,
+              "end_row": 29,
+              "end_column": 37
+            }
+          ]
+        },
+        {
+          "operation": "Delete",
+          "before": [
+            {
+              "start_row": 25,
+              "start_column": 0,
+              "end_row": 25,
+              "end_column": 2
+            }
+          ]
+        },
+        {
+          "operation": "Delete",
+          "before": [
+            {
+              "start_row": 26,
+              "start_column": 0,
+              "end_row": 26,
+              "end_column": 2
+            }
+          ]
+        },
+        {
+          "operation": "Match",
+          "before": [
+            {
+              "start_row": 24,
+              "start_column": 34,
+              "end_row": 24,
+              "end_column": 36
+            }
+          ],
+          "after": [
+            {
+              "start_row": 24,
+              "start_column": 34,
+              "end_row": 24,
+              "end_column": 35
+            }
+          ]
+        },
+        {
+          "operation": "Match",
+          "before": [
+            {
+              "start_row": 24,
+              "start_column": 36,
+              "end_row": 24,
+              "end_column": 58
+            }
+          ],
+          "after": [
+            {
+              "start_row": 24,
+              "start_column": 35,
+              "end_row": 24,
+              "end_column": 62
+            }
+          ]
+        },
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 24,
+              "start_column": 62,
+              "end_row": 24,
+              "end_column": 63
+            }
+          ]
+        }
+      ]
     }
   ]
 }

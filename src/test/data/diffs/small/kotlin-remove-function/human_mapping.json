@@ -3361,6 +3361,189 @@
       ]
     },
     {
+      "operation": "delete",
+      "before_path": [
+        "class_declaration:1",
+        "class_body:1",
+        "function_declaration:1",
+        "function_body:1",
+        "block:1",
+        "call_expression:1",
+        "navigation_expression:1",
+        "call_expression:1",
+        "annotated_lambda:1",
+        "lambda_literal:1",
+        "assignment:1",
+        "call_expression:1",
+        "navigation_expression:1"
+      ]
+    },
+    {
+      "operation": "delete",
+      "before_path": [
+        "class_declaration:1",
+        "class_body:1",
+        "function_declaration:1",
+        "function_body:1",
+        "block:1",
+        "call_expression:1",
+        "navigation_expression:1",
+        "call_expression:1",
+        "annotated_lambda:1",
+        "lambda_literal:1",
+        "assignment:1",
+        "call_expression:1",
+        "navigation_expression:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "delete",
+      "before_path": [
+        "class_declaration:1",
+        "class_body:1",
+        "function_declaration:1",
+        "function_body:1",
+        "block:1",
+        "call_expression:1",
+        "navigation_expression:1",
+        "call_expression:1",
+        "annotated_lambda:1",
+        "lambda_literal:1",
+        "assignment:1",
+        "call_expression:1",
+        "navigation_expression:1",
+        ".:1"
+      ]
+    },
+    {
+      "operation": "delete",
+      "before_path": [
+        "class_declaration:1",
+        "class_body:1",
+        "function_declaration:1",
+        "function_body:1",
+        "block:1",
+        "call_expression:1",
+        "annotated_lambda:1",
+        "lambda_literal:1",
+        "assignment:1",
+        "navigation_expression:2"
+      ]
+    },
+    {
+      "operation": "delete",
+      "before_path": [
+        "class_declaration:1",
+        "class_body:1",
+        "function_declaration:1",
+        "function_body:1",
+        "block:1",
+        "call_expression:1",
+        "annotated_lambda:1",
+        "lambda_literal:1",
+        "assignment:1",
+        "navigation_expression:2",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "delete",
+      "before_path": [
+        "class_declaration:1",
+        "class_body:1",
+        "function_declaration:1",
+        "function_body:1",
+        "block:1",
+        "call_expression:1",
+        "annotated_lambda:1",
+        "lambda_literal:1",
+        "assignment:1",
+        "navigation_expression:2",
+        ".:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "class_declaration:1",
+        "class_body:1",
+        "function_declaration:1",
+        "function_body:1",
+        "block:1",
+        "}:1"
+      ],
+      "after_path": [
+        "class_declaration:1",
+        "class_body:1",
+        "function_declaration:1",
+        "function_body:1",
+        "block:1",
+        "}:1"
+      ]
+    },
+    {
+      "operation": "delete",
+      "before_path": [
+        "class_declaration:1",
+        "class_body:1",
+        "block_comment:3"
+      ]
+    },
+    {
+      "operation": "delete_with_children",
+      "before_path": [
+        "class_declaration:1",
+        "class_body:1",
+        "property_declaration:4"
+      ]
+    },
+    {
+      "operation": "delete_with_children",
+      "before_path": [
+        "property_declaration:1"
+      ]
+    },
+    {
+      "operation": "delete",
+      "before_path": [
+        "class_declaration:1",
+        "primary_constructor:1",
+        "class_parameters:1",
+        ",:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "class_declaration:1",
+        "primary_constructor:1",
+        "class_parameters:1",
+        ",:3"
+      ],
+      "after_path": [
+        "class_declaration:1",
+        "primary_constructor:1",
+        "class_parameters:1",
+        ",:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "class_declaration:1",
+        "primary_constructor:1",
+        "class_parameters:1",
+        ",:1"
+      ],
+      "after_path": [
+        "class_declaration:1",
+        "primary_constructor:1",
+        "class_parameters:1",
+        ",:1"
+      ]
+    },
+    {
       "operation": "identical",
       "before_path": [
         "class_declaration:1",
@@ -3927,62 +4110,6 @@
         "lambda_literal:1",
         "assignment:1",
         "call_expression:1"
-      ]
-    },
-    {
-      "operation": "delete",
-      "before_path": [
-        "class_declaration:1",
-        "class_body:1",
-        "function_declaration:1",
-        "function_body:1",
-        "block:1",
-        "call_expression:1",
-        "navigation_expression:1",
-        "call_expression:1",
-        "annotated_lambda:1",
-        "lambda_literal:1",
-        "assignment:1",
-        "call_expression:1",
-        "navigation_expression:1"
-      ]
-    },
-    {
-      "operation": "delete",
-      "before_path": [
-        "class_declaration:1",
-        "class_body:1",
-        "function_declaration:1",
-        "function_body:1",
-        "block:1",
-        "call_expression:1",
-        "navigation_expression:1",
-        "call_expression:1",
-        "annotated_lambda:1",
-        "lambda_literal:1",
-        "assignment:1",
-        "call_expression:1",
-        "navigation_expression:1",
-        "identifier:1"
-      ]
-    },
-    {
-      "operation": "delete",
-      "before_path": [
-        "class_declaration:1",
-        "class_body:1",
-        "function_declaration:1",
-        "function_body:1",
-        "block:1",
-        "call_expression:1",
-        "navigation_expression:1",
-        "call_expression:1",
-        "annotated_lambda:1",
-        "lambda_literal:1",
-        "assignment:1",
-        "call_expression:1",
-        "navigation_expression:1",
-        ".:1"
       ]
     },
     {
@@ -4874,53 +5001,6 @@
       ]
     },
     {
-      "operation": "delete",
-      "before_path": [
-        "class_declaration:1",
-        "class_body:1",
-        "function_declaration:1",
-        "function_body:1",
-        "block:1",
-        "call_expression:1",
-        "annotated_lambda:1",
-        "lambda_literal:1",
-        "assignment:1",
-        "navigation_expression:2"
-      ]
-    },
-    {
-      "operation": "delete",
-      "before_path": [
-        "class_declaration:1",
-        "class_body:1",
-        "function_declaration:1",
-        "function_body:1",
-        "block:1",
-        "call_expression:1",
-        "annotated_lambda:1",
-        "lambda_literal:1",
-        "assignment:1",
-        "navigation_expression:2",
-        "identifier:1"
-      ]
-    },
-    {
-      "operation": "delete",
-      "before_path": [
-        "class_declaration:1",
-        "class_body:1",
-        "function_declaration:1",
-        "function_body:1",
-        "block:1",
-        "call_expression:1",
-        "annotated_lambda:1",
-        "lambda_literal:1",
-        "assignment:1",
-        "navigation_expression:2",
-        ".:1"
-      ]
-    },
-    {
       "operation": "identical",
       "before_path": [
         "class_declaration:1",
@@ -4978,48 +5058,12 @@
       "before_path": [
         "class_declaration:1",
         "class_body:1",
-        "function_declaration:1",
-        "function_body:1",
-        "block:1",
         "}:1"
       ],
       "after_path": [
         "class_declaration:1",
         "class_body:1",
-        "function_declaration:1",
-        "function_body:1",
-        "block:1",
         "}:1"
-      ]
-    },
-    {
-      "operation": "delete",
-      "before_path": [
-        "class_declaration:1",
-        "class_body:1",
-        "block_comment:3"
-      ]
-    },
-    {
-      "operation": "delete_with_children",
-      "before_path": [
-        "class_declaration:1",
-        "class_body:1",
-        "property_declaration:4"
-      ]
-    },
-    {
-      "operation": "delete",
-      "before_path": [
-        "class_declaration:1",
-        "class_body:1",
-        "}:1"
-      ]
-    },
-    {
-      "operation": "delete_with_children",
-      "before_path": [
-        "property_declaration:1"
       ]
     }
   ]
