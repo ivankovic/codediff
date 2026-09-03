@@ -731,6 +731,7 @@ pub(crate) fn render_paint_side(
     state: &TextPaintState,
     side: usize,
     height: usize,
+    width: usize,
 ) -> Vec<Line<'static>> {
     let selection = state.selection(side, source);
     let banked = &state.pending[side];
@@ -774,18 +775,44 @@ pub(crate) fn render_paint_side(
         class
     };
 
+    // The columns a row's text actually gets, once the line-number gutter has taken its share. A
+    // terminal too narrow to fit even one character of content turns wrapping off rather than
+    // looping forever on a zero-width chunk.
+    let content_width = width.saturating_sub(gutter_width + 1);
+
+    // How many screen rows one source row costs once wrapped. Never zero: an empty row still
+    // occupies the line it sits on.
+    let wrapped_height = |row: usize| -> usize {
+        if content_width == 0 {
+            return 1;
+        }
+        lines
+            .get(row)
+            .map(|line| line.chars().count().div_ceil(content_width).max(1))
+            .unwrap_or(1)
+    };
+
+    // `scroll_into_view` keeps the cursor within a *source*-row window (`VIEWPORT_ROWS`), which
+    // stops being the same thing as a screen-row window the moment rows wrap - one 4000-column
+    // line can eat the whole viewport on its own. So the start row is walked forward here, for
+    // display only, until the cursor's row fits. Display-only because the renderer has no business
+    // mutating scroll state, and because leaving `state.scroll` alone keeps j/k behaving the same.
+    let mut start = top.min(cursor_row);
+    if focused && content_width > 0 {
+        let mut used: usize = (start..=cursor_row).map(wrapped_height).sum();
+        while used > height && start < cursor_row {
+            used -= wrapped_height(start);
+            start += 1;
+        }
+    }
+
     let mut out = Vec::with_capacity(height);
-    for (row, line) in lines
-        .iter()
-        .enumerate()
-        .take((top + height).min(lines.len()))
-        .skip(top)
-    {
+    for (row, line) in lines.iter().enumerate().skip(start) {
+        if out.len() >= height {
+            break;
+        }
         let line = *line;
-        let mut spans_out = vec![Span::styled(
-            format!("{:>width$} ", row + 1, width = gutter_width),
-            Style::default().fg(Color::DarkGray),
-        )];
+        let mut spans_out: Vec<Span<'static>> = Vec::new();
 
         let mut run = String::new();
         let mut run_class: Option<PaintClass> = None;
@@ -820,9 +847,67 @@ pub(crate) fn render_paint_side(
             spans_out.push(Span::styled(" ".to_string(), paint_class_style(end_class)));
         }
 
-        out.push(Line::from(spans_out));
+        // One screen row per `content_width` columns of this source row. The line number goes on
+        // the first of them and the rest get a blank gutter of the same width, so the numbers stay
+        // a readable column rather than repeating down a wrapped line.
+        let gutter_style = Style::default().fg(Color::DarkGray);
+        for (chunk_index, chunk) in wrap_spans(spans_out, content_width).into_iter().enumerate() {
+            if out.len() >= height {
+                break;
+            }
+            let gutter = if chunk_index == 0 {
+                format!("{:>gutter_width$} ", row + 1)
+            } else {
+                format!("{:>gutter_width$} ", "")
+            };
+            let mut screen_row = vec![Span::styled(gutter, gutter_style)];
+            screen_row.extend(chunk);
+            out.push(Line::from(screen_row));
+        }
     }
     out
+}
+
+/// Splits one source row's styled runs into screen rows of at most `width` columns, preserving
+/// each run's style across a split. A `width` of 0 means "do not wrap" - the caller has a terminal
+/// too narrow to fit any content beside the gutter, and returning one over-long row is better than
+/// dividing by zero.
+///
+/// Counts characters rather than bytes, matching `render_paint_side`'s own column model: every
+/// character it emits occupies one column, which is exactly what `display_safe_char` guarantees by
+/// mapping the one character that would not (a tab) to a space.
+fn wrap_spans(spans: Vec<Span<'static>>, width: usize) -> Vec<Vec<Span<'static>>> {
+    if width == 0 {
+        return vec![spans];
+    }
+    let mut rows: Vec<Vec<Span<'static>>> = Vec::new();
+    let mut current: Vec<Span<'static>> = Vec::new();
+    let mut used = 0usize;
+
+    for span in spans {
+        let style = span.style;
+        let owned = span.content.into_owned();
+        let mut rest: &str = &owned;
+        while !rest.is_empty() {
+            let room = width - used;
+            let take: String = rest.chars().take(room).collect();
+            let taken = take.chars().count();
+            if taken == 0 {
+                break;
+            }
+            current.push(Span::styled(take.clone(), style));
+            used += taken;
+            rest = &rest[take.len()..];
+            if used == width {
+                rows.push(std::mem::take(&mut current));
+                used = 0;
+            }
+        }
+    }
+    if !current.is_empty() || rows.is_empty() {
+        rows.push(current);
+    }
+    rows
 }
 
 pub(crate) fn paint_class_style(class: PaintClass) -> Style {
@@ -952,7 +1037,10 @@ pub(crate) fn render_text_view_modal(
             },
         ),
     ] {
-        let lines = render_paint_side(source, &shown[side], state, side, height);
+        // Two columns go to the block's own borders, the same two rows `height` already accounts
+        // for above.
+        let inner_width = columns[side].width.saturating_sub(2) as usize;
+        let lines = render_paint_side(source, &shown[side], state, side, height, inner_width);
         let border_style = if state.side == side {
             Style::default()
                 .fg(Color::Cyan)

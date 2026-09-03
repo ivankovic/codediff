@@ -2358,7 +2358,7 @@ fn vertical_selection_leaves_a_middle_rows_tail_unstyled_but_full_line_does_not(
     // a full-line sweep would highlight and a vertical selection would not.
     let tail_column = 10;
 
-    let vertical = render_paint_side(source, &[], &state, 0, 5);
+    let vertical = render_paint_side(source, &[], &state, 0, 5, 10_000);
     assert_ne!(
         style_at(&vertical, 1, tail_column).bg,
         selected_bg,
@@ -2366,7 +2366,7 @@ fn vertical_selection_leaves_a_middle_rows_tail_unstyled_but_full_line_does_not(
     );
 
     state.vertical = false;
-    let full_line = render_paint_side(source, &[], &state, 0, 5);
+    let full_line = render_paint_side(source, &[], &state, 0, 5, 10_000);
     assert_eq!(
         style_at(&full_line, 1, tail_column).bg,
         selected_bg,
@@ -6397,7 +6397,7 @@ fn text_view_renders_no_literal_tabs_for_a_tab_indented_fixture() {
     );
 
     let state = TextPaintState::default();
-    let lines = render_paint_side(&source, &[], &state, 0, 100);
+    let lines = render_paint_side(&source, &[], &state, 0, 100, 10_000);
 
     for line in &lines {
         let rendered: String = line.spans.iter().map(|s| s.content.as_ref()).collect();
@@ -6415,7 +6415,7 @@ fn text_view_renders_no_literal_tabs_for_a_tab_indented_fixture() {
 fn text_view_keeps_one_screen_column_per_source_character() {
     let source = "\tif x {\n\t\treturn \"y\"\n\t}\n";
     let state = TextPaintState::default();
-    let lines = render_paint_side(source, &[], &state, 0, 100);
+    let lines = render_paint_side(source, &[], &state, 0, 100, 10_000);
 
     for (row, expected) in source.split('\n').enumerate() {
         // The first span is the line-number gutter, which has no source counterpart.
@@ -6637,4 +6637,131 @@ fn spans_overlap_detects_a_shared_byte_and_allows_touching_ranges() {
     );
     assert!(!spans_overlap(&[span(0, 4)]));
     assert!(!spans_overlap(&[]));
+}
+
+/// The text of every screen row a call produced, gutter included - what the reader actually sees.
+fn painted_screen_rows(lines: &[ratatui::text::Line<'static>]) -> Vec<String> {
+    lines
+        .iter()
+        .map(|line| line.spans.iter().map(|s| s.content.as_ref()).collect())
+        .collect()
+}
+
+#[test]
+fn a_long_line_wraps_across_screen_rows_with_a_blank_continuation_gutter() {
+    let source = format!("short\nx{}\ntail\n", "ABCDEFGHIJ".repeat(9));
+    let state = TextPaintState::default();
+
+    // Width 40, gutter "  N " = 4 columns, so 36 columns of content per screen row.
+    let rows = painted_screen_rows(&render_paint_side(&source, &[], &state, 0, 12, 40));
+
+    assert_eq!(rows[0], "  1 short");
+    assert_eq!(rows[1].chars().count(), 40, "a wrapped row fills the width");
+    assert!(rows[1].starts_with("  2 x"));
+    assert!(
+        rows[2].starts_with("    ") && !rows[2].starts_with("  3"),
+        "a continuation row carries a blank gutter, not a repeated line number: {:?}",
+        rows[2]
+    );
+    assert!(
+        rows.iter().any(|r| r.starts_with("  3 tail")),
+        "the next source row still gets its own number: {rows:?}"
+    );
+
+    // Nothing is lost or duplicated: the wrapped rows reassemble into the original line.
+    let rejoined: String = rows[1..4]
+        .iter()
+        .map(|r| r[4..].to_string())
+        .collect::<Vec<_>>()
+        .join("");
+    assert_eq!(rejoined, format!("x{}", "ABCDEFGHIJ".repeat(9)));
+}
+
+#[test]
+fn wrapping_never_emits_more_screen_rows_than_the_viewport_holds() {
+    let source = format!(
+        "{}\n{}\n{}\n",
+        "a".repeat(200),
+        "b".repeat(200),
+        "c".repeat(200)
+    );
+    let state = TextPaintState::default();
+
+    let rows = render_paint_side(&source, &[], &state, 0, 5, 40);
+    assert_eq!(rows.len(), 5, "a 5-row viewport must render exactly 5 rows");
+}
+
+/// `scroll_into_view` keeps the cursor inside a *source*-row window, which stops meaning the same
+/// thing once rows wrap: one very long line can fill the viewport by itself. The renderer walks
+/// its start row forward so the cursor's row is always on screen.
+#[test]
+fn the_cursor_row_stays_visible_when_the_rows_above_it_wrap() {
+    let source = format!("{}\n{}\nCURSORROW\n", "a".repeat(400), "b".repeat(400));
+    let mut state = TextPaintState::default();
+    state.cursor[0] = (2, 0);
+    state.scroll[0] = 0;
+
+    // Rows 0 and 1 wrap to 12 screen rows each at this width, so a naive render from row 0 would
+    // never reach row 2 inside a 10-row viewport.
+    let rows = painted_screen_rows(&render_paint_side(&source, &[], &state, 0, 10, 40));
+    assert!(
+        rows.iter().any(|r| r.contains("CURSORROW")),
+        "the cursor's row should have been scrolled to: {rows:?}"
+    );
+}
+
+#[test]
+fn a_width_with_no_room_beside_the_gutter_does_not_wrap_or_hang() {
+    let source = format!("{}\n", "z".repeat(80));
+    let state = TextPaintState::default();
+
+    let rows = painted_screen_rows(&render_paint_side(&source, &[], &state, 0, 5, 0));
+    // Two source rows: the 80 z's, and the empty one left by the trailing newline.
+    assert_eq!(
+        rows.len(),
+        2,
+        "no room to wrap into means no extra rows, not a loop"
+    );
+    assert!(
+        rows[0].ends_with(&"z".repeat(80)),
+        "the row is rendered whole rather than wrapped: {:?}",
+        rows[0]
+    );
+}
+
+#[test]
+fn a_painted_span_keeps_its_style_across_a_wrap_boundary() {
+    let source = format!("{}\n", "q".repeat(80));
+    // Focus the other side: `PaintClass::Cursor` outranks `Painted`, so a cursor resting on this
+    // row would style its first character as the cursor and mask what this test checks.
+    let state = TextPaintState {
+        side: 1,
+        ..TextPaintState::default()
+    };
+    let spans = vec![(
+        HumanTextSpan {
+            start_row: 0,
+            start_column: 0,
+            end_row: 0,
+            end_column: 80,
+        },
+        HumanTextVerdict::Delete,
+    )];
+
+    let lines = render_paint_side(&source, &spans, &state, 0, 5, 40);
+    assert!(
+        lines.len() > 1,
+        "80 columns should not fit in one 36-wide row"
+    );
+    for (i, line) in lines.iter().enumerate() {
+        // Span 0 is the gutter; everything after it is the painted content of that screen row.
+        for span in line.spans.iter().skip(1) {
+            assert_eq!(
+                span.style,
+                paint_class_style(PaintClass::Painted(HumanTextVerdict::Delete)),
+                "row {i} lost its paint across the wrap: {:?}",
+                span.content
+            );
+        }
+    }
 }
