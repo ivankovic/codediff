@@ -75,9 +75,13 @@ fn optimal_solution() -> Result<()> {
     // Clamp raised 1/1 -> 8/4 on 2026-08-27, by the mapping gaining the group above rather than
     // by anything in the differ changing: more nodes asserted means more of the existing
     // disagreement is visible to the check. Not a regression.
+    // 2026-09-03: tightened 8,4 -> 5,4. The limit was stale rather than a deliberate allowance: it
+    // had outlived the change that closed the gap, and `quality_baseline.csv` was the only thing
+    // still holding this fixture to its real number. Any counts above describe the older, larger
+    // residual.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "rust-error-handling",
-        8,
+        5,
         4,
     )
 }

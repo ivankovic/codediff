@@ -33,9 +33,11 @@ fn optimal_solution() -> Result<()> {
     // `identifier`) aren't on `kinds_update_allowed`'s list, so even real APTED's forced-update
     // cost (`COST_DELETE + COST_INSERT + 1` = 3) loses to plain delete+insert (2) - there's no
     // cheaper mapping to find.
-    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
+    // 2026-09-03: the clamp at 1,1 is gone - this fixture now maps exactly. The limit was stale
+    // rather than a deliberate allowance: it had outlived the change that closed the gap, and
+    // `quality_baseline.csv` was the only thing still holding this fixture to its real number. Any
+    // counts above describe a residual that no longer exists.
+    test::helper::human_mapping::assert_matches_human_mapping(
         "python-pytorch-pytorch-add-param-to-many-places-and-update-one",
-        1,
-        1,
     )
 }

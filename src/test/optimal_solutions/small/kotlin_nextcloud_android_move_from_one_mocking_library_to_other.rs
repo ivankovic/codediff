@@ -25,9 +25,13 @@ fn optimal_solution() -> Result<()> {
     // test method, replacing a single class-level `@Captor` field each old method referenced -
     // two structurally-identical new local declarations with no earlier occurrence to anchor to,
     // an inherently ambiguous near-duplicate-insert case.
+    // 2026-09-03: tightened 46,30 -> 24,12. The limit was stale rather than a deliberate allowance:
+    // it had outlived the change that closed the gap, and `quality_baseline.csv` was the only thing
+    // still holding this fixture to its real number. Any counts above describe the older, larger
+    // residual.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "kotlin-nextcloud-android-move-from-one-mocking-library-to-other",
-        46,
-        30,
+        24,
+        12,
     )
 }

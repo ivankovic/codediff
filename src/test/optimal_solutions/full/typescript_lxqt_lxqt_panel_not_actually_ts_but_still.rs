@@ -21,14 +21,12 @@ use crate::test;
 
 #[test]
 fn optimal_solution() -> Result<()> {
-    // Known, unreviewed gap against the human-authored mapping - not yet root-caused. Clamped at
-    // the observed count rather than requiring an exact match. Lower (or drop back to
-    // `assert_matches_human_mapping`) once a fix lands.
-    // 2026-09-03: the clamp at 8,0 is gone - this fixture now maps exactly. The limit was stale
-    // rather than a deliberate allowance: it had outlived the change that closed the gap, and
-    // `quality_baseline.csv` was the only thing still holding this fixture to its real number. Any
-    // counts above describe a residual that no longer exists.
+    // 2026-09-03: backfilled. This fixture had a `quality_baseline.csv` row and no test at all,
+    // so the release gate was the only thing watching it - which is exactly the asymmetry that
+    // made the baseline a second source of truth for accuracy. Its 16.3 MB human_mapping.json
+    // is not why it was missing: three larger ones (79.8 MB, 56.8 MB, 52.6 MB) have always had
+    // stubs. It maps exactly.
     test::helper::human_mapping::assert_matches_human_mapping(
-        "kotlin-yairm210-unciv-remove-tovector2-from-multiple-callsites",
+        "typescript-lxqt-lxqt-panel-not-actually-ts-but-still",
     )
 }

@@ -143,8 +143,14 @@ check-quality:
 		echo "warning: runtime is more than 2x the baseline ($$ms ms/fixture vs $$baseline_ms ms/fixture) - investigate before deploying" >&2; \
 	fi
 
-# Rewrites both baselines from a fresh run - a deliberate, separate step, never something `deploy`
-# does on its own.
+# Rewrites both baselines - a deliberate, separate step, never something `deploy` does on its own.
+#
+# **The accuracy columns do not come from the run.** They are read out of the `optimal_solutions`
+# stubs (see `human_mapping::stub_mapping_limits`), so `quality_baseline.csv` is a projection of
+# the one hand-authored limit per fixture rather than a second record of the same thing. Only
+# `elapsed_ms` and MS_PER_FIXTURE below are measured here. The consequence is the point: this
+# command cannot re-baseline an accuracy regression away. Raising a limit means editing the stub,
+# which is the file that also holds the prose explaining why - and which no tool rewrites.
 #
 # Deliberately does NOT depend on check-quality, and deliberately does not gate: the moment you
 # most need this is right after a *reviewed* regression (a net-positive trade that costs one

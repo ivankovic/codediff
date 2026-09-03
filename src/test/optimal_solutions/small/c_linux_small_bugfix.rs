@@ -28,9 +28,13 @@ fn optimal_solution() -> Result<()> {
     // outer `if`) since either pairing is valid - but codediff actually matches the inner `if` as
     // Identical rather than the group's declared MatchButNotIdentical, one mismatch beyond the
     // pre-multi-map 4.
+    // 2026-09-03: tightened 5,0 -> 4,0. The limit was stale rather than a deliberate allowance: it
+    // had outlived the change that closed the gap, and `quality_baseline.csv` was the only thing
+    // still holding this fixture to its real number. Any counts above describe the older, larger
+    // residual.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "c-linux-small-bugfix",
-        5,
+        4,
         0,
     )
 }

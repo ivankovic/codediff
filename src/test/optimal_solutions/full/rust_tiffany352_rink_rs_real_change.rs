@@ -29,9 +29,13 @@ fn optimal_solution() -> Result<()> {
     // has looked at where these 76 come from yet. That is a different thing from the clamps on
     // css-madmaxms and html-chennes, whose comments name the mechanism `--details` attributes
     // them to - so start there if this one is picked up.
+    // 2026-09-03: tightened 76,54 -> 20,16. The limit was stale rather than a deliberate allowance:
+    // it had outlived the change that closed the gap, and `quality_baseline.csv` was the only thing
+    // still holding this fixture to its real number. Any counts above describe the older, larger
+    // residual.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "rust-tiffany352-rink-rs-real-change",
-        76,
-        54,
+        20,
+        16,
     )
 }

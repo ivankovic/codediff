@@ -31,9 +31,13 @@ fn optimal_solution() -> Result<()> {
     // moved code" class of gap (see `TODO.md` / prior `GreedyAnchorBlocks`/`final_pass cost gate`
     // investigations) - not attempted again here, since past attempts at a general fix for this
     // pattern were net-negative or reverted.
+    // 2026-09-03: tightened 7,4 -> 6,4. The limit was stale rather than a deliberate allowance: it
+    // had outlived the change that closed the gap, and `quality_baseline.csv` was the only thing
+    // still holding this fixture to its real number. Any counts above describe the older, larger
+    // residual.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "java-add-exception-handling",
-        7,
+        6,
         4,
     )
 }

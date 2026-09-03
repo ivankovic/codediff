@@ -25,9 +25,13 @@ fn optimal_solution() -> Result<()> {
     // `APTED("fast_fallback")` deletes them - the terminal Myers-LCS resolver, which cannot align
     // a node whose position in the residual forest moved. Same owner and same shape as the
     // reparenting gap recorded in `project_quality_goal_cost_anomaly_census`.
+    // 2026-09-03: tightened 63,39 -> 53,30. The limit was stale rather than a deliberate allowance:
+    // it had outlived the change that closed the gap, and `quality_baseline.csv` was the only thing
+    // still holding this fixture to its real number. Any counts above describe the older, larger
+    // residual.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "scala-com-lihaoyi-mill-new-import-used-to-remove-a-lot-of-code",
-        63,
-        39,
+        53,
+        30,
     )
 }

@@ -33,9 +33,13 @@ fn optimal_solution() -> Result<()> {
     // the descendants of subtrees the human marked `Insert`/`Delete (with children)`: HTML tag
     // scaffolding and quote characters are byte-identical throughout the file, so phase-1 hash
     // matching pairs them straight across the insert/delete boundary the human drew.
+    // 2026-09-03: tightened 749,519 -> 734,510. The limit was stale rather than a deliberate
+    // allowance: it had outlived the change that closed the gap, and `quality_baseline.csv` was the
+    // only thing still holding this fixture to its real number. Any counts above describe the
+    // older, larger residual.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "html-berndporr-iir1-a-lot-of-new-functionality",
-        749,
-        519,
+        734,
+        510,
     )
 }

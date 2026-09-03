@@ -416,6 +416,8 @@ mod typescript_apache_echarts_envelop_2_lines_with_an_if_block;
 #[cfg(test)]
 mod typescript_lxqt_lxqt_openssh_askpass_change_url;
 #[cfg(test)]
+mod typescript_lxqt_lxqt_panel_not_actually_ts_but_still;
+#[cfg(test)]
 mod typescript_th_ch_youtube_music_add_a_function_and_some_small_changes;
 #[cfg(test)]
 mod vimscript_chikamichi_mediawiki_add_one_autocmd;

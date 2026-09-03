@@ -21,9 +21,12 @@ use crate::test;
 
 #[test]
 fn optimal_solution() -> Result<()> {
+    // 2026-09-03: tightened 11,9 -> 1,1. The limit was stale rather than a deliberate allowance: it
+    // had outlived the change that closed the gap, and `quality_baseline.csv` was the only thing
+    // still holding this fixture to its real number.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "scala-com-lihaoyi-mill-split-import",
-        11,
-        9,
+        1,
+        1,
     )
 }

@@ -3161,6 +3161,71 @@ pub fn assert_matches_human_mapping_within_limit(
     Ok(())
 }
 
+/// The mapping limit every `optimal_solutions` stub records for its fixture, read straight out of
+/// the stub sources.
+///
+/// **The stubs are the single source of truth for how far codediff may be from the human mapping**,
+/// and this is what lets everything else be a projection of them rather than a second copy.
+/// `quality_baseline.csv`'s two accuracy columns used to be hand-maintained alongside these limits:
+/// 461 of 510 agreed exactly, 49 did not, and the same six fixtures had to be edited in both files
+/// on the same day. Now `benchmark_optimal_solutions --write-baseline` fills those columns from
+/// here, so the only way to move a limit is to edit the stub - the file that also holds the prose
+/// explaining *why* it moved, and that no tool rewrites.
+///
+/// Two call shapes, both written by `human_solver`'s own `ensure_stub_test`, so the parse is
+/// against generated text rather than free-form code:
+///
+///   * `assert_matches_human_mapping("name")` - an exact fixture, limit `(0, 0)`.
+///   * `assert_matches_human_mapping_within_limit("name", total, visible)` - a clamped one.
+///
+/// A stub matching neither is skipped rather than guessed at: `rust_hash_optimization.rs` is
+/// hand-written and asserts specific mappings directly, so it has no single limit to report and is
+/// not gated by one.
+pub fn stub_mapping_limits() -> Result<HashMap<String, (usize, usize)>> {
+    // Deliberately whitespace-tolerant on either side of the arguments: rustfmt breaks the call
+    // across lines once the fixture name is long enough, which is most of them.
+    let exact = regex::Regex::new(r#"assert_matches_human_mapping\(\s*"([^"]+)"\s*,?\s*\)"#)
+        .expect("valid regex");
+    let clamped = regex::Regex::new(
+        r#"assert_matches_human_mapping_within_limit\(\s*"([^"]+)"\s*,\s*(\d+)\s*,\s*(\d+)\s*,?\s*\)"#,
+    )
+    .expect("valid regex");
+
+    let mut out = HashMap::new();
+    for dataset in crate::test::helper::DIFF_DATASETS {
+        let dir = optimal_solutions_dir(dataset);
+        if !dir.exists() {
+            continue;
+        }
+        for entry in std::fs::read_dir(&dir).with_context(|| format!("reading {dir:?}"))? {
+            let path = entry?.path();
+            if path.extension().and_then(|e| e.to_str()) != Some("rs") {
+                continue;
+            }
+            let source = std::fs::read_to_string(&path)
+                .with_context(|| format!("reading the stub {path:?}"))?;
+            if let Some(caps) = clamped.captures(&source) {
+                out.insert(
+                    caps[1].to_string(),
+                    (caps[2].parse().unwrap_or(0), caps[3].parse().unwrap_or(0)),
+                );
+            } else if let Some(caps) = exact.captures(&source) {
+                out.insert(caps[1].to_string(), (0, 0));
+            }
+        }
+    }
+    Ok(out)
+}
+
+/// `src/test/optimal_solutions/<dataset>/`, the directory `stub_mapping_limits` reads.
+fn optimal_solutions_dir(dataset: &str) -> std::path::PathBuf {
+    std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("src")
+        .join("test")
+        .join("optimal_solutions")
+        .join(dataset)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -25,9 +25,13 @@ fn optimal_solution() -> Result<()> {
     // specifiers added/removed), cascading into small mismatches for that statement's internal
     // punctuation/identifier nodes (`{`, `,`, `import_specifier`, ...) - all downstream of the
     // one list-content change, not independent issues.
+    // 2026-09-03: tightened 13,9 -> 2,2. The limit was stale rather than a deliberate allowance: it
+    // had outlived the change that closed the gap, and `quality_baseline.csv` was the only thing
+    // still holding this fixture to its real number. Any counts above describe the older, larger
+    // residual.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "tsx-excalidraw-excalidraw-move-from-one-struct-to-other",
-        13,
-        9,
+        2,
+        2,
     )
 }

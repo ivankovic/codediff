@@ -29,9 +29,13 @@ fn optimal_solution() -> Result<()> {
     // `resolve_flat_tree_pair` anchor-splitting fix (see `xml_nextcloud_android_delete_element.rs`'s
     // comment) - same "known, unreviewed gap" class as before, not a targeted fix for this fixture
     // specifically.
+    // 2026-09-03: tightened 231,155 -> 229,155. The limit was stale rather than a deliberate
+    // allowance: it had outlived the change that closed the gap, and `quality_baseline.csv` was the
+    // only thing still holding this fixture to its real number. Any counts above describe the
+    // older, larger residual.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "tsx-excalidraw-excalidraw-huge-file-with-real-logic-change",
-        231,
+        229,
         155,
     )
 }

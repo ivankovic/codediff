@@ -23,9 +23,13 @@ use crate::test;
 fn optimal_solution() -> Result<()> {
     // One multi-map group's declared MatchButNotIdentical operation doesn't match codediff's own
     // Identical classification for the pair it actually picks (do_block and its body_statement).
+    // 2026-09-03: tightened 10,3 -> 8,3. The limit was stale rather than a deliberate allowance: it
+    // had outlived the change that closed the gap, and `quality_baseline.csv` was the only thing
+    // still holding this fixture to its real number. Any counts above describe the older, larger
+    // residual.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "ruby-mastodon-mastodon-use-context-and-new-test-case",
-        10,
+        8,
         3,
     )
 }

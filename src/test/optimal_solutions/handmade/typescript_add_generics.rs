@@ -25,9 +25,13 @@ fn optimal_solution() -> Result<()> {
     // are fixed - see TS_TYPE_KEYWORD_KINDS in nodes.rs. The remaining 10/7 is an unrelated
     // fast_fallback issue: the renamed "const container = new NumberContainer(42)" line fails to
     // match its "const numberContainer = new Container<number>(42)" counterpart at all.
+    // 2026-09-03: tightened 10,7 -> 1,1. The limit was stale rather than a deliberate allowance: it
+    // had outlived the change that closed the gap, and `quality_baseline.csv` was the only thing
+    // still holding this fixture to its real number. Any counts above describe the older, larger
+    // residual.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "typescript-add-generics",
-        10,
-        7,
+        1,
+        1,
     )
 }

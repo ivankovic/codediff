@@ -176,8 +176,11 @@ documented there.
 * `check-quality` - what `deploy` runs before it tags a release. This target gates on a checked-in
   quality baseline. It fails hard on an accuracy regression. It only warns, and does not fail, on a
   runtime jump of more than 2x.
-* `update-quality-baseline` - deliberately lowers that bar, after a reviewed improvement. `deploy`
-  never runs this target automatically.
+* `update-quality-baseline` - re-cuts both baselines after a reviewed change. `deploy` never runs
+  it automatically. Note what it does *not* do: the per-fixture accuracy columns are read from the
+  `optimal_solutions` stubs, not from the run, so this cannot lower the accuracy bar. Raising a
+  limit means editing that fixture's stub - the same file that holds the prose explaining why -
+  and `quality_baseline.csv` is then a projection of those limits, pinned by a test.
 * `hermetic-benchmark` / `hermetic-benchmark-update-baseline` - a criterion wall-clock benchmark of
   `diff_code`, over every handmade test case from `src/test/helper.rs` (see "Speed" above). The
   first command compares against the saved baseline. The second command saves a new baseline.

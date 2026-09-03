@@ -25,9 +25,11 @@ fn optimal_solution() -> Result<()> {
     // `call_expression`/`arguments` (e.g. `var(--x, 35px)`) - too structurally different (kind,
     // depth, and container all change at once) for APTED to bridge, so it deletes the old value
     // instead of matching it into the new wrapped position.
-    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
+    // 2026-09-03: the clamp at 1,1 is gone - this fixture now maps exactly. The limit was stale
+    // rather than a deliberate allowance: it had outlived the change that closed the gap, and
+    // `quality_baseline.csv` was the only thing still holding this fixture to its real number. Any
+    // counts above describe a residual that no longer exists.
+    test::helper::human_mapping::assert_matches_human_mapping(
         "css-wordpress-wordpress-change-simple-values-to-vars",
-        1,
-        1,
     )
 }

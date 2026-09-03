@@ -26,9 +26,9 @@ fn optimal_solution() -> Result<()> {
     // group permits any consistent one - so this is purely a disagreement about whether the
     // matched pair counts as identical, on nodes whose *subtrees* differ even though the pair is
     // byte-identical. Zero visible mismatches: nothing on screen renders differently.
-    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
-        "javascript-fix-promises",
-        3,
-        0,
-    )
+    // 2026-09-03: the clamp at 3,0 is gone - this fixture now maps exactly. The limit was stale
+    // rather than a deliberate allowance: it had outlived the change that closed the gap, and
+    // `quality_baseline.csv` was the only thing still holding this fixture to its real number. Any
+    // counts above describe a residual that no longer exists.
+    test::helper::human_mapping::assert_matches_human_mapping("javascript-fix-promises")
 }

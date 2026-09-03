@@ -34,9 +34,13 @@ fn optimal_solution() -> Result<()> {
     // constructor_declaration children are deleted outright and reinserted rather than matched, and
     // every descendant of those subtrees goes with them. The remaining 105 are 49 `MovedSubtree`,
     // one `fast_fallback`, and the multi-map-group operation mismatches.
+    // 2026-09-03: tightened 993,662 -> 362,251. The limit was stale rather than a deliberate
+    // allowance: it had outlived the change that closed the gap, and `quality_baseline.csv` was the
+    // only thing still holding this fixture to its real number. Any counts above describe the
+    // older, larger residual.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "java-pdftk-java-pdftk-real-change-all-across-the-file",
-        993,
-        662,
+        362,
+        251,
     )
 }
