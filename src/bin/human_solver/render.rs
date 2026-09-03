@@ -510,12 +510,12 @@ pub(crate) fn render_modal(
             );
         }
         Modal::OpenSamplePicker {
-            options,
+            rows,
             selected,
-            hide_solved,
-            sort_order,
+            view,
+            name_input,
         } => {
-            render_open_sample_picker(frame, area, options, *selected, *hide_solved, *sort_order);
+            render_open_sample_picker(frame, area, rows, *selected, view, name_input.as_deref());
         }
         Modal::ConfirmDiscardUnsaved { target, can_save } => render_text_modal(
             frame,
@@ -1353,74 +1353,121 @@ pub(crate) fn render_open_diff_picker(
     }
 }
 
-/// Like `render_open_diff_picker`, but for `O`'s sample picker: handled (already-promoted or
-/// -rejected) entries are shown in green (" - SOLVED") or red (" - REJECTED"), both left out of
-/// the list entirely when `hide_solved` is set, and ordered per `sort_order` (cycled by `s` - see
-/// `SampleSortOrder`). Each entry also shows its `sample_diff_line_count` in parentheses, so the
-/// effect of switching to a diff-size order is visible directly, not just trusted.
+/// Renders the `O` picker as a table, one row per materialized sample and one column per
+/// dimension worth triaging on (see `SampleColumn`) - so what a filter is doing and what the sort
+/// is ranking by are readable off the table itself rather than only inferable from the title. The
+/// header carries the interaction state exactly as the `o` picker's does: the cursor column
+/// (what `s`/`f` act on) in reverse video, the sorted column with a `^`/`v` arrow, and a filtered
+/// column marked `*` and coloured, with the filters spelled out in the title.
+///
+/// Like `render_open_diff_picker`, the filtered/sorted view (`visible_sample_rows`) is recomputed
+/// here from `rows`/`view` rather than carried on the modal, so the two can never drift out of
+/// sync, and the scroll position is derived fresh each frame from `selected`.
 pub(crate) fn render_open_sample_picker(
     frame: &mut Frame,
     area: Rect,
-    options: &[(String, SampleTriageStatus, usize)],
+    rows: &[SampleRow],
     selected: usize,
-    hide_solved: bool,
-    sort_order: SampleSortOrder,
+    view: &SamplePickerView,
+    name_input: Option<&str>,
 ) {
-    let visible = visible_sample_options(options, hide_solved, sort_order);
+    let visible = visible_sample_rows(rows, view);
 
-    let popup_area = centered_rect(60, 70, area);
+    let popup_area = centered_rect(80, 70, area);
     frame.render_widget(Clear, popup_area);
 
-    let inner_height = popup_area.height.saturating_sub(2) as usize;
+    // One row for the header on top of the two border rows.
+    let inner_height = popup_area.height.saturating_sub(3) as usize;
     let max_scroll = visible.len().saturating_sub(inner_height);
     let scroll = selected.saturating_sub(inner_height / 2).min(max_scroll);
 
-    let items: Vec<ListItem> = visible
+    let table_rows: Vec<Row> = visible
         .iter()
         .enumerate()
         .skip(scroll)
         .take(inner_height.max(1))
-        .map(|(i, (name, status, size))| {
+        .map(|(i, row)| {
             let style = if i == selected {
                 Style::default().bg(Color::Yellow).fg(Color::Black)
             } else {
-                match status {
-                    SampleTriageStatus::Promoted => Style::default().fg(Color::Green),
-                    SampleTriageStatus::Rejected => Style::default().fg(Color::Red),
-                    SampleTriageStatus::Sampled => Style::default(),
-                }
+                Style::default()
             };
-            let suffix = match status {
-                SampleTriageStatus::Promoted => " - SOLVED",
-                SampleTriageStatus::Rejected => " - REJECTED",
-                SampleTriageStatus::Sampled => "",
-            };
-            let label = format!("{name} ({size}){suffix}");
-            ListItem::new(Line::from(Span::styled(label, style)))
+            Row::new(vec![
+                Cell::from(row.name.clone()),
+                Cell::from(row.language.clone()),
+                // `?` for a sample with no recorded stratum, the same "not known" glyph the `o`
+                // picker's unscanned columns use - and, like those, it is never filtered away.
+                Cell::from(row.bucket.clone().unwrap_or_else(|| "?".to_string())),
+                Cell::from(row.status.label()),
+                Cell::from(row.size.to_string()),
+            ])
+            .style(style)
         })
         .collect();
 
-    let handled_count = options
-        .iter()
-        .filter(|(_, status, _)| status.is_handled())
-        .count();
+    let header = Row::new(SampleColumn::ALL.map(|column| {
+        let mut label = column.label().to_string();
+        if view.sort.column == column {
+            label.push_str(view.sort.arrow());
+        }
+        if view.filters.is_active(column) {
+            label.push('*');
+        }
+        let mut style = Style::default().add_modifier(Modifier::BOLD);
+        if view.filters.is_active(column) {
+            style = style.fg(Color::Cyan);
+        }
+        if view.column == column {
+            style = style.add_modifier(Modifier::REVERSED);
+        }
+        Cell::from(label).style(style)
+    }))
+    .style(Style::default().add_modifier(Modifier::BOLD));
+
+    let title = if let Some(input) = name_input {
+        format!("Filter Name by substring: {input}_ — [Enter] apply (empty clears), [Esc] cancel")
+    } else {
+        format!(
+            // Abbreviated for the same reason as the `o` picker's title: the filter list on the
+            // left is the part that changes, so it is what must survive ratatui's truncation.
+            "Open sample [{}] sort:{}{} ({}/{}) — h/l col, j/k row, s sort, f filter, Esc",
+            if view.filters.any_active() {
+                view.filters.describe()
+            } else {
+                "no filters".to_string()
+            },
+            view.sort.column.label(),
+            view.sort.arrow(),
+            selected + 1,
+            visible.len()
+        )
+    };
+
     let block = Block::default()
         .borders(Borders::ALL)
-        .title(format!(
-            "Open sample ({}/{}) — j/k move, Enter open, H {} solved/rejected ({} total), s sort: {}, Esc cancel",
-            if visible.is_empty() { 0 } else { selected + 1 },
-            visible.len(),
-            if hide_solved { "show" } else { "hide" },
-            handled_count,
-            sort_order.label(),
-        ))
+        .title(title)
         .border_style(
             Style::default()
                 .fg(Color::Yellow)
                 .add_modifier(Modifier::BOLD),
         );
 
-    frame.render_widget(List::new(items).block(block), popup_area);
+    // Same left-to-right order as `SampleColumn::ALL`, each wide enough for its header plus the
+    // sort arrow and filter marker the header row can append.
+    let table = Table::new(
+        table_rows,
+        [
+            Constraint::Min(20),
+            Constraint::Length(12),
+            Constraint::Length(11),
+            Constraint::Length(10),
+            Constraint::Length(7),
+        ],
+    )
+    .header(header)
+    .block(block);
+
+    frame.render_widget(table, popup_area);
 }
 
 /// Renders the `C` picker's first step: pick a commit from this repository's own `git log`

@@ -951,10 +951,12 @@ pub(crate) enum Modal {
     /// `s` press). `selected` indexes into `visible_sample_options(&options, hide_solved,
     /// sort_order)`, not `options` itself.
     OpenSamplePicker {
-        options: Vec<(String, SampleTriageStatus, usize)>,
+        rows: Vec<SampleRow>,
         selected: usize,
-        hide_solved: bool,
-        sort_order: SampleSortOrder,
+        view: SamplePickerView,
+        /// `Some` while `f` on the `Name` column is mid-prompt, holding what has been typed so
+        /// far - same contract as `OpenDiffPicker::name_input`.
+        name_input: Option<String>,
     },
     /// Raised when a picker's selection is confirmed while the current mapping has unsaved
     /// changes: asks whether to save the *current* case before switching to `target`.
@@ -1118,14 +1120,13 @@ pub(crate) struct App {
     /// -- which pass is responsible for that mapping, not just what the mapping is. Has no effect
     /// until `algo_diff` is populated (`p`).
     pub(crate) show_reason: bool,
-    /// The `O` picker's own hide-solved toggle (distinct from `hide_solved` above, which hides
-    /// solved *subtrees* in the AST panels, not solved *samples* in this list) and sort order,
-    /// persisted here rather than reset every time a fresh `Modal::OpenSamplePicker` is built --
-    /// so picking "smallest diff first" and hiding already-promoted samples once, then closing
-    /// the picker to work through a few, sticks for the next `O` instead of reverting to A-Z/show
-    /// all every time.
-    pub(crate) sample_hide_solved: bool,
-    pub(crate) sample_sort_order: SampleSortOrder,
+    /// The `O` picker's cursor column, sort and per-column filters (see `SamplePickerView`),
+    /// persisted here rather than rebuilt every time a fresh `Modal::OpenSamplePicker` is built --
+    /// so narrowing to e.g. Go samples in the 1000-3000 stratum once, then closing the picker to
+    /// work through a few, sticks for the next `O` instead of reverting to the whole list. The
+    /// same contract `App::diff_view` has for `o`. (Not to be confused with `hide_solved` above,
+    /// which hides solved *subtrees* in the AST panels, not rows in this list.)
+    pub(crate) sample_view: SamplePickerView,
     /// Cached `sample_diff_line_count` per sample name, for the `O` picker's size column and its
     /// two size-based sort orders. Cached because that count costs an external `diff` per sample
     /// and the picker needs *every* sample's before it can draw: measured at 3.9s for the 1489
@@ -1230,8 +1231,7 @@ impl App {
             algo_diff: None,
             hide_solved: false,
             show_reason: false,
-            sample_hide_solved: false,
-            sample_sort_order: SampleSortOrder::Alphabetical,
+            sample_view: SamplePickerView::default(),
             sample_diff_sizes: std::collections::HashMap::new(),
             diff_view: DiffPickerView::default(),
             diff_disagreement: None,

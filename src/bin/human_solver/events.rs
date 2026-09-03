@@ -909,15 +909,15 @@ pub(crate) fn handle_key(
             None
         }
         KeyCode::Char('O') => {
-            match list_samples_with_status() {
-                Ok(options) if !options.is_empty() => {
+            match list_sample_rows() {
+                Ok(rows) if !rows.is_empty() => {
                     // Only the names we have not already measured, scanned in parallel: this is
                     // one external `diff` per sample, so all 1489 of them serially cost 3.9s of
                     // frozen picker on every `O` (1.9s across the scan threads, and nothing at
                     // all on the presses after the first - see `sample_diff_sizes`).
-                    let missing: Vec<String> = options
+                    let missing: Vec<String> = rows
                         .iter()
-                        .map(|(name, _)| name.clone())
+                        .map(|row| row.name.clone())
                         .filter(|name| !app.sample_diff_sizes.contains_key(name))
                         .collect();
                     if !missing.is_empty() {
@@ -925,23 +925,19 @@ pub(crate) fn handle_key(
                             Some(sample_diff_line_count(name))
                         }));
                     }
-                    let options: Vec<(String, SampleTriageStatus, usize)> = options
+                    let rows: Vec<SampleRow> = rows
                         .into_iter()
-                        .map(|(name, status)| {
-                            let size = app
+                        .map(|mut row| {
+                            row.size = app
                                 .sample_diff_sizes
-                                .get(&name)
+                                .get(&row.name)
                                 .copied()
                                 .unwrap_or_default();
-                            (name, status, size)
+                            row
                         })
                         .collect();
-                    app.modal = Some(open_sample_picker_modal(
-                        options,
-                        &app.name,
-                        app.sample_hide_solved,
-                        app.sample_sort_order,
-                    ));
+                    let view = app.sample_view.clone();
+                    app.modal = Some(open_sample_picker_modal(rows, &app.name, view));
                 }
                 Ok(_) => {
                     app.status = Some("No samples found in src/test/data/samples".to_string());
@@ -1106,93 +1102,12 @@ pub(crate) fn handle_modal_key(
             return handle_open_diff_picker(app, code, options, selected, view, name_input);
         }
         Modal::OpenSamplePicker {
-            options,
+            rows,
             selected,
-            hide_solved,
-            sort_order,
+            view,
+            name_input,
         } => {
-            let visible = visible_sample_options(&options, hide_solved, sort_order);
-
-            match code {
-                KeyCode::Up | KeyCode::Char('k') => {
-                    app.modal = Some(Modal::OpenSamplePicker {
-                        selected: selected.saturating_sub(1),
-                        options,
-                        hide_solved,
-                        sort_order,
-                    });
-                }
-                KeyCode::Down | KeyCode::Char('j') => {
-                    app.modal = Some(Modal::OpenSamplePicker {
-                        selected: (selected + 1).min(visible.len().saturating_sub(1)),
-                        options,
-                        hide_solved,
-                        sort_order,
-                    });
-                }
-                KeyCode::Enter => {
-                    if let Some((name, ..)) = visible.get(selected) {
-                        let target = OpenTarget::Sample(name.clone());
-                        if app.dirty {
-                            let can_save = matches!(app.origin, CaseOrigin::Diffs);
-                            app.modal = Some(Modal::ConfirmDiscardUnsaved { target, can_save });
-                        } else {
-                            return Some(target);
-                        }
-                    } else {
-                        app.modal = Some(Modal::OpenSamplePicker {
-                            options,
-                            selected,
-                            hide_solved,
-                            sort_order,
-                        });
-                    }
-                }
-                KeyCode::Char('h') | KeyCode::Char('H') => {
-                    let current_name = visible.get(selected).map(|(name, ..)| name.clone());
-                    let new_hide_solved = !hide_solved;
-                    let new_visible = visible_sample_options(&options, new_hide_solved, sort_order);
-                    let new_selected = current_name
-                        .and_then(|name| new_visible.iter().position(|(n, ..)| *n == name))
-                        .unwrap_or(0)
-                        .min(new_visible.len().saturating_sub(1));
-                    // Persisted on App too (not just this modal instance), so the next `O` opens
-                    // with the same hide-solved state instead of reverting to "show all".
-                    app.sample_hide_solved = new_hide_solved;
-                    app.modal = Some(Modal::OpenSamplePicker {
-                        options,
-                        selected: new_selected,
-                        hide_solved: new_hide_solved,
-                        sort_order,
-                    });
-                }
-                KeyCode::Char('s') | KeyCode::Char('S') => {
-                    // Unlike `H`, deliberately does not track the current name across the
-                    // re-sort: changing sort order is about jumping to whichever end of the new
-                    // order is interesting (e.g. the largest diff), so landing on 1 there is more
-                    // useful than staying on whatever was selected under the old order.
-                    let new_sort_order = sort_order.next();
-                    // Persisted on App too - see the `H` arm just above for why.
-                    app.sample_sort_order = new_sort_order;
-                    app.modal = Some(Modal::OpenSamplePicker {
-                        options,
-                        selected: 0,
-                        hide_solved,
-                        sort_order: new_sort_order,
-                    });
-                }
-                KeyCode::Esc => {
-                    app.status = Some("Cancelled".to_string());
-                }
-                _ => {
-                    app.modal = Some(Modal::OpenSamplePicker {
-                        options,
-                        selected,
-                        hide_solved,
-                        sort_order,
-                    });
-                }
-            }
+            return handle_open_sample_picker(app, code, rows, selected, view, name_input);
         }
         Modal::OpenCommitPicker { commits, selected } => match code {
             KeyCode::Up | KeyCode::Char('k') => {
@@ -2448,6 +2363,182 @@ fn handle_text_view(
         state.scroll_into_view(VIEWPORT_ROWS);
         app.modal = Some(Modal::TextView { state });
     }
+
+    None
+}
+
+/// `handle_modal_key`'s `Modal::OpenSamplePicker` arm, split out for the same reason as
+/// `handle_open_diff_picker` just below: it works purely on `App` and its own payload, and is too
+/// long to read as one arm of a match. The two are deliberately parallel - same keys, same
+/// re-anchoring, same persistence back onto `App` - since they are the same table over two
+/// different corpora (see `SampleColumn` on why the *types* are not shared).
+fn handle_open_sample_picker(
+    app: &mut App,
+    code: KeyCode,
+    rows: Vec<SampleRow>,
+    selected: usize,
+    view: SamplePickerView,
+    name_input: Option<String>,
+) -> Option<OpenTarget> {
+    let mut view = view;
+    let mut selected = selected;
+
+    // The `Name` filter's prompt takes every keystroke while it is open, so a name containing
+    // `j`, `s` or `f` types those characters instead of moving the selection and re-sorting the
+    // table mid-word - same posture as `handle_open_diff_picker`.
+    if let Some(mut typed) = name_input {
+        match code {
+            KeyCode::Char(c) => {
+                typed.push(c);
+                app.modal = Some(Modal::OpenSamplePicker {
+                    rows,
+                    selected,
+                    view,
+                    name_input: Some(typed),
+                });
+            }
+            KeyCode::Backspace => {
+                typed.pop();
+                app.modal = Some(Modal::OpenSamplePicker {
+                    rows,
+                    selected,
+                    view,
+                    name_input: Some(typed),
+                });
+            }
+            KeyCode::Enter => {
+                let current = visible_sample_rows(&rows, &view)
+                    .get(selected)
+                    .map(|row| row.name.clone());
+                let needle = typed.trim().to_lowercase();
+                view.filters.name = if needle.is_empty() {
+                    None
+                } else {
+                    Some(needle)
+                };
+                app.sample_view = view.clone();
+                let modal =
+                    open_sample_picker_modal(rows, current.as_deref().unwrap_or(&app.name), view);
+                app.modal = Some(modal);
+            }
+            KeyCode::Esc => {
+                app.status = Some("Name filter cancelled".to_string());
+                app.modal = Some(Modal::OpenSamplePicker {
+                    rows,
+                    selected,
+                    view,
+                    name_input: None,
+                });
+            }
+            _ => {
+                app.modal = Some(Modal::OpenSamplePicker {
+                    rows,
+                    selected,
+                    view,
+                    name_input: Some(typed),
+                });
+            }
+        }
+        return None;
+    }
+
+    let visible = visible_sample_rows(&rows, &view);
+    match code {
+        KeyCode::Up | KeyCode::Char('k') => {
+            selected = selected.saturating_sub(1);
+        }
+        KeyCode::Down | KeyCode::Char('j') => {
+            selected = (selected + 1).min(visible.len().saturating_sub(1));
+        }
+        KeyCode::Left | KeyCode::Char('h') => {
+            view.column = view.column.left();
+        }
+        KeyCode::Right | KeyCode::Char('l') => {
+            view.column = view.column.right();
+        }
+        // `s` takes the sort over to the cursor column, or flips the direction if it already owns
+        // it. The selection follows the row it was on rather than jumping to the top.
+        KeyCode::Char('s') => {
+            let current = visible.get(selected).map(|row| row.name.clone());
+            view.sort = view.sort.toggled(view.column);
+            app.sample_view = view.clone();
+            let modal =
+                open_sample_picker_modal(rows, current.as_deref().unwrap_or(&app.name), view);
+            app.modal = Some(modal);
+            return None;
+        }
+        // `f` cycles the cursor column's own filter: a value from the column for `Lang`/`Bucket`,
+        // a triage state for `Status`, off/yes/no for `Size`, and a typed substring for `Name`
+        // (which opens `name_input` above rather than taking effect immediately).
+        KeyCode::Char('f') => {
+            let current = visible.get(selected).map(|row| row.name.clone());
+            match view.column {
+                SampleColumn::Name => {
+                    app.status = Some(
+                        "Filter by name: type a substring, Enter to apply, Esc to cancel"
+                            .to_string(),
+                    );
+                    // Pre-filled with the filter already in force, so `f` edits rather than
+                    // blindly overwrites.
+                    let name_input = view.filters.name.clone().unwrap_or_default();
+                    app.modal = Some(Modal::OpenSamplePicker {
+                        rows,
+                        selected,
+                        view,
+                        name_input: Some(name_input),
+                    });
+                    return None;
+                }
+                SampleColumn::Lang => {
+                    let values = sample_language_values(&rows);
+                    view.filters.language =
+                        next_value_filter(view.filters.language.as_deref(), &values);
+                }
+                SampleColumn::Bucket => {
+                    let values = sample_bucket_values(&rows);
+                    view.filters.bucket =
+                        next_value_filter(view.filters.bucket.as_deref(), &values);
+                }
+                SampleColumn::Status => {
+                    view.filters.status = next_status_filter(view.filters.status);
+                }
+                SampleColumn::Size => {
+                    view.filters.size = view.filters.size.next();
+                }
+            }
+            app.sample_view = view.clone();
+            let modal =
+                open_sample_picker_modal(rows, current.as_deref().unwrap_or(&app.name), view);
+            app.modal = Some(modal);
+            return None;
+        }
+        KeyCode::Enter => {
+            if let Some(row) = visible.get(selected) {
+                let target = OpenTarget::Sample(row.name.clone());
+                if app.dirty {
+                    let can_save = matches!(app.origin, CaseOrigin::Diffs);
+                    app.modal = Some(Modal::ConfirmDiscardUnsaved { target, can_save });
+                } else {
+                    return Some(target);
+                }
+                return None;
+            }
+        }
+        KeyCode::Esc => {
+            app.status = Some("Cancelled".to_string());
+            return None;
+        }
+        _ => {}
+    }
+    // Covers `h`/`l`: the cursor column persists across closing and reopening the picker, the same
+    // way the sort and filters do. The other keys reaching here leave `view` untouched.
+    app.sample_view = view.clone();
+    app.modal = Some(Modal::OpenSamplePicker {
+        rows,
+        selected,
+        view,
+        name_input: None,
+    });
 
     None
 }

@@ -2830,166 +2830,278 @@ fn render_text_modal_shows_every_line_including_the_input_box_on_a_small_termina
     );
 }
 
-#[test]
-fn open_sample_picker_marks_solved_and_rejected_entries_and_can_hide_both() {
-    let options = vec![
-        (
-            "rust-x-foo-abc12345-a".to_string(),
-            SampleTriageStatus::Promoted,
-            7,
-        ),
-        (
-            "rust-x-foo-def67890-b".to_string(),
+/// A `SampleRow` without spelling out five fields at each of the call sites below.
+fn sample_row(
+    name: &str,
+    language: &str,
+    bucket: Option<&str>,
+    status: SampleTriageStatus,
+    size: usize,
+) -> SampleRow {
+    SampleRow {
+        name: name.to_string(),
+        language: language.to_string(),
+        bucket: bucket.map(str::to_string),
+        status,
+        size,
+    }
+}
+
+fn sample_rows() -> Vec<SampleRow> {
+    vec![
+        sample_row(
+            "charlie",
+            "Go",
+            Some("30-100"),
             SampleTriageStatus::Sampled,
-            3,
+            5,
         ),
-        (
-            "rust-x-foo-fed09876-c".to_string(),
-            SampleTriageStatus::Rejected,
-            2,
+        sample_row(
+            "alpha",
+            "Rust",
+            Some("1000-3000"),
+            SampleTriageStatus::Promoted,
+            20,
         ),
-    ];
-
-    let backend = ratatui::backend::TestBackend::new(80, 24);
-    let mut terminal = Terminal::new(backend).unwrap();
-    let area = Rect::new(0, 0, 80, 24);
-
-    terminal
-        .draw(|f| {
-            render_open_sample_picker(f, area, &options, 0, false, SampleSortOrder::Alphabetical)
-        })
-        .unwrap();
-    let text = rendered_text(&terminal);
-    assert!(
-        text.contains("rust-x-foo-abc12345-a (7) - SOLVED"),
-        "solved marker missing: {text}"
-    );
-    assert!(
-        text.contains("rust-x-foo-fed09876-c (2) - REJECTED"),
-        "rejected marker missing: {text}"
-    );
-    assert!(
-        text.contains("rust-x-foo-def67890-b (3)"),
-        "unsolved entry missing: {text}"
-    );
-    assert!(
-        text.contains("1/3"),
-        "count should include all three entries: {text}"
-    );
-
-    terminal
-        .draw(|f| {
-            render_open_sample_picker(f, area, &options, 0, true, SampleSortOrder::Alphabetical)
-        })
-        .unwrap();
-    let text = rendered_text(&terminal);
-    assert!(
-        !text.contains("SOLVED"),
-        "solved entry should be hidden: {text}"
-    );
-    assert!(
-        !text.contains("REJECTED"),
-        "rejected entry should be hidden: {text}"
-    );
-    assert!(
-        text.contains("rust-x-foo-def67890-b"),
-        "unsolved entry should still show: {text}"
-    );
-    assert!(
-        text.contains("1/1"),
-        "count should only include the unsolved entry: {text}"
-    );
+        sample_row("bravo", "Go", None, SampleTriageStatus::Rejected, 0),
+    ]
 }
 
 #[test]
-fn render_open_sample_picker_shows_the_current_sort_order() {
-    // Wider than the other picker tests: the title is long enough (position, hide-solved
-    // hint, sort order, key hints) that an 80-column terminal's narrow ~46-column popup
-    // truncates it well before reaching "sort:" - this test cares specifically about that
-    // tail end, so it needs the room.
-    let options = vec![("a".to_string(), SampleTriageStatus::Sampled, 1)];
+fn open_sample_picker_renders_every_column_including_the_bucket() {
+    let rows = sample_rows();
     let backend = ratatui::backend::TestBackend::new(200, 24);
     let mut terminal = Terminal::new(backend).unwrap();
     let area = Rect::new(0, 0, 200, 24);
 
     terminal
-        .draw(|f| {
-            render_open_sample_picker(
-                f,
-                area,
-                &options,
-                0,
-                false,
-                SampleSortOrder::LargestDiffFirst,
-            )
-        })
+        .draw(|f| render_open_sample_picker(f, area, &rows, 0, &SamplePickerView::default(), None))
         .unwrap();
+
     let text = rendered_text(&terminal);
+    for expected in [
+        "Name",
+        "Lang",
+        "Bucket",
+        "Status",
+        "Size", // headers
+        "30-100",
+        "1000-3000", // the strata each sample was drawn for
+        "Go",
+        "Rust",
+        "SOLVED",
+        "REJECTED",
+        "sampled",
+    ] {
+        assert!(text.contains(expected), "{expected:?} missing from: {text}");
+    }
     assert!(
-        text.contains("largest diff first"),
-        "title should reflect the current sort order: {text}"
+        text.contains('?'),
+        "an unbucketed sample should render its stratum as ?: {text}"
     );
 }
 
 #[test]
-fn visible_sample_options_orders_by_the_requested_sort_order() {
-    let options = vec![
-        ("charlie".to_string(), SampleTriageStatus::Sampled, 5),
-        ("alpha".to_string(), SampleTriageStatus::Sampled, 20),
-        ("bravo".to_string(), SampleTriageStatus::Sampled, 1),
-    ];
-
-    let names = |order| -> Vec<String> {
-        visible_sample_options(&options, false, order)
+fn visible_sample_rows_sorts_by_the_selected_column() {
+    let rows = sample_rows();
+    let names = |column: SampleColumn, descending: bool| -> Vec<String> {
+        let view = SamplePickerView {
+            column,
+            sort: SampleSort { column, descending },
+            filters: SampleFilters::default(),
+        };
+        visible_sample_rows(&rows, &view)
             .into_iter()
-            .map(|(name, ..)| name)
+            .map(|row| row.name)
             .collect()
     };
 
     assert_eq!(
-        names(SampleSortOrder::Alphabetical),
+        names(SampleColumn::Name, false),
         vec!["alpha", "bravo", "charlie"]
     );
     assert_eq!(
-        names(SampleSortOrder::ReverseAlphabetical),
+        names(SampleColumn::Name, true),
         vec!["charlie", "bravo", "alpha"]
     );
+    // Go before Rust, and the two Go rows tie-broken by name rather than left to chance.
     assert_eq!(
-        names(SampleSortOrder::SmallestDiffFirst),
+        names(SampleColumn::Lang, false),
         vec!["bravo", "charlie", "alpha"]
     );
     assert_eq!(
-        names(SampleSortOrder::LargestDiffFirst),
-        vec!["alpha", "charlie", "bravo"]
+        names(SampleColumn::Size, false),
+        vec!["bravo", "charlie", "alpha"]
+    );
+    assert_eq!(
+        names(SampleColumn::Status, false),
+        vec!["charlie", "alpha", "bravo"],
+        "untriaged rows first - they are what the picker exists to surface"
+    );
+    // 30-100 before 1000-3000, and the unbucketed row last. Sorting these as strings would put
+    // "1000-3000" first, which is the whole reason `bucket_order` parses the lower bound.
+    assert_eq!(
+        names(SampleColumn::Bucket, false),
+        vec!["charlie", "alpha", "bravo"]
     );
 }
 
 #[test]
-fn sample_sort_order_next_cycles_through_all_four_and_back() {
+fn bucket_order_ranks_by_the_lower_bound_not_the_label() {
+    assert!(bucket_order(Some("30-100")) < bucket_order(Some("100-300")));
+    assert!(bucket_order(Some("1000-3000")) < bucket_order(Some("3000+")));
+    assert!(bucket_order(Some("0-10")) < bucket_order(Some("10-30")));
     assert_eq!(
-        SampleSortOrder::Alphabetical.next(),
-        SampleSortOrder::ReverseAlphabetical
+        bucket_order(None),
+        usize::MAX,
+        "an unrecorded stratum sorts last, not first"
+    );
+}
+
+#[test]
+fn the_bucket_filter_never_hides_a_sample_with_no_recorded_stratum() {
+    let rows = sample_rows();
+    let view = SamplePickerView {
+        filters: SampleFilters {
+            bucket: Some("30-100".to_string()),
+            ..SampleFilters::default()
+        },
+        ..SamplePickerView::default()
+    };
+    let names: Vec<String> = visible_sample_rows(&rows, &view)
+        .into_iter()
+        .map(|row| row.name)
+        .collect();
+    assert_eq!(
+        names,
+        vec!["bravo", "charlie"],
+        "charlie matches the bucket and bravo has none - 'not recorded' is not evidence to drop it"
+    );
+}
+
+#[test]
+fn sample_filters_narrow_together_rather_than_either_or() {
+    let rows = sample_rows();
+    let view = SamplePickerView {
+        filters: SampleFilters {
+            language: Some("Go".to_string()),
+            size: FlagFilter::Yes,
+            ..SampleFilters::default()
+        },
+        ..SamplePickerView::default()
+    };
+    let names: Vec<String> = visible_sample_rows(&rows, &view)
+        .into_iter()
+        .map(|row| row.name)
+        .collect();
+    assert_eq!(
+        names,
+        vec!["charlie"],
+        "bravo is Go but has an empty diff, alpha has a diff but is Rust"
+    );
+}
+
+#[test]
+fn the_size_filter_finds_samples_whose_diff_is_empty() {
+    let rows = sample_rows();
+    let view = SamplePickerView {
+        filters: SampleFilters {
+            size: FlagFilter::No,
+            ..SampleFilters::default()
+        },
+        ..SamplePickerView::default()
+    };
+    let names: Vec<String> = visible_sample_rows(&rows, &view)
+        .into_iter()
+        .map(|row| row.name)
+        .collect();
+    assert_eq!(names, vec!["bravo"], "a 0-line diff is a broken draw");
+}
+
+#[test]
+fn the_name_filter_is_a_case_insensitive_substring() {
+    let rows = sample_rows();
+    let view = SamplePickerView {
+        filters: SampleFilters {
+            name: Some("rav".to_string()),
+            ..SampleFilters::default()
+        },
+        ..SamplePickerView::default()
+    };
+    let names: Vec<String> = visible_sample_rows(&rows, &view)
+        .into_iter()
+        .map(|row| row.name)
+        .collect();
+    assert_eq!(names, vec!["bravo"]);
+}
+
+#[test]
+fn value_filters_cycle_through_the_values_present_and_back_to_all() {
+    let rows = sample_rows();
+    let languages = sample_language_values(&rows);
+    assert_eq!(languages, vec!["Go", "Rust"]);
+    assert_eq!(next_value_filter(None, &languages).as_deref(), Some("Go"));
+    assert_eq!(
+        next_value_filter(Some("Go"), &languages).as_deref(),
+        Some("Rust")
     );
     assert_eq!(
-        SampleSortOrder::ReverseAlphabetical.next(),
-        SampleSortOrder::SmallestDiffFirst
+        next_value_filter(Some("Rust"), &languages),
+        None,
+        "past the last value the filter turns off rather than sticking"
+    );
+
+    // Offered smallest-stratum-first, and only for strata some row actually has.
+    let buckets = sample_bucket_values(&rows);
+    assert_eq!(buckets, vec!["30-100", "1000-3000"]);
+}
+
+#[test]
+fn the_status_filter_cycles_through_all_three_states_and_back() {
+    assert_eq!(next_status_filter(None), Some(SampleTriageStatus::Sampled));
+    assert_eq!(
+        next_status_filter(Some(SampleTriageStatus::Sampled)),
+        Some(SampleTriageStatus::Promoted)
     );
     assert_eq!(
-        SampleSortOrder::SmallestDiffFirst.next(),
-        SampleSortOrder::LargestDiffFirst
+        next_status_filter(Some(SampleTriageStatus::Promoted)),
+        Some(SampleTriageStatus::Rejected)
     );
-    assert_eq!(
-        SampleSortOrder::LargestDiffFirst.next(),
-        SampleSortOrder::Alphabetical
-    );
+    assert_eq!(next_status_filter(Some(SampleTriageStatus::Rejected)), None);
+}
+
+#[test]
+fn the_sample_picker_title_names_the_sorted_column_and_the_filters() {
+    let rows = sample_rows();
+    let backend = ratatui::backend::TestBackend::new(200, 24);
+    let mut terminal = Terminal::new(backend).unwrap();
+    let area = Rect::new(0, 0, 200, 24);
+
+    let view = SamplePickerView {
+        column: SampleColumn::Bucket,
+        sort: SampleSort {
+            column: SampleColumn::Size,
+            descending: true,
+        },
+        filters: SampleFilters {
+            language: Some("Go".to_string()),
+            ..SampleFilters::default()
+        },
+    };
+    terminal
+        .draw(|f| render_open_sample_picker(f, area, &rows, 0, &view, None))
+        .unwrap();
+
+    let text = rendered_text(&terminal);
+    assert!(text.contains("sort:Sizev"), "sorted column missing: {text}");
+    assert!(text.contains("lang=Go"), "active filter missing: {text}");
 }
 
 #[test]
 fn open_sample_picker_enter_opens_the_visible_entry_not_the_raw_index() {
-    // Regression guard for the switch from `options[selected]` to `visible.get(selected)`:
-    // with a solved entry and a rejected entry hidden, `selected` indexes the *filtered*
-    // list, so index 1 here must resolve to "unsolved-two" (the second visible entry), not
-    // "unsolved-one" (index 2 in the unfiltered `options`) or either hidden entry.
+    // Regression guard for `visible.get(selected)` rather than `rows[selected]`: with the Status
+    // filter narrowing to untriaged rows, `selected` indexes the *filtered* list, so a raw index
+    // would open the wrong sample.
     let source = "fn main() {}\n";
     let tree = parse_rust(source);
     let root = tree.root_node();
@@ -3002,15 +3114,27 @@ fn open_sample_picker_enter_opens_the_visible_entry_not_the_raw_index() {
     );
     let flat = FlatIndex::new(flatten_visible(root, &app.before.collapsed, None));
     app.modal = Some(Modal::OpenSamplePicker {
-        options: vec![
-            ("rejected-one".to_string(), SampleTriageStatus::Rejected, 0),
-            ("solved-one".to_string(), SampleTriageStatus::Promoted, 0),
-            ("unsolved-one".to_string(), SampleTriageStatus::Sampled, 0),
-            ("unsolved-two".to_string(), SampleTriageStatus::Sampled, 0),
+        rows: vec![
+            sample_row(
+                "rejected-one",
+                "Rust",
+                None,
+                SampleTriageStatus::Rejected,
+                0,
+            ),
+            sample_row("solved-one", "Rust", None, SampleTriageStatus::Promoted, 0),
+            sample_row("unsolved-one", "Rust", None, SampleTriageStatus::Sampled, 0),
+            sample_row("unsolved-two", "Rust", None, SampleTriageStatus::Sampled, 0),
         ],
         selected: 1,
-        hide_solved: true,
-        sort_order: SampleSortOrder::Alphabetical,
+        view: SamplePickerView {
+            filters: SampleFilters {
+                status: Some(SampleTriageStatus::Sampled),
+                ..SampleFilters::default()
+            },
+            ..SamplePickerView::default()
+        },
+        name_input: None,
     });
     let caches = rebuild_caches(&app.mapping.entries, root, root);
 
@@ -3033,12 +3157,11 @@ fn open_sample_picker_enter_opens_the_visible_entry_not_the_raw_index() {
         other => panic!("expected OpenTarget::Sample(\"unsolved-two\"), got {other:?}"),
     }
 }
-
 #[test]
-fn open_sample_picker_s_advances_sort_order_and_resets_selection_to_first() {
-    // Unlike `H` (which tracks the previously selected name across a re-sort), `s` always
-    // resets `selected` to 0 - changing sort order is about jumping to whichever end of the
-    // new order is interesting, not staying on what was picked under the old one.
+fn open_sample_picker_s_sorts_by_the_cursor_column_and_keeps_the_selected_row() {
+    // Unlike the old fixed four-way cycle, `s` takes the sort over to whichever column `h`/`l`
+    // last moved to, and the selection follows the row it was on - which is the point of
+    // re-sorting while looking at a particular sample.
     let source = "fn main() {}\n";
     let tree = parse_rust(source);
     let root = tree.root_node();
@@ -3051,14 +3174,18 @@ fn open_sample_picker_s_advances_sort_order_and_resets_selection_to_first() {
     );
     let flat = FlatIndex::new(flatten_visible(root, &app.before.collapsed, None));
     app.modal = Some(Modal::OpenSamplePicker {
-        options: vec![
-            ("alpha".to_string(), SampleTriageStatus::Sampled, 5),
-            ("bravo".to_string(), SampleTriageStatus::Sampled, 1),
-            ("charlie".to_string(), SampleTriageStatus::Sampled, 20),
+        rows: vec![
+            sample_row("alpha", "Rust", None, SampleTriageStatus::Sampled, 5),
+            sample_row("bravo", "Rust", None, SampleTriageStatus::Sampled, 1),
+            sample_row("charlie", "Rust", None, SampleTriageStatus::Sampled, 20),
         ],
+        // Sorted by Name, so index 2 is "charlie"; by Size it becomes index 1.
         selected: 2,
-        hide_solved: false,
-        sort_order: SampleSortOrder::Alphabetical,
+        view: SamplePickerView {
+            column: SampleColumn::Size,
+            ..SamplePickerView::default()
+        },
+        name_input: None,
     });
     let caches = rebuild_caches(&app.mapping.entries, root, root);
 
@@ -3077,27 +3204,29 @@ fn open_sample_picker_s_advances_sort_order_and_resets_selection_to_first() {
     );
 
     assert!(target.is_none(), "s should not switch cases directly");
-    match app.modal {
-        Some(Modal::OpenSamplePicker {
-            selected,
-            sort_order,
-            ..
-        }) => {
-            assert_eq!(selected, 0, "selection should reset to the first entry");
-            assert_eq!(sort_order, SampleSortOrder::ReverseAlphabetical);
+    match &app.modal {
+        Some(Modal::OpenSamplePicker { selected, view, .. }) => {
+            assert_eq!(view.sort.column, SampleColumn::Size);
+            assert!(
+                !view.sort.descending,
+                "a fresh column sorts ascending first"
+            );
+            assert_eq!(
+                *selected, 2,
+                "charlie has the largest diff, so it is last under an ascending Size sort"
+            );
         }
         other => panic!("expected Modal::OpenSamplePicker, got {other:?}"),
     }
     assert_eq!(
-        app.sample_sort_order,
-        SampleSortOrder::ReverseAlphabetical,
-        "the new sort order must persist on App too, not just this modal instance, so the \
-         next O reopens with it instead of resetting to Alphabetical"
+        app.sample_view.sort.column,
+        SampleColumn::Size,
+        "the new sort must persist on App too, not just this modal instance, so the next O \
+         reopens with it"
     );
 }
-
 #[test]
-fn open_sample_picker_h_persists_hide_solved_on_app() {
+fn open_sample_picker_f_persists_the_column_filter_on_app() {
     let source = "fn main() {}\n";
     let tree = parse_rust(source);
     let root = tree.root_node();
@@ -3110,16 +3239,25 @@ fn open_sample_picker_h_persists_hide_solved_on_app() {
     );
     let flat = FlatIndex::new(flatten_visible(root, &app.before.collapsed, None));
     app.modal = Some(Modal::OpenSamplePicker {
-        options: vec![("alpha".to_string(), SampleTriageStatus::Sampled, 5)],
+        rows: vec![sample_row(
+            "alpha",
+            "Rust",
+            Some("30-100"),
+            SampleTriageStatus::Sampled,
+            5,
+        )],
         selected: 0,
-        hide_solved: false,
-        sort_order: SampleSortOrder::Alphabetical,
+        view: SamplePickerView {
+            column: SampleColumn::Status,
+            ..SamplePickerView::default()
+        },
+        name_input: None,
     });
     let caches = rebuild_caches(&app.mapping.entries, root, root);
 
     handle_modal_key(
         &mut app,
-        KeyCode::Char('H'),
+        KeyCode::Char('f'),
         &flat,
         &flat,
         root,
@@ -3131,12 +3269,12 @@ fn open_sample_picker_h_persists_hide_solved_on_app() {
         &Code::from_string(source, &Language::Rust),
     );
 
-    assert!(
-        app.sample_hide_solved,
-        "H's new hide_solved value must persist on App too, so the next O reopens with it"
+    assert_eq!(
+        app.sample_view.filters.status,
+        Some(SampleTriageStatus::Sampled),
+        "f's new filter must persist on App too, so the next O reopens with it"
     );
 }
-
 #[test]
 fn open_commit_picker_j_k_move_selection_clamped_to_bounds() {
     let source = "fn main() {}\n";
@@ -3438,28 +3576,32 @@ fn open_commit_file_picker_esc_cancels() {
 }
 
 #[test]
-fn open_sample_picker_modal_selects_the_currently_open_case_under_the_given_sort_order() {
-    let options = vec![
-        ("alpha".to_string(), SampleTriageStatus::Sampled, 5),
-        ("bravo".to_string(), SampleTriageStatus::Sampled, 1),
-        ("charlie".to_string(), SampleTriageStatus::Sampled, 20),
+fn open_sample_picker_modal_selects_the_currently_open_case_under_the_given_view() {
+    let rows = vec![
+        sample_row("alpha", "Rust", None, SampleTriageStatus::Sampled, 5),
+        sample_row("bravo", "Rust", None, SampleTriageStatus::Sampled, 1),
+        sample_row("charlie", "Rust", None, SampleTriageStatus::Sampled, 20),
     ];
 
-    // "bravo" is index 1 in `options`' own order, but index 0 once sorted smallest-diff-first
-    // - proves `selected` is computed against the sorted/filtered view, not raw `options`.
-    let modal =
-        open_sample_picker_modal(options, "bravo", false, SampleSortOrder::SmallestDiffFirst);
+    // "bravo" is index 1 in `rows`' own order, but index 0 once sorted by Size ascending -
+    // proves `selected` is computed against the sorted/filtered view, not raw `rows`.
+    let view = SamplePickerView {
+        sort: SampleSort {
+            column: SampleColumn::Size,
+            descending: false,
+        },
+        ..SamplePickerView::default()
+    };
+    let modal = open_sample_picker_modal(rows, "bravo", view.clone());
 
     match modal {
         Modal::OpenSamplePicker {
             selected,
-            hide_solved,
-            sort_order,
+            view: got,
             ..
         } => {
             assert_eq!(selected, 0);
-            assert!(!hide_solved);
-            assert_eq!(sort_order, SampleSortOrder::SmallestDiffFirst);
+            assert_eq!(got, view);
         }
         other => panic!("expected Modal::OpenSamplePicker, got {other:?}"),
     }
@@ -3467,13 +3609,14 @@ fn open_sample_picker_modal_selects_the_currently_open_case_under_the_given_sort
 
 #[test]
 fn open_sample_picker_modal_falls_back_to_the_first_entry_when_the_current_case_is_not_a_sample() {
-    let options = vec![("alpha".to_string(), SampleTriageStatus::Sampled, 5)];
-    let modal = open_sample_picker_modal(
-        options,
-        "not-a-sample-name",
-        false,
-        SampleSortOrder::Alphabetical,
-    );
+    let rows = vec![sample_row(
+        "alpha",
+        "Rust",
+        None,
+        SampleTriageStatus::Sampled,
+        5,
+    )];
+    let modal = open_sample_picker_modal(rows, "not-a-sample-name", SamplePickerView::default());
     match modal {
         Modal::OpenSamplePicker { selected, .. } => assert_eq!(selected, 0),
         other => panic!("expected Modal::OpenSamplePicker, got {other:?}"),
@@ -5133,50 +5276,56 @@ fn sample_triage_statuses_at_reads_the_status_column_for_every_row() {
     };
     reject_sample_csv_at(file.path(), &rejected_source, "not interesting").unwrap();
 
-    let statuses = sample_triage_statuses_at(file.path()).unwrap();
+    let statuses = sample_metadata_at(file.path()).unwrap();
     assert_eq!(
-        statuses.get(&(
-            "Rust".to_string(),
-            "repo".to_string(),
-            "abc123".to_string(),
-            "src/a.rs".to_string(),
-        )),
-        Some(&SampleTriageStatus::Promoted)
+        statuses
+            .get(&(
+                "Rust".to_string(),
+                "repo".to_string(),
+                "abc123".to_string(),
+                "src/a.rs".to_string(),
+            ))
+            .map(|meta| meta.status),
+        Some(SampleTriageStatus::Promoted)
     );
     assert_eq!(
-        statuses.get(&(
-            "Rust".to_string(),
-            "repo".to_string(),
-            "def456".to_string(),
-            "src/b.rs".to_string(),
-        )),
-        Some(&SampleTriageStatus::Rejected)
+        statuses
+            .get(&(
+                "Rust".to_string(),
+                "repo".to_string(),
+                "def456".to_string(),
+                "src/b.rs".to_string(),
+            ))
+            .map(|meta| meta.status),
+        Some(SampleTriageStatus::Rejected)
     );
 }
 
 #[test]
-fn sample_triage_statuses_at_defaults_an_unmatched_row_to_sampled() {
+fn sample_metadata_at_defaults_an_unmatched_row_to_sampled() {
     let file = NamedTempFile::new().unwrap();
     write_csv(
         file.path(),
         &[("Rust", "repo", "abc123", "src/a.rs", "", "small")],
     );
 
-    let statuses = sample_triage_statuses_at(file.path()).unwrap();
+    let statuses = sample_metadata_at(file.path()).unwrap();
     assert_eq!(
-        statuses.get(&(
-            "Rust".to_string(),
-            "repo".to_string(),
-            "abc123".to_string(),
-            "src/a.rs".to_string(),
-        )),
-        Some(&SampleTriageStatus::Sampled)
+        statuses
+            .get(&(
+                "Rust".to_string(),
+                "repo".to_string(),
+                "abc123".to_string(),
+                "src/a.rs".to_string(),
+            ))
+            .map(|meta| meta.status),
+        Some(SampleTriageStatus::Sampled)
     );
 }
 
 #[test]
-fn sample_triage_statuses_at_is_empty_when_file_does_not_exist() {
-    let statuses = sample_triage_statuses_at(Path::new("/nonexistent/sample.csv")).unwrap();
+fn sample_metadata_at_is_empty_when_file_does_not_exist() {
+    let statuses = sample_metadata_at(Path::new("/nonexistent/sample.csv")).unwrap();
     assert!(statuses.is_empty());
 }
 

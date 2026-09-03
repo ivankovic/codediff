@@ -354,11 +354,16 @@ o              open a different test case (src/test/data/diffs/) as a table:
                  Disagree ~7s on the full corpus); until then those
                  columns read ?, and a ? row survives either filter direction.
                  Cursor, sort and filters persist across o
-O              open a sampled candidate (src/test/data/samples/); already-promoted
-                 samples are marked \" - SOLVED\", rejected ones \" - REJECTED\" --
-                 press H inside this picker to hide/show both, or s to cycle its
-                 sort order (A-Z, Z-A, smallest/largest text diff first) -- both
-                 persist across O
+O              open a sampled candidate (src/test/data/samples/) as a table:
+                 Name, Lang, Bucket, Status, Size. Same keys as o -- j/k pick a
+                 row, h/l pick a column, s sorts by that column (again to
+                 reverse), f filters on it: substring on Name, a value cycle on
+                 Lang and Bucket, sampled/SOLVED/REJECTED on Status, and
+                 off/nonempty/empty on Size (an empty diff is a broken draw).
+                 Bucket is the LOC stratum the sample was drawn for, ? for one
+                 sampled before strata were recorded, and a ? row survives the
+                 Bucket filter either way. Filters AND together across columns.
+                 Cursor, sort and filters persist across O
 C              open a commit from this repo's own git log, then a file it
                  changed -- before/after are that file at the commit's parent
                  and at the commit itself; s promotes into handmade/
@@ -1026,41 +1031,64 @@ enum SampleTriageStatus {
 }
 
 impl SampleTriageStatus {
-    /// Whether `hide_solved` should hide this sample: both a promotion and a rejection are a
-    /// finished triage decision -- nothing left to review -- unlike `Sampled`.
-    fn is_handled(self) -> bool {
-        matches!(
-            self,
-            SampleTriageStatus::Promoted | SampleTriageStatus::Rejected
-        )
+    fn label(self) -> &'static str {
+        match self {
+            SampleTriageStatus::Sampled => "sampled",
+            SampleTriageStatus::Promoted => "SOLVED",
+            SampleTriageStatus::Rejected => "REJECTED",
+        }
+    }
+
+    /// Sort order for the `Status` column: untriaged first, since those are the rows the picker
+    /// exists to surface, then the two finished decisions.
+    fn order(self) -> u8 {
+        match self {
+            SampleTriageStatus::Sampled => 0,
+            SampleTriageStatus::Promoted => 1,
+            SampleTriageStatus::Rejected => 2,
+        }
     }
 }
 
-/// Every sample directory name under src/test/data/samples/, paired with the triage status of the
-/// sample.csv row it came from. A sample's status is looked up by matching its `source.json`
-/// (language, repository, commit, path) against a sample.csv row -- the same join
-/// `action_promote`/`action_reject` use, so it stays correct even if a promoted diffs/ case was
+/// Every sample directory under src/test/data/samples/, as the rows the `O` picker sorts and
+/// filters. Language, repository, commit and path come from the sample's own `source.json`; the
+/// triage status and LOC bucket come from the sample.csv row that joins to - the same join
+/// `action_promote`/`action_reject` use, so it stays correct even if a promoted `diffs/` case was
 /// later renamed or the sample directory has a numbered suffix.
-fn list_samples_with_status() -> Result<Vec<(String, SampleTriageStatus)>> {
+///
+/// `size` is left at 0 here and filled in by the `O` handler from `App::sample_diff_sizes`: taking
+/// it costs an external `diff` per sample, so it is cached across presses rather than recomputed
+/// on every listing (see `sample_diff_sizes`).
+fn list_sample_rows() -> Result<Vec<SampleRow>> {
     let names = list_dir_names(&samples_root())?;
-    let statuses = sample_triage_statuses()?;
+    let meta = sample_metadata()?;
 
     Ok(names
         .into_iter()
         .map(|name| {
-            let status = source_json_for_sample(&name)
-                .and_then(|source| {
-                    statuses
-                        .get(&(
-                            source.language,
-                            source.repository,
-                            source.commit,
-                            source.path,
-                        ))
-                        .copied()
-                })
-                .unwrap_or(SampleTriageStatus::Sampled);
-            (name, status)
+            let source = source_json_for_sample(&name);
+            let language = source
+                .as_ref()
+                .map(|source| source.language.clone())
+                .unwrap_or_else(|| "?".to_string());
+            let found = source.and_then(|source| {
+                meta.get(&(
+                    source.language,
+                    source.repository,
+                    source.commit,
+                    source.path,
+                ))
+                .cloned()
+            });
+            SampleRow {
+                name,
+                language,
+                bucket: found.as_ref().and_then(|meta| meta.size_bucket.clone()),
+                status: found
+                    .map(|meta| meta.status)
+                    .unwrap_or(SampleTriageStatus::Sampled),
+                size: 0,
+            }
         })
         .collect())
 }
@@ -1072,16 +1100,26 @@ fn source_json_for_sample(name: &str) -> Option<SampleSource> {
     serde_json::from_str(&contents).ok()
 }
 
-fn sample_triage_statuses()
--> Result<std::collections::HashMap<(String, String, String, String), SampleTriageStatus>> {
-    sample_triage_statuses_at(&sample_csv_path())
+/// What the `O` picker reads off a sample.csv row, beyond the (language, repository, commit, path)
+/// it is keyed by.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct SampleMeta {
+    status: SampleTriageStatus,
+    /// `None` for a row written before bucket tracking, or sampled without `--stratified`.
+    size_bucket: Option<String>,
 }
 
-/// The triage status of every row in the sample.csv at `path`, keyed by (language, repository,
-/// commit, path). Returns an empty map, not an error, if `path` doesn't exist.
-fn sample_triage_statuses_at(
+fn sample_metadata()
+-> Result<std::collections::HashMap<(String, String, String, String), SampleMeta>> {
+    sample_metadata_at(&sample_csv_path())
+}
+
+/// The triage status and LOC bucket of every row in the sample.csv at `path`, keyed by
+/// (language, repository, commit, path). Returns an empty map, not an error, if `path` doesn't
+/// exist.
+fn sample_metadata_at(
     path: &Path,
-) -> Result<std::collections::HashMap<(String, String, String, String), SampleTriageStatus>> {
+) -> Result<std::collections::HashMap<(String, String, String, String), SampleMeta>> {
     if !path.exists() {
         return Ok(std::collections::HashMap::new());
     }
@@ -1094,7 +1132,14 @@ fn sample_triage_statuses_at(
                 "REJECTED" => SampleTriageStatus::Rejected,
                 _ => SampleTriageStatus::Sampled,
             };
-            ((row.language, row.repository, row.commit, row.path), status)
+            let size_bucket = (!row.size_bucket.is_empty()).then_some(row.size_bucket);
+            (
+                (row.language, row.repository, row.commit, row.path),
+                SampleMeta {
+                    status,
+                    size_bucket,
+                },
+            )
         })
         .collect())
 }
@@ -1543,93 +1588,316 @@ impl<'a> DiffPickerData<'a> {
     }
 }
 
-/// Sort order for the `O` (open sample) picker's list, cycled by pressing `s` while it's open (see
-/// `Modal::OpenSamplePicker`). `SmallestDiffFirst`/`LargestDiffFirst` rank by
-/// `sample_diff_line_count` - useful for triaging samples by how much work solving one by hand is
-/// likely to take, without needing to open each one first to find out.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum SampleSortOrder {
-    Alphabetical,
-    ReverseAlphabetical,
-    SmallestDiffFirst,
-    LargestDiffFirst,
+/// One row of the `O` picker's table: a materialized sample under `src/test/data/samples/`, with
+/// everything the picker can order or narrow on. `language`/`bucket` come from the sample.csv row
+/// the sample's `source.json` joins to; `size` is its `sample_diff_line_count` (cached on
+/// `App::sample_diff_sizes`, since taking it costs an external `diff` per sample).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct SampleRow {
+    pub(crate) name: String,
+    pub(crate) language: String,
+    /// The LOC stratum this sample was drawn for, or `None` for a row sampled before bucket
+    /// tracking existed or without `--stratified` (see `sample_test_diffs::Row::size_bucket`).
+    /// Rendered as `?`, and never hidden by the bucket filter - the same fail-open rule
+    /// `FlagFilter::keeps` applies to an unknown yes/no reading, for the same reason: "not
+    /// recorded" is not evidence the row should be dropped.
+    pub(crate) bucket: Option<String>,
+    pub(crate) status: SampleTriageStatus,
+    pub(crate) size: usize,
 }
 
-impl SampleSortOrder {
-    fn next(self) -> Self {
-        match self {
-            SampleSortOrder::Alphabetical => SampleSortOrder::ReverseAlphabetical,
-            SampleSortOrder::ReverseAlphabetical => SampleSortOrder::SmallestDiffFirst,
-            SampleSortOrder::SmallestDiffFirst => SampleSortOrder::LargestDiffFirst,
-            SampleSortOrder::LargestDiffFirst => SampleSortOrder::Alphabetical,
-        }
+/// One column of the `O` picker's table, left to right - the unit `h`/`l` move the cursor between,
+/// and the thing both `s` (sort) and `f` (filter) act on, exactly as in the `o` picker.
+///
+/// Deliberately its own type rather than a generic column shared with `DiffColumn`: the two
+/// pickers have only two column *shapes* in common (a typed substring and a cycle through a fixed
+/// list) and differ on every other one, so a trait spanning both would have to be read twice to
+/// understand either. The keys, the header conventions and the AND-ing of filters are what the two
+/// share, and those are a matter of behaviour rather than of types.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+enum SampleColumn {
+    #[default]
+    Name,
+    Lang,
+    Bucket,
+    Status,
+    Size,
+}
+
+impl SampleColumn {
+    /// Left-to-right order, shared by the header row, the cursor movement below and the width list
+    /// in `render_open_sample_picker` - so a column can only ever be added in one place.
+    const ALL: [SampleColumn; 5] = [
+        SampleColumn::Name,
+        SampleColumn::Lang,
+        SampleColumn::Bucket,
+        SampleColumn::Status,
+        SampleColumn::Size,
+    ];
+
+    fn index(self) -> usize {
+        SampleColumn::ALL
+            .iter()
+            .position(|column| *column == self)
+            .unwrap_or(0)
+    }
+
+    /// Clamped at both ends rather than wrapping, same as `DiffColumn::left`/`right`: the header
+    /// highlights the cursor column, so jumping from one edge to the other reads as a glitch.
+    fn left(self) -> Self {
+        SampleColumn::ALL[self.index().saturating_sub(1)]
+    }
+
+    fn right(self) -> Self {
+        SampleColumn::ALL[(self.index() + 1).min(SampleColumn::ALL.len() - 1)]
     }
 
     fn label(self) -> &'static str {
         match self {
-            SampleSortOrder::Alphabetical => "A-Z",
-            SampleSortOrder::ReverseAlphabetical => "Z-A",
-            SampleSortOrder::SmallestDiffFirst => "smallest diff first",
-            SampleSortOrder::LargestDiffFirst => "largest diff first",
+            SampleColumn::Name => "Name",
+            SampleColumn::Lang => "Lang",
+            SampleColumn::Bucket => "Bucket",
+            SampleColumn::Status => "Status",
+            SampleColumn::Size => "Size",
         }
     }
 }
 
-/// Sample entries actually shown in the `O` picker: `options` filtered by `hide_solved`, then
-/// ordered by `sort_order`. Shared by the render function and the key handler so both agree on
-/// what index `selected` refers to by construction, rather than keeping two independently
-/// maintained copies of the same filter/sort logic in sync by hand.
-fn visible_sample_options(
-    options: &[(String, SampleTriageStatus, usize)],
-    hide_solved: bool,
-    sort_order: SampleSortOrder,
-) -> Vec<(String, SampleTriageStatus, usize)> {
-    let mut visible: Vec<(String, SampleTriageStatus, usize)> = options
+/// Sort key for a LOC-bucket label: its lower bound, parsed back out of the label itself
+/// ("30-100" -> 30, "3000+" -> 3000). Ordering by the label as a string would put "100-300" before
+/// "30-100", which is exactly backwards for the one column whose whole purpose is size.
+///
+/// Parsed rather than shared with `stats::sampling::LOC_BUCKETS`, because that lives behind the
+/// `stats` feature and human_solver builds with only `test-fixtures`. An unbucketed row sorts last
+/// under either direction's ascending pass, which is where "not recorded" belongs.
+fn bucket_order(bucket: Option<&str>) -> usize {
+    let Some(bucket) = bucket else {
+        return usize::MAX;
+    };
+    bucket
+        .split(['-', '+'])
+        .next()
+        .and_then(|lower| lower.parse().ok())
+        .unwrap_or(usize::MAX)
+}
+
+/// Every column's filter at once, AND-ed together exactly like `DiffFilters`: a row shows only if
+/// it passes all of them, so narrowing on two columns asks for rows matching both ("Go samples in
+/// the 1000-3000 stratum"), never either.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+struct SampleFilters {
+    /// Case-insensitive substring of the sample name, stored already lowercased. `None` when off.
+    name: Option<String>,
+    /// An exact language, cycled through the languages actually present in the list rather than
+    /// through `Language`'s full set - offering a language no sample has would be a filter that
+    /// can only produce an empty table.
+    language: Option<String>,
+    /// An exact bucket label, cycled through the buckets present, `None` for "all". An unbucketed
+    /// row is never hidden by this - see `SampleRow::bucket`.
+    bucket: Option<String>,
+    status: Option<SampleTriageStatus>,
+    /// Yes/no on "this sample's diff has any changed lines at all". Not a filter invented to give
+    /// the column something to do: a sample whose before and after differ by nothing is a broken
+    /// draw, and this is how you find the ones worth deleting rather than triaging.
+    size: FlagFilter,
+}
+
+impl SampleFilters {
+    fn is_active(&self, column: SampleColumn) -> bool {
+        match column {
+            SampleColumn::Name => self.name.is_some(),
+            SampleColumn::Lang => self.language.is_some(),
+            SampleColumn::Bucket => self.bucket.is_some(),
+            SampleColumn::Status => self.status.is_some(),
+            SampleColumn::Size => self.size != FlagFilter::Off,
+        }
+    }
+
+    fn any_active(&self) -> bool {
+        SampleColumn::ALL
+            .iter()
+            .any(|column| self.is_active(*column))
+    }
+
+    /// The filters in force, spelled out for the picker's title bar. Empty when nothing is
+    /// filtered, so the caller can leave the title alone.
+    fn describe(&self) -> String {
+        let mut parts = Vec::new();
+        if let Some(name) = &self.name {
+            parts.push(format!("name~{name}"));
+        }
+        if let Some(language) = &self.language {
+            parts.push(format!("lang={language}"));
+        }
+        if let Some(bucket) = &self.bucket {
+            parts.push(format!("bucket={bucket}"));
+        }
+        if let Some(status) = self.status {
+            parts.push(format!("status={}", status.label()));
+        }
+        match self.size {
+            FlagFilter::Off => {}
+            FlagFilter::Yes => parts.push("size>0".to_string()),
+            FlagFilter::No => parts.push("size=0".to_string()),
+        }
+        parts.join("  ")
+    }
+
+    fn keeps(&self, row: &SampleRow) -> bool {
+        if let Some(needle) = &self.name
+            && !row.name.to_lowercase().contains(needle)
+        {
+            return false;
+        }
+        if let Some(language) = &self.language
+            && row.language != *language
+        {
+            return false;
+        }
+        // Fail open on an unbucketed row - see `SampleRow::bucket`.
+        if let Some(bucket) = &self.bucket
+            && row.bucket.as_deref().is_some_and(|b| b != bucket)
+        {
+            return false;
+        }
+        if let Some(status) = self.status
+            && row.status != status
+        {
+            return false;
+        }
+        self.size.keeps(Some(row.size > 0))
+    }
+}
+
+/// Which single column the `O` picker's rows are ordered by, and in which direction - the same
+/// one-column, no-hidden-secondary-key contract as `DiffSort`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+struct SampleSort {
+    column: SampleColumn,
+    descending: bool,
+}
+
+impl SampleSort {
+    fn toggled(self, column: SampleColumn) -> Self {
+        SampleSort {
+            column,
+            descending: self.column == column && !self.descending,
+        }
+    }
+
+    fn arrow(self) -> &'static str {
+        if self.descending { "v" } else { "^" }
+    }
+}
+
+/// The `O` picker's whole cursor/sort/filter state, carried on `Modal::OpenSamplePicker` and
+/// persisted on `App::sample_view` so it survives closing and reopening - the contract
+/// `App::sample_hide_solved`/`sample_sort_order` used to hold between them.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+struct SamplePickerView {
+    column: SampleColumn,
+    sort: SampleSort,
+    filters: SampleFilters,
+}
+
+/// The distinct values of one column across the whole list, in the order that column sorts, for
+/// `f` to cycle through. Built from the rows rather than from a static list so the cycle can only
+/// ever offer a value some row actually has.
+fn sample_language_values(rows: &[SampleRow]) -> Vec<String> {
+    let mut values: Vec<String> = rows.iter().map(|row| row.language.clone()).collect();
+    values.sort();
+    values.dedup();
+    values
+}
+
+fn sample_bucket_values(rows: &[SampleRow]) -> Vec<String> {
+    let mut values: Vec<String> = rows.iter().filter_map(|row| row.bucket.clone()).collect();
+    values.sort_by_key(|bucket| bucket_order(Some(bucket)));
+    values.dedup();
+    values
+}
+
+/// Advances a cycle-through-a-list filter: `None` (all) -> first -> ... -> last -> `None`.
+fn next_value_filter(current: Option<&str>, values: &[String]) -> Option<String> {
+    let Some(current) = current else {
+        return values.first().cloned();
+    };
+    let position = values.iter().position(|value| value == current)?;
+    values.get(position + 1).cloned()
+}
+
+fn next_status_filter(current: Option<SampleTriageStatus>) -> Option<SampleTriageStatus> {
+    match current {
+        None => Some(SampleTriageStatus::Sampled),
+        Some(SampleTriageStatus::Sampled) => Some(SampleTriageStatus::Promoted),
+        Some(SampleTriageStatus::Promoted) => Some(SampleTriageStatus::Rejected),
+        Some(SampleTriageStatus::Rejected) => None,
+    }
+}
+
+/// The rows actually shown in the `O` picker: `rows` narrowed by every active filter, then ordered
+/// by the sorted column. Shared by the renderer and the key handler so both agree on what index
+/// `selected` refers to by construction, rather than keeping two copies of this in sync by hand.
+///
+/// Every sort falls back to the name as a tiebreak, so rows that tie on the sorted column (all of
+/// them, for a column like `Bucket` with seven distinct values) keep a stable, readable order
+/// instead of shuffling between frames.
+fn visible_sample_rows(rows: &[SampleRow], view: &SamplePickerView) -> Vec<SampleRow> {
+    let mut visible: Vec<SampleRow> = rows
         .iter()
-        .filter(|(_, status, _)| !hide_solved || !status.is_handled())
+        .filter(|row| view.filters.keeps(row))
         .cloned()
         .collect();
 
-    match sort_order {
-        SampleSortOrder::Alphabetical => visible.sort_by(|a, b| a.0.cmp(&b.0)),
-        SampleSortOrder::ReverseAlphabetical => visible.sort_by(|a, b| b.0.cmp(&a.0)),
-        SampleSortOrder::SmallestDiffFirst => visible.sort_by_key(|(_, _, size)| *size),
-        SampleSortOrder::LargestDiffFirst => {
-            visible.sort_by_key(|(_, _, size)| std::cmp::Reverse(*size))
+    match view.sort.column {
+        SampleColumn::Name => visible.sort_by(|a, b| a.name.cmp(&b.name)),
+        SampleColumn::Lang => {
+            visible.sort_by(|a, b| a.language.cmp(&b.language).then(a.name.cmp(&b.name)))
         }
+        SampleColumn::Bucket => visible.sort_by(|a, b| {
+            bucket_order(a.bucket.as_deref())
+                .cmp(&bucket_order(b.bucket.as_deref()))
+                .then(a.name.cmp(&b.name))
+        }),
+        SampleColumn::Status => visible.sort_by(|a, b| {
+            a.status
+                .order()
+                .cmp(&b.status.order())
+                .then(a.name.cmp(&b.name))
+        }),
+        SampleColumn::Size => visible.sort_by(|a, b| a.size.cmp(&b.size).then(a.name.cmp(&b.name))),
+    }
+    if view.sort.descending {
+        visible.reverse();
     }
 
     visible
 }
 
-/// Builds the `O` picker's modal from a freshly-listed `options`, `current_name` (the case
-/// already open, so it starts selected if it's a sample too), and the persisted `hide_solved`/
-/// `sort_order` (`App::sample_hide_solved`/`sample_sort_order`). A pure function, separate from
-/// the `KeyCode::Char('O')` handler that calls it, specifically so this - the part with real
-/// logic to get wrong - is unit-testable without needing real files under
-/// `src/test/data/samples/` the way `list_samples_with_status`/`sample_diff_line_count` do.
+/// Builds the `O` picker's modal from a freshly-listed `rows`, `current_name` (the case already
+/// open, so it starts selected if it is a sample too) and the persisted `view`. A pure function,
+/// separate from the `KeyCode::Char('O')` handler that calls it, specifically so the part with
+/// real logic to get wrong is unit-testable without needing real files under
+/// `src/test/data/samples/`.
 ///
-/// `selected` is computed against `visible_sample_options`'s output, not raw `options`: once
-/// `hide_solved`/`sort_order` differ from `options`' own natural order (alphabetical, nothing
-/// hidden), a raw-`options` position would point at the wrong row once the picker actually renders
-/// the filtered/sorted list.
+/// `selected` is computed against `visible_sample_rows`'s output, not raw `rows`: once a filter or
+/// a non-default sort is in force, a raw-`rows` position would point at the wrong row.
 fn open_sample_picker_modal(
-    options: Vec<(String, SampleTriageStatus, usize)>,
+    rows: Vec<SampleRow>,
     current_name: &str,
-    hide_solved: bool,
-    sort_order: SampleSortOrder,
+    view: SamplePickerView,
 ) -> Modal {
-    let visible = visible_sample_options(&options, hide_solved, sort_order);
+    let visible = visible_sample_rows(&rows, &view);
     let selected = visible
         .iter()
-        .position(|(name, ..)| name == current_name)
+        .position(|row| row.name == current_name)
         .unwrap_or(0)
         .min(visible.len().saturating_sub(1));
     Modal::OpenSamplePicker {
-        options,
+        rows,
         selected,
-        hide_solved,
-        sort_order,
+        view,
+        name_input: None,
     }
 }
 
