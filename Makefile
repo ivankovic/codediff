@@ -19,7 +19,7 @@
 # Everything else that exists to produce the papers and empirical studies - corpus fetching,
 # sampling, analysis, paper builds - lives in research/Makefile too. Run those from there:
 #
-#     cd research && make <target>          # e.g. rq1-report, introductory-paper, measure-file-stats
+#     cd research && make <target>          # e.g. apted-budget-report, introductory-paper, measure-file-stats
 #
 # The split is deliberate: this file should stay readable to someone working on codediff itself,
 # who has no reason to care about the research corpus. `benchmark-quality` and `check-quality`

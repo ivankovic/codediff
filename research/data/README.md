@@ -16,7 +16,7 @@ data/
   performance/    output  - diff speed/memory over the sampled pairs
     baselines/            - pinned point-in-time snapshots, kept for comparison
   comparison/     output  - codediff against other diff tools
-  measure-rq1/            output  - whole-tree APTED against a 1-second budget (the paper's RQ1)
+  measure-apted-budget/            output  - whole-tree APTED against a 1-second budget (the paper's RQ1)
   ablation/       output  - leave-one-out heuristic study (gitignored: regenerable scratch)
 ```
 
@@ -69,7 +69,7 @@ script's own comment about Lua sampling zero pairs).
 `benchmark_<language>_baseline_pre_<change>.csv`) kept for before/after comparison across a
 specific algorithm change. These are never regenerated - that is the point of them.
 
-## measure-rq1/
+## measure-apted-budget/
 
 `apted_only_group<N>.csv`, the per-pair output of `apted_only_benchmark`: whether a single
 whole-tree APTED run finished inside a 1-second budget, for every sampled pair. Four groups purely
@@ -80,4 +80,4 @@ Also holds `archive_pre_resample_*/` (the last measurements taken against the ol
 corpus) and, currently, `partial_resample_*_INCOMPLETE/` - see that directory's own README for why
 it is not reportable.
 
-Read with `make rq1-report`; re-measure with `make measure-rq1` (hours, needs an idle machine).
+Read with `make apted-budget-report`; re-measure with `make measure-apted-budget` (hours, needs an idle machine).

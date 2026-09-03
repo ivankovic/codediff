@@ -35,10 +35,10 @@ product concerns only (build, test, install, release):
 
 ```
 cd research
-make rq1-report            # fast: re-render RQ1 from data already on disk
+make apted-budget-report            # fast: re-render RQ1 from data already on disk
 make introductory-paper    # fast: rebuild the paper PDF
 make fetch MODE=small      # slow: clone/update the 100-repository corpus
-make measure-rq1                   # slow, timing-sensitive: re-measure RQ1 (idle machine!)
+make measure-apted-budget                   # slow, timing-sensitive: re-measure RQ1 (idle machine!)
 ```
 
 Most corpus targets take `MODE=tiny` (default) / `MODE=small` / `MODE=full`, choosing which

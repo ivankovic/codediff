@@ -120,12 +120,13 @@ sample-pairs: build
 # were never measured - a silent gap between what the corpus covers and what RQ1 reports on, not
 # an error anything surfaced. Keep this list in sync with the languages the sampler actually
 # produces (check `sampled_code_pairs_all.csv`'s own `language` column, not this list).
-RQ1_LANGUAGES := c:C cpp:CPP csharp:CSharp css:CSS go:Go html:HTML java:Java \
+LANGUAGES := c:C cpp:CPP csharp:CSharp css:CSS go:Go html:HTML java:Java \
 	javascript:JavaScript json:JSON kotlin:Kotlin lua:LUA php:PHP python:Python \
 	r:R ruby:Ruby rust:Rust scala:Scala shellscript:ShellScript swift:Swift tsx:TSX \
 	typescript:TypeScript vimscript:Vimscript xml:XML yaml:YAML
 
-# Re-draws the whole RQ1 corpus, one CSV per language, with identical settings for every language.
+# Re-draws the whole sampled corpus, one CSV per language, with identical settings for every
+# language.
 # Previously only four languages had a target and the other fifteen CSVs were produced by ad-hoc
 # invocations, some with --max-commits-per-repo 100 and some without - so the committed corpus
 # mixed sampling methodologies. This target exists so the corpus is reproducible from one command.
@@ -138,7 +139,7 @@ RQ1_LANGUAGES := c:C cpp:CPP csharp:CSharp css:CSS go:Go html:HTML java:Java \
 # language against the 100-repository corpus, i.e. hours for the set, against minutes for one pass.
 #
 # Stratification follows stats::sampling::LOC_BUCKETS (7 LOC buckets, keyed by the larger of
-# before/after), so --count is split 7 ways per language. Re-run `make measure-rq1` afterwards to
+# before/after), so --count is split 7 ways per language. Re-run `make measure-apted-budget` afterwards to
 # re-measure against the new sample.
 # COUNT is per language, split evenly across the 7 LOC buckets, so the per-cell target is
 # COUNT/7: COUNT=140 draws 20 pairs per language per bucket. Sparse cells (a language with few
@@ -146,7 +147,7 @@ RQ1_LANGUAGES := c:C cpp:CPP csharp:CSharp css:CSS go:Go html:HTML java:Java \
 COUNT ?= 1000
 sample-pairs-all: build
 	$(BIN_DIR)/sample_code_pairs --path $(REPOSITORIES_DIR) --output data/samples/sampled_code_pairs_all.csv --count $(COUNT)
-	@for entry in $(RQ1_LANGUAGES); do \
+	@for entry in $(LANGUAGES); do \
 		suffix=$${entry%%:*}; language=$${entry##*:}; \
 		out=data/samples/sampled_code_pairs_$$suffix.csv; \
 		head -1 data/samples/sampled_code_pairs_all.csv > $$out; \
@@ -154,21 +155,17 @@ sample-pairs-all: build
 		echo "$$language -> $$out ($$(( $$(wc -l < $$out) - 1 )) pairs)"; \
 	done
 
-# Rust-only variants, fixed at 1000 sampled pairs (sample_code_pairs' default --count and --seed,
-# so re-running against the same checkouts reproduces the same pairs). This is the pipeline used to
-# track diff_code's performance over time on real Rust commits; re-run measure-pairs-rust after
-# any change to the diff algorithm to measure its effect.
-sample-pairs-rust: build
-	$(BIN_DIR)/sample_code_pairs --path $(REPOSITORIES_DIR) --output data/samples/sampled_code_pairs_rust.csv --language Rust
-
-sample-pairs-java: build
-	$(BIN_DIR)/sample_code_pairs --path $(REPOSITORIES_DIR) --output data/samples/sampled_code_pairs_java.csv --language Java --count 1000 --max-commits-per-repo 100
-
-sample-pairs-javascript: build
-	$(BIN_DIR)/sample_code_pairs --path $(REPOSITORIES_DIR) --output data/samples/sampled_code_pairs_javascript.csv --language JavaScript --count 1000 --max-commits-per-repo 100
-
-sample-pairs-typescript: build
-	$(BIN_DIR)/sample_code_pairs --path $(REPOSITORIES_DIR) --output data/samples/sampled_code_pairs_typescript.csv --language TypeScript --count 1000 --max-commits-per-repo 100
+# There are deliberately no per-language sampling targets. `sample-pairs-all`, `-java`,
+# `-javascript` and `-typescript` used to exist and were deleted: they wrote to the *same*
+# data/samples/sampled_code_pairs_<lang>.csv files `sample-pairs-all` produces, with different
+# settings (rust passed neither --count nor --max-commits-per-repo; the other three passed both),
+# so running one silently replaced part of a consistently-drawn corpus with a differently-drawn
+# one. That is the exact failure the comment above sample-pairs-all describes, still live in four
+# targets next to the target written to fix it - and they cost hours to do it, since each re-walks
+# every repository's full history for one language's worth of pairs.
+#
+# Draw one language by drawing them all: `make sample-pairs-all` is one pass and splits by the
+# output's own `language` column.
 
 # ── Measurement ─────────────────────────────────────────────────────────────────────────────────
 
@@ -189,10 +186,12 @@ measure-pairs-javascript: build
 measure-pairs-typescript: build
 	$(BIN_DIR)/benchmark_diff_pairs --csv data/samples/sampled_code_pairs_typescript.csv --repo-root $(REPOSITORIES_DIR) --output data/performance/benchmark_typescript.csv --max-combined-nodes 20000
 
-# Size/LOC-changed statistics and distribution plots for sample-pairs-rust's output. Depends on
-# sample-pairs-rust having already been run (needs the checked-out repositories, not just the CSV).
+# Size/LOC-changed statistics and distribution plots for sample-pairs-all's output. Depends on
+# sample-pairs-all having already been run (needs the checked-out repositories, not just the CSV).
 measure-code-pair-diffs:
-	uv run ./analysis/code_pair_diff_stats.py data/samples/sampled_code_pairs_rust.csv --repo-root $(REPOSITORIES_DIR) --output-csv data/corpus_stats/code_pair_diff_stats_rust.csv
+	uv run ./analysis/code_pair_diff_stats.py data/samples/sampled_code_pairs_$(LANGUAGE).csv \
+		--repo-root $(REPOSITORIES_DIR) \
+		--output-csv data/corpus_stats/code_pair_diff_stats_$(LANGUAGE).csv
 
 # Compares two measure-pairs-rust runs (e.g. before/after a diff_code algorithm change) and
 # charts the difference. Usage: make measure-pairs-diff BEFORE=path/to/before.csv AFTER=path/to/after.csv
@@ -205,33 +204,31 @@ measure-pairs-diff:
 	fi
 	uv run ./analysis/diff_pairs_benchmark_comparison.py --before $(abspath $(BEFORE)) --after $(abspath $(AFTER))
 
-# Benchmark against existing sampled pairs for the four primary languages (Rust, Python, Go,
-# Kotlin) and run analysis afterwards. Uses benchmark_all_extended.sh restricted to these four via
-# --language.
-measure-sampled-main-languages-only:
-	@echo "Running benchmarks for Rust, Python, Go, Kotlin..."
-	@echo "Results will be written to research/data/performance/"
-	./measure/benchmark_all_extended.sh --language "Rust Python Go Kotlin" --repos-dir /var/tmp/research/small/repositories/ --bin-dir $(BIN_DIR)
-	@echo ""
-	@echo "Running analysis..."
-	uv run ./analysis/benchmark_report.py
-
-# Benchmark with extended language set (every language with a tree-sitter grammar - see
-# ALL_LANGUAGES in benchmark_all_extended.sh) and higher node limit.
-measure-sampled-all-languages:
-	@echo "Running extended benchmarks for all supported languages..."
-	@echo "Results will be written to research/data/performance/"
-	@echo "Using 20000 node limit, max 100 commits per repo"
+# Speed and memory across a whole sampled corpus, via measure/benchmark_all_extended.sh.
+#
+# One target, LANGUAGE-parameterised, rather than the two it replaced
+# (`measure-sampled` and `measure-sampled`). Those differed only
+# in the flags they passed - the narrow one silently dropped --limit, --max-commits, --timeout-min
+# and --continue-on-error, so "the same benchmark on fewer languages" was not the same benchmark.
+# Naming a language set is not a reason to have a second copy of the settings.
+#
+#   make measure-sampled                                  # every supported language
+#   make measure-sampled LANGUAGE="Rust Python Go Kotlin"  # a subset
+LANGUAGE ?= all
+SAMPLED_REPOS ?= /var/tmp/research/small/repositories/
+SAMPLED_NODE_LIMIT ?= 20000
+SAMPLED_MAX_COMMITS ?= 100
+SAMPLED_TIMEOUT_MIN ?= 120
+measure-sampled:
+	@echo "Benchmarking $(LANGUAGE); results go to research/data/performance/"
 	./measure/benchmark_all_extended.sh \
-		--language all \
-		--repos-dir /var/tmp/research/small/repositories/ \
+		--language "$(LANGUAGE)" \
+		--repos-dir $(SAMPLED_REPOS) \
 		--bin-dir $(BIN_DIR) \
-		--limit 20000 \
-		--max-commits 100 \
-		--timeout-min 120 \
+		--limit $(SAMPLED_NODE_LIMIT) \
+		--max-commits $(SAMPLED_MAX_COMMITS) \
+		--timeout-min $(SAMPLED_TIMEOUT_MIN) \
 		--continue-on-error
-	@echo ""
-	@echo "Running analysis..."
 	uv run ./analysis/benchmark_report.py
 
 # Analysis/plotting step for the root Makefile's `benchmark-quality` (which is the product-side
@@ -353,9 +350,9 @@ install-bdiff:
 
 # ── RQ1: whole-tree APTED against a 1-second budget ─────────────────────────────────────────────
 
-# Same slow/fast split as measure-tools-timing above: `rq1-report` re-renders from whatever
-# data/rq1/apted_only_group*.csv already holds, `measure-rq1` re-measures first.
-rq1-report:
+# Same slow/fast split as measure-tools-timing above: `apted-budget-report` re-renders from whatever
+# data/rq1/apted_only_group*.csv already holds, `measure-apted-budget` re-measures first.
+apted-budget-report:
 	uv run ./analysis/apted_only_report.py
 
 # SLOW (hours) and TIMING-SENSITIVE. Every pair gets a hard 1s budget enforced by killing a worker
@@ -367,7 +364,7 @@ rq1-report:
 #
 # MODE selects which checkout root the sampled pairs are resolved against; the sample CSVs
 # themselves (data/samples/sampled_code_pairs_*.csv) are committed, so this needs no re-sampling step.
-measure-rq1:
+measure-apted-budget:
 	cd .. && cargo build --release --features stats --bin apted_only_benchmark --bin apted_only_worker
 	$(BIN_DIR)/apted_only_benchmark \
 		--csv data/samples/sampled_code_pairs_css.csv data/samples/sampled_code_pairs_python.csv \
@@ -390,7 +387,7 @@ measure-rq1:
 			data/samples/sampled_code_pairs_lua.csv data/samples/sampled_code_pairs_r.csv \
 			data/samples/sampled_code_pairs_scala.csv \
 		--repo-root $(REPOSITORIES_DIR) --output data/rq1/apted_only_group4.csv
-	$(MAKE) rq1-report
+	$(MAKE) apted-budget-report
 
 # ── Papers ──────────────────────────────────────────────────────────────────────────────────────
 

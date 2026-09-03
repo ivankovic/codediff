@@ -10,8 +10,8 @@ not a sample of anything. Kept only so the run does not have to restart from zer
 resumed.
 
 `research/data/rq1/apted_only_group1.csv` was restored from `../archive_pre_resample_2026-08-18/`
-so that `make rq1-report` reads four internally consistent files from the OLD corpus rather than
+so that `make apted-budget-report` reads four internally consistent files from the OLD corpus rather than
 silently blending this partial new-corpus file with three old-corpus ones.
 
-To resume: re-run `make measure-rq1` from the top (it re-measures every group; there is no per-group
+To resume: re-run `make measure-apted-budget` from the top (it re-measures every group; there is no per-group
 resume), or run the four `apted_only_benchmark` invocations in that target individually.

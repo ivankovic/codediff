@@ -7,7 +7,7 @@ could not be read at all, because the sample pointed at commits no local clone s
 `../PROVENANCE.md` for that failure and how it was found.
 
 `../apted_only_group1.csv` was restored from `../archive_pre_resample_2026-08-18/` when this run was
-stopped, so `make rq1-report` read four internally consistent old-corpus files rather than blending
+stopped, so `make apted-budget-report` read four internally consistent old-corpus files rather than blending
 one partial new-corpus file with three old-corpus ones. That restore has since been superseded: all
 four group files now hold the completed 2026-08-21 measurement.
 
