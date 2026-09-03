@@ -167,6 +167,13 @@ pub struct App {
     /// notification for a stolen one. Any key clears the toast *and* still does its own job, and
     /// the one-line status bar stays up afterwards as the persistent record.
     summary_toast_ticks: u8,
+    /// When the in-flight diff started, for the elapsed counter on the `Diffing` screen; `None`
+    /// when no diff is running. Read at draw time rather than accumulated on a timer: the render
+    /// loop already redraws at `frame_rate` (60Hz by default), so an `Instant::elapsed` in the
+    /// draw path costs one subtraction per frame and needs no tick handler, no background task
+    /// and no extra wakeups. The counter's resolution is therefore the frame rate, not the 4Hz
+    /// `Action::Tick`, which is what makes tenths of a second meaningful to show at all.
+    diff_started_at: Option<std::time::Instant>,
     /// Line-level +/-/~ counts for the currently loaded diff (see `diff::text::change_counts`),
     /// shown in the footer. Same lifecycle as `diff_summary` - computed once on `Action::DiffReady`,
     /// cleared on `StartDiff`/`DiffFailed`.
@@ -196,6 +203,7 @@ impl App {
             help_modal: None,
             search_modal: None,
             summary_toast_ticks: 0,
+            diff_started_at: None,
             line_prompt: None,
             action_tx,
             action_rx,
@@ -306,6 +314,7 @@ impl App {
                     self.diff_generation += 1;
                     self.restore_after_reload = None;
                     self.screen = AppScreen::Viewer;
+                    self.diff_started_at = None;
                     action_tx.send(Action::Render)?;
                     globally_handled = true;
                 }
@@ -484,6 +493,7 @@ impl App {
                 Action::DialogCancelled => self.handle_dialog_cancelled(),
                 Action::StartDiff(before, after, mode) => {
                     self.screen = AppScreen::Diffing;
+                    self.diff_started_at = Some(std::time::Instant::now());
                     self.diff_summary = None;
                     self.change_counts = None;
                     self.plain_text_fallback = false;
@@ -513,6 +523,7 @@ impl App {
                     error!("diff failed: {message}");
                     self.last_error = Some(message.clone());
                     self.screen = AppScreen::Viewer;
+                    self.diff_started_at = None;
                     self.file_dialog = None;
                     self.diff_summary = None;
                     self.change_counts = None;
@@ -570,6 +581,7 @@ impl App {
     /// state the header/footer read every frame.
     fn handle_diff_ready(&mut self, data: &DiffSessionData) {
         self.screen = AppScreen::Viewer;
+        self.diff_started_at = None;
         self.last_error = None;
         self.file_dialog = None;
         theme::record_recent_pair(&data.before_path, &data.after_path);
@@ -834,7 +846,8 @@ impl App {
                 AppScreen::SelectTheme => self.draw_theme_dialog(frame, area),
                 AppScreen::RenderOptions => self.draw_render_options_dialog(frame, area),
                 AppScreen::Diffing => {
-                    frame.render_widget(diffing_status_paragraph(), area);
+                    let elapsed = self.diff_started_at.map(|start| start.elapsed());
+                    frame.render_widget(diffing_status_paragraph(elapsed), area);
                     Ok(())
                 }
                 AppScreen::Help => self.draw_help_modal(frame, area),
@@ -1141,8 +1154,19 @@ fn format_change_counts(counts: ChangeCounts) -> String {
 /// The centered status shown while a blocking (screen-owning) diff computation is in flight.
 /// Mentions the Esc cancel because it's only discoverable here - the footer isn't drawn on the
 /// `Diffing` screen.
-fn diffing_status_paragraph() -> Paragraph<'static> {
-    Paragraph::new("Diffing\u{2026} (Esc cancels)").alignment(Alignment::Center)
+/// `elapsed` is `None` only if the screen is somehow reached without a start time, in which case
+/// the counter is left off rather than shown as a false 0.0s.
+fn diffing_status_paragraph(elapsed: Option<std::time::Duration>) -> Paragraph<'static> {
+    let text = match elapsed {
+        // Tenths, not milliseconds: this is a "something is still happening" signal, and a digit
+        // that changes 60 times a second is noise rather than information.
+        Some(elapsed) => format!(
+            "Diffing\u{2026} {:.1}s (Esc cancels)",
+            elapsed.as_secs_f64()
+        ),
+        None => "Diffing\u{2026} (Esc cancels)".to_string(),
+    };
+    Paragraph::new(text).alignment(Alignment::Center)
 }
 
 /// How many `Action::Tick`s the centered summary toast stays up for. The tick timer runs at 4Hz
@@ -2015,6 +2039,80 @@ mod tests {
             app.draw_viewer(f, area).unwrap();
         })?;
         Ok(terminal)
+    }
+
+    #[test]
+    fn the_diffing_screen_counts_elapsed_time_in_tenths() {
+        let rendered = |elapsed: Option<std::time::Duration>| -> String {
+            let backend = ratatui::backend::TestBackend::new(80, 6);
+            let mut terminal = ratatui::Terminal::new(backend).unwrap();
+            terminal
+                .draw(|f| {
+                    f.render_widget(diffing_status_paragraph(elapsed), f.size());
+                })
+                .unwrap();
+            rendered_text(&terminal)
+        };
+
+        let text = rendered(Some(std::time::Duration::from_millis(100)));
+        assert!(text.contains("0.1s"), "expected tenths of a second: {text}");
+        assert!(text.contains("Esc cancels"), "the cancel hint must survive");
+
+        // Rounded to tenths rather than shown to the millisecond - a digit changing 60 times a
+        // second is noise, not information.
+        let text = rendered(Some(std::time::Duration::from_millis(2345)));
+        assert!(text.contains("2.3s"), "expected 2.3s, got: {text}");
+
+        // Past a minute it keeps counting in seconds rather than wrapping or reformatting.
+        let text = rendered(Some(std::time::Duration::from_millis(75_400)));
+        assert!(text.contains("75.4s"), "expected 75.4s, got: {text}");
+    }
+
+    /// Reaching the screen with no recorded start time leaves the counter off rather than showing
+    /// a false 0.0s that never advances.
+    #[test]
+    fn the_diffing_screen_omits_the_counter_when_no_diff_is_timed() {
+        let backend = ratatui::backend::TestBackend::new(80, 6);
+        let mut terminal = ratatui::Terminal::new(backend).unwrap();
+        terminal
+            .draw(|f| f.render_widget(diffing_status_paragraph(None), f.size()))
+            .unwrap();
+
+        let text = rendered_text(&terminal);
+        assert!(
+            text.contains("Diffing"),
+            "still says what it is doing: {text}"
+        );
+        assert!(
+            !text.contains("0.0s"),
+            "no counter at all beats a counter stuck at zero: {text}"
+        );
+    }
+
+    /// The clock starts when the diff does and is cleared by every way out of the screen, so a
+    /// later `Diffing` never shows a duration carried over from the previous one.
+    #[test]
+    fn the_diff_clock_is_cleared_when_the_diff_finishes() -> Result<()> {
+        let mut app = App::new(4.0, 60.0)?;
+        app.diff_started_at = Some(std::time::Instant::now());
+
+        app.handle_diff_ready(&DiffSessionData {
+            before_path: PathBuf::from("a.rs"),
+            after_path: PathBuf::from("b.rs"),
+            before_contents: "fn main() {}\n".to_string(),
+            after_contents: "fn main() {}\n".to_string(),
+            before_ranges: Vec::new(),
+            after_ranges: Vec::new(),
+            comment_only: false,
+            mode: DiffMode::Fast,
+            plain_text_fallback: false,
+        });
+
+        assert!(
+            app.diff_started_at.is_none(),
+            "a finished diff must not leave its clock running"
+        );
+        Ok(())
     }
 
     #[test]
