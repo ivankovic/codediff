@@ -1085,181 +1085,7 @@ pub(crate) fn handle_modal_key(
             view,
             name_input,
         } => {
-            let mut view = view;
-            let mut selected = selected;
-
-            // The `Name` filter's prompt takes every keystroke while it is open, so a name
-            // containing `j`, `s` or `f` types those characters instead of moving the selection
-            // and re-sorting the table mid-word. Same posture as the text view's `:` line prompt.
-            if let Some(mut typed) = name_input {
-                match code {
-                    KeyCode::Char(c) => {
-                        typed.push(c);
-                        app.modal = Some(Modal::OpenDiffPicker {
-                            options,
-                            selected,
-                            view,
-                            name_input: Some(typed),
-                        });
-                    }
-                    KeyCode::Backspace => {
-                        typed.pop();
-                        app.modal = Some(Modal::OpenDiffPicker {
-                            options,
-                            selected,
-                            view,
-                            name_input: Some(typed),
-                        });
-                    }
-                    KeyCode::Enter => {
-                        // Which row the selection was on *before* the new filter narrows the list,
-                        // so it can follow that row rather than resetting to the top - same
-                        // re-anchoring every other filter/sort key here does.
-                        let current =
-                            visible_diff_options(&options, &view, DiffPickerData::from_app(app))
-                                .get(selected)
-                                .cloned();
-                        // Lowercased once here rather than per row per frame; blank clears the
-                        // filter rather than being stored as a needle that matches everything
-                        // while still reading as "filtered" in the header.
-                        let needle = typed.trim().to_lowercase();
-                        view.filters.name = if needle.is_empty() {
-                            None
-                        } else {
-                            Some(needle)
-                        };
-                        app.diff_view = view.clone();
-                        let modal = open_diff_picker_modal(
-                            options,
-                            current.as_deref().unwrap_or(&app.name),
-                            view,
-                            DiffPickerData::from_app(app),
-                        );
-                        app.modal = Some(modal);
-                    }
-                    KeyCode::Esc => {
-                        app.status = Some("Name filter cancelled".to_string());
-                        app.modal = Some(Modal::OpenDiffPicker {
-                            options,
-                            selected,
-                            view,
-                            name_input: None,
-                        });
-                    }
-                    _ => {
-                        app.modal = Some(Modal::OpenDiffPicker {
-                            options,
-                            selected,
-                            view,
-                            name_input: Some(typed),
-                        });
-                    }
-                }
-                return None;
-            }
-
-            let visible = visible_diff_options(&options, &view, DiffPickerData::from_app(app));
-            match code {
-                KeyCode::Up | KeyCode::Char('k') => {
-                    selected = selected.saturating_sub(1);
-                }
-                KeyCode::Down | KeyCode::Char('j') => {
-                    selected = (selected + 1).min(visible.len().saturating_sub(1));
-                }
-                // Column movement never triggers a scan: `s`/`f` are deliberate presses that can
-                // afford to stall for several seconds the first time (see
-                // `ensure_diff_column_data`), but walking the cursor across the header to reach
-                // one of them must stay instant.
-                KeyCode::Left | KeyCode::Char('h') => {
-                    view.column = view.column.left();
-                }
-                KeyCode::Right | KeyCode::Char('l') => {
-                    view.column = view.column.right();
-                }
-                // `s` takes the sort over to the cursor column, or flips the direction if it is
-                // already the sorted one. The selection follows the row it was on rather than
-                // jumping to the top, which is the whole point of re-sorting while looking at a
-                // particular fixture.
-                KeyCode::Char('s') => {
-                    let current = visible.get(selected).cloned();
-                    ensure_diff_column_data(app, view.column);
-                    view.sort = view.sort.toggled(view.column);
-                    app.diff_view = view.clone();
-                    let modal = open_diff_picker_modal(
-                        options,
-                        current.as_deref().unwrap_or(&app.name),
-                        view,
-                        DiffPickerData::from_app(app),
-                    );
-                    app.modal = Some(modal);
-                    return None;
-                }
-                // `f` cycles the cursor column's own filter - a dataset for `Dataset`, a
-                // three-state off/yes/no for each yes-no column, and a typed substring for `Name`
-                // (which opens `name_input` above instead of taking effect immediately).
-                KeyCode::Char('f') => {
-                    let current = visible.get(selected).cloned();
-                    if view.column == DiffColumn::Name {
-                        app.status = Some(
-                            "Filter by name: type a substring, Enter to apply, Esc to cancel"
-                                .to_string(),
-                        );
-                        // Pre-filled with the filter already in force, so `f` is an edit rather
-                        // than a blind overwrite - same idea as `PromptComment`.
-                        let name_input = view.filters.name.clone().unwrap_or_default();
-                        app.modal = Some(Modal::OpenDiffPicker {
-                            options,
-                            selected,
-                            view,
-                            name_input: Some(name_input),
-                        });
-                        return None;
-                    }
-                    ensure_diff_column_data(app, view.column);
-                    if view.column == DiffColumn::Dataset {
-                        view.filters.dataset = next_dataset_filter(view.filters.dataset);
-                    } else if let Some(flag) = view.filters.flag_mut(view.column) {
-                        *flag = flag.next();
-                    }
-                    app.diff_view = view.clone();
-                    let modal = open_diff_picker_modal(
-                        options,
-                        current.as_deref().unwrap_or(&app.name),
-                        view,
-                        DiffPickerData::from_app(app),
-                    );
-                    app.modal = Some(modal);
-                    return None;
-                }
-                KeyCode::Enter => {
-                    if let Some(name) = visible.get(selected) {
-                        let target = OpenTarget::Diffs(name.clone());
-                        if app.dirty {
-                            let can_save = matches!(app.origin, CaseOrigin::Diffs);
-                            app.modal = Some(Modal::ConfirmDiscardUnsaved { target, can_save });
-                        } else {
-                            return Some(target);
-                        }
-                        return None;
-                    }
-                }
-                KeyCode::Esc => {
-                    app.status = Some("Cancelled".to_string());
-                    return None;
-                }
-                _ => {}
-            }
-            // Covers `h`/`l`: the cursor column persists across closing and reopening the picker
-            // the same way the sort and filters `s`/`f` set do, so reopening lands back on the
-            // column that was being worked with. The other keys reaching here leave `view`
-            // untouched, so this is a no-op for them.
-            app.diff_view = view.clone();
-            app.modal = Some(Modal::OpenDiffPicker {
-                options,
-                selected,
-                view,
-                name_input: None,
-            });
+            return handle_open_diff_picker(app, code, options, selected, view, name_input);
         }
         Modal::OpenSamplePicker {
             options,
@@ -1622,275 +1448,8 @@ pub(crate) fn handle_modal_key(
                 app.modal = Some(Modal::PromptSearch { input });
             }
         },
-        Modal::TextView { mut state } => {
-            // `before_src`/`after_src` are the bytes of a `String` (`Code::contents`), so these
-            // conversions cannot fail; the fallback exists so a hypothetical non-UTF-8 source
-            // degrades to an empty painting surface rather than panicking mid-session.
-            let before_text = std::str::from_utf8(before_src).unwrap_or_default();
-            let after_text = std::str::from_utf8(after_src).unwrap_or_default();
-            // The viewport height the cursor has to stay inside. The real popup height isn't known
-            // outside `render_text_view_modal`, and threading it back here would couple the key
-            // handler to the layout for one number - a conservative constant keeps the cursor on
-            // screen for any terminal at least this tall and merely over-scrolls on a shorter one.
-            const VIEWPORT_ROWS: usize = 20;
-            let focused_source = if state.side == 0 {
-                before_text
-            } else {
-                after_text
-            };
-            let mut close = false;
-
-            // While the `:` prompt is open it takes every keystroke, so a digit is a digit rather
-            // than a movement command.
-            if let Some(mut typed) = state.line_prompt.take() {
-                match code {
-                    KeyCode::Char(c) if c.is_ascii_digit() => {
-                        typed.push(c);
-                        state.line_prompt = Some(typed);
-                    }
-                    KeyCode::Backspace => {
-                        typed.pop();
-                        state.line_prompt = Some(typed);
-                    }
-                    KeyCode::Enter => match typed.parse::<usize>() {
-                        // 1-based in, 0-based out: the gutter shows 1-based numbers, so that is
-                        // what a reader will type.
-                        Ok(line) if line >= 1 => {
-                            let last = TextPaintState::row_count(focused_source).saturating_sub(1);
-                            let row = (line - 1).min(last);
-                            state.cursor[state.side] = (row, 0);
-                            app.status = Some(format!("Jumped to line {}", row + 1));
-                        }
-                        _ => app.status = Some(format!("Not a line number: {typed:?}")),
-                    },
-                    KeyCode::Esc => app.status = Some("Cancelled".to_string()),
-                    _ => state.line_prompt = Some(typed),
-                }
-                state.scroll_into_view(VIEWPORT_ROWS);
-                app.modal = Some(Modal::TextView { state });
-                return None;
-            }
-
-            match code {
-                KeyCode::Tab => state.side = 1 - state.side,
-                KeyCode::Char(':') => {
-                    state.line_prompt = Some(String::new());
-                    app.status =
-                        Some("Jump to line: type a number, Enter to go, Esc to cancel".to_string());
-                }
-                KeyCode::Up | KeyCode::Char('k') => state.step_row(-1, focused_source),
-                KeyCode::Down | KeyCode::Char('j') => state.step_row(1, focused_source),
-                KeyCode::Left | KeyCode::Char('h') => state.step_column(false, focused_source),
-                KeyCode::Right | KeyCode::Char('l') => state.step_column(true, focused_source),
-                KeyCode::PageUp => state.step_row(-(VIEWPORT_ROWS as isize), focused_source),
-                KeyCode::PageDown => state.step_row(VIEWPORT_ROWS as isize, focused_source),
-                KeyCode::Char('0') | KeyCode::Home => state.cursor[state.side].1 = 0,
-                KeyCode::Char('$') | KeyCode::End => {
-                    let row = state.cursor[state.side].0;
-                    state.cursor[state.side].1 =
-                        TextPaintState::row_text(focused_source, row).len();
-                }
-                KeyCode::Char('g') => state.cursor[state.side] = (0, 0),
-                KeyCode::Char('G') => {
-                    let last = TextPaintState::row_count(focused_source).saturating_sub(1);
-                    state.cursor[state.side] = (last, 0);
-                }
-                KeyCode::Char('v') => {
-                    state.anchor[state.side] = match state.anchor[state.side] {
-                        Some(_) => None,
-                        None => Some(state.cursor[state.side]),
-                    };
-                    let mode = if state.vertical {
-                        "vertical"
-                    } else {
-                        "full-line"
-                    };
-                    app.status = Some(match state.anchor[state.side] {
-                        Some(_) => format!("Selecting ({mode}) - move, then d/i/m"),
-                        None => "Selection cleared".to_string(),
-                    });
-                }
-                // Swaps how a selection spanning several rows reads: vertical picks the same
-                // columns down each row (a stack of squares), full-line sweeps every row end to
-                // end - what a single contiguous multi-line block (e.g. a whole moved function)
-                // still needs, since `m` requires every span on a side to read identical text.
-                KeyCode::Char('V') => {
-                    state.vertical = !state.vertical;
-                    let mode = if state.vertical {
-                        "vertical"
-                    } else {
-                        "full-line"
-                    };
-                    app.status = Some(format!("Selections are now {mode}"));
-                }
-                // Same pair the tree panels use for their own multi-map selection: `x` banks what
-                // is selected so another range can be selected on the same side, `c` clears both
-                // sides' banks. This is what makes an N:M match reachable - one live selection can
-                // only ever describe one range.
-                KeyCode::Char('x') => {
-                    let spans = state.selection(state.side, focused_source);
-                    if spans.is_empty() {
-                        app.status = Some("Nothing selected to bank - press v first".to_string());
-                    } else {
-                        state.pending[state.side].extend(spans);
-                        state.anchor[state.side] = None;
-                        let banked = state.pending[state.side].len();
-                        app.status = Some(format!(
-                            "Banked {banked} range(s) on this side - select another, then d/i/m"
-                        ));
-                    }
-                }
-                KeyCode::Char('c') => {
-                    state.pending = [Vec::new(), Vec::new()];
-                    state.anchor = [None; 2];
-                    app.status = Some("Cleared banked ranges on both sides".to_string());
-                }
-                KeyCode::Char('m') => action_paint_match(app, &mut state, before_text, after_text),
-                KeyCode::Char('d') => action_paint_one_sided(
-                    app,
-                    &mut state,
-                    HumanTextOperation::Delete,
-                    before_text,
-                    after_text,
-                ),
-                KeyCode::Char('i') => action_paint_one_sided(
-                    app,
-                    &mut state,
-                    HumanTextOperation::Insert,
-                    before_text,
-                    after_text,
-                ),
-                KeyCode::Char('u') => action_paint_unmark(app, &state, before_text, after_text),
-                KeyCode::Char('Z') => action_paint_mark_empty(app),
-                KeyCode::Char('p') => {
-                    let next = app.text_overlay.next();
-                    // Computed on the first cycle away from `Human` and kept for the rest of the
-                    // case: running codediff is real work on a large fixture, and the default view
-                    // never needs it.
-                    if next != TextOverlay::Human && app.algo_text_spans.is_none() {
-                        app.algo_text_spans = Some(codediff_text_spans(before, after));
-                    }
-                    // Same lazy contract, for the tree-mapping side `TreeDisagreement` needs -
-                    // built independently of `algo_text_spans` since a case might be cycled
-                    // straight past `CodeDiff`/`Disagreements` without ever needing it.
-                    if next == TextOverlay::TreeDisagreement && app.tree_text_spans.is_none() {
-                        app.tree_text_spans =
-                            Some(tree_mapping_text_spans(&app.mapping, before, after));
-                    }
-                    app.text_overlay = next;
-                    let human_spans_for_status = || {
-                        [
-                            painted_spans(
-                                &app.mapping,
-                                &app.text_solution,
-                                0,
-                                before_text,
-                                after_text,
-                            ),
-                            painted_spans(
-                                &app.mapping,
-                                &app.text_solution,
-                                1,
-                                before_text,
-                                after_text,
-                            ),
-                        ]
-                    };
-                    app.status = Some(match next {
-                        TextOverlay::Human => "Showing your painting".to_string(),
-                        TextOverlay::CodeDiff => "Showing codediff's own diff".to_string(),
-                        TextOverlay::Disagreements => {
-                            let differing: usize = app
-                                .algo_text_spans
-                                .as_ref()
-                                .map(|algo| {
-                                    overlay_disagreement_spans(
-                                        &human_spans_for_status(),
-                                        algo,
-                                        before_text,
-                                        after_text,
-                                    )
-                                    .iter()
-                                    .map(Vec::len)
-                                    .sum()
-                                })
-                                .unwrap_or(0);
-                            if differing == 0 {
-                                "You and codediff agree everywhere".to_string()
-                            } else {
-                                format!("Showing {differing} disagreeing range(s)")
-                            }
-                        }
-                        TextOverlay::TreeDisagreement => {
-                            let differing: usize = app
-                                .tree_text_spans
-                                .as_ref()
-                                .map(|tree| {
-                                    overlay_disagreement_spans(
-                                        &human_spans_for_status(),
-                                        tree,
-                                        before_text,
-                                        after_text,
-                                    )
-                                    .iter()
-                                    .map(Vec::len)
-                                    .sum()
-                                })
-                                .unwrap_or(0);
-                            if differing == 0 {
-                                "Your painting and your tree mapping agree everywhere".to_string()
-                            } else {
-                                format!(
-                                    "Showing {differing} disagreeing range(s) between your painting and your tree mapping"
-                                )
-                            }
-                        }
-                    });
-                }
-                // `s` and `L` both raise the same picker; `saving` is the only difference, and it
-                // decides only what Enter does with the chosen name.
-                KeyCode::Char('s') | KeyCode::Char('L') => {
-                    let saving = matches!(code, KeyCode::Char('s'));
-                    app.modal = Some(Modal::SolutionPicker {
-                        names: solution_picker_names(&app.mapping),
-                        selected: 0,
-                        saving,
-                        new_name: None,
-                        confirm_delete: None,
-                        state,
-                    });
-                    return None;
-                }
-                KeyCode::Char('T') => match run_unix_diff(before_src, after_src) {
-                    Ok(output) => {
-                        app.modal = Some(Modal::UnixDiffView { output, scroll: 0 });
-                        return None;
-                    }
-                    Err(err) => app.status = Some(format!("Error running diff: {:#}", err)),
-                },
-                KeyCode::Esc => {
-                    // Esc backs out one step at a time, so an accidental `v` - or a half-built
-                    // N:M group - doesn't cost the whole view. Only an Esc with nothing pending
-                    // closes.
-                    if state.anchor[state.side].is_some() {
-                        state.anchor[state.side] = None;
-                        app.status = Some("Selection cleared".to_string());
-                    } else if !state.pending[state.side].is_empty() {
-                        state.pending[state.side].clear();
-                        app.status = Some("Banked ranges cleared on this side".to_string());
-                    } else {
-                        close = true;
-                    }
-                }
-                _ => {}
-            }
-
-            if close {
-                app.status = Some("Closed text view".to_string());
-            } else {
-                state.scroll_into_view(VIEWPORT_ROWS);
-                app.modal = Some(Modal::TextView { state });
-            }
+        Modal::TextView { state } => {
+            return handle_text_view(app, code, state, before_src, after_src, before, after);
         }
         Modal::SolutionPicker {
             names,
@@ -1900,102 +1459,16 @@ pub(crate) fn handle_modal_key(
             confirm_delete,
             state,
         } => {
-            let reopen = |app: &mut App, names, selected, new_name, confirm_delete| {
-                app.modal = Some(Modal::SolutionPicker {
-                    names,
-                    selected,
-                    saving,
-                    new_name,
-                    confirm_delete,
-                    state: state.clone(),
-                });
-            };
-            // The free-form row always sits one past the named ones.
-            let free_form_index = names.len();
-
-            match (new_name, code) {
-                // ── typing a new name ────────────────────────────────────────────────────────
-                (Some(mut typed), KeyCode::Char(c)) => {
-                    typed.push(c);
-                    reopen(app, names, selected, Some(typed), None);
-                }
-                (Some(mut typed), KeyCode::Backspace) => {
-                    typed.pop();
-                    reopen(app, names, selected, Some(typed), None);
-                }
-                (Some(typed), KeyCode::Enter) => {
-                    if saving {
-                        action_save_solution_as(app, &typed, true);
-                    } else {
-                        action_load_solution(app, typed.trim());
-                    }
-                    app.modal = Some(Modal::TextView { state });
-                }
-                // Esc backs out of typing to the list rather than closing outright, so a mistyped
-                // name costs one key, not the whole picker.
-                (Some(_), KeyCode::Esc) => reopen(app, names, selected, None, None),
-                (Some(typed), _) => reopen(app, names, selected, Some(typed), None),
-
-                // ── choosing from the list ───────────────────────────────────────────────────
-                (None, KeyCode::Up | KeyCode::Char('k')) => {
-                    reopen(app, names, selected.saturating_sub(1), None, None)
-                }
-                (None, KeyCode::Down | KeyCode::Char('j')) => {
-                    let next = (selected + 1).min(free_form_index);
-                    reopen(app, names, next, None, None)
-                }
-                (None, KeyCode::Enter) => {
-                    if selected == free_form_index {
-                        reopen(app, names, selected, Some(String::new()), None);
-                    } else {
-                        let chosen = names[selected].clone();
-                        if saving {
-                            action_save_solution_as(app, &chosen, true);
-                        } else {
-                            action_load_solution(app, &chosen);
-                        }
-                        app.modal = Some(Modal::TextView { state });
-                    }
-                }
-                // `e` is the one-key alternative to Enter: start the chosen name from nothing
-                // instead of from a copy of what is currently painted.
-                (None, KeyCode::Char('e')) if saving && selected < free_form_index => {
-                    let chosen = names[selected].clone();
-                    action_save_solution_as(app, &chosen, false);
-                    app.modal = Some(Modal::TextView { state });
-                }
-                // `D` twice deletes the highlighted painting. Capital, and twice, because there
-                // is no undo: the first press names what is about to go in the picker's title, the
-                // second acts on that name rather than on whatever row the cursor reached in
-                // between. Any other key clears the pending confirmation.
-                (None, KeyCode::Char('D')) if selected < free_form_index => {
-                    let chosen = names[selected].clone();
-                    let exists = app
-                        .mapping
-                        .text_mappings
-                        .iter()
-                        .any(|named| named.name == chosen);
-                    if !exists {
-                        app.status = Some(format!(
-                            "'{chosen}' is only a suggestion - nothing to delete"
-                        ));
-                        reopen(app, names, selected, None, None);
-                    } else if confirm_delete.as_deref() == Some(chosen.as_str()) {
-                        action_delete_solution(app, &chosen);
-                        let names = solution_picker_names(&app.mapping);
-                        let selected = selected.min(names.len());
-                        reopen(app, names, selected, None, None);
-                    } else {
-                        app.status = Some(format!("Press D again to delete '{chosen}'"));
-                        reopen(app, names, selected, None, Some(chosen));
-                    }
-                }
-                (None, KeyCode::Esc) => {
-                    app.status = Some("Cancelled".to_string());
-                    app.modal = Some(Modal::TextView { state });
-                }
-                (None, _) => reopen(app, names, selected, None, None),
-            }
+            return handle_solution_picker(
+                app,
+                code,
+                names,
+                selected,
+                saving,
+                new_name,
+                confirm_delete,
+                state,
+            );
         }
         Modal::UnixDiffView { output, scroll } => match code {
             KeyCode::Up | KeyCode::Char('k') => {
@@ -2566,4 +2039,576 @@ pub(crate) fn sample_comment_at(path: &Path, source: &SampleSource) -> Result<Op
     Ok(find_sample_row(&rows, source)
         .map(|row| row.comment.trim().to_string())
         .filter(|c| !c.is_empty()))
+}
+
+/// `handle_modal_key`'s `Modal::SolutionPicker` arm. Split out at 105 lines: an arm that
+/// long stops being readable as one case of a match, and taking only the 0 of
+/// nine threaded values it actually uses makes its real dependencies visible.
+#[allow(clippy::too_many_arguments)]
+fn handle_solution_picker(
+    app: &mut App,
+    code: KeyCode,
+    names: Vec<String>,
+    selected: usize,
+    saving: bool,
+    new_name: Option<String>,
+    confirm_delete: Option<String>,
+    state: TextPaintState,
+) -> Option<OpenTarget> {
+    let reopen = |app: &mut App, names, selected, new_name, confirm_delete| {
+        app.modal = Some(Modal::SolutionPicker {
+            names,
+            selected,
+            saving,
+            new_name,
+            confirm_delete,
+            state: state.clone(),
+        });
+    };
+    // The free-form row always sits one past the named ones.
+    let free_form_index = names.len();
+
+    match (new_name, code) {
+        // ── typing a new name ────────────────────────────────────────────────────────
+        (Some(mut typed), KeyCode::Char(c)) => {
+            typed.push(c);
+            reopen(app, names, selected, Some(typed), None);
+        }
+        (Some(mut typed), KeyCode::Backspace) => {
+            typed.pop();
+            reopen(app, names, selected, Some(typed), None);
+        }
+        (Some(typed), KeyCode::Enter) => {
+            if saving {
+                action_save_solution_as(app, &typed, true);
+            } else {
+                action_load_solution(app, typed.trim());
+            }
+            app.modal = Some(Modal::TextView { state });
+        }
+        // Esc backs out of typing to the list rather than closing outright, so a mistyped
+        // name costs one key, not the whole picker.
+        (Some(_), KeyCode::Esc) => reopen(app, names, selected, None, None),
+        (Some(typed), _) => reopen(app, names, selected, Some(typed), None),
+
+        // ── choosing from the list ───────────────────────────────────────────────────
+        (None, KeyCode::Up | KeyCode::Char('k')) => {
+            reopen(app, names, selected.saturating_sub(1), None, None)
+        }
+        (None, KeyCode::Down | KeyCode::Char('j')) => {
+            let next = (selected + 1).min(free_form_index);
+            reopen(app, names, next, None, None)
+        }
+        (None, KeyCode::Enter) => {
+            if selected == free_form_index {
+                reopen(app, names, selected, Some(String::new()), None);
+            } else {
+                let chosen = names[selected].clone();
+                if saving {
+                    action_save_solution_as(app, &chosen, true);
+                } else {
+                    action_load_solution(app, &chosen);
+                }
+                app.modal = Some(Modal::TextView { state });
+            }
+        }
+        // `e` is the one-key alternative to Enter: start the chosen name from nothing
+        // instead of from a copy of what is currently painted.
+        (None, KeyCode::Char('e')) if saving && selected < free_form_index => {
+            let chosen = names[selected].clone();
+            action_save_solution_as(app, &chosen, false);
+            app.modal = Some(Modal::TextView { state });
+        }
+        // `D` twice deletes the highlighted painting. Capital, and twice, because there
+        // is no undo: the first press names what is about to go in the picker's title, the
+        // second acts on that name rather than on whatever row the cursor reached in
+        // between. Any other key clears the pending confirmation.
+        (None, KeyCode::Char('D')) if selected < free_form_index => {
+            let chosen = names[selected].clone();
+            let exists = app
+                .mapping
+                .text_mappings
+                .iter()
+                .any(|named| named.name == chosen);
+            if !exists {
+                app.status = Some(format!(
+                    "'{chosen}' is only a suggestion - nothing to delete"
+                ));
+                reopen(app, names, selected, None, None);
+            } else if confirm_delete.as_deref() == Some(chosen.as_str()) {
+                action_delete_solution(app, &chosen);
+                let names = solution_picker_names(&app.mapping);
+                let selected = selected.min(names.len());
+                reopen(app, names, selected, None, None);
+            } else {
+                app.status = Some(format!("Press D again to delete '{chosen}'"));
+                reopen(app, names, selected, None, Some(chosen));
+            }
+        }
+        (None, KeyCode::Esc) => {
+            app.status = Some("Cancelled".to_string());
+            app.modal = Some(Modal::TextView { state });
+        }
+        (None, _) => reopen(app, names, selected, None, None),
+    }
+
+    None
+}
+
+/// `handle_modal_key`'s `Modal::TextView` arm. Split out at 270 lines: an arm that
+/// long stops being readable as one case of a match, and taking only the 4 of
+/// nine threaded values it actually uses makes its real dependencies visible.
+fn handle_text_view(
+    app: &mut App,
+    code: KeyCode,
+    mut state: TextPaintState,
+    before_src: &[u8],
+    after_src: &[u8],
+    before: &Code,
+    after: &Code,
+) -> Option<OpenTarget> {
+    // `before_src`/`after_src` are the bytes of a `String` (`Code::contents`), so these
+    // conversions cannot fail; the fallback exists so a hypothetical non-UTF-8 source
+    // degrades to an empty painting surface rather than panicking mid-session.
+    let before_text = std::str::from_utf8(before_src).unwrap_or_default();
+    let after_text = std::str::from_utf8(after_src).unwrap_or_default();
+    // The viewport height the cursor has to stay inside. The real popup height isn't known
+    // outside `render_text_view_modal`, and threading it back here would couple the key
+    // handler to the layout for one number - a conservative constant keeps the cursor on
+    // screen for any terminal at least this tall and merely over-scrolls on a shorter one.
+    const VIEWPORT_ROWS: usize = 20;
+    let focused_source = if state.side == 0 {
+        before_text
+    } else {
+        after_text
+    };
+    let mut close = false;
+
+    // While the `:` prompt is open it takes every keystroke, so a digit is a digit rather
+    // than a movement command.
+    if let Some(mut typed) = state.line_prompt.take() {
+        match code {
+            KeyCode::Char(c) if c.is_ascii_digit() => {
+                typed.push(c);
+                state.line_prompt = Some(typed);
+            }
+            KeyCode::Backspace => {
+                typed.pop();
+                state.line_prompt = Some(typed);
+            }
+            KeyCode::Enter => match typed.parse::<usize>() {
+                // 1-based in, 0-based out: the gutter shows 1-based numbers, so that is
+                // what a reader will type.
+                Ok(line) if line >= 1 => {
+                    let last = TextPaintState::row_count(focused_source).saturating_sub(1);
+                    let row = (line - 1).min(last);
+                    state.cursor[state.side] = (row, 0);
+                    app.status = Some(format!("Jumped to line {}", row + 1));
+                }
+                _ => app.status = Some(format!("Not a line number: {typed:?}")),
+            },
+            KeyCode::Esc => app.status = Some("Cancelled".to_string()),
+            _ => state.line_prompt = Some(typed),
+        }
+        state.scroll_into_view(VIEWPORT_ROWS);
+        app.modal = Some(Modal::TextView { state });
+        return None;
+    }
+
+    match code {
+        KeyCode::Tab => state.side = 1 - state.side,
+        KeyCode::Char(':') => {
+            state.line_prompt = Some(String::new());
+            app.status =
+                Some("Jump to line: type a number, Enter to go, Esc to cancel".to_string());
+        }
+        KeyCode::Up | KeyCode::Char('k') => state.step_row(-1, focused_source),
+        KeyCode::Down | KeyCode::Char('j') => state.step_row(1, focused_source),
+        KeyCode::Left | KeyCode::Char('h') => state.step_column(false, focused_source),
+        KeyCode::Right | KeyCode::Char('l') => state.step_column(true, focused_source),
+        KeyCode::PageUp => state.step_row(-(VIEWPORT_ROWS as isize), focused_source),
+        KeyCode::PageDown => state.step_row(VIEWPORT_ROWS as isize, focused_source),
+        KeyCode::Char('0') | KeyCode::Home => state.cursor[state.side].1 = 0,
+        KeyCode::Char('$') | KeyCode::End => {
+            let row = state.cursor[state.side].0;
+            state.cursor[state.side].1 = TextPaintState::row_text(focused_source, row).len();
+        }
+        KeyCode::Char('g') => state.cursor[state.side] = (0, 0),
+        KeyCode::Char('G') => {
+            let last = TextPaintState::row_count(focused_source).saturating_sub(1);
+            state.cursor[state.side] = (last, 0);
+        }
+        KeyCode::Char('v') => {
+            state.anchor[state.side] = match state.anchor[state.side] {
+                Some(_) => None,
+                None => Some(state.cursor[state.side]),
+            };
+            let mode = if state.vertical {
+                "vertical"
+            } else {
+                "full-line"
+            };
+            app.status = Some(match state.anchor[state.side] {
+                Some(_) => format!("Selecting ({mode}) - move, then d/i/m"),
+                None => "Selection cleared".to_string(),
+            });
+        }
+        // Swaps how a selection spanning several rows reads: vertical picks the same
+        // columns down each row (a stack of squares), full-line sweeps every row end to
+        // end - what a single contiguous multi-line block (e.g. a whole moved function)
+        // still needs, since `m` requires every span on a side to read identical text.
+        KeyCode::Char('V') => {
+            state.vertical = !state.vertical;
+            let mode = if state.vertical {
+                "vertical"
+            } else {
+                "full-line"
+            };
+            app.status = Some(format!("Selections are now {mode}"));
+        }
+        // Same pair the tree panels use for their own multi-map selection: `x` banks what
+        // is selected so another range can be selected on the same side, `c` clears both
+        // sides' banks. This is what makes an N:M match reachable - one live selection can
+        // only ever describe one range.
+        KeyCode::Char('x') => {
+            let spans = state.selection(state.side, focused_source);
+            if spans.is_empty() {
+                app.status = Some("Nothing selected to bank - press v first".to_string());
+            } else {
+                state.pending[state.side].extend(spans);
+                state.anchor[state.side] = None;
+                let banked = state.pending[state.side].len();
+                app.status = Some(format!(
+                    "Banked {banked} range(s) on this side - select another, then d/i/m"
+                ));
+            }
+        }
+        KeyCode::Char('c') => {
+            state.pending = [Vec::new(), Vec::new()];
+            state.anchor = [None; 2];
+            app.status = Some("Cleared banked ranges on both sides".to_string());
+        }
+        KeyCode::Char('m') => action_paint_match(app, &mut state, before_text, after_text),
+        KeyCode::Char('d') => action_paint_one_sided(
+            app,
+            &mut state,
+            HumanTextOperation::Delete,
+            before_text,
+            after_text,
+        ),
+        KeyCode::Char('i') => action_paint_one_sided(
+            app,
+            &mut state,
+            HumanTextOperation::Insert,
+            before_text,
+            after_text,
+        ),
+        KeyCode::Char('u') => action_paint_unmark(app, &state, before_text, after_text),
+        KeyCode::Char('Z') => action_paint_mark_empty(app),
+        KeyCode::Char('p') => {
+            let next = app.text_overlay.next();
+            // Computed on the first cycle away from `Human` and kept for the rest of the
+            // case: running codediff is real work on a large fixture, and the default view
+            // never needs it.
+            if next != TextOverlay::Human && app.algo_text_spans.is_none() {
+                app.algo_text_spans = Some(codediff_text_spans(before, after));
+            }
+            // Same lazy contract, for the tree-mapping side `TreeDisagreement` needs -
+            // built independently of `algo_text_spans` since a case might be cycled
+            // straight past `CodeDiff`/`Disagreements` without ever needing it.
+            if next == TextOverlay::TreeDisagreement && app.tree_text_spans.is_none() {
+                app.tree_text_spans = Some(tree_mapping_text_spans(&app.mapping, before, after));
+            }
+            app.text_overlay = next;
+            let human_spans_for_status = || {
+                [
+                    painted_spans(&app.mapping, &app.text_solution, 0, before_text, after_text),
+                    painted_spans(&app.mapping, &app.text_solution, 1, before_text, after_text),
+                ]
+            };
+            app.status = Some(match next {
+                TextOverlay::Human => "Showing your painting".to_string(),
+                TextOverlay::CodeDiff => "Showing codediff's own diff".to_string(),
+                TextOverlay::Disagreements => {
+                    let differing: usize = app
+                        .algo_text_spans
+                        .as_ref()
+                        .map(|algo| {
+                            overlay_disagreement_spans(
+                                &human_spans_for_status(),
+                                algo,
+                                before_text,
+                                after_text,
+                            )
+                            .iter()
+                            .map(Vec::len)
+                            .sum()
+                        })
+                        .unwrap_or(0);
+                    if differing == 0 {
+                        "You and codediff agree everywhere".to_string()
+                    } else {
+                        format!("Showing {differing} disagreeing range(s)")
+                    }
+                }
+                TextOverlay::TreeDisagreement => {
+                    let differing: usize = app
+                        .tree_text_spans
+                        .as_ref()
+                        .map(|tree| {
+                            overlay_disagreement_spans(
+                                &human_spans_for_status(),
+                                tree,
+                                before_text,
+                                after_text,
+                            )
+                            .iter()
+                            .map(Vec::len)
+                            .sum()
+                        })
+                        .unwrap_or(0);
+                    if differing == 0 {
+                        "Your painting and your tree mapping agree everywhere".to_string()
+                    } else {
+                        format!(
+                            "Showing {differing} disagreeing range(s) between your painting and your tree mapping"
+                        )
+                    }
+                }
+            });
+        }
+        // `s` and `L` both raise the same picker; `saving` is the only difference, and it
+        // decides only what Enter does with the chosen name.
+        KeyCode::Char('s') | KeyCode::Char('L') => {
+            let saving = matches!(code, KeyCode::Char('s'));
+            app.modal = Some(Modal::SolutionPicker {
+                names: solution_picker_names(&app.mapping),
+                selected: 0,
+                saving,
+                new_name: None,
+                confirm_delete: None,
+                state,
+            });
+            return None;
+        }
+        KeyCode::Char('T') => match run_unix_diff(before_src, after_src) {
+            Ok(output) => {
+                app.modal = Some(Modal::UnixDiffView { output, scroll: 0 });
+                return None;
+            }
+            Err(err) => app.status = Some(format!("Error running diff: {:#}", err)),
+        },
+        KeyCode::Esc => {
+            // Esc backs out one step at a time, so an accidental `v` - or a half-built
+            // N:M group - doesn't cost the whole view. Only an Esc with nothing pending
+            // closes.
+            if state.anchor[state.side].is_some() {
+                state.anchor[state.side] = None;
+                app.status = Some("Selection cleared".to_string());
+            } else if !state.pending[state.side].is_empty() {
+                state.pending[state.side].clear();
+                app.status = Some("Banked ranges cleared on this side".to_string());
+            } else {
+                close = true;
+            }
+        }
+        _ => {}
+    }
+
+    if close {
+        app.status = Some("Closed text view".to_string());
+    } else {
+        state.scroll_into_view(VIEWPORT_ROWS);
+        app.modal = Some(Modal::TextView { state });
+    }
+
+    None
+}
+
+/// `handle_modal_key`'s `Modal::OpenDiffPicker` arm. Split out at 182 lines: an arm that
+/// long stops being readable as one case of a match. It needs none of the nine values
+/// `handle_modal_key` threads through - it works purely on `App` and its own payload.
+fn handle_open_diff_picker(
+    app: &mut App,
+    code: KeyCode,
+    options: Vec<(String, &'static str)>,
+    selected: usize,
+    view: DiffPickerView,
+    name_input: Option<String>,
+) -> Option<OpenTarget> {
+    let mut view = view;
+    let mut selected = selected;
+
+    // The `Name` filter's prompt takes every keystroke while it is open, so a name
+    // containing `j`, `s` or `f` types those characters instead of moving the selection
+    // and re-sorting the table mid-word. Same posture as the text view's `:` line prompt.
+    if let Some(mut typed) = name_input {
+        match code {
+            KeyCode::Char(c) => {
+                typed.push(c);
+                app.modal = Some(Modal::OpenDiffPicker {
+                    options,
+                    selected,
+                    view,
+                    name_input: Some(typed),
+                });
+            }
+            KeyCode::Backspace => {
+                typed.pop();
+                app.modal = Some(Modal::OpenDiffPicker {
+                    options,
+                    selected,
+                    view,
+                    name_input: Some(typed),
+                });
+            }
+            KeyCode::Enter => {
+                // Which row the selection was on *before* the new filter narrows the list,
+                // so it can follow that row rather than resetting to the top - same
+                // re-anchoring every other filter/sort key here does.
+                let current = visible_diff_options(&options, &view, DiffPickerData::from_app(app))
+                    .get(selected)
+                    .cloned();
+                // Lowercased once here rather than per row per frame; blank clears the
+                // filter rather than being stored as a needle that matches everything
+                // while still reading as "filtered" in the header.
+                let needle = typed.trim().to_lowercase();
+                view.filters.name = if needle.is_empty() {
+                    None
+                } else {
+                    Some(needle)
+                };
+                app.diff_view = view.clone();
+                let modal = open_diff_picker_modal(
+                    options,
+                    current.as_deref().unwrap_or(&app.name),
+                    view,
+                    DiffPickerData::from_app(app),
+                );
+                app.modal = Some(modal);
+            }
+            KeyCode::Esc => {
+                app.status = Some("Name filter cancelled".to_string());
+                app.modal = Some(Modal::OpenDiffPicker {
+                    options,
+                    selected,
+                    view,
+                    name_input: None,
+                });
+            }
+            _ => {
+                app.modal = Some(Modal::OpenDiffPicker {
+                    options,
+                    selected,
+                    view,
+                    name_input: Some(typed),
+                });
+            }
+        }
+        return None;
+    }
+
+    let visible = visible_diff_options(&options, &view, DiffPickerData::from_app(app));
+    match code {
+        KeyCode::Up | KeyCode::Char('k') => {
+            selected = selected.saturating_sub(1);
+        }
+        KeyCode::Down | KeyCode::Char('j') => {
+            selected = (selected + 1).min(visible.len().saturating_sub(1));
+        }
+        // Column movement never triggers a scan: `s`/`f` are deliberate presses that can
+        // afford to stall for several seconds the first time (see
+        // `ensure_diff_column_data`), but walking the cursor across the header to reach
+        // one of them must stay instant.
+        KeyCode::Left | KeyCode::Char('h') => {
+            view.column = view.column.left();
+        }
+        KeyCode::Right | KeyCode::Char('l') => {
+            view.column = view.column.right();
+        }
+        // `s` takes the sort over to the cursor column, or flips the direction if it is
+        // already the sorted one. The selection follows the row it was on rather than
+        // jumping to the top, which is the whole point of re-sorting while looking at a
+        // particular fixture.
+        KeyCode::Char('s') => {
+            let current = visible.get(selected).cloned();
+            ensure_diff_column_data(app, view.column);
+            view.sort = view.sort.toggled(view.column);
+            app.diff_view = view.clone();
+            let modal = open_diff_picker_modal(
+                options,
+                current.as_deref().unwrap_or(&app.name),
+                view,
+                DiffPickerData::from_app(app),
+            );
+            app.modal = Some(modal);
+            return None;
+        }
+        // `f` cycles the cursor column's own filter - a dataset for `Dataset`, a
+        // three-state off/yes/no for each yes-no column, and a typed substring for `Name`
+        // (which opens `name_input` above instead of taking effect immediately).
+        KeyCode::Char('f') => {
+            let current = visible.get(selected).cloned();
+            if view.column == DiffColumn::Name {
+                app.status = Some(
+                    "Filter by name: type a substring, Enter to apply, Esc to cancel".to_string(),
+                );
+                // Pre-filled with the filter already in force, so `f` is an edit rather
+                // than a blind overwrite - same idea as `PromptComment`.
+                let name_input = view.filters.name.clone().unwrap_or_default();
+                app.modal = Some(Modal::OpenDiffPicker {
+                    options,
+                    selected,
+                    view,
+                    name_input: Some(name_input),
+                });
+                return None;
+            }
+            ensure_diff_column_data(app, view.column);
+            if view.column == DiffColumn::Dataset {
+                view.filters.dataset = next_dataset_filter(view.filters.dataset);
+            } else if let Some(flag) = view.filters.flag_mut(view.column) {
+                *flag = flag.next();
+            }
+            app.diff_view = view.clone();
+            let modal = open_diff_picker_modal(
+                options,
+                current.as_deref().unwrap_or(&app.name),
+                view,
+                DiffPickerData::from_app(app),
+            );
+            app.modal = Some(modal);
+            return None;
+        }
+        KeyCode::Enter => {
+            if let Some(name) = visible.get(selected) {
+                let target = OpenTarget::Diffs(name.clone());
+                if app.dirty {
+                    let can_save = matches!(app.origin, CaseOrigin::Diffs);
+                    app.modal = Some(Modal::ConfirmDiscardUnsaved { target, can_save });
+                } else {
+                    return Some(target);
+                }
+                return None;
+            }
+        }
+        KeyCode::Esc => {
+            app.status = Some("Cancelled".to_string());
+            return None;
+        }
+        _ => {}
+    }
+    // Covers `h`/`l`: the cursor column persists across closing and reopening the picker
+    // the same way the sort and filters `s`/`f` set do, so reopening lands back on the
+    // column that was being worked with. The other keys reaching here leave `view`
+    // untouched, so this is a no-op for them.
+    app.diff_view = view.clone();
+    app.modal = Some(Modal::OpenDiffPicker {
+        options,
+        selected,
+        view,
+        name_input: None,
+    });
+
+    None
 }

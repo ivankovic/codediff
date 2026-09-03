@@ -10,6 +10,14 @@ Scope: duplicate code, code length, refactoring/generalization opportunities, st
 readability. Ordered by expected payoff within each section. Line numbers are as of commit
 f5e78e0.
 
+## Status (2026-09-03)
+
+The two module splits this document deferred at every previous review are done:
+`bin/human_solver.rs` (15,297 lines) and `diff/apted/common.rs` (4,426) are now module
+directories, split along the seams §2 named. `handle_modal_key` is 561 lines, down from 1,088.
+§2 and §5 below are re-measured; the rest of this document still carries its 2026-07-07 numbers
+and line references, which are stale.
+
 ## Status (2026-07-07)
 
 Implemented in the working tree, verified by the full test suite (266 passed; only the two
@@ -179,38 +187,38 @@ accessors would fold each pair into one function.
 
 ## 2. Code length
 
-Function-length outliers (non-test, measured by brace matching):
+**Re-measured 2026-09-03.** The previous numbers were three reviews stale - this section listed
+`human_solver.rs` at 4,298 lines when it was 15,297, and `apted/common.rs` at 3,901 when it was
+4,426. Both splits it recommended have now been done.
+
+Function-length outliers (non-test, by brace matching):
 
 | Lines | Function | Verdict |
 |---|---|---|
-| 585 | `apted/engine.rs:498 spf_a` | Leave. Hand-tuned APTED port; prior review already ruled: profile before touching. |
-| 294 | `bin/human_solver.rs:2540 handle_key` | Worth splitting — see below. |
-| 268 | `bin/human_solver.rs:2841 handle_modal_key` | Same: one function per `Modal` variant. |
-| 207 | `diff/text.rs:42 ranges` | Shrinks naturally via finding 1.9. |
-| 180 | `apted/common.rs:2076 resolve_forest` | Sequential phases with clear comments; acceptable, could be phase-functions if touched again. |
-| 176+164 | `engine.rs compute_opt_strategy_post_l` / `_post_r` | Mirrored algorithm variants, same leave-alone rule as `spf_a`. |
-| 163 | `solve_structurally_identical_trees.rs:35 solve` | Shrinks via 1.2. |
+| 847 | `diff/text.rs:372 ranges` | **Worst remaining.** Was 207 here and predicted to "shrink naturally via finding 1.9"; it quadrupled instead. Next candidate. |
+| 592 | `apted/engine.rs:581 spf_a` | Leave. Hand-tuned APTED port; profile before touching. |
+| 561 | `bin/human_solver/events.rs handle_modal_key` | Was 1,088. Its three longest arms (`TextView` 270, `OpenDiffPicker` 182, `SolutionPicker` 105) are now functions taking only the values they use. The remaining 12 arms are 18-89 lines each and read fine as arms. |
+| 492 | `bin/human_solver/events.rs handle_key` | **Leave.** 33 arms, longest 51 lines, 19 of them ten lines or fewer - a flat one-per-key dispatch table. It is long because the tool has many keys, not because any arm is bloated, and splitting a key table across functions makes it harder to read, not easier. |
+| 485 | `diff/nodes.rs:502 is_semantically_structural` | Unexamined; a long `match` over node kinds, so possibly the same "legitimately wide table" case as `handle_key`. |
+| 368 | `bin/analyze_human_mappings.rs:634 main` | Unexamined. |
+| 328 | `bin/generate_mapping_site.rs:222 render_fixture_page` | Unexamined. |
+| 266 | `bin/human_solver/events.rs handle_text_view` | Newly extracted from `handle_modal_key`; its own `:` line-prompt sub-mode is the obvious next seam if it grows. |
 
 File-length outliers:
 
-- **`bin/human_solver.rs` (4,298 lines)** is the largest file in the repo and is a single-file
-  binary with ~900 lines of tests. It already has clean internal section banners (`State`,
-  `Tree flattening`, `Navigation`, `Marking actions`, `Rendering`, `Event loop`, `Saving`).
-  Converting it to `src/bin/human_solver/main.rs` + modules along exactly those banner lines
-  (`state.rs`, `status.rs`, `actions.rs`, `render.rs`, `persist.rs`) would be a mechanical split
-  with real navigation payoff. `handle_key`'s 294 lines are a flat `match` on `KeyCode` where most
-  arms are already one-line delegations — the long arms (`'m'`, `'f'`, `'s'`, pickers) can each
-  become an `action_*` function like their siblings.
-- **`apted/common.rs` (3,901 lines)**: ~1,300 lines are tests. The non-test remainder covers four
-  separable concerns: core forest-distance/edit-mapping (`forest_dist`, `compute_edit_mapping`),
-  the Myers flat-tree fast path (`myers_lcs` et al., ~200 lines, self-contained), the slot
-  repair/promotion heuristics (`SlotCtx` through `repair_leaf_slots`, ~900 lines), and
-  `resolve_forest` + entry points. Splitting into `apted/{myers,slots,resolve}.rs` is low-risk
-  (all `pub(crate)`) and would take the file under ~1,500 lines. Prior REVIEW.md deferred this
-  ("not a problem on its own") — still true, but it keeps growing (was 2,294 lines at that review,
-  3,901 now), so the trend argues for doing the split soon.
-- `test/optimal_solutions/*.rs` long functions (e.g. `rust_turbopack_module_rule.rs`, 407 lines)
-  are ground-truth data tables, not logic — exempt.
+- **`bin/human_solver/` was one 15,297-line file**; it is now `main.rs` (1,850) plus `tests.rs`
+  (6,239), `events.rs` (2,614), `render.rs` (1,498), `state.rs` (1,240), `actions.rs` (1,198),
+  `navigate.rs` (392), `stubs.rs` (270), `flatten.rs` (259) - split along the section banners the
+  file already carried.
+- **`apted/common.rs` was 4,426 lines**; it is now 1,153 plus `common/{slots,residual,myers,
+  resolve,prematch}.rs`, along the four concerns this document named.
+- **`bin/human_solver/tests.rs` (6,239)** is now the largest file in the repo. Splitting it so each
+  test sits beside the code it covers is worth doing and is *not* mechanical: the suite shares a
+  large fixture set, so a test's body says more about which fixtures it borrows than about what it
+  exercises, and two attempts at automatic routing both produced obviously wrong distributions.
+  Lift the shared fixtures into their own `#[cfg(test)]` module first, then route by hand.
+- `test/fixtures/**` long functions (e.g. `rust_turbopack_module_rule.rs`, 403 lines) are
+  ground-truth data tables, not logic - exempt.
 
 ---
 
@@ -272,20 +280,19 @@ File-length outliers:
 
 ## 5. Suggested order of attack
 
-1. **1.1 + 1.2 + 1.3 together** — one refactor of the two twin passes plus threading
-   `&ASTMetadata` through the pipeline removes the largest duplication, the per-pass deep clones,
-   and the O(n²) scans, and fixes the documented duplicate-collapse TODO. Guarded by the
-   existing `optimal_solutions` suite + `benchmark_optimal_solutions` (baseline: 270 mismatches).
-2. **1.5 + 1.6 + 1.9(blob)** — introduce one shared bin-support module; small, zero-risk,
-   makes `commit_stats` deterministic.
-3. **1.4** — mechanical, shrinks the unsafe surface to one site.
-4. **2: split `human_solver.rs` and `apted/common.rs` along existing seams** — pure moves,
-   no behavior change; best done when no parallel human_solver work is in flight (it is actively
-   used interactively).
-5. **1.7 / 1.8 side-parameterization** — highest-value generalization but touches the trickiest
-   code; do after 1 so the test suite is exercising the reorganized passes, and verify with the
-   fuzz oracles in `apted/common.rs`.
-6. **4: typo/lint sweep** — any time, single mechanical commit.
+**Items 1-4 of the original order are done** (see the Status section above and, for the two module
+splits, the 2026-09-03 commits). What is left, in order:
+
+1. **`diff/text.rs:372 ranges`, 847 lines** - the largest function in the codebase that is not a
+   deliberately-wide table. This document predicted it would shrink on its own and it grew 4x
+   instead, which is the strongest evidence here that a "shrinks naturally" verdict needs a
+   re-measurement rather than trust.
+2. **1.7 / 1.8 side-parameterization** - the before/after mirror pairs. Highest-value
+   generalization left, and the module splits have made the affected code easier to see.
+3. **Split `bin/human_solver/tests.rs`** so tests sit beside their code - blocked on lifting the
+   shared fixtures out first, as §2 describes.
+4. **`diff/nodes.rs is_semantically_structural`, 485 lines** - measure before splitting; it may be
+   the same legitimate wide-table case as `handle_key`.
 
 Not recommended: restructuring `engine.rs`'s APTED internals (`spf_a`, strategy functions) beyond
 the lint-silencing in §4 — prior benchmarking discipline applies (profile via
