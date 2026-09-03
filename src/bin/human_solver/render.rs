@@ -43,6 +43,29 @@ pub(crate) fn node_label(node: Node, src: &[u8]) -> String {
     }
 }
 
+/// A tab, replaced by a single space; every other character unchanged. A literal `\t` written
+/// into a ratatui cell desyncs the buffer from the terminal - ratatui has it occupying one cell,
+/// the terminal jumps the cursor to the next tab stop - so everything after it on the row lands in
+/// the wrong column, and the stale characters stay on screen when the modal is torn down. Tabs
+/// only reach a cell where raw source text is rendered character by character: `node_label`
+/// formats a leaf's text with `{:?}`, which escapes them, which is why the tree panels are
+/// unaffected and only the `t`/`T` views show it.
+///
+/// One space rather than an expansion to the next tab stop, because a character's screen column
+/// has to keep matching its byte offset: `render_paint_side` maps the paint cursor's column
+/// directly onto `line.char_indices()`, and every `HumanTextSpan` is stored in exactly those
+/// coordinates, so widening a tab would silently paint the wrong bytes. The product TUI's
+/// `display_safe` makes the same 1:1 trade for the same reason.
+pub(crate) fn display_safe_char(ch: char) -> char {
+    if ch == '\t' { ' ' } else { ch }
+}
+
+/// [`display_safe_char`] over a whole string, for the views that render a prebuilt line rather
+/// than painting it character by character.
+pub(crate) fn display_safe_str(text: &str) -> String {
+    text.chars().map(display_safe_char).collect()
+}
+
 pub(crate) fn status_glyph_and_style(status: NodeStatus) -> (&'static str, Style) {
     match status {
         NodeStatus::Unmarked => (" ", Style::default().fg(Color::Gray)),
@@ -783,7 +806,7 @@ pub(crate) fn render_paint_side(
                 push_run(&mut run, run_class, &mut spans_out);
                 run_class = Some(class);
             }
-            run.push(ch);
+            run.push(display_safe_char(ch));
         }
         push_run(&mut run, run_class, &mut spans_out);
 
@@ -1097,7 +1120,7 @@ pub(crate) fn render_unix_diff_modal(frame: &mut Frame, area: Rect, output: &str
             };
             Line::from(vec![
                 Span::styled(gutter, Style::default().fg(Color::DarkGray)),
-                Span::styled(line.to_string(), style),
+                Span::styled(display_safe_str(line), style),
             ])
         })
         .collect();

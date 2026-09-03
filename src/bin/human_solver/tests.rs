@@ -6232,3 +6232,60 @@ fn render_panel_marks_a_group_matched_node_and_a_pending_selection_distinctly() 
         "a group-derived match should carry the 'g' marker: {group_row_text:?}"
     );
 }
+
+/// A tab reaching a ratatui cell is what left the `t` view's characters on screen after the modal
+/// closed (see `display_safe_char`). `go-lazygit-switch-to-strings` is Go, so it is tab-indented,
+/// which makes it the fixture that actually reproduced it.
+#[test]
+fn text_view_renders_no_literal_tabs_for_a_tab_indented_fixture() {
+    let dir = diffs_root()
+        .join("small")
+        .join("go-lazygit-switch-to-strings");
+    let source = std::fs::read_to_string(dir.join("before.go.test")).unwrap();
+    assert!(
+        source.contains('\t'),
+        "this test is pointless unless the fixture is tab-indented"
+    );
+
+    let state = TextPaintState::default();
+    let lines = render_paint_side(&source, &[], &state, 0, 100);
+
+    for line in &lines {
+        let rendered: String = line.spans.iter().map(|s| s.content.as_ref()).collect();
+        assert!(
+            !rendered.contains('\t'),
+            "a raw tab reached the buffer: {rendered:?}"
+        );
+    }
+}
+
+/// The tab replacement has to be one character wide, not an expansion to the next tab stop:
+/// `render_paint_side` maps a paint cursor's column straight onto the line's byte offsets, so a
+/// widened tab would paint the wrong bytes.
+#[test]
+fn text_view_keeps_one_screen_column_per_source_character() {
+    let source = "\tif x {\n\t\treturn \"y\"\n\t}\n";
+    let state = TextPaintState::default();
+    let lines = render_paint_side(source, &[], &state, 0, 100);
+
+    for (row, expected) in source.split('\n').enumerate() {
+        // The first span is the line-number gutter, which has no source counterpart.
+        let rendered: String = lines[row]
+            .spans
+            .iter()
+            .skip(1)
+            .map(|s| s.content.as_ref())
+            .collect();
+        assert_eq!(
+            rendered.chars().count(),
+            expected.chars().count(),
+            "row {row} changed width: {rendered:?} vs {expected:?}"
+        );
+    }
+}
+
+#[test]
+fn display_safe_str_replaces_every_tab_and_leaves_everything_else() {
+    assert_eq!(display_safe_str("\ta\tb"), " a b");
+    assert_eq!(display_safe_str("no tabs here"), "no tabs here");
+}
