@@ -169,37 +169,52 @@ sample-pairs-all: build
 
 # ── Measurement ─────────────────────────────────────────────────────────────────────────────────
 
-# Measure diff_code's speed, memory, AST size and mapping operation count across a sampled CSV.
+# Measure diff_code's speed, memory, AST size and mapping operation count across one language's
+# sampled pairs.
+#
+# One LANGUAGE-parameterised target, not the five it replaced (`measure-pairs`, `-rust`, `-java`,
+# `-javascript`, `-typescript`). Those ran the same binary with per-target opinions nobody had
+# written down: three passed --max-combined-nodes 20000 and two did not, and they wrote to two
+# different conventions - data/diff_pairs_benchmark[_rust].csv loose in data/, against
+# data/performance/benchmark_<language>.csv for the rest. The second is canonical: it is what
+# measure/benchmark_all_extended.sh writes, what analysis/benchmark_report.py reads, and what the
+# 20-odd committed per-language CSVs in data/performance/ already use. The two loose paths were
+# never committed, so unifying on the canonical one moves no data.
+#
+#   make measure-pairs LANGUAGE=rust
+#   make measure-pairs LANGUAGE=all PAIRS_NODE_LIMIT=0     # 0 disables the cap
+#
+# Input is data/samples/sampled_code_pairs_$(LANGUAGE).csv, which `sample-pairs-all` produces for
+# every language in $(LANGUAGES) in one pass.
+PAIRS_NODE_LIMIT ?= 20000
 measure-pairs: build
-	$(BIN_DIR)/benchmark_diff_pairs --csv data/samples/sampled_code_pairs.csv --repo-root $(REPOSITORIES_DIR) --output data/diff_pairs_benchmark.csv
+	@if [ -z "$(LANGUAGE)" ]; then \
+		echo "usage: make measure-pairs LANGUAGE=<slug>" >&2; \
+		echo "slugs: $(foreach e,$(LANGUAGES),$(firstword $(subst :, ,$(e)))) all" >&2; \
+		exit 1; \
+	fi
+	@if [ ! -f data/samples/sampled_code_pairs_$(LANGUAGE).csv ]; then \
+		echo "no data/samples/sampled_code_pairs_$(LANGUAGE).csv - run 'make sample-pairs-all' first" >&2; \
+		exit 1; \
+	fi
+	$(BIN_DIR)/benchmark_diff_pairs \
+		--csv data/samples/sampled_code_pairs_$(LANGUAGE).csv \
+		--repo-root $(REPOSITORIES_DIR) \
+		--output data/performance/benchmark_$(LANGUAGE).csv \
+		--max-combined-nodes $(PAIRS_NODE_LIMIT)
 
-measure-pairs-rust: build
-	$(BIN_DIR)/benchmark_diff_pairs --csv data/samples/sampled_code_pairs_rust.csv --repo-root $(REPOSITORIES_DIR) --output data/diff_pairs_benchmark_rust.csv
-
-# Extended language targets with 20000 node limit
-measure-pairs-java: build
-	$(BIN_DIR)/benchmark_diff_pairs --csv data/samples/sampled_code_pairs_java.csv --repo-root $(REPOSITORIES_DIR) --output data/performance/benchmark_java.csv --max-combined-nodes 20000
-
-measure-pairs-javascript: build
-	$(BIN_DIR)/benchmark_diff_pairs --csv data/samples/sampled_code_pairs_javascript.csv --repo-root $(REPOSITORIES_DIR) --output data/performance/benchmark_javascript.csv --max-combined-nodes 20000
-
-measure-pairs-typescript: build
-	$(BIN_DIR)/benchmark_diff_pairs --csv data/samples/sampled_code_pairs_typescript.csv --repo-root $(REPOSITORIES_DIR) --output data/performance/benchmark_typescript.csv --max-combined-nodes 20000
-
-# Size/LOC-changed statistics and distribution plots for sample-pairs-all's output. Depends on
-# sample-pairs-all having already been run (needs the checked-out repositories, not just the CSV).
 measure-code-pair-diffs:
 	uv run ./analysis/code_pair_diff_stats.py data/samples/sampled_code_pairs_$(LANGUAGE).csv \
 		--repo-root $(REPOSITORIES_DIR) \
 		--output-csv data/corpus_stats/code_pair_diff_stats_$(LANGUAGE).csv
 
-# Compares two measure-pairs-rust runs (e.g. before/after a diff_code algorithm change) and
-# charts the difference. Usage: make measure-pairs-diff BEFORE=path/to/before.csv AFTER=path/to/after.csv
-# (save a copy of data/diff_pairs_benchmark_rust.csv before re-running measure-pairs-rust, then
+# Compares two `measure-pairs` runs (e.g. before/after a diff_code algorithm change) and
+# charts the difference. Usage: make pairs-diff-report BEFORE=path/to/before.csv AFTER=path/to/after.csv
+# (save a copy of data/performance/benchmark_<language>.csv before re-running measure-pairs, then
 # pass that copy as BEFORE and the fresh run as AFTER).
-measure-pairs-diff:
+pairs-diff-report:
 	@if [ -z "$(BEFORE)" ] || [ -z "$(AFTER)" ]; then \
-		echo "usage: make measure-pairs-diff BEFORE=path/to/before.csv AFTER=path/to/after.csv" >&2; \
+		echo "usage: make pairs-diff-report BEFORE=path/to/before.csv AFTER=path/to/after.csv" >&2; \
 		exit 1; \
 	fi
 	uv run ./analysis/diff_pairs_benchmark_comparison.py --before $(abspath $(BEFORE)) --after $(abspath $(AFTER))
@@ -214,15 +229,17 @@ measure-pairs-diff:
 #
 #   make measure-sampled                                  # every supported language
 #   make measure-sampled LANGUAGE="Rust Python Go Kotlin"  # a subset
-LANGUAGE ?= all
+# Deliberately no default. `measure-sampled` treats an unset LANGUAGE as "every language"; for
+# `measure-pairs` there is no sensible default and an unset one has to be an error, not a guess -
+# a shared `LANGUAGE ?= all` made the second silently measure the whole corpus.
 SAMPLED_REPOS ?= /var/tmp/research/small/repositories/
 SAMPLED_NODE_LIMIT ?= 20000
 SAMPLED_MAX_COMMITS ?= 100
 SAMPLED_TIMEOUT_MIN ?= 120
 measure-sampled:
-	@echo "Benchmarking $(LANGUAGE); results go to research/data/performance/"
+	@echo "Benchmarking $(or $(LANGUAGE),all); results go to research/data/performance/"
 	./measure/benchmark_all_extended.sh \
-		--language "$(LANGUAGE)" \
+		--language "$(or $(LANGUAGE),all)" \
 		--repos-dir $(SAMPLED_REPOS) \
 		--bin-dir $(BIN_DIR) \
 		--limit $(SAMPLED_NODE_LIMIT) \
