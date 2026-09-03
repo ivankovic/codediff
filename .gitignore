@@ -69,3 +69,11 @@ venv.bak/
 # sample-pairs-all writes one combined CSV and then splits it per language. The per-language files
 # are the artifact; the combined one is a regenerable intermediate that duplicates all 3MB of them.
 **/research/data/samples/sampled_code_pairs_all.csv
+
+# Materialized sample candidates awaiting triage. `materialize_test_diffs` renders the pointers in
+# src/test/data/sample.csv into before/after fixtures here, and `human_solver` promotes the ones a
+# human accepts into src/test/data/diffs/ (carrying README.md attribution with them). That makes
+# this a staging area whose contents are fully regenerable from sample.csv + the research
+# checkouts, so it doesn't belong in git - it was tracked until the stratified draw made that
+# ~3000 files at a time (previously it was emptied by hand after each triage round, e.g. 920efe8).
+src/test/data/samples/
