@@ -18,14 +18,14 @@ plus its verbatim comment is checkable in a way a derived count is not.
 
 Nothing in the corpus format marks the second. An annotator who meets one records the closest
 one-to-one approximation and writes the real correspondence in the fixture's test case, which is
-why this list was found by reading `src/test/optimal_solutions/**/*.rs` rather than by enumeration.
+why this list was found by reading `src/test/fixtures/**/*.rs` rather than by enumeration.
 It is a lower bound of unknown tightness. No denominator is quoted for it anywhere in the paper.
 
 ## How the list was found
 
 ```
 grep -rniE "[0-9]+:[0-9]+ (map|match)|N:M|N-to-M|multi-to-multi|many.to.(one|many)|[0-9]+-to-[0-9]+|mutli" \
-  src/test/optimal_solutions/*/*.rs
+  src/test/fixtures/*/*.rs
 ```
 
 **The `[0-9]+:[0-9]+` alternative is load-bearing and was missing from the first version of this
@@ -51,7 +51,7 @@ detector that exists.
 | `c-postgres-real-logic-change` | 2 statements to 1 | no |
 | `scala-com-lihaoyi-mill-split-two-asserts-into-six-two-times` | string escapes, N:M | no |
 
-Verbatim, from `src/test/optimal_solutions/`:
+Verbatim, from `src/test/fixtures/`:
 
 * `full/c_pixaranimationstudios_opensubdiv_change_license_comment.rs`:
   "Requires a N:M match for perfect solution"

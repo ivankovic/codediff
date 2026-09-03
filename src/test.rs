@@ -15,10 +15,8 @@
  *  You should have received a copy of the GNU Affero General Public License
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
+pub mod fixtures;
 pub mod helper;
-pub mod optimal_solutions;
-#[cfg(test)]
-mod painting_agreement;
 
 #[cfg(test)]
 mod tests {
@@ -65,7 +63,7 @@ mod tests {
 
     /// **A clamped limit must say why it is clamped.**
     ///
-    /// See `optimal_solutions`' module doc for the boundary this enforces: `description.md` says
+    /// See `fixtures`' module doc for the boundary this enforces: `description.md` says
     /// what the fixture demands, a stub comment says why codediff falls short of it, and a limit
     /// with neither is a number nobody can review. New clamps have to carry one; the ones that
     /// already did not are listed above and must only ever shrink.
@@ -78,7 +76,7 @@ mod tests {
             let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
                 .join("src")
                 .join("test")
-                .join("optimal_solutions")
+                .join("fixtures")
                 .join(dataset);
             if !dir.exists() {
                 continue;
@@ -100,10 +98,25 @@ mod tests {
                 else {
                     continue;
                 };
-                // A comment inside the test body, indented one level - the module-level licence
-                // header and any `///` docs sit at column zero and are not an explanation of this
-                // fixture's residual.
-                let explained = source.lines().any(|line| line.starts_with("    //"));
+                // Scoped to the one test that holds the clamped call, not the whole file. These
+                // files carry a `painting()` test too since the two suites were merged, and a few
+                // handmade ones carry extra mapping tests under their own names - an explanation
+                // of a painting residual, or of a different assertion, says nothing about why
+                // *this* number is what it is. Reading the file as a whole let one fixture look
+                // explained when it was not.
+                //
+                // Found by walking back from the call to its `#[test]` rather than by function
+                // name: `mapping()` is the standard name, but a handful of fixtures also carry a
+                // `mapping_details()` test asserting specific nodes by hand, and the clamped call
+                // is not always in the first one. Indented one level, too - the licence header
+                // and any `///` docs sit at column zero and explain the file, not this number.
+                let call_at = source
+                    .find("assert_matches_human_mapping_within_limit")
+                    .unwrap_or(0);
+                let test_at = source[..call_at].rfind("#[test]").unwrap_or(0);
+                let explained = source[test_at..call_at]
+                    .lines()
+                    .any(|line| line.starts_with("    //"));
                 let allowed = CLAMPS_WITHOUT_AN_EXPLANATION.contains(&name.as_str());
                 match (explained, allowed) {
                     (false, false) => undocumented.push(name),

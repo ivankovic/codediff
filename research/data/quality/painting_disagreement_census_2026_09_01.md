@@ -1,6 +1,6 @@
 # Rendering vs. painting: a full census of the `painting_agreement` corpus, 2026-09-01
 
-**What this is.** For every fixture in `src/test/painting_agreement/` (the ones with both a
+**What this is.** For every fixture in `src/test/fixtures/` (the ones with both a
 `Minimal` and/or `Full` hand-painted text ground truth), how much codediff's own rendering
 disagrees with that painting under each preset, and - read by hand, one fixture at a time - *why*.
 Companion to `text_painting_findings.md` (which is about what the two painting styles mean and the

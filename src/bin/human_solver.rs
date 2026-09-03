@@ -17,7 +17,7 @@
  */
 
 /**
-* A helper binary for building the ground-truth AST mappings used by src/test/optimal_solutions.
+* A helper binary for building the ground-truth AST mappings used by src/test/fixtures.
 *
 * Run as `cargo run --bin human_solver -- <name>`, where `<name>` is the name of a directory under
 * `src/test/data/diffs/` (e.g. "rust-add-if"). If `<name>` is omitted, the first available case
@@ -26,7 +26,7 @@
 * of the before and after code side by side (not the source text), lets a human walk both trees
 * independently and mark nodes as matching, deleted or inserted, and saves the result as
 * `src/test/data/diffs/<name>/human_mapping.json`. It also creates the corresponding
-* `src/test/optimal_solutions/<name>.rs` test file (if one doesn't already exist), which simply
+* `src/test/fixtures/<name>.rs` test file (if one doesn't already exist), which simply
 * calls `codediff::test::helper::human_mapping::assert_matches_human_mapping`, a generic comparison
 * that parses the code again, computes codediff's own diff and checks it agrees with the human
 * mapping. Nodes are addressed by path (kind + sibling position), not by TreeSitter node ID, since
@@ -8338,7 +8338,7 @@ fn action_save(
     *dirty = false;
     Ok(if created {
         format!(
-            "Saved human_mapping.json and created optimal_solutions/{}.rs",
+            "Saved human_mapping.json and created fixtures/{}.rs",
             module_name(name)
         )
     } else {
@@ -8817,7 +8817,7 @@ fn sample_comment_at(path: &Path, source: &SampleSource) -> Result<Option<String
 }
 
 // ---------------------------------------------------------------------------------------------
-// optimal_solutions test stub generation
+// fixture test stub generation
 // ---------------------------------------------------------------------------------------------
 
 const LICENSE_HEADER: &str = "/*  This file is part of the CodeDiff code diffing tool.
@@ -8843,27 +8843,27 @@ fn module_name(name: &str) -> String {
     name.replace('-', "_")
 }
 
-/// `optimal_solutions/` mirrors `diffs/`'s split by dataset (see `DIFF_DATASETS`): `dataset`'s
-/// fixtures get their stub test files here, alongside `optimal_solutions/<dataset>.rs`'s mod-list
+/// `fixtures/` mirrors `diffs/`'s split by dataset (see `DIFF_DATASETS`): `dataset`'s
+/// fixtures get their stub test files here, alongside `fixtures/<dataset>.rs`'s mod-list
 /// (see `optimal_solutions_mod_file`).
-fn optimal_solutions_dir(dataset: &str) -> PathBuf {
+fn fixtures_dir(dataset: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("src")
         .join("test")
-        .join("optimal_solutions")
+        .join("fixtures")
         .join(dataset)
 }
 
-fn optimal_solutions_mod_file(dataset: &str) -> PathBuf {
+fn fixtures_mod_file(dataset: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("src")
         .join("test")
-        .join("optimal_solutions")
+        .join("fixtures")
         .join(format!("{dataset}.rs"))
 }
 
-/// Creates `optimal_solutions/<dataset>/<name>.rs` if it doesn't already exist, and makes sure
-/// it's registered in `optimal_solutions/<dataset>.rs`. Returns whether the stub `.rs` file was
+/// Creates `fixtures/<dataset>/<name>.rs` if it doesn't already exist, and makes sure
+/// it's registered in `fixtures/<dataset>.rs`. Returns whether the stub `.rs` file was
 /// newly created. `dataset` is resolved from `name`'s actual location under `diffs/`
 /// (`case_dataset`) - every caller (an already-open existing case, or `action_promote`, which
 /// creates the diffs/ directory before calling this) runs after that directory already exists, so
@@ -8876,13 +8876,13 @@ fn optimal_solutions_mod_file(dataset: &str) -> PathBuf {
 fn ensure_stub_test(name: &str, comment: Option<&str>) -> Result<bool> {
     let dataset = case_dataset(name).unwrap_or_else(legacy_dataset);
     let module = module_name(name);
-    let dir = optimal_solutions_dir(&dataset);
+    let dir = fixtures_dir(&dataset);
     let stub_path = dir.join(format!("{module}.rs"));
 
     let created = if stub_path.exists() {
         false
     } else {
-        // `handmade`/`small`/`full` predate this dataset's `optimal_solutions/<dataset>/`
+        // `handmade`/`small`/`full` predate this dataset's `fixtures/<dataset>/`
         // directory existing at all, so this was never exercised until `stratified` (or any
         // future dataset) needed it fresh on first promotion - real gap, not defensive
         // programming against something that can't happen.
@@ -8897,16 +8897,16 @@ fn ensure_stub_test(name: &str, comment: Option<&str>) -> Result<bool> {
     Ok(created)
 }
 
-/// Builds the full contents of a freshly-created `optimal_solutions/<dataset>/<name>.rs` stub -
+/// Builds the full contents of a freshly-created `fixtures/<dataset>/<name>.rs` stub -
 /// split out from `ensure_stub_test` as a pure string-building function (no filesystem access) so
-/// it's directly unit-testable without writing into the real repo's `src/test/optimal_solutions/`.
+/// it's directly unit-testable without writing into the real repo's `src/test/fixtures/`.
 fn stub_test_contents(name: &str, comment: Option<&str>) -> String {
     let comment_block = match comment.map(str::trim) {
         Some(c) if !c.is_empty() => wrap_comment_lines(c),
         _ => String::new(),
     };
     format!(
-        "{LICENSE_HEADER}use anyhow::Result;\n\nuse crate::test;\n\n#[test]\nfn optimal_solution() -> Result<()> {{\n{comment_block}    test::helper::human_mapping::assert_matches_human_mapping(\"{name}\")\n}}\n"
+        "{LICENSE_HEADER}use anyhow::Result;\n\nuse crate::test;\n\n#[test]\nfn mapping() -> Result<()> {{\n{comment_block}    test::helper::human_mapping::assert_matches_human_mapping(\"{name}\")\n}}\n"
     )
 }
 
@@ -8946,119 +8946,65 @@ fn wrap_comment_lines(comment: &str) -> String {
         .collect()
 }
 
-/// Creates `src/test/painting_agreement/<name>.rs` and lists it, the painting counterpart of
-/// [`ensure_stub_test`]. Returns whether a new file was written.
+/// Appends a `painting()` test to the fixture's own file, the painting counterpart of
+/// [`ensure_stub_test`]. Returns whether one was actually added.
 ///
-/// Only called once a fixture actually has a painting: an unpainted one has nothing to score, and
-/// `assert_matches_human_painting_within_limit` would fail with "paint it first" rather than
-/// report a distance. That is why this is not folded into `ensure_stub_test` - the two ground
-/// truths are finished at different times, and a fixture routinely has a tree mapping months
-/// before anyone paints it.
+/// **Appends rather than writing its own file.** These used to be a parallel tree,
+/// `src/test/painting_agreement/<name>.rs`, mirroring `optimal_solutions/` one file per fixture.
+/// Everything a fixture's two ground truths have been measured to now lives in one place (see
+/// `test::fixtures`' module doc), so this edits the file `ensure_stub_test` created rather than
+/// starting a second one. Every caller runs after that call, so the file is always there; a fixture
+/// file that somehow is not is an error rather than a silent second home.
 ///
-/// The stub is clamped at 100.0 rather than 0.0. Nothing in the corpus agrees exactly yet (the
-/// rates run from hundredths of a percent to about 60%), so a fresh 0.0 would fail on the first
-/// run and the writer would have to loosen it - which is exactly the "clamp moved for a reason
-/// that was not a measurement" habit the per-file layout exists to prevent. 100.0 always passes,
-/// and the comment says in plain words that it means nothing until measured.
+/// Idempotent: a file that already has a `painting()` test is left exactly as it is, which is the
+/// same "never rewrite an existing clamp" contract `ensure_stub_test` has - the recorded number and
+/// the prose next to it are the human's, not this tool's.
 fn ensure_painting_stub_test(name: &str) -> Result<bool> {
+    let dataset = case_dataset(name).unwrap_or_else(legacy_dataset);
     let module = module_name(name);
-    let dir = painting_agreement_dir();
-    let stub_path = dir.join(format!("{module}.rs"));
+    let path = fixtures_dir(&dataset).join(format!("{module}.rs"));
+    let existing = fs::read_to_string(&path)
+        .with_context(|| format!("reading the fixture test file {:?}", path))?;
+    if existing.contains("fn painting()") {
+        return Ok(false);
+    }
 
-    let created = if stub_path.exists() {
-        false
+    // The import goes next to the one `ensure_stub_test` already wrote, not at the end of the
+    // file, so rustfmt has nothing to move on the next run.
+    const USE_LINE: &str =
+        "use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;\n";
+    let anchor = "use crate::test;\n";
+    let mut updated = if existing.contains(USE_LINE) {
+        existing.clone()
+    } else if let Some(at) = existing.find(anchor) {
+        let cut = at + anchor.len();
+        format!("{}{USE_LINE}{}", &existing[..cut], &existing[cut..])
     } else {
-        fs::create_dir_all(&dir).with_context(|| format!("creating {:?}", dir))?;
-        fs::write(&stub_path, painting_stub_contents(name))
-            .with_context(|| format!("writing painting stub to {:?}", stub_path))?;
-        true
+        format!("{existing}{USE_LINE}")
     };
-
-    insert_painting_mod_declaration(&module)?;
-    Ok(created)
+    if !updated.ends_with('\n') {
+        updated.push('\n');
+    }
+    updated.push_str(&painting_test_block(name));
+    fs::write(&path, updated).with_context(|| format!("writing {:?}", path))?;
+    Ok(true)
 }
 
-/// The contents of a fresh painting stub - pure string building, no filesystem access, so it is
-/// unit-testable without writing into the real `src/test/painting_agreement/`.
-fn painting_stub_contents(name: &str) -> String {
+/// The `painting()` test appended by [`ensure_painting_stub_test`] - pure string building, no
+/// filesystem access, so it is directly unit-testable.
+fn painting_test_block(name: &str) -> String {
     format!(
-        "{LICENSE_HEADER}use anyhow::Result;\n\n\
-         use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;\n\n\
-         #[test]\nfn painting_agreement() -> Result<()> {{\n\
+        "\n#[test]\nfn painting() -> Result<()> {{\n\
          \x20   // Not measured yet: 100.0 passes unconditionally. Run this test, read the rate it\n\
          \x20   // reports for both modes, and record that instead.\n\
          \x20   assert_matches_human_painting_within_limit(\"{name}\", 100.0)\n}}\n"
     )
 }
 
-/// Adds `mod <module>;` to `src/test/painting_agreement.rs`, keeping the list sorted and the
-/// module doc above it untouched. A module already listed is left alone, so this is idempotent.
-fn insert_painting_mod_declaration(module: &str) -> Result<()> {
-    let mod_file = painting_agreement_mod_file();
-    let content =
-        fs::read_to_string(&mod_file).with_context(|| format!("reading {:?}", mod_file))?;
-
-    let mut lines = content.lines().peekable();
-    let mut header_lines = Vec::new();
-    while let Some(&line) = lines.peek() {
-        if line.trim() == "#[cfg(test)]" {
-            break;
-        }
-        header_lines.push(line.to_string());
-        lines.next();
-    }
-
-    let mut entries: Vec<String> = Vec::new();
-    while let Some(line) = lines.next() {
-        if line.trim() != "#[cfg(test)]" {
-            continue;
-        }
-        let mod_line = lines.next().with_context(|| {
-            format!(
-                "'#[cfg(test)]' not followed by a mod line in {:?}",
-                mod_file
-            )
-        })?;
-        entries.push(mod_line.trim().to_string());
-    }
-
-    let wanted = format!("mod {module};");
-    if !entries.contains(&wanted) {
-        entries.push(wanted);
-    }
-    entries.sort();
-    entries.dedup();
-
-    let mut out = header_lines.join("\n");
-    if !out.ends_with('\n') {
-        out.push('\n');
-    }
-    for entry in entries {
-        out.push_str("#[cfg(test)]\n");
-        out.push_str(&entry);
-        out.push('\n');
-    }
-    fs::write(&mod_file, out).with_context(|| format!("writing {:?}", mod_file))
-}
-
-fn painting_agreement_dir() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("src")
-        .join("test")
-        .join("painting_agreement")
-}
-
-fn painting_agreement_mod_file() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("src")
-        .join("test")
-        .join("painting_agreement.rs")
-}
-
-/// Adds `#[cfg(test)]\nmod <module>;` to `optimal_solutions/<dataset>.rs`, keeping the list
+/// Adds `#[cfg(test)]\nmod <module>;` to `fixtures/<dataset>.rs`, keeping the list
 /// sorted, unless it's already present.
 fn insert_mod_declaration(dataset: &str, module: &str) -> Result<()> {
-    let mod_file = optimal_solutions_mod_file(dataset);
+    let mod_file = fixtures_mod_file(dataset);
     let content =
         fs::read_to_string(&mod_file).with_context(|| format!("reading {:?}", mod_file))?;
 
@@ -9156,7 +9102,7 @@ mod tests {
         let contents = stub_test_contents("rust-add-if", None);
         assert!(!contents.contains("//\n") && !contents.contains("    // "));
         assert!(contents.contains(
-            "fn optimal_solution() -> Result<()> {\n    test::helper::human_mapping::assert_matches_human_mapping(\"rust-add-if\")\n}\n"
+            "fn mapping() -> Result<()> {\n    test::helper::human_mapping::assert_matches_human_mapping(\"rust-add-if\")\n}\n"
         ));
     }
 
@@ -9176,7 +9122,7 @@ mod tests {
     fn stub_test_contents_includes_a_wrapped_comment_block_right_before_the_assert() {
         let contents = stub_test_contents("rust-add-if", Some("A short note."));
         assert!(contents.contains(
-            "fn optimal_solution() -> Result<()> {\n    // A short note.\n    test::helper::human_mapping::assert_matches_human_mapping(\"rust-add-if\")\n}\n"
+            "fn mapping() -> Result<()> {\n    // A short note.\n    test::helper::human_mapping::assert_matches_human_mapping(\"rust-add-if\")\n}\n"
         ));
     }
 
@@ -11255,25 +11201,25 @@ mod tests {
         }
     }
 
-    /// The painting stub is clamped at 100.0, not 0.0. Nothing in the corpus agrees exactly yet,
+    /// The painting test is clamped at 100.0, not 0.0. Nothing in the corpus agrees exactly yet,
     /// so a fresh 0.0 would fail on the first run and have to be loosened - which is the "clamp
     /// moved for a reason that was not a measurement" habit the per-file layout exists to prevent.
     #[test]
-    fn a_fresh_painting_stub_passes_and_says_it_means_nothing_yet() {
-        let contents = painting_stub_contents("rust-add-if");
+    fn a_fresh_painting_test_passes_and_says_it_means_nothing_yet() {
+        let block = painting_test_block("rust-add-if");
 
         assert!(
-            contents
-                .contains(r#"assert_matches_human_painting_within_limit("rust-add-if", 100.0)"#),
-            "got: {contents}"
+            block.contains(r#"assert_matches_human_painting_within_limit("rust-add-if", 100.0)"#),
+            "got: {block}"
         );
-        assert!(contents.contains("Not measured yet"), "got: {contents}");
+        assert!(block.contains("Not measured yet"), "got: {block}");
         assert!(
-            contents.contains("fn painting_agreement()"),
-            "the test name has to match the module's convention: {contents}"
+            block.contains("fn painting()"),
+            "the test name has to match the module's convention: {block}"
         );
-        // Same licence header every generated file in this repository carries.
-        assert!(contents.starts_with("/*  This file is part of the CodeDiff"));
+        // Appended to a file that already has the licence header and the mapping test, so it
+        // carries neither of its own - it starts at the blank line before its own `#[test]`.
+        assert!(block.starts_with("\n#[test]"), "got: {block}");
     }
 
     /// A bare `App` for the text-painting action tests: they only touch `mapping`, `dirty` and

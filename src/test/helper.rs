@@ -691,7 +691,7 @@ pub fn diffs_case_dir(name: &str) -> Option<std::path::PathBuf> {
 /// rare case of 1:2." A fact about the data, true whoever is diffing it, and it travels with the
 /// directory. What does *not* belong here is why codediff currently falls short of that; a
 /// residual is a fact about this implementation and stops being true when someone fixes it, so it
-/// lives next to the limit it justifies, in the fixture's `optimal_solutions` stub (see that
+/// lives next to the limit it justifies, in the fixture's `fixtures` test file (see that
 /// module's own doc for both halves of the rule).
 ///
 /// **Not a new convention.** 21 fixtures already carry this file - hand-written prose saying what

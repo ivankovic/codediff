@@ -3161,7 +3161,7 @@ pub fn assert_matches_human_mapping_within_limit(
     Ok(())
 }
 
-/// The mapping limit every `optimal_solutions` stub records for its fixture, read straight out of
+/// The mapping limit every fixture test file records for its fixture, read straight out of
 /// the stub sources.
 ///
 /// **The stubs are the single source of truth for how far codediff may be from the human mapping**,
@@ -3217,12 +3217,12 @@ pub fn stub_mapping_limits() -> Result<HashMap<String, (usize, usize)>> {
     Ok(out)
 }
 
-/// `src/test/optimal_solutions/<dataset>/`, the directory `stub_mapping_limits` reads.
+/// `src/test/fixtures/<dataset>/`, the directory `stub_mapping_limits` reads.
 fn optimal_solutions_dir(dataset: &str) -> std::path::PathBuf {
     std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("src")
         .join("test")
-        .join("optimal_solutions")
+        .join("fixtures")
         .join(dataset)
 }
 

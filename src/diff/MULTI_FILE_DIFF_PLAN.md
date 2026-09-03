@@ -284,7 +284,7 @@ unchanged.
   monotonic per file, `*_hash_to_node` correctly unions duplicate hashes across files, and the
   single-file path matches `compute_ast_metadata`'s direct output byte-for-byte.
 
-Existing `src/test/optimal_solutions/*.rs` fixtures are single-file and are left untouched - the
+Existing `src/test/fixtures/*.rs` fixtures are single-file and are left untouched - the
 identity property means they need no changes.
 
 ## Implementation order (risk mitigation - run full suite after each step)

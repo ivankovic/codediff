@@ -44,7 +44,7 @@ data.
 
 **Per-file unit tests must run in under 1 second.**
 
-`src/test/` also holds slower, fixture-driven tests, for example `src/test/optimal_solutions/`.
+`src/test/` also holds slower, fixture-driven tests, for example `src/test/fixtures/`.
 These tests check real diffs against a human-verified ground truth. **These tests must run in
 under 5 seconds.**
 
@@ -82,7 +82,7 @@ Both are stated in *visible* nodes - the ones carrying text of their own, per
 `codediff::diff::nodes::is_structurally_visible` - not all AST nodes. A wrongly-matched `block` or
 `argument_list`, whose every readable byte belongs to a child, is not the same defect as a
 wrongly-matched identifier. About 68% of nodes are visible corpus-wide, so the two counts differ.
-The benchmark prints both (`Mismatches` / `Vis Mism`), and every clamped `optimal_solutions` test
+The benchmark prints both (`Mismatches` / `Vis Mism`), and every clamped `fixtures` test
 pins both (`assert_matches_human_mapping_within_limit(name, total, visible)`, which fails if
 *either* limit is exceeded).
 
@@ -178,7 +178,7 @@ documented there.
   runtime jump of more than 2x.
 * `update-quality-baseline` - re-cuts both baselines after a reviewed change. `deploy` never runs
   it automatically. Note what it does *not* do: the per-fixture accuracy columns are read from the
-  `optimal_solutions` stubs, not from the run, so this cannot lower the accuracy bar. Raising a
+  `fixtures` stubs, not from the run, so this cannot lower the accuracy bar. Raising a
   limit means editing that fixture's stub - the same file that holds the prose explaining why -
   and `quality_baseline.csv` is then a projection of those limits, pinned by a test.
 * `hermetic-benchmark` / `hermetic-benchmark-update-baseline` - a criterion wall-clock benchmark of
