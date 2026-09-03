@@ -22,7 +22,9 @@ use crate::test::helper::human_mapping::assert_matches_human_painting_within_lim
 
 #[test]
 fn mapping() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("cpp-ollama-ollama-update-commit-hash-7")
+    test::helper::human_mapping::assert_matches_human_mapping(
+        "cpp-ollama-ollama-update-commit-hash-7",
+    )
 }
 
 #[test]

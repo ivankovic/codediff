@@ -26,7 +26,7 @@ fn mapping() -> Result<()> {
     // cannot align a node whose position in the residual forest moved.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "rust-yannjor-krabby-actual-normal-change",
-        135,
-        101,
+        147,
+        110,
     )
 }

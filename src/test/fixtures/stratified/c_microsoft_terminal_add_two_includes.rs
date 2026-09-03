@@ -22,7 +22,9 @@ use crate::test::helper::human_mapping::assert_matches_human_painting_within_lim
 
 #[test]
 fn mapping() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("c-microsoft-terminal-add-two-includes")
+    test::helper::human_mapping::assert_matches_human_mapping(
+        "c-microsoft-terminal-add-two-includes",
+    )
 }
 
 #[test]

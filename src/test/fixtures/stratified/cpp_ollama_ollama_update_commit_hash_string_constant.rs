@@ -22,12 +22,17 @@ use crate::test::helper::human_mapping::assert_matches_human_painting_within_lim
 
 #[test]
 fn mapping() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("cpp-ollama-ollama-update-commit-hash-string-constant")
+    test::helper::human_mapping::assert_matches_human_mapping(
+        "cpp-ollama-ollama-update-commit-hash-string-constant",
+    )
 }
 
 #[test]
 fn painting() -> Result<()> {
     // Not measured yet: 100.0 passes unconditionally. Run this test, read the rate it
     // reports for both modes, and record that instead.
-    assert_matches_human_painting_within_limit("cpp-ollama-ollama-update-commit-hash-string-constant", 100.0)
+    assert_matches_human_painting_within_limit(
+        "cpp-ollama-ollama-update-commit-hash-string-constant",
+        100.0,
+    )
 }
