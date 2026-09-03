@@ -21,5 +21,7 @@ use crate::test;
 
 #[test]
 fn mapping() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("html-pandas-dev-pandas-release-banner-update")
+    test::helper::human_mapping::assert_matches_human_mapping(
+        "html-pandas-dev-pandas-release-banner-update",
+    )
 }

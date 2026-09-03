@@ -24,7 +24,9 @@ use crate::test::helper::human_mapping::assert_matches_human_painting_within_lim
 fn mapping() -> Result<()> {
     // Not pure HTML. Contains templating characters that break TreeSitter HTML parsing. Because
     // of this, requires N:M mapping for the AST, but wouldn't if it parsed correctly.
-    test::helper::human_mapping::assert_matches_human_mapping("html-gohugoio-hugo-template-not-pure-html")
+    test::helper::human_mapping::assert_matches_human_mapping(
+        "html-gohugoio-hugo-template-not-pure-html",
+    )
 }
 
 #[test]

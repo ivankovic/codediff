@@ -23,7 +23,9 @@ use crate::test::helper::human_mapping::assert_matches_human_painting_within_lim
 #[test]
 fn mapping() -> Result<()> {
     // Note pure HTML. Template use causes TreeSitter parsing to return suboptimal results.
-    test::helper::human_mapping::assert_matches_human_mapping("html-gohugoio-hugo-template-not-pure-html-2")
+    test::helper::human_mapping::assert_matches_human_mapping(
+        "html-gohugoio-hugo-template-not-pure-html-2",
+    )
 }
 
 #[test]
