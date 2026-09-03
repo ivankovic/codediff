@@ -20,7 +20,7 @@ use crossterm::event::KeyCode;
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
-    widgets::{Clear, Paragraph},
+    widgets::{Block, BorderType, Borders, Clear, Paragraph},
 };
 use tokio::sync::mpsc;
 use tracing::{debug, error};
@@ -157,6 +157,16 @@ pub struct App {
     /// Cleared on `StartDiff`/`DiffFailed` so a stale summary from the *previous* diff never shows
     /// while a new one is loading or after it fails.
     diff_summary: Option<DiffSummary>,
+    /// Ticks remaining before the centered `diff_summary` toast fades on its own; 0 means no
+    /// toast is up. The status bar is easy to miss precisely when it matters most - "whitespace
+    /// changes only" is exactly the case where a user skims two panels that look different and
+    /// concludes something real changed - so a fresh diff also announces itself in the middle of
+    /// the screen, where the eye already is. Deliberately *not* a modal
+    /// (`AppScreen`/`help_modal`): this TUI is usually a git difftool opened per file, where the
+    /// first keystroke is `n` or `q`, and swallowing that keystroke would trade a missed
+    /// notification for a stolen one. Any key clears the toast *and* still does its own job, and
+    /// the one-line status bar stays up afterwards as the persistent record.
+    summary_toast_ticks: u8,
     /// Line-level +/-/~ counts for the currently loaded diff (see `diff::text::change_counts`),
     /// shown in the footer. Same lifecycle as `diff_summary` - computed once on `Action::DiffReady`,
     /// cleared on `StartDiff`/`DiffFailed`.
@@ -185,6 +195,7 @@ impl App {
             render_options_dialog: None,
             help_modal: None,
             search_modal: None,
+            summary_toast_ticks: 0,
             line_prompt: None,
             action_tx,
             action_rx,
@@ -273,6 +284,13 @@ impl App {
         let mut globally_handled = false;
 
         // Global key handling that doesn't depend on which component is focused.
+        // Any keystroke means the user is already looking at the screen, so the toast has done
+        // its job - clear it here, *before* dispatch, so the same key still performs its normal
+        // action (see `summary_toast_ticks`'s doc comment on why this isn't a modal).
+        if matches!(event, Event::Key(_)) {
+            self.dismiss_summary_toast();
+        }
+
         if let Event::Key(key) = &event {
             match key.code {
                 KeyCode::Char('q') => {
@@ -455,7 +473,7 @@ impl App {
                 debug!("{action:?}");
             }
             match &action {
-                Action::Tick => {}
+                Action::Tick => self.tick_summary_toast(),
                 Action::Quit => self.should_exit = true,
                 Action::Suspend => self.should_suspend = true,
                 Action::Resume => self.should_suspend = false,
@@ -565,6 +583,14 @@ impl App {
             &data.after_ranges,
             data.comment_only,
         );
+        // Only announce something worth announcing: `summarize_diff_with_comment_check` returns
+        // `None` for an ordinary mixed diff, which is most of them, and a toast on every file
+        // would train the eye to ignore it.
+        self.summary_toast_ticks = if self.diff_summary.is_some() {
+            SUMMARY_TOAST_TICKS
+        } else {
+            0
+        };
         self.change_counts = Some(change_counts(
             &data.before_contents,
             &data.after_contents,
@@ -864,7 +890,38 @@ impl App {
             next += 1;
         }
         self.draw_footer(frame, layout[next]);
+        // Last, so it sits over the panels rather than under them, and against the *whole* viewer
+        // area rather than `layout[..]` so it centers on the screen the user is looking at
+        // instead of on whichever sub-rectangle happens to be left over.
+        self.draw_summary_toast(frame, area);
         Ok(())
+    }
+
+    /// Draw the centered diff-summary toast, if one is up (see `summary_toast_ticks`). A no-op
+    /// once the countdown reaches zero or the diff has no summary worth reporting, which is why
+    /// `draw_viewer` can call it unconditionally.
+    fn draw_summary_toast(&self, frame: &mut ratatui::Frame, area: Rect) {
+        let Some(summary) = self.diff_summary else {
+            return;
+        };
+        if self.summary_toast_ticks == 0 {
+            return;
+        }
+        let popup = summary_toast_area(summary, area);
+        frame.render_widget(Clear, popup);
+        frame.render_widget(summary_toast_paragraph(summary), popup);
+    }
+
+    /// Count one `Action::Tick` against the summary toast's lifetime. Separate from
+    /// `handle_actions` so it's reachable from a test without building a real `UI` (and so the
+    /// countdown has one owner rather than being open-coded in the action match).
+    fn tick_summary_toast(&mut self) {
+        self.summary_toast_ticks = self.summary_toast_ticks.saturating_sub(1);
+    }
+
+    /// Take the summary toast down now, whatever the countdown says.
+    fn dismiss_summary_toast(&mut self) {
+        self.summary_toast_ticks = 0;
     }
 
     /// The always-visible footer: the focused panel's cursor position, the diff's +/-/~ line
@@ -1088,21 +1145,62 @@ fn diffing_status_paragraph() -> Paragraph<'static> {
     Paragraph::new("Diffing\u{2026} (Esc cancels)").alignment(Alignment::Center)
 }
 
+/// How many `Action::Tick`s the centered summary toast stays up for. The tick timer runs at 4Hz
+/// (`UI::tick_rate`'s default, and what every `App::new` caller passes), so 16 ticks is about four
+/// seconds - long enough to read six words without looking away from the diff, short enough that
+/// it doesn't sit on top of the code the user came to read. It also clears on the first keystroke,
+/// so this bound only matters for a user who hasn't touched the keyboard yet.
+const SUMMARY_TOAST_TICKS: u8 = 16;
+
+/// The area the centered summary toast occupies within `area` - same fixed-width, content-height,
+/// centered shape as `ThemeDialog::popup_area`, sized to the label rather than to a fraction of
+/// the screen (a six-word notice in a 90%-of-screen box, `HelpModal`'s shape, would read as an
+/// error dialog). Clamped to `area` so a narrow terminal degrades to a truncated box instead of
+/// panicking on an out-of-bounds `Rect`.
+fn summary_toast_area(summary: DiffSummary, area: Rect) -> Rect {
+    let width = (summary.label().chars().count() as u16 + 4).min(area.width);
+    let height = 3.min(area.height);
+    let x = area.x + (area.width.saturating_sub(width)) / 2;
+    let y = area.y + (area.height.saturating_sub(height)) / 2;
+    Rect::new(x, y, width, height)
+}
+
+/// The centered summary toast's content: the same label and the same color as the status bar
+/// (`status_bar_paragraph`), inside a rounded border so it reads as an overlay rather than as part
+/// of either code panel. Sharing `DiffSummary::label` with the status bar is deliberate - the two
+/// say the same thing in two places, and the toast is the one that fades.
+fn summary_toast_paragraph(summary: DiffSummary) -> Paragraph<'static> {
+    let color = summary_color(summary);
+    Paragraph::new(summary.label())
+        .style(Style::new().fg(color).add_modifier(Modifier::BOLD))
+        .alignment(Alignment::Center)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_type(BorderType::Rounded)
+                .border_style(Style::new().fg(color)),
+        )
+}
+
 /// Maps a `DiffSummary` to its status-bar styling - color-coded consistently with this TUI's
 /// existing insert/delete/move conventions (`tui::headless::ansi_color` draws the same mapping for
 /// the headless renderer): green for a pure addition, red for a pure removal, cyan for a pure
 /// reformat, blue for a comment-only change, yellow for a pure reorganization, gray when there's
 /// nothing to report at all. `DiffSummary` itself stays presentation-agnostic (just a label) - see
 /// its own doc comment.
-fn status_bar_paragraph(summary: DiffSummary) -> Paragraph<'static> {
-    let color = match summary {
+fn summary_color(summary: DiffSummary) -> Color {
+    match summary {
         DiffSummary::NoChanges => Color::DarkGray,
         DiffSummary::NewFile => Color::Green,
         DiffSummary::DeletedFile => Color::Red,
         DiffSummary::WhitespaceOnly => Color::Cyan,
         DiffSummary::CommentOnly => Color::Blue,
         DiffSummary::RefactorMovedOnly => Color::Yellow,
-    };
+    }
+}
+
+fn status_bar_paragraph(summary: DiffSummary) -> Paragraph<'static> {
+    let color = summary_color(summary);
     Paragraph::new(summary.label())
         .style(Style::new().fg(color).add_modifier(Modifier::BOLD))
         .alignment(Alignment::Center)
@@ -1896,6 +1994,152 @@ mod tests {
             );
         }
         Ok(())
+    }
+
+    /// The centered toast and the one-line status bar say the same thing, so the label lands in
+    /// the buffer twice while the toast is up and once after it fades. Counting occurrences keeps
+    /// this independent of where either one is drawn - asserting on a position would break the
+    /// next time the layout changes width.
+    fn summary_label_occurrences(
+        terminal: &ratatui::Terminal<ratatui::backend::TestBackend>,
+        summary: DiffSummary,
+    ) -> usize {
+        rendered_text(terminal).matches(summary.label()).count()
+    }
+
+    fn draw_viewer_once(app: &mut App) -> Result<ratatui::Terminal<ratatui::backend::TestBackend>> {
+        let backend = ratatui::backend::TestBackend::new(80, 24);
+        let mut terminal = ratatui::Terminal::new(backend)?;
+        terminal.draw(|f| {
+            let area = f.size();
+            app.draw_viewer(f, area).unwrap();
+        })?;
+        Ok(terminal)
+    }
+
+    #[test]
+    fn draw_viewer_shows_a_centered_toast_while_the_countdown_runs() -> Result<()> {
+        let mut app = App::new(4.0, 60.0)?;
+        app.diff_summary = Some(DiffSummary::WhitespaceOnly);
+        app.summary_toast_ticks = SUMMARY_TOAST_TICKS;
+
+        let terminal = draw_viewer_once(&mut app)?;
+
+        assert_eq!(
+            summary_label_occurrences(&terminal, DiffSummary::WhitespaceOnly),
+            2,
+            "the label should be drawn twice - once in the status bar, once in the toast"
+        );
+        assert!(
+            rendered_text(&terminal).contains('\u{256d}'),
+            "the toast should draw its rounded border"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn summary_toast_fades_on_its_own_but_the_status_bar_stays() -> Result<()> {
+        let mut app = App::new(4.0, 60.0)?;
+        app.diff_summary = Some(DiffSummary::WhitespaceOnly);
+        app.summary_toast_ticks = SUMMARY_TOAST_TICKS;
+
+        for _ in 0..SUMMARY_TOAST_TICKS {
+            app.tick_summary_toast();
+        }
+        assert_eq!(app.summary_toast_ticks, 0);
+
+        let terminal = draw_viewer_once(&mut app)?;
+        assert_eq!(
+            summary_label_occurrences(&terminal, DiffSummary::WhitespaceOnly),
+            1,
+            "once the toast fades the status bar should still report the summary"
+        );
+        assert!(
+            !rendered_text(&terminal).contains('\u{256d}'),
+            "the toast border should be gone"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn summary_toast_is_dismissed_without_waiting_for_the_countdown() -> Result<()> {
+        let mut app = App::new(4.0, 60.0)?;
+        app.diff_summary = Some(DiffSummary::CommentOnly);
+        app.summary_toast_ticks = SUMMARY_TOAST_TICKS;
+
+        app.dismiss_summary_toast();
+
+        let terminal = draw_viewer_once(&mut app)?;
+        assert_eq!(
+            summary_label_occurrences(&terminal, DiffSummary::CommentOnly),
+            1,
+            "a dismissed toast should leave only the status bar"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn no_toast_is_drawn_when_the_diff_has_no_summary_worth_reporting() -> Result<()> {
+        let mut app = App::new(4.0, 60.0)?;
+        app.diff_summary = None;
+        // Even with a countdown left over, there is nothing to announce.
+        app.summary_toast_ticks = SUMMARY_TOAST_TICKS;
+
+        let terminal = draw_viewer_once(&mut app)?;
+        assert!(
+            !rendered_text(&terminal).contains('\u{256d}'),
+            "no toast should be drawn without a summary"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn diff_ready_starts_the_toast_countdown() -> Result<()> {
+        let mut app = App::new(4.0, 60.0)?;
+        assert_eq!(app.summary_toast_ticks, 0);
+
+        // Byte-identical sides classify as `NoChanges`, which is a summary worth announcing.
+        app.handle_diff_ready(&DiffSessionData {
+            before_path: PathBuf::from("a.rs"),
+            after_path: PathBuf::from("b.rs"),
+            before_contents: "fn main() {}\n".to_string(),
+            after_contents: "fn main() {}\n".to_string(),
+            before_ranges: Vec::new(),
+            after_ranges: Vec::new(),
+            comment_only: false,
+            mode: DiffMode::Fast,
+            plain_text_fallback: false,
+        });
+
+        assert_eq!(app.diff_summary, Some(DiffSummary::NoChanges));
+        assert_eq!(
+            app.summary_toast_ticks, SUMMARY_TOAST_TICKS,
+            "a fresh summary should raise the toast"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn summary_toast_area_is_centered_and_clamped_to_a_narrow_terminal() {
+        let summary = DiffSummary::WhitespaceOnly;
+        let area = Rect::new(0, 0, 80, 24);
+        let popup = summary_toast_area(summary, area);
+
+        assert_eq!(popup.height, 3);
+        assert_eq!(popup.width, summary.label().chars().count() as u16 + 4);
+        // Centered: the margins on either side differ by at most a rounding remainder.
+        let right_margin = area.width - popup.width - popup.x;
+        assert!(
+            popup.x.abs_diff(right_margin) <= 1,
+            "expected a centered popup, got x={} right={}",
+            popup.x,
+            right_margin
+        );
+
+        // A terminal narrower than the label must clamp rather than overflow the buffer.
+        let narrow = summary_toast_area(summary, Rect::new(0, 0, 10, 2));
+        assert_eq!((narrow.width, narrow.height), (10, 2));
+        assert_eq!((narrow.x, narrow.y), (0, 0));
     }
 
     /// The footer's key hints must render regardless of whether the status bar or error banner
