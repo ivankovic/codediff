@@ -26,6 +26,107 @@ mod tests {
 
     use anyhow::Result;
 
+    /// Clamped stubs that predate the rule below and have no explanation yet.
+    ///
+    /// A backlog, not an exemption. Every one of these asserts that codediff cannot currently do
+    /// better without saying why - which is exactly the state the 49 stale clamps were in before
+    /// they were re-measured, and half of those turned out to need no clamp at all. Shrink this
+    /// list by writing the explanation (or by tightening the limit until none is needed); never
+    /// grow it.
+    #[cfg(feature = "test-fixtures")]
+    const CLAMPS_WITHOUT_AN_EXPLANATION: &[&str] = &[
+        "c-linux-small-change-struct-to-char",
+        "cpp-godot-small-bugfix",
+        "cpp-ladybird-refactor-variables-if-changes",
+        "cpp-tensorflow-switch-to-primitive-types",
+        "csharp-cyanfish-naps2-add-condition-to-if",
+        "csharp-jellyfin-add-function",
+        "go-lazygit-switch-to-strings",
+        "html-mozilla-firefox-firefox-remove-li-around-button",
+        "javascript-typescript-interesting-small-edit-refactor",
+        "json-excalidraw-excalidraw-change-translations-mostly-add",
+        "json-kiwix-kiwix-desktop-add-a-few-change-a-few",
+        "kotlin-jetbrains-kotlin-remove-one-comment-line",
+        "kotlin-nextcloud-a-few-small-removals",
+        "php-zetacomponents-consoletools-file-with-parse-errors-and-a-few-deletions",
+        "python-ansible-ansible-ridiculously-long-yaml-in-string-constant-and-actual-code-changes",
+        "python-portagefilelist-client-remove-one-import-and-update-one-const-string",
+        "rust-vercel-nextjs-refactoring-would-require-mulitmap-mapping",
+        "scala-com-lihaoyi-mill-add-a-function-call",
+        "scala-com-lihaoyi-mill-small-refactoring",
+        "shellscript-scikit-learn-scikit-learn-string-to-regex",
+        "swift-apple-swift-argument-parser-small-change",
+        "swift-nextcloud-ios-move-function-and-refactor-logic",
+        "swift-nextcloud-ios-refactor-and-change",
+        "typescript-apache-echarts-envelop-2-lines-with-an-if-block",
+        "vimscript-neovim-neovim-test-debian-package-parsing-awful-string-matching",
+        "xml-gap-packages-toric-remove-two-attributes",
+    ];
+
+    /// **A clamped limit must say why it is clamped.**
+    ///
+    /// See `optimal_solutions`' module doc for the boundary this enforces: `description.md` says
+    /// what the fixture demands, a stub comment says why codediff falls short of it, and a limit
+    /// with neither is a number nobody can review. New clamps have to carry one; the ones that
+    /// already did not are listed above and must only ever shrink.
+    #[test]
+    #[cfg(feature = "test-fixtures")]
+    fn the_clamped_stubs_explain_their_limits() -> Result<()> {
+        let mut undocumented = Vec::new();
+        let mut stale_allowance = Vec::new();
+        for dataset in helper::DIFF_DATASETS {
+            let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("src")
+                .join("test")
+                .join("optimal_solutions")
+                .join(dataset);
+            if !dir.exists() {
+                continue;
+            }
+            for entry in std::fs::read_dir(&dir)? {
+                let path = entry?.path();
+                if path.extension().and_then(|e| e.to_str()) != Some("rs") {
+                    continue;
+                }
+                let source = std::fs::read_to_string(&path)?;
+                if !source.contains("assert_matches_human_mapping_within_limit") {
+                    continue;
+                }
+                let Some(name) = source
+                    .split_once("assert_matches_human_mapping_within_limit(")
+                    .and_then(|(_, rest)| rest.split_once('"'))
+                    .and_then(|(_, rest)| rest.split_once('"'))
+                    .map(|(name, _)| name.to_string())
+                else {
+                    continue;
+                };
+                // A comment inside the test body, indented one level - the module-level licence
+                // header and any `///` docs sit at column zero and are not an explanation of this
+                // fixture's residual.
+                let explained = source.lines().any(|line| line.starts_with("    //"));
+                let allowed = CLAMPS_WITHOUT_AN_EXPLANATION.contains(&name.as_str());
+                match (explained, allowed) {
+                    (false, false) => undocumented.push(name),
+                    (true, true) => stale_allowance.push(name),
+                    _ => {}
+                }
+            }
+        }
+        assert!(
+            undocumented.is_empty(),
+            "these clamped limits have no comment saying why codediff cannot do better. Write one, \
+             or tighten the limit until none is needed:\n    {}",
+            undocumented.join("\n    ")
+        );
+        assert!(
+            stale_allowance.is_empty(),
+            "these are now explained and must come off CLAMPS_WITHOUT_AN_EXPLANATION - the list \
+             only shrinks:\n    {}",
+            stale_allowance.join("\n    ")
+        );
+        Ok(())
+    }
+
     /// Pins what `stub_mapping_limits` can and cannot read, so the projection above is checked
     /// against a parse that is itself checked - a regex that silently matched nothing would make
     /// that test vacuously pass.
