@@ -178,7 +178,7 @@ required-features = ["test-fixtures"]
 
 [[bin]]
 name = "human_solver"
-path = "src/bin/human_solver.rs"
+path = "src/bin/human_solver/main.rs"
 required-features = ["test-fixtures"]
 
 [[bin]]
