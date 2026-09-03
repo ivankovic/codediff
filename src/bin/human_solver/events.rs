@@ -1839,6 +1839,12 @@ pub(crate) struct SampleCsvRow {
     /// REJECTED. `action_reject` also writes here (the rejection reason *is* the comment, not a
     /// separate column) - see that function and `Modal::PromptRejectReason`. Empty if never set.
     pub(crate) comment: String,
+    /// The `stats::sampling::loc_bucket` this row was drawn for, or empty for a row that predates
+    /// bucket tracking or was not sampled with `sample_test_diffs --stratified` - see
+    /// `sample_test_diffs::Row::size_bucket`. Read and written purely so a round-trip through this
+    /// tool preserves it: promoting or rejecting one sample rewrites the whole file, so a column
+    /// this reader dropped would be erased for every other row at the same time.
+    pub(crate) size_bucket: String,
 }
 
 /// Same backfill `sample_test_diffs::default_status` uses for a sample.csv row written before
@@ -1872,6 +1878,7 @@ pub(crate) fn read_sample_csv_rows(path: &Path) -> Result<Vec<SampleCsvRow>> {
             dataset: record.get(5).unwrap_or("small").to_string(),
             status,
             comment: record.get(7).unwrap_or("").to_string(),
+            size_bucket: record.get(8).unwrap_or("").to_string(),
         });
     }
     Ok(rows)
@@ -1888,6 +1895,7 @@ pub(crate) fn write_sample_csv_rows(path: &Path, rows: &[SampleCsvRow]) -> Resul
         "dataset",
         "status",
         "comment",
+        "size_bucket",
     ])?;
     for row in rows {
         writer.write_record([
@@ -1899,6 +1907,7 @@ pub(crate) fn write_sample_csv_rows(path: &Path, rows: &[SampleCsvRow]) -> Resul
             &row.dataset,
             &row.status,
             &row.comment,
+            &row.size_bucket,
         ])?;
     }
     writer.flush()?;

@@ -6289,3 +6289,49 @@ fn display_safe_str_replaces_every_tab_and_leaves_everything_else() {
     assert_eq!(display_safe_str("\ta\tb"), " a b");
     assert_eq!(display_safe_str("no tabs here"), "no tabs here");
 }
+
+/// Promoting or rejecting one sample rewrites the whole sample.csv, so any column the reader drops
+/// is erased for every other row at the same time. `size_bucket` was exactly that column between
+/// the stratified draw landing and this test.
+#[test]
+fn sample_csv_round_trip_preserves_the_size_bucket() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("sample.csv");
+    std::fs::write(
+        &path,
+        "language,repository,commit,path,promoted_to,dataset,status,comment,size_bucket\n\
+         Go,r,abc,a.go,,stratified,SAMPLED,,100-300\n\
+         Rust,r2,def,b.rs,,small,PROMOTED,a note,\n",
+    )
+    .unwrap();
+
+    let rows = read_sample_csv_rows(&path).unwrap();
+    assert_eq!(rows[0].size_bucket, "100-300");
+    assert_eq!(rows[1].size_bucket, "", "a legacy row simply has no bucket");
+
+    write_sample_csv_rows(&path, &rows).unwrap();
+    let again = read_sample_csv_rows(&path).unwrap();
+    assert_eq!(again[0].size_bucket, "100-300");
+    assert_eq!(again[1].size_bucket, "");
+    assert_eq!(again[1].comment, "a note", "the columns must not shift");
+}
+
+/// The same guarantee against the real corpus file, so a future column added to sample.csv by
+/// `sample_test_diffs` but not to this tool's reader/writer fails here rather than silently
+/// deleting itself the next time someone presses `s` in the `O` picker.
+#[test]
+fn round_tripping_the_real_sample_csv_loses_nothing() {
+    let rows = read_sample_csv_rows(&sample_csv_path()).unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("out.csv");
+    write_sample_csv_rows(&path, &rows).unwrap();
+    let again = read_sample_csv_rows(&path).unwrap();
+
+    assert_eq!(again.len(), rows.len());
+    let buckets = |rows: &[SampleCsvRow]| -> Vec<(String, String)> {
+        rows.iter()
+            .map(|r| (r.commit.clone(), r.size_bucket.clone()))
+            .collect()
+    };
+    assert_eq!(buckets(&again), buckets(&rows));
+}
