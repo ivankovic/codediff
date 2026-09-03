@@ -25,6 +25,8 @@ mod c_genymobile_scrcpy_add_a_define_;
 #[cfg(test)]
 mod c_genymobile_scrcpy_add_a_define_2;
 #[cfg(test)]
+mod c_genymobile_scrcpy_add_to_import_path_and_move_imports_around;
+#[cfg(test)]
 mod c_genymobile_scrcpy_rename_and_add_a_define;
 #[cfg(test)]
 mod c_genymobile_scrcpy_rename_defines;
@@ -77,6 +79,10 @@ mod css_wordpress_wordpress_re_format_in_one_line;
 #[cfg(test)]
 mod css_wordpress_wordpress_reformat_and_fix_lint_errors;
 #[cfg(test)]
+mod css_wordpress_wordpress_remove_one_rule;
+#[cfg(test)]
+mod css_wordpress_wordpress_remove_webkit_prefix;
+#[cfg(test)]
 mod go_gin_gonic_gin_update_version_string;
 #[cfg(test)]
 mod go_gin_gonic_gin_update_version_string_;
@@ -97,6 +103,14 @@ mod go_ollama_ollama_add_go_build_comment;
 #[cfg(test)]
 mod go_ollama_ollama_remove_go_build_comment;
 #[cfg(test)]
+mod html_fatedier_frp_update_hashes;
+#[cfg(test)]
+mod html_fatedier_frp_update_hashes_2;
+#[cfg(test)]
+mod html_fatedier_frp_update_hashes_3;
+#[cfg(test)]
+mod html_fatedier_frp_update_hashes_4;
+#[cfg(test)]
 mod html_gohugoio_hugo_template_not_pure_html;
 #[cfg(test)]
 mod html_gohugoio_hugo_template_not_pure_html_2;
@@ -114,3 +128,21 @@ mod java_genymobile_scrcpy_add_parameter;
 mod javascript_facebook_react_update_comment_only;
 #[cfg(test)]
 mod javascript_microsoft_typescript_add_use_strict;
+#[cfg(test)]
+mod javascript_microsoft_typescript_add_use_strict_2;
+#[cfg(test)]
+mod javascript_mozilla_firefox_firefox_remove_one_comment;
+#[cfg(test)]
+mod javascript_mui_material_ui_delete_one_import;
+#[cfg(test)]
+mod javascript_vercel_next_add_doccomment;
+#[cfg(test)]
+mod json_microsoft_playwright_version_update;
+#[cfg(test)]
+mod json_puppeteer_puppeteer_version_update;
+#[cfg(test)]
+mod json_puppeteer_puppeteer_version_update_2;
+#[cfg(test)]
+mod lua_awesomewm_awesome_add_to_table_constructor;
+#[cfg(test)]
+mod lua_awesomewm_awesome_update_comment;

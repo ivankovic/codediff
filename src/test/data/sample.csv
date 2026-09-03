@@ -5,7 +5,7 @@ C,FFmpeg-FFmpeg.git,619839ac16a41d6562c30afd29ac9a7ea8304d39,libavformat/tee.c,,
 C,Genymobile-scrcpy.git,238ab872ba0ea18c2553dfe3c2202d64d67d8960,app/src/events.h,c-genymobile-scrcpy-add-a-define,stratified,PROMOTED,,0-10
 C,Genymobile-scrcpy.git,4f9e9c6619cdf847e3ee78f480fc4ca642ae7c2c,app/src/events.h,c-genymobile-scrcpy-rename-defines,stratified,PROMOTED,,0-10
 C,Genymobile-scrcpy.git,730eb1086ad32fbd368a6ded61ef8b79741e5f66,app/src/events.h,c-genymobile-scrcpy-rename-and-add-a-define,stratified,PROMOTED,,0-10
-C,Genymobile-scrcpy.git,af15c72f9caef4f829d337c35701d8bc00a58989,app/src/usb/keyboard_aoa.h,,stratified,SAMPLED,,10-30
+C,Genymobile-scrcpy.git,af15c72f9caef4f829d337c35701d8bc00a58989,app/src/usb/keyboard_aoa.h,c-genymobile-scrcpy-add-to-import-path-and-move-imports-around,stratified,PROMOTED,,10-30
 C,Genymobile-scrcpy.git,b1b33e3eaf00b94d6a7d7a3c625b8bbc8c7c8014,app/src/events.h,c-genymobile-scrcpy-add-a-define-2,stratified,PROMOTED,,0-10
 C,Genymobile-scrcpy.git,bf2b679e705ed0864e765b1de5f238799a09ece7,app/src/uhid/uhid_output.c,,stratified,SAMPLED,,10-30
 C,Genymobile-scrcpy.git,d3c2955fb9e46949694ce91cbe6cc15ca068207b,app/src/events.h,c-genymobile-scrcpy-add-a-define-,stratified,PROMOTED,,0-10
@@ -213,13 +213,13 @@ CSS,WordPress-WordPress.git,bd8fb3ef1c2636515747c498195ce73b4e5f9589,wp-includes
 CSS,WordPress-WordPress.git,bd8fb3ef1c2636515747c498195ce73b4e5f9589,wp-includes/css/dist/block-library/html/editor.css,css-wordpress-add-comment,small,PROMOTED,,
 CSS,WordPress-WordPress.git,bd8fb3ef1c2636515747c498195ce73b4e5f9589,wp-includes/css/dist/block-library/navigation/editor.min.css,,stratified,SAMPLED,,0-10
 CSS,WordPress-WordPress.git,bd8fb3ef1c2636515747c498195ce73b4e5f9589,wp-includes/css/dist/block-library/query/editor.css,,stratified,SAMPLED,,100-300
-CSS,WordPress-WordPress.git,bd8fb3ef1c2636515747c498195ce73b4e5f9589,wp-includes/css/dist/block-library/reset-rtl.min.css,,stratified,SAMPLED,,0-10
+CSS,WordPress-WordPress.git,bd8fb3ef1c2636515747c498195ce73b4e5f9589,wp-includes/css/dist/block-library/reset-rtl.min.css,css-wordpress-wordpress-remove-webkit-prefix,stratified,PROMOTED,,0-10
 CSS,WordPress-WordPress.git,bd8fb3ef1c2636515747c498195ce73b4e5f9589,wp-includes/css/dist/list-reusable-blocks/style.css,,stratified,SAMPLED,,100-300
 CSS,WordPress-WordPress.git,bd8fb3ef1c2636515747c498195ce73b4e5f9589,wp-includes/css/dist/patterns/style-rtl.css,,stratified,SAMPLED,,100-300
 CSS,WordPress-WordPress.git,beaa495197ba0c3f535e412fb002eb656d0ae9e8,wp-admin/css/themes-rtl.css,,stratified,SAMPLED,,1000-3000
 CSS,WordPress-WordPress.git,c2bd5cd4295c29b25735a9322670626fc1e35e47,wp-includes/blocks/navigation-link/style.css,,stratified,SAMPLED,,10-30
 CSS,WordPress-WordPress.git,c2bd5cd4295c29b25735a9322670626fc1e35e47,wp-includes/blocks/social-links/style.css,,stratified,SAMPLED,,300-1000
-CSS,WordPress-WordPress.git,c2bd5cd4295c29b25735a9322670626fc1e35e47,wp-includes/blocks/tag-cloud/style.min.css,,stratified,SAMPLED,,0-10
+CSS,WordPress-WordPress.git,c2bd5cd4295c29b25735a9322670626fc1e35e47,wp-includes/blocks/tag-cloud/style.min.css,css-wordpress-wordpress-remove-one-rule,stratified,PROMOTED,,0-10
 CSS,WordPress-WordPress.git,c2bd5cd4295c29b25735a9322670626fc1e35e47,wp-includes/css/dist/block-library/style.css,,stratified,SAMPLED,,3000+
 CSS,WordPress-WordPress.git,cc0fed354707bda984d8aacee4bc7cf4d8569991,wp-admin/css/forms-rtl.css,,stratified,SAMPLED,,1000-3000
 CSS,WordPress-WordPress.git,db567e7f82022f0bfae34e83c52e2c12f11d6e46,wp-includes/css/jquery-ui-dialog.css,css-wordpress-smalll-change,small,PROMOTED,,
@@ -478,12 +478,12 @@ HTML,chennes-med,f17a48594d7c668eb68850284c50aeb9c5fe7159,doc/html.dox/a02105_a3
 HTML,chennes-med,f17a48594d7c668eb68850284c50aeb9c5fe7159,doc/html.dox/dir_000019_000013.html,html-chennes-med-only-text-value-change-2,full,PROMOTED,,
 HTML,django-django.git,283ea9e9e014adf0013c18700c36b98efa2f0aac,django/contrib/admin/templates/admin/object_history.html,,stratified,SAMPLED,,30-100
 HTML,eslint-eslint.git,6769b5fa11ecfb2c2cf78472d3d90564a1e01d3c,docs/src/use/formatters/html-formatter-example.html,,stratified,SAMPLED,,100-300
-HTML,fatedier-frp.git,04560c18969b5fbeebcaa455d9574f45ce0566f6,assets/static/index.html,,stratified,SAMPLED,,0-10
+HTML,fatedier-frp.git,04560c18969b5fbeebcaa455d9574f45ce0566f6,assets/static/index.html,html-fatedier-frp-update-hashes,stratified,PROMOTED,,0-10
 HTML,fatedier-frp.git,31f40aa9136b86d879f3495a601084eba6de873f,assets/frps/static/index.html,html-fatedier-add-attribute,small,PROMOTED,,
 HTML,fatedier-frp.git,341a5e3e3a8ffe05b2ef6a392b6e142e851d446c,assets/frps/static/index.html,,stratified,SAMPLED,,10-30
-HTML,fatedier-frp.git,9a849a29e94e969d99b41c8f3bb70c89ea46fdd3,assets/frps/static/index.html,,stratified,SAMPLED,,0-10
-HTML,fatedier-frp.git,c7d4637382bef6756683e822e2fc651a00f20e5a,assets/frpc/static/index.html,,stratified,SAMPLED,,0-10
-HTML,fatedier-frp.git,c7d4637382bef6756683e822e2fc651a00f20e5a,assets/frps/static/index.html,,stratified,SAMPLED,,0-10
+HTML,fatedier-frp.git,9a849a29e94e969d99b41c8f3bb70c89ea46fdd3,assets/frps/static/index.html,html-fatedier-frp-update-hashes-2,stratified,PROMOTED,,0-10
+HTML,fatedier-frp.git,c7d4637382bef6756683e822e2fc651a00f20e5a,assets/frpc/static/index.html,html-fatedier-frp-update-hashes-3,stratified,PROMOTED,,0-10
+HTML,fatedier-frp.git,c7d4637382bef6756683e822e2fc651a00f20e5a,assets/frps/static/index.html,html-fatedier-frp-update-hashes-4,stratified,PROMOTED,,0-10
 HTML,gohugoio-hugo.git,0c2fa2460f485e0eca564dcccf36d34538374922,layouts/_partials/layouts/home/sponsors.html,,stratified,SAMPLED,,30-100
 HTML,gohugoio-hugo.git,1e00842489b05ae49bb3c8af8b4795f68b3be979,tpl/tplimpl/embedded/templates/_partials/pagination.html,,stratified,SAMPLED,,100-300
 HTML,gohugoio-hugo.git,29cf87444f97665a753732d1fa5efd2770f9ee43,create/skeletons/theme/layouts/home.html,html-gohugoio-hugo-template-not-pure-html,stratified,PROMOTED,,0-10
@@ -585,7 +585,7 @@ JSON,main-branch-track_open_instances,2460ddeabd975b42925daf0572220ef6cbe208fd,r
 JSON,mastodon-mastodon.git,85bf5be604f076de18f2f888b6da1aa82df68baa,app/javascript/mastodon/locales/fo.json,json-mastodon-add-translation,small,PROMOTED,,
 JSON,mathjax-MathJax,5c2a3d130b2eaeac666f99790df11f41b8c11648,sre/mathmaps/it.json,,full,REJECTED,"This is a ridiculously large json file with 135k nodes. For now, this is out of scope.",
 JSON,microsoft-TypeScript.git,97f3f0c8dd77858ddd938dcd132b082036f44055,tests/baselines/reference/pathMappingBasedModuleResolution3_node.trace.json,,stratified,SAMPLED,,100-300
-JSON,microsoft-playwright.git,3a7bdf27581926336671c17057685d8cf17e647c,tests/playwright-test/stable-test-runner/package.json,,stratified,SAMPLED,,0-10
+JSON,microsoft-playwright.git,3a7bdf27581926336671c17057685d8cf17e647c,tests/playwright-test/stable-test-runner/package.json,json-microsoft-playwright-version-update,stratified,PROMOTED,,0-10
 JSON,mui-material-ui.git,19fb7dc6d40bfd135be68752415f51024d44b6ed,docs/translations/translations.json,,stratified,SAMPLED,,100-300
 JSON,mui-material-ui.git,27f21b9341f48d5366b0f0388ee56b33b053b962,test/bundling/fixtures/next-webpack4/package.json,,stratified,SAMPLED,,30-100
 JSON,mui-material-ui.git,5cac916e20b9b27056cff9ba76ab0a99f351ef1c,packages/mui-styled-engine/package.json,,stratified,SAMPLED,,30-100
@@ -597,8 +597,8 @@ JSON,nextcloud-server.git,7e474a9ac496c4ed25de6ad14a15db844a251555,apps/files_sh
 JSON,nextcloud-server.git,f43a4c62d6809fcdac3272de017b73f03f90e57b,apps/files_sharing/l10n/is.json,,stratified,SAMPLED,,300-1000
 JSON,open-webui-open-webui.git,114f709337283743a81be86c3a39cf0feb28014a,package-lock.json,,stratified,SAMPLED,,3000+
 JSON,prettier-prettier.git,b261f60dcfbb4d21d21f9327e3052c590dcf2a56,website/package.json,,stratified,SAMPLED,,30-100
-JSON,puppeteer-puppeteer.git,05f61366ee61f480c7be6f237ec890c907fea67f,website/versions.json,,stratified,SAMPLED,,0-10
-JSON,puppeteer-puppeteer.git,92705d848e9183d7e82f529549984daee497c473,website/versions.json,,stratified,SAMPLED,,0-10
+JSON,puppeteer-puppeteer.git,05f61366ee61f480c7be6f237ec890c907fea67f,website/versions.json,json-puppeteer-puppeteer-version-update,stratified,PROMOTED,,0-10
+JSON,puppeteer-puppeteer.git,92705d848e9183d7e82f529549984daee497c473,website/versions.json,json-puppeteer-puppeteer-version-update-2,stratified,PROMOTED,,0-10
 JSON,puppeteer-puppeteer.git,cab4d1cff6b556e5b4316d6b3b01909a80cc0975,.release-please-manifest.json,,stratified,SAMPLED,,0-10
 JSON,puppeteer-puppeteer.git,da1074b5bf81056d37f57c21a139641e14e040d8,packages/testserver/package.json,,stratified,SAMPLED,,30-100
 JSON,python-cpython.git,2be147e1e75022d66eecb80b46904ed61a7a574f,Platforms/emscripten/browser_test/package-lock.json,,stratified,SAMPLED,,1000-3000
@@ -739,7 +739,7 @@ JavaScript,microsoft-TypeScript.git,01c23d68b1113a4b71acb8484f1bf78a98307933,tes
 JavaScript,microsoft-TypeScript.git,01c23d68b1113a4b71acb8484f1bf78a98307933,tests/baselines/reference/symbolProperty45.js,,stratified,SAMPLED,,10-30
 JavaScript,microsoft-TypeScript.git,01c23d68b1113a4b71acb8484f1bf78a98307933,tests/baselines/reference/transpile/Supports setting out.js,javascript-microsoft-typescript-add-use-strict,stratified,PROMOTED,,0-10
 JavaScript,microsoft-TypeScript.git,01c23d68b1113a4b71acb8484f1bf78a98307933,tests/baselines/reference/typeSatisfaction_propNameConstraining.js,javascript-microsoft-typescript-another-test-case-marked-with-strict,small,PROMOTED,,
-JavaScript,microsoft-TypeScript.git,01c23d68b1113a4b71acb8484f1bf78a98307933,tests/baselines/reference/typingsSuggestion2.js,,stratified,SAMPLED,,0-10
+JavaScript,microsoft-TypeScript.git,01c23d68b1113a4b71acb8484f1bf78a98307933,tests/baselines/reference/typingsSuggestion2.js,javascript-microsoft-typescript-add-use-strict-2,stratified,PROMOTED,,0-10
 JavaScript,microsoft-TypeScript.git,01c23d68b1113a4b71acb8484f1bf78a98307933,tests/baselines/reference/unicodeExtendedEscapesInTemplates17(target=es6).js,javascript-typescript-very-interesting-brokn-code,small,PROMOTED,,
 JavaScript,microsoft-TypeScript.git,206ed1a00ffde637d821bbb3172d1488e3d949e8,tests/baselines/reference/nodeModulesImportTypeModeDeclarationEmit1(module=node20).js,,stratified,SAMPLED,,30-100
 JavaScript,microsoft-TypeScript.git,3fc1f264de2aacae0c008eb4295e66833ade36d9,tests/baselines/reference/ArrowFunction4.js,,stratified,SAMPLED,,10-30
@@ -776,12 +776,12 @@ JavaScript,microsoft-TypeScript.git,ffd1c3a1986e2f87ac79bde065432ec81144cfde,tes
 JavaScript,microsoft-TypeScript.git,ffd1c3a1986e2f87ac79bde065432ec81144cfde,tests/baselines/reference/inheritanceStaticMembersCompatible.js,,stratified,SAMPLED,,10-30
 JavaScript,mozilla-firefox-firefox.git,56a439fc7470e23fcf79e09be06cbc95aa6ede2d,tools/lint/stylelint/stylelint-plugin-mozilla/tests/use-design-tokens.background-color.tests.mjs,,stratified,SAMPLED,,300-1000
 JavaScript,mozilla-firefox-firefox.git,7fc79073377db7556ba2c55a8c39cda5be9a2b94,js/src/tests/test262/built-ins/TypedArray/prototype/subarray/minus-zero.js,,stratified,SAMPLED,,30-100
-JavaScript,mozilla-firefox-firefox.git,7fc79073377db7556ba2c55a8c39cda5be9a2b94,js/src/tests/test262/language/module-code/instn-star-props-dflt-skip-star-prod_FIXTURE.js,,stratified,SAMPLED,,0-10
+JavaScript,mozilla-firefox-firefox.git,7fc79073377db7556ba2c55a8c39cda5be9a2b94,js/src/tests/test262/language/module-code/instn-star-props-dflt-skip-star-prod_FIXTURE.js,javascript-mozilla-firefox-firefox-remove-one-comment,stratified,PROMOTED,,0-10
 JavaScript,mozilla-firefox-firefox.git,f5848b1deb702ab2647691f2591c8a5410fb5541,toolkit/components/extensions/ExtensionParent.sys.mjs,,stratified,SAMPLED,,1000-3000
 JavaScript,mozilla-firefox-firefox.git,f5848b1deb702ab2647691f2591c8a5410fb5541,toolkit/modules/IndexedDB.sys.mjs,javascript-mozilla-firefox-add-comment,small,PROMOTED,,
 JavaScript,mozilla-pdf.js.git,1b20ba5c3f68e0c7c028f4099936aada475dd789,src/display/editor/tools.js,,stratified,SAMPLED,,1000-3000
 JavaScript,mozilla-pdf.js.git,d25f13d1fd6d7fc10845ee15c045770aa72ad418,test/unit/api_spec.js,,stratified,SAMPLED,,3000+
-JavaScript,mui-material-ui.git,6c9e82f975fe9b59815e435094408d8195bbd723,docs/pages/material-ui/getting-started/design-resources.js,,stratified,SAMPLED,,0-10
+JavaScript,mui-material-ui.git,6c9e82f975fe9b59815e435094408d8195bbd723,docs/pages/material-ui/getting-started/design-resources.js,javascript-mui-material-ui-delete-one-import,stratified,PROMOTED,,0-10
 JavaScript,nextcloud-server.git,36f4423887406ddae8cd962c6c9de5597d3c2dca,dist/9396-9396.js,,stratified,SAMPLED,,0-10
 JavaScript,nextcloud-server.git,7e474a9ac496c4ed25de6ad14a15db844a251555,apps/settings/l10n/es_MX.js,,stratified,SAMPLED,,300-1000
 JavaScript,nextcloud-server.git,7e474a9ac496c4ed25de6ad14a15db844a251555,apps/theming/l10n/de.js,,stratified,SAMPLED,,100-300
@@ -795,7 +795,7 @@ JavaScript,usebruno-bruno,59514127d53ba669a1e411d9112a3a24d5ba3ce9,packages/brun
 JavaScript,vercel-next.js.git,2f2a71d6f53d4d18cc81eac6fa25c7e160555bc9,packages/next/src/compiled/react-server-dom-webpack-experimental/cjs/react-server-dom-webpack-server.node.development.js,,stratified,SAMPLED,,3000+
 JavaScript,vercel-next.js.git,54ac195abab56a0ff694592d76c7e7ef32797977,packages/next/src/compiled/react-dom-experimental/cjs/react-dom-server.node.production.js,,stratified,SAMPLED,,3000+
 JavaScript,vercel-next.js.git,a04499797e2ff9ca0321ab0706d6f335d59266df,packages/next/src/compiled/react-dom/cjs/react-dom-server.edge.development.js,,stratified,SAMPLED,,3000+
-JavaScript,vercel-next.js.git,c979cefa4a2889d582370f7e5dffb98604468504,crates/next-custom-transforms/tests/fixture/track-dynamic-imports/1/output.js,,stratified,SAMPLED,,0-10
+JavaScript,vercel-next.js.git,c979cefa4a2889d582370f7e5dffb98604468504,crates/next-custom-transforms/tests/fixture/track-dynamic-imports/1/output.js,javascript-vercel-next-add-doccomment,stratified,PROMOTED,,0-10
 Kotlin,JetBrains-kotlin,61658f95fe65cf06a2fd7d351ec89c02185e9291,core/compiler.common/src/org/jetbrains/kotlin/resolve/checkers/OptInDescription.kt,kotlin-jetbrains-kotlin-remove-typealias-with-annotations,full,PROMOTED,,
 Kotlin,JetBrains-kotlin,7a1169836f180282ce51df9ede15816e4a5920d9,compiler/testData/codegen/bytecodeText/builtinFunctions/genericParameterBridge/mutableSetInterfaces.kt,kotlin-jetbrains-kotlin-remove-one-comment-line,full,PROMOTED,,
 Kotlin,JetBrains-kotlin,f5f13c54ea4e0b3bba61ebb397cc952d7720a713,compiler/test-infrastructure-utils/testFixtures/org/jetbrains/kotlin/codegen/forTestCompile/TestCompilePaths.kt,kotlin-jetbrains-kotlin-add-single-const,full,PROMOTED,,
@@ -886,7 +886,7 @@ LUA,awesomeWM-awesome.git,13cd20780e95f85f59906f6b57b8779abe2dfcd6,lib/awful/dbu
 LUA,awesomeWM-awesome.git,1a2037758b8ce47dabc475dd73c05f73ee4c4bba,tests/examples/awful/tag/module_default_layouts.lua,,stratified,SAMPLED,,10-30
 LUA,awesomeWM-awesome.git,2eab55e53681418eba6a87cd72f9198ea4f9bb9f,lib/wibox/container/border.lua,,stratified,SAMPLED,,1000-3000
 LUA,awesomeWM-awesome.git,4bd90f0f35d0f93235f0bcf207ca16baa174f8a1,lib/awful/mouse/resize.lua,lua-awesomewm-awesome-comment-changes-and-additions,small,PROMOTED,,
-LUA,awesomeWM-awesome.git,4bd90f0f35d0f93235f0bcf207ca16baa174f8a1,lib/gears/sort/init.lua,,stratified,SAMPLED,,0-10
+LUA,awesomeWM-awesome.git,4bd90f0f35d0f93235f0bcf207ca16baa174f8a1,lib/gears/sort/init.lua,lua-awesomewm-awesome-update-comment,stratified,PROMOTED,,0-10
 LUA,awesomeWM-awesome.git,4bd90f0f35d0f93235f0bcf207ca16baa174f8a1,lib/naughty/layout/legacy.lua,,stratified,SAMPLED,,300-1000
 LUA,awesomeWM-awesome.git,4fa957b75dfabe63d3eb4636b5e409038318b461,lib/wibox/widget/systray.lua,,stratified,SAMPLED,,100-300
 LUA,awesomeWM-awesome.git,54a5a7dce580da39152175f2668463c7751d904c,lib/awful/_compat.lua,,stratified,SAMPLED,,100-300
@@ -907,7 +907,7 @@ LUA,awesomeWM-awesome.git,88c65a71ddd9ef5b6c18cef576580a4bf7c691dd,tests/example
 LUA,awesomeWM-awesome.git,956bd96e94363d96173acb52ff1144cf1aa87bb8,tests/examples/wibox/layout/grid/add_column_border1.lua,,stratified,SAMPLED,,30-100
 LUA,awesomeWM-awesome.git,956bd96e94363d96173acb52ff1144cf1aa87bb8,tests/examples/wibox/layout/grid/border_width2.lua,,stratified,SAMPLED,,30-100
 LUA,awesomeWM-awesome.git,98884cb3dfd17e99356ae6ba47f713ae91c1a1bb,tests/examples/wibox/awidget/defaults/watch.lua,,stratified,SAMPLED,,10-30
-LUA,awesomeWM-awesome.git,afe58d6cd22518f6009c9e316672b9663c5c9cce,lib/ruled/init.lua,,stratified,SAMPLED,,0-10
+LUA,awesomeWM-awesome.git,afe58d6cd22518f6009c9e316672b9663c5c9cce,lib/ruled/init.lua,lua-awesomewm-awesome-add-to-table-constructor,stratified,PROMOTED,,0-10
 LUA,awesomeWM-awesome.git,b343cb81119068559f4a6f6fcea847c696f3caa1,lib/gears/timer.lua,,stratified,SAMPLED,,100-300
 LUA,awesomeWM-awesome.git,b4c989bcf8bd0780c384e1c1a4864a90899205e6,tests/examples/awful/placement/top_right.lua,,stratified,SAMPLED,,10-30
 LUA,awesomeWM-awesome.git,b73b885c1edb9382eee64eff98ab99d9642f45a8,docs/_parser.lua,,stratified,SAMPLED,,100-300

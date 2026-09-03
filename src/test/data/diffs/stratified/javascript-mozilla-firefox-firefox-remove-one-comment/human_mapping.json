@@ -1,0 +1,154 @@
+{
+  "entries": [
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [],
+      "after_path": []
+    },
+    {
+      "operation": "delete",
+      "before_path": [
+        "comment:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "comment:2"
+      ],
+      "after_path": [
+        "comment:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "comment:3"
+      ],
+      "after_path": [
+        "comment:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "export_statement:1"
+      ],
+      "after_path": [
+        "export_statement:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "export_statement:1",
+        "export:1"
+      ],
+      "after_path": [
+        "export_statement:1",
+        "export:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "export_statement:1",
+        "*:1"
+      ],
+      "after_path": [
+        "export_statement:1",
+        "*:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "export_statement:1",
+        "from:1"
+      ],
+      "after_path": [
+        "export_statement:1",
+        "from:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "export_statement:1",
+        "string:1"
+      ],
+      "after_path": [
+        "export_statement:1",
+        "string:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "export_statement:1",
+        "string:1",
+        "':1"
+      ],
+      "after_path": [
+        "export_statement:1",
+        "string:1",
+        "':1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "export_statement:1",
+        "string:1",
+        "string_fragment:1"
+      ],
+      "after_path": [
+        "export_statement:1",
+        "string:1",
+        "string_fragment:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "export_statement:1",
+        "string:1",
+        "':2"
+      ],
+      "after_path": [
+        "export_statement:1",
+        "string:1",
+        "':2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "export_statement:1",
+        ";:1"
+      ],
+      "after_path": [
+        "export_statement:1",
+        ";:1"
+      ]
+    }
+  ],
+  "text_mappings": [
+    {
+      "name": "Only one solution",
+      "entries": [
+        {
+          "operation": "Delete",
+          "before": [
+            {
+              "start_row": 0,
+              "start_column": 0,
+              "end_row": 0,
+              "end_column": 36
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
