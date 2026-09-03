@@ -1,0 +1,171 @@
+{
+  "entries": [
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [],
+      "after_path": []
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "comment:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "package_clause:1"
+      ],
+      "after_path": [
+        "package_clause:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "package_clause:1",
+        "package:1"
+      ],
+      "after_path": [
+        "package_clause:1",
+        "package:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "package_clause:1",
+        "package_identifier:1"
+      ],
+      "after_path": [
+        "package_clause:1",
+        "package_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "comment:1"
+      ],
+      "after_path": [
+        "comment:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "comment:2"
+      ],
+      "after_path": [
+        "comment:3"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_declaration:1"
+      ],
+      "after_path": [
+        "import_declaration:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_declaration:1",
+        "import:1"
+      ],
+      "after_path": [
+        "import_declaration:1",
+        "import:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_declaration:1",
+        "import_spec:1"
+      ],
+      "after_path": [
+        "import_declaration:1",
+        "import_spec:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_declaration:1",
+        "import_spec:1",
+        "interpreted_string_literal:1"
+      ],
+      "after_path": [
+        "import_declaration:1",
+        "import_spec:1",
+        "interpreted_string_literal:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_declaration:1",
+        "import_spec:1",
+        "interpreted_string_literal:1",
+        "\":1"
+      ],
+      "after_path": [
+        "import_declaration:1",
+        "import_spec:1",
+        "interpreted_string_literal:1",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_declaration:1",
+        "import_spec:1",
+        "interpreted_string_literal:1",
+        "interpreted_string_literal_content:1"
+      ],
+      "after_path": [
+        "import_declaration:1",
+        "import_spec:1",
+        "interpreted_string_literal:1",
+        "interpreted_string_literal_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_declaration:1",
+        "import_spec:1",
+        "interpreted_string_literal:1",
+        "\":2"
+      ],
+      "after_path": [
+        "import_declaration:1",
+        "import_spec:1",
+        "interpreted_string_literal:1",
+        "\":2"
+      ]
+    }
+  ],
+  "text_mappings": [
+    {
+      "name": "Only one solution",
+      "entries": [
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 0,
+              "start_column": 0,
+              "end_row": 1,
+              "end_column": 0
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

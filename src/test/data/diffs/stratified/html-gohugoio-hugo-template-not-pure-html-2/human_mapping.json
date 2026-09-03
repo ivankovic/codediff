@@ -1,0 +1,36 @@
+{
+  "entries": [
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [],
+      "after_path": []
+    },
+    {
+      "operation": "update",
+      "before_path": [
+        "text:1"
+      ],
+      "after_path": [
+        "text:1"
+      ]
+    }
+  ],
+  "text_mappings": [
+    {
+      "name": "Only one solution",
+      "entries": [
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 0,
+              "start_column": 0,
+              "end_row": 0,
+              "end_column": 157
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

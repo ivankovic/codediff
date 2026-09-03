@@ -1,0 +1,110 @@
+{
+  "entries": [
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [],
+      "after_path": []
+    },
+    {
+      "operation": "delete",
+      "before_path": [
+        "comment:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "comment:2"
+      ],
+      "after_path": [
+        "comment:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "comment:3"
+      ],
+      "after_path": [
+        "comment:2"
+      ]
+    },
+    {
+      "operation": "update",
+      "before_path": [
+        "comment:4"
+      ],
+      "after_path": [
+        "comment:3"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "package_clause:1"
+      ],
+      "after_path": [
+        "package_clause:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "package_clause:1",
+        "package:1"
+      ],
+      "after_path": [
+        "package_clause:1",
+        "package:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "package_clause:1",
+        "package_identifier:1"
+      ],
+      "after_path": [
+        "package_clause:1",
+        "package_identifier:1"
+      ]
+    }
+  ],
+  "text_mappings": [
+    {
+      "name": "Only one solution",
+      "entries": [
+        {
+          "operation": "Delete",
+          "before": [
+            {
+              "start_row": 0,
+              "start_column": 0,
+              "end_row": 0,
+              "end_column": 14
+            }
+          ]
+        },
+        {
+          "operation": "Match",
+          "before": [
+            {
+              "start_row": 4,
+              "start_column": 48,
+              "end_row": 4,
+              "end_column": 72
+            }
+          ],
+          "after": [
+            {
+              "start_row": 2,
+              "start_column": 48,
+              "end_row": 2,
+              "end_column": 69
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

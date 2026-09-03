@@ -1,0 +1,238 @@
+{
+  "entries": [
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [],
+      "after_path": []
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "comment:1"
+      ],
+      "after_path": [
+        "comment:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "comment:2"
+      ],
+      "after_path": [
+        "comment:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "comment:3"
+      ],
+      "after_path": [
+        "comment:3"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "package_clause:1"
+      ],
+      "after_path": [
+        "package_clause:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "package_clause:1",
+        "package:1"
+      ],
+      "after_path": [
+        "package_clause:1",
+        "package:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "package_clause:1",
+        "package_identifier:1"
+      ],
+      "after_path": [
+        "package_clause:1",
+        "package_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "comment:4"
+      ],
+      "after_path": [
+        "comment:4"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "const_declaration:1"
+      ],
+      "after_path": [
+        "const_declaration:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "const_declaration:1",
+        "const:1"
+      ],
+      "after_path": [
+        "const_declaration:1",
+        "const:1"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "const_declaration:1",
+        "const_spec:1"
+      ],
+      "after_path": [
+        "const_declaration:1",
+        "const_spec:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "const_declaration:1",
+        "const_spec:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "const_declaration:1",
+        "const_spec:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "const_declaration:1",
+        "const_spec:1",
+        "=:1"
+      ],
+      "after_path": [
+        "const_declaration:1",
+        "const_spec:1",
+        "=:1"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "const_declaration:1",
+        "const_spec:1",
+        "expression_list:1"
+      ],
+      "after_path": [
+        "const_declaration:1",
+        "const_spec:1",
+        "expression_list:1"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "const_declaration:1",
+        "const_spec:1",
+        "expression_list:1",
+        "interpreted_string_literal:1"
+      ],
+      "after_path": [
+        "const_declaration:1",
+        "const_spec:1",
+        "expression_list:1",
+        "interpreted_string_literal:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "const_declaration:1",
+        "const_spec:1",
+        "expression_list:1",
+        "interpreted_string_literal:1",
+        "\":1"
+      ],
+      "after_path": [
+        "const_declaration:1",
+        "const_spec:1",
+        "expression_list:1",
+        "interpreted_string_literal:1",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "update",
+      "before_path": [
+        "const_declaration:1",
+        "const_spec:1",
+        "expression_list:1",
+        "interpreted_string_literal:1",
+        "interpreted_string_literal_content:1"
+      ],
+      "after_path": [
+        "const_declaration:1",
+        "const_spec:1",
+        "expression_list:1",
+        "interpreted_string_literal:1",
+        "interpreted_string_literal_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "const_declaration:1",
+        "const_spec:1",
+        "expression_list:1",
+        "interpreted_string_literal:1",
+        "\":2"
+      ],
+      "after_path": [
+        "const_declaration:1",
+        "const_spec:1",
+        "expression_list:1",
+        "interpreted_string_literal:1",
+        "\":2"
+      ]
+    }
+  ],
+  "text_mappings": [
+    {
+      "name": "Only one solution",
+      "entries": [
+        {
+          "operation": "Match",
+          "before": [
+            {
+              "start_row": 7,
+              "start_column": 21,
+              "end_row": 7,
+              "end_column": 22
+            }
+          ],
+          "after": [
+            {
+              "start_row": 7,
+              "start_column": 21,
+              "end_row": 7,
+              "end_column": 22
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

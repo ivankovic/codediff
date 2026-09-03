@@ -70,3 +70,47 @@ mod csharp_lidarr_lidarr_add_method_to_class;
 mod csharp_sonarr_sonarr_add_attribute;
 #[cfg(test)]
 mod csharp_sonarr_sonarr_add_attribute_2;
+#[cfg(test)]
+mod css_wordpress_wordpress_go_to_one_line;
+#[cfg(test)]
+mod css_wordpress_wordpress_re_format_in_one_line;
+#[cfg(test)]
+mod css_wordpress_wordpress_reformat_and_fix_lint_errors;
+#[cfg(test)]
+mod go_gin_gonic_gin_update_version_string;
+#[cfg(test)]
+mod go_gin_gonic_gin_update_version_string_;
+#[cfg(test)]
+mod go_gin_gonic_gin_update_version_string_2;
+#[cfg(test)]
+mod go_gin_gonic_gin_update_version_string_3;
+#[cfg(test)]
+mod go_gin_gonic_gin_update_version_string_4;
+#[cfg(test)]
+mod go_gin_gonic_gin_update_version_string_5;
+#[cfg(test)]
+mod go_gin_gonic_gin_update_version_string_6;
+#[cfg(test)]
+mod go_golang_go_update_copyright_year;
+#[cfg(test)]
+mod go_ollama_ollama_add_go_build_comment;
+#[cfg(test)]
+mod go_ollama_ollama_remove_go_build_comment;
+#[cfg(test)]
+mod html_gohugoio_hugo_template_not_pure_html;
+#[cfg(test)]
+mod html_gohugoio_hugo_template_not_pure_html_2;
+#[cfg(test)]
+mod html_mozilla_pdf_add_closing_tags;
+#[cfg(test)]
+mod html_pandas_dev_pandas_release_banner_update;
+#[cfg(test)]
+mod html_prettier_prettier_not_pure_html_includes_yaml_as_well;
+#[cfg(test)]
+mod html_twbs_bootstrap_not_html_template_extract_two_vars;
+#[cfg(test)]
+mod java_genymobile_scrcpy_add_parameter;
+#[cfg(test)]
+mod javascript_facebook_react_update_comment_only;
+#[cfg(test)]
+mod javascript_microsoft_typescript_add_use_strict;
