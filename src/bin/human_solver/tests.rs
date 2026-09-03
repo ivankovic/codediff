@@ -6484,3 +6484,157 @@ fn round_tripping_the_real_sample_csv_loses_nothing() {
     };
     assert_eq!(buckets(&again), buckets(&rows));
 }
+
+#[test]
+fn codediff_text_entries_keeps_the_pairing_that_the_span_view_drops() {
+    let before = Code::from_string("fn main() {\n    foo();\n}\n", &Language::Rust);
+    let after = Code::from_string("fn main() {\n    bar();\n}\n", &Language::Rust);
+
+    let entries = codediff_text_entries(&before, &after).expect("this pair pairs up cleanly");
+    assert!(!entries.is_empty(), "an edited pair should produce entries");
+
+    for entry in &entries {
+        match entry.operation {
+            HumanTextOperation::Match => {
+                assert!(
+                    !entry.before.is_empty() && !entry.after.is_empty(),
+                    "a match is a decision about a pair, so it needs both sides: {entry:?}"
+                );
+            }
+            HumanTextOperation::Delete => {
+                assert!(!entry.before.is_empty() && entry.after.is_empty());
+            }
+            HumanTextOperation::Insert => {
+                assert!(entry.before.is_empty() && !entry.after.is_empty());
+            }
+        }
+    }
+}
+
+/// The point of the seed: what it writes must *be* codediff's rendering, so the starting point
+/// shows zero disagreement and every remaining edit is a correction the human chose to make.
+#[test]
+fn seeding_a_painting_reproduces_codediffs_own_spans_on_both_sides() {
+    let before_src = "fn main() {\n    foo();\n}\n";
+    let after_src = "fn main() {\n    bar();\n}\n";
+    let before = Code::from_string(before_src, &Language::Rust);
+    let after = Code::from_string(after_src, &Language::Rust);
+    let tree = parse_rust(before_src);
+    let root = tree.root_node();
+    let mut app = App::new(
+        "test".to_string(),
+        CaseOrigin::Diffs,
+        root.id(),
+        root.id(),
+        HumanMapping::default(),
+    );
+
+    action_paint_seed_from_codediff(&mut app, &before, &after);
+    assert!(app.dirty, "seeding is an unsaved change to the mapping");
+
+    let algo = codediff_text_spans(&before, &after);
+    for side in [0usize, 1usize] {
+        let mut painted: Vec<_> = painted_spans(
+            &app.mapping,
+            &app.text_solution,
+            side,
+            before_src,
+            after_src,
+        );
+        let mut expected = algo[side].clone();
+        painted.sort_by_key(|(span, _)| (span.start_row, span.start_column));
+        expected.sort_by_key(|(span, _)| (span.start_row, span.start_column));
+        assert_eq!(
+            painted, expected,
+            "side {side} should read exactly as codediff renders it"
+        );
+    }
+}
+
+#[test]
+fn seeding_refuses_to_overwrite_a_painting_that_already_has_ranges() {
+    let before_src = "fn main() {\n    foo();\n}\n";
+    let after_src = "fn main() {\n    bar();\n}\n";
+    let before = Code::from_string(before_src, &Language::Rust);
+    let after = Code::from_string(after_src, &Language::Rust);
+    let tree = parse_rust(before_src);
+    let root = tree.root_node();
+    let mut app = App::new(
+        "test".to_string(),
+        CaseOrigin::Diffs,
+        root.id(),
+        root.id(),
+        HumanMapping::default(),
+    );
+
+    action_paint_seed_from_codediff(&mut app, &before, &after);
+    // `HumanTextEntry` comes from the library and carries no `PartialEq`, so compare the rendered
+    // shape rather than deriving one on a public type purely for this assertion.
+    let seeded = format!("{:?}", solution_entries(&app.mapping, &app.text_solution));
+    app.dirty = false;
+
+    action_paint_seed_from_codediff(&mut app, &before, &after);
+
+    assert_eq!(
+        format!("{:?}", solution_entries(&app.mapping, &app.text_solution)),
+        seeded,
+        "a second P must leave hand-corrected work exactly as it was"
+    );
+    assert!(!app.dirty, "a refused seed is not a change");
+    assert!(
+        app.status
+            .as_deref()
+            .is_some_and(|s| s.contains("already has painted ranges")),
+        "the refusal should say why: {:?}",
+        app.status
+    );
+}
+
+/// The overlap guard, against a fixture that actually trips it. codediff's own rendering produces
+/// overlapping ranges on 22 of the 513 corpus fixtures, so this is a real shape, not a contrived
+/// one - and a painting cannot represent it, because the renderer resolves an overlap by highest
+/// verdict while the scorer resolves it by list order.
+#[test]
+fn seeding_refuses_a_pair_whose_codediff_ranges_overlap() {
+    let pairs = codediff::test::helper::handmade_test_code_pairs().unwrap();
+    let (before, after) = pairs
+        .get("xml-odoo-odoo-add-two-attributes")
+        .expect("fixture should exist");
+
+    let overlapping = codediff_text_spans(before, after)
+        .iter()
+        .any(|side| spans_overlap(side));
+    assert!(
+        overlapping,
+        "this test is pointless unless the fixture still has overlapping codediff ranges"
+    );
+
+    let error = codediff_text_entries(before, after)
+        .expect_err("an overlapping pair must not produce a painting");
+    assert!(
+        error.contains("overlap"),
+        "the reason should say why: {error}"
+    );
+}
+
+#[test]
+fn spans_overlap_detects_a_shared_byte_and_allows_touching_ranges() {
+    let span = |sc, ec| {
+        (
+            HumanTextSpan {
+                start_row: 0,
+                start_column: sc,
+                end_row: 0,
+                end_column: ec,
+            },
+            HumanTextVerdict::Delete,
+        )
+    };
+    assert!(spans_overlap(&[span(0, 8), span(4, 12)]), "they share 4..8");
+    assert!(
+        !spans_overlap(&[span(0, 4), span(4, 8)]),
+        "abutting ranges share no byte - end is exclusive"
+    );
+    assert!(!spans_overlap(&[span(0, 4)]));
+    assert!(!spans_overlap(&[]));
+}

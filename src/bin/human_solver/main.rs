@@ -330,6 +330,13 @@ t              text view: read the source, and paint the human text-range ground
                  solution becomes a Minimal + Full pair.
                  p cycles what is drawn: your painting, codediff's own rendering
                  of the same pair, or only the bytes where the two disagree
+                 P copies codediff's rendering into the current painting as a
+                 starting point, so a fixture is corrected rather than painted
+                 from a blank page -- only into an empty painting, so it can
+                 never overwrite work (s branches this one to a new name first),
+                 and it declines outright on a pair whose codediff ranges
+                 overlap or fail to pair up, rather than seeding a painting that
+                 would render and score differently
 T              view the output of unix `diff -u`, with before/after line numbers
                  (t/T switch between these two views while either is open)
 H              toggle hiding fully solved subtrees (unmarked nodes and their

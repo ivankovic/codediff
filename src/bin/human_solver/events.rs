@@ -2247,6 +2247,9 @@ fn handle_text_view(
         ),
         KeyCode::Char('u') => action_paint_unmark(app, &state, before_text, after_text),
         KeyCode::Char('Z') => action_paint_mark_empty(app),
+        // Shift-`p`, next to the `p` that shows codediff's rendering: `p` looks at it, `P` adopts
+        // it as the draft to correct.
+        KeyCode::Char('P') => action_paint_seed_from_codediff(app, before, after),
         KeyCode::Char('p') => {
             let next = app.text_overlay.next();
             // Computed on the first cycle away from `Human` and kept for the rest of the

@@ -364,6 +364,146 @@ pub(crate) fn codediff_text_spans(
     [convert(text_diff.all(0)), convert(text_diff.all(1))]
 }
 
+/// codediff's own rendering of this pair as human painting *entries* - what `P` copies into an
+/// empty painting so a fixture can be corrected from a draft rather than painted from nothing.
+///
+/// Built from `codediff_text_spans`, so what this writes is exactly what the `p` overlay draws -
+/// seeding then showing "codediff's own diff" must not reveal a difference.
+///
+/// Move and Update both become `Match`: `HumanTextOperation` records only Match/Delete/Insert, and
+/// whether a match reads as a move or an update is derived from whether the two spans' text is
+/// identical (see `HumanTextEntry::verdict`) rather than stored. So this cannot get that call
+/// wrong - there is no call to make.
+pub(crate) fn codediff_text_entries(
+    before: &Code,
+    after: &Code,
+) -> Result<Vec<HumanTextEntry>, &'static str> {
+    let [before_spans, after_spans] = codediff_text_spans(before, after);
+
+    // A painting cannot represent two ranges claiming the same byte, and nothing downstream
+    // agrees on what it would mean: `render_paint_side` resolves an overlap per byte by
+    // `PaintClass`'s `max` (so the highest-ranked *verdict* wins), while `label_bytes` - what
+    // `compare_painting` grades against - fills its array in list order, so the *last entry* wins.
+    // A seeded overlap would therefore render as one thing and score as another, silently, in
+    // ground truth a human has no reason to re-check. codediff's own rendering does produce
+    // overlapping spans - 22 of the 513 corpus fixtures, across six languages - so this is a real
+    // case, not a defensive one.
+    if spans_overlap(&before_spans) || spans_overlap(&after_spans) {
+        return Err(
+            "codediff's own ranges overlap on this pair, which a painting cannot represent",
+        );
+    }
+
+    // The two sides' matched spans are two views of the same decisions, walked in the same order,
+    // so the k-th match on one side is the k-th on the other. `TextDiff` keeps `before_ranges` and
+    // `after_ranges` as two independent lists with no cross-reference - `RangeMatch::destination`
+    // is only meaningful for `Identical`, and is zero on exactly the changed ranges this needs -
+    // so order is the only pairing available. If the two counts ever disagree, the shape is one
+    // this cannot pair, and it gives up rather than inventing a pairing: a wrong `Match` is worse
+    // than no seed, for the same "nobody will re-check it" reason as the overlap case above.
+    let matched = |spans: &[(HumanTextSpan, HumanTextVerdict)]| -> Vec<HumanTextSpan> {
+        spans
+            .iter()
+            .filter(|(_, verdict)| {
+                matches!(verdict, HumanTextVerdict::Move | HumanTextVerdict::Update)
+            })
+            .map(|(span, _)| *span)
+            .collect()
+    };
+    let before_matched = matched(&before_spans);
+    let after_matched = matched(&after_spans);
+    if before_matched.len() != after_matched.len() {
+        return Err("codediff's two sides do not pair up here, so a match cannot be derived");
+    }
+
+    let mut entries: Vec<HumanTextEntry> = before_matched
+        .into_iter()
+        .zip(after_matched)
+        .map(|(before_span, after_span)| HumanTextEntry {
+            operation: HumanTextOperation::Match,
+            before: vec![before_span],
+            after: vec![after_span],
+        })
+        .collect();
+
+    // A deletion only exists on the before side and an insertion only on the after side, so
+    // neither needs pairing.
+    entries.extend(
+        before_spans
+            .iter()
+            .filter(|(_, verdict)| *verdict == HumanTextVerdict::Delete)
+            .map(|(span, _)| HumanTextEntry {
+                operation: HumanTextOperation::Delete,
+                before: vec![*span],
+                after: Vec::new(),
+            }),
+    );
+    entries.extend(
+        after_spans
+            .iter()
+            .filter(|(_, verdict)| *verdict == HumanTextVerdict::Insert)
+            .map(|(span, _)| HumanTextEntry {
+                operation: HumanTextOperation::Insert,
+                before: Vec::new(),
+                after: vec![*span],
+            }),
+    );
+
+    Ok(entries)
+}
+
+/// Whether any two of `spans` claim a common byte. Quadratic, but it runs once per `P` on one
+/// file's worth of ranges, not per frame.
+pub(crate) fn spans_overlap(spans: &[(HumanTextSpan, HumanTextVerdict)]) -> bool {
+    let starts_before = |a: &HumanTextSpan, b: &HumanTextSpan| {
+        (a.start_row, a.start_column) < (b.end_row, b.end_column)
+    };
+    spans.iter().enumerate().any(|(i, (a, _))| {
+        spans[i + 1..]
+            .iter()
+            .any(|(b, _)| starts_before(a, b) && starts_before(b, a))
+    })
+}
+
+/// `P` in the text view: copy codediff's own rendering of this pair into the current painting as a
+/// starting point, so a fixture is corrected rather than painted from a blank page.
+///
+/// Refuses outright on a painting that already has ranges, exactly as `action_paint_mark_empty`
+/// does and for the same reason: this replaces the whole painting, and silently overwriting
+/// hand-painted work would be unrecoverable in a tool with no undo. `s` branches the current
+/// painting to a new name, which is the way to seed a second reading of the same pair.
+pub(crate) fn action_paint_seed_from_codediff(app: &mut App, before: &Code, after: &Code) {
+    let solution = app.text_solution.clone();
+    if !solution_entries(&app.mapping, &solution).is_empty() {
+        app.status = Some(format!(
+            "'{solution}' already has painted ranges - P only seeds an empty painting (s branches \
+             this one to a new name)"
+        ));
+        return;
+    }
+
+    let entries = match codediff_text_entries(before, after) {
+        Ok(entries) if entries.is_empty() => {
+            app.status = Some("codediff paints nothing on this pair - nothing to copy".to_string());
+            return;
+        }
+        Ok(entries) => entries,
+        Err(reason) => {
+            app.status = Some(format!(
+                "Cannot seed from codediff: {reason} - paint by hand"
+            ));
+            return;
+        }
+    };
+
+    let count = entries.len();
+    *solution_entries_mut(&mut app.mapping, &solution) = entries;
+    app.dirty = true;
+    app.status = Some(format!(
+        "Copied codediff's {count} range(s) into '{solution}' - correct them from here (u removes one)"
+    ));
+}
+
 /// The human's own *tree* mapping (`HumanMapping::entries`, never `diff_code`'s output) for this
 /// case, as painting spans - the tree-mapping counterpart of `codediff_text_spans`, and what backs
 /// `TextOverlay::TreeDisagreement`.
