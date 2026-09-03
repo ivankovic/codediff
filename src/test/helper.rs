@@ -687,6 +687,13 @@ pub fn diffs_case_dir(name: &str) -> Option<std::path::PathBuf> {
 
 /// The free-form human note for one fixture: `src/test/data/diffs/<dataset>/<name>/description.md`.
 ///
+/// **What belongs here: what the fixture is and what it demands** - "Requires an N:M mapping. A
+/// rare case of 1:2." A fact about the data, true whoever is diffing it, and it travels with the
+/// directory. What does *not* belong here is why codediff currently falls short of that; a
+/// residual is a fact about this implementation and stops being true when someone fixes it, so it
+/// lives next to the limit it justifies, in the fixture's `optimal_solutions` stub (see that
+/// module's own doc for both halves of the rule).
+///
 /// **Not a new convention.** 21 fixtures already carry this file - hand-written prose saying what
 /// the case demonstrates - and until now nothing read it. Wiring it up beats inventing a second
 /// note file beside it, and it complements `sample.csv`'s `comment` column exactly: every one of
@@ -779,6 +786,52 @@ pub struct SampleProvenance {
     /// (see [`read_note`]) for everything promoted; kept here because an unpromoted sample has
     /// nowhere else to put one.
     pub comment: String,
+}
+
+/// Provenance read from a fixture's **own** `README.md`, the file that travels with it.
+///
+/// **The fixture directory is the source of truth for what a fixture is**, and this is what makes
+/// that true rather than aspirational. The same four facts - repository, commit, path, dataset -
+/// used to live in `sample.csv` as well, and `diff_inventory` joined against that CSV on
+/// `promoted_to` to fill its provenance columns. That join is what made a fixture depend on a file
+/// outside itself to describe itself: move the directory, or lose the row, and the fixture goes
+/// anonymous. `README.md` has always carried strictly more (it also records the upstream license,
+/// which `sample.csv` never did), so nothing is lost by preferring it.
+///
+/// `sample.csv` keeps its own job: the append-only record of what was *sampled* and what happened
+/// to each candidate, including the 25 rejections that have no directory at all.
+///
+/// Returns `None` for a fixture with no README - the 61 `handmade` fixtures were written by hand
+/// rather than sampled from a repository, so they have no upstream provenance to record, and they
+/// have no `sample.csv` row either. Blank provenance for them is the same answer the join gave.
+///
+/// The parse is against `render_readme`'s own generated output (see
+/// `materialize_test_diffs`), not free-form Markdown: each fact is the single backticked span on
+/// its labelled line. The repository line carries both a clone URL and the slug; the slug is the
+/// backticked one, and the slug is what every other consumer keys on.
+#[cfg(feature = "test-fixtures")]
+pub fn readme_provenance(name: &str) -> Option<SampleProvenance> {
+    let dir = diffs_case_dir(name)?;
+    let readme = std::fs::read_to_string(dir.join("README.md")).ok()?;
+
+    let backticked = |label: &str| -> String {
+        readme
+            .lines()
+            .find(|line| line.starts_with(&format!("- **{label}:**")))
+            .and_then(|line| line.rsplit_once('`').map(|(head, _)| head))
+            .and_then(|head| head.rsplit_once('`').map(|(_, value)| value.to_string()))
+            .unwrap_or_default()
+    };
+
+    Some(SampleProvenance {
+        repository: backticked("Repository"),
+        commit: backticked("Commit"),
+        path: backticked("File"),
+        // Never read from the README: the directory a fixture sits in *is* its dataset, and a
+        // README that disagreed with its own location would be a third opinion about a fact the
+        // filesystem already settles.
+        comment: String::new(),
+    })
 }
 
 /// `sample.csv` keyed by the fixture name each row was promoted to.

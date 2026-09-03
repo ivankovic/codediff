@@ -32,7 +32,6 @@
 //! the same kind of file as the sample manifest it joins against. Everything in it is cheap and
 //! derived, so it is safe to regenerate at any time and never needs hand-editing.
 
-use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
@@ -42,8 +41,8 @@ use codediff::test::helper::human_mapping::{
     rebuild_caches_for_mapping, status_after, status_before,
 };
 use codediff::test::helper::{
-    DIFF_DATASETS, SampleProvenance, code_pair_from_dir, human_mapping, note_as_csv_cell,
-    read_note, sample_provenance,
+    DIFF_DATASETS, code_pair_from_dir, human_mapping, note_as_csv_cell, read_note,
+    readme_provenance,
 };
 
 #[derive(Parser)]
@@ -101,9 +100,11 @@ struct Row {
     path: String,
     dataset: String,
     language: String,
-    // ── provenance, joined from sample.csv on `promoted_to` ──────────────────────────────────
-    // Blank for a handmade fixture that was never promoted from a sample, which is not missing
-    // data: it has no upstream commit to point at.
+    // ── provenance, read from the fixture's own README.md ────────────────────────────────────
+    // Blank for a handmade fixture, which is not missing data: it was written by hand rather than
+    // sampled, so it has no upstream commit to point at and no README to record one.
+    // Deliberately *not* joined against sample.csv any more - a fixture that needs a row in a file
+    // outside itself to say what it is is not self-describing (see `helper::readme_provenance`).
     repository: String,
     commit: String,
     source_path: String,
@@ -150,7 +151,6 @@ fn main() -> Result<()> {
     let args = Args::parse();
     let out = args.out.unwrap_or_else(default_out_path);
 
-    let provenance = sample_provenance()?;
     let mut rows = Vec::new();
     let mut unreadable = Vec::new();
 
@@ -167,7 +167,7 @@ fn main() -> Result<()> {
                 continue;
             }
             let name = entry.file_name().to_string_lossy().into_owned();
-            match row_for(&name, dataset, &entry.path(), &provenance) {
+            match row_for(&name, dataset, &entry.path()) {
                 Ok(Some(row)) => rows.push(row),
                 // A directory with no readable before/after pair isn't a fixture at all.
                 Ok(None) => {}
@@ -224,12 +224,7 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn row_for(
-    name: &str,
-    dataset: &str,
-    dir: &Path,
-    provenance: &HashMap<String, SampleProvenance>,
-) -> Result<Option<Row>> {
+fn row_for(name: &str, dataset: &str, dir: &Path) -> Result<Option<Row>> {
     let Some((before, after)) = code_pair_from_dir(dir)? else {
         return Ok(None);
     };
@@ -259,7 +254,8 @@ fn row_for(
             _ => (0, 0, 0, 0),
         };
 
-    let sample = provenance.get(name);
+    let sample = readme_provenance(name);
+    let sample = sample.as_ref();
     let mut painting_names: Vec<String> = mapping
         .text_mappings
         .iter()
@@ -389,7 +385,6 @@ mod tests {
     /// surface, and a stub would never catch that.
     #[test]
     fn every_fixture_in_the_corpus_produces_a_row() {
-        let provenance = sample_provenance().unwrap();
         let mut seen = 0usize;
         for dataset in DIFF_DATASETS {
             let root = diffs_root().join(dataset);
@@ -401,7 +396,7 @@ mod tests {
                     continue;
                 }
                 let name = entry.file_name().to_string_lossy().into_owned();
-                let row = row_for(&name, dataset, &entry.path(), &provenance)
+                let row = row_for(&name, dataset, &entry.path())
                     .unwrap_or_else(|err| panic!("'{name}' should be readable: {err:#}"));
                 if let Some(row) = row {
                     assert!(row.before_lines > 0, "'{name}' has no before content");
@@ -415,10 +410,9 @@ mod tests {
 
     #[test]
     fn a_handmade_fixture_has_blank_provenance_rather_than_a_missing_row() {
-        let provenance = sample_provenance().unwrap();
         let dir = codediff::test::helper::diffs_case_dir("cpp-add-templates")
             .expect("a known handmade fixture");
-        let row = row_for("cpp-add-templates", "handmade", &dir, &provenance)
+        let row = row_for("cpp-add-templates", "handmade", &dir)
             .unwrap()
             .expect("a row");
 
@@ -439,12 +433,9 @@ mod tests {
     /// walk counted every node.
     #[test]
     fn error_nodes_and_their_percentage_come_from_the_real_parse() {
-        let provenance = sample_provenance().unwrap();
         let row_of = |name: &str, dataset: &str| {
             let dir = codediff::test::helper::diffs_case_dir(name).expect("a known fixture");
-            row_for(name, dataset, &dir, &provenance)
-                .unwrap()
-                .expect("a row")
+            row_for(name, dataset, &dir).unwrap().expect("a row")
         };
 
         // The worst parse in the corpus: one ERROR per 2.3 nodes.
