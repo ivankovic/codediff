@@ -51,7 +51,7 @@ let before_metadata = before.metadata.ast_metadata.clone().unwrap_or_else(|| {
 Sites (9 files, 18 clones): `solve_identical_trees.rs:37`, `solve_structurally_identical_trees.rs:42`,
 `solve_semantically_structural_nodes.rs:115` **and** `:258` (twice in one file),
 `solve_similar_flow_control.rs:56`, `solve_identical_diagnostic_statements.rs:62`,
-`solve_moved_subtrees.rs:66`, `apted/common.rs:2293`, `test/helper/optimal_iud.rs:160`.
+`solve_moved_subtrees.rs:66`, `apted/common.rs:2293`.
 
 This is not just repetition: `ASTMetadata` holds several whole-tree `HashMap`s
 (`node_info`, `node_to_full_hash`, `full_hash_to_node`, structural-hash maps, …), so a single
@@ -184,11 +184,9 @@ Function-length outliers (non-test, measured by brace matching):
 | Lines | Function | Verdict |
 |---|---|---|
 | 585 | `apted/engine.rs:498 spf_a` | Leave. Hand-tuned APTED port; prior review already ruled: profile before touching. |
-| 298 | `test/helper/optimal_iud.rs:311 solve_with_slices` | Test-only oracle; splitting the 4-branch cost search per `AlgorithmChoice` arm would help, but low priority. |
 | 294 | `bin/human_solver.rs:2540 handle_key` | Worth splitting — see below. |
 | 268 | `bin/human_solver.rs:2841 handle_modal_key` | Same: one function per `Modal` variant. |
 | 207 | `diff/text.rs:42 ranges` | Shrinks naturally via finding 1.9. |
-| 204 | `test/helper/optimal_iud.rs:691 update_diff` | Same file/status as `solve_with_slices`. |
 | 180 | `apted/common.rs:2076 resolve_forest` | Sequential phases with clear comments; acceptable, could be phase-functions if touched again. |
 | 176+164 | `engine.rs compute_opt_strategy_post_l` / `_post_r` | Mirrored algorithm variants, same leave-alone rule as `spf_a`. |
 | 163 | `solve_structurally_identical_trees.rs:35 solve` | Shrinks via 1.2. |
@@ -227,11 +225,11 @@ File-length outliers:
   `const PIPELINE: &[…]` would (a) let the ordering constraints be asserted in one place or at
   least documented next to a single list, (b) give benchmarking/tracing a hook per pass, and
   (c) force new passes (1.1's metadata refs) through one signature change instead of seven.
-- **`optimal_iud.rs` lives under `test/helper/` but is a full algorithm** (the exponential oracle
-  used by `benchmark_optimal_solutions` and tests). Placement is defensible (it must never ship in
-  the production path), but the name `memoo` for the memoization map and the misspelled
-  `unmached`/`first_unmached_node_index` in its public-ish internals hurt grep-ability
-  (searching "unmatched" misses them).
+- **`optimal_iud.rs` was deleted 2026-09-03.** This finding described it as "the exponential
+  oracle used by `benchmark_optimal_solutions` and tests" - neither was true by then. Its only
+  caller was `benches/optimal_iud_benchmark.rs`, which itself had no Makefile target and did not
+  compile; its 16 tests tested only itself. 1777 lines, recoverable from git if it is ever wanted
+  back as the starting point for a real oracle.
 - **`NodeCache`'s transmuted `'static` lifetime** (diff.rs:40–54) is thoroughly documented, and
   callers are currently disciplined. If it ever grows another caller, consider the standard
   self-referential escape: make `NodeCache<'tree>` borrow properly and let the few construction
@@ -254,7 +252,7 @@ File-length outliers:
   `let … = if …` where trivial) keeps the port shape while silencing the lint. Safe because the
   fuzz/oracle tests in `common.rs` pin behavior.
 - **Typos in identifiers and docs** (all trivially fixable, some hurt search):
-  `memoo`, `unmached` (optimal_iud.rs, incl. parameter names), "forrest", "theorethically",
+  "forrest", "theorethically",
   "maping" (diff.rs doc comments), "mapps" (solve_structurally_identical_trees.rs:31), test name
   `hello_world_translations_in_all_langauges` (diff.rs:787), recurring "it's" where "its" is meant
   (ASTMappingOperation docs).
@@ -263,7 +261,7 @@ File-length outliers:
   up and adds an indentation level to an already 5-deep nest (solve_identical_trees.rs:98,
   solve_structurally_identical_trees.rs:98). Goes away with 1.2.
 - **Doc-comment style is split** between `/** … */` block style (older core files: diff.rs,
-  helper.rs, optimal_iud.rs) and `///` line style (newer files: human_solver.rs, the newer
+  helper.rs) and `///` line style (newer files: human_solver.rs, the newer
   passes). Rustfmt/idiom favors `///`; a mechanical conversion pass would make the codebase read
   uniformly, but do it in a dedicated commit so it doesn't pollute diffs.
 - `Diff::from_code`'s pipeline comments are good; the `// TODO: switch to Algorithm::Apted once

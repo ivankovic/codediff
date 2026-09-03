@@ -30,8 +30,10 @@ to the current node. Hitting the escape key or t again will close the pop-up.
 The Terminal User Interface is written using the ratatui library using crossterm as the terminal
 control provider.
 
-The automated tests for the TUI use the TestBackend from ratatui and insta for snapshot testing and
-crossterms mock backend to simulate terminal input/output.
+The automated tests for the TUI use the TestBackend from ratatui and crossterm's mock backend to
+simulate terminal input/output. (They used to be described as using `insta` for snapshot testing
+too; nothing ever did - there were no snapshots and the dev-dependency was unused, so it was
+removed 2026-09-03.)
 
 The tests must cover at least all user flows described in this document.
 

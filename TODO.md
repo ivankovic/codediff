@@ -1751,7 +1751,7 @@ all converted to `rustc_hash::FxHashMap`. Much larger blast radius than the `AST
 ~35 call sites across `apted/common.rs`, `apted/engine.rs`, `solve_moved_subtrees.rs`,
 `solve_greedy_anchor_blocks.rs`, `solve_syntax_aware_matching.rs`, `solve_identical_diagnostic_
 statements.rs`, `solve_similar_flow_control.rs` (via the shared `nodes::collect_unmatched`),
-`test/helper/human_mapping.rs`, `test/helper/optimal_iud.rs` - all mechanical type-annotation
+`test/helper/human_mapping.rs` - all mechanical type-annotation
 widening (`&HashMap<usize, usize>` -> `&rustc_hash::FxHashMap<usize, usize>` etc.), no logic
 changes, found by letting the compiler enumerate every call site rather than grepping for all of
 them up front. Cleaned up the now-unused `std::collections::HashMap` imports this left behind in

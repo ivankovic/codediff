@@ -117,7 +117,6 @@ syntect = { version = "5.2", features = ["default-fancy"], optional = true }
 two-face = { version = "0.5.2", default-features = false, features = ["syntect-fancy"], optional = true }
 
 [dev-dependencies]
-insta = "1.38.0"
 
 [features]
 # `tui` on by default so a bare `cargo build`/`cargo install codediff` keeps producing the working

@@ -905,11 +905,6 @@ impl CodeViewerWidget {
             .map(|l| format!("{:?}", l))
             .unwrap_or_else(|| "Plain Text".to_string())
     }
-
-    /// Get the display title (currently always the filename - see `filename()`)
-    pub fn display_title(&self) -> String {
-        self.filename()
-    }
 }
 
 /// The style for the line-number gutter and the `…` truncation markers - deliberately not part

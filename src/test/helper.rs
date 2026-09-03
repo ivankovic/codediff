@@ -16,7 +16,6 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 pub mod human_mapping;
-pub mod optimal_iud;
 
 use anyhow::{Context, Result, bail};
 #[cfg(feature = "stats")]

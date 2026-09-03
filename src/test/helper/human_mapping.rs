@@ -924,12 +924,6 @@ pub fn assert_matches_human_painting_within_limit(name: &str, max_percent: f64) 
     );
 }
 
-/// [`assert_matches_human_painting_within_limit`] with no allowance - both modes must agree with
-/// the painting exactly.
-pub fn assert_matches_human_painting(name: &str) -> Result<()> {
-    assert_matches_human_painting_within_limit(name, 0.0)
-}
-
 /// Byte offset -> row, for annotating a disagreement without rescanning the file each time.
 struct RowIndex {
     /// Byte offset at which each row starts, ascending.

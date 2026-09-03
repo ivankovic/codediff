@@ -1902,8 +1902,10 @@ mismatches or cost columns):**
   `operation_cost` scores. `mapping.cost` drives no decisions (verified: no comparisons on it
   anywhere), but twice today a recorded zero that "didn't matter" derailed a diagnosis.
 - `hash_tree_matching::classify`: same hole in the descent classifier.
-- `test::helper::optimal_iud`: same hole in the oracle tests compare against - an oracle that
-  under-prices matching stops being the optimum of the model it is meant to certify.
+- ~~`test::helper::optimal_iud`: same hole in the oracle tests compare against.~~ Moot: that
+  module was deleted 2026-09-03. No test ever compared against it - its only caller was a bench
+  that neither compiled nor had a Makefile target, so the under-pricing bug was in an oracle
+  nothing ran.
 
 **Found and fixed (class b, behavioral):** `COST_LITERAL_UPDATE` was 2 = `COST_DELETE +
 COST_INSERT` exactly, documented in `rust_sniffnet_protocol.rs` as an "accepted cost tie" that

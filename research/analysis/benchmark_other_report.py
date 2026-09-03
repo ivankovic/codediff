@@ -199,17 +199,6 @@ def has_warm(rows: list[dict], id_: str) -> bool:
     return bool(rows) and column in rows[0] and any(r[column] != "" for r in rows)
 
 
-def has_gumtree_warm(rows: list[dict]) -> bool:
-    """Whether `gumtree_warm_ms` is present and non-empty for at least one row - the batch driver
-    is opt-in per *run*, not per-fixture (see `plot_runtime`'s doc comment), so this is checked
-    once per report rather than treated like a per-fixture language scope."""
-    return (
-        bool(rows)
-        and "gumtree_warm_ms" in rows[0]
-        and any(r["gumtree_warm_ms"] != "" for r in rows)
-    )
-
-
 def read_rows(csv_path: Path) -> tuple[list[str], list[dict]]:
     with open(csv_path, newline="") as f:
         reader = csv.DictReader(f)
@@ -243,16 +232,6 @@ def ms_values(row: dict, column: str) -> list[float]:
     `applicable_rows` already uses for the sibling `_mismatches` column."""
     raw = row.get(column, "")
     return [float(v) for v in raw.split(";")] if raw else []
-
-
-def ms_median(row: dict, column: str) -> float | None:
-    """The single representative value for `row[column]`'s repeats, used wherever a plot needs one
-    number per fixture rather than the full spread (e.g. the accuracy histogram's bucketing is
-    unaffected by timing at all, but a future per-fixture summary would want this) - median, not
-    mean, so one slow outlier repeat (a GC pause, a scheduler hiccup) doesn't move the summary as
-    much as it would move a mean."""
-    values = ms_values(row, column)
-    return float(np.median(values)) if values else None
 
 
 def applicable_rows(rows: list[dict], tool: str) -> list[dict]:
@@ -371,7 +350,6 @@ BUCKETS = [
     (r"$<$95\%", lambda mismatches, agreement: True),
 ]
 PLAIN_BUCKET_LABELS = ["Perfect", ">=99%", "95-99%", "<95%"]
-
 
 # The metrics a bucket table can be built over: `(mismatch column suffix, denominator column)`.
 #

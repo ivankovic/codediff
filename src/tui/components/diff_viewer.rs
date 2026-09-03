@@ -104,21 +104,6 @@ impl DiffViewer {
         Self::default()
     }
 
-    pub fn with_files(left_path: PathBuf, right_path: PathBuf) -> Self {
-        Self {
-            left_viewer: CodeViewer::with_file(left_path),
-            right_viewer: CodeViewer::with_file(right_path),
-            ..Default::default()
-        }
-    }
-
-    /// Load files into the viewers
-    pub fn load_files(&mut self, left_path: PathBuf, right_path: PathBuf) -> Result<()> {
-        self.left_viewer.load_file(left_path)?;
-        self.right_viewer.load_file(right_path)?;
-        Ok(())
-    }
-
     /// Load a completed diff: the file contents (already read, no further disk I/O here) plus
     /// the before/after diff ranges, and reset the cursor/cross-highlight to the start.
     pub fn load_diff(&mut self, data: &DiffSessionData) {
@@ -571,16 +556,6 @@ impl DiffViewer {
         }
         let state = viewer.state();
         Some((state.cursor_row, state.cursor_col))
-    }
-
-    /// The focused panel's total distinct changes and how many are at or before the cursor - see
-    /// `CodeViewer::change_count_and_index` - shown in `app.rs`'s footer line after `n`/`p`.
-    pub fn focused_change_count_and_index(&self) -> Option<(usize, usize)> {
-        let viewer = match self.active_panel {
-            Panel::Before => &self.left_viewer,
-            Panel::After => &self.right_viewer,
-        };
-        viewer.change_count_and_index()
     }
 
     /// Load a single file (no diff overlay yet) into the "Before" panel.
