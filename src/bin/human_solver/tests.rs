@@ -4132,9 +4132,7 @@ fn count_unmarked_nodes_in_tree_counts_every_hole_not_just_the_first() {
 /// them so the filtering path is covered too.
 #[test]
 fn scan_corpus_returns_the_same_map_at_every_worker_count() {
-    let names: Vec<(String, &'static str)> = (0..500)
-        .map(|i| (format!("case-{i:03}"), "handmade"))
-        .collect();
+    let names: Vec<String> = (0..500).map(|i| format!("case-{i:03}")).collect();
     // Deliberately a pure function of the name, so the expected map is knowable independently
     // of which thread happened to run which entry.
     let scan = |name: &str| {
@@ -4162,7 +4160,7 @@ fn scan_corpus_returns_the_same_map_at_every_worker_count() {
 /// immediately for most of them.
 #[test]
 fn scan_corpus_handles_more_workers_than_entries() {
-    let names = vec![("only".to_string(), "handmade")];
+    let names = vec!["only".to_string()];
     assert_eq!(
         scan_corpus_with_threads(&names, 8, |name| Some(name.len())),
         std::collections::HashMap::from([("only".to_string(), 4)])
@@ -4178,8 +4176,7 @@ fn scan_corpus_handles_more_workers_than_entries() {
 /// the picker and be indistinguishable from "not scanned yet".
 #[test]
 fn scan_corpus_propagates_a_worker_panic() {
-    let names: Vec<(String, &'static str)> =
-        (0..64).map(|i| (format!("case-{i}"), "handmade")).collect();
+    let names: Vec<String> = (0..64).map(|i| format!("case-{i}")).collect();
 
     // The default hook would dump a backtrace for a panic this test is deliberately causing.
     let hook = std::panic::take_hook();

@@ -470,6 +470,15 @@ fn list_dir_names(root: &Path) -> Result<Vec<String>> {
 /// the `o` picker doesn't distinguish between them (see the title bar's `[dataset]` tag, via
 /// `case_dataset`, for where a given case actually lives), since names are unique across all of
 /// them by construction (`action_promote`'s collision check spans all of them too).
+/// Just the case names from [`list_available_cases`], for the `scan_corpus` calls that only ever
+/// look a case up by name (all of them - the dataset half is for the picker's own Dataset column).
+fn list_available_case_names() -> Result<Vec<String>> {
+    Ok(list_available_cases()?
+        .into_iter()
+        .map(|(name, _)| name)
+        .collect())
+}
+
 fn list_available_cases() -> Result<Vec<(String, &'static str)>> {
     let mut names = Vec::new();
     for dataset in DIFF_DATASETS {
@@ -647,10 +656,7 @@ fn next_dataset_filter(current: Option<&'static str>) -> Option<&'static str> {
 /// 616ms -> 292ms, `compute_diff_comments` 14ms -> 1.6ms over 513 fixtures): they are I/O-bound
 /// rather than CPU-bound, so the gain is smaller, but it is a gain on the measurements above and
 /// keeping one code path for all four is worth more than the handful of milliseconds either way.
-fn scan_corpus<T, F>(
-    names: &[(String, &'static str)],
-    scan: F,
-) -> std::collections::HashMap<String, T>
+fn scan_corpus<T, F>(names: &[String], scan: F) -> std::collections::HashMap<String, T>
 where
     T: Send,
     F: Fn(&str) -> Option<T> + Sync,
@@ -689,7 +695,7 @@ const MAX_SCAN_THREADS: usize = 8;
 /// `scan_corpus` with the worker count pinned - the seam the tests use to check that a parallel
 /// run returns exactly what a single-threaded one does.
 fn scan_corpus_with_threads<T, F>(
-    names: &[(String, &'static str)],
+    names: &[String],
     threads: usize,
     scan: F,
 ) -> std::collections::HashMap<String, T>
@@ -700,7 +706,7 @@ where
     if threads <= 1 || names.len() <= 1 {
         return names
             .iter()
-            .filter_map(|(name, _)| scan(name).map(|value| (name.clone(), value)))
+            .filter_map(|name| scan(name).map(|value| (name.clone(), value)))
             .collect();
     }
 
@@ -717,7 +723,7 @@ where
                     let mut found = Vec::new();
                     loop {
                         let index = next.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                        let Some((name, _)) = names.get(index) else {
+                        let Some(name) = names.get(index) else {
                             break;
                         };
                         if let Some(value) = scan(name) {
@@ -853,10 +859,10 @@ fn refresh_diff_unmarked(app: &mut App, name: &str) {
 /// through a `PathCache` rather than rescanning siblings per entry - see `rebuild_caches`'s own
 /// doc comment for the very different cost that used to be.
 fn compute_diff_unmarked() -> std::collections::HashMap<String, usize> {
-    let Ok(options) = list_available_cases() else {
+    let Ok(names) = list_available_case_names() else {
         return std::collections::HashMap::new();
     };
-    scan_corpus(&options, diff_case_unmarked_count)
+    scan_corpus(&names, diff_case_unmarked_count)
 }
 
 /// Whether `name`'s human mapping already carries a painted text-range mapping (see
@@ -910,14 +916,14 @@ fn refresh_diff_text_painted(app: &mut App, name: &str) {
 /// on first `X` rather than eagerly on every `o`, both to match `H`'s behaviour and because 1.4 GB
 /// of mapping files is not free to read however cheap the per-file test is.
 fn compute_diff_text_painted() -> std::collections::HashMap<String, bool> {
-    let Ok(options) = list_available_cases() else {
+    let Ok(names) = list_available_case_names() else {
         return std::collections::HashMap::new();
     };
     // `Some(..unwrap_or(false))`, not `diff_case_has_text_mapping` directly: this map is keyed on
     // every listed case, with an unreadable one recorded as unpainted rather than left absent -
     // the fail-open direction this scan has always had, and the one place the four scans differ
     // in what they do with a `None`.
-    scan_corpus(&options, |name| {
+    scan_corpus(&names, |name| {
         Some(diff_case_has_text_mapping(name).unwrap_or(false))
     })
 }
@@ -972,10 +978,10 @@ fn refresh_diff_disagreement(app: &mut App, name: &str) {
 /// `ASTDiff` from the tree mapping and renders it through `TextDiff::from` per fixture - still
 /// bounded by the same corpus size, just a heavier constant per fixture.
 fn compute_diff_disagreement() -> std::collections::HashMap<String, usize> {
-    let Ok(options) = list_available_cases() else {
+    let Ok(names) = list_available_case_names() else {
         return std::collections::HashMap::new();
     };
-    scan_corpus(&options, diff_case_disagreement_bytes)
+    scan_corpus(&names, diff_case_disagreement_bytes)
 }
 
 /// Every case's note, keyed by case name, for the `o` picker. Cases without one are simply
@@ -986,10 +992,10 @@ fn compute_diff_disagreement() -> std::collections::HashMap<String, usize> {
 /// sides with tree-sitter. Most fixtures have no `description.md` at all, so most of this is a
 /// failed `stat`.
 fn compute_diff_comments() -> std::collections::HashMap<String, String> {
-    let Ok(options) = list_available_cases() else {
+    let Ok(names) = list_available_case_names() else {
         return std::collections::HashMap::new();
     };
-    scan_corpus(&options, read_note)
+    scan_corpus(&names, read_note)
 }
 
 /// Refreshes just `name`'s entry, for the same reason as `refresh_diff_text_painted`: `e` is the

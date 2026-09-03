@@ -1126,6 +1126,15 @@ pub(crate) struct App {
     /// all every time.
     pub(crate) sample_hide_solved: bool,
     pub(crate) sample_sort_order: SampleSortOrder,
+    /// Cached `sample_diff_line_count` per sample name, for the `O` picker's size column and its
+    /// two size-based sort orders. Cached because that count costs an external `diff` per sample
+    /// and the picker needs *every* sample's before it can draw: measured at 3.9s for the 1489
+    /// samples the stratified draw produced, paid on every single `O` press, where a few dozen
+    /// samples used to make it imperceptible. A materialized sample's before/after files never
+    /// change (promotion copies them out, it does not rewrite them), so a count only ever has to
+    /// be taken once per session; new samples appearing on disk mid-session are still picked up,
+    /// because only the names missing from this map get scanned.
+    pub(crate) sample_diff_sizes: std::collections::HashMap<String, usize>,
     /// The `o` picker's cursor column, sort and per-column filters (see `DiffPickerView`),
     /// persisted here rather than rebuilt from scratch on every `o`, for the same reason as
     /// `sample_hide_solved`/`sample_sort_order` above: narrowing to e.g. just `handmade` fixtures
@@ -1223,6 +1232,7 @@ impl App {
             show_reason: false,
             sample_hide_solved: false,
             sample_sort_order: SampleSortOrder::Alphabetical,
+            sample_diff_sizes: std::collections::HashMap::new(),
             diff_view: DiffPickerView::default(),
             diff_disagreement: None,
             diff_text_painted: None,

@@ -911,10 +911,28 @@ pub(crate) fn handle_key(
         KeyCode::Char('O') => {
             match list_samples_with_status() {
                 Ok(options) if !options.is_empty() => {
+                    // Only the names we have not already measured, scanned in parallel: this is
+                    // one external `diff` per sample, so all 1489 of them serially cost 3.9s of
+                    // frozen picker on every `O` (1.9s across the scan threads, and nothing at
+                    // all on the presses after the first - see `sample_diff_sizes`).
+                    let missing: Vec<String> = options
+                        .iter()
+                        .map(|(name, _)| name.clone())
+                        .filter(|name| !app.sample_diff_sizes.contains_key(name))
+                        .collect();
+                    if !missing.is_empty() {
+                        app.sample_diff_sizes.extend(scan_corpus(&missing, |name| {
+                            Some(sample_diff_line_count(name))
+                        }));
+                    }
                     let options: Vec<(String, SampleTriageStatus, usize)> = options
                         .into_iter()
                         .map(|(name, status)| {
-                            let size = sample_diff_line_count(&name);
+                            let size = app
+                                .sample_diff_sizes
+                                .get(&name)
+                                .copied()
+                                .unwrap_or_default();
                             (name, status, size)
                         })
                         .collect();
