@@ -278,9 +278,15 @@ impl OverlayTheme {
                 OverlayPalette {
                     insert_bg: blend_toward_base((80, 250, 123), bg, 0.6), // green
                     delete_bg: blend_toward_base((255, 85, 85), bg, 0.6),  // red
-                    move_bg: blend_toward_base((189, 147, 249), bg, 0.6),  // purple
+                    // The one band that is deliberately *not* this theme's canonical accent (see
+                    // the note above): a plain grey, because a move is the one operation that
+                    // changes no code. Purple read as loud as insert/delete/update and pulled the
+                    // eye to the thing that needs the least attention. Blended toward the
+                    // background at the same 0.6 as its neighbours, so it sits at their weight
+                    // rather than glowing: #aaaaaa over Dracula's base lands on Rgb(92, 93, 100).
+                    move_bg: blend_toward_base((170, 170, 170), bg, 0.6), // grey, #aaaaaa
                     update_bg: blend_toward_base((241, 250, 140), bg, 0.6), // yellow
-                    overlay_fg: Color::Rgb(248, 248, 242),                 // foreground
+                    overlay_fg: Color::Rgb(248, 248, 242),                // foreground
                     cross_highlight_bg: blend_toward_base((139, 233, 253), bg, 0.4), // cyan
                     search_bg: blend_toward_base((255, 184, 108), bg, 0.4), // orange
                     before_title_fg: PRESET_BEFORE_TITLE_FG,
@@ -696,6 +702,23 @@ mod tests {
                 "{theme:?} is identical to Dark"
             );
         }
+    }
+
+    /// A move changes no code - it is the one band that reports relocation rather than an edit -
+    /// so the shipped default paints it neutral instead of giving it a fourth loud hue competing
+    /// with insert/delete/update for the eye. Asserted as "reads as grey" rather than as an exact
+    /// triple, so the value can still be retuned against the background without the intent
+    /// silently reverting to a color.
+    #[test]
+    fn the_default_themes_move_band_is_grey_rather_than_a_hue() {
+        let Color::Rgb(r, g, b) = OverlayTheme::default().palette().move_bg else {
+            panic!("expected an rgb move band");
+        };
+        let spread = r.max(g).max(b) - r.min(g).min(b);
+        assert!(
+            spread <= 12,
+            "move_bg should read as grey, got rgb({r}, {g}, {b}) with channel spread {spread}"
+        );
     }
 
     /// Every theme's bands must actually be distinct colors - otherwise the picker would offer
