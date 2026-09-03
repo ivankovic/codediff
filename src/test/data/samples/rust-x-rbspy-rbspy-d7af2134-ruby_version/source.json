@@ -1,8 +1,0 @@
-{
-  "language": "Rust",
-  "repository": "rbspy-rbspy",
-  "commit": "d7af2134b698e7e2d9d66bbed6c6523011d24012",
-  "path": "src/core/ruby_version.rs",
-  "dataset": "full",
-  "status": "SAMPLED"
-}

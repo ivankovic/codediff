@@ -1,8 +1,0 @@
-{
-  "language": "YAML",
-  "repository": "Arkq-bluez-alsa",
-  "commit": "d16a166667ba8dab48b8a1a80bab8343747b4a87",
-  "path": ".github/workflows/code-scanning.yaml",
-  "dataset": "full",
-  "status": "SAMPLED"
-}

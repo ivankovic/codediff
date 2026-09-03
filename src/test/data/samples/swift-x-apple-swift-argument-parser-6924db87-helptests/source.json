@@ -1,8 +1,0 @@
-{
-  "language": "Swift",
-  "repository": "apple-swift-argument-parser",
-  "commit": "6924db870dae99d2abf8b78a81eed46da1638b09",
-  "path": "Tests/ArgumentParserPackageManagerTests/HelpTests.swift",
-  "dataset": "full",
-  "status": "SAMPLED"
-}

@@ -1,8 +1,0 @@
-{
-  "language": "LUA",
-  "repository": "CorsixTH-CorsixTH",
-  "commit": "bb4f67d5b45d767539ec2e809b41cc63bc97c166",
-  "path": "CorsixTH/Lua/rooms/training.lua",
-  "dataset": "full",
-  "status": "SAMPLED"
-}

@@ -1,8 +1,0 @@
-{
-  "language": "Java",
-  "repository": "hunterhacker-jdom",
-  "commit": "b7cb36b2305a894355c092ebb698fcdd50b1d67d",
-  "path": "core/src/java/org/jdom2/output/DOMOutputter.java",
-  "dataset": "full",
-  "status": "SAMPLED"
-}

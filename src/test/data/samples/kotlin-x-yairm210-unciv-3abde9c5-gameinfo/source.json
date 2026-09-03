@@ -1,8 +1,0 @@
-{
-  "language": "Kotlin",
-  "repository": "yairm210-Unciv",
-  "commit": "3abde9c543ca5fe92f5e97d7205a6d2f71fe6119",
-  "path": "core/src/com/unciv/logic/GameInfo.kt",
-  "dataset": "full",
-  "status": "SAMPLED"
-}

@@ -1,8 +1,0 @@
-{
-  "language": "Swift",
-  "repository": "tree-sitter-tree-sitter-haskell",
-  "commit": "d0bdf18a667c58f339d599807616bab4c9f2b927",
-  "path": "Package.swift",
-  "dataset": "full",
-  "status": "SAMPLED"
-}

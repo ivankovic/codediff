@@ -1,8 +1,0 @@
-{
-  "language": "Ruby",
-  "repository": "moneta-rb-moneta",
-  "commit": "e7f4c27472e555946a2f27f5ac8be0e8b0702aac",
-  "path": "lib/moneta/transforms/bson.rb",
-  "dataset": "full",
-  "status": "SAMPLED"
-}

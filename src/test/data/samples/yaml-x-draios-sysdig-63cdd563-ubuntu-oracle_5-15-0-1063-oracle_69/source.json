@@ -1,8 +1,0 @@
-{
-  "language": "YAML",
-  "repository": "draios-sysdig",
-  "commit": "63cdd56353c6953e2323fc2fd10018a8ee1fd627",
-  "path": "scripts/driverkit/config/8.0.0+driver/x86_64/ubuntu-oracle_5.15.0-1063-oracle_69.yaml",
-  "dataset": "full",
-  "status": "SAMPLED"
-}

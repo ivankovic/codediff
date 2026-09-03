@@ -1,8 +1,0 @@
-{
-  "language": "PHP",
-  "repository": "Icinga-icingaweb2-module-graphite",
-  "commit": "cc8690fdda1b4e463caa5ed699ae39faefebea77",
-  "path": "application/controllers/ServicesController.php",
-  "dataset": "full",
-  "status": "SAMPLED"
-}

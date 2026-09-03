@@ -1,8 +1,0 @@
-{
-  "language": "Ruby",
-  "repository": "jmespath-jmespath.rb",
-  "commit": "9e861c736ef88ee99cdd5910f59c9e6c5d5e607a",
-  "path": "lib/jmespath/parser.rb",
-  "dataset": "full",
-  "status": "SAMPLED"
-}

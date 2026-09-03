@@ -1,8 +1,0 @@
-{
-  "language": "CPP",
-  "repository": "MikePopoloski-slang",
-  "commit": "62164d11ddce3b4c09102b4013fb10ce2bf8cb44",
-  "path": "source/analysis/DriverTracker.cpp",
-  "dataset": "full",
-  "status": "SAMPLED"
-}

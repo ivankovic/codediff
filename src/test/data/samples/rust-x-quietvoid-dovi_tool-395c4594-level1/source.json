@@ -1,8 +1,0 @@
-{
-  "language": "Rust",
-  "repository": "quietvoid-dovi_tool",
-  "commit": "395c45941eb48b30f8a5cfafd1fad1769b36dbe9",
-  "path": "dolby_vision/src/rpu/extension_metadata/blocks/level1.rs",
-  "dataset": "full",
-  "status": "SAMPLED"
-}

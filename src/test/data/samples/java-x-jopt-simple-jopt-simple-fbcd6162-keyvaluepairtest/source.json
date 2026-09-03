@@ -1,8 +1,0 @@
-{
-  "language": "Java",
-  "repository": "jopt-simple-jopt-simple",
-  "commit": "fbcd61626db0b7492faa7779917fe2564acb7c08",
-  "path": "src/test/java/net/sf/joptsimple/KeyValuePairTest.java",
-  "dataset": "full",
-  "status": "SAMPLED"
-}

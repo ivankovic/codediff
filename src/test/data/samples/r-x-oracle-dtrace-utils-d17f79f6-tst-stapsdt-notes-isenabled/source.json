@@ -1,8 +1,0 @@
-{
-  "language": "R",
-  "repository": "oracle-dtrace-utils",
-  "commit": "d17f79f640453be8e7a2ebf033c20fafee338617",
-  "path": "test/unittest/usdt/tst.stapsdt-notes-isenabled.r",
-  "dataset": "full",
-  "status": "SAMPLED"
-}

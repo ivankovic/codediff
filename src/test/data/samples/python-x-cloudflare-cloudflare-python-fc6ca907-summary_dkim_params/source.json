@@ -1,8 +1,0 @@
-{
-  "language": "Python",
-  "repository": "cloudflare-cloudflare-python",
-  "commit": "fc6ca90779cd230dc06445ba42e4c540da186ce0",
-  "path": "src/cloudflare/types/radar/email/security/summary_dkim_params.py",
-  "dataset": "full",
-  "status": "SAMPLED"
-}

@@ -1,8 +1,0 @@
-{
-  "language": "TSX",
-  "repository": "Kong-insomnia",
-  "commit": "c62a114d28a064c303d0c7114ced1cf68b2a8bc3",
-  "path": "packages/insomnia/src/ui/components/templating/tag-editor.tsx",
-  "dataset": "full",
-  "status": "SAMPLED"
-}

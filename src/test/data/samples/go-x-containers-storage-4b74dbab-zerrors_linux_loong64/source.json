@@ -1,8 +1,0 @@
-{
-  "language": "Go",
-  "repository": "containers-storage",
-  "commit": "4b74dbabbb2e78ad6905bfb042e2a690a86ff176",
-  "path": "vendor/golang.org/x/sys/unix/zerrors_linux_loong64.go",
-  "dataset": "full",
-  "status": "SAMPLED"
-}

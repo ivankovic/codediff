@@ -1,8 +1,0 @@
-{
-  "language": "Go",
-  "repository": "jesseduffield-lazygit.git",
-  "commit": "1b60c9d7c6f4121a5561022986a0ae4627668b1b",
-  "path": "vendor/golang.org/x/sys/cpu/cpu_gccgo_arm64.go",
-  "dataset": "full",
-  "status": "SAMPLED"
-}

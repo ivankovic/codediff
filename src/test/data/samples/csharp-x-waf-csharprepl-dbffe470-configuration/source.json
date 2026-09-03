@@ -1,8 +1,0 @@
-{
-  "language": "CSharp",
-  "repository": "waf-CSharpRepl",
-  "commit": "dbffe470e8c1186627b9ccbc9d94f3bd3722d2e0",
-  "path": "CSharpRepl.Services/Configuration.cs",
-  "dataset": "full",
-  "status": "SAMPLED"
-}

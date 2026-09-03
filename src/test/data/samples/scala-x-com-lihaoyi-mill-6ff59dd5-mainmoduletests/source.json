@@ -1,8 +1,0 @@
-{
-  "language": "Scala",
-  "repository": "com-lihaoyi-mill",
-  "commit": "6ff59dd551eedf467c062993da6b7218e69ca237",
-  "path": "libs/util/test/src/mill/util/MainModuleTests.scala",
-  "dataset": "full",
-  "status": "SAMPLED"
-}

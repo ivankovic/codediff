@@ -1,8 +1,0 @@
-{
-  "language": "Java",
-  "repository": "eclipse-jdt-eclipse.jdt.core",
-  "commit": "a6af724bba7dffe7c31fb18e1b3c1b16b107607a",
-  "path": "org.eclipse.jdt.core.compiler.batch/src/org/eclipse/jdt/internal/compiler/ast/IPolyExpression.java",
-  "dataset": "full",
-  "status": "SAMPLED"
-}

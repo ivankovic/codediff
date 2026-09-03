@@ -1,8 +1,0 @@
-{
-  "language": "Kotlin",
-  "repository": "yairm210-Unciv",
-  "commit": "f0df80df32353e04737361a5f881900e20613c8c",
-  "path": "core/src/com/unciv/ui/screens/cityscreen/CityScreen.kt",
-  "dataset": "full",
-  "status": "SAMPLED"
-}

@@ -1,8 +1,0 @@
-{
-  "language": "Vimscript",
-  "repository": "preservim-tagbar",
-  "commit": "8de7694c0aeda253073098bbc9fb890b2902ddb8",
-  "path": "autoload/tagbar.vim",
-  "dataset": "full",
-  "status": "SAMPLED"
-}

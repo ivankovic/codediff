@@ -1,8 +1,0 @@
-{
-  "language": "Java",
-  "repository": "pdftk-java-pdftk",
-  "commit": "f5a7e3e86af59ff8c9e441e9d892b95b7d316a5f",
-  "path": "java/com/gitlab/pdftk_java/com/lowagie/text/pdf/PdfAppearance.java",
-  "dataset": "full",
-  "status": "SAMPLED"
-}

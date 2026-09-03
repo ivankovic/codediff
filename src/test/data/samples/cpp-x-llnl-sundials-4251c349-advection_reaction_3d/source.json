@@ -1,8 +1,0 @@
-{
-  "language": "CPP",
-  "repository": "LLNL-sundials",
-  "commit": "4251c3499acf5ec5707be7e66b5029933bc030f6",
-  "path": "benchmarks/advection_reaction_3D/raja/advection_reaction_3D.cpp",
-  "dataset": "full",
-  "status": "SAMPLED"
-}

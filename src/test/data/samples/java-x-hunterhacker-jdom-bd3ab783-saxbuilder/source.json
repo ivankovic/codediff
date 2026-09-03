@@ -1,8 +1,0 @@
-{
-  "language": "Java",
-  "repository": "hunterhacker-jdom",
-  "commit": "bd3ab78370098491911d7fe9d7a43b97144a234e",
-  "path": "core/src/java/org/jdom2/input/SAXBuilder.java",
-  "dataset": "full",
-  "status": "SAMPLED"
-}

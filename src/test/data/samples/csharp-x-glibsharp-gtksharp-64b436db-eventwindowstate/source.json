@@ -1,8 +1,0 @@
-{
-  "language": "CSharp",
-  "repository": "GLibSharp-GtkSharp",
-  "commit": "64b436dbde99fee8326a6ab0fc48a9c6eaba6988",
-  "path": "Source/gdk/EventWindowState.cs",
-  "dataset": "full",
-  "status": "SAMPLED"
-}

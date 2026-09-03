@@ -1,8 +1,0 @@
-{
-  "language": "PHP",
-  "repository": "ConSol-Monitoring-pnp",
-  "commit": "f82f96f780924e2f9a25fe97ece543f055e3931e",
-  "path": "share/pnp/application/vendor/fpdf/fpdf.php",
-  "dataset": "full",
-  "status": "SAMPLED"
-}

@@ -1,8 +1,0 @@
-{
-  "language": "C",
-  "repository": "PixarAnimationStudios-OpenSubdiv",
-  "commit": "17530d964d082f9f59fd1b429c5501bb61178329",
-  "path": "regression/common/far_utils.h",
-  "dataset": "full",
-  "status": "SAMPLED"
-}

@@ -1,8 +1,0 @@
-{
-  "language": "Go",
-  "repository": "StackExchange-blackbox",
-  "commit": "4cb38089141bc33899d30036eedfdd978f5b72a6",
-  "path": "pkg/bbutil/umask_windows.go",
-  "dataset": "full",
-  "status": "SAMPLED"
-}

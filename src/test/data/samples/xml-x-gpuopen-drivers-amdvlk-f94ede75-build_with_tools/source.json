@@ -1,8 +1,0 @@
-{
-  "language": "XML",
-  "repository": "GPUOpen-Drivers-AMDVLK",
-  "commit": "f94ede75631645e311f1fc84e770daaa7a91e35f",
-  "path": "build_with_tools.xml",
-  "dataset": "full",
-  "status": "SAMPLED"
-}

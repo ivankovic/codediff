@@ -1,8 +1,0 @@
-{
-  "language": "XML",
-  "repository": "AdoptOpenJDK-icedtea-web",
-  "commit": "66422421d703566dd4f4b2b098ad25ae536fd369",
-  "path": "integration/pom.xml",
-  "dataset": "full",
-  "status": "SAMPLED"
-}

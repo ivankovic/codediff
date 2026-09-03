@@ -1,8 +1,0 @@
-{
-  "language": "ShellScript",
-  "repository": "hgst-libzbc",
-  "commit": "ae872375126497f66898d8d79f7b12e66b158ef1",
-  "path": "test/scripts/05_xmr_per_activation/432.sh",
-  "dataset": "full",
-  "status": "SAMPLED"
-}

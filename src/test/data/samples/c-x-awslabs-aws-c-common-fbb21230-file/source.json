@@ -1,8 +1,0 @@
-{
-  "language": "C",
-  "repository": "awslabs-aws-c-common",
-  "commit": "fbb21230e117d2afe49d03ebe8605270dacb4ab3",
-  "path": "include/aws/common/file.h",
-  "dataset": "full",
-  "status": "SAMPLED"
-}

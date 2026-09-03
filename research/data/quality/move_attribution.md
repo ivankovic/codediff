@@ -167,8 +167,18 @@ tends to blame the block that was jumped over, which is usually the larger of th
 
 The fixture above is
 `src/test/data/samples/python-x-aboutcode-org-license-expression-af87cfab-utils_thirdparty` (a
-sample, never promoted to `diffs/`, so it is *not* among the 501 counted here). Rendered move
-hunks, via `codediff --mode json before.py.test after.py.test`:
+sample, never promoted to `diffs/`, so it is *not* among the 501 counted here).
+
+That directory no longer exists in the working tree: `src/test/data/samples/` was emptied once
+every sample in it had been triaged, since a promoted sample's content lives on in `diffs/` and a
+rejected one is recorded in `sample.csv`. It is still in git history, so this measurement stays
+reproducible - recover just this one directory with:
+
+```
+git checkout 904e5de -- src/test/data/samples/python-x-aboutcode-org-license-expression-af87cfab-utils_thirdparty
+```
+
+Rendered move hunks, via `codediff --mode json before.py.test after.py.test`:
 
 ```
 before reconcile_moves:   before: move rows 27..32     after: move rows 33..34

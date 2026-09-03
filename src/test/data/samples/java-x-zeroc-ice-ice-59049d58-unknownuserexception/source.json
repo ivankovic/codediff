@@ -1,8 +1,0 @@
-{
-  "language": "Java",
-  "repository": "zeroc-ice-ice",
-  "commit": "59049d585865f74326e1ff85103de4f9491106f6",
-  "path": "java/src/com.zeroc.ice/src/main/java/com/zeroc/Ice/UnknownUserException.java",
-  "dataset": "full",
-  "status": "SAMPLED"
-}

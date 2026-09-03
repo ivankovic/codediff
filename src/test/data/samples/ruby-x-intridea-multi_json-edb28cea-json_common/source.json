@@ -1,8 +1,0 @@
-{
-  "language": "Ruby",
-  "repository": "intridea-multi_json",
-  "commit": "edb28ceab21b915aff6354cf9b05a08905d71d35",
-  "path": "lib/multi_json/adapters/json_common.rb",
-  "dataset": "full",
-  "status": "SAMPLED"
-}

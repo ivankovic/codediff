@@ -1,8 +1,0 @@
-{
-  "language": "LUA",
-  "repository": "LuaLS-lua-language-server",
-  "commit": "715893512fc707cf0ffdbd18e240baad942920ae",
-  "path": "script/library.lua",
-  "dataset": "full",
-  "status": "SAMPLED"
-}

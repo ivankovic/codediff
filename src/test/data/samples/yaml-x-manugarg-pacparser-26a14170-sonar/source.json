@@ -1,8 +1,0 @@
-{
-  "language": "YAML",
-  "repository": "manugarg-pacparser",
-  "commit": "26a14170bacd97ef208b511d6e7e2e0c56ebedac",
-  "path": ".github/workflows/sonar.yml",
-  "dataset": "full",
-  "status": "SAMPLED"
-}

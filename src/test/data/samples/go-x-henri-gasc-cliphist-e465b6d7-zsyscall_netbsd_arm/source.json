@@ -1,8 +1,0 @@
-{
-  "language": "Go",
-  "repository": "henri-gasc-cliphist",
-  "commit": "e465b6d7439c681831a61523216092cec19b0895",
-  "path": "vendor/golang.org/x/sys/unix/zsyscall_netbsd_arm.go",
-  "dataset": "full",
-  "status": "SAMPLED"
-}

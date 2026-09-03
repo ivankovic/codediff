@@ -1,8 +1,0 @@
-{
-  "language": "ShellScript",
-  "repository": "OpenLightingProject-ola",
-  "commit": "2058e5c4fae214661f08c5aefaf8e1651f6a8f39",
-  "path": ".travis-ci.sh",
-  "dataset": "full",
-  "status": "SAMPLED"
-}

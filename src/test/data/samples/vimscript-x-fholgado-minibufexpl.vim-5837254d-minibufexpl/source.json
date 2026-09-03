@@ -1,8 +1,0 @@
-{
-  "language": "Vimscript",
-  "repository": "fholgado-minibufexpl.vim",
-  "commit": "5837254d3564705b7af3da43cb2004e63e5f3009",
-  "path": "plugin/minibufexpl.vim",
-  "dataset": "full",
-  "status": "SAMPLED"
-}

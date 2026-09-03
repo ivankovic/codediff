@@ -1,8 +1,0 @@
-{
-  "language": "TSX",
-  "repository": "popcorn-official-popcorn-desktop",
-  "commit": "108e30a11c47fb6bbf3f392349dd37fc3d1dc8dd",
-  "path": "apps/desktop/src/routes/splash.test.tsx",
-  "dataset": "full",
-  "status": "SAMPLED"
-}

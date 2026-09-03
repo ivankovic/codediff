@@ -1,8 +1,0 @@
-{
-  "language": "Java",
-  "repository": "jakartaee-rest",
-  "commit": "6984bfcc1996423a08ae6c0b71ae3da6bc591d9c",
-  "path": "jaxrs-api/src/main/java/jakarta/ws/rs/client/ClientBuilder.java",
-  "dataset": "full",
-  "status": "SAMPLED"
-}

@@ -1,8 +1,0 @@
-{
-  "language": "Scala",
-  "repository": "com-lihaoyi-mill",
-  "commit": "1a3ab3bf6b3bb336d15e95a5b34f0d63f6cf8bca",
-  "path": "runner/daemon/src/mill/daemon/RunnerState.scala",
-  "dataset": "full",
-  "status": "SAMPLED"
-}

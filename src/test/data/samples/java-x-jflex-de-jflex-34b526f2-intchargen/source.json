@@ -1,8 +1,0 @@
-{
-  "language": "Java",
-  "repository": "jflex-de-jflex",
-  "commit": "34b526f2364bdd786beb235cd7714d788949a1e6",
-  "path": "jflex/src/test/java/jflex/core/unicode/IntCharGen.java",
-  "dataset": "full",
-  "status": "SAMPLED"
-}

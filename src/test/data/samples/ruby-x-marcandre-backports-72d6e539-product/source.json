@@ -1,8 +1,0 @@
-{
-  "language": "Ruby",
-  "repository": "marcandre-backports",
-  "commit": "72d6e539c0960506a1afd2cff05e4b257fb865b3",
-  "path": "lib/backports/3.2.0/enumerator/product.rb",
-  "dataset": "full",
-  "status": "SAMPLED"
-}

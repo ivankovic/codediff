@@ -1,8 +1,0 @@
-{
-  "language": "Kotlin",
-  "repository": "JetBrains-kotlin",
-  "commit": "7a1169836f180282ce51df9ede15816e4a5920d9",
-  "path": "compiler/testData/codegen/bytecodeText/builtinFunctions/genericParameterBridge/mutableSetInterfaces.kt",
-  "dataset": "full",
-  "status": "SAMPLED"
-}

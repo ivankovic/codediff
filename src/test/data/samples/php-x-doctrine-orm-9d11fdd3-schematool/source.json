@@ -1,8 +1,0 @@
-{
-  "language": "PHP",
-  "repository": "doctrine-orm",
-  "commit": "9d11fdd3da9ffb78f4ed703421accbd443366f16",
-  "path": "src/Tools/SchemaTool.php",
-  "dataset": "full",
-  "status": "SAMPLED"
-}

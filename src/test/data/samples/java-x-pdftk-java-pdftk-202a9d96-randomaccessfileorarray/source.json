@@ -1,8 +1,0 @@
-{
-  "language": "Java",
-  "repository": "pdftk-java-pdftk",
-  "commit": "202a9d96eb2aa40fc55c2d71817656715b6f4128",
-  "path": "java/com/gitlab/pdftk_java/com/lowagie/text/pdf/RandomAccessFileOrArray.java",
-  "dataset": "full",
-  "status": "SAMPLED"
-}

@@ -1,8 +1,0 @@
-{
-  "language": "Scala",
-  "repository": "ymnk-jzlib",
-  "commit": "389af328c466fdcdcf36249e99b82ceed92d5b97",
-  "path": "src/test/scala/WrapperTypeTest.scala",
-  "dataset": "full",
-  "status": "SAMPLED"
-}

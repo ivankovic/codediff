@@ -1,8 +1,0 @@
-{
-  "language": "PHP",
-  "repository": "rk4an-phpsysinfo",
-  "commit": "b51107578a6ccd8bb8ab2fdfd4693f3c7593ca1f",
-  "path": "includes/os/class.BSDCommon.inc.php",
-  "dataset": "full",
-  "status": "SAMPLED"
-}

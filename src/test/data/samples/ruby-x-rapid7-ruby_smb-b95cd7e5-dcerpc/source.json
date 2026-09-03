@@ -1,8 +1,0 @@
-{
-  "language": "Ruby",
-  "repository": "rapid7-ruby_smb",
-  "commit": "b95cd7e5d7cff53dcc49951b15d2c18e0ec8b8b0",
-  "path": "lib/ruby_smb/dcerpc.rb",
-  "dataset": "full",
-  "status": "SAMPLED"
-}

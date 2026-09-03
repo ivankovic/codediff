@@ -1,8 +1,0 @@
-{
-  "language": "ShellScript",
-  "repository": "fleetingheart-ksre",
-  "commit": "3ea71d606765ba0c1a88bbc42cf975dc512eced2",
-  "path": "tl_videos_gen/translate.sh",
-  "dataset": "full",
-  "status": "SAMPLED"
-}

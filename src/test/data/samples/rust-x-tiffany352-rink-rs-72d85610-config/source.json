@@ -1,8 +1,0 @@
-{
-  "language": "Rust",
-  "repository": "tiffany352-rink-rs",
-  "commit": "72d856109bd7f4b73082d8f785f0dfdc1d644b1e",
-  "path": "cli/src/config.rs",
-  "dataset": "full",
-  "status": "SAMPLED"
-}

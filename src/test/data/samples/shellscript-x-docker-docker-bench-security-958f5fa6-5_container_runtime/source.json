@@ -1,8 +1,0 @@
-{
-  "language": "ShellScript",
-  "repository": "docker-docker-bench-security",
-  "commit": "958f5fa6c378fc8f9a73e7f89204ed434cf09d2a",
-  "path": "tests/5_container_runtime.sh",
-  "dataset": "full",
-  "status": "SAMPLED"
-}

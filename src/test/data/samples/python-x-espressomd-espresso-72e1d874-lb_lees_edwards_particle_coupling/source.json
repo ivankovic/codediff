@@ -1,8 +1,0 @@
-{
-  "language": "Python",
-  "repository": "espressomd-espresso",
-  "commit": "72e1d874fe6b39401fd839d1a69e6c451c6fac83",
-  "path": "testsuite/python/lb_lees_edwards_particle_coupling.py",
-  "dataset": "full",
-  "status": "SAMPLED"
-}

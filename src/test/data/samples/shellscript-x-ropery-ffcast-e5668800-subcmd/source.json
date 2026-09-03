@@ -1,8 +1,0 @@
-{
-  "language": "ShellScript",
-  "repository": "ropery-ffcast",
-  "commit": "e56688008be0a6a588251f77d7e517f2ae2b5917",
-  "path": "src/subcmd.bash",
-  "dataset": "full",
-  "status": "SAMPLED"
-}

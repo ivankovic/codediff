@@ -1,8 +1,0 @@
-{
-  "language": "Vimscript",
-  "repository": "jreybert-vimagit",
-  "commit": "e892fb654b97fe815cd0fafe035169bfad333a4e",
-  "path": "autoload/magit/state.vim",
-  "dataset": "full",
-  "status": "SAMPLED"
-}
