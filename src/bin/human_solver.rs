@@ -118,17 +118,19 @@
 *                  immediately on Enter (not on `w` - that saves human_mapping.json); an empty
 *                  submission deletes the file. The `o` picker marks cases that have one with a
 *                  leading `*` and shows the selected case's note along the bottom.
-*                  `diff_inventory` prefers it over the sample.csv comment when writing
-*                  diffs.csv, and the prompt pre-fills from that comment when no note exists yet,
-*                  so promoting carries one forward. On a sample it still edits sample.csv
-*                  instead: prompts for
+*                  It is the *only* home for a promoted fixture's note: `diff_inventory` reads
+*                  `description.md` and nothing else, and promotion moves any sample comment into
+*                  the file rather than leaving a copy in sample.csv (see `action_promote` /
+*                  `update_sample_csv_at`). On a sample it still edits sample.csv instead:
+*                  prompts for
 *                  text, pre-filled with whatever's already recorded, and records it verbatim in
 *                  the matching sample.csv row's `comment` column -- unlike `R`, doesn't touch
-*                  `status`, works whether the row is SAMPLED/PROMOTED/REJECTED, and an empty
-*                  submission clears the comment rather than being rejected as invalid input. If a
-*                  comment is present when the sample is later promoted (`s`), it's also written as
-*                  a leading comment in the generated optimal_solutions test stub. Has no effect on
-*                  a real test case or a git-commit-sourced case, same as `R`
+*                  `status`, and an empty submission clears the comment rather than being rejected
+*                  as invalid input. If a comment is present when the sample is later promoted
+*                  (`s`), it is written both as a leading comment in the generated
+*                  optimal_solutions test stub and into the new fixture's `description.md`, and
+*                  the sample.csv cell is cleared. Has no effect on a real test case or a
+*                  git-commit-sourced case, same as `R`
 *   o              open a different test case: a table of every directory under
 *                  src/test/data/diffs/{handmade,small,full,stratified}/, one row per case and one
 *                  column per thing worth triaging on - Name, Dataset, Cmpl, Unmarked, Paint,
@@ -7114,13 +7116,10 @@ fn handle_key(
         }
         KeyCode::Char('e') => {
             if let CaseOrigin::Diffs = &app.origin {
-                // Pre-filled from the note if there is one, and otherwise from the sample.csv
-                // comment this fixture was promoted with. That second fallback is what keeps
-                // "description.md wins" from stranding anything: the old comment appears in the
-                // prompt, and confirming it copies it into the file the inventory now prefers.
-                let existing = read_note(&app.name)
-                    .or_else(|| promoted_sample_comment(&app.name))
-                    .unwrap_or_default();
+                // Just the note: a promoted fixture's sample.csv row no longer carries a comment
+                // to fall back to, because `action_promote` moves it into `description.md` and
+                // clears the cell rather than leaving a second copy behind.
+                let existing = read_note(&app.name).unwrap_or_default();
                 app.modal = Some(Modal::PromptComment {
                     input: existing,
                     error: None,
@@ -8479,11 +8478,10 @@ fn action_promote(
         comment.as_deref(),
     )?;
 
-    // ...and into the fixture's own `description.md`, which is where `diff_inventory` reads a
-    // note from. Without this a promoted case would leave its comment behind in sample.csv - the
-    // one place a fixture's note can be edited but not seen, since `e` on the promoted case now
-    // writes the file. Every commented fixture in the corpus has one; this is what keeps that
-    // true for the next promotion rather than only for the migration that established it.
+    // ...and into the fixture's own `description.md`, which is where `diff_inventory` reads a note
+    // from and where `e` on the promoted case writes one. The sample.csv cell is cleared below:
+    // the note **moves** here rather than being copied, so a promoted fixture has exactly one
+    // note and there is no second copy to drift. `no_promoted_row_carries_a_comment` pins that.
     let note_written = match &comment {
         Some(comment) => write_note(new_name, comment).is_ok(),
         None => false,
@@ -8694,20 +8692,6 @@ fn promoted_case_name(source: &SampleSource) -> Option<String> {
         .filter(|name| !name.trim().is_empty())
 }
 
-/// The `sample.csv` comment recorded against the sample this fixture was promoted from, if any.
-///
-/// Joined on `promoted_to`, the same key `diff_inventory` uses. Only ever a *fallback*: it fills
-/// the `e` prompt for a diff that has no `description.md` yet, so a comment written before
-/// promotion is one Enter away from becoming the note the inventory now prefers. A handmade
-/// fixture was never sampled and has no row at all, which is exactly why `description.md` exists.
-fn promoted_sample_comment(name: &str) -> Option<String> {
-    let rows = read_sample_csv_rows(&sample_csv_path()).ok()?;
-    rows.iter()
-        .find(|row| row.promoted_to == name)
-        .map(|row| row.comment.clone())
-        .filter(|comment| !comment.trim().is_empty())
-}
-
 fn find_sample_row<'a>(
     rows: &'a [SampleCsvRow],
     source: &SampleSource,
@@ -8753,6 +8737,12 @@ fn update_sample_csv_at(path: &Path, source: &SampleSource, new_name: &str) -> R
     };
     row.promoted_to = new_name.to_string();
     row.status = "PROMOTED".to_string();
+    // The note **moves** to the fixture's own `description.md` (written by `action_promote` just
+    // before this call) rather than being copied there. A promoted row keeping its comment is how
+    // one fixture ended up with two notes that could drift - and one pair had, by the time the
+    // duplication was found. `no_promoted_row_carries_a_comment` pins the invariant; a rejection
+    // keeps its reason here, because a rejected sample has no directory to hold one.
+    row.comment.clear();
 
     write_sample_csv_rows(path, &rows)?;
     Ok(true)
@@ -10377,22 +10367,29 @@ mod tests {
         );
     }
 
-    /// Every commented fixture in the corpus keeps its note in its own `description.md`, not in
-    /// sample.csv. Pins the migration: the 20 fixtures whose note used to live only in a
-    /// sample.csv row were copied across, and this fails if one is ever removed or if a new
-    /// commented fixture arrives without one.
+    /// **A promoted fixture's note lives in its own `description.md`, and nowhere else.**
+    ///
+    /// Stronger than the rule this replaced, which only asked that a sample.csv comment also have
+    /// a file - that allowed two copies, and two copies drift: of the 19 promoted rows that
+    /// carried a comment, 18 matched their `description.md` byte for byte and one had already
+    /// diverged. Promotion now *moves* the note (see `update_sample_csv_at`) rather than copying
+    /// it, so the correct state is no comment at all on a promoted row, and that is what this
+    /// checks.
+    ///
+    /// A rejected or still-untriaged row keeps its comment: there is no fixture directory to put
+    /// it in, and for a rejection the reason is the only record of the decision.
     #[test]
-    fn no_fixture_has_a_sample_comment_without_its_own_description() {
+    fn no_promoted_row_carries_a_comment() {
         let rows = read_sample_csv_rows(&sample_csv_path()).expect("sample.csv");
-        let stranded: Vec<&str> = rows
+        let duplicated: Vec<&str> = rows
             .iter()
             .filter(|row| !row.promoted_to.trim().is_empty() && !row.comment.trim().is_empty())
-            .filter(|row| read_note(&row.promoted_to).is_none())
             .map(|row| row.promoted_to.as_str())
             .collect();
         assert!(
-            stranded.is_empty(),
-            "these fixtures' notes live only in sample.csv, where nothing reads them: {stranded:?}"
+            duplicated.is_empty(),
+            "these promoted fixtures still carry a sample.csv comment, a second home for a note \
+             that belongs only in their own description.md: {duplicated:?}"
         );
     }
 
