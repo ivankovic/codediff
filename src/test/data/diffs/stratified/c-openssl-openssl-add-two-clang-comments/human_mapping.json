@@ -1,0 +1,162 @@
+{
+  "entries": [
+    {
+      "operation": "insert_with_children",
+      "after_path": [
+        "comment:1"
+      ]
+    },
+    {
+      "operation": "insert_with_children",
+      "after_path": [
+        "comment:2"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [],
+      "after_path": []
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_def:1"
+      ],
+      "after_path": [
+        "preproc_def:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_def:1",
+        "#define:1"
+      ],
+      "after_path": [
+        "preproc_def:1",
+        "#define:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_def:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "preproc_def:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_def:1",
+        "preproc_arg:1"
+      ],
+      "after_path": [
+        "preproc_def:1",
+        "preproc_arg:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_include:1"
+      ],
+      "after_path": [
+        "preproc_include:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_include:1",
+        "#include:1"
+      ],
+      "after_path": [
+        "preproc_include:1",
+        "#include:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_include:1",
+        "string_literal:1"
+      ],
+      "after_path": [
+        "preproc_include:1",
+        "string_literal:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_include:1",
+        "string_literal:1",
+        "\":1"
+      ],
+      "after_path": [
+        "preproc_include:1",
+        "string_literal:1",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_include:1",
+        "string_literal:1",
+        "string_content:1"
+      ],
+      "after_path": [
+        "preproc_include:1",
+        "string_literal:1",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_include:1",
+        "string_literal:1",
+        "\":2"
+      ],
+      "after_path": [
+        "preproc_include:1",
+        "string_literal:1",
+        "\":2"
+      ]
+    }
+  ],
+  "text_mappings": [
+    {
+      "name": "Only one solution",
+      "entries": [
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 1,
+              "start_column": 0,
+              "end_row": 1,
+              "end_column": 22
+            }
+          ]
+        },
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 3,
+              "start_column": 0,
+              "end_row": 3,
+              "end_column": 21
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

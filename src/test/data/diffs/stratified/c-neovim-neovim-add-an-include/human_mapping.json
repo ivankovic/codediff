@@ -1,0 +1,215 @@
+{
+  "entries": [
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [],
+      "after_path": []
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_call:1"
+      ],
+      "after_path": [
+        "preproc_call:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_call:1",
+        "preproc_directive:1"
+      ],
+      "after_path": [
+        "preproc_call:1",
+        "preproc_directive:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_call:1",
+        "preproc_arg:1"
+      ],
+      "after_path": [
+        "preproc_call:1",
+        "preproc_arg:1"
+      ]
+    },
+    {
+      "operation": "insert_with_children",
+      "after_path": [
+        "preproc_include:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_include:1"
+      ],
+      "after_path": [
+        "preproc_include:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_include:1",
+        "#include:1"
+      ],
+      "after_path": [
+        "preproc_include:2",
+        "#include:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_include:1",
+        "string_literal:1"
+      ],
+      "after_path": [
+        "preproc_include:2",
+        "string_literal:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_include:1",
+        "string_literal:1",
+        "\":1"
+      ],
+      "after_path": [
+        "preproc_include:2",
+        "string_literal:1",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_include:1",
+        "string_literal:1",
+        "string_content:1"
+      ],
+      "after_path": [
+        "preproc_include:2",
+        "string_literal:1",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_include:1",
+        "string_literal:1",
+        "\":2"
+      ],
+      "after_path": [
+        "preproc_include:2",
+        "string_literal:1",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_include:1",
+        "comment:1"
+      ],
+      "after_path": [
+        "preproc_include:2",
+        "comment:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_include:2"
+      ],
+      "after_path": [
+        "preproc_include:3"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_include:2",
+        "#include:1"
+      ],
+      "after_path": [
+        "preproc_include:3",
+        "#include:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_include:2",
+        "string_literal:1"
+      ],
+      "after_path": [
+        "preproc_include:3",
+        "string_literal:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_include:2",
+        "string_literal:1",
+        "\":1"
+      ],
+      "after_path": [
+        "preproc_include:3",
+        "string_literal:1",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_include:2",
+        "string_literal:1",
+        "string_content:1"
+      ],
+      "after_path": [
+        "preproc_include:3",
+        "string_literal:1",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_include:2",
+        "string_literal:1",
+        "\":2"
+      ],
+      "after_path": [
+        "preproc_include:3",
+        "string_literal:1",
+        "\":2"
+      ]
+    }
+  ],
+  "text_mappings": [
+    {
+      "name": "Only one solution",
+      "entries": [
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 2,
+              "start_column": 0,
+              "end_row": 2,
+              "end_column": 56
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

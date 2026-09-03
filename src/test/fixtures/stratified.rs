@@ -18,3 +18,55 @@
 // Empty until the first `stratified` fixture is promoted (see `test::helper::DIFF_DATASETS` and
 // `sample_test_diffs --stratified`) - `human_solver`'s `insert_mod_declaration` adds entries here
 // the same way it does for `handmade.rs`/`small.rs`/`full.rs`.
+#[cfg(test)]
+mod c_genymobile_scrcpy_add_a_define;
+#[cfg(test)]
+mod c_genymobile_scrcpy_add_a_define_;
+#[cfg(test)]
+mod c_genymobile_scrcpy_add_a_define_2;
+#[cfg(test)]
+mod c_genymobile_scrcpy_rename_and_add_a_define;
+#[cfg(test)]
+mod c_genymobile_scrcpy_rename_defines;
+#[cfg(test)]
+mod c_microsoft_terminal_add_two_includes;
+#[cfg(test)]
+mod c_neovim_neovim_add_an_include;
+#[cfg(test)]
+mod c_neovim_neovim_small_change;
+#[cfg(test)]
+mod c_openssl_openssl_add_two_clang_comments;
+#[cfg(test)]
+mod c_rust_lang_rust_add_two_consts;
+#[cfg(test)]
+mod cpp_nzbgetcom_nzbget_add_include;
+#[cfg(test)]
+mod cpp_ollama_ollama_update_commit_hash;
+#[cfg(test)]
+mod cpp_ollama_ollama_update_commit_hash_2;
+#[cfg(test)]
+mod cpp_ollama_ollama_update_commit_hash_3;
+#[cfg(test)]
+mod cpp_ollama_ollama_update_commit_hash_4;
+#[cfg(test)]
+mod cpp_ollama_ollama_update_commit_hash_5;
+#[cfg(test)]
+mod cpp_ollama_ollama_update_commit_hash_6;
+#[cfg(test)]
+mod cpp_ollama_ollama_update_commit_hash_7;
+#[cfg(test)]
+mod cpp_ollama_ollama_update_commit_hash_8;
+#[cfg(test)]
+mod cpp_ollama_ollama_update_commit_hash_string_constant;
+#[cfg(test)]
+mod csharp_jellyfin_jellyfin_update_version_string;
+#[cfg(test)]
+mod csharp_lidarr_lidarr_add_enum_value;
+#[cfg(test)]
+mod csharp_lidarr_lidarr_add_function_signature_to_class;
+#[cfg(test)]
+mod csharp_lidarr_lidarr_add_method_to_class;
+#[cfg(test)]
+mod csharp_sonarr_sonarr_add_attribute;
+#[cfg(test)]
+mod csharp_sonarr_sonarr_add_attribute_2;

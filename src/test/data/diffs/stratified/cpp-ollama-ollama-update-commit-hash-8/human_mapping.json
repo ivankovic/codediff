@@ -1,0 +1,626 @@
+{
+  "entries": [
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [],
+      "after_path": []
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "declaration:1"
+      ],
+      "after_path": [
+        "declaration:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "declaration:1",
+        "primitive_type:1"
+      ],
+      "after_path": [
+        "declaration:1",
+        "primitive_type:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "declaration:1",
+        "init_declarator:1"
+      ],
+      "after_path": [
+        "declaration:1",
+        "init_declarator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "declaration:1",
+        "init_declarator:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "declaration:1",
+        "init_declarator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "declaration:1",
+        "init_declarator:1",
+        "=:1"
+      ],
+      "after_path": [
+        "declaration:1",
+        "init_declarator:1",
+        "=:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "declaration:1",
+        "init_declarator:1",
+        "number_literal:1"
+      ],
+      "after_path": [
+        "declaration:1",
+        "init_declarator:1",
+        "number_literal:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "declaration:1",
+        ";:1"
+      ],
+      "after_path": [
+        "declaration:1",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "declaration:2"
+      ],
+      "after_path": [
+        "declaration:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "declaration:2",
+        "primitive_type:1"
+      ],
+      "after_path": [
+        "declaration:2",
+        "primitive_type:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "declaration:2",
+        "type_qualifier:1"
+      ],
+      "after_path": [
+        "declaration:2",
+        "type_qualifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "declaration:2",
+        "type_qualifier:1",
+        "const:1"
+      ],
+      "after_path": [
+        "declaration:2",
+        "type_qualifier:1",
+        "const:1"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "declaration:2",
+        "init_declarator:1"
+      ],
+      "after_path": [
+        "declaration:2",
+        "init_declarator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "declaration:2",
+        "init_declarator:1",
+        "pointer_declarator:1"
+      ],
+      "after_path": [
+        "declaration:2",
+        "init_declarator:1",
+        "pointer_declarator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "declaration:2",
+        "init_declarator:1",
+        "pointer_declarator:1",
+        "*:1"
+      ],
+      "after_path": [
+        "declaration:2",
+        "init_declarator:1",
+        "pointer_declarator:1",
+        "*:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "declaration:2",
+        "init_declarator:1",
+        "pointer_declarator:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "declaration:2",
+        "init_declarator:1",
+        "pointer_declarator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "declaration:2",
+        "init_declarator:1",
+        "=:1"
+      ],
+      "after_path": [
+        "declaration:2",
+        "init_declarator:1",
+        "=:1"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "declaration:2",
+        "init_declarator:1",
+        "string_literal:1"
+      ],
+      "after_path": [
+        "declaration:2",
+        "init_declarator:1",
+        "string_literal:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "declaration:2",
+        "init_declarator:1",
+        "string_literal:1",
+        "\":1"
+      ],
+      "after_path": [
+        "declaration:2",
+        "init_declarator:1",
+        "string_literal:1",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "update",
+      "before_path": [
+        "declaration:2",
+        "init_declarator:1",
+        "string_literal:1",
+        "string_content:1"
+      ],
+      "after_path": [
+        "declaration:2",
+        "init_declarator:1",
+        "string_literal:1",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "declaration:2",
+        "init_declarator:1",
+        "string_literal:1",
+        "\":2"
+      ],
+      "after_path": [
+        "declaration:2",
+        "init_declarator:1",
+        "string_literal:1",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "declaration:2",
+        ";:1"
+      ],
+      "after_path": [
+        "declaration:2",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "declaration:3"
+      ],
+      "after_path": [
+        "declaration:3"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "declaration:3",
+        "primitive_type:1"
+      ],
+      "after_path": [
+        "declaration:3",
+        "primitive_type:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "declaration:3",
+        "type_qualifier:1"
+      ],
+      "after_path": [
+        "declaration:3",
+        "type_qualifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "declaration:3",
+        "type_qualifier:1",
+        "const:1"
+      ],
+      "after_path": [
+        "declaration:3",
+        "type_qualifier:1",
+        "const:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "declaration:3",
+        "init_declarator:1"
+      ],
+      "after_path": [
+        "declaration:3",
+        "init_declarator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "declaration:3",
+        "init_declarator:1",
+        "pointer_declarator:1"
+      ],
+      "after_path": [
+        "declaration:3",
+        "init_declarator:1",
+        "pointer_declarator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "declaration:3",
+        "init_declarator:1",
+        "pointer_declarator:1",
+        "*:1"
+      ],
+      "after_path": [
+        "declaration:3",
+        "init_declarator:1",
+        "pointer_declarator:1",
+        "*:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "declaration:3",
+        "init_declarator:1",
+        "pointer_declarator:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "declaration:3",
+        "init_declarator:1",
+        "pointer_declarator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "declaration:3",
+        "init_declarator:1",
+        "=:1"
+      ],
+      "after_path": [
+        "declaration:3",
+        "init_declarator:1",
+        "=:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "declaration:3",
+        "init_declarator:1",
+        "string_literal:1"
+      ],
+      "after_path": [
+        "declaration:3",
+        "init_declarator:1",
+        "string_literal:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "declaration:3",
+        "init_declarator:1",
+        "string_literal:1",
+        "\":1"
+      ],
+      "after_path": [
+        "declaration:3",
+        "init_declarator:1",
+        "string_literal:1",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "declaration:3",
+        "init_declarator:1",
+        "string_literal:1",
+        "\":2"
+      ],
+      "after_path": [
+        "declaration:3",
+        "init_declarator:1",
+        "string_literal:1",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "declaration:3",
+        ";:1"
+      ],
+      "after_path": [
+        "declaration:3",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "declaration:4"
+      ],
+      "after_path": [
+        "declaration:4"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "declaration:4",
+        "primitive_type:1"
+      ],
+      "after_path": [
+        "declaration:4",
+        "primitive_type:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "declaration:4",
+        "type_qualifier:1"
+      ],
+      "after_path": [
+        "declaration:4",
+        "type_qualifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "declaration:4",
+        "type_qualifier:1",
+        "const:1"
+      ],
+      "after_path": [
+        "declaration:4",
+        "type_qualifier:1",
+        "const:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "declaration:4",
+        "init_declarator:1"
+      ],
+      "after_path": [
+        "declaration:4",
+        "init_declarator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "declaration:4",
+        "init_declarator:1",
+        "pointer_declarator:1"
+      ],
+      "after_path": [
+        "declaration:4",
+        "init_declarator:1",
+        "pointer_declarator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "declaration:4",
+        "init_declarator:1",
+        "pointer_declarator:1",
+        "*:1"
+      ],
+      "after_path": [
+        "declaration:4",
+        "init_declarator:1",
+        "pointer_declarator:1",
+        "*:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "declaration:4",
+        "init_declarator:1",
+        "pointer_declarator:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "declaration:4",
+        "init_declarator:1",
+        "pointer_declarator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "declaration:4",
+        "init_declarator:1",
+        "=:1"
+      ],
+      "after_path": [
+        "declaration:4",
+        "init_declarator:1",
+        "=:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "declaration:4",
+        "init_declarator:1",
+        "string_literal:1"
+      ],
+      "after_path": [
+        "declaration:4",
+        "init_declarator:1",
+        "string_literal:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "declaration:4",
+        "init_declarator:1",
+        "string_literal:1",
+        "\":1"
+      ],
+      "after_path": [
+        "declaration:4",
+        "init_declarator:1",
+        "string_literal:1",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "declaration:4",
+        "init_declarator:1",
+        "string_literal:1",
+        "\":2"
+      ],
+      "after_path": [
+        "declaration:4",
+        "init_declarator:1",
+        "string_literal:1",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "declaration:4",
+        ";:1"
+      ],
+      "after_path": [
+        "declaration:4",
+        ";:1"
+      ]
+    }
+  ],
+  "text_mappings": [
+    {
+      "name": "Only one solution",
+      "entries": [
+        {
+          "operation": "Match",
+          "before": [
+            {
+              "start_row": 1,
+              "start_column": 28,
+              "end_row": 1,
+              "end_column": 37
+            }
+          ],
+          "after": [
+            {
+              "start_row": 1,
+              "start_column": 28,
+              "end_row": 1,
+              "end_column": 68
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
