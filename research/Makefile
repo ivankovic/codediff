@@ -234,10 +234,10 @@ measure-sampled-all-languages:
 	@echo "Running analysis..."
 	uv run ./analysis/benchmark_report.py
 
-# Analysis/plotting step for the root Makefile's `benchmark-optimal` (which is the product-side
+# Analysis/plotting step for the root Makefile's `benchmark-quality` (which is the product-side
 # regression gate and stays there). Kept here because the report itself is a research artifact.
 matching-reasons-report:
-	$(MAKE) -C .. benchmark-optimal
+	$(MAKE) -C .. benchmark-quality
 	uv run ./analysis/matching_reasons_report.py
 
 # Change-shape census over the human-authored mappings: which shapes (reparent, sibling reorder,
@@ -294,9 +294,38 @@ rendering-report:
 
 # Runs the timing benchmark's own analysis/plotting step over whatever
 # data/comparison/benchmark_other.csv already has on disk, without re-running the benchmark
-# itself. Split out from benchmark-timing below so a paper rebuild (introductory-paper) can
+# itself. Split out from measure-tools-timing below so a paper rebuild (introductory-paper) can
 # re-render from existing data without paying for a fresh (slow - GumTree's JVM cold-starts per
 # fixture) benchmark run.
+# Codediff against the other diff tools (Unix `diff`, GumTree, difftastic, diffsitter) over this
+# repository's own fixture corpus - timing, and agreement with the human ground truth.
+#
+# **In research/, not the root Makefile, because they measure other people's tools.** A benchmark
+# answers "how good is codediff"; the moment a number depends on which version of GumTree happens
+# to be installed in /var/tmp, it is a study of the field rather than product QA, and it belongs
+# here with everything else whose answer moves when someone else ships a release. That is the rule
+# even though these two do run against src/test/data/diffs/ and need no REPOSITORIES_DIR.
+#
+# `benchmark_other` itself stays in ../src/bin/: it is a dev tool gated behind `test-fixtures`, and
+# nothing about it needed duplicating to move these targets - only the entry points moved.
+#
+# A tool that is not installed is skipped with a note, not an error, so both targets still produce
+# a codediff column on a machine with none of them. See data/comparison/PROVENANCE.md for which
+# builds are installed and which of their numbers are safe to quote.
+#
+# Timing is the only reason to pay for `measure-tools-timing`'s slow, machine-load-sensitive run.
+# Its CSV does carry per-tool `*_mismatches` columns, but those are line-granularity only and are
+# superseded by `measure-tools-accuracy`, which scores the same agreement at line, node, leaf and
+# visible granularity. Both take `--fixtures a,b,c` to score a subset, and `--accuracy-csv` also
+# takes `--tools name,...`; a scoped run parses only the fixtures asked for (0.6s against 18.8s for
+# one fixture), which is worth knowing when iterating on a single tool adapter.
+measure-tools-timing:
+	cd .. && cargo run --release --features test-fixtures --bin benchmark_other -- --csv
+	$(MAKE) timing-report
+
+measure-tools-accuracy:
+	cd .. && cargo run --release --features test-fixtures --bin benchmark_other -- --accuracy-csv
+
 timing-report:
 	uv run ./analysis/benchmark_other_report.py
 
@@ -324,7 +353,7 @@ install-bdiff:
 
 # ── RQ1: whole-tree APTED against a 1-second budget ─────────────────────────────────────────────
 
-# Same slow/fast split as benchmark-timing above: `rq1-report` re-renders from whatever
+# Same slow/fast split as measure-tools-timing above: `rq1-report` re-renders from whatever
 # data/rq1/apted_only_group*.csv already holds, `measure-rq1` re-measures first.
 rq1-report:
 	uv run ./analysis/apted_only_report.py
@@ -376,7 +405,7 @@ measure-rq1:
 # Invoked from the two paper targets below via a recipe-body $(MAKE), not listed as a prerequisite
 # of either: it must run *after* whichever producer that target depends on (file-stats-report
 # writes the empirical fragment this reads), and prerequisite order isn't guaranteed under
-# `make -j`. Same recipe-body-$(MAKE) convention benchmark-timing uses for its own report step.
+# `make -j`. Same recipe-body-$(MAKE) convention measure-tools-timing uses for its own report step.
 paper-variables:
 	uv run ./analysis/paper_variables.py
 
@@ -389,7 +418,7 @@ paper-variables:
 # A routine PDF rebuild must not silently swap 156-fixture charts into a paper whose prose says
 # 98 - exactly that happened live on 2026-08-19, caught only because the regenerated variance
 # table's n column changed. When the evaluation is deliberately refreshed, run
-# `make benchmark-timing` (or timing-report), update the authored blocks in
+# `make measure-tools-timing` (or timing-report), update the authored blocks in
 # paper_variables.py to match, and re-render - together, never piecemeal.
 #
 # Also does not regenerate plots/tips.png, which needs the full repository-fetch pipeline
@@ -428,7 +457,7 @@ introductory-paper:
 # already has on disk for the current MODE (default tiny - pass MODE=small or MODE=full to match
 # whatever `make measure-file-stats` run you actually have). Reuses the fast half of that split
 # (file-stats-report), not measure-file-stats itself, for the same reason introductory-paper depends on
-# timing-report and not benchmark-timing: rebuilding a paper should never pay for the slow
+# timing-report and not measure-tools-timing: rebuilding a paper should never pay for the slow
 # step. Run `make measure-file-stats MODE=<mode>` yourself first to (re)populate that mode's stats.sqlite.
 introductory-paper-empirical: file-stats-report
 	$(MAKE) paper-variables

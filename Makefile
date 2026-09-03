@@ -2,14 +2,19 @@
 #
 # **Three verbs, and the split between them is what this file's boundary is made of:**
 #
-#   benchmark-   measures codediff. Lives here, because it is production QA rather than a study,
-#                and because it needs nothing a bare checkout does not already have: every one of
-#                these runs against src/test/data/diffs/, the corpus that ships with the repo.
+#   benchmark-   measures codediff, and only codediff. There are exactly two, because there are
+#                exactly two questions - is it right (benchmark-quality) and is it fast
+#                (benchmark-speed). Production QA rather than a study, and neither needs anything
+#                a bare checkout lacks: both run against src/test/data/, which ships with the repo.
 #   check-       gates. Runs in CI on every push and fails the build. Today that is check-quality
-#                alone. Deliberately not in .githooks/pre-push - see that file for why a slow hook
+#                alone, gating on precisely what benchmark-quality measures - the pairing is the
+#                point. Deliberately not in .githooks/pre-push - see that file for why a slow hook
 #                is worse than no hook.
-#   measure-     measures something that is not codediff, or needs the cloned upstream corpus at
-#                REPOSITORIES_DIR. Lives in research/Makefile, never here.
+#   measure-     measures anything that is not codediff alone: other people's diff tools, or the
+#                cloned upstream corpus at REPOSITORIES_DIR. Lives in research/Makefile, never
+#                here. A number that moves when someone else ships a GumTree release is a study of
+#                the field, not product QA - so the tool comparisons are `measure-tools-*` over
+#                there even though they read this repository's own fixtures.
 #
 # Everything else that exists to produce the papers and empirical studies - corpus fetching,
 # sampling, analysis, paper builds - lives in research/Makefile too. Run those from there:
@@ -17,11 +22,10 @@
 #     cd research && make <target>          # e.g. rq1-report, introductory-paper, measure-file-stats
 #
 # The split is deliberate: this file should stay readable to someone working on codediff itself,
-# who has no reason to care about the research corpus. The `benchmark-*` targets and
-# `check-quality` write under research/data/ anyway, because that is where this project keeps
-# measurements - but producing them is product QA, and none of them reads anything research/
-# produces. Nothing here invokes a research/ target; the reports that turn these CSVs into paper
-# tables live over there and are run separately.
+# who has no reason to care about the research corpus. `benchmark-quality` and `check-quality`
+# write under research/data/ anyway, because that is where this project keeps measurements - but
+# producing them is product QA, and neither reads anything research/ produces. Nothing here
+# invokes a research/ target.
 
 test: test-mapping-site-js
 	cargo nextest run --release
@@ -70,9 +74,12 @@ install-hooks:
 
 # Scores codediff's diffing accuracy against the human-authored ground truth corpus in
 # src/test/data/ - the project's own primary regression gate for any change to the diff
-# algorithm (see TODO.md). --features test-fixtures: this binary needs codediff::test's
-# fixture-loading helpers, gated separately from `stats` since it needs no git2/rusqlite.
-benchmark-optimal:
+# algorithm (see TODO.md). Named to pair with `check-quality`, which gates on exactly this
+# measurement: benchmark- produces the number, check- fails the build on it.
+#
+# --features test-fixtures: this binary needs codediff::test's fixture-loading helpers, gated
+# separately from `stats` since it needs no git2/rusqlite.
+benchmark-quality:
 	cargo run --release --features test-fixtures --bin benchmark_optimal_solutions -- --csv
 
 # Regenerates src/test/data/diffs.csv: one row per fixture with its provenance, size, and how far
@@ -108,35 +115,7 @@ lint-python:
 ci:
 	python3 scripts/ci_local.py
 
-# Codediff against the other diff tools, over this repository's own fixture corpus - timing, and
-# agreement with the human ground truth. Both write into research/data/comparison/, for the same
-# reason `check-quality` writes into research/data/quality/: the numbers are research artifacts,
-# but producing them is product QA, and the tool being measured is codediff.
-#
-# In the root Makefile, not research/, because neither needs the cloned upstream corpus: they run
-# `--features test-fixtures` against src/test/data/diffs/, which every checkout has. That is the
-# line between `benchmark-` here and `measure-` there - what is being measured, and whether a bare
-# checkout can measure it.
-#
-# Neither renders anything. `make -C research timing-report` turns benchmark_other.csv into the
-# paper's tables; keeping that call out of here is deliberate, since the root Makefile does not
-# reach into research/ (see this file's own header).
-#
-# Timing is the reason to pay for `benchmark-timing`'s slow, machine-load-sensitive run. Its CSV
-# does carry per-tool `*_mismatches` columns, but those are line-granularity only and superseded by
-# `benchmark-accuracy`, which scores the same agreement at line, node, leaf and visible
-# granularity. Both take `--fixtures a,b,c` to score a subset, and `--accuracy-csv` also takes
-# `--tools name,...`; a scoped run parses only the fixtures asked for (0.6s against 18.8s for one
-# fixture), which is worth knowing when iterating on a single tool adapter. See
-# research/data/comparison/PROVENANCE.md for which external builds are installed and which of
-# their numbers are safe to quote.
-benchmark-timing:
-	cargo run --release --features test-fixtures --bin benchmark_other -- --csv
-
-benchmark-accuracy:
-	cargo run --release --features test-fixtures --bin benchmark_other -- --accuracy-csv
-
-# Re-runs `benchmark-optimal` with individual solver passes disabled, to see what each is worth.
+# Re-runs `benchmark-quality` with individual solver passes disabled, to see what each is worth.
 # A codediff measurement over this repository's own fixtures, so it lives here rather than in
 # research/ despite having been written there.
 #

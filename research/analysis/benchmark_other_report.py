@@ -64,7 +64,7 @@ And one LaTeX macro fragment:
     merges it into the single `plots/variables.tex`, same contract as
     `apted_only_report.py::write_paper_fragment`.
 
-    The accuracy half reads `data/comparison/benchmark_accuracy.csv` (`make benchmark-accuracy`),
+    The accuracy half reads `data/comparison/benchmark_accuracy.csv` (`make measure-tools-accuracy`),
     not this script's own `--csv` - that file carries an explicit per-tool `_status` column, so
     "scored" is a recorded fact rather than inferred from a blank cell, and it is machine- and
     load-independent. The speed half necessarily reads the timing CSV. Passing an accuracy CSV is
@@ -1001,7 +1001,7 @@ def write_paper_fragment(
 
     if accuracy_rows is None:
         print(
-            "note: no benchmark_accuracy.csv - writing speed macros only (run `make benchmark-accuracy`)."
+            "note: no benchmark_accuracy.csv - writing speed macros only (run `make measure-tools-accuracy`)."
         )
     else:
         lines.append(f"% Accuracy: {len(accuracy_rows)} fixtures with a human mapping.")

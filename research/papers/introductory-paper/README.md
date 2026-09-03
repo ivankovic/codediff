@@ -175,7 +175,7 @@ at all. `--refresh-eras` re-derives deliberately.
 
 Added 2026-08-23: four git algorithm variants (`git_myers`, `git_minimal`, `git_patience`,
 `git_histogram`) and BDiff (`bdiff`), all text-based, all covering the full corpus. They are wired
-into `benchmark-timing`, `benchmark-accuracy`, both CSVs, the charts and the generated macros, so
+into `measure-tools-timing`, `measure-tools-accuracy`, both CSVs, the charts and the generated macros, so
 every future re-benchmark includes them with no further work.
 
 **Why CodeDiff's line rate flips sign between the two subsets** (0.795% on its own 493 fixtures,

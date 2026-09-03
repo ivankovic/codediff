@@ -233,7 +233,7 @@ property of the syntax tree and the source bytes **and of nothing else** -
 depend on the diff: a measurement whose own denominator moves when the algorithm changes cannot
 be used to judge the algorithm. Corpus-wide about 68% of nodes are visible.
 
-`make benchmark-optimal` reports both the raw and the visible mismatch count per fixture.
+`make benchmark-quality` reports both the raw and the visible mismatch count per fixture.
 
 # License
 

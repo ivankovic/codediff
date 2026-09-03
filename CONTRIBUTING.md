@@ -69,7 +69,7 @@ be re-verified the same way rather than assumed: jj has renamed its config surfa
 ### Quality
 
 Run `cargo run --release --features test-fixtures --bin benchmark_optimal_solutions`, or `make
-benchmark-optimal`. This command diffs every fixture in `src/test/data/diffs/` that has a
+benchmark-quality`. This command diffs every fixture in `src/test/data/diffs/` that has a
 human-verified ground truth mapping. It reports how many nodes each fixture gets wrong. Use this
 output to see whether a change made diffs better or worse.
 
@@ -173,23 +173,25 @@ documented there.
   and cannot mirror.
 Three verbs, and which file a target lives in follows from them:
 
-* **`benchmark-`** measures codediff, and lives in the root Makefile. Production QA, not a study -
-  and none of them needs anything a bare checkout lacks, since they all run against
-  `src/test/data/diffs/`.
-* **`check-`** gates. Runs in CI on every push and fails the build.
-* **`measure-`** measures something that is not codediff, or needs the cloned upstream corpus at
-  `REPOSITORIES_DIR`. Lives in `research/Makefile`, never the root one.
+* **`benchmark-`** measures **codediff**, and lives in the root Makefile. Exactly two, because
+  there are exactly two questions: is it right (`benchmark-quality`) and is it fast
+  (`benchmark-speed`). Production QA, and neither needs anything a bare checkout lacks.
+* **`check-`** gates. Runs in CI on every push and fails the build. `check-quality` gates on
+  precisely what `benchmark-quality` measures - the pairing is the point.
+* **`measure-`** measures anything that is not codediff alone: other people's tools, or the cloned
+  upstream corpus at `REPOSITORIES_DIR`. Lives in `research/Makefile`, never the root one. A number
+  that moves when someone else ships a GumTree release is a study of the field, not product QA.
 
-* `benchmark-optimal` - runs `benchmark_optimal_solutions`, the project's primary diff-quality
-  measurement: mismatch count against the human-authored ground truth (see "Quality" above).
-* `benchmark-accuracy` - codediff against the other diff tools (Unix `diff`, GumTree, difftastic,
-  diffsitter), scored against the same ground truth at line, node, leaf and visible granularity.
-  Writes `research/data/comparison/benchmark_accuracy.csv`.
-* `benchmark-timing` - the same comparison, timed. Slow and sensitive to machine load; timing is
-  the only reason to pay for it. Writes `research/data/comparison/benchmark_other.csv`. Neither of
-  these renders anything - `make -C research timing-report` turns the CSV into the paper's tables.
-* `benchmark-ablation` - re-runs `benchmark-optimal` with individual solver passes disabled, to see
-  what each is worth.
+* `benchmark-quality` - runs `benchmark_optimal_solutions`: mismatch count against the
+  human-authored ground truth, per fixture (see "Quality" above).
+* `benchmark-speed` / `benchmark-speed-update-baseline` - criterion wall-clock of `diff_code` over
+  every handmade test case from `src/test/helper.rs` (see "Speed" above). The first compares
+  against the saved baseline, the second saves a new one. Note the asymmetry with quality:
+  criterion keeps its baseline under `target/`, which is not checked in, so a speed baseline is
+  local to one working copy and nothing gates on it.
+* `benchmark-ablation` - re-runs `benchmark-quality` with individual solver passes disabled, to see
+  what each is worth. A one-off investigation rather than a routine measurement, which is why it is
+  not folded into `benchmark-quality`.
 * `check-quality` - the gate. What CI runs on every push and what `deploy` runs before it tags a
   release. Fails hard on an accuracy regression against the checked-in baseline; only warns on a
   runtime jump of more than 2x.

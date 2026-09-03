@@ -73,7 +73,7 @@ beta4 zip: its generator set differs in both directions and its numbers are not 
 
 Same corpus and the same external-tool binaries, but accuracy only - no timing, so unlike
 `benchmark_other.csv` this file is machine-independent and unaffected by load. Produced by
-`cd research && make benchmark-accuracy` (`benchmark_other --accuracy-csv`).
+`cd research && make measure-tools-accuracy` (`benchmark_other --accuracy-csv`).
 
 One row per fixture that has a `human_mapping.json`. Columns: `sample.csv` provenance
 (`language`, `repository`, `commit`, `path` - blank for the handmade fixtures that were never

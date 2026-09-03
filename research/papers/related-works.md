@@ -29,7 +29,7 @@ mapping. diffsitter is the fastest AST-aware tool in the whole comparison (media
 difftastic sits between codediff and GumTree's warm-JVM number (median 54.40ms). See
 `research/data/comparison/benchmark_other.csv` and `research/plots/benchmark_other_accuracy.png`. Installed with
 `cargo install --root /var/tmp/codediff-tools difftastic diffsitter`, pointed at via `DIFFT_BIN`/
-`DIFFSITTER_BIN` - see `research/Makefile`'s `benchmark-timing` target for the full setup.
+`DIFFSITTER_BIN` - see `research/Makefile`'s `measure-tools-timing` target for the full setup.
 
 ## The GumTree family (mostly academic, Java-centric)
 
