@@ -264,14 +264,6 @@ path = "src/bin/sample_code_pairs.rs"
 required-features = ["stats"]
 
 [[bench]]
-name = "hash_benchmark"
-harness = false
-
-[[bench]]
-name = "optimal_iud_benchmark"
-harness = false
-
-[[bench]]
 name = "diff_code_benchmark"
 harness = false
 

@@ -95,10 +95,10 @@ uv run ./analysis/verify_sample.py --repo-root "$REPOS" data/samples/sampled_cod
 # Stages 1 and 2 are finished by now, which is the reason they are stages rather than background
 # jobs.
 stage "Stage 3/4: re-measure RQ1 (serial, wall-clock against a 1s budget)"
-make rq1 MODE=$MODE || fail "rq1 measurement failed"
+make measure-rq1 MODE=$MODE || fail "measure-rq1 measurement failed"
 
 # ── Stage 4: regenerate the paper ───────────────────────────────────────────────────────────────
-# `make rq1` already ran rq1-report, which writes plots/variables_rq1.tex; this folds it into
+# `make measure-rq1` already ran rq1-report, which writes plots/variables_rq1.tex; this folds it into
 # plots/variables.tex and rebuilds the PDF.
 stage "Stage 4/4: regenerate paper variables and rebuild the PDF"
 make introductory-paper || fail "paper rebuild failed"

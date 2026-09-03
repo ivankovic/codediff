@@ -38,7 +38,7 @@ cd research
 make rq1-report            # fast: re-render RQ1 from data already on disk
 make introductory-paper    # fast: rebuild the paper PDF
 make fetch MODE=small      # slow: clone/update the 100-repository corpus
-make rq1                   # slow, timing-sensitive: re-measure RQ1 (idle machine!)
+make measure-rq1                   # slow, timing-sensitive: re-measure RQ1 (idle machine!)
 ```
 
 Most corpus targets take `MODE=tiny` (default) / `MODE=small` / `MODE=full`, choosing which

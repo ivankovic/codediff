@@ -1,14 +1,27 @@
-# Product-side targets only: build, test, install, the quality gate, and release.
+# Product-side targets only: build, test, install, the benchmarks, the quality gate, and release.
 #
-# Everything that exists to produce the papers and empirical studies - corpus fetching, sampling,
-# measurement, analysis, paper builds - lives in research/Makefile instead. Run those from there:
+# **Three verbs, and the split between them is what this file's boundary is made of:**
 #
-#     cd research && make <target>          # e.g. rq1-report, introductory-paper, file-stats
+#   benchmark-   measures codediff. Lives here, because it is production QA rather than a study,
+#                and because it needs nothing a bare checkout does not already have: every one of
+#                these runs against src/test/data/diffs/, the corpus that ships with the repo.
+#   check-       gates. Runs in CI on every push and fails the build. Today that is check-quality
+#                alone. Deliberately not in .githooks/pre-push - see that file for why a slow hook
+#                is worse than no hook.
+#   measure-     measures something that is not codediff, or needs the cloned upstream corpus at
+#                REPOSITORIES_DIR. Lives in research/Makefile, never here.
+#
+# Everything else that exists to produce the papers and empirical studies - corpus fetching,
+# sampling, analysis, paper builds - lives in research/Makefile too. Run those from there:
+#
+#     cd research && make <target>          # e.g. rq1-report, introductory-paper, measure-file-stats
 #
 # The split is deliberate: this file should stay readable to someone working on codediff itself,
-# who has no reason to care about the research corpus. `benchmark-optimal` and `check-quality`
-# stay here despite reading/writing files under research/data/, because they are this project's
-# own regression gate and release gate, not research artifacts.
+# who has no reason to care about the research corpus. The `benchmark-*` targets and
+# `check-quality` write under research/data/ anyway, because that is where this project keeps
+# measurements - but producing them is product QA, and none of them reads anything research/
+# produces. Nothing here invokes a research/ target; the reports that turn these CSVs into paper
+# tables live over there and are run separately.
 
 test: test-mapping-site-js
 	cargo nextest run --release
@@ -26,8 +39,8 @@ test-mapping-site-js:
 	node assets/mapping_site/index.test.js
 	node assets/mapping_site/viewer.test.js
 
-# --features stats: every target below this one (file-stats, commit-stats, sample-pairs,
-# benchmark-pairs, and the language-specific variants) runs a stats-gated binary
+# --features stats: every target below this one (measure-file-stats, measure-commit-stats, sample-pairs,
+# measure-pairs, and the language-specific variants) runs a stats-gated binary
 # (file_stats/commit_stats/sample_code_pairs/benchmark_diff_pairs) that doesn't exist in
 # target/release without it - see Cargo.toml's `stats` feature.
 build: test
@@ -94,6 +107,44 @@ lint-python:
 # `--job <id>` runs one.
 ci:
 	python3 scripts/ci_local.py
+
+# Codediff against the other diff tools, over this repository's own fixture corpus - timing, and
+# agreement with the human ground truth. Both write into research/data/comparison/, for the same
+# reason `check-quality` writes into research/data/quality/: the numbers are research artifacts,
+# but producing them is product QA, and the tool being measured is codediff.
+#
+# In the root Makefile, not research/, because neither needs the cloned upstream corpus: they run
+# `--features test-fixtures` against src/test/data/diffs/, which every checkout has. That is the
+# line between `benchmark-` here and `measure-` there - what is being measured, and whether a bare
+# checkout can measure it.
+#
+# Neither renders anything. `make -C research timing-report` turns benchmark_other.csv into the
+# paper's tables; keeping that call out of here is deliberate, since the root Makefile does not
+# reach into research/ (see this file's own header).
+#
+# Timing is the reason to pay for `benchmark-timing`'s slow, machine-load-sensitive run. Its CSV
+# does carry per-tool `*_mismatches` columns, but those are line-granularity only and superseded by
+# `benchmark-accuracy`, which scores the same agreement at line, node, leaf and visible
+# granularity. Both take `--fixtures a,b,c` to score a subset, and `--accuracy-csv` also takes
+# `--tools name,...`; a scoped run parses only the fixtures asked for (0.6s against 18.8s for one
+# fixture), which is worth knowing when iterating on a single tool adapter. See
+# research/data/comparison/PROVENANCE.md for which external builds are installed and which of
+# their numbers are safe to quote.
+benchmark-timing:
+	cargo run --release --features test-fixtures --bin benchmark_other -- --csv
+
+benchmark-accuracy:
+	cargo run --release --features test-fixtures --bin benchmark_other -- --accuracy-csv
+
+# Re-runs `benchmark-optimal` with individual solver passes disabled, to see what each is worth.
+# A codediff measurement over this repository's own fixtures, so it lives here rather than in
+# research/ despite having been written there.
+#
+# Usage: make benchmark-ablation [OUT_DIR=path]  (default: research/data/ablation)
+benchmark-ablation:
+	./scripts/ablation_study.sh $(OUT_DIR)
+
+OUT_DIR ?= research/data/ablation
 
 QUALITY_BASELINE := research/data/quality/quality_baseline.csv
 RUNTIME_BASELINE := research/data/quality/quality_baseline.txt
@@ -229,8 +280,26 @@ deploy-github: deploy-checks
 # with `-j`.
 deploy: deploy-crates deploy-github
 
-hermetic-benchmark:
-	cargo bench --bench diff_code_benchmark
+# Wall-clock `diff_code` over every handmade fixture, through criterion. Named for what it
+# measures rather than for how (it was `hermetic-benchmark`): the isolation is the method, and the
+# method is not what a reader is looking for when they want the speed number.
+#
+# **`--features test-fixtures` is load-bearing.** The bench reads the fixture corpus through
+# `codediff::test::helper`, which `lib.rs` gates behind `cfg(any(test, feature = "test-fixtures"))`
+# - and a `cargo bench` build is not `cfg(test)` for the library it links. Without the flag this
+# target failed to compile, which it had been doing silently: nothing runs `cargo bench` in CI, so
+# the only speed measurement this project has was unrunnable and nobody found out.
+#
+# **Its baseline does not survive `cargo clean`, and nothing gates on it.** criterion keeps
+# comparisons under target/criterion/, which is not checked in, so `benchmark-speed-update-baseline`
+# records a number only for this working copy. That is the opposite of how accuracy is handled -
+# `check-quality` compares against a committed baseline and fails CI - and it is why a speed
+# regression is currently something you notice rather than something that stops you. Two other
+# criterion benches (`hash_benchmark`, `optimal_iud_benchmark`) had no target at all and were
+# deleted rather than left invisible; if speed ever needs to gate, this is the target to build it
+# on.
+benchmark-speed:
+	cargo bench --features test-fixtures --bench diff_code_benchmark
 
-hermetic-benchmark-update-baseline:
-	cargo bench --bench diff_code_benchmark -- --save-baseline baseline
+benchmark-speed-update-baseline:
+	cargo bench --features test-fixtures --bench diff_code_benchmark -- --save-baseline baseline

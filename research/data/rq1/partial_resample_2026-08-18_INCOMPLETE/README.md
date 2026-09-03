@@ -13,5 +13,5 @@ resumed.
 so that `make rq1-report` reads four internally consistent files from the OLD corpus rather than
 silently blending this partial new-corpus file with three old-corpus ones.
 
-To resume: re-run `make rq1` from the top (it re-measures every group; there is no per-group
+To resume: re-run `make measure-rq1` from the top (it re-measures every group; there is no per-group
 resume), or run the four `apted_only_benchmark` invocations in that target individually.

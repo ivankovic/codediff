@@ -2059,7 +2059,7 @@ other known gaps above, not a new bug.
 1226.7, via `benchmark_optimal_solutions --csv | tee target/benchmark_optimal_output.txt` (the
 `--csv` also refreshes `research/data/quality/optimal_solutions_benchmark.csv`, which
 `research/analysis/matching_reasons_report.py` reads - re-ran that too via
-`make benchmark-optimal-report`'s underlying commands, regenerating
+`make matching-reasons-report`'s underlying commands, regenerating
 `research/plots/matching_reason_totals.png` and
 `research/plots/matching_reason_share_by_fixture.png` against the now-150-fixture corpus).
 `make check-quality`: clean against the new baseline. `cargo test --release --features

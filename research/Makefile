@@ -24,7 +24,7 @@ LIST_TINY := ../list_of_repositories_tiny.csv
 # Default mode is "tiny", can be overridden with "make MODE=small" or "make MODE=full"
 MODE ?= tiny
 
-# Commits per repository the edit-shape census walks; see the `edit-shape` target.
+# Commits per repository the measure-edit-shape census walks; see the `measure-edit-shape` target.
 EDIT_SHAPE_COMMITS ?= 50
 
 # Resolve the appropriate list based on mode. Deliberately `=` (recursive/lazy), not `:=`
@@ -65,18 +65,18 @@ fetch: $(LIST) $(SCRIPTS_SAMPLING_DIR)/dataset.sh
 
 # ── Corpus statistics ───────────────────────────────────────────────────────────────────────────
 
-# Just the analysis/plotting/paper-variables step of file-stats, over whatever
+# Just the analysis/plotting/paper-variables step of measure-file-stats, over whatever
 # $(RESEARCH_DIR)/stats.sqlite already has on disk, without re-running file_stats itself. Split
-# out for the same reason as benchmark-timing-report below - see introductory-paper-empirical,
-# which depends on this, not on file-stats.
+# out for the same reason as timing-report below - see introductory-paper-empirical,
+# which depends on this, not on measure-file-stats.
 file-stats-report:
 	uv run ./analysis/file_stats.py $(RESEARCH_DIR)/stats.sqlite
 
-file-stats: build
+measure-file-stats: build
 	$(BIN_DIR)/file_stats --path $(REPOSITORIES_DIR) --db $(RESEARCH_DIR)/stats.sqlite
 	$(MAKE) file-stats-report
 
-commit-stats: build
+measure-commit-stats: build
 	$(BIN_DIR)/commit_stats --path $(REPOSITORIES_DIR) --db $(RESEARCH_DIR)/stats.sqlite
 	uv run ./analysis/commit_stats.py $(RESEARCH_DIR)/stats.sqlite
 
@@ -94,7 +94,7 @@ debug-stats:
 	./measure/debug.sh --$(DEBUG_MODE) $(DIR)
 
 # Analysis target that respects current mode
-analyze: file-stats
+analyze: measure-file-stats
 
 # Mode-specific convenience targets
 tiny: override MODE=tiny
@@ -138,7 +138,7 @@ RQ1_LANGUAGES := c:C cpp:CPP csharp:CSharp css:CSS go:Go html:HTML java:Java \
 # language against the 100-repository corpus, i.e. hours for the set, against minutes for one pass.
 #
 # Stratification follows stats::sampling::LOC_BUCKETS (7 LOC buckets, keyed by the larger of
-# before/after), so --count is split 7 ways per language. Re-run `make rq1` afterwards to
+# before/after), so --count is split 7 ways per language. Re-run `make measure-rq1` afterwards to
 # re-measure against the new sample.
 # COUNT is per language, split evenly across the 7 LOC buckets, so the per-cell target is
 # COUNT/7: COUNT=140 draws 20 pairs per language per bucket. Sparse cells (a language with few
@@ -156,7 +156,7 @@ sample-pairs-all: build
 
 # Rust-only variants, fixed at 1000 sampled pairs (sample_code_pairs' default --count and --seed,
 # so re-running against the same checkouts reproduces the same pairs). This is the pipeline used to
-# track diff_code's performance over time on real Rust commits; re-run benchmark-pairs-rust after
+# track diff_code's performance over time on real Rust commits; re-run measure-pairs-rust after
 # any change to the diff algorithm to measure its effect.
 sample-pairs-rust: build
 	$(BIN_DIR)/sample_code_pairs --path $(REPOSITORIES_DIR) --output data/samples/sampled_code_pairs_rust.csv --language Rust
@@ -173,34 +173,34 @@ sample-pairs-typescript: build
 # ── Measurement ─────────────────────────────────────────────────────────────────────────────────
 
 # Measure diff_code's speed, memory, AST size and mapping operation count across a sampled CSV.
-benchmark-pairs: build
+measure-pairs: build
 	$(BIN_DIR)/benchmark_diff_pairs --csv data/samples/sampled_code_pairs.csv --repo-root $(REPOSITORIES_DIR) --output data/diff_pairs_benchmark.csv
 
-benchmark-pairs-rust: build
+measure-pairs-rust: build
 	$(BIN_DIR)/benchmark_diff_pairs --csv data/samples/sampled_code_pairs_rust.csv --repo-root $(REPOSITORIES_DIR) --output data/diff_pairs_benchmark_rust.csv
 
 # Extended language targets with 20000 node limit
-benchmark-pairs-java: build
+measure-pairs-java: build
 	$(BIN_DIR)/benchmark_diff_pairs --csv data/samples/sampled_code_pairs_java.csv --repo-root $(REPOSITORIES_DIR) --output data/performance/benchmark_java.csv --max-combined-nodes 20000
 
-benchmark-pairs-javascript: build
+measure-pairs-javascript: build
 	$(BIN_DIR)/benchmark_diff_pairs --csv data/samples/sampled_code_pairs_javascript.csv --repo-root $(REPOSITORIES_DIR) --output data/performance/benchmark_javascript.csv --max-combined-nodes 20000
 
-benchmark-pairs-typescript: build
+measure-pairs-typescript: build
 	$(BIN_DIR)/benchmark_diff_pairs --csv data/samples/sampled_code_pairs_typescript.csv --repo-root $(REPOSITORIES_DIR) --output data/performance/benchmark_typescript.csv --max-combined-nodes 20000
 
 # Size/LOC-changed statistics and distribution plots for sample-pairs-rust's output. Depends on
 # sample-pairs-rust having already been run (needs the checked-out repositories, not just the CSV).
-code-pair-diff-stats:
+measure-code-pair-diffs:
 	uv run ./analysis/code_pair_diff_stats.py data/samples/sampled_code_pairs_rust.csv --repo-root $(REPOSITORIES_DIR) --output-csv data/corpus_stats/code_pair_diff_stats_rust.csv
 
-# Compares two benchmark-pairs-rust runs (e.g. before/after a diff_code algorithm change) and
-# charts the difference. Usage: make benchmark-pairs-diff BEFORE=path/to/before.csv AFTER=path/to/after.csv
-# (save a copy of data/diff_pairs_benchmark_rust.csv before re-running benchmark-pairs-rust, then
+# Compares two measure-pairs-rust runs (e.g. before/after a diff_code algorithm change) and
+# charts the difference. Usage: make measure-pairs-diff BEFORE=path/to/before.csv AFTER=path/to/after.csv
+# (save a copy of data/diff_pairs_benchmark_rust.csv before re-running measure-pairs-rust, then
 # pass that copy as BEFORE and the fresh run as AFTER).
-benchmark-pairs-diff:
+measure-pairs-diff:
 	@if [ -z "$(BEFORE)" ] || [ -z "$(AFTER)" ]; then \
-		echo "usage: make benchmark-pairs-diff BEFORE=path/to/before.csv AFTER=path/to/after.csv" >&2; \
+		echo "usage: make measure-pairs-diff BEFORE=path/to/before.csv AFTER=path/to/after.csv" >&2; \
 		exit 1; \
 	fi
 	uv run ./analysis/diff_pairs_benchmark_comparison.py --before $(abspath $(BEFORE)) --after $(abspath $(AFTER))
@@ -208,7 +208,7 @@ benchmark-pairs-diff:
 # Benchmark against existing sampled pairs for the four primary languages (Rust, Python, Go,
 # Kotlin) and run analysis afterwards. Uses benchmark_all_extended.sh restricted to these four via
 # --language.
-benchmark-sampled-main-languages-only:
+measure-sampled-main-languages-only:
 	@echo "Running benchmarks for Rust, Python, Go, Kotlin..."
 	@echo "Results will be written to research/data/performance/"
 	./measure/benchmark_all_extended.sh --language "Rust Python Go Kotlin" --repos-dir /var/tmp/research/small/repositories/ --bin-dir $(BIN_DIR)
@@ -218,7 +218,7 @@ benchmark-sampled-main-languages-only:
 
 # Benchmark with extended language set (every language with a tree-sitter grammar - see
 # ALL_LANGUAGES in benchmark_all_extended.sh) and higher node limit.
-benchmark-sampled-all-languages:
+measure-sampled-all-languages:
 	@echo "Running extended benchmarks for all supported languages..."
 	@echo "Results will be written to research/data/performance/"
 	@echo "Using 20000 node limit, max 100 commits per repo"
@@ -234,15 +234,9 @@ benchmark-sampled-all-languages:
 	@echo "Running analysis..."
 	uv run ./analysis/benchmark_report.py
 
-# Leave-one-out ablation study over the diff algorithm's optional heuristic passes - see
-# measure/ablation_study.sh's own header comment for exactly what it measures.
-# Usage: make ablation-study [OUT_DIR=path]  (default OUT_DIR: research/data/ablation)
-ablation-study:
-	./measure/ablation_study.sh $(OUT_DIR)
-
 # Analysis/plotting step for the root Makefile's `benchmark-optimal` (which is the product-side
 # regression gate and stays there). Kept here because the report itself is a research artifact.
-benchmark-optimal-report:
+matching-reasons-report:
 	$(MAKE) -C .. benchmark-optimal
 	uv run ./analysis/matching_reasons_report.py
 
@@ -272,7 +266,7 @@ shapes-report:
 # Churn is derived from numstat plus the after-side blob's line count, not read from stats.sqlite:
 # that database's lines_added/lines_removed/lines_changed/nodes_* columns are all zero, hardcoded
 # by commit_stats.rs.
-edit-shape:
+measure-edit-shape:
 	uv run ./analysis/edit_shape_stats.py --repositories $(REPOSITORIES_DIR) --max-commits $(EDIT_SHAPE_COMMITS)
 
 # Ground-truth ambiguity over the human-authored mappings: how often a real-world change admits no
@@ -303,84 +297,8 @@ rendering-report:
 # itself. Split out from benchmark-timing below so a paper rebuild (introductory-paper) can
 # re-render from existing data without paying for a fresh (slow - GumTree's JVM cold-starts per
 # fixture) benchmark run.
-benchmark-timing-report:
+timing-report:
 	uv run ./analysis/benchmark_other_report.py
-
-# Compares codediff against other diff tools (Unix diff, GumTree, difftastic, diffsitter) on
-# runtime, plus line-level agreement with the human-authored mapping, then runs the analysis step
-# above. --features test-fixtures: benchmark_other, like benchmark_optimal_solutions, needs
-# codediff::test's fixture-loading helpers.
-#
-# Requires GUMTREE_BIN, DIFFT_BIN and DIFFSITTER_BIN, each pointing at a built binary - unlike
-# everything else here, these are external, non-Rust (GumTree) or at least non-workspace
-# (difftastic, diffsitter) tool dependencies this target can't provide on its own. All three are
-# required for a full run: a missing one fails loudly on the first fixture in that tool's language
-# scope rather than silently skipping the tool. difftastic and diffsitter are plain
-# `cargo install`-able; install them into a scratch prefix to keep them out of the system-wide
-# cargo bin directory:
-#
-#     cargo install --root /var/tmp/codediff-tools difftastic diffsitter
-#     export DIFFT_BIN=/var/tmp/codediff-tools/bin/difft \
-#            DIFFSITTER_BIN=/var/tmp/codediff-tools/bin/diffsitter
-#
-# NVIM_BIN points at a neovim binary. Neovim is scored because it is the diff a large number of
-# developers actually read, and the only entry here that pairs a line-level match with
-# character-level display; `assets/nvim_diff_driver.lua` drives it headless and reads its
-# classification back through `diff_hlID()`, since Neovim writes its diff to no stream at all.
-# Install without root:
-#
-#     curl -sL https://github.com/neovim/neovim/releases/download/v0.10.2/nvim-linux64.tar.gz \
-#       | tar xz -C /var/tmp/tools
-#     export NVIM_BIN=/var/tmp/tools/nvim-linux64/bin/nvim
-#
-# BDIFF_PYTHON points at a python interpreter with BDiff importable - `make install-bdiff` below
-# builds one. The four git variants need no configuration: they shell out to whatever `git` is on
-# PATH, with the user's git config neutralized (see `git_env` in benchmark_other.rs - this is
-# load-bearing, not hygiene).
-#
-# GumTree is a built Java distribution, so GUMTREE_BIN points at its `bin/gumtree` script. See
-# drivers/gumtree-batch/build.sh for its optional warm-JVM timing variant, and
-# data/comparison/PROVENANCE.md for which GumTree build is installed and which of its numbers are
-# safe to quote.
-#
-# Named for timing because that is what only this target measures. Its CSV does also carry
-# per-tool `*_mismatches` columns, but those are line-granularity only and are superseded by
-# benchmark-accuracy below, which scores the same agreement at line, node, leaf and visible
-# granularity. Timing is the reason to pay for this target's slow, machine-load-sensitive run.
-# (Renamed from `benchmark-other` 2026-08-20; the binary, CSV and report script keep their
-# `benchmark_other` names, since the binary genuinely serves both this target and
-# benchmark-accuracy.)
-benchmark-timing:
-	cd .. && cargo run --release --features test-fixtures --bin benchmark_other -- --csv
-	$(MAKE) benchmark-timing-report
-
-# Accuracy-only counterpart of benchmark-timing: per fixture, every tool's agreement with the
-# human mapping at line, node, leaf-node and visible-node granularity, written to
-# data/comparison/benchmark_accuracy.csv with sample.csv provenance columns for cross-referencing.
-# No timing at all, so unlike benchmark-timing this doesn't need the warm-JVM driver and doesn't
-# care about machine load - accuracy is deterministic. Same GUMTREE_BIN / DIFFT_BIN /
-# DIFFSITTER_BIN requirement.
-#
-# The node columns are a "did the tool consider this node's text changed" projection, NOT the
-# node-mapping fidelity benchmark_optimal_solutions reports - see data/comparison/PROVENANCE.md
-# and `benchmark_other --help`. Unix diff has no node columns by construction.
-#
-# The `*_visible_node_mismatches` columns restrict that projection to nodes that actually reach
-# the screen when the diff is rendered. Visibility is judged against the *human* mapping, so every
-# tool is scored against one fixed, tool-independent set of visible nodes - deliberately unlike
-# benchmark_optimal_solutions' own visible count, which judges codediff by codediff's own
-# rendering. Visible is not a synonym for leaf; see PROVENANCE.md for why they differ both ways.
-# Both targets above take `--fixtures a,b,c` (score only these) and `--accuracy-csv` also takes
-# `--tools name,...` (score only these, `codediff` included) - see `benchmark_other --help`. Worth
-# knowing when iterating on one adapter: a scoped run loads only the fixtures it was asked for
-# rather than parsing the whole corpus, which is 0.6s against 18.8s for a single fixture.
-#
-# They are also what lets `tests/benchmark_other_e2e.rs` exercise this harness end to end in
-# 60ms, by pointing DIFFT_BIN at `fake_diff_tool` - a stand-in that answers predictably
-# (nothing changed / everything changed / a per-line hash / a crash) so the scoring can be checked
-# against arithmetic rather than against a real tool whose right answer nobody knows.
-benchmark-accuracy:
-	cd .. && cargo run --release --features test-fixtures --bin benchmark_other -- --accuracy-csv
 
 # Installs BDiff (arXiv 2510.21094, block-aware text-based differencing) into a virtualenv under
 # /var/tmp, matching where this project's other comparison tools live, and prints the BDIFF_PYTHON
@@ -407,7 +325,7 @@ install-bdiff:
 # ── RQ1: whole-tree APTED against a 1-second budget ─────────────────────────────────────────────
 
 # Same slow/fast split as benchmark-timing above: `rq1-report` re-renders from whatever
-# data/rq1/apted_only_group*.csv already holds, `rq1` re-measures first.
+# data/rq1/apted_only_group*.csv already holds, `measure-rq1` re-measures first.
 rq1-report:
 	uv run ./analysis/apted_only_report.py
 
@@ -420,7 +338,7 @@ rq1-report:
 #
 # MODE selects which checkout root the sampled pairs are resolved against; the sample CSVs
 # themselves (data/samples/sampled_code_pairs_*.csv) are committed, so this needs no re-sampling step.
-rq1:
+measure-rq1:
 	cd .. && cargo build --release --features stats --bin apted_only_benchmark --bin apted_only_worker
 	$(BIN_DIR)/apted_only_benchmark \
 		--csv data/samples/sampled_code_pairs_css.csv data/samples/sampled_code_pairs_python.csv \
@@ -464,14 +382,14 @@ paper-variables:
 
 # Rebuilds the paper PDF from the figures and macros already in plots/.
 #
-# Deliberately does NOT depend on benchmark-timing-report: that step regenerates the comparison
+# Deliberately does NOT depend on timing-report: that step regenerates the comparison
 # charts and variance table from whatever data/comparison/benchmark_other.csv currently holds,
 # and that CSV (156 fixtures) has grown past the corpus every AUTHORED number in the paper was
 # measured on (98 fixtures - see paper_variables.py's COMPARISON block and the TODO in main.tex).
 # A routine PDF rebuild must not silently swap 156-fixture charts into a paper whose prose says
 # 98 - exactly that happened live on 2026-08-19, caught only because the regenerated variance
 # table's n column changed. When the evaluation is deliberately refreshed, run
-# `make benchmark-timing` (or benchmark-timing-report), update the authored blocks in
+# `make benchmark-timing` (or timing-report), update the authored blocks in
 # paper_variables.py to match, and re-render - together, never piecemeal.
 #
 # Also does not regenerate plots/tips.png, which needs the full repository-fetch pipeline
@@ -508,10 +426,10 @@ introductory-paper:
 # file, not hand-transcribed - see write_paper_variables's own doc comment in analysis/file_stats.py
 # for exactly why that matters) and its file-types figure, from whatever $(RESEARCH_DIR)/stats.sqlite
 # already has on disk for the current MODE (default tiny - pass MODE=small or MODE=full to match
-# whatever `make file-stats` run you actually have). Reuses the fast half of that split
-# (file-stats-report), not file-stats itself, for the same reason introductory-paper depends on
-# benchmark-timing-report and not benchmark-timing: rebuilding a paper should never pay for the slow
-# step. Run `make file-stats MODE=<mode>` yourself first to (re)populate that mode's stats.sqlite.
+# whatever `make measure-file-stats` run you actually have). Reuses the fast half of that split
+# (file-stats-report), not measure-file-stats itself, for the same reason introductory-paper depends on
+# timing-report and not benchmark-timing: rebuilding a paper should never pay for the slow
+# step. Run `make measure-file-stats MODE=<mode>` yourself first to (re)populate that mode's stats.sqlite.
 introductory-paper-empirical: file-stats-report
 	$(MAKE) paper-variables
 	$(build-pdf)

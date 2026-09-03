@@ -96,9 +96,9 @@ script.
 `variables.tex`. There is no copy step: regenerating a chart or the macro file updates what the
 paper builds from, immediately. `research/plots/` is committed for exactly this reason.
 
-If the empirical fragment (`plots/variables_empirical.tex`, written by the slow `file-stats` run)
+If the empirical fragment (`plots/variables_empirical.tex`, written by the slow `measure-file-stats` run)
 is missing, the assembler carries the previous values forward from the `variables.tex` already on
-disk rather than overwriting good numbers with placeholders - `file-stats` is deliberately not a
+disk rather than overwriting good numbers with placeholders - `measure-file-stats` is deliberately not a
 prerequisite of the paper targets, so a routine rebuild must not destroy them. It only emits a
 loud `\textbf{??}` when a macro has no value from any source - never silently omits one, because
 `main.tex` builds under `-interaction=nonstopmode`, where an *undefined* macro does not fail the
@@ -212,9 +212,9 @@ per-tool *mean* runtimes in this corpus are distorted by run order - whichever t
 fixture absorbs cold-cache cost, which is why `unix_diff` and `git_myers` show ~18 ms means
 against ~2.5 ms medians. Quote percentiles, not means; the paper's speed table already does.
 
-### The edit-shape census (Section 3.2, Table 2)
+### The measure-edit-shape census (Section 3.2, Table 2)
 
-`analysis/edit_shape_stats.py` (`make edit-shape MODE=small`) walks the most recent
+`analysis/edit_shape_stats.py` (`make measure-edit-shape MODE=small`) walks the most recent
 `EDIT_SHAPE_COMMITS` (50, matching `\CorpusCloneDepth`) non-merge commits of each cloned
 repository and reports how big a real-world edit is. It replaced a "TODO: Add our own metrics
 here" that had stood in Section 3.2 next to the Arafat and Riehle citation.
@@ -252,7 +252,7 @@ bug: computing the full corpus's numbers for real means running `file_stats` (tr
 + AST-node counting) over ~7,445 already-cloned repositories, which a timing probe against the
 100-repo sample put at roughly 24-25 hours and ~400GB of database (measured 2026-07-31: 100 repos
 took 19m50s, 1.35M files, 1,133 files/sec). Swapping in the real full-corpus numbers, once that run
-finishes, is `make file-stats MODE=full` (slow, run once) followed by `make
+finishes, is `make measure-file-stats MODE=full` (slow, run once) followed by `make
 introductory-paper-empirical MODE=full` (fast, re-renders and rebuilds) - no hand-editing required.
 
 **Every ground-truth number was refreshed on 2026-08-20** against the current 468-fixture corpus
@@ -309,7 +309,7 @@ table, not a chart, `\input` directly rather than copied as a PNG).
 empty scratch artifact.
 
 **The RQ1 measurement block is generated, not authored** (`plots/variables_rq1.tex`, written by
-`analysis/apted_only_report.py` via `make rq1-report`), so a full `make rq1` re-measurement flows
+`analysis/apted_only_report.py` via `make rq1-report`), so a full `make measure-rq1` re-measurement flows
 into the paper with no hand-editing. The numbers currently on disk were measured against the
 pre-2026-08-18 sampled corpus (see `data/rq1/PROVENANCE.md`); the prose cites only the code and
 config/data categories, deliberately - the scripting category does not exist in that measurement
@@ -337,7 +337,7 @@ Regenerating from `research/` (not the repository root - these targets live in
   rebuilds the PDF.
 * `make introductory-paper-empirical MODE=<tiny|small|full>` - fast (seconds), re-renders Table 1
   and friends from whatever `MODE`'s `stats.sqlite` already has, and rebuilds the PDF. Does *not*
-  run `file_stats` itself - that's `make file-stats MODE=<mode>`, and it's the slow one (see
+  run `file_stats` itself - that's `make measure-file-stats MODE=<mode>`, and it's the slow one (see
   "Status" above).
 * `make paper-variables` - fast (instant). Just regenerates `plots/variables.tex` from whatever
   is already on disk, without rebuilding the PDF.

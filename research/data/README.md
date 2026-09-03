@@ -16,7 +16,7 @@ data/
   performance/    output  - diff speed/memory over the sampled pairs
     baselines/            - pinned point-in-time snapshots, kept for comparison
   comparison/     output  - codediff against other diff tools
-  rq1/            output  - whole-tree APTED against a 1-second budget (the paper's RQ1)
+  measure-rq1/            output  - whole-tree APTED against a 1-second budget (the paper's RQ1)
   ablation/       output  - leave-one-out heuristic study (gitignored: regenerable scratch)
 ```
 
@@ -42,7 +42,7 @@ distribution per language, and size/LOC-changed statistics for the sampled Rust 
 `analysis/file_stats.py` and `analysis/code_pair_diff_stats.py`.
 
 `edit_shape.csv` is how big a real-world *edit* is, per language, over the most recent 50 commits
-of each repository (`make edit-shape MODE=<mode>`, `analysis/edit_shape_stats.py`) - the source of
+of each repository (`make measure-edit-shape MODE=<mode>`, `analysis/edit_shape_stats.py`) - the source of
 the paper's Table 2. Per-language rows only: the per-edit population is ~48k modifications and the
 uncapped one ~20M, neither of which belongs in git. The 50-commit cap is load-bearing rather than
 a speed measure - these clones are shallow but not uniformly so, and `torvalds-linux.git` alone
@@ -69,7 +69,7 @@ script's own comment about Lua sampling zero pairs).
 `benchmark_<language>_baseline_pre_<change>.csv`) kept for before/after comparison across a
 specific algorithm change. These are never regenerated - that is the point of them.
 
-## rq1/
+## measure-rq1/
 
 `apted_only_group<N>.csv`, the per-pair output of `apted_only_benchmark`: whether a single
 whole-tree APTED run finished inside a 1-second budget, for every sampled pair. Four groups purely
@@ -80,4 +80,4 @@ Also holds `archive_pre_resample_*/` (the last measurements taken against the ol
 corpus) and, currently, `partial_resample_*_INCOMPLETE/` - see that directory's own README for why
 it is not reportable.
 
-Read with `make rq1-report`; re-measure with `make rq1` (hours, needs an idle machine).
+Read with `make rq1-report`; re-measure with `make measure-rq1` (hours, needs an idle machine).

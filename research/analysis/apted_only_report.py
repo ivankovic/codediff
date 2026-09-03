@@ -325,7 +325,7 @@ def write_paper_fragment(
     A fragment, not the file main.tex reads: `analysis/paper_variables.py` merges this with the
     paper's other numbers into the single `plots/variables.tex` - same contract as
     `file_stats.py::write_paper_variables`. Regenerating is `make rq1-report` (fast, reads
-    whatever data/rq1/ holds) then `make paper-variables`; a full `make rq1` re-measurement flows
+    whatever data/rq1/ holds) then `make paper-variables`; a full `make measure-rq1` re-measurement flows
     into the paper the same way with no hand-editing.
 
     Only the macros the paper's prose actually cites are emitted, not every (category, bucket)

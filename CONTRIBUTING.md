@@ -97,7 +97,7 @@ perfect zero on 124 real mismatches under the old definition.
 
 Automated benchmarks measure the wall-clock time of the main diffing algorithm. These benchmarks
 use the Rust criterion library and run over every handmade test case from `src/test/helper.rs`
-(`make hermetic-benchmark`). Run these benchmarks frequently, to catch performance regressions.
+(`make benchmark-speed`). Run these benchmarks frequently, to catch performance regressions.
 
 ## Code structure
 
@@ -171,19 +171,38 @@ documented there.
   than keeping a copy, so it cannot drift from CI; `python3 scripts/ci_local.py --list` shows the
   job ids and `--job <id>` runs one of them. See that script's module docstring for what it can
   and cannot mirror.
+Three verbs, and which file a target lives in follows from them:
+
+* **`benchmark-`** measures codediff, and lives in the root Makefile. Production QA, not a study -
+  and none of them needs anything a bare checkout lacks, since they all run against
+  `src/test/data/diffs/`.
+* **`check-`** gates. Runs in CI on every push and fails the build.
+* **`measure-`** measures something that is not codediff, or needs the cloned upstream corpus at
+  `REPOSITORIES_DIR`. Lives in `research/Makefile`, never the root one.
+
 * `benchmark-optimal` - runs `benchmark_optimal_solutions`, the project's primary diff-quality
-  gate. This measures mismatch count against the human-authored ground truth (see "Quality" above).
-* `check-quality` - what `deploy` runs before it tags a release. This target gates on a checked-in
-  quality baseline. It fails hard on an accuracy regression. It only warns, and does not fail, on a
+  measurement: mismatch count against the human-authored ground truth (see "Quality" above).
+* `benchmark-accuracy` - codediff against the other diff tools (Unix `diff`, GumTree, difftastic,
+  diffsitter), scored against the same ground truth at line, node, leaf and visible granularity.
+  Writes `research/data/comparison/benchmark_accuracy.csv`.
+* `benchmark-timing` - the same comparison, timed. Slow and sensitive to machine load; timing is
+  the only reason to pay for it. Writes `research/data/comparison/benchmark_other.csv`. Neither of
+  these renders anything - `make -C research timing-report` turns the CSV into the paper's tables.
+* `benchmark-ablation` - re-runs `benchmark-optimal` with individual solver passes disabled, to see
+  what each is worth.
+* `check-quality` - the gate. What CI runs on every push and what `deploy` runs before it tags a
+  release. Fails hard on an accuracy regression against the checked-in baseline; only warns on a
   runtime jump of more than 2x.
 * `update-quality-baseline` - re-cuts both baselines after a reviewed change. `deploy` never runs
   it automatically. Note what it does *not* do: the per-fixture accuracy columns are read from the
   `fixtures` stubs, not from the run, so this cannot lower the accuracy bar. Raising a
   limit means editing that fixture's stub - the same file that holds the prose explaining why -
   and `quality_baseline.csv` is then a projection of those limits, pinned by a test.
-* `hermetic-benchmark` / `hermetic-benchmark-update-baseline` - a criterion wall-clock benchmark of
+* `benchmark-speed` / `benchmark-speed-update-baseline` - a criterion wall-clock benchmark of
   `diff_code`, over every handmade test case from `src/test/helper.rs` (see "Speed" above). The
-  first command compares against the saved baseline. The second command saves a new baseline.
+  first compares against the saved baseline, the second saves a new one. Note the asymmetry with
+  accuracy: criterion keeps its baseline under `target/`, which is not checked in, so a speed
+  baseline is local to one working copy and nothing gates on it.
 
 ### Release
 

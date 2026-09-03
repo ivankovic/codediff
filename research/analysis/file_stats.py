@@ -254,7 +254,7 @@ def write_paper_variables(
     this fragment together with the paper's other numbers into the single `plots/variables.tex`
     that main.tex actually `\\input`s - the paper has exactly one macro file, and this is one of
     its inputs. Writing straight to `variables.tex` here would clobber every non-empirical macro
-    in it on the next `make file-stats` run.
+    in it on the next `make measure-file-stats` run.
 
     This exists because of a real, already-happened failure: the paper's original Table 1 numbers
     were hand-transcribed from a conference slide deck, and the slide deck's own source

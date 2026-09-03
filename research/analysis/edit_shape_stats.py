@@ -356,7 +356,7 @@ def write_paper_fragment(summary, path):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     # Defaults match the research Makefile's own REPOSITORIES_DIR/RESEARCH_DIR for MODE=small;
-    # the `edit-shape` target passes both explicitly so MODE keeps working.
+    # the `measure-edit-shape` target passes both explicitly so MODE keeps working.
     parser.add_argument("--repositories", default="/var/tmp/research/small/repositories")
     # Matches the corpus's stated clone depth. 0 walks the whole clone,
     # which lets one very deep repository dominate - see this module's doc comment.

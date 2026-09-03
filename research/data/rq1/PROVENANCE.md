@@ -34,10 +34,10 @@ resolvability in place.
 ## Known gap in this measurement
 
 **2,922 of 3,089 sampled pairs were measured.** The missing 167 are R (79) and Scala (88): the
-sampler drew them, but `Makefile`'s `RQ1_LANGUAGES` and the `rq1` target's four group lists covered
+sampler drew them, but `Makefile`'s `RQ1_LANGUAGES` and the `measure-rq1` target's four group lists covered
 only 22 of the 24 languages, so no per-language CSV existed for either. Both were added to the
 Makefile on 2026-08-21 and their CSVs generated from `sampled_code_pairs_all.csv`, so the next
-`make rq1` covers all 24 — but the numbers currently committed here, and the ones the paper cites,
+`make measure-rq1` covers all 24 — but the numbers currently committed here, and the ones the paper cites,
 are the 22-language measurement. Do not describe this measurement as covering the whole sample.
 
 ## Superseded data
