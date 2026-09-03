@@ -1,11 +1,6 @@
 {
   "entries": [
     {
-      "operation": "match_but_not_identical",
-      "before_path": [],
-      "after_path": []
-    },
-    {
       "operation": "identical",
       "before_path": [
         "block_comment:1"

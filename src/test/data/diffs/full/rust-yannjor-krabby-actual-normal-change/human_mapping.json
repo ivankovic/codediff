@@ -9630,6 +9630,101 @@
         "block:1",
         "}:1"
       ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "attribute_item:4"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "attribute_item:4",
+        "#:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "attribute_item:4",
+        "[:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "attribute_item:4",
+        "attribute:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "attribute_item:4",
+        "attribute:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "attribute_item:4",
+        "attribute:1",
+        "token_tree:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "attribute_item:4",
+        "attribute:1",
+        "token_tree:1",
+        "(:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "attribute_item:4",
+        "attribute:1",
+        "token_tree:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "attribute_item:4",
+        "attribute:1",
+        "token_tree:1",
+        ",:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "attribute_item:4",
+        "attribute:1",
+        "token_tree:1",
+        "identifier:2"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "attribute_item:4",
+        "attribute:1",
+        "token_tree:1",
+        "):1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "attribute_item:4",
+        "]:1"
+      ]
     }
   ]
 }

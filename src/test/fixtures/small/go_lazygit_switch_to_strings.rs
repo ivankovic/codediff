@@ -16,6 +16,7 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 use crate::test;
+use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
 use anyhow::Result;
 
 #[test]
@@ -25,4 +26,11 @@ fn mapping() -> Result<()> {
         4,
         1,
     )
+}
+
+#[test]
+fn painting() -> Result<()> {
+    // Not measured yet: 100.0 passes unconditionally. Run this test, read the rate it
+    // reports for both modes, and record that instead.
+    assert_matches_human_painting_within_limit("go-lazygit-switch-to-strings", 100.0)
 }
