@@ -137,7 +137,7 @@ def translate_uses(step: dict[str, Any]) -> list[str] | None:
         raise StepSkipped(f"using the local cargo-{tool}")
 
     if name == "astral-sh/ruff-action":
-        check_tool(["ruff", "--version"], "the research/ Python lint")
+        check_tool(["ruff", "--version"], "the Python lint")
         wanted = str(inputs.get("version", ""))
         local = tool_version(["ruff", "--version"]).split()[-1]
         if wanted and local != wanted:

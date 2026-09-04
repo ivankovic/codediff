@@ -87,7 +87,7 @@ jobs:
   # feature configs. The ruff version is pinned for the same reason the rule set is pinned in
   # research/pyproject.toml: an unpinned linter turns CI red on a day nobody touched the code.
   python-lint:
-    name: ruff (research/)
+    name: ruff (research/, scripts/)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -96,13 +96,13 @@ jobs:
         with:
           version: 0.16.4
           args: check
-          src: research
+          src: research scripts
 
       - uses: astral-sh/ruff-action@v3
         with:
           version: 0.16.4
           args: format --check
-          src: research
+          src: research scripts
 
   # The release gate, run on every push rather than only at deploy time - a regression is far
   # cheaper to find on the commit that caused it than in the middle of a release. Safe to gate in

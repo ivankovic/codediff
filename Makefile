@@ -27,6 +27,34 @@
 # producing them is product QA, and neither reads anything research/ produces. Nothing here
 # invokes a research/ target.
 
+# Which of this repository's own lines the test suite actually executes.
+#
+# Not one of the three verbs above, and deliberately so: `benchmark-` and `check-` measure
+# codediff's *output* against a corpus, and `measure-` studies the field. This measures the test
+# suite instead - a fact about how well this repository is examining itself, not about how well
+# codediff diffs. It is on demand rather than a gate: a coverage threshold in CI mostly teaches
+# people to write tests that touch lines, and the number that matters here (`src/diff/`) is
+# already high enough that a floor would only ever fire on the dev tools.
+#
+# `cargo-llvm-cov` drives `cargo nextest` directly, so this runs exactly the suite `make test`
+# does, under the same feature set CI's widest job uses. Around ten minutes and 6GB peak: it
+# rebuilds the whole workspace with instrumentation, which is why it is not wired into anything
+# that runs often.
+#
+# Writes a browsable report to target/llvm-cov/html/index.html and prints a per-area summary -
+# see scripts/coverage_report.py for why per-area rather than llvm-cov's own per-file table.
+coverage:
+	# Explicit, because `--no-report` deliberately does *not* clean: it exists so several test
+	# invocations can accumulate into one report. Without this the numbers only ever climb, since
+	# each run adds to whatever the last one left behind.
+	cargo llvm-cov clean --workspace
+	cargo llvm-cov nextest --no-report --release --features stats
+	cargo llvm-cov report --release --html
+	cargo llvm-cov report --release --json --summary-only \
+	  | python3 scripts/coverage_report.py
+	@echo
+	@echo "Browsable report: target/llvm-cov/html/index.html"
+
 test: test-mapping-site-js
 	cargo nextest run --release
 
