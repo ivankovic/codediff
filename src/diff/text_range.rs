@@ -336,8 +336,23 @@ fn is_whitespace_between(a: &TextRange, b: &TextRange, code: &SourceText) -> boo
 
     // Convert positions to byte indices (see `SourceText::byte_index` - the slice below needs byte
     // offsets, not character counts).
-    let first_end_idx = code.byte_index(first.end_row, first.end_column);
-    let second_start_idx = code.byte_index(second.start_row, second.start_column);
+    // `None` means the position is not addressable - a row past the end of the file, or a column
+    // inside a multi-byte character. Refusing to extend is the safe direction and the one the
+    // arm above already takes for incomparable ranges; the previous in-band `text.len()` sentinel
+    // made both cases satisfy `first_end_idx >= second_start_idx` instead, so an unaddressable
+    // position silently read as "no gap here, merge them".
+    let (Some(first_end_idx), Some(second_start_idx)) = (
+        code.byte_index(
+            SourceRow::from_raw(first.end_row),
+            SourceColumn::from_raw(first.end_column),
+        ),
+        code.byte_index(
+            SourceRow::from_raw(second.start_row),
+            SourceColumn::from_raw(second.start_column),
+        ),
+    ) else {
+        return false;
+    };
 
     if first_end_idx >= second_start_idx {
         // No gap or overlapping
@@ -345,7 +360,7 @@ fn is_whitespace_between(a: &TextRange, b: &TextRange, code: &SourceText) -> boo
     }
 
     // Extract the gap text and check if all characters are whitespace
-    let gap_text = &code.text()[first_end_idx..second_start_idx];
+    let gap_text = &code.text()[first_end_idx.get()..second_start_idx.get()];
     gap_text.chars().all(|c| c.is_whitespace())
 }
 
@@ -405,23 +420,21 @@ impl<'a> SourceText<'a> {
     ///
     /// `byte_index_agrees_with_a_linear_walk_everywhere` checks the equivalence exhaustively
     /// against the original implementation rather than trusting this description.
-    pub fn byte_index(&self, row: usize, column: usize) -> usize {
-        let Some(&start) = self.row_starts.get(row) else {
-            return self.text.len();
-        };
+    pub fn byte_index(&self, row: SourceRow, column: SourceColumn) -> Option<SourceOffset> {
+        let &start = self.row_starts.get(row.get())?;
         // The row ends just before the next row's first byte - that is, at its newline - or at the
         // end of the text for the last row. A column exactly *at* the row's end is valid: it is the
         // position the walk reached before consuming the newline.
         let row_end = self
             .row_starts
-            .get(row + 1)
+            .get(row.get() + 1)
             .map(|next| next - 1)
             .unwrap_or(self.text.len());
-        let index = start + column;
+        let index = start + column.get();
         if index > row_end || !self.text.is_char_boundary(index) {
-            return self.text.len();
+            return None;
         }
-        index
+        Some(SourceOffset::from_raw(index))
     }
 }
 
@@ -433,14 +446,14 @@ mod tests {
     /// equivalence test checks against. Its semantics - including what it does with a column past
     /// the row's end or inside a multi-byte character - are the contract, and they were implicit in
     /// the walk rather than written down anywhere.
-    fn row_col_to_byte_index(row: usize, col: usize, code: &str) -> usize {
+    fn row_col_to_byte_index(row: usize, col: usize, code: &str) -> Option<usize> {
         let mut current_row = 0;
         let mut current_col = 0; // byte offset within the current row
         let mut byte_index = 0; // byte offset from the start of the string
 
         for ch in code.chars() {
             if current_row == row && current_col == col {
-                return byte_index;
+                return Some(byte_index);
             }
             let len = ch.len_utf8();
             if ch == '\n' {
@@ -451,7 +464,11 @@ mod tests {
             }
             byte_index += len;
         }
-        byte_index
+        // The walk ran out of text: the position is addressable only if it is exactly the end.
+        // The previous version returned `byte_index` unconditionally here, which is the same
+        // in-band sentinel `byte_index` itself used to have - it made "one past the end" and "not
+        // a real position" indistinguishable in the very test meant to pin the behaviour.
+        (current_row == row && current_col == col).then_some(byte_index)
     }
 
     /// The same equivalence, over the real corpus rather than hand-picked samples. Kept
@@ -470,7 +487,12 @@ mod tests {
                     let width = code.split('\n').nth(row).map(str::len).unwrap_or(0);
                     for column in 0..=(width + 2) {
                         assert_eq!(
-                            index.byte_index(row, column),
+                            index
+                                .byte_index(
+                                    SourceRow::from_raw(row),
+                                    SourceColumn::from_raw(column)
+                                )
+                                .map(SourceOffset::get),
                             row_col_to_byte_index(row, column, code),
                             "'{name}' ({row}, {column})"
                         );
@@ -506,7 +528,9 @@ mod tests {
             for row in 0..rows {
                 for column in 0..(code.len() + 3) {
                     assert_eq!(
-                        index.byte_index(row, column),
+                        index
+                            .byte_index(SourceRow::from_raw(row), SourceColumn::from_raw(column))
+                            .map(SourceOffset::get),
                         row_col_to_byte_index(row, column, code),
                         "({row}, {column}) in {code:?}"
                     );
@@ -855,10 +879,10 @@ mod tests {
         // convention - see `row_col_to_byte_index`'s doc comment), so column 4 is right after it
         // ('a' = 1 byte + '—' = 3 bytes = byte 4), not "the 4th character" (which would be 'c').
         let code = "a—bc";
-        assert_eq!(row_col_to_byte_index(0, 0, code), 0); // 'a'
-        assert_eq!(row_col_to_byte_index(0, 1, code), 1); // '—', right after 'a'
-        assert_eq!(row_col_to_byte_index(0, 4, code), 4); // 'b', right after '—'
-        assert_eq!(row_col_to_byte_index(0, 5, code), 5); // 'c', right after 'b'
+        assert_eq!(row_col_to_byte_index(0, 0, code), Some(0)); // 'a'
+        assert_eq!(row_col_to_byte_index(0, 1, code), Some(1)); // '—', right after 'a'
+        assert_eq!(row_col_to_byte_index(0, 4, code), Some(4)); // 'b', right after '—'
+        assert_eq!(row_col_to_byte_index(0, 5, code), Some(5)); // 'c', right after 'b'
     }
 
     /// Regression test for a real crash: `is_whitespace_between` used to slice `code` with

@@ -492,23 +492,34 @@ pub(crate) fn restore_paired_brackets(
     }
 
     let text = SourceText::new(source);
-    let byte_range = |range: &TextRange| {
-        (
-            text.byte_index(range.start_row, range.start_column),
-            text.byte_index(range.end_row, range.end_column),
-        )
+    // `None` for a position that is not addressable (a row past the end, or a column inside a
+    // multi-byte character). Such a range covers nothing rather than covering everything, which is
+    // what the previous `text.len()` sentinel would have made it collapse to.
+    let byte_range = |range: &TextRange| -> Option<(usize, usize)> {
+        let start = text.byte_index(
+            crate::diff::text_range::SourceRow::from_raw(range.start_row),
+            crate::diff::text_range::SourceColumn::from_raw(range.start_column),
+        )?;
+        let end = text.byte_index(
+            crate::diff::text_range::SourceRow::from_raw(range.end_row),
+            crate::diff::text_range::SourceColumn::from_raw(range.end_column),
+        )?;
+        Some((start.get(), end.get()))
     };
     let partners = bracket_pair_partners(source);
     let covered = |byte: usize| {
-        result.iter().any(|kept| {
-            let (s, e) = byte_range(&kept.source);
-            s <= byte && byte < e
-        })
+        result
+            .iter()
+            .any(|kept| byte_range(&kept.source).is_some_and(|(s, e)| s <= byte && byte < e))
     };
 
     let mut restored = Vec::new();
     for candidate in dropped {
-        let (start, end) = byte_range(&candidate.source);
+        // An unaddressable candidate is skipped rather than treated as an empty range at the end
+        // of the file, which is what the old sentinel silently made it.
+        let Some((start, end)) = byte_range(&candidate.source) else {
+            continue;
+        };
         let Some(text) = source.get(start..end) else {
             continue;
         };

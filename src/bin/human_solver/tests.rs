@@ -6765,3 +6765,39 @@ fn a_painted_span_keeps_its_style_across_a_wrap_boundary() {
         }
     }
 }
+
+/// A wrapped row must respect terminal *cells*, not characters: a CJK ideograph is one character
+/// and two cells, so a character-counted wrap overflows the panel by one column per ideograph.
+#[test]
+fn wrapping_measures_terminal_cells_not_characters() {
+    let source = format!("{}\n", "漢".repeat(20));
+    let state = TextPaintState::default();
+
+    // Width 20, gutter "  N " = 4 columns, so 16 cells of content: eight ideographs per row.
+    let rows: Vec<String> = render_paint_side(&source, &[], &state, 0, 12, 20)
+        .iter()
+        .map(|line| line.spans.iter().map(|s| s.content.as_ref()).collect())
+        .collect();
+
+    let cells = |s: &str| -> usize {
+        use unicode_width::UnicodeWidthChar;
+        s.chars().map(|c| c.width().unwrap_or(0)).sum()
+    };
+    for (i, row) in rows.iter().enumerate() {
+        assert!(
+            cells(row) <= 20,
+            "row {i} is {} cells wide, past the 20-column panel: {row:?}",
+            cells(row)
+        );
+    }
+    assert!(
+        rows.len() >= 3,
+        "20 ideographs need three rows of eight: {rows:?}"
+    );
+    let rejoined: String = rows.iter().map(|r| r[4..].to_string()).collect();
+    assert_eq!(
+        rejoined,
+        "漢".repeat(20),
+        "wrapping must not lose or split a character"
+    );
+}

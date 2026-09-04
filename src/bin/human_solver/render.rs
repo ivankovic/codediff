@@ -788,7 +788,7 @@ pub(crate) fn render_paint_side(
         }
         lines
             .get(row)
-            .map(|line| line.chars().count().div_ceil(content_width).max(1))
+            .map(|line| row_cells(line).div_ceil(content_width).max(1))
             .unwrap_or(1)
     };
 
@@ -887,27 +887,42 @@ fn wrap_spans(spans: Vec<Span<'static>>, width: usize) -> Vec<Vec<Span<'static>>
     for span in spans {
         let style = span.style;
         let owned = span.content.into_owned();
-        let mut rest: &str = &owned;
-        while !rest.is_empty() {
-            let room = width - used;
-            let take: String = rest.chars().take(room).collect();
-            let taken = take.chars().count();
-            if taken == 0 {
-                break;
+        let mut chunk = String::new();
+        for ch in owned.chars() {
+            let cells = char_cells(ch);
+            // A wide character that will not fit in the room left starts the next row whole: a
+            // terminal cannot render half an ideograph, and splitting one would desynchronise
+            // every column after it on that row.
+            if used + cells > width && !chunk.is_empty() {
+                current.push(Span::styled(std::mem::take(&mut chunk), style));
             }
-            current.push(Span::styled(take.clone(), style));
-            used += taken;
-            rest = &rest[take.len()..];
-            if used == width {
+            if used + cells > width {
                 rows.push(std::mem::take(&mut current));
                 used = 0;
             }
+            chunk.push(ch);
+            used += cells;
+        }
+        if !chunk.is_empty() {
+            current.push(Span::styled(chunk, style));
         }
     }
     if !current.is_empty() || rows.is_empty() {
         rows.push(current);
     }
     rows
+}
+
+/// How many terminal cells `ch` occupies. A combining mark takes none, a CJK ideograph two - so
+/// neither a byte count nor a character count is the width a wrapped row must respect.
+fn char_cells(ch: char) -> usize {
+    use unicode_width::UnicodeWidthChar;
+    ch.width().unwrap_or(0)
+}
+
+/// The width of a whole row in terminal cells.
+fn row_cells(line: &str) -> usize {
+    line.chars().map(char_cells).sum()
 }
 
 pub(crate) fn paint_class_style(class: PaintClass) -> Style {
