@@ -381,6 +381,11 @@ C              open a commit from this repo's own git log, then a file it
                  changed -- before/after are that file at the commit's parent
                  and at the commit itself; s promotes into handmade/
 
+!              start this case from scratch: clears the tree mapping, its
+                 multi-map groups and every named painting at once, after a
+                 confirmation. Nothing is written until s, so reopening the case
+                 without saving gets it back
+
 ?              toggle this help
 q / Esc        quit
 ";

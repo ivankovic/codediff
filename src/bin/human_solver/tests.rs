@@ -6909,3 +6909,113 @@ fn painting_two_ranges_that_meet_at_a_newline_is_allowed() {
         app.status
     );
 }
+
+/// `!` clears all three grounds truth at once. Clearing the tree mapping while leaving paintings
+/// behind would leave a fixture asserting things about a mapping that no longer exists.
+#[test]
+fn resetting_a_case_clears_the_mapping_the_groups_and_every_painting() {
+    let source = "fn main() {}\n";
+    let tree = parse_rust(source);
+    let root = tree.root_node();
+    let mut mapping = HumanMapping::default();
+    mapping.entries.push(HumanMappingEntry {
+        operation: HumanOperation::Delete,
+        before_path: Some(vec!["source_file:1".to_string()]),
+        after_path: None,
+    });
+    solution_entries_mut(&mut mapping, "Minimal").push(HumanTextEntry {
+        operation: HumanTextOperation::Delete,
+        before: vec![HumanTextSpan {
+            start_row: 0,
+            start_column: 0,
+            end_row: 0,
+            end_column: 2,
+        }],
+        after: Vec::new(),
+    });
+    let mut app = App::new(
+        "test".to_string(),
+        CaseOrigin::Diffs,
+        root.id(),
+        root.id(),
+        mapping,
+    );
+    app.dirty = false;
+
+    let status = action_reset_case(&mut app);
+
+    assert!(
+        app.mapping.entries.is_empty(),
+        "tree mapping should be gone"
+    );
+    assert!(app.mapping.groups.is_empty(), "groups should be gone");
+    assert!(
+        app.mapping.text_mappings.is_empty(),
+        "every painting should be gone"
+    );
+    assert!(app.dirty, "a reset is an unsaved change");
+    assert!(
+        app.tree_text_spans.is_none(),
+        "spans derived from the discarded mapping must not survive it"
+    );
+    assert!(status.contains("Reset"), "status should say so: {status}");
+}
+
+/// The confirmation only goes through on the explicit key. Enter confirms everywhere else in this
+/// tool, so it is exactly the key most likely to be pressed by reflex on a modal that cannot be
+/// undone.
+#[test]
+fn resetting_a_case_needs_the_explicit_key_and_enter_will_not_do() {
+    let source = "fn main() {}\n";
+    let tree = parse_rust(source);
+    let root = tree.root_node();
+    let flat = FlatIndex::new(flatten_visible(root, &Default::default(), None));
+
+    for (key, should_clear) in [
+        (KeyCode::Char('y'), true),
+        (KeyCode::Enter, false),
+        (KeyCode::Esc, false),
+        (KeyCode::Char('n'), false),
+    ] {
+        let mut mapping = HumanMapping::default();
+        mapping.entries.push(HumanMappingEntry {
+            operation: HumanOperation::Delete,
+            before_path: Some(vec!["source_file:1".to_string()]),
+            after_path: None,
+        });
+        let mut app = App::new(
+            "test".to_string(),
+            CaseOrigin::Diffs,
+            root.id(),
+            root.id(),
+            mapping,
+        );
+        app.modal = Some(Modal::ConfirmResetCase {
+            entries: 1,
+            groups: 0,
+            paintings: 0,
+        });
+        let caches = rebuild_caches(&app.mapping.entries, root, root);
+
+        handle_modal_key(
+            &mut app,
+            key,
+            &flat,
+            &flat,
+            root,
+            root,
+            &caches,
+            source.as_bytes(),
+            source.as_bytes(),
+            &Code::from_string(source, &Language::Rust),
+            &Code::from_string(source, &Language::Rust),
+        );
+
+        assert_eq!(
+            app.mapping.entries.is_empty(),
+            should_clear,
+            "{key:?} should {} the mapping",
+            if should_clear { "clear" } else { "leave" }
+        );
+    }
+}

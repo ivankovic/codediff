@@ -491,6 +491,17 @@ pub(crate) fn handle_key(
             app.should_quit = true;
             None
         }
+        // Shift-1 rather than a letter: every letter near the ones this view uses is a keystroke
+        // away from something harmless, and this is the one action in the tool that cannot be
+        // undone.
+        KeyCode::Char('!') => {
+            app.modal = Some(Modal::ConfirmResetCase {
+                entries: app.mapping.entries.len(),
+                groups: app.mapping.groups.len(),
+                paintings: app.mapping.text_mappings.len(),
+            });
+            None
+        }
         KeyCode::Char('?') => {
             app.modal = Some(Modal::Help { scroll: 0 });
             None
@@ -1000,6 +1011,17 @@ pub(crate) fn handle_modal_key(
     let modal = app.modal.take()?;
 
     match modal {
+        Modal::ConfirmResetCase { .. } => match code {
+            KeyCode::Char('y') | KeyCode::Char('Y') => {
+                app.status = Some(action_reset_case(app));
+            }
+            // Anything else backs out. A reset is unrecoverable without re-solving the fixture by
+            // hand, so only the explicit key goes through - not Enter, which is the confirming key
+            // everywhere else here and is therefore the one most likely to be hit by reflex.
+            _ => {
+                app.status = Some("Reset cancelled".to_string());
+            }
+        },
         Modal::ConfirmKindMismatch {
             before_id,
             after_id,

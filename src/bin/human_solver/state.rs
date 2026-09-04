@@ -1104,6 +1104,40 @@ pub(crate) fn action_paint_unmark(
 /// Only reachable when there is genuinely nothing to paint - two identical files. Without it that
 /// case is indistinguishable from an unvisited fixture, since both would leave `text_mapping` at
 /// `None`, and a completeness count would quietly under-report forever.
+/// `!`: throw away everything recorded for this case and start over.
+///
+/// Clears all three grounds truth at once - `entries`, `groups` and every named painting in
+/// `text_mappings` - because "start fresh" means the case as a whole, and clearing the tree
+/// mapping while leaving paintings behind would leave a fixture asserting things about a mapping
+/// that no longer exists.
+///
+/// Only the in-memory case: nothing is written until `s`, so a reset entered by mistake is undone
+/// by reopening the case without saving. `dirty` is set so the usual unsaved-changes guard on
+/// switching cases still fires.
+pub(crate) fn action_reset_case(app: &mut App) -> String {
+    let entries = app.mapping.entries.len();
+    let groups = app.mapping.groups.len();
+    let paintings = app.mapping.text_mappings.len();
+
+    app.mapping.entries.clear();
+    app.mapping.groups.clear();
+    app.mapping.text_mappings.clear();
+
+    // Everything derived from the mapping goes with it, exactly as when a different case is
+    // opened: a stale `tree_text_spans` would keep drawing the mapping that was just discarded,
+    // and `text_solution` would name a painting that no longer exists.
+    app.tree_text_spans = None;
+    app.text_solution = starting_solution(&app.mapping);
+    app.before_multi_select.clear();
+    app.after_multi_select.clear();
+    app.dirty = true;
+
+    format!(
+        "Reset: cleared {entries} mapping entries, {groups} groups and {paintings} paintings - \
+         nothing written until s"
+    )
+}
+
 pub(crate) fn action_paint_mark_empty(app: &mut App) {
     let solution = app.text_solution.clone();
     if !solution_entries(&app.mapping, &solution).is_empty() {
@@ -1183,6 +1217,15 @@ pub(crate) enum Modal {
         /// `Some` while `f` on the `Name` column is mid-prompt, holding what has been typed so
         /// far - same contract as `OpenDiffPicker::name_input`.
         name_input: Option<String>,
+    },
+    /// Raised by `!`: confirms throwing away everything recorded for this case - the tree
+    /// mapping, its multi-map groups, and every named painting - so it can be re-solved from
+    /// nothing. Behind a confirmation because there is no undo and no partial form of it: the
+    /// alternative to getting this wrong is re-solving a fixture by hand.
+    ConfirmResetCase {
+        entries: usize,
+        groups: usize,
+        paintings: usize,
     },
     /// Raised when a picker's selection is confirmed while the current mapping has unsaved
     /// changes: asks whether to save the *current* case before switching to `target`.

@@ -461,6 +461,18 @@ pub(crate) fn render_modal(
     diff_comments: Option<&std::collections::HashMap<String, String>>,
 ) {
     match modal {
+        Modal::ConfirmResetCase {
+            entries,
+            groups,
+            paintings,
+        } => render_text_modal(
+            frame,
+            area,
+            "Start this case from scratch?",
+            &format!(
+                "This throws away everything recorded for this case:\n\n  {entries} mapping entries\n  {groups} multi-map groups\n  {paintings} named paintings\n\nThere is no undo. Nothing is written until you press s, so reopening\nthe case without saving still gets it back.\n\n[y] clear it   [any other key] cancel"
+            ),
+        ),
         Modal::ConfirmKindMismatch {
             before_kind,
             after_kind,
