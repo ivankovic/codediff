@@ -598,6 +598,57 @@ mod tests {
     }
 
     // Tests for TextRange::from_treesitter_range()
+    /// The end-of-row normalisation must key on the row's **byte** length, which is the unit
+    /// tree-sitter reports columns in. Feeding it a character count fires the rule on the wrong
+    /// rows, in both directions, and this pins the direction that is hardest to notice: a *mid-row*
+    /// column being mistaken for the end of the row and rewritten to the next one, silently
+    /// widening the range to the end of the line.
+    ///
+    /// `let 漢 = "yy";` is 15 bytes and 13 characters, so byte column 13 - where the string's
+    /// content ends - is exactly the coincidence that used to trigger it.
+    #[test]
+    fn from_treesitter_range_does_not_normalize_a_mid_row_column_that_matches_a_character_count() {
+        use tree_sitter::{Point, Range};
+
+        let row = "let 漢 = \"yy\";";
+        assert_eq!(row.len(), 15, "fifteen bytes");
+        assert_eq!(row.chars().count(), 13, "thirteen characters");
+        // Through the real producer, not a hand-written `vec![row.len()]`: the unit has to be
+        // right at both ends of the pipeline, and a literal here would only test this function's
+        // half of it.
+        let row_byte_lengths = crate::code::metadata::compute_row_byte_lengths(row);
+
+        let mid_row = TextRange::from_treesitter_range(
+            Range {
+                start_point: Point { row: 0, column: 11 },
+                end_point: Point { row: 0, column: 13 },
+                start_byte: 11,
+                end_byte: 13,
+            },
+            &row_byte_lengths,
+        );
+        assert_eq!(
+            (mid_row.end_row, mid_row.end_column),
+            (0, 13),
+            "byte column 13 is mid-row here and must stay where it is"
+        );
+
+        let end_of_row = TextRange::from_treesitter_range(
+            Range {
+                start_point: Point { row: 0, column: 11 },
+                end_point: Point { row: 0, column: 15 },
+                start_byte: 11,
+                end_byte: 15,
+            },
+            &row_byte_lengths,
+        );
+        assert_eq!(
+            (end_of_row.end_row, end_of_row.end_column),
+            (1, 0),
+            "the row's real end still normalises"
+        );
+    }
+
     #[test]
     fn from_treesitter_range_end_at_line_end() {
         use tree_sitter::Point;
@@ -890,5 +941,80 @@ mod position_tests {
         }
         // The whole row's width, for reference: a(1) 漢(2) é(1) combining(0) b(1) —(1) c(1).
         assert_eq!(previous, ScreenColumn::from_raw(7));
+    }
+}
+
+#[cfg(test)]
+mod corpus_position_invariants {
+    /// Every column codediff emits is a byte offset into its own row (see [`super::SourceColumn`]).
+    /// This asserts that over the whole corpus, which is what a character count masquerading as a
+    /// column violates: it produces a column that is either past the row's byte length or sitting
+    /// inside a multi-byte character, and both are invisible until something slices there.
+    ///
+    /// What this does **not** catch, checked rather than assumed: reintroducing the character
+    /// count in `compute_row_byte_lengths` leaves this passing. A mis-normalised end is still a
+    /// legal position - `(row + 1, 0)` always is - so nothing here is out of range or mid-
+    /// character. The guard for the *unit* is
+    /// `from_treesitter_range_does_not_normalize_a_mid_row_column_that_matches_a_character_count`
+    /// (fast, and it does fail on that regression) together with
+    /// `headless::tests::a_highlight_covers_the_same_text_on_ascii_and_non_ascii_rows`, which
+    /// catches it where a user would see it.
+    ///
+    /// This one covers the neighbouring class those two do not: a column past its row's end, or
+    /// inside a multi-byte character, which panics or silently truncates at the next slice.
+    /// Deliberately not `#[ignore]`d, unlike `byte_index_agrees_with_a_linear_walk_on_the_corpus`
+    /// next door - that guards an optimisation against a reference implementation and is only
+    /// interesting when someone touches it, whereas any change to position handling anywhere can
+    /// break this one.
+    #[test]
+    fn every_range_the_corpus_produces_is_a_byte_column_on_a_character_boundary() {
+        let pairs = crate::test::helper::handmade_test_code_pairs().expect("corpus");
+        let mut checked = 0usize;
+
+        for (name, (before, after)) in pairs.iter() {
+            let diff = crate::diff::diff_code(before, after);
+            let Some(ast) = diff.ast.as_ref() else {
+                continue;
+            };
+            let cache = crate::diff::NodeCache::build(before, after);
+            let text_diff = crate::diff::text::TextDiff::from(before, after, ast, &cache);
+
+            for (side, contents) in [(0usize, &before.contents), (1usize, &after.contents)] {
+                let rows: Vec<&str> = contents.split('\n').collect();
+                for range in text_diff.all(side) {
+                    for (label, row, column) in [
+                        ("start", range.source.start_row, range.source.start_column),
+                        ("end", range.source.end_row, range.source.end_column),
+                    ] {
+                        // A row one past the last is the normalized "end of file" form, and a
+                        // column of 0 on it is the only legal position there.
+                        let Some(text) = rows.get(row) else {
+                            assert_eq!(
+                                column, 0,
+                                "{name} side{side}: {label} past the last row must be column 0"
+                            );
+                            continue;
+                        };
+                        assert!(
+                            column <= text.len(),
+                            "{name} side{side}: {label} column {column} exceeds row {row}'s \
+                             {} bytes - a character count cannot stand in for a byte column",
+                            text.len()
+                        );
+                        assert!(
+                            text.is_char_boundary(column),
+                            "{name} side{side}: {label} column {column} falls inside a multi-byte \
+                             character on row {row}"
+                        );
+                        checked += 1;
+                    }
+                }
+            }
+        }
+
+        assert!(
+            checked > 0,
+            "the corpus should have produced ranges to check"
+        );
     }
 }
