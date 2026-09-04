@@ -280,7 +280,8 @@ impl TextRange {
     /// `row`. Shared by `tui::widgets::code_viewer` (column-precise overlay painting) and
     /// `tui::headless` (column-precise inline ANSI highlighting) - both walk the same per-row
     /// span math, just onto different rendering targets (a ratatui `Line` vs. a plain string).
-    pub fn columns_on_row(&self, row: usize, row_len: usize) -> Option<(usize, usize)> {
+    pub fn columns_on_row(&self, row: usize, row_len: SourceColumn) -> Option<(usize, usize)> {
+        let row_len = row_len.get();
         if row < self.start_row || row > self.end_row {
             return None;
         }

@@ -1212,7 +1212,7 @@ fn render_code_row(
     // stays untrimmed: it still has to bound the unstyled tail appended after the last segment
     // below, or that trailing whitespace would be dropped from the page's text entirely instead
     // of just left uncolored.
-    let paint_row_len = line.trim_end().len();
+    let paint_row_len = codediff::diff::text_range::row_len_of(line.trim_end());
     let side = &panel.side;
 
     // Every span this row draws, as byte-column bounds in left-to-right order: this rendering's

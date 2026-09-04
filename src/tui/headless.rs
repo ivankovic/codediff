@@ -108,7 +108,7 @@ fn row_overlay(ranges: &[RangeMatch], lines: &[&str]) -> (Vec<RowFlags>, Vec<Row
             // Bytes, matching the columns `TextRange` carries. A character count here was the
             // defect: on a row holding any multi-byte character it clamps to the wrong column and
             // every span past that point is off by the byte/char difference accumulated before it.
-            let row_len = crate::diff::text_range::row_len_of(lines[row].trim_end()).get();
+            let row_len = crate::diff::text_range::row_len_of(lines[row].trim_end());
             let Some((start_col, end_col)) = r.columns_on_row(row, row_len) else {
                 continue;
             };

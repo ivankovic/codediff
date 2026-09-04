@@ -196,7 +196,7 @@ fn count_and_index(positions: &[(usize, usize)], cursor: (usize, usize)) -> Opti
 ///
 /// Only ever narrows the *fallback* width used for a row a range doesn't end on - a range's own
 /// `start_column`/`end_column` come straight from the diff and are untouched.
-fn trailing_whitespace_trimmed_len(line: &Line<'_>) -> usize {
+fn trailing_whitespace_trimmed_len(line: &Line<'_>) -> crate::diff::text_range::SourceColumn {
     // Bytes, matching the columns `TextRange` carries (see `text_range::SourceColumn`). This
     // counted characters, which on any row holding a multi-byte character clamped
     // `columns_on_row` to the wrong column and shifted every painted span after it.
@@ -209,7 +209,7 @@ fn trailing_whitespace_trimmed_len(line: &Line<'_>) -> usize {
         .take_while(|c| c.is_whitespace())
         .map(char::len_utf8)
         .sum();
-    total - trailing_whitespace
+    crate::diff::text_range::SourceColumn::from_raw(total - trailing_whitespace)
 }
 
 /// Paint `style` onto the `[start_col, end_col)` character range of `line`, preserving the
@@ -649,8 +649,10 @@ impl CodeViewerWidget {
 
     /// Every occurrence of `query` in the file, in document order, as `TextRange`s (always
     /// `start_row == end_row`: a search match never spans a line break, unlike diff ranges).
-    /// Empty for an empty query. Columns are character offsets into the *original* line,
-    /// matching every other column in this module (`cursor_col`, `columns_on_row`).
+    /// Empty for an empty query. Columns are **byte** offsets into the original line, like every
+    /// other column in this codebase (see `diff::text_range::SourceColumn`) - the match is found
+    /// character by character, since a query is a sequence of characters and case folding is
+    /// per character, but what it reports is bytes.
     ///
     /// Smart-case, the vim/ripgrep convention: an all-lowercase query matches
     /// case-insensitively; a query containing any uppercase character matches exactly - typing
@@ -675,6 +677,11 @@ impl CodeViewerWidget {
         let query_len = query_chars.len();
         let mut matches = Vec::new();
         for (row, line) in self.contents.lines().enumerate() {
+            // Byte offsets alongside the characters: the match is *found* character by character
+            // (a query is a sequence of characters, and case folding is per character), but the
+            // `TextRange` it produces must carry byte columns like every other range in this
+            // codebase - `columns_on_row` and `paint_columns` read them as bytes.
+            let starts: Vec<usize> = line.char_indices().map(|(index, _)| index).collect();
             let chars: Vec<char> = line.chars().collect();
             if chars.len() < query_len {
                 continue;
@@ -692,7 +699,11 @@ impl CodeViewerWidget {
                         continue 'starts;
                     }
                 }
-                matches.push(TextRange::new(row, start, row, start + query_len));
+                // The end is the byte offset one past the match's last character, which is the
+                // next character's start - or the row's length when the match runs to the end.
+                let start_byte = starts[start];
+                let end_byte = starts.get(start + query_len).copied().unwrap_or(line.len());
+                matches.push(TextRange::new(row, start_byte, row, end_byte));
             }
         }
         matches
@@ -1160,10 +1171,42 @@ mod tests {
     #[test]
     fn find_matches_columns_are_correct_when_lowercasing_changes_character_count() {
         let widget = widget_with_line("İ world\n");
+        // Byte columns, like every other range in this codebase: 'İ' is one character and two
+        // bytes, so "world" starts at byte 3 rather than character 2. This asserted the character
+        // offsets until the renderers were corrected to read columns as bytes - at which point a
+        // search highlight on any non-ASCII line would have been drawn a column short.
         assert_eq!(
             widget.find_matches("world"),
-            vec![TextRange::new(0, 2, 0, 7)]
+            vec![TextRange::new(0, 3, 0, 8)]
         );
+    }
+
+    /// A search highlight must cover exactly the query text, whatever precedes it on the row.
+    /// Asserted through `paint_columns`, where the columns are actually consumed, rather than on
+    /// the range - a range is only right relative to the unit its reader assumes.
+    #[test]
+    fn a_search_highlight_covers_the_query_on_a_non_ascii_row() {
+        for (label, line, query) in [
+            ("ascii", "let a = world;", "world"),
+            ("two-byte", "let é = world;", "world"),
+            ("three-byte", "let 漢 = world;", "world"),
+            ("wide-run", "漢漢漢 world", "world"),
+        ] {
+            let widget = widget_with_line(&format!("{line}\n"));
+            let matches = widget.find_matches(query);
+            assert_eq!(matches.len(), 1, "{label}: expected one match");
+
+            let row_len = crate::diff::text_range::row_len_of(line);
+            let (start, end) = matches[0]
+                .columns_on_row(0, row_len)
+                .expect("the match is on row 0");
+            assert_eq!(
+                &line[start..end],
+                query,
+                "{label}: the highlight covers {:?} instead of the query",
+                &line[start..end]
+            );
+        }
     }
 
     /// The palette `widget_with_line`'s widget uses, since it never overrides `overlay_theme`.
