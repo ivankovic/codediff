@@ -8,10 +8,16 @@ do, several of which exist to be run once and read. Averaging them together with
 produces a number that means nothing about either.
 
 Reads the JSON on stdin so it composes with whatever llvm-cov invocation the caller wants.
+
+`--badge` additionally writes a shields.io endpoint file, which is what the README's badge reads.
+Both numbers go on it: a badge showing only the 91% would be quietly choosing the flattering half,
+and one showing only the 79% would describe the sampler harnesses rather than the diff engine.
 """
 
+import argparse
 import json
 import sys
+from pathlib import Path
 
 # Longest prefix wins, so `src/bin/human_solver/` can be split out of `src/bin/` if that is ever
 # wanted. Order here is display order.
@@ -34,7 +40,47 @@ def area_of(path: str) -> str:
     return label
 
 
+def badge_color(percent: float) -> str:
+    """shields.io's own palette, at the thresholds it uses for coverage by convention."""
+    for floor, color in (
+        (90, "brightgreen"),
+        (80, "green"),
+        (70, "yellowgreen"),
+        (60, "yellow"),
+    ):
+        if percent >= floor:
+            return color
+    return "orange"
+
+
+def write_badge(path: Path, product: list[int], everything: list[int]) -> None:
+    lib = 100.0 * product[0] / product[1] if product[1] else 0.0
+    total = 100.0 * everything[0] / everything[1] if everything[1] else 0.0
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(
+            {
+                "schemaVersion": 1,
+                "label": "coverage",
+                "message": f"{lib:.0f}% lib · {total:.0f}% all",
+                "color": badge_color(lib),
+            },
+            indent=2,
+        )
+        + "\n"
+    )
+
+
 def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument(
+        "--badge",
+        type=Path,
+        metavar="PATH",
+        help="also write a shields.io endpoint JSON here, for the README badge",
+    )
+    args = parser.parse_args()
+
     report = json.load(sys.stdin)
     files = report["data"][0]["files"]
 
@@ -71,6 +117,10 @@ def main() -> int:
         sum(v[1] for v in totals.values()),
     ]
     print(row("EVERYTHING", *everything))
+
+    if args.badge:
+        write_badge(args.badge, product, everything)
+        print(f"\nBadge written to {args.badge}")
 
     worst.sort(reverse=True)
     print("\nMost uncovered lines")

@@ -51,6 +51,36 @@ under 5 seconds.**
 Semi-automated tests run on the small and full dataset. They take more time to run. Run them when
 appropriate, and always before a release.
 
+### Coverage
+
+`make coverage` reports which of this repository's own lines the suite executes. `cargo-llvm-cov`
+drives `cargo nextest` directly, so it measures exactly the suite `make test` runs rather than a
+second, differently-built one. It writes a browsable report to `target/llvm-cov/html/index.html`
+and prints a per-area table, because a single number over 675 files describes nothing:
+
+| area | lines | |
+| --- | --- | --- |
+| `src/diff/` - the engine | 10761/11118 | 96.8% |
+| `src/test/` - fixture helpers | 6845/7329 | 93.4% |
+| `src/code/` - parsing, metadata | 899/984 | 91.4% |
+| `src/stats/` - sampling, git | 410/477 | 86.0% |
+| `src/tui/` - viewer, headless | 5513/6846 | 80.5% |
+| `src/bin/` - dev tools | 8066/14205 | 56.8% |
+| **product (everything but `src/bin/`)** | **24428/26754** | **91.3%** |
+| everything | 33957/42936 | 79.1% |
+
+Measured 2026-09-04 over 1718 tests. The engine and the dev tools are deliberately held to
+different standards: `src/bin/` is samplers, benchmark harnesses and `human_solver`, several of
+which exist to be run once and read.
+
+**Not a CI gate.** It costs about ten minutes and 5.7GB peak, since it rebuilds the workspace with
+instrumentation - and a threshold mostly teaches people to write tests that touch lines. At 96.8%
+the engine would never be what tripped a floor; only the dev tools would.
+
+The README badge reads `research/data/coverage/badge.json`, which `make coverage` rewrites.
+It is therefore only as current as the last run somebody committed - re-run and commit it when
+the number has moved enough to matter.
+
 ### Test dependencies
 
 **No mocks.** Mocks block testing through the interface, and mocks are brittle.
@@ -157,6 +187,9 @@ documented there.
   after every test instead of accumulating for the whole suite. Measured on this repo's full suite,
   same machine, both `--release`: peak RSS 10.66GB under plain `cargo test --release` vs 5.37GB
   under `cargo nextest run --release` - about half, at comparable wall-clock time.
+* `coverage` - line coverage of the suite over this repository's own code, via `cargo-llvm-cov`
+  driving nextest (`cargo install cargo-llvm-cov`, plus `rustup component add llvm-tools-preview`).
+  See "Coverage" above for what it reports and why it is not a gate.
 * `build` - the `test` target above + `cargo build --release --features stats` (the `stats` feature
   builds the dataset-analysis binaries in `src/bin/`).
 * `install` - `cargo install --path . --force`, so `codediff` on `PATH` matches this checkout.

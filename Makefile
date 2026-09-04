@@ -51,9 +51,10 @@ coverage:
 	cargo llvm-cov nextest --no-report --release --features stats
 	cargo llvm-cov report --release --html
 	cargo llvm-cov report --release --json --summary-only \
-	  | python3 scripts/coverage_report.py
+	  | python3 scripts/coverage_report.py --badge research/data/coverage/badge.json
 	@echo
 	@echo "Browsable report: target/llvm-cov/html/index.html"
+	@echo "README badge: commit research/data/coverage/badge.json to publish this number"
 
 test: test-mapping-site-js
 	cargo nextest run --release
