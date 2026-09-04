@@ -146,3 +146,27 @@ mod json_puppeteer_puppeteer_version_update_2;
 mod lua_awesomewm_awesome_add_to_table_constructor;
 #[cfg(test)]
 mod lua_awesomewm_awesome_update_comment;
+#[cfg(test)]
+mod rust_gyulyvgc_sniffnet_add_mod;
+#[cfg(test)]
+mod rust_gyulyvgc_sniffnet_add_mod_2;
+#[cfg(test)]
+mod rust_gyulyvgc_sniffnet_add_mod_3;
+#[cfg(test)]
+mod rust_gyulyvgc_sniffnet_remoev_attribute;
+#[cfg(test)]
+mod rust_rust_lang_rust_change_use;
+#[cfg(test)]
+mod rust_rust_lang_rust_update_comment;
+#[cfg(test)]
+mod rust_tauri_apps_tauri_rename_mod;
+#[cfg(test)]
+mod rust_vercel_next_add_mode;
+#[cfg(test)]
+mod rust_vercel_next_remove_mod;
+#[cfg(test)]
+mod rust_zed_industries_zed_add_mod;
+#[cfg(test)]
+mod rust_zed_industries_zed_change_mod_and_use;
+#[cfg(test)]
+mod rust_zed_industries_zed_change_mods;

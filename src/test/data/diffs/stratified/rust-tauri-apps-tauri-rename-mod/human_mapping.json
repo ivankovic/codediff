@@ -1,0 +1,270 @@
+{
+  "entries": [
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [],
+      "after_path": []
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "line_comment:1"
+      ],
+      "after_path": [
+        "line_comment:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "line_comment:1",
+        "//:1"
+      ],
+      "after_path": [
+        "line_comment:1",
+        "//:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "line_comment:2"
+      ],
+      "after_path": [
+        "line_comment:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "line_comment:2",
+        "//:1"
+      ],
+      "after_path": [
+        "line_comment:2",
+        "//:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "line_comment:3"
+      ],
+      "after_path": [
+        "line_comment:3"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "line_comment:3",
+        "//:1"
+      ],
+      "after_path": [
+        "line_comment:3",
+        "//:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "mod_item:1"
+      ],
+      "after_path": [
+        "mod_item:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "mod_item:1",
+        "visibility_modifier:1"
+      ],
+      "after_path": [
+        "mod_item:1",
+        "visibility_modifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "mod_item:1",
+        "visibility_modifier:1",
+        "pub:1"
+      ],
+      "after_path": [
+        "mod_item:1",
+        "visibility_modifier:1",
+        "pub:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "mod_item:1",
+        "mod:1"
+      ],
+      "after_path": [
+        "mod_item:1",
+        "mod:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "mod_item:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "mod_item:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "mod_item:1",
+        ";:1"
+      ],
+      "after_path": [
+        "mod_item:1",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "mod_item:2"
+      ],
+      "after_path": [
+        "mod_item:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "mod_item:2",
+        "visibility_modifier:1"
+      ],
+      "after_path": [
+        "mod_item:2",
+        "visibility_modifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "mod_item:2",
+        "visibility_modifier:1",
+        "pub:1"
+      ],
+      "after_path": [
+        "mod_item:2",
+        "visibility_modifier:1",
+        "pub:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "mod_item:2",
+        "mod:1"
+      ],
+      "after_path": [
+        "mod_item:2",
+        "mod:1"
+      ]
+    },
+    {
+      "operation": "update",
+      "before_path": [
+        "mod_item:2",
+        "identifier:1"
+      ],
+      "after_path": [
+        "mod_item:2",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "mod_item:2",
+        ";:1"
+      ],
+      "after_path": [
+        "mod_item:2",
+        ";:1"
+      ]
+    }
+  ],
+  "text_mappings": [
+    {
+      "name": "Minimal",
+      "entries": [
+        {
+          "operation": "Match",
+          "before": [
+            {
+              "start_row": 5,
+              "start_column": 11,
+              "end_row": 5,
+              "end_column": 13
+            }
+          ],
+          "after": [
+            {
+              "start_row": 5,
+              "start_column": 11,
+              "end_row": 5,
+              "end_column": 15
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Full",
+      "entries": [
+        {
+          "operation": "Match",
+          "before": [
+            {
+              "start_row": 5,
+              "start_column": 11,
+              "end_row": 5,
+              "end_column": 13
+            }
+          ],
+          "after": [
+            {
+              "start_row": 5,
+              "start_column": 11,
+              "end_row": 5,
+              "end_column": 15
+            }
+          ]
+        },
+        {
+          "operation": "Match",
+          "before": [
+            {
+              "start_row": 5,
+              "start_column": 8,
+              "end_row": 5,
+              "end_column": 11
+            }
+          ],
+          "after": [
+            {
+              "start_row": 5,
+              "start_column": 8,
+              "end_row": 5,
+              "end_column": 11
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

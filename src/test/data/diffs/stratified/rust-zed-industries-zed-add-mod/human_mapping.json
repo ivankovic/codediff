@@ -3,7 +3,7 @@
     {
       "operation": "insert_with_children",
       "after_path": [
-        "preproc_def:8"
+        "mod_item:5"
       ]
     },
     {
@@ -14,295 +14,331 @@
     {
       "operation": "identical",
       "before_path": [
-        "preproc_def:1"
+        "mod_item:1"
       ],
       "after_path": [
-        "preproc_def:1"
+        "mod_item:1"
       ]
     },
     {
       "operation": "identical",
       "before_path": [
-        "preproc_def:1",
-        "#define:1"
+        "mod_item:1",
+        "visibility_modifier:1"
       ],
       "after_path": [
-        "preproc_def:1",
-        "#define:1"
+        "mod_item:1",
+        "visibility_modifier:1"
       ]
     },
     {
       "operation": "identical",
       "before_path": [
-        "preproc_def:1",
+        "mod_item:1",
+        "visibility_modifier:1",
+        "pub:1"
+      ],
+      "after_path": [
+        "mod_item:1",
+        "visibility_modifier:1",
+        "pub:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "mod_item:1",
+        "mod:1"
+      ],
+      "after_path": [
+        "mod_item:1",
+        "mod:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "mod_item:1",
         "identifier:1"
       ],
       "after_path": [
-        "preproc_def:1",
-        "identifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "preproc_def:1",
-        "preproc_arg:1"
-      ],
-      "after_path": [
-        "preproc_def:1",
-        "preproc_arg:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "preproc_def:2"
-      ],
-      "after_path": [
-        "preproc_def:2"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "preproc_def:2",
-        "#define:1"
-      ],
-      "after_path": [
-        "preproc_def:2",
-        "#define:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "preproc_def:2",
-        "identifier:1"
-      ],
-      "after_path": [
-        "preproc_def:2",
+        "mod_item:1",
         "identifier:1"
       ]
     },
     {
       "operation": "identical",
       "before_path": [
-        "preproc_def:2",
-        "preproc_arg:1"
+        "mod_item:1",
+        ";:1"
       ],
       "after_path": [
-        "preproc_def:2",
-        "preproc_arg:1"
+        "mod_item:1",
+        ";:1"
       ]
     },
     {
       "operation": "identical",
       "before_path": [
-        "preproc_def:3"
+        "mod_item:2"
       ],
       "after_path": [
-        "preproc_def:3"
+        "mod_item:2"
       ]
     },
     {
       "operation": "identical",
       "before_path": [
-        "preproc_def:3",
-        "#define:1"
+        "mod_item:2",
+        "visibility_modifier:1"
       ],
       "after_path": [
-        "preproc_def:3",
-        "#define:1"
+        "mod_item:2",
+        "visibility_modifier:1"
       ]
     },
     {
       "operation": "identical",
       "before_path": [
-        "preproc_def:3",
+        "mod_item:2",
+        "visibility_modifier:1",
+        "pub:1"
+      ],
+      "after_path": [
+        "mod_item:2",
+        "visibility_modifier:1",
+        "pub:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "mod_item:2",
+        "mod:1"
+      ],
+      "after_path": [
+        "mod_item:2",
+        "mod:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "mod_item:2",
         "identifier:1"
       ],
       "after_path": [
-        "preproc_def:3",
-        "identifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "preproc_def:3",
-        "preproc_arg:1"
-      ],
-      "after_path": [
-        "preproc_def:3",
-        "preproc_arg:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "preproc_def:4"
-      ],
-      "after_path": [
-        "preproc_def:4"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "preproc_def:4",
-        "#define:1"
-      ],
-      "after_path": [
-        "preproc_def:4",
-        "#define:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "preproc_def:4",
-        "identifier:1"
-      ],
-      "after_path": [
-        "preproc_def:4",
+        "mod_item:2",
         "identifier:1"
       ]
     },
     {
       "operation": "identical",
       "before_path": [
-        "preproc_def:4",
-        "preproc_arg:1"
+        "mod_item:2",
+        ";:1"
       ],
       "after_path": [
-        "preproc_def:4",
-        "preproc_arg:1"
+        "mod_item:2",
+        ";:1"
       ]
     },
     {
       "operation": "identical",
       "before_path": [
-        "preproc_def:5"
+        "mod_item:3"
       ],
       "after_path": [
-        "preproc_def:5"
+        "mod_item:3"
       ]
     },
     {
       "operation": "identical",
       "before_path": [
-        "preproc_def:5",
-        "#define:1"
+        "mod_item:3",
+        "visibility_modifier:1"
       ],
       "after_path": [
-        "preproc_def:5",
-        "#define:1"
+        "mod_item:3",
+        "visibility_modifier:1"
       ]
     },
     {
       "operation": "identical",
       "before_path": [
-        "preproc_def:5",
+        "mod_item:3",
+        "visibility_modifier:1",
+        "pub:1"
+      ],
+      "after_path": [
+        "mod_item:3",
+        "visibility_modifier:1",
+        "pub:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "mod_item:3",
+        "mod:1"
+      ],
+      "after_path": [
+        "mod_item:3",
+        "mod:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "mod_item:3",
         "identifier:1"
       ],
       "after_path": [
-        "preproc_def:5",
-        "identifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "preproc_def:5",
-        "preproc_arg:1"
-      ],
-      "after_path": [
-        "preproc_def:5",
-        "preproc_arg:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "preproc_def:6"
-      ],
-      "after_path": [
-        "preproc_def:6"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "preproc_def:6",
-        "#define:1"
-      ],
-      "after_path": [
-        "preproc_def:6",
-        "#define:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "preproc_def:6",
-        "identifier:1"
-      ],
-      "after_path": [
-        "preproc_def:6",
+        "mod_item:3",
         "identifier:1"
       ]
     },
     {
       "operation": "identical",
       "before_path": [
-        "preproc_def:6",
-        "preproc_arg:1"
+        "mod_item:3",
+        ";:1"
       ],
       "after_path": [
-        "preproc_def:6",
-        "preproc_arg:1"
+        "mod_item:3",
+        ";:1"
       ]
     },
     {
       "operation": "identical",
       "before_path": [
-        "preproc_def:7"
+        "mod_item:4"
       ],
       "after_path": [
-        "preproc_def:7"
+        "mod_item:4"
       ]
     },
     {
       "operation": "identical",
       "before_path": [
-        "preproc_def:7",
-        "#define:1"
+        "mod_item:4",
+        "visibility_modifier:1"
       ],
       "after_path": [
-        "preproc_def:7",
-        "#define:1"
+        "mod_item:4",
+        "visibility_modifier:1"
       ]
     },
     {
       "operation": "identical",
       "before_path": [
-        "preproc_def:7",
+        "mod_item:4",
+        "visibility_modifier:1",
+        "pub:1"
+      ],
+      "after_path": [
+        "mod_item:4",
+        "visibility_modifier:1",
+        "pub:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "mod_item:4",
+        "mod:1"
+      ],
+      "after_path": [
+        "mod_item:4",
+        "mod:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "mod_item:4",
         "identifier:1"
       ],
       "after_path": [
-        "preproc_def:7",
+        "mod_item:4",
         "identifier:1"
       ]
     },
     {
       "operation": "identical",
       "before_path": [
-        "preproc_def:7",
-        "preproc_arg:1"
+        "mod_item:4",
+        ";:1"
       ],
       "after_path": [
-        "preproc_def:7",
-        "preproc_arg:1"
+        "mod_item:4",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "mod_item:5"
+      ],
+      "after_path": [
+        "mod_item:6"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "mod_item:5",
+        "visibility_modifier:1"
+      ],
+      "after_path": [
+        "mod_item:6",
+        "visibility_modifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "mod_item:5",
+        "visibility_modifier:1",
+        "pub:1"
+      ],
+      "after_path": [
+        "mod_item:6",
+        "visibility_modifier:1",
+        "pub:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "mod_item:5",
+        "mod:1"
+      ],
+      "after_path": [
+        "mod_item:6",
+        "mod:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "mod_item:5",
+        "identifier:1"
+      ],
+      "after_path": [
+        "mod_item:6",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "mod_item:5",
+        ";:1"
+      ],
+      "after_path": [
+        "mod_item:6",
+        ";:1"
       ]
     }
   ],
@@ -314,10 +350,10 @@
           "operation": "Insert",
           "after": [
             {
-              "start_row": 7,
+              "start_row": 4,
               "start_column": 0,
-              "end_row": 7,
-              "end_column": 61
+              "end_row": 5,
+              "end_column": 0
             }
           ]
         }
