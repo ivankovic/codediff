@@ -421,6 +421,15 @@ impl<'a> SourceText<'a> {
     /// `byte_index_agrees_with_a_linear_walk_everywhere` checks the equivalence exhaustively
     /// against the original implementation rather than trusting this description.
     pub fn byte_index(&self, row: SourceRow, column: SourceColumn) -> Option<SourceOffset> {
+        // The end-of-file position, in this module's own `(row + 1, 0)` convention for "past the
+        // end of the last row" (see the doc comment at the top of this file). There is no
+        // `row_starts` entry for it - it is one past the last row - but it is a real, addressable
+        // position that 79 ranges in the corpus end at, so it is answered here rather than
+        // rejected. The pre-`Option` version happened to return `text.len()` for it via its
+        // failure sentinel, which was the right answer reached by the wrong route.
+        if row.get() == self.row_starts.len() && column.get() == 0 {
+            return Some(SourceOffset::from_raw(self.text.len()));
+        }
         let &start = self.row_starts.get(row.get())?;
         // The row ends just before the next row's first byte - that is, at its newline - or at the
         // end of the text for the last row. A column exactly *at* the row's end is valid: it is the
@@ -447,6 +456,14 @@ mod tests {
     /// the row's end or inside a multi-byte character - are the contract, and they were implicit in
     /// the walk rather than written down anywhere.
     fn row_col_to_byte_index(row: usize, col: usize, code: &str) -> Option<usize> {
+        // This module's `(row + 1, 0)` end-of-file form (see the doc comment at the top of the
+        // file): one past the last row, which the walk below cannot reach because it only ever
+        // visits positions that real characters sit at. `byte_index` answers it directly, so the
+        // reference has to as well or the two disagree on 79 of the corpus's ranges.
+        if row == code.split('\n').count() && col == 0 {
+            return Some(code.len());
+        }
+
         let mut current_row = 0;
         let mut current_col = 0; // byte offset within the current row
         let mut byte_index = 0; // byte offset from the start of the string
@@ -1040,5 +1057,79 @@ mod corpus_position_invariants {
             checked > 0,
             "the corpus should have produced ranges to check"
         );
+    }
+
+    /// Every position codediff emits must be addressable as a byte offset, and the only text two
+    /// ranges on one side may both claim is a line terminator.
+    ///
+    /// Both halves are measurements turned into invariants rather than guesses. Across the corpus
+    /// there are 7620 overlapping pairs on 59 fixtures, and *all 7620* share exactly one byte,
+    /// always `\n`: `from_treesitter_range` normalises an end landing at the end of a row to
+    /// `(row + 1, 0)`, which in byte terms is one past `(row, row_len)` and so takes in the
+    /// newline, while the next range starts at that newline. Every consumer excludes newlines
+    /// already - `label_bytes` nulls them outright, `columns_on_row` stops at the row's trimmed
+    /// content - which is why this has never mis-rendered anything.
+    ///
+    /// Two ranges sharing a *character* would be a different thing: a genuine disagreement about
+    /// real code, which the renderers and the scorer resolve by different rules (highest verdict
+    /// vs. last writer). This fails if one ever appears.
+    #[test]
+    fn corpus_ranges_are_addressable_and_share_nothing_but_line_terminators() {
+        use crate::diff::text_range::{SourceColumn, SourceOffset, SourceRow, SourceText};
+
+        let pairs = crate::test::helper::handmade_test_code_pairs().expect("corpus");
+        for (name, (before, after)) in pairs.iter() {
+            let diff = crate::diff::diff_code(before, after);
+            let Some(ast) = diff.ast.as_ref() else {
+                continue;
+            };
+            let cache = crate::diff::NodeCache::build(before, after);
+            let text_diff = crate::diff::text::TextDiff::from(before, after, ast, &cache);
+
+            for (side, contents) in [(0usize, &before.contents), (1usize, &after.contents)] {
+                let text = SourceText::new(contents);
+                let mut spans: Vec<(usize, usize)> = Vec::new();
+                for range in text_diff.all(side) {
+                    let offset = |row: usize, column: usize| -> usize {
+                        text.byte_index(SourceRow::from_raw(row), SourceColumn::from_raw(column))
+                            .map(SourceOffset::get)
+                            .unwrap_or_else(|| {
+                                panic!(
+                                    "{name} side{side}: r{row}c{column} is not addressable as a \
+                                     byte offset"
+                                )
+                            })
+                    };
+                    let start = offset(range.source.start_row, range.source.start_column);
+                    let end = offset(range.source.end_row, range.source.end_column);
+                    assert!(
+                        end >= start,
+                        "{name} side{side}: range ends before it starts ({start}..{end})"
+                    );
+                    if end > start {
+                        spans.push((start, end));
+                    }
+                }
+
+                for i in 0..spans.len() {
+                    for j in (i + 1)..spans.len() {
+                        let lo = spans[i].0.max(spans[j].0);
+                        let hi = spans[i].1.min(spans[j].1);
+                        if lo >= hi {
+                            continue;
+                        }
+                        assert_eq!(
+                            &contents[lo..hi],
+                            "\n",
+                            "{name} side{side}: ranges {:?} and {:?} both claim {:?}, which is not \
+                             a line terminator",
+                            spans[i],
+                            spans[j],
+                            &contents[lo..hi]
+                        );
+                    }
+                }
+            }
+        }
     }
 }
