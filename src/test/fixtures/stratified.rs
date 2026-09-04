@@ -27,17 +27,35 @@ mod c_genymobile_scrcpy_add_a_define_2;
 #[cfg(test)]
 mod c_genymobile_scrcpy_add_to_import_path_and_move_imports_around;
 #[cfg(test)]
+mod c_genymobile_scrcpy_big_change;
+#[cfg(test)]
 mod c_genymobile_scrcpy_rename_and_add_a_define;
 #[cfg(test)]
 mod c_genymobile_scrcpy_rename_defines;
 #[cfg(test)]
+mod c_htop_dev_htop_add_comment;
+#[cfg(test)]
+mod c_htop_dev_htop_add_function;
+#[cfg(test)]
 mod c_microsoft_terminal_add_two_includes;
+#[cfg(test)]
+mod c_mozilla_firefox_firefox_remove_two_comments;
 #[cfg(test)]
 mod c_neovim_neovim_add_an_include;
 #[cfg(test)]
 mod c_neovim_neovim_small_change;
 #[cfg(test)]
+mod c_ollama_ollama_change_imports;
+#[cfg(test)]
+mod c_openssl_openssl_add_import;
+#[cfg(test)]
 mod c_openssl_openssl_add_two_clang_comments;
+#[cfg(test)]
+mod c_openssl_openssl_whitepsace_only;
+#[cfg(test)]
+mod c_openssl_openssl_whitespace_only;
+#[cfg(test)]
+mod c_postgres_postgres_update_copyright_year;
 #[cfg(test)]
 mod c_rust_lang_rust_add_two_consts;
 #[cfg(test)]

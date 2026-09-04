@@ -1,0 +1,3491 @@
+{
+  "entries": [
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [],
+      "after_path": []
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_call:1"
+      ],
+      "after_path": [
+        "preproc_call:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_call:1",
+        "preproc_directive:1"
+      ],
+      "after_path": [
+        "preproc_call:1",
+        "preproc_directive:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_call:1",
+        "preproc_arg:1"
+      ],
+      "after_path": [
+        "preproc_call:1",
+        "preproc_arg:1"
+      ]
+    },
+    {
+      "operation": "insert_with_children",
+      "after_path": [
+        "preproc_include:1"
+      ]
+    },
+    {
+      "operation": "insert_with_children",
+      "after_path": [
+        "preproc_include:2"
+      ]
+    },
+    {
+      "operation": "insert_with_children",
+      "after_path": [
+        "preproc_include:3"
+      ]
+    },
+    {
+      "operation": "delete_with_children",
+      "before_path": [
+        "preproc_include:1"
+      ]
+    },
+    {
+      "operation": "delete",
+      "before_path": [
+        "comment:1"
+      ]
+    },
+    {
+      "operation": "delete_with_children",
+      "before_path": [
+        "preproc_def:1"
+      ]
+    },
+    {
+      "operation": "delete_with_children",
+      "before_path": [
+        "preproc_include:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:1"
+      ],
+      "after_path": [
+        "labeled_statement:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:1",
+        "statement_identifier:1"
+      ],
+      "after_path": [
+        "labeled_statement:1",
+        "statement_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:1",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "labeled_statement:1",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:1",
+        "ERROR:1",
+        "::1"
+      ],
+      "after_path": [
+        "labeled_statement:1",
+        "ERROR:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:1",
+        "ERROR:1",
+        "::2"
+      ],
+      "after_path": [
+        "labeled_statement:1",
+        "ERROR:1",
+        "::2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:1",
+        "ERROR:1",
+        "type_identifier:1"
+      ],
+      "after_path": [
+        "labeled_statement:1",
+        "ERROR:1",
+        "type_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:1",
+        "ERROR:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "labeled_statement:1",
+        "ERROR:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:1",
+        "ERROR:1",
+        "(:1"
+      ],
+      "after_path": [
+        "labeled_statement:1",
+        "ERROR:1",
+        "(:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:1",
+        "ERROR:1",
+        "type_qualifier:1"
+      ],
+      "after_path": [
+        "labeled_statement:1",
+        "ERROR:1",
+        "type_qualifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:1",
+        "ERROR:1",
+        "type_qualifier:1",
+        "const:1"
+      ],
+      "after_path": [
+        "labeled_statement:1",
+        "ERROR:1",
+        "type_qualifier:1",
+        "const:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:1",
+        "ERROR:1",
+        "type_identifier:2"
+      ],
+      "after_path": [
+        "labeled_statement:1",
+        "ERROR:1",
+        "type_identifier:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:1",
+        "ERROR:1",
+        "::3"
+      ],
+      "after_path": [
+        "labeled_statement:1",
+        "ERROR:1",
+        "::3"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:1",
+        "::1"
+      ],
+      "after_path": [
+        "labeled_statement:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:1",
+        "expression_statement:1"
+      ],
+      "after_path": [
+        "labeled_statement:1",
+        "expression_statement:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "comma_expression:1"
+      ],
+      "after_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "comma_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "comma_expression:1",
+        "binary_expression:1"
+      ],
+      "after_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "comma_expression:1",
+        "binary_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "comma_expression:1",
+        "binary_expression:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "comma_expression:1",
+        "binary_expression:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "comma_expression:1",
+        "binary_expression:1",
+        "&:1"
+      ],
+      "after_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "comma_expression:1",
+        "binary_expression:1",
+        "&:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "comma_expression:1",
+        "binary_expression:1",
+        "identifier:2"
+      ],
+      "after_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "comma_expression:1",
+        "binary_expression:1",
+        "identifier:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "comma_expression:1",
+        ",:1"
+      ],
+      "after_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "comma_expression:1",
+        ",:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "comma_expression:1",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "comma_expression:1",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "comma_expression:1",
+        "ERROR:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "comma_expression:1",
+        "ERROR:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "comma_expression:1",
+        "assignment_expression:1"
+      ],
+      "after_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "comma_expression:1",
+        "assignment_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "comma_expression:1",
+        "assignment_expression:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "comma_expression:1",
+        "assignment_expression:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "comma_expression:1",
+        "assignment_expression:1",
+        "=:1"
+      ],
+      "after_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "comma_expression:1",
+        "assignment_expression:1",
+        "=:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "comma_expression:1",
+        "assignment_expression:1",
+        "false:1"
+      ],
+      "after_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "comma_expression:1",
+        "assignment_expression:1",
+        "false:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "ERROR:1",
+        "):1"
+      ],
+      "after_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "ERROR:1",
+        "):1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        ";:1"
+      ],
+      "after_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1"
+      ],
+      "after_path": [
+        "struct_specifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "struct:1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "struct:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "type_identifier:1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "type_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "{:1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "{:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "type_identifier:1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "type_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "ERROR:1",
+        "::1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "ERROR:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "ERROR:1",
+        "::2"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "ERROR:1",
+        "::2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "ERROR:1",
+        "field_identifier:1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "ERROR:1",
+        "field_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "ERROR:1",
+        "<:1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "ERROR:1",
+        "<:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "field_identifier:1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "field_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "ERROR:2"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "ERROR:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "ERROR:2",
+        "::1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "ERROR:2",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "bitfield_clause:1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "bitfield_clause:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "bitfield_clause:1",
+        "::1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "bitfield_clause:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "bitfield_clause:1",
+        "binary_expression:1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "bitfield_clause:1",
+        "binary_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "(:1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "(:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "ERROR:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "ERROR:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "ERROR:1",
+        "identifier:2"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "ERROR:1",
+        "identifier:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "ERROR:1",
+        "::1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "ERROR:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "ERROR:1",
+        "::2"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "ERROR:1",
+        "::2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "binary_expression:1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "binary_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "binary_expression:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "binary_expression:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "binary_expression:1",
+        "&:1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "binary_expression:1",
+        "&:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "binary_expression:1",
+        "identifier:2"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "binary_expression:1",
+        "identifier:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        ",:1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        ",:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "ERROR:2"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "ERROR:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "ERROR:2",
+        "identifier:1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "ERROR:2",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "ERROR:2",
+        "::1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "ERROR:2",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "ERROR:2",
+        "::2"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "ERROR:2",
+        "::2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "ERROR:2",
+        "identifier:2"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "ERROR:2",
+        "identifier:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "ERROR:2",
+        "&:1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "ERROR:2",
+        "&:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "):1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "):1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        ">:1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        ">:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        ";:1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "type_identifier:1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "type_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "ERROR:1",
+        "::1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "ERROR:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "ERROR:1",
+        "::2"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "ERROR:1",
+        "::2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "ERROR:1",
+        "field_identifier:1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "ERROR:1",
+        "field_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "ERROR:1",
+        "<:1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "ERROR:1",
+        "<:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "field_identifier:1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "field_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "ERROR:2"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "ERROR:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "ERROR:2",
+        "::1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "ERROR:2",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "bitfield_clause:1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "bitfield_clause:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "bitfield_clause:1",
+        "::1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "bitfield_clause:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "bitfield_clause:1",
+        "binary_expression:1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "bitfield_clause:1",
+        "binary_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "(:1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "(:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "ERROR:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "ERROR:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "ERROR:1",
+        "identifier:2"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "ERROR:1",
+        "identifier:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "ERROR:1",
+        "::1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "ERROR:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "ERROR:1",
+        "::2"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "ERROR:1",
+        "::2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "binary_expression:1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "binary_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "binary_expression:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "binary_expression:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "binary_expression:1",
+        "&:1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "binary_expression:1",
+        "&:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "binary_expression:1",
+        "identifier:2"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "binary_expression:1",
+        "identifier:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        ",:1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        ",:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "ERROR:2"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "ERROR:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "ERROR:2",
+        "identifier:1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "ERROR:2",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "ERROR:2",
+        "identifier:2"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "ERROR:2",
+        "identifier:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "ERROR:2",
+        "::1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "ERROR:2",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "ERROR:2",
+        "::2"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "ERROR:2",
+        "::2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "ERROR:3"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "ERROR:3"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "ERROR:3",
+        "&:1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "ERROR:3",
+        "&:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "):1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "):1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        ">:1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        ">:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        ";:1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:3"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:3"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:3",
+        "type_identifier:1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:3",
+        "type_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:3",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:3",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:3",
+        "ERROR:1",
+        "::1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:3",
+        "ERROR:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:3",
+        "ERROR:1",
+        "::2"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:3",
+        "ERROR:1",
+        "::2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:3",
+        "ERROR:1",
+        "field_identifier:1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:3",
+        "ERROR:1",
+        "field_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:3",
+        "ERROR:1",
+        "<:1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:3",
+        "ERROR:1",
+        "<:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:3",
+        "ERROR:1",
+        "primitive_type:1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:3",
+        "ERROR:1",
+        "primitive_type:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:3",
+        "ERROR:1",
+        "(:1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:3",
+        "ERROR:1",
+        "(:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:3",
+        "field_identifier:1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:3",
+        "field_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:3",
+        "ERROR:2"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:3",
+        "ERROR:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:3",
+        "ERROR:2",
+        "::1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:3",
+        "ERROR:2",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:3",
+        "bitfield_clause:1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:3",
+        "bitfield_clause:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:3",
+        "bitfield_clause:1",
+        "::1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:3",
+        "bitfield_clause:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:3",
+        "bitfield_clause:1",
+        "binary_expression:1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:3",
+        "bitfield_clause:1",
+        "binary_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:3",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:3",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:3",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:3",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:3",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "ERROR:1",
+        "&:1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:3",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "ERROR:1",
+        "&:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:3",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "ERROR:1",
+        "):1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:3",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "ERROR:1",
+        "):1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:3",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        ">:1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:3",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        ">:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:3",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "identifier:2"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:3",
+        "bitfield_clause:1",
+        "binary_expression:1",
+        "identifier:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:3",
+        ";:1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:3",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "}:1"
+      ],
+      "after_path": [
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "}:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        ";:1"
+      ],
+      "after_path": [
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:2"
+      ],
+      "after_path": [
+        "struct_specifier:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:2",
+        "struct:1"
+      ],
+      "after_path": [
+        "struct_specifier:2",
+        "struct:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:2",
+        "type_identifier:1"
+      ],
+      "after_path": [
+        "struct_specifier:2",
+        "type_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:2",
+        "field_declaration_list:1"
+      ],
+      "after_path": [
+        "struct_specifier:2",
+        "field_declaration_list:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:2",
+        "field_declaration_list:1",
+        "{:1"
+      ],
+      "after_path": [
+        "struct_specifier:2",
+        "field_declaration_list:1",
+        "{:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:2",
+        "field_declaration_list:1",
+        "field_declaration:1"
+      ],
+      "after_path": [
+        "struct_specifier:2",
+        "field_declaration_list:1",
+        "field_declaration:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:2",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "primitive_type:1"
+      ],
+      "after_path": [
+        "struct_specifier:2",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "primitive_type:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:2",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "field_identifier:1"
+      ],
+      "after_path": [
+        "struct_specifier:2",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "field_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:2",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "struct_specifier:2",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:2",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "ERROR:1",
+        "=:1"
+      ],
+      "after_path": [
+        "struct_specifier:2",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "ERROR:1",
+        "=:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:2",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "ERROR:1",
+        "false:1"
+      ],
+      "after_path": [
+        "struct_specifier:2",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "ERROR:1",
+        "false:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:2",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        ";:1"
+      ],
+      "after_path": [
+        "struct_specifier:2",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_specifier:2",
+        "field_declaration_list:1",
+        "}:1"
+      ],
+      "after_path": [
+        "struct_specifier:2",
+        "field_declaration_list:1",
+        "}:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        ";:2"
+      ],
+      "after_path": [
+        ";:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:2"
+      ],
+      "after_path": [
+        "labeled_statement:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:2",
+        "statement_identifier:1"
+      ],
+      "after_path": [
+        "labeled_statement:2",
+        "statement_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:2",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "labeled_statement:2",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:2",
+        "ERROR:1",
+        "::1"
+      ],
+      "after_path": [
+        "labeled_statement:2",
+        "ERROR:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:2",
+        "ERROR:1",
+        "::2"
+      ],
+      "after_path": [
+        "labeled_statement:2",
+        "ERROR:1",
+        "::2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:2",
+        "ERROR:1",
+        "type_identifier:1"
+      ],
+      "after_path": [
+        "labeled_statement:2",
+        "ERROR:1",
+        "type_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:2",
+        "ERROR:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "labeled_statement:2",
+        "ERROR:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:2",
+        "ERROR:1",
+        "(:1"
+      ],
+      "after_path": [
+        "labeled_statement:2",
+        "ERROR:1",
+        "(:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:2",
+        "ERROR:1",
+        "type_qualifier:1"
+      ],
+      "after_path": [
+        "labeled_statement:2",
+        "ERROR:1",
+        "type_qualifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:2",
+        "ERROR:1",
+        "type_qualifier:1",
+        "const:1"
+      ],
+      "after_path": [
+        "labeled_statement:2",
+        "ERROR:1",
+        "type_qualifier:1",
+        "const:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:2",
+        "ERROR:1",
+        "type_identifier:2"
+      ],
+      "after_path": [
+        "labeled_statement:2",
+        "ERROR:1",
+        "type_identifier:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:2",
+        "ERROR:1",
+        "::3"
+      ],
+      "after_path": [
+        "labeled_statement:2",
+        "ERROR:1",
+        "::3"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:2",
+        "::1"
+      ],
+      "after_path": [
+        "labeled_statement:2",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:2",
+        "expression_statement:1"
+      ],
+      "after_path": [
+        "labeled_statement:2",
+        "expression_statement:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:2",
+        "expression_statement:1",
+        "comma_expression:1"
+      ],
+      "after_path": [
+        "labeled_statement:2",
+        "expression_statement:1",
+        "comma_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:2",
+        "expression_statement:1",
+        "comma_expression:1",
+        "binary_expression:1"
+      ],
+      "after_path": [
+        "labeled_statement:2",
+        "expression_statement:1",
+        "comma_expression:1",
+        "binary_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:2",
+        "expression_statement:1",
+        "comma_expression:1",
+        "binary_expression:1",
+        "binary_expression:1"
+      ],
+      "after_path": [
+        "labeled_statement:2",
+        "expression_statement:1",
+        "comma_expression:1",
+        "binary_expression:1",
+        "binary_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:2",
+        "expression_statement:1",
+        "comma_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "labeled_statement:2",
+        "expression_statement:1",
+        "comma_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:2",
+        "expression_statement:1",
+        "comma_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "<:1"
+      ],
+      "after_path": [
+        "labeled_statement:2",
+        "expression_statement:1",
+        "comma_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "<:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:2",
+        "expression_statement:1",
+        "comma_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "call_expression:1"
+      ],
+      "after_path": [
+        "labeled_statement:2",
+        "expression_statement:1",
+        "comma_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "call_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:2",
+        "expression_statement:1",
+        "comma_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "labeled_statement:2",
+        "expression_statement:1",
+        "comma_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:2",
+        "expression_statement:1",
+        "comma_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1"
+      ],
+      "after_path": [
+        "labeled_statement:2",
+        "expression_statement:1",
+        "comma_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:2",
+        "expression_statement:1",
+        "comma_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "(:1"
+      ],
+      "after_path": [
+        "labeled_statement:2",
+        "expression_statement:1",
+        "comma_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "(:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:2",
+        "expression_statement:1",
+        "comma_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "labeled_statement:2",
+        "expression_statement:1",
+        "comma_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:2",
+        "expression_statement:1",
+        "comma_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "ERROR:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "labeled_statement:2",
+        "expression_statement:1",
+        "comma_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "ERROR:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:2",
+        "expression_statement:1",
+        "comma_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "ERROR:1",
+        "identifier:2"
+      ],
+      "after_path": [
+        "labeled_statement:2",
+        "expression_statement:1",
+        "comma_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "ERROR:1",
+        "identifier:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:2",
+        "expression_statement:1",
+        "comma_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "ERROR:1",
+        "&:1"
+      ],
+      "after_path": [
+        "labeled_statement:2",
+        "expression_statement:1",
+        "comma_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "ERROR:1",
+        "&:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:2",
+        "expression_statement:1",
+        "comma_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "):1"
+      ],
+      "after_path": [
+        "labeled_statement:2",
+        "expression_statement:1",
+        "comma_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "call_expression:1",
+        "argument_list:1",
+        "):1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:2",
+        "expression_statement:1",
+        "comma_expression:1",
+        "binary_expression:1",
+        ">:1"
+      ],
+      "after_path": [
+        "labeled_statement:2",
+        "expression_statement:1",
+        "comma_expression:1",
+        "binary_expression:1",
+        ">:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:2",
+        "expression_statement:1",
+        "comma_expression:1",
+        "binary_expression:1",
+        "pointer_expression:1"
+      ],
+      "after_path": [
+        "labeled_statement:2",
+        "expression_statement:1",
+        "comma_expression:1",
+        "binary_expression:1",
+        "pointer_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:2",
+        "expression_statement:1",
+        "comma_expression:1",
+        "binary_expression:1",
+        "pointer_expression:1",
+        "&:1"
+      ],
+      "after_path": [
+        "labeled_statement:2",
+        "expression_statement:1",
+        "comma_expression:1",
+        "binary_expression:1",
+        "pointer_expression:1",
+        "&:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:2",
+        "expression_statement:1",
+        "comma_expression:1",
+        "binary_expression:1",
+        "pointer_expression:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "labeled_statement:2",
+        "expression_statement:1",
+        "comma_expression:1",
+        "binary_expression:1",
+        "pointer_expression:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:2",
+        "expression_statement:1",
+        "comma_expression:1",
+        ",:1"
+      ],
+      "after_path": [
+        "labeled_statement:2",
+        "expression_statement:1",
+        "comma_expression:1",
+        ",:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:2",
+        "expression_statement:1",
+        "comma_expression:1",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "labeled_statement:2",
+        "expression_statement:1",
+        "comma_expression:1",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:2",
+        "expression_statement:1",
+        "comma_expression:1",
+        "ERROR:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "labeled_statement:2",
+        "expression_statement:1",
+        "comma_expression:1",
+        "ERROR:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:2",
+        "expression_statement:1",
+        "comma_expression:1",
+        "binary_expression:2"
+      ],
+      "after_path": [
+        "labeled_statement:2",
+        "expression_statement:1",
+        "comma_expression:1",
+        "binary_expression:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:2",
+        "expression_statement:1",
+        "comma_expression:1",
+        "binary_expression:2",
+        "identifier:1"
+      ],
+      "after_path": [
+        "labeled_statement:2",
+        "expression_statement:1",
+        "comma_expression:1",
+        "binary_expression:2",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:2",
+        "expression_statement:1",
+        "comma_expression:1",
+        "binary_expression:2",
+        "&:1"
+      ],
+      "after_path": [
+        "labeled_statement:2",
+        "expression_statement:1",
+        "comma_expression:1",
+        "binary_expression:2",
+        "&:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:2",
+        "expression_statement:1",
+        "comma_expression:1",
+        "binary_expression:2",
+        "identifier:2"
+      ],
+      "after_path": [
+        "labeled_statement:2",
+        "expression_statement:1",
+        "comma_expression:1",
+        "binary_expression:2",
+        "identifier:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:2",
+        "expression_statement:1",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "labeled_statement:2",
+        "expression_statement:1",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:2",
+        "expression_statement:1",
+        "ERROR:1",
+        "=:1"
+      ],
+      "after_path": [
+        "labeled_statement:2",
+        "expression_statement:1",
+        "ERROR:1",
+        "=:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:2",
+        "expression_statement:1",
+        "ERROR:1",
+        "{:1"
+      ],
+      "after_path": [
+        "labeled_statement:2",
+        "expression_statement:1",
+        "ERROR:1",
+        "{:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:2",
+        "expression_statement:1",
+        "ERROR:1",
+        "}:1"
+      ],
+      "after_path": [
+        "labeled_statement:2",
+        "expression_statement:1",
+        "ERROR:1",
+        "}:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:2",
+        "expression_statement:1",
+        "ERROR:1",
+        "):1"
+      ],
+      "after_path": [
+        "labeled_statement:2",
+        "expression_statement:1",
+        "ERROR:1",
+        "):1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:2",
+        "expression_statement:1",
+        ";:1"
+      ],
+      "after_path": [
+        "labeled_statement:2",
+        "expression_statement:1",
+        ";:1"
+      ]
+    }
+  ],
+  "text_mappings": [
+    {
+      "name": "Only one solution",
+      "entries": [
+        {
+          "operation": "Delete",
+          "before": [
+            {
+              "start_row": 2,
+              "start_column": 0,
+              "end_row": 2,
+              "end_column": 17
+            }
+          ]
+        },
+        {
+          "operation": "Delete",
+          "before": [
+            {
+              "start_row": 3,
+              "start_column": 0,
+              "end_row": 5,
+              "end_column": 19
+            }
+          ]
+        },
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 2,
+              "start_column": 0,
+              "end_row": 2,
+              "end_column": 32
+            }
+          ]
+        },
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 4,
+              "start_column": 0,
+              "end_row": 5,
+              "end_column": 17
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
