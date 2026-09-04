@@ -17,6 +17,102 @@
  */
 use tree_sitter::Range;
 
+/// A row in the source document: the index of a `\n`-delimited line.
+///
+/// Rows have only one unit - a line index is a line index however the bytes on it are encoded -
+/// so there is deliberately no byte/character/cell variant of this type. The distinction that
+/// *does* exist for rows is source vs screen: see [`ScreenRow`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+pub struct SourceRow(usize);
+
+/// A column in the source document: a **byte** offset within its row.
+///
+/// Bytes - not characters, and not terminal cells. That is what tree-sitter's `Point::column`
+/// reports, what `human_mapping.json` stores for every painted span, what
+/// `SourceText::byte_index` adds to a row start, and what `human_solver`'s cursor walks
+/// (`step_column` advances by `char::len_utf8`). Re-basing this on characters would silently
+/// invalidate every painted span in the corpus that sits on a non-ASCII row.
+///
+/// The defect this type exists to prevent is a row length measured in *characters* reaching a
+/// place that wanted a byte column - which is why [`row_len_of`] is the way to obtain one for a
+/// whole row, and why [`SourceColumn::from_raw`] is named to be uncomfortable at a call site.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+pub struct SourceColumn(usize);
+
+/// An absolute **byte** offset into the whole file - the flat form of a
+/// (`SourceRow`, `SourceColumn`) pair.
+///
+/// A separate type from `SourceColumn` because both are byte counts and both were bare `usize`s:
+/// nothing distinguished "byte 9 of this row" from "byte 9 of this file", and they are freely
+/// mixed at slicing sites.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+pub struct SourceOffset(usize);
+
+/// A row in the rendered viewport: a line index *after* wrapping.
+///
+/// Distinct from [`SourceRow`] because one source row can occupy several screen rows once long
+/// lines wrap, so "keep the cursor within N rows" means two different things depending on which
+/// one is meant - `human_solver`'s `scroll_into_view` keeps a *source*-row window while the
+/// viewport is a *screen*-row window, and needs an explicit walk to reconcile them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+pub struct ScreenRow(usize);
+
+/// A column in the rendered viewport: a terminal **cell** offset within its screen row.
+///
+/// Neither bytes nor characters: a CJK ideograph occupies two cells, a combining mark zero. Only
+/// meaningful together with the row's text, so it is derived at the render boundary by
+/// [`screen_column_in`] and never stored or persisted.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+pub struct ScreenColumn(usize);
+
+macro_rules! position_newtype {
+    ($name:ident) => {
+        impl $name {
+            /// Wrap a bare `usize`. Deliberately verbose: every call is a place where the unit is
+            /// being asserted rather than carried, so it should be visible in review and greppable.
+            pub const fn from_raw(value: usize) -> Self {
+                Self(value)
+            }
+
+            pub const fn get(self) -> usize {
+                self.0
+            }
+        }
+    };
+}
+
+position_newtype!(SourceRow);
+position_newtype!(SourceColumn);
+position_newtype!(SourceOffset);
+position_newtype!(ScreenRow);
+position_newtype!(ScreenColumn);
+
+/// The extent of `line` as a source column - its length in **bytes**, which is the column one past
+/// its last character and the value `TextRange::columns_on_row` wants as a row length.
+///
+/// This exists so that call sites cannot reach for `line.chars().count()`, which is the exact
+/// substitution that mis-highlighted every non-ASCII row: a character count is not a byte column.
+pub fn row_len_of(line: &str) -> SourceColumn {
+    SourceColumn(line.len())
+}
+
+/// How many terminal cells the first `column` bytes of `line` occupy - the source-to-screen
+/// conversion, and the only place a `SourceColumn` may become a `ScreenColumn`.
+///
+/// A column landing inside a multi-byte character counts that character not at all rather than
+/// partially: cells are indivisible, and rounding down keeps the result monotonic in `column`.
+pub fn screen_column_in(line: &str, column: SourceColumn) -> ScreenColumn {
+    use unicode_width::UnicodeWidthChar;
+    let mut cells = 0usize;
+    for (index, ch) in line.char_indices() {
+        if index + ch.len_utf8() > column.get() {
+            break;
+        }
+        cells += ch.width().unwrap_or(0);
+    }
+    ScreenColumn(cells)
+}
+
 /**
 * A range of text. The range is a right-open interval, i.e. the end point is NOT part of the range.
 * Each point in the range is a (row, column) pair.
@@ -725,5 +821,74 @@ mod tests {
         let b = TextRange::new(0, 8, 0, 9); // starts at "c" (byte 8)
 
         assert!(a.can_extend_with_whitespace(&b, &SourceText::new(code)));
+    }
+}
+
+#[cfg(test)]
+mod position_tests {
+    use super::*;
+
+    #[test]
+    fn row_len_is_bytes_not_characters() {
+        assert_eq!(row_len_of("abc"), SourceColumn::from_raw(3));
+        // Two characters, three bytes. A character count here is the defect these types exist to
+        // prevent: tree-sitter would report column 3 for the end of this row, not column 2.
+        assert_eq!(row_len_of("é]"), SourceColumn::from_raw(3));
+        assert_eq!(row_len_of(""), SourceColumn::from_raw(0));
+    }
+
+    #[test]
+    fn screen_column_counts_cells_not_bytes_or_characters() {
+        // ASCII: all three units agree.
+        assert_eq!(
+            screen_column_in("let a", SourceColumn::from_raw(5)),
+            ScreenColumn::from_raw(5)
+        );
+        // 'é' is two bytes but one cell, so byte column 3 is screen column 2.
+        assert_eq!(
+            screen_column_in("aéb", SourceColumn::from_raw(3)),
+            ScreenColumn::from_raw(2)
+        );
+        // A CJK ideograph is three bytes and *two* cells - the case a character count also gets
+        // wrong, in the other direction.
+        assert_eq!(
+            screen_column_in("a漢b", SourceColumn::from_raw(4)),
+            ScreenColumn::from_raw(3)
+        );
+        // A combining mark occupies no cell of its own.
+        assert_eq!(
+            screen_column_in("e\u{0301}x", SourceColumn::from_raw(3)),
+            ScreenColumn::from_raw(1)
+        );
+    }
+
+    #[test]
+    fn screen_column_rounds_down_inside_a_multi_byte_character() {
+        // Byte column 2 lands inside the three-byte '漢'. A cell is indivisible, so the character
+        // counts for nothing rather than partially - and the result stays monotonic in `column`.
+        assert_eq!(
+            screen_column_in("a漢", SourceColumn::from_raw(2)),
+            ScreenColumn::from_raw(1)
+        );
+        assert_eq!(
+            screen_column_in("a漢", SourceColumn::from_raw(4)),
+            ScreenColumn::from_raw(3)
+        );
+    }
+
+    #[test]
+    fn screen_column_is_monotonic_across_every_byte_column_of_a_mixed_row() {
+        let line = "a漢é\u{0301}b—c";
+        let mut previous = ScreenColumn::from_raw(0);
+        for column in 0..=line.len() {
+            let cells = screen_column_in(line, SourceColumn::from_raw(column));
+            assert!(
+                cells >= previous,
+                "screen column went backwards at byte {column} of {line:?}"
+            );
+            previous = cells;
+        }
+        // The whole row's width, for reference: a(1) 漢(2) é(1) combining(0) b(1) —(1) c(1).
+        assert_eq!(previous, ScreenColumn::from_raw(7));
     }
 }

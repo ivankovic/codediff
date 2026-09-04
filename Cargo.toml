@@ -64,6 +64,10 @@ num_cpus = { version = "1.17.0", optional = true }
 # Only used by src/stats/sampling.rs (feature-gated) and the stats-gated sample_*.rs dev tools.
 rand = { version = "0.8", optional = true }
 regex = "1.12.2"
+# Terminal cell widths for `text_range::ScreenColumn`. Already in the lockfile via ratatui, so
+# declaring it directly adds no new dependency - it makes the existing one honest, since the
+# source->screen column conversion needs it outside the TUI too (headless rendering).
+unicode-width = "0.1.14"
 # Bundled/C-compiled, and (like git2 just above) only used by two of the stats-gated src/bin/
 # tools (commit_stats.rs, file_stats.rs) - gated the same way for the same reason: the main
 # codediff binary/library has no use for it, so it shouldn't be a mandatory build-time cost for

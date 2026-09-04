@@ -305,6 +305,7 @@ dependencies = [
  "tree-sitter-xml",
  "tree-sitter-yaml",
  "two-face",
+ "unicode-width",
  "walkdir",
 ]
 
