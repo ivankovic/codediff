@@ -779,13 +779,13 @@ fn preset_name(options: crate::diff::text::RenderOptions) -> Option<&'static str
 /// answer - so both presets are held to it, which is exactly the property a single painting
 /// claims. That is why the name matters less than the count: `Only one solution` is the
 /// conventional name for the single case, but any single painting means the same thing.
-pub fn painting_for_mode(
+pub fn paintings_for_mode(
     mapping: &HumanMapping,
     options: crate::diff::text::RenderOptions,
-) -> Result<&NamedTextMapping> {
+) -> Result<Vec<&NamedTextMapping>> {
     match mapping.text_mappings.len() {
         0 => bail!("this fixture has no text painting yet - paint it in human_solver's `t` view"),
-        1 => Ok(&mapping.text_mappings[0]),
+        1 => Ok(vec![&mapping.text_mappings[0]]),
         _ => {
             let wanted = preset_name(options).with_context(|| {
                 format!(
@@ -793,24 +793,43 @@ pub fn painting_for_mode(
                      multi-painting fixture can be checked against"
                 )
             })?;
-            mapping
+            let candidates: Vec<&NamedTextMapping> = mapping
                 .text_mappings
                 .iter()
-                .find(|named| named.name == wanted)
-                .with_context(|| {
-                    let have: Vec<&str> = mapping
-                        .text_mappings
-                        .iter()
-                        .map(|named| named.name.as_str())
-                        .collect();
-                    format!(
-                        "no '{wanted}' painting to hold {options:?} to - this fixture has {have:?}. \
-                         A fixture with several paintings needs one named for each preset, or a \
-                         single painting if its rendering is unambiguous"
-                    )
-                })
+                .filter(|named| designates_preset(&named.name, wanted))
+                .collect();
+            if candidates.is_empty() {
+                let have: Vec<&str> = mapping
+                    .text_mappings
+                    .iter()
+                    .map(|named| named.name.as_str())
+                    .collect();
+                bail!(
+                    "no '{wanted}' painting to hold {options:?} to - this fixture has {have:?}. A \
+                     fixture with several paintings needs one named for each preset (optionally \
+                     several per preset, as '{wanted} (something)'), or a single painting if its \
+                     rendering is unambiguous"
+                );
+            }
+            Ok(candidates)
         }
     }
+}
+
+/// Whether a painting named `name` is an answer for the `preset` preset.
+///
+/// Exactly the preset, or the preset followed by a qualifier: `Minimal`, `Minimal (left)`,
+/// `Minimal (right)`. The qualified form is how a painter records that an edit has **more than one
+/// defensible rendering under the same preset** - deleting one of two identical substrings can be
+/// read as deleting either, and both are correct. `human_solver`'s own help promises that a check
+/// passes on any of them; before this, `painting_for_mode` looked for one exact name and a fixture
+/// painted that way failed with "no 'Minimal' painting" despite being painted more carefully than
+/// one that passed.
+fn designates_preset(name: &str, preset: &str) -> bool {
+    name == preset
+        || name
+            .strip_prefix(preset)
+            .is_some_and(|rest| rest.starts_with(' '))
 }
 
 /// Compares codediff's rendering under `options` against the painting that preset is answerable
@@ -829,19 +848,7 @@ pub fn compare_painting(
 ) -> Result<PaintingComparison> {
     let (before, after) = &*super::handmade_test_code_pair(name)?;
     let mapping = load(name)?;
-    let painting = painting_for_mode(&mapping, options)?;
-
-    // The human's side.
-    let mut painted: [Vec<(HumanTextSpan, TextLabel)>; 2] = [Vec::new(), Vec::new()];
-    for entry in &painting.mapping.entries {
-        let label = TextLabel::from_verdict(entry.verdict(&before.contents, &after.contents)?);
-        for span in &entry.before {
-            painted[0].push((*span, label));
-        }
-        for span in &entry.after {
-            painted[1].push((*span, label));
-        }
-    }
+    let candidates = paintings_for_mode(&mapping, options)?;
 
     // codediff's side, through exactly the pipeline the TUI renders: a real diff, projected by
     // `TextDiff`, then filtered by the options. Not a re-derivation - what is compared is what a
@@ -865,26 +872,60 @@ pub fn compare_painting(
         options.paint_reindent_only_moves,
     );
 
-    let mut mismatched_bytes = 0usize;
-    let mut total_bytes = 0usize;
-    for (side, contents) in [(0usize, &before.contents), (1usize, &after.contents)] {
-        let ours = crate::diff::text::ranges_for_options(&text_diff.all(side), contents, options);
-        let ours = label_bytes_from_ranges(contents, &ours);
-        let theirs = label_bytes(contents, &painted[side]);
-        total_bytes += contents.len();
-        mismatched_bytes += ours
-            .iter()
-            .zip(&theirs)
-            .filter(|(ours, theirs)| ours != theirs)
-            .count();
+    // codediff's side does not depend on which candidate painting is being compared, so it is
+    // labelled once and reused.
+    let ours: [Vec<Option<TextLabel>>; 2] = [0usize, 1usize].map(|side| {
+        let contents = if side == 0 {
+            &before.contents
+        } else {
+            &after.contents
+        };
+        let ranges = crate::diff::text::ranges_for_options(&text_diff.all(side), contents, options);
+        label_bytes_from_ranges(contents, &ranges)
+    });
+    let total_bytes = before.contents.len() + after.contents.len();
+
+    // The best of the preset's candidates. Several paintings under one preset are *alternative*
+    // readings of an ambiguous edit, not a conjunction to satisfy at once, so agreeing with any
+    // one of them is agreement - and the closest is also the most useful one to name in a failure.
+    let mut best: Option<PaintingComparison> = None;
+    for painting in candidates {
+        let mut painted: [Vec<(HumanTextSpan, TextLabel)>; 2] = [Vec::new(), Vec::new()];
+        for entry in &painting.mapping.entries {
+            let label = TextLabel::from_verdict(entry.verdict(&before.contents, &after.contents)?);
+            for span in &entry.before {
+                painted[0].push((*span, label));
+            }
+            for span in &entry.after {
+                painted[1].push((*span, label));
+            }
+        }
+
+        let mut mismatched_bytes = 0usize;
+        for (side, contents) in [(0usize, &before.contents), (1usize, &after.contents)] {
+            let theirs = label_bytes(contents, &painted[side]);
+            mismatched_bytes += ours[side]
+                .iter()
+                .zip(&theirs)
+                .filter(|(ours, theirs)| ours != theirs)
+                .count();
+        }
+
+        let comparison = PaintingComparison {
+            options,
+            solution: painting.name.clone(),
+            mismatched_bytes,
+            total_bytes,
+        };
+        if best
+            .as_ref()
+            .is_none_or(|best| comparison.mismatched_bytes < best.mismatched_bytes)
+        {
+            best = Some(comparison);
+        }
     }
 
-    Ok(PaintingComparison {
-        options,
-        solution: painting.name.clone(),
-        mismatched_bytes,
-        total_bytes,
-    })
+    best.context("a preset with no candidate paintings should have been rejected above")
 }
 
 /// Asserts codediff's rendering matches the human painting under **both** presets, within
@@ -3409,6 +3450,75 @@ mod tests {
         assert!(!json.contains("text_mapping"), "got: {json}");
         let round_tripped: HumanMapping = serde_json::from_str(&json).unwrap();
         assert!(round_tripped.text_mappings.is_empty());
+    }
+
+    fn named(names: &[&str]) -> HumanMapping {
+        HumanMapping {
+            entries: vec![],
+            groups: vec![],
+            text_mappings: names
+                .iter()
+                .map(|name| NamedTextMapping {
+                    name: (*name).to_string(),
+                    mapping: HumanTextMapping::default(),
+                })
+                .collect(),
+        }
+    }
+
+    /// A preset may carry several *alternative* readings, named `Minimal (left)` and
+    /// `Minimal (right)`. Deleting one of two identical substrings is the shape that needs it:
+    /// both readings are correct and nothing in the text can choose between them.
+    #[test]
+    fn a_preset_collects_every_alternative_named_for_it() {
+        let mapping = named(&["Minimal (left)", "Minimal (right)", "Full"]);
+
+        let minimal = paintings_for_mode(&mapping, crate::diff::text::RenderOptions::MINIMAL)
+            .expect("both Minimal alternatives should be found");
+        let names: Vec<&str> = minimal.iter().map(|p| p.name.as_str()).collect();
+        assert_eq!(names, vec!["Minimal (left)", "Minimal (right)"]);
+
+        let full = paintings_for_mode(&mapping, crate::diff::text::RenderOptions::FULL)
+            .expect("the unqualified Full should be found");
+        assert_eq!(full.len(), 1);
+        assert_eq!(full[0].name, "Full");
+    }
+
+    #[test]
+    fn a_preset_name_must_be_the_whole_name_or_be_followed_by_a_qualifier() {
+        assert!(designates_preset("Minimal", "Minimal"));
+        assert!(designates_preset("Minimal (left)", "Minimal"));
+        assert!(designates_preset("Minimal but only the strings", "Minimal"));
+        // Not a qualifier - a different word that merely starts the same way. Without this,
+        // "Minimalist" would be graded as an answer for `Minimal`.
+        assert!(!designates_preset("Minimalist", "Minimal"));
+        assert!(!designates_preset("Full", "Minimal"));
+        assert!(!designates_preset("", "Minimal"));
+    }
+
+    /// A single painting still answers for both presets - that is what painting a fixture once
+    /// claims - and the name it happens to carry is irrelevant to that.
+    #[test]
+    fn a_single_painting_answers_for_either_preset_whatever_it_is_called() {
+        let mapping = named(&["Only one solution"]);
+        for options in [
+            crate::diff::text::RenderOptions::MINIMAL,
+            crate::diff::text::RenderOptions::FULL,
+        ] {
+            let found = paintings_for_mode(&mapping, options).expect("the single painting");
+            assert_eq!(found.len(), 1);
+            assert_eq!(found[0].name, "Only one solution");
+        }
+    }
+
+    #[test]
+    fn a_preset_with_no_painting_named_for_it_says_which_names_the_fixture_has() {
+        let mapping = named(&["Minimal", "Something else"]);
+        let error = paintings_for_mode(&mapping, crate::diff::text::RenderOptions::FULL)
+            .expect_err("there is no Full painting here");
+        let message = format!("{error:#}");
+        assert!(message.contains("no 'Full' painting"), "got: {message}");
+        assert!(message.contains("Something else"), "got: {message}");
     }
 
     /// `None` and `Some(empty)` have to stay distinguishable: "nobody has painted this" is not

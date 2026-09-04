@@ -388,7 +388,10 @@ fn painting_disagreement_detail_batch() -> Result<()> {
                     continue;
                 }
             };
-            let painting = match painting_for_mode(&mapping, options) {
+            // First candidate: these are diagnostics over one painting at a time, not the
+            // grader, so the alternative readings a preset may now carry are reported one by one
+            // rather than reduced to a best.
+            let painting = match paintings_for_mode(&mapping, options).map(|all| all[0]) {
                 Ok(p) => p,
                 Err(e) => {
                     eprintln!("fixture={name} mode={mode}: ERROR: {e:#}");
@@ -481,7 +484,7 @@ fn painting_disagreement_detail() -> Result<()> {
 
     let (before, after) = &*crate::test::helper::handmade_test_code_pair(&name)?;
     let mapping = load(&name)?;
-    let painting = painting_for_mode(&mapping, options)?;
+    let painting = paintings_for_mode(&mapping, options)?[0];
 
     let mut painted: [Vec<(HumanTextSpan, TextLabel)>; 2] = [Vec::new(), Vec::new()];
     for entry in &painting.mapping.entries {

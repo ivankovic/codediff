@@ -22,7 +22,9 @@ use crate::test::helper::human_mapping::assert_matches_human_painting_within_lim
 
 #[test]
 fn mapping() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("rust-zed-industries-zed-change-mod-and-use")
+    test::helper::human_mapping::assert_matches_human_mapping(
+        "rust-zed-industries-zed-change-mod-and-use",
+    )
 }
 
 #[test]
