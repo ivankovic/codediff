@@ -41,38 +41,32 @@ fn walk_preorder<'a>(root: tree_sitter::Node<'a>, mut visit: impl FnMut(tree_sit
     }
 }
 
-/// Compute the number of columns (characters) in each row of the given code.
+/// The length of each row of `contents` in **bytes** - the column one past its last character,
+/// in the unit every column in this codebase uses (see `diff::text_range::SourceColumn`).
 ///
-/// For each line in the code, this function counts the number of characters before each newline.
-/// The last line (which may not end with a newline) is also included.
+/// Bytes, not characters, and the distinction is not academic. The only consumer is
+/// `TextRange::from_treesitter_range`, which asks "does this node's end land exactly at the end of
+/// its row?" by comparing this against tree-sitter's `Point::column` - a **byte** offset. While
+/// this counted characters the comparison was between two different units, and it went wrong in
+/// both directions:
 ///
-/// # Arguments
+/// * it **failed to fire** on a row whose byte length exceeded its character count, leaving a
+///   genuine end-of-row unnormalized;
+/// * it **fired spuriously** whenever a mid-row byte column happened to equal the row's character
+///   count, rewriting that end as `(row + 1, 0)` and silently widening the range to the end of the
+///   line. `let 漢 = "yy";` is 15 bytes and 13 characters, and the string's end at byte 13 was
+///   read as end-of-row - which painted `yy";` where the human sees `yy` change.
 ///
-/// * `contents` - The code contents as a string slice
-///
-/// # Returns
-///
-/// A vector where each element represents the number of columns (characters) in the corresponding row.
-pub fn compute_columns_per_row(contents: &str) -> Vec<usize> {
-    let mut result = Vec::new();
-    let mut start = 0;
+/// Renamed from `compute_row_byte_lengths` deliberately: the unit is the whole point, so it belongs
+/// in the name rather than in a doc comment nobody re-reads.
+pub fn compute_row_byte_lengths(contents: &str) -> Vec<usize> {
+    let mut result: Vec<usize> = contents.split('\n').map(str::len).collect();
 
-    for (idx, ch) in contents.char_indices() {
-        if ch == '\n' {
-            // Count characters from start to this newline
-            let count = contents[start..idx].chars().count();
-            result.push(count);
-            start = idx + 1;
-        }
-    }
-
-    // Handle the last line (which may not end with a newline)
-    if start < contents.len() {
-        let count = contents[start..].chars().count();
-        result.push(count);
-    } else if result.is_empty() {
-        // Handle empty string case
-        result.push(0);
+    // `split` always yields one trailing empty piece for a string ending in a newline. That piece
+    // is not a row: a file of "a\n" has one row, not two. An empty input keeps its single zero
+    // row, matching the previous behaviour.
+    if result.len() > 1 && result.last() == Some(&0) {
+        result.pop();
     }
 
     result
@@ -428,47 +422,68 @@ mod tests {
     }
 
     #[test]
-    fn compute_columns_per_row_empty_string() {
-        let result = compute_columns_per_row("");
+    fn compute_row_byte_lengths_empty_string() {
+        let result = compute_row_byte_lengths("");
         assert_eq!(result, vec![0]);
     }
 
     #[test]
-    fn compute_columns_per_row_single_line() {
-        let result = compute_columns_per_row("hello");
+    fn compute_row_byte_lengths_single_line() {
+        let result = compute_row_byte_lengths("hello");
         assert_eq!(result, vec![5]);
     }
 
     #[test]
-    fn compute_columns_per_row_single_line_with_newline() {
-        let result = compute_columns_per_row("hello\n");
+    fn compute_row_byte_lengths_single_line_with_newline() {
+        let result = compute_row_byte_lengths("hello\n");
         assert_eq!(result, vec![5]);
     }
 
     #[test]
-    fn compute_columns_per_row_multiple_lines() {
-        let result = compute_columns_per_row("abc\ndef\nghi");
+    fn compute_row_byte_lengths_multiple_lines() {
+        let result = compute_row_byte_lengths("abc\ndef\nghi");
         assert_eq!(result, vec![3, 3, 3]);
     }
 
     #[test]
-    fn compute_columns_per_row_varying_lengths() {
-        let result = compute_columns_per_row("a\nbb\nccc\n");
+    fn compute_row_byte_lengths_varying_lengths() {
+        let result = compute_row_byte_lengths("a\nbb\nccc\n");
         assert_eq!(result, vec![1, 2, 3]);
     }
 
     #[test]
-    fn compute_columns_per_row_with_empty_lines() {
-        let result = compute_columns_per_row("abc\n\ndef");
+    fn compute_row_byte_lengths_with_empty_lines() {
+        let result = compute_row_byte_lengths("abc\n\ndef");
         assert_eq!(result, vec![3, 0, 3]);
     }
 
     #[test]
-    fn compute_columns_per_row_multibyte_characters() {
-        // Test with multi-byte UTF-8 characters (emojis)
-        let result = compute_columns_per_row("a🎉b\nc🎉d");
-        // Each line has 3 characters: a, emoji, b (or c, emoji, d)
-        assert_eq!(result, vec![3, 3]);
+    fn compute_row_byte_lengths_multibyte_characters() {
+        let result = compute_row_byte_lengths("a🎉b\nc🎉d");
+        // Six bytes, not three characters: the emoji is four bytes, and the one consumer of this
+        // compares the result against tree-sitter's byte columns. Asserting 3 here is what let the
+        // end-of-row check fire on a mid-row column - see `compute_row_byte_lengths`' doc comment.
+        assert_eq!(result, vec![6, 6]);
+    }
+
+    /// The end-of-row check this feeds must agree with tree-sitter's own column for that position,
+    /// on rows where bytes and characters disagree in either direction.
+    #[test]
+    fn compute_row_byte_lengths_agrees_with_byte_offsets_on_mixed_rows() {
+        for line in [
+            "ascii only",
+            "é two-byte",
+            "漢 three-byte",
+            "𝛼 four-byte",
+            "",
+        ] {
+            let text = format!("{line}\n");
+            assert_eq!(
+                compute_row_byte_lengths(&text),
+                vec![line.len()],
+                "row length must be the byte column one past the last character of {line:?}"
+            );
+        }
     }
 
     #[test]

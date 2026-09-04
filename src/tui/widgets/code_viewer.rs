@@ -197,14 +197,18 @@ fn count_and_index(positions: &[(usize, usize)], cursor: (usize, usize)) -> Opti
 /// Only ever narrows the *fallback* width used for a row a range doesn't end on - a range's own
 /// `start_column`/`end_column` come straight from the diff and are untouched.
 fn trailing_whitespace_trimmed_len(line: &Line<'_>) -> usize {
-    let total: usize = line.spans.iter().map(|s| s.content.chars().count()).sum();
-    let trailing_whitespace = line
+    // Bytes, matching the columns `TextRange` carries (see `text_range::SourceColumn`). This
+    // counted characters, which on any row holding a multi-byte character clamped
+    // `columns_on_row` to the wrong column and shifted every painted span after it.
+    let total: usize = line.spans.iter().map(|s| s.content.len()).sum();
+    let trailing_whitespace: usize = line
         .spans
         .iter()
         .rev()
         .flat_map(|span| span.content.chars().rev())
         .take_while(|c| c.is_whitespace())
-        .count();
+        .map(char::len_utf8)
+        .sum();
     total - trailing_whitespace
 }
 
@@ -220,7 +224,10 @@ fn paint_columns(
     let mut col = 0usize;
 
     for span in &line.spans {
-        let text: Vec<char> = span.content.chars().collect();
+        let text: &str = span.content.as_ref();
+        // Bytes, not characters: `start_col`/`end_col` are the byte columns `TextRange` carries.
+        // Splitting on character indices read them as character offsets, so a row containing any
+        // multi-byte character had its highlight shifted right by the accumulated difference.
         let span_len = text.len();
         let span_start = col;
         let span_end = col + span_len;
@@ -231,20 +238,29 @@ fn paint_columns(
             continue;
         }
 
-        let local_start = start_col.saturating_sub(span_start).min(span_len);
-        let local_end = end_col.saturating_sub(span_start).min(span_len);
+        // Rounded back to a character boundary so a column landing inside a multi-byte character
+        // splits before it rather than panicking the slice.
+        let boundary = |mut index: usize| -> usize {
+            index = index.min(span_len);
+            while index > 0 && !text.is_char_boundary(index) {
+                index -= 1;
+            }
+            index
+        };
+        let local_start = boundary(start_col.saturating_sub(span_start));
+        let local_end = boundary(end_col.saturating_sub(span_start));
 
         if local_start > 0 {
-            let before: String = text[0..local_start].iter().collect();
-            spans.push(Span::styled(before, span.style));
+            spans.push(Span::styled(text[0..local_start].to_string(), span.style));
         }
         if local_end > local_start {
-            let painted: String = text[local_start..local_end].iter().collect();
-            spans.push(Span::styled(painted, span.style.patch(style)));
+            spans.push(Span::styled(
+                text[local_start..local_end].to_string(),
+                span.style.patch(style),
+            ));
         }
         if local_end < span_len {
-            let after: String = text[local_end..].iter().collect();
-            spans.push(Span::styled(after, span.style));
+            spans.push(Span::styled(text[local_end..].to_string(), span.style));
         }
     }
 

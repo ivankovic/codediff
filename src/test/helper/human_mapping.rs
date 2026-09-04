@@ -2611,7 +2611,7 @@ pub fn node_extents(code: &crate::code::Code) -> Vec<NodeExtent> {
     let Some(ast) = code.ast.as_ref() else {
         return Vec::new();
     };
-    let columns = crate::code::metadata::compute_columns_per_row(&code.contents);
+    let columns = crate::code::metadata::compute_row_byte_lengths(&code.contents);
     let mut extents = Vec::new();
     let mut stack = vec![ast.root_node()];
     while let Some(node) = stack.pop() {

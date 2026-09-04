@@ -105,7 +105,10 @@ fn row_overlay(ranges: &[RangeMatch], lines: &[&str]) -> (Vec<RowFlags>, Vec<Row
             // isn't the range's own end row) should only color up to the last real character,
             // never a line's trailing whitespace or, past it, the newline - `colorize_line`
             // still prints that trailing text, just uncolored, via its own untrimmed tail append.
-            let row_len = lines[row].trim_end().chars().count();
+            // Bytes, matching the columns `TextRange` carries. A character count here was the
+            // defect: on a row holding any multi-byte character it clamps to the wrong column and
+            // every span past that point is off by the byte/char difference accumulated before it.
+            let row_len = crate::diff::text_range::row_len_of(lines[row].trim_end()).get();
             let Some((start_col, end_col)) = r.columns_on_row(row, row_len) else {
                 continue;
             };
@@ -229,34 +232,58 @@ fn moved_chunk_destination(
 }
 
 /// Wraps each colored span of `line` (as computed by `row_overlay`) in its operation's ANSI
-/// color, leaving the untouched characters between spans as plain text - genuine inline/per-hunk
-/// highlighting rather than coloring the whole line by one dominant operation. `spans` are
-/// non-overlapping and sorted by start column (ranges on one side never overlap by construction),
-/// so a single left-to-right walk suffices.
+/// color, leaving the untouched text between spans plain - genuine inline/per-hunk highlighting
+/// rather than coloring the whole line by one dominant operation.
+///
+/// `spans` are **byte** columns, the unit `TextRange` carries throughout (see
+/// `text_range::SourceColumn`), and this slices `line` by those bytes directly. It used to collect
+/// `line.chars()` and index that, which silently read a byte column as a character offset: on
+/// `let é = "yy";` the range for the changed string is byte columns 10..12, and indexing
+/// characters there highlighted `y";` instead of `yy`.
+///
+/// Terminal *cells* deliberately do not enter here. Colouring a substring only needs the right
+/// substring; how wide the result renders is the terminal's business, and a `ScreenColumn` would
+/// be the wrong tool for choosing where to cut.
+///
+/// A span boundary that is not a character boundary, or that runs backwards past a previous span,
+/// is clamped rather than trusted - see the walk below.
 fn colorize_line(line: &str, spans: &[(usize, usize, TextOperation)], use_color: bool) -> String {
     if !use_color || spans.is_empty() {
         return line.to_string();
     }
-    let chars: Vec<char> = line.chars().collect();
-    let mut out = String::new();
-    let mut col = 0usize;
-    for (start, end, op) in spans {
-        let start = (*start).min(chars.len());
-        let end = (*end).min(chars.len());
-        if start > col {
-            out.extend(&chars[col..start]);
+    // Rounds a byte column to a character boundary at or before it, so a malformed span can never
+    // panic the slice below.
+    let boundary = |mut index: usize| -> usize {
+        index = index.min(line.len());
+        while index > 0 && !line.is_char_boundary(index) {
+            index -= 1;
         }
-        if end > start {
-            let segment: String = chars[start..end].iter().collect();
+        index
+    };
+
+    let mut out = String::new();
+    let mut cut = 0usize;
+    for (start, end, op) in spans {
+        let start = boundary(*start);
+        let end = boundary(*end);
+        if start > cut {
+            out.push_str(&line[cut..start]);
+        }
+        // `cut`, not `start`: a span overlapping the previous one must not re-emit text already
+        // written. Ranges on one side are not expected to overlap, but a duplicated character is
+        // a silent corruption of the user's own code, so this does not rely on that holding.
+        let segment_start = start.max(cut);
+        if end > segment_start {
+            let segment = &line[segment_start..end];
             match ansi_color(op) {
                 Some(code) => out.push_str(&format!("\u{1b}[{code}m{segment}\u{1b}[0m")),
-                None => out.push_str(&segment),
+                None => out.push_str(segment),
             }
         }
-        col = col.max(end);
+        cut = cut.max(end);
     }
-    if col < chars.len() {
-        out.extend(&chars[col..]);
+    if cut < line.len() {
+        out.push_str(&line[cut..]);
     }
     out
 }
@@ -667,6 +694,97 @@ mod tests {
     /// manual smoke testing on small synthetic files, so this builds the `RangeMatch` by hand
     /// (with a `destination` in some other line range) instead of depending on the diff engine's
     /// move classification.
+    /// The text a highlight actually covers, unwrapped from its ANSI escapes.
+    fn highlighted_segments(colored: &str) -> Vec<String> {
+        let mut out = Vec::new();
+        let mut rest = colored;
+        while let Some(open) = rest.find('\u{1b}') {
+            let Some(open_end) = rest[open..].find('m').map(|i| open + i + 1) else {
+                break;
+            };
+            let Some(close) = rest[open_end..].find('\u{1b}').map(|i| open_end + i) else {
+                break;
+            };
+            if !rest[open_end..close].is_empty() {
+                out.push(rest[open_end..close].to_string());
+            }
+            rest = &rest[close..];
+            // Step over the reset sequence so the next search finds the following opener.
+            if let Some(reset_end) = rest.find('m') {
+                rest = &rest[reset_end + 1..];
+            }
+        }
+        out
+    }
+
+    /// The columns a `TextRange` carries are byte offsets, and this renderer used to read them as
+    /// character offsets. The two agree on an ASCII row and diverge on every other one, so the
+    /// same edit at the same visual position highlighted the wrong text as soon as a multi-byte
+    /// character appeared earlier in the line.
+    ///
+    /// Driven through the real diff pipeline rather than hand-written ranges: hand-written columns
+    /// would encode whichever unit the test author had in mind, which is the bug, not the check.
+    #[test]
+    fn a_highlight_covers_the_same_text_on_ascii_and_non_ascii_rows() {
+        for (label, before_src, after_src) in [
+            ("ascii", "let a = \"xx\";\n", "let a = \"yy\";\n"),
+            ("two-byte", "let é = \"xx\";\n", "let é = \"yy\";\n"),
+            ("three-byte", "let 漢 = \"xx\";\n", "let 漢 = \"yy\";\n"),
+            ("astral", "let 𝛼 = \"xx\";\n", "let 𝛼 = \"yy\";\n"),
+        ] {
+            let before = crate::code::Code::from_string(before_src, &crate::code::Language::Rust);
+            let after = crate::code::Code::from_string(after_src, &crate::code::Language::Rust);
+            let diff = crate::diff::diff_code(&before, &after);
+            let ast = diff.ast.as_ref().expect("the pair should parse");
+            let cache = crate::diff::NodeCache::build(&before, &after);
+            let text_diff = crate::diff::text::TextDiff::from(&before, &after, ast, &cache);
+
+            let lines: Vec<&str> = after_src.split('\n').collect();
+            let (_flags, spans) = row_overlay(&text_diff.all(1), &lines);
+            let colored = colorize_line(lines[0], &spans[0], true);
+
+            assert_eq!(
+                highlighted_segments(&colored),
+                vec!["yy".to_string()],
+                "{label}: the highlight should cover exactly the changed text, got {colored:?}"
+            );
+        }
+    }
+
+    /// Whatever the spans say, the rendered line must still *be* the line: colouring may add
+    /// escapes but must never drop, duplicate or reorder a character.
+    #[test]
+    fn colorizing_never_alters_the_text_of_the_row() {
+        let line = "let é = 漢字;";
+        for spans in [
+            vec![(0usize, 3usize, TextOperation::Insert)],
+            // Deliberately malformed: overlapping, and a boundary inside the two-byte 'é'.
+            vec![
+                (0usize, 6usize, TextOperation::Insert),
+                (5usize, 12usize, TextOperation::Delete),
+            ],
+            // Past the end of the row.
+            vec![(4usize, 999usize, TextOperation::Update)],
+        ] {
+            let colored = colorize_line(line, &spans, true);
+            let stripped: String = {
+                let mut out = String::new();
+                let mut in_escape = false;
+                for ch in colored.chars() {
+                    if ch == '\u{1b}' {
+                        in_escape = true;
+                    } else if in_escape {
+                        in_escape = ch != 'm';
+                    } else {
+                        out.push(ch);
+                    }
+                }
+                out
+            };
+            assert_eq!(stripped, line, "spans {spans:?} altered the row");
+        }
+    }
+
     #[test]
     fn render_side_wraps_a_moved_chunk_in_a_box_with_header_bar_and_footer() {
         let contents = "fn main() {\n    moved_call();\n    same();\n}";

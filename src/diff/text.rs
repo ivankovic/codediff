@@ -19,7 +19,7 @@
 use tree_sitter::{Node, Point, Range};
 
 use crate::{
-    code::{Code, metadata::compute_columns_per_row},
+    code::{Code, metadata::compute_row_byte_lengths},
     diff::{
         ASTDiff, ASTMappingOperation, ASTMappingReason, NodeCache, nodes,
         text_range::{SourceText, TextRange},
@@ -387,8 +387,8 @@ fn ranges(
     let mut ranges = Vec::new();
 
     // Compute columns per row for source and destination
-    let source_columns = compute_columns_per_row(&source.contents);
-    let destination_columns = compute_columns_per_row(&destination.contents);
+    let source_columns = compute_row_byte_lengths(&source.contents);
+    let destination_columns = compute_row_byte_lengths(&destination.contents);
     // Row offsets for both sides, built once for the whole traversal. `RangeMatch::extends` below
     // needs them for every merge decision it makes, and rebuilding them per decision is exactly the
     // cost this replaced.
