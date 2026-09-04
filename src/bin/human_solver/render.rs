@@ -21,6 +21,7 @@
 
 #[allow(unused_imports)]
 use crate::*;
+use codediff::diff::text_range::{ScreenColumn, SourceRow, cell_width_of, row_cells_of};
 
 // ---------------------------------------------------------------------------------------------
 // Rendering
@@ -778,17 +779,22 @@ pub(crate) fn render_paint_side(
     // The columns a row's text actually gets, once the line-number gutter has taken its share. A
     // terminal too narrow to fit even one character of content turns wrapping off rather than
     // looping forever on a zero-width chunk.
-    let content_width = width.saturating_sub(gutter_width + 1);
+    let content_width = ScreenColumn::from_raw(width.saturating_sub(gutter_width + 1));
 
     // How many screen rows one source row costs once wrapped. Never zero: an empty row still
     // occupies the line it sits on.
-    let wrapped_height = |row: usize| -> usize {
-        if content_width == 0 {
+    let wrapped_height = |row: SourceRow| -> usize {
+        if content_width.get() == 0 {
             return 1;
         }
         lines
-            .get(row)
-            .map(|line| row_cells(line).div_ceil(content_width).max(1))
+            .get(row.get())
+            .map(|line| {
+                row_cells_of(line)
+                    .get()
+                    .div_ceil(content_width.get())
+                    .max(1)
+            })
             .unwrap_or(1)
     };
 
@@ -797,17 +803,24 @@ pub(crate) fn render_paint_side(
     // line can eat the whole viewport on its own. So the start row is walked forward here, for
     // display only, until the cursor's row fits. Display-only because the renderer has no business
     // mutating scroll state, and because leaving `state.scroll` alone keeps j/k behaving the same.
-    let mut start = top.min(cursor_row);
-    if focused && content_width > 0 {
-        let mut used: usize = (start..=cursor_row).map(wrapped_height).sum();
+    // `start`/`cursor_row` are *source* rows; `used`/`height` count *screen* rows. Conflating the
+    // two is what made this walk necessary in the first place - `scroll_into_view` bounds the
+    // cursor in source rows while the viewport is measured in screen rows - so the two spaces are
+    // named apart here rather than being four `usize`s that happen to mean different things.
+    let cursor_row = SourceRow::from_raw(cursor_row);
+    let mut start = SourceRow::from_raw(top).min(cursor_row);
+    if focused && content_width.get() > 0 {
+        let mut used: usize = (start.get()..=cursor_row.get())
+            .map(|row| wrapped_height(SourceRow::from_raw(row)))
+            .sum();
         while used > height && start < cursor_row {
             used -= wrapped_height(start);
-            start += 1;
+            start = SourceRow::from_raw(start.get() + 1);
         }
     }
 
     let mut out = Vec::with_capacity(height);
-    for (row, line) in lines.iter().enumerate().skip(start) {
+    for (row, line) in lines.iter().enumerate().skip(start.get()) {
         if out.len() >= height {
             break;
         }
@@ -876,7 +889,8 @@ pub(crate) fn render_paint_side(
 /// Counts characters rather than bytes, matching `render_paint_side`'s own column model: every
 /// character it emits occupies one column, which is exactly what `display_safe_char` guarantees by
 /// mapping the one character that would not (a tab) to a space.
-fn wrap_spans(spans: Vec<Span<'static>>, width: usize) -> Vec<Vec<Span<'static>>> {
+fn wrap_spans(spans: Vec<Span<'static>>, width: ScreenColumn) -> Vec<Vec<Span<'static>>> {
+    let width = width.get();
     if width == 0 {
         return vec![spans];
     }
@@ -889,7 +903,7 @@ fn wrap_spans(spans: Vec<Span<'static>>, width: usize) -> Vec<Vec<Span<'static>>
         let owned = span.content.into_owned();
         let mut chunk = String::new();
         for ch in owned.chars() {
-            let cells = char_cells(ch);
+            let cells = cell_width_of(ch).get();
             // A wide character that will not fit in the room left starts the next row whole: a
             // terminal cannot render half an ideograph, and splitting one would desynchronise
             // every column after it on that row.
@@ -911,18 +925,6 @@ fn wrap_spans(spans: Vec<Span<'static>>, width: usize) -> Vec<Vec<Span<'static>>
         rows.push(current);
     }
     rows
-}
-
-/// How many terminal cells `ch` occupies. A combining mark takes none, a CJK ideograph two - so
-/// neither a byte count nor a character count is the width a wrapped row must respect.
-fn char_cells(ch: char) -> usize {
-    use unicode_width::UnicodeWidthChar;
-    ch.width().unwrap_or(0)
-}
-
-/// The width of a whole row in terminal cells.
-fn row_cells(line: &str) -> usize {
-    line.chars().map(char_cells).sum()
 }
 
 pub(crate) fn paint_class_style(class: PaintClass) -> Style {

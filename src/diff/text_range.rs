@@ -102,15 +102,27 @@ pub fn row_len_of(line: &str) -> SourceColumn {
 /// A column landing inside a multi-byte character counts that character not at all rather than
 /// partially: cells are indivisible, and rounding down keeps the result monotonic in `column`.
 pub fn screen_column_in(line: &str, column: SourceColumn) -> ScreenColumn {
-    use unicode_width::UnicodeWidthChar;
     let mut cells = 0usize;
     for (index, ch) in line.char_indices() {
         if index + ch.len_utf8() > column.get() {
             break;
         }
-        cells += ch.width().unwrap_or(0);
+        cells += cell_width_of(ch).get();
     }
     ScreenColumn(cells)
+}
+
+/// How many terminal cells `ch` occupies: two for a CJK ideograph, none for a combining mark, one
+/// for most things. Neither a byte count nor a character count answers this, which is why wrapping
+/// and any other width arithmetic has to go through it.
+pub fn cell_width_of(ch: char) -> ScreenColumn {
+    use unicode_width::UnicodeWidthChar;
+    ScreenColumn(ch.width().unwrap_or(0))
+}
+
+/// The width of a whole row in terminal cells.
+pub fn row_cells_of(line: &str) -> ScreenColumn {
+    screen_column_in(line, row_len_of(line))
 }
 
 /**
