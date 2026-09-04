@@ -316,6 +316,12 @@ t              text view: read the source, and paint the human text-range ground
                  spans' text is identical), u removes the range under the cursor,
                  Z marks a nothing-to-paint fixture, : jumps to a line number,
                  Esc unselects or closes.
+                 A range that overlaps one already painted is refused at the
+                 keystroke (u removes the old one first): the renderer resolves
+                 an overlap by highest verdict and the scorer by list order, so
+                 such a painting would look like one thing and grade as another.
+                 Two ranges meeting at a line break share only the newline and
+                 are fine.
                  x banks a selection so another can be made on the same side, c
                  clears the banks; banked and live ranges commit together, which
                  is how an N:M match is made -- every span on ONE side must read

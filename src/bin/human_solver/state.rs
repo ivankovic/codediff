@@ -869,6 +869,80 @@ impl TextPaintState {
 /// entry is worth is then checked immediately rather than at save time: `verdict` refuses a group
 /// whose spans disagree within a side, and refusing at the keystroke is the only point where the
 /// human still has the selection in front of them to fix.
+/// The first span of `entry` that claims a byte some already-painted range in `solution` claims,
+/// as `(side, description)` for a status line.
+///
+/// Overlapping painted ranges are not representable: `render_paint_side` resolves an overlap per
+/// byte by `PaintClass`'s `max`, so the highest-ranked *verdict* wins, while `label_bytes` - what
+/// `compare_painting` grades against - fills its array in list order, so the *last entry* wins.
+/// A painting with one therefore looks like one thing on screen and scores as another, with no
+/// diagnostic either side. Both those readers say in their own comments that the solver never
+/// produces overlaps; until now nothing enforced it, and a second `v`-`d` over already-painted
+/// text was accepted in silence.
+///
+/// Refused at the keystroke rather than at save time, for the same reason `action_paint_match`
+/// resolves its verdict now: this is the one moment the selection is still on screen and the
+/// human can see what they just asked for.
+fn overlapping_painted_range(
+    mapping: &HumanMapping,
+    solution: &str,
+    entry: &HumanTextEntry,
+    before_src: &str,
+    after_src: &str,
+) -> Option<String> {
+    let sides = [
+        (0usize, "Before", &entry.before, before_src),
+        (1usize, "After", &entry.after, after_src),
+    ];
+    for (side, panel, spans, source) in sides {
+        let painted = painted_spans(mapping, solution, side, before_src, after_src);
+        for span in spans {
+            for (existing, verdict) in &painted {
+                if !spans_share_a_byte(*span, *existing, source) {
+                    continue;
+                }
+                return Some(format!(
+                    "{panel} row {} already has a painted {verdict:?} range at columns {}-{}",
+                    existing.start_row + 1,
+                    existing.start_column,
+                    existing.end_column
+                ));
+            }
+        }
+    }
+    None
+}
+
+/// Whether two spans on one side claim a common byte, compared as absolute offsets so the two
+/// encodings of a row boundary - `(row + 1, 0)` and `(row, row_len)` - cannot read as an overlap.
+/// A shared line terminator does not count: `label_bytes` never labels one, so two ranges meeting
+/// at a newline disagree about nothing.
+fn spans_share_a_byte(a: HumanTextSpan, b: HumanTextSpan, source: &str) -> bool {
+    let text = codediff::diff::text_range::SourceText::new(source);
+    let offset = |row: usize, column: usize| -> Option<usize> {
+        text.byte_index(
+            codediff::diff::text_range::SourceRow::from_raw(row),
+            codediff::diff::text_range::SourceColumn::from_raw(column),
+        )
+        .map(codediff::diff::text_range::SourceOffset::get)
+    };
+    let (Some(a_start), Some(a_end)) = (
+        offset(a.start_row, a.start_column),
+        offset(a.end_row, a.end_column),
+    ) else {
+        return false;
+    };
+    let (Some(b_start), Some(b_end)) = (
+        offset(b.start_row, b.start_column),
+        offset(b.end_row, b.end_column),
+    ) else {
+        return false;
+    };
+    let lo = a_start.max(b_start);
+    let hi = a_end.min(b_end);
+    lo < hi && source[lo..hi].chars().any(|c| c != '\n')
+}
+
 pub(crate) fn action_paint_match(
     app: &mut App,
     state: &mut TextPaintState,
@@ -900,6 +974,12 @@ pub(crate) fn action_paint_match(
 
     let shape = format!("{}:{}", entry.before.len(), entry.after.len());
     let solution = app.text_solution.clone();
+    if let Some(clash) =
+        overlapping_painted_range(&app.mapping, &solution, &entry, before_src, after_src)
+    {
+        app.status = Some(format!("Not matched: {clash} - u removes it first"));
+        return;
+    }
     solution_entries_mut(&mut app.mapping, &solution).push(entry);
     app.dirty = true;
     state.anchor = [None; 2];
@@ -965,6 +1045,12 @@ pub(crate) fn action_paint_one_sided(
     }
 
     let solution = app.text_solution.clone();
+    if let Some(clash) =
+        overlapping_painted_range(&app.mapping, &solution, &entry, before_src, after_src)
+    {
+        app.status = Some(format!("Not painted: {clash} - u removes it first"));
+        return;
+    }
     solution_entries_mut(&mut app.mapping, &solution).push(entry);
     app.dirty = true;
     state.anchor[side] = None;

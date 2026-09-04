@@ -4127,9 +4127,15 @@ fn help_modal_renders_keybindings() {
     // than for anything it exists to check - which had already cost two rounds of trimming
     // real content to fit a fixture. The modal scrolls (j/k) precisely because the reference
     // outgrew one screen long ago on any ordinary terminal.
-    let backend = ratatui::backend::TestBackend::new(140, 120);
+    //
+    // Derived from HELP_TEXT rather than fixed, so the next entry added to the reference does not
+    // fail this test again: at 90% minus the two border rows, the popup needs `(lines + 2) / 0.9`
+    // rows to show all of it.
+    let lines = HELP_TEXT.lines().count();
+    let height = ((lines + 2) as f32 / 0.9).ceil() as u16 + 1;
+    let backend = ratatui::backend::TestBackend::new(140, height);
     let mut terminal = Terminal::new(backend).unwrap();
-    let area = Rect::new(0, 0, 140, 120);
+    let area = Rect::new(0, 0, 140, height);
 
     terminal.draw(|f| render_help_modal(f, area, 0)).unwrap();
 
@@ -6799,5 +6805,107 @@ fn wrapping_measures_terminal_cells_not_characters() {
         rejoined,
         "漢".repeat(20),
         "wrapping must not lose or split a character"
+    );
+}
+
+/// Two painted ranges claiming the same byte are not representable: the renderer resolves an
+/// overlap by highest verdict and the scorer by list order, so such a painting looks like one
+/// thing and grades as another. Refused at the keystroke, while the selection is still on screen.
+#[test]
+fn painting_over_an_already_painted_range_is_refused() {
+    let before_src = "aaaabbbbcccc\n";
+    let after_src = "aaaabbbbdddd\n";
+    let tree = parse_rust("fn main() {}\n");
+    let root = tree.root_node();
+    let mut app = App::new(
+        "test".to_string(),
+        CaseOrigin::Diffs,
+        root.id(),
+        root.id(),
+        HumanMapping::default(),
+    );
+    let mut state = TextPaintState {
+        side: 0,
+        ..TextPaintState::default()
+    };
+
+    // Paint cols 0..8 on the Before side.
+    state.cursor[0] = (0, 0);
+    state.anchor[0] = Some((0, 7));
+    action_paint_one_sided(
+        &mut app,
+        &mut state,
+        HumanTextOperation::Delete,
+        before_src,
+        after_src,
+    );
+    assert_eq!(
+        solution_entries(&app.mapping, &app.text_solution).len(),
+        1,
+        "the first paint should land: {:?}",
+        app.status
+    );
+
+    // Now paint cols 4..12, which shares bytes 4..8 with it.
+    state.cursor[0] = (0, 4);
+    state.anchor[0] = Some((0, 11));
+    action_paint_one_sided(
+        &mut app,
+        &mut state,
+        HumanTextOperation::Delete,
+        before_src,
+        after_src,
+    );
+
+    assert_eq!(
+        solution_entries(&app.mapping, &app.text_solution).len(),
+        1,
+        "the overlapping paint must be refused, not appended"
+    );
+    let status = app.status.clone().unwrap_or_default();
+    assert!(
+        status.contains("already has a painted"),
+        "the refusal should say what it clashes with: {status:?}"
+    );
+}
+
+/// Two ranges meeting at a line boundary share only the newline, which `label_bytes` never
+/// labels. They disagree about nothing, and refusing them would make ordinary line-by-line
+/// painting impossible.
+#[test]
+fn painting_two_ranges_that_meet_at_a_newline_is_allowed() {
+    let before_src = "first line\nsecond line\n";
+    let after_src = "first line\nchanged line\n";
+    let tree = parse_rust("fn main() {}\n");
+    let root = tree.root_node();
+    let mut app = App::new(
+        "test".to_string(),
+        CaseOrigin::Diffs,
+        root.id(),
+        root.id(),
+        HumanMapping::default(),
+    );
+    let mut state = TextPaintState {
+        side: 0,
+        ..TextPaintState::default()
+    };
+
+    for (row, last_col) in [(0usize, 9usize), (1usize, 10usize)] {
+        state.cursor[0] = (row, 0);
+        state.anchor[0] = Some((row, last_col));
+        action_paint_one_sided(
+            &mut app,
+            &mut state,
+            HumanTextOperation::Delete,
+            before_src,
+            after_src,
+        );
+    }
+
+    assert_eq!(
+        solution_entries(&app.mapping, &app.text_solution).len(),
+        2,
+        "both rows should paint: {:?}",
+        app.status
     );
 }
