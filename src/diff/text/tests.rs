@@ -106,8 +106,7 @@ fn paint_reindent_only_moves_gates_only_tagged_nodes() {
         &after,
         ast.ast.as_ref().unwrap(),
         &node_cache,
-        false,
-        true,
+        RenderOptions::FULL,
     );
     assert!(
         painted
@@ -124,8 +123,7 @@ fn paint_reindent_only_moves_gates_only_tagged_nodes() {
         &after,
         ast.ast.as_ref().unwrap(),
         &node_cache,
-        false,
-        false,
+        RenderOptions::MINIMAL,
     );
     assert!(
         !unpainted
@@ -1790,7 +1788,14 @@ fn diff_ast(
 fn ranges_paints_a_wholly_new_comments_own_words_not_just_its_marker() {
     let (before, after, ast, node_cache) =
         diff_ast("fn main() {}\n", "// hi there\nfn main() {}\n");
-    let after_ranges = ranges(&after, &before, &ast, &node_cache, false, false, true);
+    let after_ranges = ranges(
+        &after,
+        &before,
+        &ast,
+        &node_cache,
+        false,
+        RenderOptions::FULL,
+    );
 
     let words_painted = after_ranges.iter().any(|r| {
         r.operation == TextOperation::Insert
@@ -1823,7 +1828,14 @@ fn ranges_paints_a_wholly_new_comments_own_words_not_just_its_marker() {
 fn a_no_gap_string_literal_does_not_break_whitespace_merging_with_a_sibling() {
     let (before, after, ast, node_cache) =
         diff_ast("fn main() {}\n", "fn main() {\n    let s = \"a\" + b;\n}\n");
-    let after_ranges = ranges(&after, &before, &ast, &node_cache, false, false, true);
+    let after_ranges = ranges(
+        &after,
+        &before,
+        &ast,
+        &node_cache,
+        false,
+        RenderOptions::FULL,
+    );
 
     let row1_inserts: Vec<_> = after_ranges
         .iter()
@@ -2026,7 +2038,14 @@ fn ranges_decomposes_a_small_change_inside_a_long_identifier() {
         "fn main() {\n    let long_identifier_name = 5;\n}",
         "fn main() {\n    let long_identifier_nome = 5;\n}",
     );
-    let before_ranges = ranges(&before, &after, &ast, &node_cache, true, false, true);
+    let before_ranges = ranges(
+        &before,
+        &after,
+        &ast,
+        &node_cache,
+        true,
+        RenderOptions::FULL,
+    );
 
     let updates: Vec<_> = before_ranges
         .iter()
@@ -2047,7 +2066,14 @@ fn ranges_decomposes_a_small_change_inside_a_long_identifier() {
          20-character identifier"
     );
 
-    let after_ranges = ranges(&after, &before, &ast, &node_cache, false, false, true);
+    let after_ranges = ranges(
+        &after,
+        &before,
+        &ast,
+        &node_cache,
+        false,
+        RenderOptions::FULL,
+    );
     let after_updates: Vec<_> = after_ranges
         .iter()
         .filter(|r| r.operation == TextOperation::Update)
@@ -2070,7 +2096,17 @@ fn ranges_reports_the_whole_identifier_when_whole_pair_updates_is_set() {
         "fn main() {\n    let long_identifier_name = 5;\n}",
         "fn main() {\n    let long_identifier_nome = 5;\n}",
     );
-    let before_ranges = ranges(&before, &after, &ast, &node_cache, true, true, true);
+    let before_ranges = ranges(
+        &before,
+        &after,
+        &ast,
+        &node_cache,
+        true,
+        RenderOptions {
+            whole_pair_updates: true,
+            ..RenderOptions::FULL
+        },
+    );
 
     let updates: Vec<_> = before_ranges
         .iter()
@@ -2096,7 +2132,14 @@ fn ranges_falls_back_to_a_whole_span_update_when_there_is_no_common_affix() {
         "fn main() {\n    let foo = 5;\n}",
         "fn main() {\n    let bar = 5;\n}",
     );
-    let before_ranges = ranges(&before, &after, &ast, &node_cache, true, false, true);
+    let before_ranges = ranges(
+        &before,
+        &after,
+        &ast,
+        &node_cache,
+        true,
+        RenderOptions::FULL,
+    );
 
     let updates: Vec<_> = before_ranges
         .iter()
@@ -2120,7 +2163,14 @@ fn ranges_decomposes_a_small_change_inside_a_comment() {
         "// hello world!\nfn main() {}",
         "// hello universe!\nfn main() {}",
     );
-    let before_ranges = ranges(&before, &after, &ast, &node_cache, true, false, true);
+    let before_ranges = ranges(
+        &before,
+        &after,
+        &ast,
+        &node_cache,
+        true,
+        RenderOptions::FULL,
+    );
 
     let updates: Vec<_> = before_ranges
         .iter()

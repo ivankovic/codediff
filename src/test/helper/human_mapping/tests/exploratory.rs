@@ -515,8 +515,7 @@ fn painting_disagreement_detail_batch() -> Result<()> {
                 after,
                 ast,
                 &node_cache,
-                options.whole_pair_updates,
-                options.paint_reindent_only_moves,
+                options,
             );
 
             let comparison = compare_painting(name, options)?;
@@ -596,14 +595,8 @@ fn painting_disagreement_detail() -> Result<()> {
         .as_ref()
         .with_context(|| format!("codediff produced no AST diff for '{name}'"))?;
     let node_cache = crate::diff::NodeCache::build(before, after);
-    let text_diff = crate::diff::text::TextDiff::from_with_options(
-        before,
-        after,
-        ast,
-        &node_cache,
-        options.whole_pair_updates,
-        options.paint_reindent_only_moves,
-    );
+    let text_diff =
+        crate::diff::text::TextDiff::from_with_options(before, after, ast, &node_cache, options);
 
     eprintln!(
         "fixture={name} mode={mode} (painting solution='{}')",

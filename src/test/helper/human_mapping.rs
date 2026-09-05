@@ -889,17 +889,14 @@ pub fn compare_painting_with_diff(
     // `TextDiff`, then filtered by the options. Not a re-derivation - what is compared is what a
     // reader would actually see.
     //
-    // Not `TextDiff::from` (which hardcodes both construction-time options to their legacy
-    // defaults) - `paint_reindent_only_moves` genuinely differs between `MINIMAL`/`FULL` (unlike
-    // `whole_pair_updates`, which never has), so this must resolve `options`'s own value rather
-    // than assume it.
+    // Not `TextDiff::from` (which builds under `FULL`): `paint_reindent_only_moves` genuinely
+    // differs between `MINIMAL`/`FULL`, so this must build under `options` itself.
     let text_diff = crate::diff::text::TextDiff::from_with_options(
         before,
         after,
         &diff.ast,
         &diff.node_cache,
-        options.whole_pair_updates,
-        options.paint_reindent_only_moves,
+        options,
     );
 
     // codediff's side does not depend on which candidate painting is being compared, so it is

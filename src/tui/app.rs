@@ -784,16 +784,9 @@ impl App {
         // `whole_pair_updates`/`paint_reindent_only_moves` currently are, not have to know to pass
         // them along individually.
         let render_options = self.diff_viewer.render_options();
-        let whole_pair_updates = render_options.whole_pair_updates;
-        let paint_reindent_only_moves = render_options.paint_reindent_only_moves;
         tokio::task::spawn_blocking(move || {
             let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                compute_diff_with_update_style(
-                    &before,
-                    &after,
-                    whole_pair_updates,
-                    paint_reindent_only_moves,
-                )
+                compute_diff_with_options(&before, &after, render_options)
             }));
             let outcome = match result {
                 Ok(Ok((data, _large_residual))) => DiffOutcome::Ready(data),
@@ -1215,7 +1208,7 @@ fn status_bar_paragraph(summary: DiffSummary) -> Paragraph<'static> {
 ///
 /// Does not require either side to have parsed successfully: a side with no tree-sitter grammar
 /// (unrecognized extension, e.g. a `Makefile`) comes back with `ast: None` rather than an error -
-/// `compute_diff_with_update_style` checks for that itself and routes to
+/// `compute_diff_with_options` checks for that itself and routes to
 /// `diff::text::plain_text_line_diff` instead of the AST pipeline, rather than failing outright.
 /// Before that fallback existed, this bailed with "unsupported or unrecognized file type" here,
 /// which - via `headless`/`json_output`'s non-interactive callers - propagated as a fatal exit;
@@ -1250,23 +1243,14 @@ fn assemble_diff_session_data(
     before_code: &Code,
     after_code: &Code,
     diff: &Diff,
-    // [`RenderOptions::whole_pair_updates`]/[`RenderOptions::paint_reindent_only_moves`] - unlike
-    // the rest of `RenderOptions`, these change which ranges `TextDiff` itself builds rather than
-    // which of an already-built list get painted, so they have to reach in here rather than
-    // `ranges_for_options`'s later filter pass.
-    whole_pair_updates: bool,
-    paint_reindent_only_moves: bool,
+    // Only its two construction-time options are read here (see `TextDiff::from_with_options`);
+    // the rest filter the built list in `ranges_for_options`, which callers apply afterwards.
+    render_options: RenderOptions,
 ) -> Result<DiffSessionData> {
     let node_cache = NodeCache::build(before_code, after_code);
     let ast = diff.ast.as_ref().context("diff produced no AST mapping")?;
-    let text_diff = TextDiff::from_with_options(
-        before_code,
-        after_code,
-        ast,
-        &node_cache,
-        whole_pair_updates,
-        paint_reindent_only_moves,
-    );
+    let text_diff =
+        TextDiff::from_with_options(before_code, after_code, ast, &node_cache, render_options);
     // Computed here, not later from DiffSessionData's own fields: needs AST-level node-kind
     // access (is_comment_only_diff), which is gone by the time DiffSessionData exists - see that
     // field's own doc comment.
@@ -1339,19 +1323,16 @@ fn assemble_plain_text_diff_session_data(
 /// terminal-independent diff computation either way - only what happens to the result (draw it
 /// interactively vs. print it as text) differs between the two modes.
 ///
-/// Test-only convenience: [`RenderOptions::whole_pair_updates`] off, unconditionally. Every real
+/// Test-only convenience: [`compute_diff_with_options`] under [`RenderOptions::FULL`]. Every real
 /// (non-test) caller - `App::start_diff`, `tui::headless::run`, `tui::json_output::run` - resolves
-/// that option from the live viewer or from CLI/config and calls
-/// [`compute_diff_with_update_style`] directly, so as of that option's own toggle reaching the `M`
-/// panel there is no production caller left that has no opinion on it. Kept anyway, `#[cfg(test)]`
-/// gated, purely so the many tests across this module and `headless`/`json_output` that predate
-/// that option don't all need updating just to keep passing `false`.
+/// its options from the live viewer or from CLI/config; this exists so the many tests across this
+/// module and `headless`/`json_output` that predate the options don't all need to pass a preset.
 #[cfg(test)]
 pub(crate) fn compute_diff(before: &Path, after: &Path) -> Result<(DiffSessionData, bool)> {
-    compute_diff_with_update_style(before, after, false, true)
+    compute_diff_with_options(before, after, RenderOptions::FULL)
 }
 
-/// Stack size for the thread [`compute_diff_with_update_style`] runs the actual pipeline on.
+/// Stack size for the thread [`compute_diff_with_options`] runs the actual pipeline on.
 ///
 /// Mirrors `file_stats.rs`'s `WORKER_STACK_SIZE` and its rationale: real-world corpora contain
 /// pathologically deep trees (huge generated/minified files, deeply nested JSON, long chained
@@ -1377,24 +1358,16 @@ const DIFF_COMPUTE_STACK_SIZE: usize = 256 * 1024 * 1024;
 /// `resume_unwind` rather than converted to an `Err`, so it still looks like an ordinary panic on
 /// the calling thread to every existing caller (the TUI's `catch_unwind`, and headless/json's
 /// unwrapped default panic behavior).
-pub(crate) fn compute_diff_with_update_style(
+pub(crate) fn compute_diff_with_options(
     before: &Path,
     after: &Path,
-    whole_pair_updates: bool,
-    paint_reindent_only_moves: bool,
+    render_options: RenderOptions,
 ) -> Result<(DiffSessionData, bool)> {
     let before = before.to_path_buf();
     let after = after.to_path_buf();
     match std::thread::Builder::new()
         .stack_size(DIFF_COMPUTE_STACK_SIZE)
-        .spawn(move || {
-            compute_diff_with_update_style_inner(
-                &before,
-                &after,
-                whole_pair_updates,
-                paint_reindent_only_moves,
-            )
-        })
+        .spawn(move || compute_diff_with_options_inner(&before, &after, render_options))
         .expect("failed to spawn diff-computation thread")
         .join()
     {
@@ -1403,11 +1376,10 @@ pub(crate) fn compute_diff_with_update_style(
     }
 }
 
-fn compute_diff_with_update_style_inner(
+fn compute_diff_with_options_inner(
     before: &Path,
     after: &Path,
-    whole_pair_updates: bool,
-    paint_reindent_only_moves: bool,
+    render_options: RenderOptions,
 ) -> Result<(DiffSessionData, bool)> {
     let (before_code, after_code) = parse_before_after(before, after)?;
     if before_code.ast.is_none() || after_code.ast.is_none() {
@@ -1423,8 +1395,7 @@ fn compute_diff_with_update_style_inner(
         &before_code,
         &after_code,
         &diff,
-        whole_pair_updates,
-        paint_reindent_only_moves,
+        render_options,
     )?;
     Ok((data, large_residual))
 }

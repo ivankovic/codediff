@@ -72,7 +72,7 @@ use crate::diff::text::{
 };
 use crate::diff::text_range::TextRange;
 use crate::tui::actions::DiffSessionData;
-use crate::tui::app::compute_diff_with_update_style;
+use crate::tui::app::compute_diff_with_options;
 use crate::tui::headless::nearest_reference_line;
 
 /// A `TextRange`, reshaped for JSON. Kept as a local type rather than `#[derive(Serialize)]` on
@@ -293,12 +293,7 @@ pub fn binary_diff_json(before: &Path, after: &Path) -> Result<String> {
 /// Returns whether the two files differ at all (raw byte comparison, same convention as
 /// `headless::run`) so `main.rs` can turn it into a `diff`-style exit code.
 pub fn run(before: &Path, after: &Path, render_options: RenderOptions) -> Result<bool> {
-    let (mut data, large_residual) = compute_diff_with_update_style(
-        before,
-        after,
-        render_options.whole_pair_updates,
-        render_options.paint_reindent_only_moves,
-    )?;
+    let (mut data, large_residual) = compute_diff_with_options(before, after, render_options)?;
     // See `headless::run`'s note: a presentation filter over a finished diff, not a different one.
     data.before_ranges =
         ranges_for_options(&data.before_ranges, &data.before_contents, render_options);

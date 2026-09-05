@@ -33,7 +33,7 @@ use crate::diff::text::{
     RangeMatch, RenderOptions, TextOperation, ranges_for_options, summarize_diff_with_comment_check,
 };
 use crate::tui::actions::DiffSessionData;
-use crate::tui::app::compute_diff_with_update_style;
+use crate::tui::app::compute_diff_with_options;
 
 /// ANSI SGR color for each `TextOperation`, matching the TUI's own canonical palette
 /// (`tui::theme::OverlayTheme`): insert green, delete red, move magenta, update yellow.
@@ -545,12 +545,7 @@ pub fn run(
     context: usize,
     render_options: RenderOptions,
 ) -> Result<bool> {
-    let (mut data, large_residual) = compute_diff_with_update_style(
-        before,
-        after,
-        render_options.whole_pair_updates,
-        render_options.paint_reindent_only_moves,
-    )?;
+    let (mut data, large_residual) = compute_diff_with_options(before, after, render_options)?;
     // Applied here rather than inside `compute_diff`: the mapping is identical under every set of
     // options, so this is a presentation filter over a finished diff, not a different diff.
     data.before_ranges =

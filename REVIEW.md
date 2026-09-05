@@ -101,6 +101,14 @@ done; the §4 typos are fixed except `symetric` (×3).
   with the measurement narratives carried over as each method's doc comment; `classify_node`/
   `NodeChange` is the one operation-to-visible-change classification, used by both `ranges` and
   `summary::scan`.
+- **2026-09-05, section 5 (boolean parameters)** - done for the `RenderOptions` chain:
+  `TextDiff::from_with_options`, `ranges`, `compute_diff_with_options` (was
+  `compute_diff_with_update_style`) and `assemble_diff_session_data` take a `RenderOptions`
+  instead of the two construction-time flags forwarded positionally through three levels;
+  `TextDiff::from` is `from_with_options(.., RenderOptions::FULL)`, whose two flags are exactly
+  the legacy literals it hardcoded; `from_with_update_style` had no callers. Left as they are:
+  `intra_node_update_ranges`'s private three bools, `exit_code_for(bool, bool, bool)` (three
+  unrelated facts, pinned by its tests) and `headless::render_side`'s two.
 - **Runtime finding from the same measurement**: over the corpus, AST metadata costs about three
   times the tree-sitter parse, and the parse plus metadata (15.5s) is more than half the diff
   itself (28s per the quality baseline). Section 6's items 1-3 are that cost.

@@ -167,7 +167,7 @@ pub struct RenderOptions {
     ///
     /// **Not a third state of `MINIMAL`/`FULL`, deliberately.** Unlike `leading_whitespace`/
     /// `structural_punctuation`, this doesn't change how much of an *already-computed* range list
-    /// gets painted - it changes which ranges `TextDiff::from_with_update_style` builds in the
+    /// gets painted - it changes which ranges `TextDiff::from_with_options` builds in the
     /// first place (see `intra_node_update_ranges`), so it can't be applied by
     /// `ranges_for_options` as a pure post-filter the way the other two are. `MINIMAL`/`FULL` both
     /// leave it `false`: the corpus was painted narrow either way, so turning this on under either

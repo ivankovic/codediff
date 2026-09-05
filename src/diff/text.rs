@@ -454,12 +454,10 @@ struct RangeWalk<'a> {
     // Which file `source` is. Only `intra_node_update_ranges` needs it, and only to tell an
     // insertion from a deletion - see its doc comment. Everything else in here is symmetric.
     source_is_before: bool,
-    // [`RenderOptions::whole_pair_updates`], forwarded straight through to every
-    // `intra_node_update_ranges` call - see that parameter's own doc comment.
-    whole_pair_updates: bool,
-    // [`RenderOptions::paint_reindent_only_moves`] - see that field's own doc comment and
-    // `known_pure_reindent` in `identical_or_move`.
-    paint_reindent_only_moves: bool,
+    // Only [`RenderOptions::whole_pair_updates`] (forwarded to every `intra_node_update_ranges`
+    // call) and [`RenderOptions::paint_reindent_only_moves`] (`known_pure_reindent` in
+    // `identical_or_move`) are read here - see [`TextDiff::from_with_options`].
+    options: RenderOptions,
     /// Where the last range that is part of the normal sequential flow ended on the destination
     /// side: a deleted/inserted/updated node has no real destination counterpart, so its range
     /// is anchored here (see `advance_and_build_range`); a `Move`'s destination is out of the
@@ -476,8 +474,7 @@ fn ranges(
     diff: &ASTDiff,
     node_cache: &NodeCache,
     source_is_before: bool,
-    whole_pair_updates: bool,
-    paint_reindent_only_moves: bool,
+    options: RenderOptions,
 ) -> Vec<RangeMatch> {
     let mut walk = RangeWalk {
         source,
@@ -489,8 +486,7 @@ fn ranges(
         source_text: SourceText::new(&source.contents),
         destination_text: SourceText::new(&destination.contents),
         source_is_before,
-        whole_pair_updates,
-        paint_reindent_only_moves,
+        options,
         last_non_move_range: TextRange::zero(),
         ranges: Vec::new(),
         current_range: RangeMatch::zero(),
@@ -715,7 +711,7 @@ impl RangeWalk<'_> {
         // `rust-add-if`'s own shape is exactly the counter-example that ruled that out, which is
         // why it's included here by *verified reason* (`WrapGrowth`) rather than by loosening the
         // position-based heuristic itself.
-        let known_pure_reindent = !self.paint_reindent_only_moves
+        let known_pure_reindent = !self.options.paint_reindent_only_moves
             && matches!(
                 reason,
                 ASTMappingReason::NestedConditionCollapse | ASTMappingReason::WrapGrowth
@@ -769,7 +765,7 @@ impl RangeWalk<'_> {
             },
             self.source_is_before,
             is_content_node(node.kind()),
-            self.whole_pair_updates,
+            self.options.whole_pair_updates,
         )
     }
 
@@ -803,7 +799,7 @@ impl RangeWalk<'_> {
                     },
                     self.source_is_before,
                     is_content_node(node.kind()),
-                    self.whole_pair_updates,
+                    self.options.whole_pair_updates,
                 )
             }
             _ => vec![self.placed(node, TextOperation::Update)],
@@ -1147,72 +1143,30 @@ fn reconcile_moves(before: &mut [RangeMatch], after: &mut [RangeMatch]) {
 }
 
 impl TextDiff {
-    /// Construct the TextDiff from an ASTDiff, with [`RenderOptions::whole_pair_updates`] off and
-    /// [`RenderOptions::paint_reindent_only_moves`] on - the readings every caller but the ones
-    /// that resolve those options from a real `RenderOptions` wants (both match every release
-    /// before either option existed). See [`Self::from_with_options`] for the parameterized
-    /// version and why this stays the zero-argument default rather than growing parameters of its
-    /// own: touching every call site's signature for options almost none of them resolve is
-    /// exactly the "risky `ranges()` logic" churn that isn't worth it just to type two literals in
-    /// one place instead of here.
+    /// Construct the TextDiff from an ASTDiff under [`RenderOptions::FULL`]'s construction-time
+    /// options ([`RenderOptions::whole_pair_updates`] off, [`RenderOptions::paint_reindent_only_moves`]
+    /// on - the readings of every release before either option existed). For callers with no
+    /// opinion on them: `human_solver`, `generate_mapping_site`, the test harness. A caller that
+    /// resolves a real `RenderOptions` calls [`Self::from_with_options`].
     pub fn from(before: &Code, after: &Code, diff: &ASTDiff, node_cache: &NodeCache) -> Self {
-        Self::from_with_options(before, after, diff, node_cache, false, true)
+        Self::from_with_options(before, after, diff, node_cache, RenderOptions::FULL)
     }
 
-    /// [`Self::from_with_update_style`], with [`RenderOptions::paint_reindent_only_moves`] also
-    /// threaded through - kept as a thin wrapper (rather than renaming callers) so the one
-    /// existing caller that only ever resolved `whole_pair_updates` doesn't need to also decide
-    /// an opinion on the newer option; new callers that need both should call
-    /// [`Self::from_with_options`] directly.
-    pub fn from_with_update_style(
-        before: &Code,
-        after: &Code,
-        diff: &ASTDiff,
-        node_cache: &NodeCache,
-        whole_pair_updates: bool,
-    ) -> Self {
-        Self::from_with_options(before, after, diff, node_cache, whole_pair_updates, true)
-    }
-
-    /// [`Self::from`], with both [`RenderOptions::whole_pair_updates`] and
-    /// [`RenderOptions::paint_reindent_only_moves`] threaded through to every node that needs
-    /// them, instead of hardcoded to their legacy defaults.
-    ///
-    /// A separate method rather than parameters on `from` itself: `from` has real call sites in
-    /// `human_solver`, `generate_mapping_site` and the test harness that have no opinion on either
-    /// option and would otherwise all need updating (and re-reviewing) just to keep passing the
-    /// same two literals - the cost `RenderOptions::whole_pair_updates`'s own doc comment says
-    /// this design avoids. Callers that resolve a real `RenderOptions` (`tui::app::
-    /// assemble_diff_session_data`, and `test::helper::human_mapping::compare_painting` - the
-    /// latter now builds one `TextDiff` per mode instead of one shared between `Minimal`/`Full`,
-    /// since `paint_reindent_only_moves` genuinely differs between the two presets where
-    /// `whole_pair_updates` never did) call this one.
+    /// [`Self::from`] under `options`. Only the two construction-time options are read here -
+    /// [`RenderOptions::whole_pair_updates`] and [`RenderOptions::paint_reindent_only_moves`]
+    /// change which ranges are *built*; everything else in `RenderOptions` filters an
+    /// already-built list (`ranges_for_options`). `paint_reindent_only_moves` genuinely differs
+    /// between the `MINIMAL` and `FULL` presets, which is why `compare_painting` builds one
+    /// `TextDiff` per preset rather than sharing one.
     pub fn from_with_options(
         before: &Code,
         after: &Code,
         diff: &ASTDiff,
         node_cache: &NodeCache,
-        whole_pair_updates: bool,
-        paint_reindent_only_moves: bool,
+        options: RenderOptions,
     ) -> Self {
-        let mut before_ranges_plain = ranges(
-            before,
-            after,
-            diff,
-            node_cache,
-            true,
-            whole_pair_updates,
-            paint_reindent_only_moves,
-        );
-        let mut after_ranges_plain = ranges(
-            after,
-            before,
-            diff,
-            node_cache,
-            false,
-            whole_pair_updates,
-            paint_reindent_only_moves,
-        );
+        let mut before_ranges_plain = ranges(before, after, diff, node_cache, true, options);
+        let mut after_ranges_plain = ranges(after, before, diff, node_cache, false, options);
 
         // Each `ranges` call above decided `Move` from its own walk order, so the two can name
         // different pairs for the same reorder - see `reconcile_moves`.
