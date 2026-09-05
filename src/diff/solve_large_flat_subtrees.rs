@@ -78,9 +78,9 @@ pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
     let language = before_metadata.language;
 
     let mut before_items =
-        top_level_identities(before_ast.root_node(), &before_metadata, &language, before);
+        top_level_identities(before_ast.root_node(), before_metadata, &language, before);
     let mut after_items =
-        top_level_identities(after_ast.root_node(), &after_metadata, &language, after);
+        top_level_identities(after_ast.root_node(), after_metadata, &language, after);
 
     // A data-shaped file (JSON, YAML, ...) has no named top-level declarations to key off at
     // all - its whole content is one anonymous value (an `object`/`array`/mapping/...), so
@@ -113,11 +113,11 @@ pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
             continue;
         };
 
-        let Some(before_flat) = largest_flat_container_in(before_id, &before_metadata, &language)
+        let Some(before_flat) = largest_flat_container_in(before_id, before_metadata, &language)
         else {
             continue;
         };
-        let Some(after_flat) = largest_flat_container_in(after_id, &after_metadata, &language)
+        let Some(after_flat) = largest_flat_container_in(after_id, after_metadata, &language)
         else {
             continue;
         };
@@ -125,8 +125,8 @@ pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
         // Diff the flat descendant directly - the flat-tree fast path in `resolve_forest` picks
         // it up and routes to Myers.
         apted::for_nodes(
-            &before_metadata,
-            &after_metadata,
+            before_metadata,
+            after_metadata,
             vec![before_flat],
             vec![after_flat],
             Algorithm::Apted,
@@ -159,8 +159,8 @@ pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
                 before_id,
                 after_node,
                 after_id,
-                &before_metadata,
-                &after_metadata,
+                before_metadata,
+                after_metadata,
                 before,
                 after,
                 diff,
@@ -174,8 +174,8 @@ pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
         apted::prematch_identical_statement_siblings(
             before_id,
             after_id,
-            &before_metadata,
-            &after_metadata,
+            before_metadata,
+            after_metadata,
             "large_flat_subtree_container",
             diff,
         );
@@ -183,8 +183,8 @@ pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
         // Diff the top-level item itself (flat descendant, and anything just pre-matched above,
         // already in `diff` -> pruned).
         apted::for_nodes(
-            &before_metadata,
-            &after_metadata,
+            before_metadata,
+            after_metadata,
             vec![before_id],
             vec![after_id],
             Algorithm::Apted,

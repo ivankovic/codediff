@@ -27,11 +27,9 @@ use codediff::diff::text_range::{ScreenColumn, SourceRow, cell_width_of, row_cel
 // Rendering
 // ---------------------------------------------------------------------------------------------
 
-#[derive(Clone, Copy)]
-pub(crate) enum Side {
-    Before,
-    After,
-}
+// The same two-variant enum `human_mapping` tags its mismatches with; one type, not a private
+// twin.
+pub(crate) use codediff::test::helper::human_mapping::Side;
 
 pub(crate) fn node_label(node: Node, src: &[u8]) -> String {
     if node.child_count() == 0 {

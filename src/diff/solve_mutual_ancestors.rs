@@ -61,14 +61,14 @@ pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
 
     let lca_after = aggregate_lca(
         before_ast.root_node().id(),
-        &before_metadata,
-        &after_metadata,
+        before_metadata,
+        after_metadata,
         &diff.before_node_map,
     );
     let lca_before = aggregate_lca(
         after_ast.root_node().id(),
-        &after_metadata,
-        &before_metadata,
+        after_metadata,
+        before_metadata,
         &diff.after_node_map,
     );
 

@@ -156,8 +156,8 @@ pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
             anchor_pair_via_apted(
                 *before_child_id,
                 *after_child_id,
-                &before_metadata,
-                &after_metadata,
+                before_metadata,
+                after_metadata,
                 "unique_type_matching",
                 ASTMappingReason::UniqueTypeMatching,
                 diff,

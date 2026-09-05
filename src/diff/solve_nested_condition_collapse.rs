@@ -101,13 +101,7 @@ pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
         if diff.before_node_map.contains_key(&outer_if.id()) {
             continue;
         }
-        try_collapse(
-            node_cache,
-            &before_metadata,
-            &after_metadata,
-            diff,
-            outer_if,
-        );
+        try_collapse(node_cache, before_metadata, after_metadata, diff, outer_if);
     }
 }
 

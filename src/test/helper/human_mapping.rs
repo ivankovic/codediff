@@ -1379,9 +1379,6 @@ pub fn status_after(node: Node, caches: &Caches) -> NodeStatus {
     NodeStatus::Unmarked
 }
 
-/// Helper function to find a node by ID in a tree and return its kind.
-/// Returns "None" if the node is not found, "0" if the ID is 0,
-/// or the node kind if found.
 /// Which side of the diff a [`Mismatch`]'s `node_id` belongs to.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Side {

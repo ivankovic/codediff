@@ -92,7 +92,7 @@ pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
                     .is_some_and(|info| !info.children.is_empty())
         })
         .collect();
-    sort_deepest_first(&mut before_candidates, &before_metadata);
+    sort_deepest_first(&mut before_candidates, before_metadata);
 
     for before_id in before_candidates {
         if diff.before_node_map.contains_key(&before_id) {
@@ -172,8 +172,8 @@ pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
         anchor_pair_via_apted(
             before_id,
             after_id,
-            &before_metadata,
-            &after_metadata,
+            before_metadata,
+            after_metadata,
             "bottom_up_propagation",
             ASTMappingReason::BottomUpPropagation,
             diff,
@@ -186,7 +186,7 @@ pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
     // above (matching `B` to `P` sets both `before_node_map[B]` and `after_node_map[P]` via
     // `ASTDiff::add_mapping`).
     let mut after_candidates: Vec<usize> = after_metadata.node_to_depth.keys().copied().collect();
-    sort_deepest_first(&mut after_candidates, &after_metadata);
+    sort_deepest_first(&mut after_candidates, after_metadata);
 
     for after_id in after_candidates {
         if diff.after_node_map.contains_key(&after_id) {

@@ -111,7 +111,7 @@ pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
         if claimed_before.contains(&b) {
             continue;
         }
-        if !subtree_fully_unmapped(b, &before_metadata, &diff.before_node_map) {
+        if !subtree_fully_unmapped(b, before_metadata, &diff.before_node_map) {
             continue;
         }
         let Some(hash) = before_metadata.node_to_full_hash.get(&b) else {
@@ -131,7 +131,7 @@ pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
             .filter(|a| {
                 !claimed_after.contains(a)
                     && diff.after_node_map.get(a) == Some(&0)
-                    && subtree_fully_unmapped(*a, &after_metadata, &diff.after_node_map)
+                    && subtree_fully_unmapped(*a, after_metadata, &diff.after_node_map)
             })
             .collect();
         candidates.sort_unstable_by_key(|a| {
@@ -171,14 +171,14 @@ pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
                 .unwrap_or(0)
                 < AMBIGUOUS_MOVE_MIN_SIZE
         {
-            match disambiguate_by_context(b, &candidates, &before_metadata, &after_metadata) {
+            match disambiguate_by_context(b, &candidates, before_metadata, after_metadata) {
                 Some(best) => candidates = vec![best],
                 None => continue,
             }
         }
         let source_container = outermost_unmapped_reference_kind(
             b,
-            &before_metadata,
+            before_metadata,
             before_parents,
             &diff.before_node_map,
             &language,
@@ -186,7 +186,7 @@ pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
         let Some(&a) = candidates.iter().find(|&&a| {
             let target_container = outermost_unmapped_reference_kind(
                 a,
-                &after_metadata,
+                after_metadata,
                 after_parents,
                 &diff.after_node_map,
                 &language,
@@ -196,9 +196,9 @@ pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
             continue;
         };
 
-        remap_moved_subtree(b, a, &before_metadata, &after_metadata, diff);
-        claim_subtree(b, &before_metadata, &mut claimed_before);
-        claim_subtree(a, &after_metadata, &mut claimed_after);
+        remap_moved_subtree(b, a, before_metadata, after_metadata, diff);
+        claim_subtree(b, before_metadata, &mut claimed_before);
+        claim_subtree(a, after_metadata, &mut claimed_after);
     }
 }
 

@@ -87,6 +87,14 @@ done; the §4 typos are fixed except `symetric` (×3).
   per-pass `metadata_of` calls at entry are gone (13 pipeline call sites, 32 test call sites).
   The ordered `PIPELINE` constant was not added: the phases are interleaved with config gates
   and two non-pass calls, so the list in `pending_with_config`'s comment stays the record.
+- **2026-09-05, section 4 items 4 and 9 (part)** - done: the apted before/after mirror pairs
+  share one body each - `emit_subtree(Side, ..)` behind `emit_before/after_subtree`,
+  `subtree_cost(Side, ..)` behind `subtree_del/ins_cost`, and a `SideDecision` trait over the
+  two decision enums behind `match_target`/`collect_side_subtree_targets` (the four
+  `before_*`/`after_*` names stay as one-line wrappers for their callers). `human_solver`'s
+  private `Side` twin is the `human_mapping::Side` re-exported. Its five small mirror pairs
+  (`algo_status_*`, `algo_reason_*`, `algo_disagrees_*`, `advance_*_to_next_unmarked`,
+  `clear_*_descendants`) are still open.
 - **Runtime finding from the same measurement**: over the corpus, AST metadata costs about three
   times the tree-sitter parse, and the parse plus metadata (15.5s) is more than half the diff
   itself (28s per the quality baseline). Section 6's items 1-3 are that cost.

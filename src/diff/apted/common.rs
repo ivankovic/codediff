@@ -646,6 +646,80 @@ pub(crate) enum AfterDecision {
     Insert,
 }
 
+/// What [`BeforeDecision`] and [`AfterDecision`] have in common, so the before/after halves of
+/// the emission and slot logic can share one body instead of a mirrored copy each - every fix
+/// that used to have to be made twice (and was, once, made only once) is made once.
+pub(crate) trait SideDecision: Copy {
+    /// The fresh match target, or `None` for the side's prune decision (`Delete`/`Insert`).
+    fn match_target(self) -> Option<usize>;
+}
+
+impl SideDecision for BeforeDecision {
+    fn match_target(self) -> Option<usize> {
+        match self {
+            Self::Match(target) => Some(target),
+            Self::Delete => None,
+        }
+    }
+}
+
+impl SideDecision for AfterDecision {
+    fn match_target(self) -> Option<usize> {
+        match self {
+            Self::Match(target) => Some(target),
+            Self::Insert => None,
+        }
+    }
+}
+
+/// Which tree a node belongs to, for the helpers whose before and after versions differ only in
+/// which maps they consult, which key shape `(before, after)` they write, and which of
+/// delete/insert they charge.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Side {
+    Before,
+    After,
+}
+
+impl Side {
+    /// The `(before, after)` mapping key pairing this side's `own` node with `partner`.
+    pub(crate) fn pair(self, own: usize, partner: usize) -> (usize, usize) {
+        match self {
+            Side::Before => (own, partner),
+            Side::After => (partner, own),
+        }
+    }
+
+    /// The `(before, after)` mapping key that prunes this side's `own` node (partner 0).
+    pub(crate) fn prune_key(self, own: usize) -> (usize, usize) {
+        self.pair(own, 0)
+    }
+
+    /// The operation and unit cost that pruning one node on this side records.
+    pub(crate) fn prune_operation(self) -> (ASTMappingOperation, u64) {
+        match self {
+            Side::Before => (ASTMappingOperation::Delete, COST_DELETE),
+            Side::After => (ASTMappingOperation::Insert, COST_INSERT),
+        }
+    }
+
+    /// This side's node map in `diff`.
+    pub(crate) fn node_map(self, diff: &ASTDiff) -> &rustc_hash::FxHashMap<usize, usize> {
+        match self {
+            Side::Before => &diff.before_node_map,
+            Side::After => &diff.after_node_map,
+        }
+    }
+
+    /// The cost of pruning one node on this side under `cost_model`.
+    pub(crate) fn node_cost(self, cost_model: &UnitCostModel, info: &ASTNodeMetadata) -> u64 {
+        match self {
+            Side::Before => cost_model.del(info),
+            Side::After => cost_model.ins(info),
+        }
+    }
+}
+
 pub(crate) struct ResolveCtx<'a> {
     pub(crate) before_meta: &'a ASTMetadata,
     pub(crate) after_meta: &'a ASTMetadata,
@@ -656,6 +730,31 @@ pub(crate) struct ResolveCtx<'a> {
     /// Provenance label for every `ASTMappingReason::APTED` entry this resolution produces - see
     /// `for_nodes`'s doc comment.
     pub(crate) source: &'static str,
+}
+
+impl ResolveCtx<'_> {
+    pub(crate) fn meta(&self, side: Side) -> &ASTMetadata {
+        match side {
+            Side::Before => self.before_meta,
+            Side::After => self.after_meta,
+        }
+    }
+
+    /// `id`'s fresh match target on `side`, if this call's decisions matched it.
+    fn fresh_match_target(&self, side: Side, id: usize) -> Option<usize> {
+        match side {
+            Side::Before => self.before_decision.get(&id).and_then(|d| d.match_target()),
+            Side::After => self.after_decision.get(&id).and_then(|d| d.match_target()),
+        }
+    }
+
+    fn has_match_below(&self, side: Side, id: usize) -> bool {
+        let map = match side {
+            Side::Before => &self.before_has_match_below,
+            Side::After => &self.after_has_match_below,
+        };
+        map.get(&id).copied().unwrap_or(false)
+    }
 }
 
 pub(crate) fn compute_has_match_below(
@@ -910,75 +1009,47 @@ pub(crate) fn emit_match(
 }
 
 pub(crate) fn emit_before_subtree(before_id: usize, ctx: &ResolveCtx, diff: &mut ASTDiff) -> u64 {
-    if let Some(BeforeDecision::Match(after_id)) = ctx.before_decision.get(&before_id) {
-        return emit_match(before_id, *after_id, ctx, diff);
-    }
-
-    if !ctx
-        .before_has_match_below
-        .get(&before_id)
-        .copied()
-        .unwrap_or(false)
-    {
-        add_delete_mappings(before_id, ctx.before_meta, ctx.source, diff);
-        return subtree_del_cost(
-            before_id,
-            ctx.before_meta,
-            &UnitCostModel::new(ctx.before_meta.language),
-        );
-    }
-
-    // Something below this node is reused elsewhere: delete just this node (cost 1) and let
-    // its children be independently classified.
-    let mut total = COST_DELETE;
-    if let Some(info) = ctx.before_meta.node_info.get(&before_id) {
-        for child in filter_mapped_nodes(&info.children, &diff.before_node_map) {
-            total += emit_before_subtree(child, ctx, diff);
-        }
-    }
-    diff.add_mapping(
-        before_id,
-        0,
-        ASTMapping {
-            cost: total,
-            operation: ASTMappingOperation::Delete,
-            reason: ASTMappingReason::APTED(ctx.source),
-        },
-    );
-    total
+    emit_subtree(Side::Before, before_id, ctx, diff)
 }
 
 pub(crate) fn emit_after_subtree(after_id: usize, ctx: &ResolveCtx, diff: &mut ASTDiff) -> u64 {
-    if let Some(AfterDecision::Match(before_id)) = ctx.after_decision.get(&after_id) {
-        return emit_match(*before_id, after_id, ctx, diff);
+    emit_subtree(Side::After, after_id, ctx, diff)
+}
+
+/// Emits the mappings for `id`'s subtree on `side` per this call's decisions, returning their
+/// total cost: a fresh match is emitted as one; a subtree with nothing reused below it is pruned
+/// whole; otherwise just this node is pruned (unit cost) and each child is classified on its own.
+fn emit_subtree(side: Side, id: usize, ctx: &ResolveCtx, diff: &mut ASTDiff) -> u64 {
+    if let Some(partner) = ctx.fresh_match_target(side, id) {
+        let (before_id, after_id) = side.pair(id, partner);
+        return emit_match(before_id, after_id, ctx, diff);
     }
 
-    if !ctx
-        .after_has_match_below
-        .get(&after_id)
-        .copied()
-        .unwrap_or(false)
-    {
-        add_insert_mappings(after_id, ctx.after_meta, ctx.source, diff);
-        return subtree_ins_cost(
-            after_id,
-            ctx.after_meta,
-            &UnitCostModel::new(ctx.after_meta.language),
-        );
+    let meta = ctx.meta(side);
+    if !ctx.has_match_below(side, id) {
+        match side {
+            Side::Before => add_delete_mappings(id, meta, ctx.source, diff),
+            Side::After => add_insert_mappings(id, meta, ctx.source, diff),
+        }
+        return subtree_cost(side, id, meta, &UnitCostModel::new(meta.language));
     }
 
-    let mut total = COST_INSERT;
-    if let Some(info) = ctx.after_meta.node_info.get(&after_id) {
-        for child in filter_mapped_nodes(&info.children, &diff.after_node_map) {
-            total += emit_after_subtree(child, ctx, diff);
+    // Something below this node is reused elsewhere: prune just this node (unit cost) and let
+    // its children be independently classified.
+    let (operation, unit_cost) = side.prune_operation();
+    let mut total = unit_cost;
+    if let Some(info) = meta.node_info.get(&id) {
+        for child in filter_mapped_nodes(&info.children, side.node_map(diff)) {
+            total += emit_subtree(side, child, ctx, diff);
         }
     }
+    let (before_id, after_id) = side.prune_key(id);
     diff.add_mapping(
-        0,
+        before_id,
         after_id,
         ASTMapping {
             cost: total,
-            operation: ASTMappingOperation::Insert,
+            operation,
             reason: ASTMappingReason::APTED(ctx.source),
         },
     );
@@ -1109,17 +1180,7 @@ pub(crate) fn subtree_del_cost(
     meta: &ASTMetadata,
     cost_model: &UnitCostModel,
 ) -> u64 {
-    if node_id == 0 {
-        return 0;
-    }
-    let Some(info) = meta.node_info.get(&node_id) else {
-        return 0;
-    };
-    let mut cost = cost_model.del(info);
-    for &child_id in &info.children {
-        cost += subtree_del_cost(child_id, meta, cost_model);
-    }
-    cost
+    subtree_cost(Side::Before, node_id, meta, cost_model)
 }
 
 /// Compute the cost of inserting an entire subtree.
@@ -1128,15 +1189,20 @@ pub(crate) fn subtree_ins_cost(
     meta: &ASTMetadata,
     cost_model: &UnitCostModel,
 ) -> u64 {
+    subtree_cost(Side::After, node_id, meta, cost_model)
+}
+
+/// The cost of pruning `node_id`'s entire subtree on `side` (delete before, insert after).
+fn subtree_cost(side: Side, node_id: usize, meta: &ASTMetadata, cost_model: &UnitCostModel) -> u64 {
     if node_id == 0 {
         return 0;
     }
     let Some(info) = meta.node_info.get(&node_id) else {
         return 0;
     };
-    let mut cost = cost_model.ins(info);
+    let mut cost = side.node_cost(cost_model, info);
     for &child_id in &info.children {
-        cost += subtree_ins_cost(child_id, meta, cost_model);
+        cost += subtree_cost(side, child_id, meta, cost_model);
     }
     cost
 }

@@ -39,11 +39,7 @@ pub(crate) fn before_match_target(
     before_decision: &HashMap<usize, BeforeDecision>,
     diff: &ASTDiff,
 ) -> Option<usize> {
-    match before_decision.get(&id) {
-        Some(BeforeDecision::Match(t)) => Some(*t),
-        Some(BeforeDecision::Delete) => None,
-        None => diff.before_node_map.get(&id).copied().filter(|&t| t != 0),
-    }
+    match_target(id, before_decision, &diff.before_node_map)
 }
 
 /// After-side counterpart of `before_match_target`.
@@ -52,10 +48,19 @@ pub(crate) fn after_match_target(
     after_decision: &HashMap<usize, AfterDecision>,
     diff: &ASTDiff,
 ) -> Option<usize> {
-    match after_decision.get(&id) {
-        Some(AfterDecision::Match(t)) => Some(*t),
-        Some(AfterDecision::Insert) => None,
-        None => diff.after_node_map.get(&id).copied().filter(|&t| t != 0),
+    match_target(id, after_decision, &diff.after_node_map)
+}
+
+/// One side's match target: this call's decision if it made one, else the earlier passes'
+/// anchor in `node_map` (`0` there means pruned, not matched).
+fn match_target<D: SideDecision>(
+    id: usize,
+    decisions: &HashMap<usize, D>,
+    node_map: &rustc_hash::FxHashMap<usize, usize>,
+) -> Option<usize> {
+    match decisions.get(&id) {
+        Some(decision) => decision.match_target(),
+        None => node_map.get(&id).copied().filter(|&t| t != 0),
     }
 }
 
@@ -135,20 +140,12 @@ pub(crate) fn collect_before_subtree_targets(
     diff: &ASTDiff,
     out: &mut Vec<usize>,
 ) {
-    collect_subtree_targets(
+    collect_side_subtree_targets(
         root,
         before_meta,
+        before_decision,
+        &diff.before_node_map,
         out,
-        &|child| match before_decision.get(&child) {
-            Some(BeforeDecision::Match(t)) => SubtreeTargetOutcome::MatchAndRecurse(*t),
-            Some(BeforeDecision::Delete) => SubtreeTargetOutcome::PruneRecurse,
-            None => SubtreeTargetOutcome::Leaf(
-                diff.before_node_map
-                    .get(&child)
-                    .copied()
-                    .filter(|&t| t != 0),
-            ),
-        },
     );
 }
 
@@ -160,18 +157,25 @@ pub(crate) fn collect_after_subtree_targets(
     diff: &ASTDiff,
     out: &mut Vec<usize>,
 ) {
-    collect_subtree_targets(
-        root,
-        after_meta,
-        out,
-        &|child| match after_decision.get(&child) {
-            Some(AfterDecision::Match(t)) => SubtreeTargetOutcome::MatchAndRecurse(*t),
-            Some(AfterDecision::Insert) => SubtreeTargetOutcome::PruneRecurse,
-            None => SubtreeTargetOutcome::Leaf(
-                diff.after_node_map.get(&child).copied().filter(|&t| t != 0),
-            ),
+    collect_side_subtree_targets(root, after_meta, after_decision, &diff.after_node_map, out);
+}
+
+/// The shared body of the two above: a fresh match is collected and recursed past, a fresh prune
+/// is recursed past, and an earlier pass's anchor (or nothing) is a leaf.
+fn collect_side_subtree_targets<D: SideDecision>(
+    root: usize,
+    meta: &ASTMetadata,
+    decisions: &HashMap<usize, D>,
+    node_map: &rustc_hash::FxHashMap<usize, usize>,
+    out: &mut Vec<usize>,
+) {
+    collect_subtree_targets(root, meta, out, &|child| match decisions.get(&child) {
+        Some(decision) => match decision.match_target() {
+            Some(t) => SubtreeTargetOutcome::MatchAndRecurse(t),
+            None => SubtreeTargetOutcome::PruneRecurse,
         },
-    );
+        None => SubtreeTargetOutcome::Leaf(node_map.get(&child).copied().filter(|&t| t != 0)),
+    });
 }
 
 /// Post-DP slot alignment: reshapes cost-*neutral* corners of the DP's decision so they read the

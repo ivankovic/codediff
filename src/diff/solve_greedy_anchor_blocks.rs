@@ -115,8 +115,8 @@ pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
     let language = before_metadata.language;
 
     let before_candidate_ids =
-        collect_candidates(&before_metadata, &diff.before_node_map, &language);
-    let after_candidate_ids = collect_candidates(&after_metadata, &diff.after_node_map, &language);
+        collect_candidates(before_metadata, &diff.before_node_map, &language);
+    let after_candidate_ids = collect_candidates(after_metadata, &diff.after_node_map, &language);
     if before_candidate_ids.is_empty() || after_candidate_ids.is_empty() {
         return;
     }
@@ -125,11 +125,11 @@ pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
     // `grouped_greedy_matcher`'s determinism contract directly, no extra sort needed here.
     let before_candidates: Vec<(usize, PositionalKey)> = before_candidate_ids
         .iter()
-        .map(|&id| (id, positional_key_before(id, &before_metadata, diff)))
+        .map(|&id| (id, positional_key_before(id, before_metadata, diff)))
         .collect();
     let after_candidates: Vec<(usize, PositionalKey)> = after_candidate_ids
         .iter()
-        .map(|&id| (id, positional_key_after(id, &after_metadata, diff)))
+        .map(|&id| (id, positional_key_after(id, after_metadata, diff)))
         .collect();
 
     crate::diff::grouped_greedy_matcher::solve(
@@ -137,7 +137,7 @@ pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
         &before_candidates,
         &after_candidates,
         |before_id, after_id| {
-            cost_ratio(before_id, after_id, &before_metadata, &after_metadata)
+            cost_ratio(before_id, after_id, before_metadata, after_metadata)
                 .unwrap_or(f64::INFINITY)
         },
         Some(MAX_COST_RATIO),
@@ -145,8 +145,8 @@ pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
             anchor_pair_via_apted(
                 before_id,
                 after_id,
-                &before_metadata,
-                &after_metadata,
+                before_metadata,
+                after_metadata,
                 "greedy_anchor_block",
                 ASTMappingReason::GreedyAnchorBlock,
                 diff,
