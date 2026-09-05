@@ -109,6 +109,11 @@ done; the §4 typos are fixed except `symetric` (×3).
   the legacy literals it hardcoded; `from_with_update_style` had no callers. Left as they are:
   `intra_node_update_ranges`'s private three bools, `exit_code_for(bool, bool, bool)` (three
   unrelated facts, pinned by its tests) and `headless::render_side`'s two.
+- **2026-09-05, section 5 (`is_semantically_structural`)** - done: `named_child_text` replaces
+  the twenty arms of the "named child of an accepted kind" shape with one line each (485 to 439
+  lines). The rest is the wide-table case the review allowed for: 48 arms that genuinely differ
+  (Rust `impl_item`, Go receivers and specs, C declarators, ...), most carrying the measurement
+  that put them there. `make check-quality`: 0 regressed, 0 improved.
 - **Runtime finding from the same measurement**: over the corpus, AST metadata costs about three
   times the tree-sitter parse, and the parse plus metadata (15.5s) is more than half the diff
   itself (28s per the quality baseline). Section 6's items 1-3 are that cost.

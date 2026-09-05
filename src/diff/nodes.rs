@@ -486,6 +486,24 @@ pub(crate) fn local_identity_name(
     }
 }
 
+/// The identity `(node_kind, text)` of `node` when its `field` child exists (and, if `kind` is
+/// given, has that kind): the one shape most of [`is_semantically_structural`]'s arms share, so
+/// each arm is one line naming the field and the accepted kind, and the genuinely special ones
+/// (Rust `impl_item`, Go receivers, C declarators, ...) stand out.
+fn named_child_text(
+    node: &Node,
+    bytes: &[u8],
+    field: &str,
+    kind: Option<&str>,
+) -> Option<(String, String)> {
+    let child = node.child_by_field_name(field)?;
+    if kind.is_some_and(|kind| child.kind() != kind) {
+        return None;
+    }
+    let text = child.utf8_text(bytes).ok()?;
+    Some((node.kind().to_string(), text.to_string()))
+}
+
 /*
 * Semantically structural nodes are nodes that have a semantic meaning that is "loosely fixed" and
 * typically enforced by the compiler in some way. For example, there can only ever be ONE
@@ -506,16 +524,12 @@ pub fn is_semantically_structural<'a>(
     // Language-specific reference nodes
     match language {
         Language::Rust => match node_kind {
-            "function_item" | "mod_item" => node
-                .child_by_field_name("name")
-                .filter(|n| n.kind() == "identifier")
-                .and_then(|n| n.utf8_text(bytes).ok())
-                .map(|name| (node_kind.to_string(), name.to_string())),
-            "struct_item" | "enum_item" | "trait_item" => node
-                .child_by_field_name("name")
-                .filter(|n| n.kind() == "type_identifier")
-                .and_then(|n| n.utf8_text(bytes).ok())
-                .map(|name| (node_kind.to_string(), name.to_string())),
+            "function_item" | "mod_item" => {
+                named_child_text(node, bytes, "name", Some("identifier"))
+            }
+            "struct_item" | "enum_item" | "trait_item" => {
+                named_child_text(node, bytes, "name", Some("type_identifier"))
+            }
             "impl_item" => {
                 let type_name = node
                     .child_by_field_name("type")
@@ -532,19 +546,13 @@ pub fn is_semantically_structural<'a>(
             _ => None,
         },
         Language::Python => match node_kind {
-            "function_definition" | "class_definition" => node
-                .child_by_field_name("name")
-                .filter(|n| n.kind() == "identifier")
-                .and_then(|n| n.utf8_text(bytes).ok())
-                .map(|name| (node_kind.to_string(), name.to_string())),
+            "function_definition" | "class_definition" => {
+                named_child_text(node, bytes, "name", Some("identifier"))
+            }
             _ => None,
         },
         Language::Go => match node_kind {
-            "function_declaration" => node
-                .child_by_field_name("name")
-                .filter(|n| n.kind() == "identifier")
-                .and_then(|n| n.utf8_text(bytes).ok())
-                .map(|name| (node_kind.to_string(), name.to_string())),
+            "function_declaration" => named_child_text(node, bytes, "name", Some("identifier")),
             "method_declaration" => {
                 let method_name = node
                     .child_by_field_name("name")
@@ -561,11 +569,9 @@ pub fn is_semantically_structural<'a>(
                     format!("{receiver_type}.{method_name}"),
                 ))
             }
-            "type_spec" | "type_alias" => node
-                .child_by_field_name("name")
-                .filter(|n| n.kind() == "type_identifier")
-                .and_then(|n| n.utf8_text(bytes).ok())
-                .map(|name| (node_kind.to_string(), name.to_string())),
+            "type_spec" | "type_alias" => {
+                named_child_text(node, bytes, "name", Some("type_identifier"))
+            }
             // A top-level `var tests = []T{...}` (or `const`) declaration is exactly as common a
             // home for a large, table-driven data literal as a named function is, but had no
             // identity signal at all before this - confirmed via a live case
@@ -653,22 +659,12 @@ pub fn is_semantically_structural<'a>(
                     format!("{}{}{}", receiver_prefix, func_name, param_sig),
                 ))
             }
-            "class_declaration" | "object_declaration" => node
-                .child_by_field_name("name")
-                .filter(|n| n.kind() == "identifier")
-                .and_then(|n| n.utf8_text(bytes).ok())
-                .map(|name| (node_kind.to_string(), name.to_string())),
-            "companion_object" => node
-                .child_by_field_name("name")
-                .filter(|n| n.kind() == "identifier")
-                .and_then(|n| n.utf8_text(bytes).ok())
-                .map(|name| (node_kind.to_string(), name.to_string())),
+            "class_declaration" | "object_declaration" => {
+                named_child_text(node, bytes, "name", Some("identifier"))
+            }
+            "companion_object" => named_child_text(node, bytes, "name", Some("identifier")),
             // `typealias Foo = Bar` uses field "type" (not "name") for the alias identifier
-            "type_alias" => node
-                .child_by_field_name("type")
-                .filter(|n| n.kind() == "identifier")
-                .and_then(|n| n.utf8_text(bytes).ok())
-                .map(|name| (node_kind.to_string(), name.to_string())),
+            "type_alias" => named_child_text(node, bytes, "type", Some("identifier")),
             _ => None,
         },
         // Previously entirely unhandled here (confirmed empirically 2026-07-25, chasing a
@@ -693,10 +689,7 @@ pub fn is_semantically_structural<'a>(
             | "enum_declaration"
             | "record_declaration"
             | "method_declaration"
-            | "namespace_declaration" => node
-                .child_by_field_name("name")
-                .and_then(|n| n.utf8_text(bytes).ok())
-                .map(|name| (node_kind.to_string(), name.to_string())),
+            | "namespace_declaration" => named_child_text(node, bytes, "name", None),
             // No direct "name" field (unlike the kinds above) - wraps a `variable_declaration`
             // holding one or more `variable_declarator`s (`int a, b;` is one `field_declaration`
             // naming two variables). Keyed on the *first* declarator only, same simplification
@@ -735,10 +728,9 @@ pub fn is_semantically_structural<'a>(
                 .child_by_field_name("declarator")
                 .and_then(|d| c_family_declarator_name(d, bytes))
                 .map(|name| (node_kind.to_string(), name.to_string())),
-            "struct_specifier" | "enum_specifier" | "union_specifier" => node
-                .child_by_field_name("name")
-                .and_then(|n| n.utf8_text(bytes).ok())
-                .map(|name| (node_kind.to_string(), name.to_string())),
+            "struct_specifier" | "enum_specifier" | "union_specifier" => {
+                named_child_text(node, bytes, "name", None)
+            }
             _ => None,
         },
         Language::CPP => match node_kind {
@@ -754,17 +746,13 @@ pub fn is_semantically_structural<'a>(
                         .and_then(|d| c_family_declarator_name(d, bytes))
                         .map(|name| (node_kind.to_string(), name.to_string()))
                 }),
-            "class_specifier" | "struct_specifier" | "enum_specifier" | "union_specifier" => node
-                .child_by_field_name("name")
-                .and_then(|n| n.utf8_text(bytes).ok())
-                .map(|name| (node_kind.to_string(), name.to_string())),
+            "class_specifier" | "struct_specifier" | "enum_specifier" | "union_specifier" => {
+                named_child_text(node, bytes, "name", None)
+            }
             // Already returns a fully-qualified name for `namespace A::B { ... }` (a
             // `nested_namespace_specifier`, not a plain `namespace_identifier`) - confirmed
             // empirically, no extra unwrapping needed unlike `function_definition` above.
-            "namespace_definition" => node
-                .child_by_field_name("name")
-                .and_then(|n| n.utf8_text(bytes).ok())
-                .map(|name| (node_kind.to_string(), name.to_string())),
+            "namespace_definition" => named_child_text(node, bytes, "name", None),
             _ => None,
         },
         // Same 2026-07-26 gap as the CSharp/C/CPP arms above (`TODO.md`'s speed-goal
@@ -778,10 +766,7 @@ pub fn is_semantically_structural<'a>(
             | "interface_declaration"
             | "enum_declaration"
             | "record_declaration"
-            | "method_declaration" => node
-                .child_by_field_name("name")
-                .and_then(|n| n.utf8_text(bytes).ok())
-                .map(|name| (node_kind.to_string(), name.to_string())),
+            | "method_declaration" => named_child_text(node, bytes, "name", None),
             // No direct "name" field - wraps a `variable_declarator` (possibly several, for
             // `int a, b;`) the same shape C#'s `field_declaration` arm above already handles,
             // minus that language's extra `variable_declaration` wrapper layer (confirmed
@@ -804,10 +789,7 @@ pub fn is_semantically_structural<'a>(
             | "class_declaration"
             | "method_definition"
             | "interface_declaration"
-            | "type_alias_declaration" => node
-                .child_by_field_name("name")
-                .and_then(|n| n.utf8_text(bytes).ok())
-                .map(|name| (node_kind.to_string(), name.to_string())),
+            | "type_alias_declaration" => named_child_text(node, bytes, "name", None),
             // `const f = () => ...`/`const f = function() {...}`: the function itself has no
             // name field (confirmed empirically - only its *enclosing* `variable_declarator`
             // does), unlike a `function_declaration`. Deliberately narrow: only fires when the
@@ -899,10 +881,9 @@ pub fn is_semantically_structural<'a>(
         // of them) - every one of those 28 functions was invisible to phase 4, same "no named
         // candidates, falls back to one giant blob" pattern as Ruby/YAML.
         Language::PHP => match node_kind {
-            "class_declaration" | "function_definition" | "method_declaration" => node
-                .child_by_field_name("name")
-                .and_then(|n| n.utf8_text(bytes).ok())
-                .map(|name| (node_kind.to_string(), name.to_string())),
+            "class_declaration" | "function_definition" | "method_declaration" => {
+                named_child_text(node, bytes, "name", None)
+            }
             _ => None,
         },
         Language::Ruby => match node_kind {
@@ -916,10 +897,9 @@ pub fn is_semantically_structural<'a>(
             // 2026-08-02: `ruby-homebrew-add-or-expression`, 4.2s dominated by a single `module`
             // pair with a 1022-node residual, for a fixture whose only real edit is one line inside
             // one `def self.*` method - see `TODO.md`).
-            "class" | "module" | "method" | "singleton_method" => node
-                .child_by_field_name("name")
-                .and_then(|n| n.utf8_text(bytes).ok())
-                .map(|name| (node_kind.to_string(), name.to_string())),
+            "class" | "module" | "method" | "singleton_method" => {
+                named_child_text(node, bytes, "name", None)
+            }
             _ => None,
         },
         // Every remaining language `is_reference` above lists a kind set for, but with no
@@ -934,28 +914,21 @@ pub fn is_semantically_structural<'a>(
             | "class_declaration"
             | "struct_declaration"
             | "enum_declaration"
-            | "protocol_declaration" => node
-                .child_by_field_name("name")
-                .and_then(|n| n.utf8_text(bytes).ok())
-                .map(|name| (node_kind.to_string(), name.to_string())),
+            | "protocol_declaration" => named_child_text(node, bytes, "name", None),
             _ => None,
         },
         Language::Scala => match node_kind {
             "class_definition"
             | "object_definition"
             | "trait_definition"
-            | "function_definition" => node
-                .child_by_field_name("name")
-                .and_then(|n| n.utf8_text(bytes).ok())
-                .map(|name| (node_kind.to_string(), name.to_string())),
+            | "function_definition" => named_child_text(node, bytes, "name", None),
             _ => None,
         },
         Language::R | Language::ShellScript | Language::LUA | Language::Vimscript => {
             match node_kind {
-                "function_definition" | "function_declaration" => node
-                    .child_by_field_name("name")
-                    .and_then(|n| n.utf8_text(bytes).ok())
-                    .map(|name| (node_kind.to_string(), name.to_string())),
+                "function_definition" | "function_declaration" => {
+                    named_child_text(node, bytes, "name", None)
+                }
                 _ => None,
             }
         }
@@ -972,10 +945,9 @@ pub fn is_semantically_structural<'a>(
         // `block_mapping_pair` that's itself a candidate contributes its own key to the fully-
         // resolved scope chain (`solve_qualified_name_groups`'s doc comment), so two pairs only
         // ever share an identity if their *entire* ancestor key path matches, not just the leaf key.
-        Language::YAML if node_kind == "block_mapping_pair" => node
-            .child_by_field_name("key")
-            .and_then(|n| n.utf8_text(bytes).ok())
-            .map(|name| (node_kind.to_string(), name.to_string())),
+        Language::YAML if node_kind == "block_mapping_pair" => {
+            named_child_text(node, bytes, "key", None)
+        }
         _ => None,
     }
 }
