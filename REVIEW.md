@@ -15,6 +15,14 @@ re-verified here rather than repeated: 1.7, 1.8, 1.9 (`was_*` helpers), §3 `Dif
 §5 items 1-4 are still open; 1.9's `ranges` arm de-duplication and the `blob_content` sharing are
 done; the §4 typos are fixed except `symetric` (×3).
 
+## Status
+
+- **2026-09-05, section 1** - all six defects fixed: `benchmark-ablation` path, `build: test`
+  is handled in section 2, `code_percentiles.csv` path, `benchmark_other`'s provenance copy
+  replaced by `helper::sample_provenance` (its `language` column now comes from the fixture's
+  detected language, which is the same detector `sample.csv` recorded), `dataset.sh`'s project
+  filter, R/Scala in `LANGUAGE_CATEGORY`, `[[bench]]` gating.
+
 ## Headline numbers
 
 | Measure | Value |

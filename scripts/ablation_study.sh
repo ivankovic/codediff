@@ -25,11 +25,11 @@
 # measured contribution to accuracy on the fixture corpus.
 #
 # Usage: ./ablation_study.sh [output-dir]  (default output-dir: research/data/ablation)
-# Can be run from anywhere - always operates relative to the repo root, two directories up from
-# this script's own location (research/measure/).
+# Can be run from anywhere - always operates relative to the repo root, one directory up from
+# this script's own location (scripts/).
 
 set -uo pipefail
-cd "$(dirname "$0")/../.."
+cd "$(dirname "$0")/.."
 
 OUT_DIR="${1:-research/data/ablation}"
 mkdir -p "$OUT_DIR"

@@ -269,6 +269,9 @@ required-features = ["stats"]
 [[bench]]
 name = "diff_code_benchmark"
 harness = false
+# Loads its inputs through `codediff::test::helper`, which is gated the same way (see `test-fixtures`
+# above), so a bare `cargo bench` skips this target instead of failing to build it.
+required-features = ["test-fixtures"]
 
 [dev-dependencies.criterion]
 version = "0.5"

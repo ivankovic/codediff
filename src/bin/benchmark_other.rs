@@ -63,6 +63,7 @@ use codediff::code::{Code, Language};
 use codediff::diff;
 use codediff::diff::text_range::TextRange;
 use codediff::test::helper;
+use codediff::test::helper::SampleProvenance;
 use codediff::test::helper::human_mapping;
 use csv::Writer;
 use std::collections::HashMap;
@@ -1242,39 +1243,6 @@ struct ToolScore {
     status: &'static str,
 }
 
-/// Reads `src/test/data/sample.csv` into `promoted_to -> (language, repository, commit, path)`,
-/// the provenance join `AccuracyRow` carries so a row can be traced back to the real-world commit
-/// it was sampled from.
-fn sample_provenance() -> Result<HashMap<String, (String, String, String, String)>> {
-    let path = std::path::Path::new("src/test/data/sample.csv");
-    let mut out = HashMap::new();
-    if !path.exists() {
-        return Ok(out);
-    }
-    let mut reader = csv::Reader::from_path(path)
-        .with_context(|| format!("reading sample provenance from {path:?}"))?;
-    for record in reader.deserialize::<HashMap<String, String>>() {
-        let record = record.context("parsing a sample.csv row")?;
-        let Some(promoted) = record.get("promoted_to") else {
-            continue;
-        };
-        if promoted.is_empty() {
-            continue;
-        }
-        let field = |key: &str| record.get(key).cloned().unwrap_or_default();
-        out.insert(
-            promoted.clone(),
-            (
-                field("language"),
-                field("repository"),
-                field("commit"),
-                field("path"),
-            ),
-        );
-    }
-    Ok(out)
-}
-
 /// Scores every tool's line- and node-level agreement with the human mapping for one fixture.
 ///
 /// Ground truth for both granularities comes from the same synthetic `ASTDiff`
@@ -1284,7 +1252,7 @@ fn score_accuracy(
     name: &str,
     before: &Code,
     after: &Code,
-    provenance: &HashMap<String, (String, String, String, String)>,
+    provenance: &HashMap<String, SampleProvenance>,
     selection: &ToolSelection,
 ) -> Result<AccuracyRow> {
     let node_cache = codediff::diff::NodeCache::build(before, after);
@@ -1475,18 +1443,18 @@ fn score_accuracy(
         });
     }
 
-    let (language_name, repository, commit, path) = provenance
-        .get(name)
-        .cloned()
-        .unwrap_or_else(|| (String::new(), String::new(), String::new(), String::new()));
+    // `sample.csv`'s own `language` column is the same detector's verdict on the same file, so
+    // the fixture's language is used directly rather than read back out of the CSV.
+    let SampleProvenance {
+        repository,
+        commit,
+        path,
+        ..
+    } = provenance.get(name).cloned().unwrap_or_default();
 
     Ok(AccuracyRow {
         solution: name.to_string(),
-        language: if language_name.is_empty() {
-            format!("{language:?}")
-        } else {
-            language_name
-        },
+        language: format!("{language:?}"),
         repository,
         commit,
         path,
@@ -1568,7 +1536,7 @@ fn run_accuracy(
     path: &std::path::Path,
     selection: &ToolSelection,
 ) -> Result<()> {
-    let provenance = sample_provenance()?;
+    let provenance = helper::sample_provenance()?;
     let mut rows = Vec::with_capacity(names.len());
     for (index, name) in names.iter().enumerate() {
         if index % 25 == 0 {

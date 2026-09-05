@@ -33,7 +33,7 @@ function update() {
   rm -f "$2"/failed
 
   while IFS=, read -r project_name repository category; do
-    if [[ "$1" != "all" && "$dataset" != *"$1"* ]]; then
+    if [[ "$1" != "all" && "$project_name" != *"$1"* ]]; then
       continue
     fi
     repository="$(echo "$repository" | xargs)"
@@ -42,16 +42,13 @@ function update() {
 
     case "$repository" in
       https://github.com/* | https://gitlab.com/* | https://codeberg.org/*)
-        # Identify domain and strip prefix
+        # Strip the host prefix
         if [[ "$repository" == https://github.com/* ]]; then
           REST="${repository#https://github.com/}"
-          DOMAIN="https://github.com"
         elif [[ "$repository" == https://gitlab.com/* ]]; then
           REST="${repository#https://gitlab.com/}"
-          DOMAIN="https://gitlab.com"
         else
           REST="${repository#https://codeberg.org/}"
-          DOMAIN="https://codeberg.org"
         fi
 
         USER="$(echo "$REST" | cut -d/ -f1)"

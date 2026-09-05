@@ -463,7 +463,11 @@ def compute_code_only_stats(df):
     plt.close()
 
     # Export percentiles to CSV
-    export_percentiles_to_csv(df, ["bytes", "ast_nodes", "lines_of_code"], "code_percentiles.csv")
+    # data/README.md names this file as Table 1's source; cwd-relative like the `plots/` paths
+    # above, since `make file-stats-report` runs from research/.
+    export_percentiles_to_csv(
+        df, ["bytes", "ast_nodes", "lines_of_code"], "data/corpus_stats/code_percentiles.csv"
+    )
 
     return language_count, bytes_percentiles, loc_percentiles, ast_percentiles, correlation
 

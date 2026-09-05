@@ -769,6 +769,7 @@ pub fn note_as_csv_cell(note: &str) -> String {
 // it), so it lives here rather than being written twice and drifting.
 
 /// The upstream columns of one promoted `sample.csv` row.
+#[derive(Debug, Clone, Default)]
 pub struct SampleProvenance {
     /// The clone-directory slug, `owner` and `repo` joined by a dash - **not** `owner/repo` and
     /// not a URL. The dash carries no boundary, so `Ondsel-Development-OndselSolver` cannot be
