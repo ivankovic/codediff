@@ -221,17 +221,11 @@ mod navigate;
 mod render;
 mod state;
 mod stubs;
-#[allow(unused_imports)]
 use actions::*;
-#[allow(unused_imports)]
 use events::*;
-#[allow(unused_imports)]
 use flatten::*;
-#[allow(unused_imports)]
 use navigate::*;
-#[allow(unused_imports)]
 use render::*;
-#[allow(unused_imports)]
 use state::*;
 use std::collections::HashMap;
 use std::fs;

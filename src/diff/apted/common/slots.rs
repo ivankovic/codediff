@@ -20,7 +20,6 @@
 //!
 //! Split out of `common.rs`, which was 4,426 lines.
 
-#[allow(unused_imports)]
 use super::*;
 
 /// Cost charged for a `ren()` pairing that `ContainmentCtx` has vetoed - deliberately the same

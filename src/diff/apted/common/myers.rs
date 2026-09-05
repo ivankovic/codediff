@@ -20,7 +20,6 @@
 //!
 //! Split out of `common.rs`, which was 4,426 lines.
 
-#[allow(unused_imports)]
 use super::*;
 
 /// Minimum number of still-unmatched direct children (leaves or subtrees - see `flat_children`)

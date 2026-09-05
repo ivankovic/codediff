@@ -20,7 +20,6 @@
 //!
 //! Split out of `common.rs`, which was 4,426 lines.
 
-#[allow(unused_imports)]
 use super::*;
 
 /// Minimum direct-child count worth pre-matching via [`prematch_identical_statement_siblings`] -

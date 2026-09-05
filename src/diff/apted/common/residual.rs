@@ -20,7 +20,6 @@
 //!
 //! Split out of `common.rs`, which was 4,426 lines.
 
-#[allow(unused_imports)]
 use super::*;
 
 /// Edit-distance cap for `resolve_residual_forest_via_myers_lcs`'s Myers diff - same role as

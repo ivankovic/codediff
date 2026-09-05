@@ -126,6 +126,10 @@ done; the §4 typos are fixed except `symetric` (×3).
   files `diff/apted.rs` and `tui/widgets.rs` like every other module. Left open: splitting the
   kind taxonomy out of `diff/nodes.rs`, `apted/common.rs`'s glob re-export tail (and the 22
   `#[allow(unused_imports)]` globs behind it), and the `CodeViewer`/`CodeViewerWidget` naming.
+- **2026-09-06, section 3 (glob re-exports)** - done: all 22 `#[allow(unused_imports)]` are
+  gone. Only four warnings ever hid behind them - `pub use x::*` tails re-exporting nothing
+  `pub` - which are `pub(crate) use` now; the `use super::*`/`use crate::*` globs themselves
+  warn on nothing, so the lint is armed in both subsystems without touching them.
 - **Runtime finding from the same measurement**: over the corpus, AST metadata costs about three
   times the tree-sitter parse, and the parse plus metadata (15.5s) is more than half the diff
   itself (28s per the quality baseline). Section 6's items 1-3 are that cost.

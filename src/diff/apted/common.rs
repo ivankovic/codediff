@@ -1210,19 +1210,14 @@ fn subtree_cost(side: Side, node_id: usize, meta: &ASTMetadata, cost_model: &Uni
 // --- Flat-tree fast path: Myers O(ND) sequence diff ---
 
 mod myers;
-#[allow(unused_imports)]
-pub use myers::*;
+pub(crate) use myers::*;
 mod prematch;
-#[allow(unused_imports)]
-pub use prematch::*;
+pub(crate) use prematch::*;
 mod residual;
-#[allow(unused_imports)]
-pub use residual::*;
+pub(crate) use residual::*;
 mod slots;
-#[allow(unused_imports)]
-pub use slots::*;
+pub(crate) use slots::*;
 mod resolve;
-#[allow(unused_imports)]
 pub use resolve::*;
 
 #[cfg(test)]

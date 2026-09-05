@@ -19,7 +19,6 @@
 //!
 //! Split out of `main.rs` along the section banner that already marked this boundary.
 
-#[allow(unused_imports)]
 use crate::*;
 
 // ---------------------------------------------------------------------------------------------
