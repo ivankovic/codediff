@@ -15,10 +15,9 @@
  *  You should have received a copy of the GNU Affero General License
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
-use crate::code::Code;
-use crate::code::metadata::metadata_of;
+use crate::diff::PassCtx;
 use crate::diff::nodes::{is_comment, is_leading_modifier, map_identical_descendants};
-use crate::diff::{ASTDiff, ASTMapping, ASTMappingReason, NodeCache};
+use crate::diff::{ASTDiff, ASTMapping, ASTMappingReason};
 
 /// Match comments and attribute/decorator modifiers that immediately precede already-matched
 /// nodes, walking backward through however many consecutive ones there are.
@@ -48,10 +47,11 @@ use crate::diff::{ASTDiff, ASTMapping, ASTMappingReason, NodeCache};
 /// declaration directly. Stops at the first hop that fails (different kind, not a recognized
 /// leading-sibling kind, already matched on either side, or text differs) - a failed hop never
 /// causes an *earlier* successful hop in the same chain to be undone.
-pub fn solve(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut ASTDiff) {
+pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
+    let (before, after, node_cache) = (ctx.before, ctx.after, ctx.node_cache);
     let before_src = before.contents.as_bytes();
     let after_src = after.contents.as_bytes();
-    let language = metadata_of(before).language;
+    let language = ctx.language();
 
     let current_mappings: Vec<(usize, usize)> =
         diff.before_node_map.iter().map(|(&k, &v)| (k, v)).collect();

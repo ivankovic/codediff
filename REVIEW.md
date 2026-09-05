@@ -81,6 +81,12 @@ done; the §4 typos are fixed except `symetric` (×3).
   the pure functions in `research/analysis/` and `scripts/`) runs as `make test-python`, in
   `make test` and in CI. The committed `plots/*.tex` fragments were stale against the committed
   scripts and data (e.g. `ShapeFixtures` 512 vs 597) and are regenerated.
+- **2026-09-05, section 4 item 2** - done: `diff::PassCtx` (both sides, the `NodeCache`, both
+  sides' metadata resolved once) is the one signature for all fourteen passes,
+  `fn solve(ctx: &PassCtx, diff: &mut ASTDiff)`; the five `_`-prefixed parameters and the
+  per-pass `metadata_of` calls at entry are gone (13 pipeline call sites, 32 test call sites).
+  The ordered `PIPELINE` constant was not added: the phases are interleaved with config gates
+  and two non-pass calls, so the list in `pending_with_config`'s comment stays the record.
 - **Runtime finding from the same measurement**: over the corpus, AST metadata costs about three
   times the tree-sitter parse, and the parse plus metadata (15.5s) is more than half the diff
   itself (28s per the quality baseline). Section 6's items 1-3 are that cost.

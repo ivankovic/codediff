@@ -15,8 +15,8 @@
  *  You should have received a copy of the GNU Affero General Public License
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
-use crate::code::metadata::metadata_of;
-use crate::code::{ASTMetadata, Code};
+use crate::code::ASTMetadata;
+use crate::diff::PassCtx;
 use crate::diff::hash_tree_matching::pair_children_for_descent;
 use crate::diff::{
     ASTDiff, ASTMapping, ASTMappingOperation, ASTMappingReason, COST_UPDATE, NodeCache,
@@ -74,15 +74,16 @@ use crate::diff::{
 * rendering verdict, just the fact this pass is positioned to know that a bare heuristic in
 * `ranges` cannot safely derive on its own.
 */
-pub fn solve(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut ASTDiff) {
+pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
+    let (before, after, node_cache) = (ctx.before, ctx.after, ctx.node_cache);
     let Some(before_tree) = &before.ast else {
         return;
     };
     if after.ast.is_none() {
         return;
     }
-    let before_metadata = metadata_of(before);
-    let after_metadata = metadata_of(after);
+    let before_metadata = ctx.before_metadata();
+    let after_metadata = ctx.after_metadata();
 
     let mut candidates: Vec<tree_sitter::Node> = Vec::new();
     let mut stack = vec![before_tree.root_node()];
@@ -374,8 +375,14 @@ mod tests {
         );
         let node_cache = NodeCache::build(&before, &after);
         let mut diff = crate::diff::ASTDiff::default();
-        crate::diff::solve_hash_descent::solve(&before, &after, &node_cache, &mut diff);
-        super::solve(&before, &after, &node_cache, &mut diff);
+        crate::diff::solve_hash_descent::solve(
+            &crate::diff::PassCtx::new(&before, &after, &node_cache),
+            &mut diff,
+        );
+        super::solve(
+            &crate::diff::PassCtx::new(&before, &after, &node_cache),
+            &mut diff,
+        );
 
         let before_root = before.ast.as_ref().unwrap().root_node();
         let after_root = after.ast.as_ref().unwrap().root_node();
@@ -407,10 +414,16 @@ mod tests {
         let after = before.clone();
         let node_cache = NodeCache::build(&before, &after);
         let mut diff = crate::diff::ASTDiff::default();
-        crate::diff::solve_hash_descent::solve(&before, &after, &node_cache, &mut diff);
+        crate::diff::solve_hash_descent::solve(
+            &crate::diff::PassCtx::new(&before, &after, &node_cache),
+            &mut diff,
+        );
         let before_matches = diff.mapping.len();
 
-        super::solve(&before, &after, &node_cache, &mut diff);
+        super::solve(
+            &crate::diff::PassCtx::new(&before, &after, &node_cache),
+            &mut diff,
+        );
 
         assert_eq!(
             diff.mapping.len(),
@@ -449,7 +462,10 @@ mod tests {
         );
         let node_cache = NodeCache::build(&before, &after);
         let mut diff = crate::diff::ASTDiff::default();
-        crate::diff::solve_hash_descent::solve(&before, &after, &node_cache, &mut diff);
+        crate::diff::solve_hash_descent::solve(
+            &crate::diff::PassCtx::new(&before, &after, &node_cache),
+            &mut diff,
+        );
 
         let before_root = before.ast.as_ref().unwrap().root_node();
         let outer_if = find_first_of_kind(before_root, "if_expression").unwrap();
@@ -458,7 +474,10 @@ mod tests {
             "test setup: the outer if must be unmatched before this pass runs"
         );
 
-        super::solve(&before, &after, &node_cache, &mut diff);
+        super::solve(
+            &crate::diff::PassCtx::new(&before, &after, &node_cache),
+            &mut diff,
+        );
 
         assert!(
             !diff.before_node_map.contains_key(&outer_if.id()),

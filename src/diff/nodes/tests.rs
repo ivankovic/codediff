@@ -708,7 +708,10 @@ def subtract(self, a, b):
     let after = Code::from_string(after_src, &Language::Python);
     let node_cache = NodeCache::build(&before, &after);
     let mut diff = ASTDiff::default();
-    solve(&before, &after, &node_cache, &mut diff);
+    solve(
+        &crate::diff::PassCtx::new(&before, &after, &node_cache),
+        &mut diff,
+    );
 
     let before_root = before.ast.as_ref().unwrap().root_node();
     let after_root = after.ast.as_ref().unwrap().root_node();
@@ -879,7 +882,10 @@ fun subtract(a: Int, b: Int): Int = a - b - 1
     let after = Code::from_string(after_src, &Language::Kotlin);
     let node_cache = NodeCache::build(&before, &after);
     let mut diff = ASTDiff::default();
-    solve(&before, &after, &node_cache, &mut diff);
+    solve(
+        &crate::diff::PassCtx::new(&before, &after, &node_cache),
+        &mut diff,
+    );
 
     let before_root = before.ast.as_ref().unwrap().root_node();
     let after_root = after.ast.as_ref().unwrap().root_node();

@@ -21,11 +21,11 @@ use tree_sitter::Node;
 
 use crate::code::metadata::metadata_of;
 use crate::code::{Code, Language};
+use crate::diff::PassCtx;
 use crate::diff::apted::{self, Algorithm};
 use crate::diff::nodes::flow_control_similarity_of_sets;
 use crate::diff::{
-    ASTDiff, NodeCache, grouped_greedy_matcher, nodes, solve_greedy_anchor_blocks,
-    solve_large_flat_subtrees,
+    ASTDiff, grouped_greedy_matcher, nodes, solve_greedy_anchor_blocks, solve_large_flat_subtrees,
 };
 
 /**
@@ -57,11 +57,12 @@ use crate::diff::{
 * the flat descendant specifically). Pre-empting it explicitly here fixed a 141-mismatch regression
 * on that fixture - see `TODO.md`.
 */
-pub fn solve(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut ASTDiff) {
-    solve_large_flat_subtrees::solve(before, after, node_cache, diff);
+pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
+    let (before, after) = (ctx.before, ctx.after);
+    solve_large_flat_subtrees::solve(ctx, diff);
     solve_qualified_name_groups(before, after, diff);
     solve_import_list_overlap(before, after, diff);
-    solve_greedy_anchor_blocks::solve(before, after, node_cache, diff);
+    solve_greedy_anchor_blocks::solve(ctx, diff);
 }
 
 /**
@@ -462,6 +463,7 @@ mod tests {
     use super::*;
     use crate::code::Language;
     use crate::diff::ASTMappingOperation;
+    use crate::diff::NodeCache;
     use crate::test::helper::find_first_of_kind;
 
     #[test]
@@ -484,7 +486,10 @@ impl Bar { fn new() -> Bar { Bar::default() } }
         let after = Code::from_string(after_src, &Language::Rust);
         let node_cache = NodeCache::build(&before, &after);
         let mut diff = ASTDiff::default();
-        solve(&before, &after, &node_cache, &mut diff);
+        solve(
+            &crate::diff::PassCtx::new(&before, &after, &node_cache),
+            &mut diff,
+        );
 
         let before_root = before.ast.as_ref().unwrap().root_node();
         let after_root = after.ast.as_ref().unwrap().root_node();
@@ -545,7 +550,10 @@ func TestThings(t *testing.T) {
         let after = Code::from_string(after_src, &Language::Go);
         let node_cache = NodeCache::build(&before, &after);
         let mut diff = ASTDiff::default();
-        solve(&before, &after, &node_cache, &mut diff);
+        solve(
+            &crate::diff::PassCtx::new(&before, &after, &node_cache),
+            &mut diff,
+        );
 
         let qualified_name_count = diff
             .mapping
@@ -583,7 +591,10 @@ impl Foo { fn b() -> i32 { 20 } }
         let after = Code::from_string(after_src, &Language::Rust);
         let node_cache = NodeCache::build(&before, &after);
         let mut diff = ASTDiff::default();
-        solve(&before, &after, &node_cache, &mut diff);
+        solve(
+            &crate::diff::PassCtx::new(&before, &after, &node_cache),
+            &mut diff,
+        );
 
         // Both `fn a` and `fn b` should end up mapped somewhere (not left as orphans) regardless
         // of which of the two same-keyed `impl Foo` blocks they were grouped under.
@@ -624,7 +635,10 @@ impl Foo { fn b() -> i32 { 20 } }
         let after = Code::from_string(after_src, &Language::Rust);
         let node_cache = NodeCache::build(&before, &after);
         let mut diff = ASTDiff::default();
-        solve(&before, &after, &node_cache, &mut diff);
+        solve(
+            &crate::diff::PassCtx::new(&before, &after, &node_cache),
+            &mut diff,
+        );
 
         let before_use =
             find_first_of_kind(before.ast.as_ref().unwrap().root_node(), "use_declaration")
@@ -646,7 +660,10 @@ impl Foo { fn b() -> i32 { 20 } }
         let after = Code::from_string(after_src, &Language::Rust);
         let node_cache = NodeCache::build(&before, &after);
         let mut diff = ASTDiff::default();
-        solve(&before, &after, &node_cache, &mut diff);
+        solve(
+            &crate::diff::PassCtx::new(&before, &after, &node_cache),
+            &mut diff,
+        );
 
         let before_use =
             find_first_of_kind(before.ast.as_ref().unwrap().root_node(), "use_declaration")

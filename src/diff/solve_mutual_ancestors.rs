@@ -15,9 +15,10 @@
  *  You should have received a copy of the GNU Affero General Public License
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
-use crate::code::{ASTMetadata, Code};
+use crate::code::ASTMetadata;
+use crate::diff::PassCtx;
 use crate::diff::nodes::kinds_update_allowed;
-use crate::diff::{ASTDiff, ASTMapping, ASTMappingReason, NodeCache};
+use crate::diff::{ASTDiff, ASTMapping, ASTMappingReason};
 use rustc_hash::FxHashMap;
 
 /// Match an unmatched container to its counterpart when each side is the lowest common ancestor of
@@ -50,9 +51,10 @@ use rustc_hash::FxHashMap;
 /// behind, and the more matched descendants exist when it runs, the better its LCAs are - but
 /// before `solve_unresolved_nodes`, which would otherwise have already spent these nodes on
 /// delete/insert decisions.
-pub fn solve(before: &Code, after: &Code, _node_cache: &NodeCache, diff: &mut ASTDiff) {
-    let before_metadata = crate::code::metadata::metadata_of(before);
-    let after_metadata = crate::code::metadata::metadata_of(after);
+pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
+    let (before, after) = (ctx.before, ctx.after);
+    let before_metadata = ctx.before_metadata();
+    let after_metadata = ctx.after_metadata();
     let (Some(before_ast), Some(after_ast)) = (before.ast.as_ref(), after.ast.as_ref()) else {
         return;
     };
@@ -208,8 +210,10 @@ fn lowest_common_ancestor(mut a: usize, mut b: usize, metadata: &ASTMetadata) ->
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::code::Code;
     use crate::code::Language;
     use crate::diff::Diff;
+    use crate::diff::NodeCache;
 
     /// Pre-matches exactly the statement pairs named by `statement_pairs` (as `(before_index,
     /// after_index)` into each block's named children) and then runs *only* this pass, so a passing
@@ -233,7 +237,10 @@ mod tests {
                 ASTMapping::identical(ASTMappingReason::IdenticalHash),
             );
         }
-        solve(before, after, &node_cache, &mut diff);
+        solve(
+            &crate::diff::PassCtx::new(before, after, &node_cache),
+            &mut diff,
+        );
         diff
     }
 
@@ -332,7 +339,10 @@ mod tests {
                 );
             }
         }
-        solve(&before, &after, &node_cache, &mut diff);
+        solve(
+            &crate::diff::PassCtx::new(&before, &after, &node_cache),
+            &mut diff,
+        );
 
         assert!(
             !diff.before_node_map.contains_key(&before_f_block.id())

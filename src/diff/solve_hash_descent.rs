@@ -15,11 +15,10 @@
  *  You should have received a copy of the GNU Affero General Public License
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
-use crate::code::Code;
-use crate::code::metadata::metadata_of;
+use crate::diff::PassCtx;
 use crate::diff::hash_tree_matching::{self, NodeSelectionConfig};
 use crate::diff::nodes::is_import_kind;
-use crate::diff::{ASTDiff, ASTMappingReason, NodeCache};
+use crate::diff::{ASTDiff, ASTMappingReason};
 
 /**
 * Phase 1 of the matching pipeline (`Diff::pending_with_config` lists all ten phases): "hash-based, largest-subtree-
@@ -43,10 +42,11 @@ use crate::diff::{ASTDiff, ASTMappingReason, NodeCache};
 * recursion level (see `code::hash::compute_kind_and_value_hash`'s doc comment) - order-
 * independence is inherent to both hashes, not a bolted-on third one.
 */
-pub fn solve(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut ASTDiff) {
+pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
+    let (before, after, node_cache) = (ctx.before, ctx.after, ctx.node_cache);
     let selector_config = NodeSelectionConfig::default();
-    let before_metadata = metadata_of(before);
-    let after_metadata = metadata_of(after);
+    let before_metadata = ctx.before_metadata();
+    let after_metadata = ctx.after_metadata();
     hash_tree_matching::solve_with_hash_map(
         before,
         after,
@@ -89,7 +89,9 @@ pub fn solve(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut AST
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::code::Code;
     use crate::code::Language;
+    use crate::diff::NodeCache;
     use crate::diff::{ASTMappingOperation, ASTMappingReason, COST_UPDATE};
     use crate::test::helper::find_first_of_kind;
 
@@ -105,7 +107,10 @@ mod tests {
         let node_cache = NodeCache::build(&before, &after);
         let mut diff = ASTDiff::default();
 
-        solve(&before, &after, &node_cache, &mut diff);
+        solve(
+            &crate::diff::PassCtx::new(&before, &after, &node_cache),
+            &mut diff,
+        );
 
         let before_root = before.ast.as_ref().unwrap().root_node();
         let after_root = after.ast.as_ref().unwrap().root_node();

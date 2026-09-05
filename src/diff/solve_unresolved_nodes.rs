@@ -16,7 +16,8 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 use crate::code::Code;
-use crate::diff::{ASTDiff, ASTMapping, ASTMappingReason, NodeCache};
+use crate::diff::PassCtx;
+use crate::diff::{ASTDiff, ASTMapping, ASTMappingReason};
 
 /// Terminal completeness sweep: give every node still carrying no decision at all an explicit
 /// `Delete` (before side) or `Insert` (after side).
@@ -48,7 +49,8 @@ use crate::diff::{ASTDiff, ASTMapping, ASTMappingReason, NodeCache};
 /// matched descendants (the wrap case above is exactly that), and `DeleteWithChildren` would claim
 /// the whole subtree went away. Cost is this node alone for the same reason - its children carry
 /// their own entries and their own costs.
-pub fn solve(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut ASTDiff) {
+pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
+    let (before, after, node_cache) = (ctx.before, ctx.after, ctx.node_cache);
     match_roots_if_unresolved(before, after, diff);
 
     // Sorted for determinism: `NodeCache`'s maps are `FxHashMap`s, and while the mappings added
@@ -125,6 +127,7 @@ fn match_roots_if_unresolved(before: &Code, after: &Code, diff: &mut ASTDiff) {
 mod tests {
     use super::*;
     use crate::code::Language;
+    use crate::diff::NodeCache;
     use crate::diff::{ASTMappingOperation, Diff};
 
     /// The wrap that motivated this pass: statements move inside a new `try` block. The wrapper

@@ -17,8 +17,8 @@
  */
 use tree_sitter::Node;
 
-use crate::code::Code;
-use crate::diff::{ASTDiff, ASTMappingOperation, ASTMappingReason, NodeCache};
+use crate::diff::PassCtx;
+use crate::diff::{ASTDiff, ASTMappingOperation, ASTMappingReason};
 
 /// Fixes up one attribution gap phase 1's hash descent structurally cannot close: when a class or
 /// interface gains a heritage clause (`class Foo implements Bar`, `interface Foo extends Bar`),
@@ -39,7 +39,8 @@ use crate::diff::{ASTDiff, ASTMappingOperation, ASTMappingReason, NodeCache};
 /// nodes whose immediate parent is `class_declaration`/`interface_declaration`, which by
 /// construction excludes both counter-examples' node kinds entirely - narrow-by-shape rather than
 /// narrow-by-threshold.
-pub fn solve(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut ASTDiff) {
+pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
+    let (before, after, node_cache) = (ctx.before, ctx.after, ctx.node_cache);
     let before_src = before.contents.as_bytes();
     let after_src = after.contents.as_bytes();
 
@@ -147,6 +148,7 @@ fn shift_explained_by_preceding_insertion(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::code::Code;
     use crate::code::Language;
     use crate::diff::diff_code;
 

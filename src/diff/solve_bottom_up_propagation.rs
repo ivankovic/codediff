@@ -15,10 +15,10 @@
  *  You should have received a copy of the GNU Affero General Public License
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
-use crate::code::Code;
+use crate::diff::COST_INSERT;
+use crate::diff::PassCtx;
 use crate::diff::nodes::{anchor_pair_via_apted, kinds_update_allowed};
 use crate::diff::{ASTDiff, ASTMapping, ASTMappingOperation, ASTMappingReason, COST_DELETE};
-use crate::diff::{COST_INSERT, NodeCache};
 
 /// Phase-2 of the phases-4-7 rearchitecture (`TODO.md`,
 /// `~/.claude/plans/iterative-herding-panda.md`): a strict, unconditional bottom-up propagation
@@ -57,9 +57,9 @@ use crate::diff::{COST_INSERT, NodeCache};
 /// mattering once Phase 3 (per-region dispatch) introduces intermediate-granularity deletes/
 /// inserts ahead of the terminal catch-all - implemented now so this module doesn't need
 /// revisiting when that lands.
-pub fn solve(before: &Code, after: &Code, _node_cache: &NodeCache, diff: &mut ASTDiff) {
-    let before_metadata = crate::code::metadata::metadata_of(before);
-    let after_metadata = crate::code::metadata::metadata_of(after);
+pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
+    let before_metadata = ctx.before_metadata();
+    let after_metadata = ctx.after_metadata();
     let language = before_metadata.language;
 
     // Deepest nodes first (ties broken by `preorder_index`, not node id - see
@@ -248,14 +248,21 @@ fn sort_deepest_first(candidates: &mut [usize], metadata: &crate::code::ASTMetad
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::code::Code;
     use crate::code::Language;
     use crate::diff::NodeCache;
 
     fn solve_only(before: &Code, after: &Code) -> ASTDiff {
         let node_cache = NodeCache::build(before, after);
         let mut diff = ASTDiff::default();
-        crate::diff::solve_hash_descent::solve(before, after, &node_cache, &mut diff);
-        solve(before, after, &node_cache, &mut diff);
+        crate::diff::solve_hash_descent::solve(
+            &crate::diff::PassCtx::new(before, after, &node_cache),
+            &mut diff,
+        );
+        solve(
+            &crate::diff::PassCtx::new(before, after, &node_cache),
+            &mut diff,
+        );
         diff
     }
 

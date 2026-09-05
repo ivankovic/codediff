@@ -17,7 +17,7 @@
  */
 use tree_sitter::Node;
 
-use crate::code::Code;
+use crate::diff::PassCtx;
 use crate::diff::{ASTDiff, ASTMappingOperation, ASTMappingReason, NodeCache};
 
 /// Fixes up the same kind of phase-1 attribution gap as `solve_heritage_clause_growth`, for a
@@ -51,7 +51,8 @@ use crate::diff::{ASTDiff, ASTMappingOperation, ASTMappingReason, NodeCache};
 /// ground truth wants either way. The sibling-purity check (`is_safe_wrapper_sibling`) is what
 /// guards against the JS-destructuring-style false positive: a sibling with an identity elsewhere
 /// in `before` that *isn't* the reused node's own original sibling disqualifies the whole climb.
-pub fn solve(_before: &Code, _after: &Code, node_cache: &NodeCache, diff: &mut ASTDiff) {
+pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
+    let node_cache = ctx.node_cache;
     let candidates: Vec<(usize, usize)> = diff
         .mapping
         .iter()
@@ -215,6 +216,7 @@ fn is_safe_wrapper_sibling(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::code::Code;
     use crate::code::Language;
     use crate::diff::diff_code;
     use crate::test::helper::find_first_of_kind;

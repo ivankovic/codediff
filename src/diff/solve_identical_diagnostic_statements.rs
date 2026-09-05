@@ -17,9 +17,9 @@
  */
 use std::collections::{HashMap, VecDeque};
 
-use crate::code::Code;
+use crate::diff::PassCtx;
 use crate::diff::nodes::{collect_unmatched, is_diagnostic_statement, map_identical_descendants};
-use crate::diff::{ASTDiff, ASTMapping, ASTMappingReason, NodeCache};
+use crate::diff::{ASTDiff, ASTMapping, ASTMappingReason};
 
 /**
 * MatchIdenticalDiagnosticStatements: pairs up still-unmatched calls/macros that look like they're
@@ -57,9 +57,10 @@ use crate::diff::{ASTDiff, ASTMapping, ASTMappingReason, NodeCache};
 * since this pass has no basis for deciding two non-identical diagnostic statements are "the same"
 * one.
 */
-pub fn solve(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut ASTDiff) {
-    let before_metadata = crate::code::metadata::metadata_of(before);
-    let after_metadata = crate::code::metadata::metadata_of(after);
+pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
+    let (before, after, node_cache) = (ctx.before, ctx.after, ctx.node_cache);
+    let before_metadata = ctx.before_metadata();
+    let after_metadata = ctx.after_metadata();
 
     let Some(before_ast) = before.ast.as_ref() else {
         return;
@@ -143,8 +144,10 @@ pub fn solve(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut AST
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::code::Code;
     use crate::code::Language;
     use crate::diff::ASTMappingOperation;
+    use crate::diff::NodeCache;
     use crate::test::helper::find_first_of_kind;
     use tree_sitter::Node;
 
@@ -184,7 +187,10 @@ fn parse(s: &str) -> Result<i32> {
         let node_cache = NodeCache::build(&before, &after);
         let mut diff = ASTDiff::default();
 
-        solve(&before, &after, &node_cache, &mut diff);
+        solve(
+            &crate::diff::PassCtx::new(&before, &after, &node_cache),
+            &mut diff,
+        );
 
         let before_ast = before.ast.as_ref().unwrap();
         let after_ast = after.ast.as_ref().unwrap();
@@ -218,7 +224,10 @@ fn b() {
         let node_cache = NodeCache::build(&before, &after);
         let mut diff = ASTDiff::default();
 
-        solve(&before, &after, &node_cache, &mut diff);
+        solve(
+            &crate::diff::PassCtx::new(&before, &after, &node_cache),
+            &mut diff,
+        );
 
         let before_ast = before.ast.as_ref().unwrap();
         let after_ast = after.ast.as_ref().unwrap();
@@ -252,7 +261,10 @@ fn b() {
         let node_cache = NodeCache::build(&before, &after);
         let mut diff = ASTDiff::default();
 
-        solve(&before, &after, &node_cache, &mut diff);
+        solve(
+            &crate::diff::PassCtx::new(&before, &after, &node_cache),
+            &mut diff,
+        );
 
         let before_ast = before.ast.as_ref().unwrap();
         let after_ast = after.ast.as_ref().unwrap();
@@ -290,7 +302,10 @@ fn b() {
         let node_cache = NodeCache::build(&before, &after);
         let mut diff = ASTDiff::default();
 
-        solve(&before, &after, &node_cache, &mut diff);
+        solve(
+            &crate::diff::PassCtx::new(&before, &after, &node_cache),
+            &mut diff,
+        );
 
         let before_ast = before.ast.as_ref().unwrap();
         let after_ast = after.ast.as_ref().unwrap();

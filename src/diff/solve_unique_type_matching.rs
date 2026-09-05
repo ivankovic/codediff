@@ -15,8 +15,7 @@
  *  You should have received a copy of the GNU Affero General Public License
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
-use crate::code::Code;
-use crate::diff::NodeCache;
+use crate::diff::PassCtx;
 use crate::diff::nodes::anchor_pair_via_apted;
 use crate::diff::{ASTDiff, ASTMappingReason};
 use std::collections::HashMap;
@@ -51,9 +50,9 @@ use std::collections::HashMap;
 /// resolves) and before the terminal Myers-LCS fallback (`apted::for_roots_fallback`), so this
 /// pass's precise, cheap pairs are locked in before that lossy, whole-subtree-only catch-all ever
 /// sees them.
-pub fn solve(before: &Code, after: &Code, _node_cache: &NodeCache, diff: &mut ASTDiff) {
-    let before_metadata = crate::code::metadata::metadata_of(before);
-    let after_metadata = crate::code::metadata::metadata_of(after);
+pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
+    let before_metadata = ctx.before_metadata();
+    let after_metadata = ctx.after_metadata();
 
     // Snapshot of currently-matched pairs, sorted by the before node's preorder index for
     // deterministic iteration order regardless of `FxHashMap`'s own iteration order - see
@@ -170,8 +169,10 @@ pub fn solve(before: &Code, after: &Code, _node_cache: &NodeCache, diff: &mut AS
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::code::Code;
     use crate::code::Language;
     use crate::diff::ASTMapping;
+    use crate::diff::NodeCache;
 
     /// Manually marks `before_id`/`after_id` as matched (an arbitrary placeholder mapping, not
     /// produced by any real pass) and runs *only* `solve` - no `solve_hash_descent` or any other
@@ -194,7 +195,10 @@ mod tests {
             container_after_id,
             ASTMapping::identical(ASTMappingReason::IdenticalHash),
         );
-        solve(before, after, &node_cache, &mut diff);
+        solve(
+            &crate::diff::PassCtx::new(before, after, &node_cache),
+            &mut diff,
+        );
         diff
     }
 

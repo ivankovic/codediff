@@ -18,9 +18,10 @@
 use std::collections::HashMap;
 
 use crate::code::{ASTMetadata, Code, Language};
+use crate::diff::PassCtx;
 use crate::diff::apted::{self, Algorithm};
 use crate::diff::solve_syntax_aware_matching::solve_qualified_name_groups_within;
-use crate::diff::{ASTDiff, NodeCache, nodes};
+use crate::diff::{ASTDiff, nodes};
 
 /// Minimum direct-child count for a node to be treated as a "flat" sequence worth Myers-diffing
 /// on its own - matches `apted::common`'s own `FLAT_MIN_CHILDREN` threshold (the fast path this
@@ -63,9 +64,10 @@ const FLAT_CONTAINER_MIN_CHILDREN: usize = 50;
 * edit (see this pass's own git history / `nodes::is_commutative_container`'s doc comment for the
 * concrete case this fixes).
 */
-pub fn solve(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut ASTDiff) {
-    let before_metadata = crate::code::metadata::metadata_of(before);
-    let after_metadata = crate::code::metadata::metadata_of(after);
+pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
+    let (before, after, node_cache) = (ctx.before, ctx.after, ctx.node_cache);
+    let before_metadata = ctx.before_metadata();
+    let after_metadata = ctx.after_metadata();
 
     let Some(before_ast) = before.ast.as_ref() else {
         return;
@@ -408,7 +410,10 @@ mod tests {
         let node_cache = NodeCache::build(&before, &after);
         let mut diff = ASTDiff::default();
 
-        solve(&before, &after, &node_cache, &mut diff);
+        solve(
+            &crate::diff::PassCtx::new(&before, &after, &node_cache),
+            &mut diff,
+        );
 
         // The macro_invocation (vec!) itself should end up mapped, with the flat body
         // pre-matched via the "large_flat_subtree" reason before it was diffed.
@@ -433,7 +438,10 @@ mod tests {
         let node_cache = NodeCache::build(&before, &after);
         let mut diff = ASTDiff::default();
 
-        solve(&before, &after, &node_cache, &mut diff);
+        solve(
+            &crate::diff::PassCtx::new(&before, &after, &node_cache),
+            &mut diff,
+        );
 
         assert!(
             diff.mapping.is_empty(),
@@ -464,7 +472,10 @@ mod tests {
         let node_cache = NodeCache::build(&before, &after);
         let mut diff = ASTDiff::default();
 
-        solve(&before, &after, &node_cache, &mut diff);
+        solve(
+            &crate::diff::PassCtx::new(&before, &after, &node_cache),
+            &mut diff,
+        );
 
         let has_flat_reason = diff.mapping.values().any(|m| {
             matches!(
@@ -491,7 +502,10 @@ mod tests {
         let node_cache = NodeCache::build(&before, &after);
         let mut diff = ASTDiff::default();
 
-        solve(&before, &after, &node_cache, &mut diff);
+        solve(
+            &crate::diff::PassCtx::new(&before, &after, &node_cache),
+            &mut diff,
+        );
 
         assert!(
             diff.mapping.is_empty(),
@@ -542,7 +556,10 @@ mod tests {
         let node_cache = NodeCache::build(&before, &after);
         let mut diff = ASTDiff::default();
 
-        solve(&before, &after, &node_cache, &mut diff);
+        solve(
+            &crate::diff::PassCtx::new(&before, &after, &node_cache),
+            &mut diff,
+        );
 
         let has_flat_reason = diff.mapping.values().any(|m| {
             matches!(
@@ -591,7 +608,10 @@ mod tests {
         let node_cache = NodeCache::build(&before, &after);
         let mut diff = ASTDiff::default();
 
-        solve(&before, &after, &node_cache, &mut diff);
+        solve(
+            &crate::diff::PassCtx::new(&before, &after, &node_cache),
+            &mut diff,
+        );
 
         let has_qualified_name_reason = diff.mapping.values().any(|m| {
             matches!(

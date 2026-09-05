@@ -57,9 +57,10 @@
 
 use std::collections::HashSet;
 
-use crate::code::{ASTMetadata, Code, Language};
+use crate::code::{ASTMetadata, Language};
+use crate::diff::PassCtx;
 use crate::diff::nodes::is_reference;
-use crate::diff::{ASTDiff, ASTMapping, ASTMappingReason, NodeCache};
+use crate::diff::{ASTDiff, ASTMapping, ASTMappingReason};
 
 /// Minimum subtree size (node count, incl. the root) for a delete/insert pair to be considered a
 /// move. Below this, identical subtrees are commodity code (single tokens, trivial statements)
@@ -77,10 +78,11 @@ const MIN_MOVE_SUBTREE_SIZE: usize = 4;
 /// construct that several copies of it moving is more likely a genuine reorder than a coincidence.
 const AMBIGUOUS_MOVE_MIN_SIZE: usize = 8;
 
-pub fn solve(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut ASTDiff) {
+pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
+    let (before, node_cache) = (ctx.before, ctx.node_cache);
     let language = before.metadata.language.unwrap_or_default();
-    let before_metadata = crate::code::metadata::metadata_of(before);
-    let after_metadata = crate::code::metadata::metadata_of(after);
+    let before_metadata = ctx.before_metadata();
+    let after_metadata = ctx.after_metadata();
     let before_parents = &before_metadata.node_to_parent;
     let after_parents = &after_metadata.node_to_parent;
 

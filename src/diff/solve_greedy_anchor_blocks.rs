@@ -15,9 +15,10 @@
  *  You should have received a copy of the GNU Affero General Public License
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
-use crate::code::{ASTMetadata, Code, Language};
+use crate::code::{ASTMetadata, Language};
+use crate::diff::PassCtx;
 use crate::diff::nodes::{anchor_pair_via_apted, is_block_container};
-use crate::diff::{ASTDiff, ASTMappingReason, NodeCache};
+use crate::diff::{ASTDiff, ASTMappingReason};
 
 /**
 * GreedyAnchorBlock: the pipeline's only *greedy, cost-estimate-driven* matcher. Every other
@@ -108,9 +109,9 @@ const MIN_SUBTREE_SIZE: usize = 4;
 ///   reuse there). Net -28 (-3.4%), 2 improved vs. 1 regressed - kept.
 const MAX_COST_RATIO: f64 = 0.8;
 
-pub fn solve(before: &Code, after: &Code, _node_cache: &NodeCache, diff: &mut ASTDiff) {
-    let before_metadata = crate::code::metadata::metadata_of(before);
-    let after_metadata = crate::code::metadata::metadata_of(after);
+pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
+    let before_metadata = ctx.before_metadata();
+    let after_metadata = ctx.after_metadata();
     let language = before_metadata.language;
 
     let before_candidate_ids =
@@ -351,7 +352,9 @@ fn sequence_edit_cost(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::code::Code;
     use crate::code::Language;
+    use crate::diff::NodeCache;
     use crate::test::helper::find_first_of_kind as first_child_of_kind;
 
     #[test]
@@ -458,7 +461,10 @@ mod tests {
             crate::diff::ASTMapping::matched_not_identical(ASTMappingReason::APTED("test")),
         );
 
-        solve(&before, &after, &node_cache, &mut diff);
+        solve(
+            &crate::diff::PassCtx::new(&before, &after, &node_cache),
+            &mut diff,
+        );
 
         let before_if = first_child_of_kind(before_fn, "if_expression").unwrap();
         let after_if = first_child_of_kind(after_fn, "if_expression").unwrap();
@@ -481,7 +487,10 @@ mod tests {
         let node_cache = NodeCache::build(&before, &after);
         let mut diff = ASTDiff::default();
 
-        solve(&before, &after, &node_cache, &mut diff);
+        solve(
+            &crate::diff::PassCtx::new(&before, &after, &node_cache),
+            &mut diff,
+        );
 
         let before_block =
             first_child_of_kind(before.ast.as_ref().unwrap().root_node(), "block").unwrap();
@@ -513,7 +522,10 @@ mod tests {
         let node_cache = NodeCache::build(&before, &after);
         let mut diff = ASTDiff::default();
 
-        solve(&before, &after, &node_cache, &mut diff);
+        solve(
+            &crate::diff::PassCtx::new(&before, &after, &node_cache),
+            &mut diff,
+        );
 
         let before_if =
             first_child_of_kind(before.ast.as_ref().unwrap().root_node(), "if_expression").unwrap();

@@ -202,6 +202,7 @@ impl Diff {
     ) -> PendingDiff<'code> {
         // Build node cache for efficient lookup
         let node_cache = NodeCache::build(before, after);
+        let ctx = PassCtx::new(before, after, &node_cache);
 
         // Compute metadata fresh for the diff algorithm
         let mut ast_diff = ASTDiff {
@@ -234,17 +235,17 @@ impl Diff {
         //   10 solve_unresolved_nodes             - terminal completeness sweep (delete/insert)
 
         // Phase 1: hash-based, largest-subtree-first descent (KindAndValueHash, KindOnlyHash).
-        solve_hash_descent::solve(before, after, &node_cache, &mut ast_diff);
+        solve_hash_descent::solve(&ctx, &mut ast_diff);
 
         // Phase 1b: nested-condition collapse (e.g. Rust's `if let`-chains) - reacts to whatever
         // phase 1 just matched to fix up the one attribution gap pure hash matching structurally
         // cannot close on its own. See that module's doc comment for the full mechanism.
-        solve_nested_condition_collapse::solve(before, after, &node_cache, &mut ast_diff);
+        solve_nested_condition_collapse::solve(&ctx, &mut ast_diff);
 
         // Phase 1c: heritage-clause growth (`class Foo implements Bar`, `interface Foo extends
         // Bar`) - the same kind of phase-1 attribution fix-up, for a different structural shape.
         // See that module's doc comment.
-        solve_heritage_clause_growth::solve(before, after, &node_cache, &mut ast_diff);
+        solve_heritage_clause_growth::solve(&ctx, &mut ast_diff);
 
         // Phase 2: contextual exact matching - houses solve_leading_siblings (a comment or
         // attribute/decorator modifier that immediately precedes a matched node, walking a whole
@@ -256,8 +257,8 @@ impl Diff {
         // statements are deliberately held back from phase 1 to avoid fragmenting a bigger match),
         // mopping up leftovers right after phase 1 before the fuzzier phases below start guessing.
         // Not `solve_moved_subtrees` - that's phase 7.
-        solve_leading_siblings::solve(before, after, &node_cache, &mut ast_diff);
-        solve_identical_diagnostic_statements::solve(before, after, &node_cache, &mut ast_diff);
+        solve_leading_siblings::solve(&ctx, &mut ast_diff);
+        solve_identical_diagnostic_statements::solve(&ctx, &mut ast_diff);
 
         // Phase 3 (bottom-up expansion, Dice-coefficient threshold) and phase 5 (a second pass of
         // the same, after phase 4 below produced more matched descendants to vote on) were removed
@@ -271,7 +272,7 @@ impl Diff {
         // absorb solve_similar_flow_control (arm-overlap matching), gated on
         // `solver_similar_flow_control` - deleted 2026-08-14, net-negative in the 2026-07-15
         // ablation study (-82) and never re-enabled; see `TODO.md`.
-        solve_syntax_aware_matching::solve(before, after, &node_cache, &mut ast_diff);
+        solve_syntax_aware_matching::solve(&ctx, &mut ast_diff);
 
         // `PendingDiff::large_residual`'s inputs: how many nodes on each side are still unmatched
         // heading into phase 6. Safe to compute from
@@ -297,6 +298,48 @@ impl Diff {
             unmatched_after,
             config: *config,
         }
+    }
+}
+
+/// What every matching pass reads: the two sides, the [`NodeCache`] over them, and each side's
+/// [`ASTMetadata`], resolved once per diff here rather than by every pass on entry.
+///
+/// One signature for all fourteen `solve_*` passes (`fn solve(ctx: &PassCtx, diff: &mut
+/// ASTDiff)`), so adding an input reaches every pass through one field instead of fourteen
+/// parameter lists, and a pass that needs only part of it does not carry `_`-prefixed
+/// parameters for the rest.
+pub struct PassCtx<'a> {
+    pub before: &'a Code,
+    pub after: &'a Code,
+    pub node_cache: &'a NodeCache,
+    before_metadata: std::borrow::Cow<'a, crate::code::ASTMetadata>,
+    after_metadata: std::borrow::Cow<'a, crate::code::ASTMetadata>,
+}
+
+impl<'a> PassCtx<'a> {
+    pub fn new(before: &'a Code, after: &'a Code, node_cache: &'a NodeCache) -> Self {
+        Self {
+            before,
+            after,
+            node_cache,
+            before_metadata: crate::code::metadata::metadata_of(before),
+            after_metadata: crate::code::metadata::metadata_of(after),
+        }
+    }
+
+    /// The before side's metadata (`metadata_of`, borrowed when `Code` already carries it).
+    pub fn before_metadata(&self) -> &crate::code::ASTMetadata {
+        &self.before_metadata
+    }
+
+    /// The after side's metadata.
+    pub fn after_metadata(&self) -> &crate::code::ASTMetadata {
+        &self.after_metadata
+    }
+
+    /// The language both sides are parsed as (the before side's, which every pass has read).
+    pub fn language(&self) -> Language {
+        self.before_metadata.language
     }
 }
 
@@ -359,6 +402,7 @@ impl<'code> PendingDiff<'code> {
             config,
             ..
         } = self;
+        let ctx = PassCtx::new(before, after, &node_cache);
 
         // Phase 6: pre-match top-level scope-locally-named entities (e.g. shell variable
         // assignments with no enclosing named container at all, so `solve_syntax_aware_matching`'s
@@ -390,7 +434,7 @@ impl<'code> PendingDiff<'code> {
         // ever sees it: a parent this resolves is one less "maximal unmatched root" the fallback
         // would otherwise have to guess at via lossy whole-subtree hashing.
         if config.solver_bottom_up_propagation {
-            solve_bottom_up_propagation::solve(before, after, &node_cache, &mut ast_diff);
+            solve_bottom_up_propagation::solve(&ctx, &mut ast_diff);
         }
 
         // GumTree Simple's "unique type matching" recovery sub-phase (see `TODO.md`'s 2026-08-17
@@ -398,7 +442,7 @@ impl<'code> PendingDiff<'code> {
         // bottom-up propagation so it has the most already-matched parent pairs to work from, and
         // before the terminal fallback so its precise, cheap pairs are locked in first.
         if config.solver_unique_type_matching {
-            solve_unique_type_matching::solve(before, after, &node_cache, &mut ast_diff);
+            solve_unique_type_matching::solve(&ctx, &mut ast_diff);
         }
         apted::for_roots_fallback(before, after, "fast_fallback", &mut ast_diff);
 
@@ -411,7 +455,7 @@ impl<'code> PendingDiff<'code> {
         // matter landed. Cheap: O(n) by construction, and a no-op whenever the fallback found
         // nothing new to propagate.
         if config.solver_bottom_up_propagation {
-            solve_bottom_up_propagation::solve(before, after, &node_cache, &mut ast_diff);
+            solve_bottom_up_propagation::solve(&ctx, &mut ast_diff);
         }
 
         // Phase 7: unanchored-move fallback (`solve_moved_subtrees`). After the terminal
@@ -429,7 +473,7 @@ impl<'code> PendingDiff<'code> {
         // See TODO.md's `solve_moved_subtrees` vs. phase 4 comparison for why phase 4's four
         // anchor-requiring mechanisms can't substitute for this.
         if config.solver_moved_subtrees {
-            solve_moved_subtrees::solve(before, after, &node_cache, &mut ast_diff);
+            solve_moved_subtrees::solve(&ctx, &mut ast_diff);
         }
 
         // Phase 8: mutual-ancestor recovery, for containers the passes above left unclaimed - an
@@ -439,7 +483,7 @@ impl<'code> PendingDiff<'code> {
         // descendants available, and strictly before the completeness sweep, which would otherwise
         // spend these nodes on delete/insert.
         if config.solver_mutual_ancestors {
-            solve_mutual_ancestors::solve(before, after, &node_cache, &mut ast_diff);
+            solve_mutual_ancestors::solve(&ctx, &mut ast_diff);
         }
 
         // Phase 9: wrap growth (`try { EXISTING } catch (...) { NEW }`, an existing `if`/`else` becoming an
@@ -459,13 +503,13 @@ impl<'code> PendingDiff<'code> {
         // before the terminal completeness sweep below (not after) so it only ever re-tags a real,
         // already-verified `Identical` match - never touches a node that sweep is about to resolve.
         // See that module's own doc comment for the verification itself.
-        solve_wrap_growth::solve(before, after, &node_cache, &mut ast_diff);
+        solve_wrap_growth::solve(&ctx, &mut ast_diff);
 
         // Phase 10: terminal completeness sweep. Everything above is free to leave a node
         // undecided, so this records the delete/insert implied by whatever absence is left. Must
         // be last - it pairs nothing, and any pass running after it would find every node already
         // claimed. See `solve_unresolved_nodes`.
-        solve_unresolved_nodes::solve(before, after, &node_cache, &mut ast_diff);
+        solve_unresolved_nodes::solve(&ctx, &mut ast_diff);
 
         Diff {
             ast: Some(ast_diff),
