@@ -135,6 +135,13 @@ done; the §4 typos are fixed except `symetric` (×3).
   `clear_descendants`, each taking a `Side`; `render.rs`'s three `match side` dispatches over
   them are direct calls. The asymmetry that mattered (`Some(0)` is Deleted on one side and
   Inserted on the other) is the one `match` left inside `algo_status`.
+- **Deliberately left (2026-09-06)**: splitting the kind taxonomy out of `diff/nodes.rs`. The
+  file is three mutators (100 lines) over a 2,000-line table of node-kind and language
+  predicates, and the 100 `nodes::is_comment`-style call sites read correctly as they are; a
+  rename buys the file a better name at the cost of touching all of them. Revisit if the table
+  grows another concern. Also left: `CodeViewer` vs `CodeViewerWidget`/`CodeViewerState`.
+  What remains of the review is section 6 (performance): profile with `make benchmark-speed`
+  (buildable again since section 1), then the metadata arena.
 - **Runtime finding from the same measurement**: over the corpus, AST metadata costs about three
   times the tree-sitter parse, and the parse plus metadata (15.5s) is more than half the diff
   itself (28s per the quality baseline). Section 6's items 1-3 are that cost.
