@@ -1,3 +1,281 @@
+# Code Health Review — 2026-09-05
+
+Scope: dead code, duplication, ease of understanding, runtime performance, testing. Whole
+repository (Rust crate, `src/bin/` tools, `research/`, `scripts/`, `assets/mapping_site`, both
+Makefiles, CI). Method: four independent surveys (dead code, duplication/readability, Python and
+build, tests and hot path), a window-hash duplicate-block scan over `src/` and `research/`, a timed
+run of the full release suite, and a manual re-check of every claim listed below. Claims that did
+not survive the re-check were dropped (for example, `OverlayTheme::to_palette` and
+`DiffViewer::scroll_view` were reported dead and are not; the three APTED fuzz tests were guessed
+to dominate wall-clock and take 0.3s each). Everything below was verified against the tree at this
+date. Line numbers are as of commit `ebcf904`.
+
+The previous review (2026-07-06, re-measured 2026-09-03) follows this section. Its open items are
+re-verified here rather than repeated: 1.7, 1.8, 1.9 (`was_*` helpers), §3 `DiffPass` trait, and
+§5 items 1-4 are still open; 1.9's `ranges` arm de-duplication and the `blob_content` sharing are
+done; the §4 typos are fixed except `symetric` (×3).
+
+## Headline numbers
+
+| Measure | Value |
+|---|---|
+| Rust source | 710 files, 104k lines (fixture tables ~30k of that) |
+| Tracked Python | 7.1k lines (`research/analysis` 5.9k, `scripts/` 0.5k) |
+| Full release suite | 1736 tests, 139s wall, 491s CPU, 0 failures |
+| Six tests over 30s each | 321s CPU, 65% of the suite |
+| Duplicate blocks ≥12 code lines in `src/` | 109 runs, ~1.6k lines, mostly test boilerplate |
+| Compiler / clippy warnings | 0 (CI enforces `-D warnings`) |
+
+## 1. Correctness defects found along the way (fix first, trivial)
+
+- **`make benchmark-ablation` is broken.** `scripts/ablation_study.sh:32` does
+  `cd "$(dirname "$0")/../.."`, correct when the script lived in `research/measure/`; since the
+  move to `scripts/` it lands in the parent of the repo, so `cargo build` fails. Fix: one `..`.
+- **`research/analysis/file_stats.py:466`** writes `code_percentiles.csv` to the working
+  directory, not to `data/corpus_stats/` which `data/README.md` names as Table 1's source.
+- **`bin/benchmark_other.rs:1248 sample_provenance`** is a cwd-relative copy of
+  `test/helper.rs:847`; run from anywhere but the repo root it silently blanks the
+  `repository/commit/path` columns of the accuracy CSV. Delete the copy, call the helper.
+- **`research/sampling/dataset.sh:36`** tests `$dataset`, which is never set, so the
+  `-p/--project` filter skips every repository.
+- **`research/analysis/apted_only_report.py:149 LANGUAGE_CATEGORY`** lacks R and Scala while
+  `measure-apted-budget` group 4 feeds `sampled_code_pairs_{r,scala}.csv`; `categories_of`
+  exits on an unclassified language. Latent until the next re-measurement.
+- **`benches/diff_code_benchmark.rs`** uses `codediff::test`, which is gated behind
+  `test-fixtures`; the `[[bench]]` entry has no `required-features`, so a bare `cargo bench` (and
+  rust-analyzer) fails to build it.
+
+## 2. Build, dependencies, CI
+
+- **`Makefile:79 build: test`** makes the five research measurement targets that depend on
+  `build` run the whole release suite first. `deploy-checks` already gates explicitly.
+- **Seven dependencies are unconditional but used only behind a feature**: `tempfile`
+  (tests and the `test-fixtures` module only), `regex` (`stats` + `test-fixtures`), `futures`,
+  `tracing`, `tracing-subscriber`, `tracing-error` (`tui` only), `walkdir` (`stats` only). A
+  `default-features = false` library consumer still compiles all of them. Gate them; `tempfile`
+  becomes a dev-dependency plus `test-fixtures`.
+- **Three feature sets share one `target/release`**, re-linking the fat-LTO binary whenever a
+  developer alternates `make build` (`stats`), `make check-quality` (`test-fixtures`) and
+  `make test` (default). One `FEATURES := stats` for every local release target fixes it (CI's
+  matrix is unaffected).
+- **Python lint scope drifts three ways**: CI lints `research scripts`, `make lint-python` lints
+  `research` only, the pre-push hook says `research/`, and `scripts/` has no ruff config so it
+  gets ~415 default rules instead of research's pinned ~138. `assets/bdiff_driver.py` is linted
+  nowhere. One root `ruff.toml`, one `make lint-python`, CI calls it.
+- `ci.yml:82-83` lists the two JS test files by hand although `make test-mapping-site-js` exists
+  for exactly the reason the pre-push hook documents. No `.PHONY` in either Makefile.
+- `check-quality` / `update-quality-baseline` / `benchmark-quality` triplicate the benchmark
+  invocation and the `ms/fixture` extraction.
+
+## 3. Dead code
+
+Verified by grep for constructions and call sites, not by the compiler (which is clean; the
+`#[allow(unused_imports)]` glob re-exports below are why it cannot see this layer).
+
+- **`DiffMode` / `--exact` / `fallback_used`**: `PendingDiff::finish(_mode)` ignores its
+  argument (`diff.rs:410`) and says so; `DiffMode` is still threaded through 87 sites in eight
+  files, `--exact` is documented as a deprecated no-op, and the JSON field `fallback_used` is
+  documented as "whether the guard substituted a cheaper fallback" while the fallback is
+  unconditional (`diff.rs:499`), so the field is false by construction. Remove the enum, the
+  flag (or keep it hidden for script compatibility) and the field, ~150 lines. Visible CLI/JSON
+  surface, but the values are already meaningless.
+- **`Action::Suspend` chain**: never constructed. Dead downstream: `App::should_suspend`,
+  `app.rs:271-275`, `Action::Resume` (only produced inside that block), `Ui::suspend`/`resume`.
+- **`ASTMappingOperation::DoNothing` and `::Move`** are never constructed (every `::Move` in
+  the tree is `TextOperation::Move`); `COST_MOVE` goes with them.
+- `Diff::is_node_mapped` (0 refs), `stats::is_generated` + `AUTO_GENERATED_RE` (test-only),
+  `Sketch::is_exact` (test-only), `PendingDiff::unmatched_counts` (one assert message),
+  `TextRange::intersects` (19 refs, all tests), `ScreenRow` newtype (never used).
+- `Algorithm::ZhangShasha` and `apted/zhang_shasha.rs` are compiled into the release binary
+  purely as a test oracle; `ASTMappingReason::OptimalIDU` outlived `optimal_iud.rs` (deleted
+  2026-09-03) and is constructed only in tests. Gate both with `#[cfg(test)]`.
+- **22 `#[allow(unused_imports)]` glob imports/re-exports** from the 2026-09-03 module splits
+  (`apted/common/*.rs:23`, `apted/common.rs:1137-1150`, `human_solver/*.rs:22`,
+  `human_solver/main.rs:224-235`) plus 158 `pub(crate)` items with zero external references are
+  what keep rustc's dead-code lint blind in those two subsystems. Explicit imports and private
+  visibility would let the compiler do the next survey.
+- Three print-only tests that cannot fail: `apted/common/tests.rs:776,790,806 debug_dump_*`
+  (only `eprintln!`); mark `#[ignore = "debug dump"]` like their sibling at `:452`.
+- Research: `research/analysis/optimal_solutions_benchmark_report.py` (357 lines) and its five
+  `optimal_solutions_*.png` have zero references from any Makefile, README, CI or `main.tex`.
+  `commit_stats.py:116-256` plots columns `commit_stats.rs` writes as hardcoded zeros.
+  `sample-pairs`, `measure-code-pair-diffs` and `process_gentoo_package_list.sh` have no readers.
+  ~60 generated LaTeX macros are no longer referenced by `main.tex`.
+
+## 4. Duplication
+
+Ranked by lines saved times drift risk. "Algorithm" marks changes that touch the mapping and must
+be checked against `make check-quality`; everything else is rendering, tooling or tests.
+
+1. **Byte-column span walk with the char-boundary clamp, four copies**: `tui/headless.rs:250-301`,
+   `tui/widgets/code_viewer.rs:217-270`, `bin/generate_mapping_site.rs:1201-1300`,
+   `bin/fake_diff_tool.rs:216-229`. The same byte-vs-char defect was found and fixed separately
+   in the two product copies. One `text_range::floor_char_boundary` plus a `segment_runs`
+   iterator. Also per renderer: trailing-whitespace row length (×5) and `TextOperation` to
+   colour/class (×5).
+2. **The 15 `solve_*` passes share an implicit `(before, after, node_cache, diff)` signature that
+   five ignore** (`_node_cache` ×4, `_before, _after` ×1); `metadata_of` is re-called at every
+   entry (28 calls, 12 in `hash_tree_matching.rs`; cheap borrows, but noise), and six repeat the
+   `let Some(ast) = ... else return` guard. A `PassCtx` built once in `pending_with_config` and a
+   `const PIPELINE` list put the ordering hazards the memory notes keep tripping on in one place.
+   Mechanical; algorithm-neutral.
+3. **`ASTMapping { cost, operation, reason }` literal at 45 sites**. Constructors
+   (`identical`, `delete`, `insert`, `update`, `matched`) make the cost/operation pairing
+   un-mistypable. Zero risk.
+4. **apted before/after mirror pairs** (REVIEW 1.7, still open): `emit_before/after_subtree`,
+   `subtree_del/ins_cost`, `before/after_match_target`, `collect_before/after_subtree_targets`,
+   ~130 lines to ~65 via a `SideCtx`. Algorithm; pure parameterisation.
+5. **Lockstep "descend adding Identical mappings" exists four times**: `nodes.rs:35-66`,
+   `hash_tree_matching.rs:240-286`, `solve_nested_condition_collapse.rs:303-340`,
+   `solve_moved_subtrees.rs:320-352`. Algorithm; identical output if each site keeps its pairer.
+6. **`diff/text.rs:372 ranges`** (522 lines by brace count, nesting 10) and
+   `text/summary.rs:325-378 scan` re-implement the same operation-to-visible-change
+   classification. Split into `move_or_identical`, `own_gap_ranges`, `update_ranges_for`, a
+   `RangeAccumulator`, and one shared visitor. Rendering only.
+7. **`bin/apted_only_benchmark.rs` vs `bin/benchmark_diff_pairs.rs`**: `read_pairs_csv`,
+   `open_repo`, `blob_content` byte-identical, `main()` skeleton identical, ~200 lines. Share the
+   plumbing only; the CSV writers are research output and must stay byte-identical.
+8. **`test/helper/human_mapping.rs`**: mirror pairs by function name (×5), `check_entry` 157
+   lines, `check_group_entry` 226 lines, `compute_mismatches*` as an eight-function suffix matrix
+   (`:2443-3089`), `node_kind_for_id` does a full DFS per mismatch though `node_info[id].kind`
+   exists. `codediff_line_mismatches` is forked in `bin/benchmark_other.rs:485-509` (published
+   metric; must stay byte-identical).
+9. **human_solver** (REVIEW 1.8, still open): five mirror pairs, `render.rs:31 Side` duplicating
+   `human_mapping.rs:1353 Side`, four picker renderers sharing a byte-identical 15-line header,
+   13 functions taking the same seven `(before_flat, after_flat, ..., caches)` parameters.
+10. **Research Python**: `read_rows` ×7, `pct` ×5, `latex_number` ×3, `repo_root` ×4,
+    `\newcommand` fragment writers ×8, chart-chrome constants ×5, sixteen identical
+    savefig/close/print tails. `percentile_report.py` already proves a shared module works; add
+    `research/analysis/_common.py`. Language list enumerated five times across Makefile, shell
+    and Python. `write_bucket_table` / `write_node_bucket_table` ~110 lines apart by one param.
+11. Smaller: `positional_key_before/after` (45 lines), two identical sweeps in
+    `solve_unresolved_nodes.rs:60-96`, shared prologue of `solve_heritage_clause_growth` and
+    `solve_wrap_growth`, `popup_area` ×6 in the TUI dialogs, scroll-into-view ×3 and
+    centre-in-window ×6, `ASTMetadata` lookup idioms (`subtree_size` unwrap ×29, stack-DFS ×37),
+    the six-step panel draw run three times in `components/diff_viewer.rs:880-1012`.
+
+## 5. Ease of understanding
+
+- **Comments that contradict `diff.rs`**: `solve_moved_subtrees.rs:19` "the final pass" and
+  `diff.rs:511-512` "Phase 7 ... dead last" (phases 8-10 follow); "seven-phase pipeline" in three
+  pass docs vs "now runs ten"; `final_apted` cited 6× and never existed under that name;
+  `RESIDUAL_SEGMENT_MAX_TOTAL_SIZE` cited after deletion; `resolve_forest`'s and
+  `human_mapping_cost`'s doc comments are attached to the wrong item (no blank line);
+  `compute_diff_interactive` cited 3×, does not exist; broken intra-doc links
+  `painting_for_mode` / `ranges_for_mode`; `src/bin/human_solver.rs` referenced as a file 14×
+  including five lines in `Cargo.toml`.
+- **History narrated in source**: `diff.rs:420-467` (48 lines of measurements and merge
+  receipts), `nodes.rs:2064-2105`, `residual.rs:323-350`, `myers.rs:31-67` and `:559-594` (a
+  comment refuting an older comment), `solve_greedy_anchor_blocks.rs:22-86`,
+  `solve_identical_diagnostic_statements.rs:24-59` (two paragraphs on a deleted pass). `diff.rs`
+  is 42% comment lines; `Cargo.toml` is 30% prose. Three `TODO.md` files (289K, 178K, 36K) hold
+  the same investigations unevenly. Keep the invariant sentence in source, move the narrative to
+  one dated TODO.md.
+- **Module names**: `diff/nodes.rs` is 100 lines of diff mutators plus a 2000-line kind/language
+  taxonomy; `src/metadata.rs` (anomalous path list) collides with `code/metadata.rs`;
+  `apted/common.rs` is a facade whose tail glob-re-exports five submodules; two `mod.rs` against
+  a sibling-file convention everywhere else; `CodeViewer` vs `CodeViewerWidget`/`CodeViewerState`.
+- **Boolean parameter soup** around `RenderOptions`: `ranges(.., source_is_before,
+  whole_pair_updates, paint_reindent_only_moves)`, `intra_node_update_ranges` (3 bools),
+  `exit_code_for(bool, bool, bool)`, the same two flags forwarded positionally through three
+  levels of `tui/app.rs`. Pass the struct; use `Side`.
+- `nodes.rs:502-987 is_semantically_structural` (485 lines): ~30 of 68 arms are the same
+  four-line "named child of accepted kind" closure. A `named_child_text` helper halves it.
+- Doc style split: 109 `/** */` blocks in 26 files vs ~1940 `///`.
+
+## 6. Runtime performance
+
+Current corpus latency (`research/data/quality/quality_baseline.csv`, 597 fixtures): p50 4.1ms,
+p90 106ms, p99 722ms, max 1667ms. Items 1-4 form one refactor; profile before starting it
+(`make benchmark-speed` after fixing the `[[bench]]` gating above).
+
+1. **Every node stores its whole subtree text as an owned `String`** (`code.rs:283-287`,
+   filled at `code/metadata.rs:189-193`), so metadata is O(bytes × depth) heap per side, and
+   `kind: String` copies a `&'static str` per node.
+2. **Nine node-id-keyed `FxHashMap`s** (`code.rs:409-520`) where a `Vec` indexed by the
+   `preorder_index` that already exists would do; `NodeCache` is a tenth, built by another walk.
+3. **Eight full-tree walks per side** in `metadata.rs:99-110`, each allocating a cursor per node
+   and several collecting children into a `Vec` per node.
+4. **APTED's inner cost evaluation does hash lookups and `String` compares**: `engine.rs:398
+   vnode` looks up `node_info` per `vren/vdel/vins`; `common.rs:92 ren` compares `kind` and
+   `text` strings; `resolve.rs:152-185 adjust` adds an `is_ancestor_or_self` parent-chain walk
+   with a lookup per hop, per pruned target. Precomputed per-preorder arrays (kind id, text hash,
+   `[pre_lo, pre_hi]`) make all of it O(1). Needs profiling to size, but it is the O(n·m) loop.
+5. **Myers keeps a full `V` snapshot per `d`** (`myers.rs:116-117`): O(d²) memory,
+   `PLAIN_TEXT_MAX_EDIT = 10_000` allows ~1.6GB for two large dissimilar plain-text files.
+6. `slots.rs:884-908 compute_pruned_targets` clones its memoised `Vec` at every ancestor level.
+7. `std::HashMap`/`HashSet` (SipHash) in `apted/common.rs:638-652`, `hash_tree_matching.rs`,
+   `grouped_greedy_matcher.rs`, four `solve_*` passes, while the rest of the crate is Fx. Purely
+   mechanical.
+8. Per-node `String` keys (`scope.join("::")`) in `solve_syntax_aware_matching.rs:298-306`;
+   two `String`s per call in `is_semantically_structural`; six `Vec`s per node in
+   `code/hash.rs:129-152`; `TextDiff::all` clones the whole range `Vec`; sort keys doing four
+   lookups per comparison in `slots.rs:700-710`.
+- Checked and fine: no `Regex::new` in the hot path; no `Vec<Box<_>>`; the `metadata_of` repeats
+  are `Cow::Borrowed`.
+
+## 7. Testing
+
+CONTRIBUTING says per-file unit tests must run under 1s and fixture tests under 5s. The suite has
+37 tests over 1s and 6 over 30s. Measured (release, nextest, one process per test):
+
+| CPU s | Test | Why |
+|---|---|---|
+| 73.8 | `text_range::corpus_position_invariants::corpus_ranges_are_addressable...` | diffs all 597 fixtures |
+| 72.7 | `text_range::corpus_position_invariants::every_range_the_corpus_produces...` | diffs all 597 again |
+| 61.2 | `diff_inventory::tests::every_fixture_in_the_corpus_produces_a_row` | diffs all 597 a third time |
+| 42.9 | `test::helper::tests::test_handmade_test_code_pairs_returns_all_diffs` | parses the corpus to check three keys exist |
+| 40.9 | `human_solver::tests::seeding_refuses_a_pair_whose_codediff_ranges_overlap` | parses the corpus to fetch one fixture |
+| 30.0 | `human_solver::tests::open_diff_picker_f_computes_the_unmarked_map_lazily...` | scans the corpus |
+
+- The two `text_range` invariants can run inside the per-fixture harness (which already computes
+  the diff, in parallel across processes) at zero extra cost; the inventory test can sample; the
+  `returns_all_diffs` test needs directory names, not parsed trees; the seeding test needs
+  `handmade_test_code_pair(name)`, which exists. That alone removes ~300s of 491s CPU.
+- **`painting()` runs the diff twice** (`human_mapping.rs:941-965` loops presets and
+  `compare_painting` re-diffs per preset), ×298 tests. Diff once, render twice.
+- **`NodeCache` is rebuilt 2-4× per fixture test** because `diff_code` builds one internally and
+  the harness builds another; nextest's process-per-test also defeats the two `OnceLock` corpus
+  caches, so the five largest fixtures are parsed and diffed at least four times each.
+- **Six fixture-loader entry points**, two near-identical (`helper.rs:474` and `:521`, which
+  also leaks a kept tempdir and prints on every call). ~60 hand-rolled "from_string ×2 +
+  diff_code" blocks across 15 files; the public `diff_strings` has zero callers and one trivial
+  test.
+- **148 clamped mapping limits carry no `measured` line** (the painting clamps do; their slack is
+  ≤0.03pp), so mapping drift toward the limit is invisible. Extend the census that exists for
+  painting.
+- **Zero tests**: `bin/analyze_human_mappings.rs` (1001 lines), the six `benchmark_other/*`
+  output parsers (pure functions over other tools' stdout, the cheapest coverage win in `bin/`),
+  `stats/git.rs`, `tui.rs`, `tui/events.rs`, `tui/actions.rs`, and `main.rs`'s file error paths
+  (missing path, directory, invalid UTF-8; 30 tests exist, all argument parsing).
+- **No Python tests at all**; `paper_variables.py:84` names a test that does not exist. Pure
+  targets are listed in the survey: `latex_number`, `read_newcommands`, `bucket_index`,
+  `ms_values`, `speed_percentiles`, `numstat_rows`, `ci_local.expand`, `coverage_report.area_of`.
+- `viewer.js`: 496 of 574 lines sit below the DOM guard and are untested, including the
+  "file an issue" URL builder. Both JS test files are bare `assert` with no case names.
+- Duplicate test names across binaries (`help_modal_renders_keybindings`, `end_to_end`, ...)
+  make `nextest -E` ambiguous. `human_solver`'s 216 tests all start from an empty mapping, which
+  scores as perfect; audit which assertions depend on mapping content.
+
+## 8. Order of attack
+
+1. **Section 1 and 2 in one commit each**: the six defects, `build: test`, dependency gating,
+   `[[bench]]` gating, CI/lint unification. All trivial, none touch the algorithm.
+2. **Test wall-clock**: the six slow tests, the double painting diff, the shared `NodeCache`.
+   Target: no test over 5s, suite under 60s CPU. Pure test-harness work.
+3. **Dead code**: `DiffMode`/`--exact`/`fallback_used`, the `Suspend` chain, the two unused
+   operations, the small orphans, the `#[cfg(test)]` gates, then the glob re-exports so the
+   compiler takes over.
+4. **Stale comments** (section 5, first bullet) and the history-to-TODO move. Zero risk, large
+   clarity gain, best done as its own commit so diffs stay reviewable.
+5. **Duplication, rendering side first** (items 1, 3, 6 of section 4), then `PassCtx`, then the
+   algorithm-side pairs (4, 5) each verified with `make check-quality`.
+6. **Research Python**: `_common.py`, pytest, the dead report script.
+7. **Performance**: profile with the fixed bench, then the arena refactor (6.1-6.4), the Myers
+   snapshot, the Fx sweep.
+
+---
+
 # Code Health Review — 2026-07-06
 
 # HUMAN PLAYTESTING
