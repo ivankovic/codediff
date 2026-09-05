@@ -107,7 +107,7 @@ fn row_overlay(ranges: &[RangeMatch], lines: &[&str]) -> (Vec<RowFlags>, Vec<Row
             // Bytes, matching the columns `TextRange` carries. A character count here was the
             // defect: on a row holding any multi-byte character it clamps to the wrong column and
             // every span past that point is off by the byte/char difference accumulated before it.
-            let row_len = crate::diff::text_range::row_len_of(lines[row].trim_end());
+            let row_len = crate::diff::text_range::paint_row_len(lines[row]);
             let Some((start_col, end_col)) = r.columns_on_row(row, row_len) else {
                 continue;
             };
@@ -250,15 +250,8 @@ fn colorize_line(line: &str, spans: &[(usize, usize, TextOperation)], use_color:
     if !use_color || spans.is_empty() {
         return line.to_string();
     }
-    // Rounds a byte column to a character boundary at or before it, so a malformed span can never
-    // panic the slice below.
-    let boundary = |mut index: usize| -> usize {
-        index = index.min(line.len());
-        while index > 0 && !line.is_char_boundary(index) {
-            index -= 1;
-        }
-        index
-    };
+    // A malformed span can never panic the slice below.
+    let boundary = |index: usize| crate::diff::text_range::floor_char_boundary(line, index);
 
     let mut out = String::new();
     let mut cut = 0usize;

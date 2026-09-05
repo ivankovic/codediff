@@ -1002,11 +1002,7 @@ pub(crate) fn emit_identical_subtree(
     diff.add_mapping(
         before_id,
         after_id,
-        ASTMapping {
-            cost: 0,
-            operation: ASTMappingOperation::Identical,
-            reason: ASTMappingReason::APTED(source),
-        },
+        ASTMapping::identical(ASTMappingReason::APTED(source)),
     );
     if let (Some(before_info), Some(after_info)) = (
         before_meta.node_info.get(&before_id),

@@ -18,7 +18,7 @@
 use crate::code::Code;
 use crate::code::metadata::metadata_of;
 use crate::diff::nodes::{is_comment, is_leading_modifier, map_identical_descendants};
-use crate::diff::{ASTDiff, ASTMapping, ASTMappingOperation, ASTMappingReason, NodeCache};
+use crate::diff::{ASTDiff, ASTMapping, ASTMappingReason, NodeCache};
 
 /// Match comments and attribute/decorator modifiers that immediately precede already-matched
 /// nodes, walking backward through however many consecutive ones there are.
@@ -132,11 +132,7 @@ pub fn solve(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut AST
             diff.add_mapping(
                 before_prev.id(),
                 after_prev.id(),
-                ASTMapping {
-                    cost: 0, // Byte-identical text, so a true no-op match.
-                    operation: ASTMappingOperation::Identical,
-                    reason: ASTMappingReason::LeadingSibling,
-                },
+                ASTMapping::identical(ASTMappingReason::LeadingSibling),
             );
 
             // The leading sibling's own text matched byte-for-byte, so every descendant (e.g. a
@@ -156,6 +152,7 @@ pub fn solve(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut AST
 mod tests {
     use super::*;
     use crate::code::{Code, Language};
+    use crate::diff::ASTMappingOperation;
     use crate::test::helper::find_first_of_kind;
 
     #[test]

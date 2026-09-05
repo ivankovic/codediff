@@ -113,13 +113,7 @@ fn syntect_color_to_ratatui(color: syntect::highlighting::Color) -> ratatui::sty
 /// Background color used to paint a given diff operation from `palette`, or `None` for
 /// `Identical`/`NotYetSet` ranges which keep plain syntax highlighting.
 fn background_for_operation(operation: &TextOperation, palette: &OverlayPalette) -> Option<Color> {
-    match operation {
-        TextOperation::Insert => Some(palette.insert_bg),
-        TextOperation::Delete => Some(palette.delete_bg),
-        TextOperation::Move => Some(palette.move_bg),
-        TextOperation::Update => Some(palette.update_bg),
-        TextOperation::Identical | TextOperation::NotYetSet => None,
-    }
+    palette.background_for(operation)
 }
 
 /// Build indices into `ranges`, sorted by source start position (end position as a secondary
@@ -238,15 +232,9 @@ fn paint_columns(
             continue;
         }
 
-        // Rounded back to a character boundary so a column landing inside a multi-byte character
-        // splits before it rather than panicking the slice.
-        let boundary = |mut index: usize| -> usize {
-            index = index.min(span_len);
-            while index > 0 && !text.is_char_boundary(index) {
-                index -= 1;
-            }
-            index
-        };
+        // A column landing inside a multi-byte character splits before it rather than panicking
+        // the slice.
+        let boundary = |index: usize| crate::diff::text_range::floor_char_boundary(text, index);
         let local_start = boundary(start_col.saturating_sub(span_start));
         let local_end = boundary(end_col.saturating_sub(span_start));
 

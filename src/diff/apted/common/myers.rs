@@ -339,11 +339,7 @@ pub(crate) fn resolve_flat_tree_pair(
     diff.add_mapping(
         before_root,
         after_root,
-        ASTMapping {
-            cost: 0,
-            operation: ASTMappingOperation::MatchButNotIdentical,
-            reason: ASTMappingReason::FlatSequenceDiff,
-        },
+        ASTMapping::matched_not_identical(ASTMappingReason::FlatSequenceDiff),
     );
 }
 

@@ -17,7 +17,7 @@
  */
 use crate::code::{ASTMetadata, Code};
 use crate::diff::nodes::kinds_update_allowed;
-use crate::diff::{ASTDiff, ASTMapping, ASTMappingOperation, ASTMappingReason, NodeCache};
+use crate::diff::{ASTDiff, ASTMapping, ASTMappingReason, NodeCache};
 use rustc_hash::FxHashMap;
 
 /// Match an unmatched container to its counterpart when each side is the lowest common ancestor of
@@ -116,11 +116,7 @@ pub fn solve(before: &Code, after: &Code, _node_cache: &NodeCache, diff: &mut AS
         diff.add_mapping(
             before_id,
             after_id,
-            ASTMapping {
-                cost: 0,
-                operation: ASTMappingOperation::MatchButNotIdentical,
-                reason: ASTMappingReason::MutualAncestor,
-            },
+            ASTMapping::matched_not_identical(ASTMappingReason::MutualAncestor),
         );
     }
 }
@@ -234,11 +230,7 @@ mod tests {
             diff.add_mapping(
                 before_block.named_child(b).unwrap().id(),
                 after_block.named_child(a).unwrap().id(),
-                ASTMapping {
-                    cost: 0,
-                    operation: ASTMappingOperation::Identical,
-                    reason: ASTMappingReason::IdenticalHash,
-                },
+                ASTMapping::identical(ASTMappingReason::IdenticalHash),
             );
         }
         solve(before, after, &node_cache, &mut diff);
@@ -336,11 +328,7 @@ mod tests {
                 diff.add_mapping(
                     block.named_child(b).unwrap().id(),
                     after_block.named_child(a).unwrap().id(),
-                    ASTMapping {
-                        cost: 0,
-                        operation: ASTMappingOperation::Identical,
-                        reason: ASTMappingReason::IdenticalHash,
-                    },
+                    ASTMapping::identical(ASTMappingReason::IdenticalHash),
                 );
             }
         }

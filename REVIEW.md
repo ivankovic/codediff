@@ -64,6 +64,13 @@ done; the §4 typos are fixed except `symetric` (×3).
   `programms` typos). Section 5's remaining bullets (history narrative, module names, boolean
   parameters, `is_semantically_structural`, doc style) are still open apart from the phase-6
   history that went to `src/diff/TODO.md` with section 3.
+- **2026-09-05, section 4 (first cut)** - done: `ASTMapping::{identical, matched_not_identical,
+  updated, deleted, inserted}` replace the 31 standard-shape literals (the computed-cost ones
+  stay written out); `text_range::floor_char_boundary` is the one home for the byte-column clamp
+  (headless, the code viewer widget, the mapping site, the fake diff tool) and
+  `text_range::paint_row_len` for the trimmed paint extent; `OverlayPalette::background_for` is
+  the one operation-to-colour table for the ratatui renderers. `make check-quality`: 0 regressed,
+  0 improved. Still open: items 2 (`PassCtx`, ~50 call sites incl. tests), 4-9, 10-11.
 - **Runtime finding from the same measurement**: over the corpus, AST metadata costs about three
   times the tree-sitter parse, and the parse plus metadata (15.5s) is more than half the diff
   itself (28s per the quality baseline). Section 6's items 1-3 are that cost.

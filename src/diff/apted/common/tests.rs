@@ -1208,18 +1208,10 @@ fn test_already_matched_nodes_are_skipped() -> Result<()> {
         // Map before_node_1 to after_node_2 (wrong partner)
         // and before_node_2 to after_node_1 (wrong partner)
         // This forces APTED to potentially create additional correct mappings
-        let wrong_mapping_1 = ASTMapping {
-            cost: 0,
-            operation: ASTMappingOperation::Identical,
-            reason: ASTMappingReason::OptimalIDU,
-        };
+        let wrong_mapping_1 = ASTMapping::identical(ASTMappingReason::OptimalIDU);
         diff.add_mapping(before_node_1.id(), after_node_2.id(), wrong_mapping_1);
 
-        let wrong_mapping_2 = ASTMapping {
-            cost: 0,
-            operation: ASTMappingOperation::Identical,
-            reason: ASTMappingReason::OptimalIDU,
-        };
+        let wrong_mapping_2 = ASTMapping::identical(ASTMappingReason::OptimalIDU);
         diff.add_mapping(before_node_2.id(), after_node_1.id(), wrong_mapping_2);
     }
 
@@ -1297,11 +1289,7 @@ fn test_honors_pre_existing_match_and_still_finds_nested_reuse() -> Result<()> {
     diff.add_mapping(
         before_assignment.id(),
         after_assignment.id(),
-        ASTMapping {
-            cost: 0,
-            operation: ASTMappingOperation::Identical,
-            reason: ASTMappingReason::OptimalIDU,
-        },
+        ASTMapping::identical(ASTMappingReason::OptimalIDU),
     );
 
     for_roots(

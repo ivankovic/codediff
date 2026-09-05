@@ -707,6 +707,57 @@ pub struct ASTMapping {
     pub reason: ASTMappingReason,
 }
 
+/// The five standard entries, each pairing an operation with the cost the unit-cost model
+/// assigns it (`cost.rs::operation_cost`), so a call site cannot write one without the other.
+/// Entries whose cost is computed (APTED's subtree totals, `DeleteWithChildren`/
+/// `InsertWithChildren`) are still written out in full.
+impl ASTMapping {
+    /// Byte-identical subtrees: a free match.
+    pub fn identical(reason: ASTMappingReason) -> Self {
+        Self {
+            cost: 0,
+            operation: ASTMappingOperation::Identical,
+            reason,
+        }
+    }
+
+    /// Same-kind internal nodes whose difference is carried by their descendants' own entries.
+    pub fn matched_not_identical(reason: ASTMappingReason) -> Self {
+        Self {
+            cost: 0,
+            operation: ASTMappingOperation::MatchButNotIdentical,
+            reason,
+        }
+    }
+
+    /// A leaf whose text changed.
+    pub fn updated(reason: ASTMappingReason) -> Self {
+        Self {
+            cost: COST_UPDATE,
+            operation: ASTMappingOperation::Update,
+            reason,
+        }
+    }
+
+    /// A single node deleted (its children, if any, are accounted for separately).
+    pub fn deleted(reason: ASTMappingReason) -> Self {
+        Self {
+            cost: COST_DELETE,
+            operation: ASTMappingOperation::Delete,
+            reason,
+        }
+    }
+
+    /// A single node inserted (its children, if any, are accounted for separately).
+    pub fn inserted(reason: ASTMappingReason) -> Self {
+        Self {
+            cost: COST_INSERT,
+            operation: ASTMappingOperation::Insert,
+            reason,
+        }
+    }
+}
+
 /**
 * The operations that can be used to transform one tree into another.
 */
@@ -1406,11 +1457,7 @@ mod tests {
         diff_ast.mapping.clear();
         diff_ast.mapping.insert(
             (invalid_before_id, invalid_after_id),
-            ASTMapping {
-                cost: 0,
-                operation: ASTMappingOperation::Identical,
-                reason: ASTMappingReason::IdenticalHash,
-            },
+            ASTMapping::identical(ASTMappingReason::IdenticalHash),
         );
 
         // The mapping should be invalid
@@ -1439,20 +1486,12 @@ mod tests {
         diff_ast.add_mapping(
             0,
             123, // 0 represents a null node (insert)
-            ASTMapping {
-                cost: COST_INSERT,
-                operation: ASTMappingOperation::Insert,
-                reason: ASTMappingReason::OptimalIDU,
-            },
+            ASTMapping::inserted(ASTMappingReason::OptimalIDU),
         );
         diff_ast.add_mapping(
             456,
             0, // 0 represents a null node (delete)
-            ASTMapping {
-                cost: COST_DELETE,
-                operation: ASTMappingOperation::Delete,
-                reason: ASTMappingReason::OptimalIDU,
-            },
+            ASTMapping::deleted(ASTMappingReason::OptimalIDU),
         );
 
         // Null mappings should be considered valid
@@ -1482,11 +1521,7 @@ mod tests {
         diff.add_mapping(
             before_root_id,
             after_root_id,
-            ASTMapping {
-                cost: 0,
-                operation: ASTMappingOperation::Identical,
-                reason: ASTMappingReason::IdenticalHash,
-            },
+            ASTMapping::identical(ASTMappingReason::IdenticalHash),
         );
 
         // Verify that all maps were updated correctly

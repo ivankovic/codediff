@@ -19,7 +19,7 @@ use tree_sitter::Node;
 
 use crate::code::{ASTMetadata, Code, Language};
 use crate::diff::apted::{self, Algorithm};
-use crate::diff::{ASTDiff, ASTMapping, ASTMappingOperation, ASTMappingReason};
+use crate::diff::{ASTDiff, ASTMapping, ASTMappingReason};
 
 /// Recursively maps every descendant of an already-matched pair as `Identical`/cost 0/
 /// `IdenticalHashOfAncestor`, position-by-position in lockstep (stack-based DFS, so children are
@@ -54,11 +54,7 @@ pub fn map_identical_descendants<'a>(
             diff.add_mapping(
                 before_child.id(),
                 after_child.id(),
-                ASTMapping {
-                    cost: 0,
-                    operation: ASTMappingOperation::Identical,
-                    reason: ASTMappingReason::IdenticalHashOfAncestor,
-                },
+                ASTMapping::identical(ASTMappingReason::IdenticalHashOfAncestor),
             );
             stack.push((before_child, after_child));
         }

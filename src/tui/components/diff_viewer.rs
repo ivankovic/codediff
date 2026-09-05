@@ -1029,23 +1029,14 @@ fn render_minimap(
     bands: &[Option<crate::diff::text::TextOperation>],
     theme: OverlayTheme,
 ) {
-    use crate::diff::text::TextOperation;
     let palette = theme.palette();
     let lines: Vec<Line> = bands
         .iter()
         .map(|band| match band {
-            Some(op) => {
-                let color = match op {
-                    TextOperation::Insert => palette.insert_bg,
-                    TextOperation::Delete => palette.delete_bg,
-                    TextOperation::Move => palette.move_bg,
-                    TextOperation::Update => palette.update_bg,
-                    TextOperation::Identical | TextOperation::NotYetSet => {
-                        return Line::from(" ");
-                    }
-                };
-                Line::from(Span::styled("█", Style::new().fg(color)))
-            }
+            Some(op) => match palette.background_for(op) {
+                Some(color) => Line::from(Span::styled("█", Style::new().fg(color))),
+                None => Line::from(" "),
+            },
             None => Line::from(" "),
         })
         .collect();

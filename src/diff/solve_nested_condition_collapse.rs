@@ -268,21 +268,13 @@ fn try_collapse(
         diff.add_mapping(
             before_if_token.id(),
             after_if_token.id(),
-            ASTMapping {
-                cost: 0,
-                operation: ASTMappingOperation::Identical,
-                reason: ASTMappingReason::NestedConditionCollapse,
-            },
+            ASTMapping::identical(ASTMappingReason::NestedConditionCollapse),
         );
     }
     diff.add_mapping(
         terminal_block.id(),
         after_block.id(),
-        ASTMapping {
-            cost: 0,
-            operation: ASTMappingOperation::Identical,
-            reason: ASTMappingReason::NestedConditionCollapse,
-        },
+        ASTMapping::identical(ASTMappingReason::NestedConditionCollapse),
     );
     for (before_cond, after_cond) in conditions.into_iter().zip(after_conditions) {
         map_identical_subtree(
@@ -313,11 +305,7 @@ fn map_identical_subtree(
     diff.add_mapping(
         before_node.id(),
         after_node.id(),
-        ASTMapping {
-            cost: 0,
-            operation: ASTMappingOperation::Identical,
-            reason: ASTMappingReason::NestedConditionCollapse,
-        },
+        ASTMapping::identical(ASTMappingReason::NestedConditionCollapse),
     );
     let mut stack = vec![(before_node, after_node)];
     while let Some((b, a)) = stack.pop() {
@@ -329,11 +317,7 @@ fn map_identical_subtree(
             diff.add_mapping(
                 before_child.id(),
                 after_child.id(),
-                ASTMapping {
-                    cost: 0,
-                    operation: ASTMappingOperation::Identical,
-                    reason: ASTMappingReason::NestedConditionCollapse,
-                },
+                ASTMapping::identical(ASTMappingReason::NestedConditionCollapse),
             );
             stack.push((before_child, after_child));
         }

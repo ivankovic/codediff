@@ -215,11 +215,8 @@ fn mix(mut hash: u64) -> u64 {
 /// inside a multi-byte character. Nothing downstream slices the line with these, so a split offset
 /// would not panic - it would just describe a span no character starts at, which is a needlessly
 /// strange thing for a test instrument to emit.
-fn snap_down(line: &str, mut index: usize) -> usize {
-    while index > 0 && !line.is_char_boundary(index) {
-        index -= 1;
-    }
-    index
+fn snap_down(line: &str, index: usize) -> usize {
+    codediff::diff::text_range::floor_char_boundary(line, index)
 }
 
 fn snap_up(line: &str, mut index: usize) -> usize {

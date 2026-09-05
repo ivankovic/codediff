@@ -87,6 +87,29 @@ pub fn row_len_of(line: &str) -> SourceColumn {
     SourceColumn(line.len())
 }
 
+/// The extent of `line` a renderer should paint up to when a range covers the row without ending
+/// on it: [`row_len_of`] with trailing whitespace excluded, so a painted range never covers
+/// trailing whitespace or, past it, the newline (RULES_AND_PREFERENCES.md, "never show end of
+/// line whitespace"). Renderers still print the trimmed tail; they just do not colour it.
+pub fn paint_row_len(line: &str) -> SourceColumn {
+    row_len_of(line.trim_end())
+}
+
+/// `column` clamped to `line`'s length and rounded down to a character boundary, so a byte
+/// column that is off - a malformed painting, a stale range, an offset derived from a hash - can
+/// slice `line` without panicking inside a multi-byte character.
+///
+/// The one home for this clamp. Every renderer that slices a row by column used to carry its own
+/// copy, and the byte-versus-character defect behind it was found and fixed separately in two of
+/// them (see [`SourceColumn`]).
+pub fn floor_char_boundary(line: &str, column: usize) -> usize {
+    let mut column = column.min(line.len());
+    while column > 0 && !line.is_char_boundary(column) {
+        column -= 1;
+    }
+    column
+}
+
 /// How many terminal cells the first `column` bytes of `line` occupy - the source-to-screen
 /// conversion, and the only place a `SourceColumn` may become a `ScreenColumn`.
 ///

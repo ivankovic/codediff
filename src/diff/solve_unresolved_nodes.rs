@@ -16,9 +16,7 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 use crate::code::Code;
-use crate::diff::{
-    ASTDiff, ASTMapping, ASTMappingOperation, ASTMappingReason, COST_DELETE, COST_INSERT, NodeCache,
-};
+use crate::diff::{ASTDiff, ASTMapping, ASTMappingReason, NodeCache};
 
 /// Terminal completeness sweep: give every node still carrying no decision at all an explicit
 /// `Delete` (before side) or `Insert` (after side).
@@ -68,11 +66,7 @@ pub fn solve(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut AST
         diff.add_mapping(
             before_id,
             0,
-            ASTMapping {
-                cost: COST_DELETE,
-                operation: ASTMappingOperation::Delete,
-                reason: ASTMappingReason::UnresolvedNode,
-            },
+            ASTMapping::deleted(ASTMappingReason::UnresolvedNode),
         );
     }
 
@@ -87,11 +81,7 @@ pub fn solve(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut AST
         diff.add_mapping(
             0,
             after_id,
-            ASTMapping {
-                cost: COST_INSERT,
-                operation: ASTMappingOperation::Insert,
-                reason: ASTMappingReason::UnresolvedNode,
-            },
+            ASTMapping::inserted(ASTMappingReason::UnresolvedNode),
         );
     }
 }
@@ -127,11 +117,7 @@ fn match_roots_if_unresolved(before: &Code, after: &Code, diff: &mut ASTDiff) {
     diff.add_mapping(
         before_root,
         after_root,
-        ASTMapping {
-            cost: 0,
-            operation: ASTMappingOperation::MatchButNotIdentical,
-            reason: ASTMappingReason::UnresolvedNode,
-        },
+        ASTMapping::matched_not_identical(ASTMappingReason::UnresolvedNode),
     );
 }
 
@@ -139,7 +125,7 @@ fn match_roots_if_unresolved(before: &Code, after: &Code, diff: &mut ASTDiff) {
 mod tests {
     use super::*;
     use crate::code::Language;
-    use crate::diff::Diff;
+    use crate::diff::{ASTMappingOperation, Diff};
 
     /// The wrap that motivated this pass: statements move inside a new `try` block. The wrapper
     /// nodes and the root above them must come out as explicit decisions, not as absences.

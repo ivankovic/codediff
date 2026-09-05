@@ -171,7 +171,7 @@ pub fn solve(before: &Code, after: &Code, _node_cache: &NodeCache, diff: &mut AS
 mod tests {
     use super::*;
     use crate::code::Language;
-    use crate::diff::{ASTMapping, ASTMappingOperation};
+    use crate::diff::ASTMapping;
 
     /// Manually marks `before_id`/`after_id` as matched (an arbitrary placeholder mapping, not
     /// produced by any real pass) and runs *only* `solve` - no `solve_hash_descent` or any other
@@ -192,11 +192,7 @@ mod tests {
         diff.add_mapping(
             container_before_id,
             container_after_id,
-            ASTMapping {
-                cost: 0,
-                operation: ASTMappingOperation::Identical,
-                reason: ASTMappingReason::IdenticalHash,
-            },
+            ASTMapping::identical(ASTMappingReason::IdenticalHash),
         );
         solve(before, after, &node_cache, &mut diff);
         diff

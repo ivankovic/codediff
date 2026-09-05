@@ -352,7 +352,6 @@ fn sequence_edit_cost(
 mod tests {
     use super::*;
     use crate::code::Language;
-    use crate::diff::ASTMappingOperation;
     use crate::test::helper::find_first_of_kind as first_child_of_kind;
 
     #[test]
@@ -456,11 +455,7 @@ mod tests {
         diff.add_mapping(
             before_fn.id(),
             after_fn.id(),
-            crate::diff::ASTMapping {
-                cost: 0,
-                operation: ASTMappingOperation::MatchButNotIdentical,
-                reason: ASTMappingReason::APTED("test"),
-            },
+            crate::diff::ASTMapping::matched_not_identical(ASTMappingReason::APTED("test")),
         );
 
         solve(&before, &after, &node_cache, &mut diff);

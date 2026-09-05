@@ -271,20 +271,12 @@ pub(crate) fn resolve_oversized_pair(
         diff.add_mapping(
             before_root,
             0,
-            ASTMapping {
-                cost: COST_DELETE,
-                operation: ASTMappingOperation::Delete,
-                reason: ASTMappingReason::APTED(source),
-            },
+            ASTMapping::deleted(ASTMappingReason::APTED(source)),
         );
         diff.add_mapping(
             0,
             after_root,
-            ASTMapping {
-                cost: COST_INSERT,
-                operation: ASTMappingOperation::Insert,
-                reason: ASTMappingReason::APTED(source),
-            },
+            ASTMapping::inserted(ASTMappingReason::APTED(source)),
         );
     }
 

@@ -4138,11 +4138,7 @@ mod tests {
             diff.add_mapping(
                 b.id(),
                 a.id(),
-                ASTMapping {
-                    cost: 0,
-                    operation: ASTMappingOperation::Identical,
-                    reason: ASTMappingReason::default(),
-                },
+                ASTMapping::identical(ASTMappingReason::default()),
             );
             let mut bc = b.walk();
             let mut ac = a.walk();
@@ -4335,22 +4331,14 @@ mod tests {
         diff.add_mapping(
             before_foos[0].id(),
             after_foo.id(),
-            ASTMapping {
-                cost: 0,
-                operation: ASTMappingOperation::Identical,
-                reason: ASTMappingReason::default(),
-            },
+            ASTMapping::identical(ASTMappingReason::default()),
         );
         // The second foo() is a group member too, but here it's mapped to qux() - a real node,
         // just not one that's part of this group - instead of being deleted.
         diff.add_mapping(
             before_foos[1].id(),
             after_qux.id(),
-            ASTMapping {
-                cost: 0,
-                operation: ASTMappingOperation::MatchButNotIdentical,
-                reason: ASTMappingReason::default(),
-            },
+            ASTMapping::matched_not_identical(ASTMappingReason::default()),
         );
 
         let mut mismatches = Vec::new();
@@ -4464,11 +4452,7 @@ mod tests {
         diff.add_mapping(
             f1_ident.id(),
             g0_ident.id(),
-            ASTMapping {
-                cost: 0,
-                operation: ASTMappingOperation::Identical,
-                reason: ASTMappingReason::default(),
-            },
+            ASTMapping::identical(ASTMappingReason::default()),
         );
 
         let group = MultiMapGroup {

@@ -818,21 +818,6 @@ fn code_operation_class(operation: &TextOperation) -> Option<&'static str> {
     }
 }
 
-/// Snaps `column` down to the nearest UTF-8 character boundary of `line`, clamped to its length.
-///
-/// `TextRange` columns are tree-sitter's own *byte* columns, and every range this module renders
-/// comes from a node boundary, so a column should always already land on a character boundary.
-/// This exists so that "should" can't turn a malformed range into a panicking site generator:
-/// slicing a `&str` mid-character panics, and a whole site build failing over one odd range in one
-/// fixture is a far worse outcome than that fixture's highlight being a byte or two off.
-fn snap_to_char_boundary(line: &str, column: usize) -> usize {
-    let mut column = column.min(line.len());
-    while column > 0 && !line.is_char_boundary(column) {
-        column -= 1;
-    }
-    column
-}
-
 /// A caret drawn on one side to mark where the *other* side's inserted or deleted text belongs -
 /// the only thing a pure insertion's before panel, or a pure deletion's after panel, has to show
 /// at all.
@@ -1035,7 +1020,7 @@ impl PanelRanges {
 ///
 /// `Err` if any entry is malformed or falls outside its file (`HumanTextEntry::verdict`'s own
 /// contract). The caller skips that painting rather than failing the build, for the same reason
-/// `snap_to_char_boundary` clamps: one bad painting should cost its own panel, not the whole site.
+/// `floor_char_boundary` clamps: one bad painting should cost its own panel, not the whole site.
 fn painting_panels(
     named: &human_mapping::NamedTextMapping,
     before: &str,
@@ -1212,7 +1197,7 @@ fn render_code_row(
     // stays untrimmed: it still has to bound the unstyled tail appended after the last segment
     // below, or that trailing whitespace would be dropped from the page's text entirely instead
     // of just left uncolored.
-    let paint_row_len = codediff::diff::text_range::row_len_of(line.trim_end());
+    let paint_row_len = codediff::diff::text_range::paint_row_len(line);
     let side = &panel.side;
 
     // Every span this row draws, as byte-column bounds in left-to-right order: this rendering's
@@ -1240,7 +1225,7 @@ fn render_code_row(
         })
         .collect();
     segments.extend(markers.iter().map(|marker| {
-        let column = snap_to_char_boundary(line, marker.column);
+        let column = codediff::diff::text_range::floor_char_boundary(line, marker.column);
         (
             column,
             column,
@@ -1257,8 +1242,8 @@ fn render_code_row(
     let mut cursor = 0usize;
     let mut has_marker = false;
     for (start, end, operation, id, counterpart) in segments {
-        let start = snap_to_char_boundary(line, start).max(cursor);
-        let end = snap_to_char_boundary(line, end).max(start);
+        let start = codediff::diff::text_range::floor_char_boundary(line, start).max(cursor);
+        let end = codediff::diff::text_range::floor_char_boundary(line, end).max(start);
         if start > cursor {
             text.push_str(&escape_html_text(&line[cursor..start]));
         }

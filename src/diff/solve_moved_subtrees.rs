@@ -59,7 +59,7 @@ use std::collections::HashSet;
 
 use crate::code::{ASTMetadata, Code, Language};
 use crate::diff::nodes::is_reference;
-use crate::diff::{ASTDiff, ASTMapping, ASTMappingOperation, ASTMappingReason, NodeCache};
+use crate::diff::{ASTDiff, ASTMapping, ASTMappingReason, NodeCache};
 
 /// Minimum subtree size (node count, incl. the root) for a delete/insert pair to be considered a
 /// move. Below this, identical subtrees are commodity code (single tokens, trivial statements)
@@ -326,15 +326,7 @@ fn remap_moved_subtree(
 ) {
     diff.remove_delete_mapping(b);
     diff.remove_insert_mapping(a);
-    diff.add_mapping(
-        b,
-        a,
-        ASTMapping {
-            cost: 0,
-            operation: ASTMappingOperation::Identical,
-            reason: ASTMappingReason::MovedSubtree,
-        },
-    );
+    diff.add_mapping(b, a, ASTMapping::identical(ASTMappingReason::MovedSubtree));
 
     let b_children = before_meta
         .node_info

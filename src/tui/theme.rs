@@ -215,6 +215,22 @@ pub struct OverlayPalette {
 pub const PRESET_BEFORE_TITLE_FG: Color = Color::Red;
 pub const PRESET_AFTER_TITLE_FG: Color = Color::Green;
 
+impl OverlayPalette {
+    /// The background that paints `operation`, or `None` for `Identical` and the `NotYetSet`
+    /// sentinel, which keep plain syntax highlighting. The one operation-to-colour table for
+    /// every ratatui renderer (the code viewer's overlay, the diff viewer's minimap bands).
+    pub fn background_for(&self, operation: &crate::diff::text::TextOperation) -> Option<Color> {
+        use crate::diff::text::TextOperation;
+        match operation {
+            TextOperation::Insert => Some(self.insert_bg),
+            TextOperation::Delete => Some(self.delete_bg),
+            TextOperation::Move => Some(self.move_bg),
+            TextOperation::Update => Some(self.update_bg),
+            TextOperation::Identical | TextOperation::NotYetSet => None,
+        }
+    }
+}
+
 impl OverlayTheme {
     /// The colors for this theme.
     ///

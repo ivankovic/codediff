@@ -19,7 +19,7 @@ use std::collections::{HashMap, VecDeque};
 
 use crate::code::Code;
 use crate::diff::nodes::{collect_unmatched, is_diagnostic_statement, map_identical_descendants};
-use crate::diff::{ASTDiff, ASTMapping, ASTMappingOperation, ASTMappingReason, NodeCache};
+use crate::diff::{ASTDiff, ASTMapping, ASTMappingReason, NodeCache};
 
 /**
 * MatchIdenticalDiagnosticStatements: pairs up still-unmatched calls/macros that look like they're
@@ -130,11 +130,7 @@ pub fn solve(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut AST
         diff.add_mapping(
             before_node.id(),
             after_node_id,
-            ASTMapping {
-                cost: 0,
-                operation: ASTMappingOperation::Identical,
-                reason: ASTMappingReason::IdenticalHash,
-            },
+            ASTMapping::identical(ASTMappingReason::IdenticalHash),
         );
 
         // Recursively add all descendants with IdenticalHashOfAncestor reason - same idiom as
