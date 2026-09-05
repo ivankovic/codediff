@@ -41,7 +41,7 @@ use codediff::test::helper::human_mapping::{
     rebuild_caches_for_mapping, status_after, status_before,
 };
 use codediff::test::helper::{
-    DIFF_DATASETS, code_pair_from_dir, human_mapping, note_as_csv_cell, read_note,
+    DIFF_DATASETS, code_pair_from_dir_without_metadata, human_mapping, note_as_csv_cell, read_note,
     readme_provenance,
 };
 
@@ -225,7 +225,9 @@ fn main() -> Result<()> {
 }
 
 fn row_for(name: &str, dataset: &str, dir: &Path) -> Result<Option<Row>> {
-    let Some((before, after)) = code_pair_from_dir(dir)? else {
+    // Tree only: nothing below diffs, so the hashes and sizes `code_pair_from_dir` would add
+    // are three quarters of a load that nothing reads.
+    let Some((before, after)) = code_pair_from_dir_without_metadata(dir)? else {
         return Ok(None);
     };
 

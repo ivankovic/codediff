@@ -1136,6 +1136,35 @@ fn load_side(file_path: &Path) -> Result<Code> {
 * test cases.
 */
 pub fn code_pair_from_dir(path: &Path) -> Result<Option<(Code, Code)>> {
+    let Some((mut before, mut after)) = code_pair_from_dir_without_metadata(path)? else {
+        return Ok(None);
+    };
+
+    // `ensure_parsed`, not `parse` - see `handmade_test_code`'s doc comment for why leaving
+    // `ast_metadata` uncached here silently turns every downstream `metadata_of` call into a full
+    // recompute, and why this is now safe against the stale-root-id hazard that blocked the first
+    // attempt at this fix. The tree is already there, so this only adds the metadata.
+    if before.metadata.language.is_some() {
+        before.ensure_parsed()?;
+    }
+    if after.metadata.language.is_some() {
+        after.ensure_parsed()?;
+    }
+
+    Ok(Some((before, after)))
+}
+
+/// [`code_pair_from_dir`] without the AST metadata: both sides read and parsed with tree-sitter,
+/// `ast_metadata` left `None`.
+///
+/// For the corpus scans that only walk the tree - `diff_inventory`'s row per fixture, the
+/// `human_solver` picker's unmarked-node count - and never diff. Over the whole corpus the parse is
+/// under a quarter of the load (measured 2026-09-05, release, single-threaded: 3.7s to parse
+/// 26MB of fixtures, 15.5s with the hashes, subtree sizes and sketches on top), and a scan that
+/// pays for metadata it never reads is the difference between the picker feeling instant and
+/// feeling stuck. Anything that goes on to `diff_code` must use [`code_pair_from_dir`] instead:
+/// with `ast_metadata` unset, every `metadata_of` call downstream recomputes it from scratch.
+pub fn code_pair_from_dir_without_metadata(path: &Path) -> Result<Option<(Code, Code)>> {
     let mut before_code = None;
     let mut after_code = None;
 
@@ -1162,17 +1191,9 @@ pub fn code_pair_from_dir(path: &Path) -> Result<Option<(Code, Code)>> {
         return Ok(None);
     };
 
-    // `ensure_parsed`, not `parse` - see `handmade_test_code`'s doc comment for why leaving
-    // `ast_metadata` uncached here silently turns every downstream `metadata_of` call into a full
-    // recompute, and why this is now safe against the stale-root-id hazard that blocked the first
-    // attempt at this fix. No `tree_sitter::Parser` needed here at all - `ensure_parsed` builds its
-    // own short-lived one internally.
-    if before.metadata.language.is_some() {
-        before.ensure_parsed()?;
-    }
-    if after.metadata.language.is_some() {
-        after.ensure_parsed()?;
-    }
+    let mut parser = tree_sitter::Parser::new();
+    before.parse(&mut parser);
+    after.parse(&mut parser);
 
     Ok(Some((before, after)))
 }
@@ -1736,21 +1757,22 @@ mod tests {
         Ok(())
     }
 
+    /// The corpus walk, not the corpus load: `handmade_test_code_pairs` parses every fixture and
+    /// computes its metadata, which is the whole suite's single most expensive test for three
+    /// `contains_key` checks. `handmade_test_case_dirs` is the same walk without the parse, and
+    /// the loaders that build on it are covered by the fixture tests themselves.
     #[test]
-    fn test_handmade_test_code_pairs_returns_all_diffs() -> Result<()> {
-        let diffs = handmade_test_code_pairs()?;
+    fn test_handmade_test_case_dirs_lists_every_diff() -> Result<()> {
+        let names: Vec<String> = handmade_test_case_dirs()?
+            .into_iter()
+            .map(|(name, _)| name)
+            .collect();
 
-        println!("Found {} test code pairs:", diffs.len());
-        for key in diffs.keys() {
-            println!("  - {}", key);
-        }
-
-        // We should have all the expected diffs
-        assert!(diffs.contains_key("rust-no-change"));
-        assert!(diffs.contains_key("rust-hello-world-added-message"));
-        assert!(diffs.contains_key("rust-leetcode-1-bugfix"));
-
-        assert!(diffs.len() > 3);
+        assert!(names.contains(&"rust-no-change".to_string()));
+        assert!(names.contains(&"rust-hello-world-added-message".to_string()));
+        assert!(names.contains(&"rust-leetcode-1-bugfix".to_string()));
+        assert!(names.len() > 3);
+        assert!(names.is_sorted(), "sorted so every caller sees one order");
 
         Ok(())
     }

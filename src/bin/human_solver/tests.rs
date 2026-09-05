@@ -6602,10 +6602,9 @@ fn seeding_refuses_to_overwrite_a_painting_that_already_has_ranges() {
 /// verdict while the scorer resolves it by list order.
 #[test]
 fn seeding_refuses_a_pair_whose_codediff_ranges_overlap() {
-    let pairs = codediff::test::helper::handmade_test_code_pairs().unwrap();
-    let (before, after) = pairs
-        .get("xml-odoo-odoo-add-two-attributes")
+    let pair = codediff::test::helper::handmade_test_code_pair("xml-odoo-odoo-add-two-attributes")
         .expect("fixture should exist");
+    let (before, after) = &*pair;
 
     let overlapping = codediff_text_spans(before, after)
         .iter()

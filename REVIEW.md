@@ -31,6 +31,20 @@ done; the §4 typos are fixed except `symetric` (×3).
   assets`; CI's JS job calls `make test-mapping-site-js`. Left open: `research/Makefile`'s own
   items (no `.PHONY`, `matching-reasons-report`'s benchmark prerequisite, the
   `measure-apted-budget` blocks) - that file had uncommitted edits at the time.
+- **2026-09-05, section 7 (wall-clock)** - done: the two corpus invariant tests are one
+  streamed, multi-threaded pass (147s of CPU across two tests, now 16s wall on one); the
+  corpus-loader test checks the directory walk instead of parsing the corpus (43s to 0.01s);
+  the seeding test loads its one fixture (41s to 2.4s); `painting()` diffs each fixture once for
+  both presets (`compare_painting_with_diff`); `code_pair_from_dir_without_metadata` gives the
+  inventory and the `human_solver` picker scan a tree without the hashes and sketches they never
+  read (measured 2026-09-05: parsing the corpus is 3.7s, metadata another 12s), which also
+  speeds up the picker's `o` scan in the tool itself. Still over 5s: the inventory test (31s,
+  now dominated by reading 1.4GB of `human_mapping.json`), the picker scan test (12.6s), the
+  invariants pass (16s), and the largest fixtures' own mapping tests. Left open: `NodeCache`
+  rebuilt outside `diff_code` (the transmuted `'static` cache would have to travel in `Diff`).
+- **Runtime finding from the same measurement**: over the corpus, AST metadata costs about three
+  times the tree-sitter parse, and the parse plus metadata (15.5s) is more than half the diff
+  itself (28s per the quality baseline). Section 6's items 1-3 are that cost.
 
 ## Headline numbers
 

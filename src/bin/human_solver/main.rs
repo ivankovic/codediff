@@ -255,8 +255,8 @@ use codediff::tui::theme::{self, OverlayPalette, OverlayTheme};
 #[cfg(test)]
 use codediff::test::helper::human_mapping::rebuild_caches;
 use codediff::test::helper::{
-    DIFF_DATASETS, code_pair_from_dir, diffs_case_dir, node_for_path, path_for_node,
-    precompute_paths, read_note, write_note,
+    DIFF_DATASETS, code_pair_from_dir, code_pair_from_dir_without_metadata, diffs_case_dir,
+    node_for_path, path_for_node, precompute_paths, read_note, write_note,
 };
 
 #[derive(Parser, Debug)]
@@ -839,7 +839,9 @@ fn count_unmarked_nodes_in_tree(
 /// it does, only what the `Cmpl`/`Unmarked` columns say about it.
 fn diff_case_unmarked_count(name: &str) -> Option<usize> {
     let dir = diffs_case_dir(name)?;
-    let (before, after) = code_pair_from_dir(&dir).ok().flatten()?;
+    // Tree only: the count walks nodes and never diffs, and the metadata `code_pair_from_dir`
+    // adds is three quarters of the load (see that function's doc comment).
+    let (before, after) = code_pair_from_dir_without_metadata(&dir).ok().flatten()?;
     let mapping = human_mapping::load(name).ok()?;
     let before_root = before.ast.as_ref()?.root_node();
     let after_root = after.ast.as_ref()?.root_node();

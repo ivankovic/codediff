@@ -1000,41 +1000,87 @@ mod position_tests {
 
 #[cfg(test)]
 mod corpus_position_invariants {
-    /// Every column codediff emits is a byte offset into its own row (see [`super::SourceColumn`]).
-    /// This asserts that over the whole corpus, which is what a character count masquerading as a
-    /// column violates: it produces a column that is either past the row's byte length or sitting
-    /// inside a multi-byte character, and both are invisible until something slices there.
+    /// Every position codediff emits over the whole corpus is a byte column on a character
+    /// boundary of its own row, is addressable as a byte offset, and the only text two ranges on
+    /// one side may both claim is a line terminator.
     ///
-    /// What this does **not** catch, checked rather than assumed: reintroducing the character
-    /// count in `compute_row_byte_lengths` leaves this passing. A mis-normalised end is still a
-    /// legal position - `(row + 1, 0)` always is - so nothing here is out of range or mid-
-    /// character. The guard for the *unit* is
+    /// One pass, not one test per invariant: each fixture is loaded and diffed once here, and
+    /// that is what this test costs - it was the suite's two slowest tests when the invariants
+    /// were checked separately, each diffing all 597 fixtures on its own. Streamed through
+    /// `handmade_test_case_dirs` rather than `handmade_test_code_pairs` for the same reason the
+    /// benchmark is: nothing here needs two fixtures in memory at once.
+    ///
+    /// **Byte columns** (see [`super::SourceColumn`]): a character count masquerading as a column
+    /// produces one that is either past the row's byte length or inside a multi-byte character,
+    /// and both are invisible until something slices there. What this does **not** catch,
+    /// checked rather than assumed: reintroducing the character count in
+    /// `compute_row_byte_lengths` leaves this passing, because a mis-normalised end is still a
+    /// legal position - `(row + 1, 0)` always is. The guard for the *unit* is
     /// `from_treesitter_range_does_not_normalize_a_mid_row_column_that_matches_a_character_count`
     /// (fast, and it does fail on that regression) together with
     /// `headless::tests::a_highlight_covers_the_same_text_on_ascii_and_non_ascii_rows`, which
-    /// catches it where a user would see it.
+    /// catches it where a user would see it. This covers the neighbouring class those two do not.
     ///
-    /// This one covers the neighbouring class those two do not: a column past its row's end, or
-    /// inside a multi-byte character, which panics or silently truncates at the next slice.
+    /// **Overlaps**: a measurement turned into an invariant. Across the corpus there are 7620
+    /// overlapping pairs on 59 fixtures, and *all 7620* share exactly one byte, always `\n`:
+    /// `from_treesitter_range` normalises an end landing at the end of a row to `(row + 1, 0)`,
+    /// which in byte terms is one past `(row, row_len)` and so takes in the newline, while the
+    /// next range starts at that newline. Every consumer excludes newlines already - `label_bytes`
+    /// nulls them outright, `columns_on_row` stops at the row's trimmed content - which is why
+    /// this has never mis-rendered anything. Two ranges sharing a *character* would be a genuine
+    /// disagreement about real code, which the renderers and the scorer resolve by different rules
+    /// (highest verdict vs. last writer). This fails if one ever appears.
+    ///
     /// Deliberately not `#[ignore]`d, unlike `byte_index_agrees_with_a_linear_walk_on_the_corpus`
     /// next door - that guards an optimisation against a reference implementation and is only
     /// interesting when someone touches it, whereas any change to position handling anywhere can
     /// break this one.
     #[test]
-    fn every_range_the_corpus_produces_is_a_byte_column_on_a_character_boundary() {
-        let pairs = crate::test::helper::handmade_test_code_pairs().expect("corpus");
-        let mut checked = 0usize;
+    fn corpus_ranges_are_addressable_byte_columns_sharing_nothing_but_line_terminators() {
+        let cases = crate::test::helper::handmade_test_case_dirs().expect("corpus");
+        let checked = std::sync::atomic::AtomicUsize::new(0);
 
-        for (name, (before, after)) in pairs.iter() {
-            let diff = crate::diff::diff_code(before, after);
+        // One thread per core over slices of the corpus: this is the suite's slowest test, and
+        // the fixtures are independent. A failing assertion panics its thread, which `scope`
+        // re-raises on join, so a failure is still a failure.
+        let threads = std::thread::available_parallelism().map_or(1, |n| n.get());
+        let chunk = cases.len().div_ceil(threads).max(1);
+        std::thread::scope(|scope| {
+            for slice in cases.chunks(chunk) {
+                scope.spawn(|| check_cases(slice, &checked));
+            }
+        });
+
+        assert!(
+            checked.load(std::sync::atomic::Ordering::Relaxed) > 0,
+            "the corpus should have produced ranges to check"
+        );
+    }
+
+    fn check_cases(
+        cases: &[(String, std::path::PathBuf)],
+        checked: &std::sync::atomic::AtomicUsize,
+    ) {
+        use crate::diff::text_range::{SourceColumn, SourceOffset, SourceRow, SourceText};
+
+        for (name, dir) in cases {
+            let Some((before, after)) =
+                crate::test::helper::code_pair_from_dir(dir).expect("fixture loads")
+            else {
+                continue;
+            };
+            let diff = crate::diff::diff_code(&before, &after);
             let Some(ast) = diff.ast.as_ref() else {
                 continue;
             };
-            let cache = crate::diff::NodeCache::build(before, after);
-            let text_diff = crate::diff::text::TextDiff::from(before, after, ast, &cache);
+            let cache = crate::diff::NodeCache::build(&before, &after);
+            let text_diff = crate::diff::text::TextDiff::from(&before, &after, ast, &cache);
 
             for (side, contents) in [(0usize, &before.contents), (1usize, &after.contents)] {
                 let rows: Vec<&str> = contents.split('\n').collect();
+                let text = SourceText::new(contents);
+                let mut spans: Vec<(usize, usize)> = Vec::new();
+
                 for range in text_diff.all(side) {
                     for (label, row, column) in [
                         ("start", range.source.start_row, range.source.start_column),
@@ -1060,49 +1106,9 @@ mod corpus_position_invariants {
                             "{name} side{side}: {label} column {column} falls inside a multi-byte \
                              character on row {row}"
                         );
-                        checked += 1;
+                        checked.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                     }
-                }
-            }
-        }
 
-        assert!(
-            checked > 0,
-            "the corpus should have produced ranges to check"
-        );
-    }
-
-    /// Every position codediff emits must be addressable as a byte offset, and the only text two
-    /// ranges on one side may both claim is a line terminator.
-    ///
-    /// Both halves are measurements turned into invariants rather than guesses. Across the corpus
-    /// there are 7620 overlapping pairs on 59 fixtures, and *all 7620* share exactly one byte,
-    /// always `\n`: `from_treesitter_range` normalises an end landing at the end of a row to
-    /// `(row + 1, 0)`, which in byte terms is one past `(row, row_len)` and so takes in the
-    /// newline, while the next range starts at that newline. Every consumer excludes newlines
-    /// already - `label_bytes` nulls them outright, `columns_on_row` stops at the row's trimmed
-    /// content - which is why this has never mis-rendered anything.
-    ///
-    /// Two ranges sharing a *character* would be a different thing: a genuine disagreement about
-    /// real code, which the renderers and the scorer resolve by different rules (highest verdict
-    /// vs. last writer). This fails if one ever appears.
-    #[test]
-    fn corpus_ranges_are_addressable_and_share_nothing_but_line_terminators() {
-        use crate::diff::text_range::{SourceColumn, SourceOffset, SourceRow, SourceText};
-
-        let pairs = crate::test::helper::handmade_test_code_pairs().expect("corpus");
-        for (name, (before, after)) in pairs.iter() {
-            let diff = crate::diff::diff_code(before, after);
-            let Some(ast) = diff.ast.as_ref() else {
-                continue;
-            };
-            let cache = crate::diff::NodeCache::build(before, after);
-            let text_diff = crate::diff::text::TextDiff::from(before, after, ast, &cache);
-
-            for (side, contents) in [(0usize, &before.contents), (1usize, &after.contents)] {
-                let text = SourceText::new(contents);
-                let mut spans: Vec<(usize, usize)> = Vec::new();
-                for range in text_diff.all(side) {
                     let offset = |row: usize, column: usize| -> usize {
                         text.byte_index(SourceRow::from_raw(row), SourceColumn::from_raw(column))
                             .map(SourceOffset::get)

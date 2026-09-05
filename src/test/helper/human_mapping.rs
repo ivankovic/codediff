@@ -847,18 +847,48 @@ pub fn compare_painting(
     options: crate::diff::text::RenderOptions,
 ) -> Result<PaintingComparison> {
     let (before, after) = &*super::handmade_test_code_pair(name)?;
+    let diff = codediff_diff_for_painting(name, before, after)?;
+    compare_painting_with_diff(name, options, before, after, &diff)
+}
+
+/// codediff's side of a painting comparison: a real diff, so that every preset is projected from
+/// the same mapping. Built once per fixture and handed to [`compare_painting_with_diff`] for each
+/// preset, since the diff is the expensive half and does not depend on the preset.
+pub struct PaintingDiff {
+    ast: crate::diff::ASTDiff,
+    node_cache: crate::diff::NodeCache,
+}
+
+/// See [`PaintingDiff`].
+pub fn codediff_diff_for_painting(
+    name: &str,
+    before: &crate::code::Code,
+    after: &crate::code::Code,
+) -> Result<PaintingDiff> {
+    let diff = crate::diff::diff_code(before, after);
+    let ast = diff
+        .ast
+        .with_context(|| format!("codediff produced no AST diff for '{name}'"))?;
+    let node_cache = crate::diff::NodeCache::build(before, after);
+    Ok(PaintingDiff { ast, node_cache })
+}
+
+/// [`compare_painting`] over an already computed diff - see [`PaintingDiff`] for why the two are
+/// separate.
+pub fn compare_painting_with_diff(
+    name: &str,
+    options: crate::diff::text::RenderOptions,
+    before: &crate::code::Code,
+    after: &crate::code::Code,
+    diff: &PaintingDiff,
+) -> Result<PaintingComparison> {
     let mapping = load(name)?;
     let candidates = paintings_for_mode(&mapping, options)?;
 
     // codediff's side, through exactly the pipeline the TUI renders: a real diff, projected by
     // `TextDiff`, then filtered by the options. Not a re-derivation - what is compared is what a
     // reader would actually see.
-    let diff = crate::diff::diff_code(before, after);
-    let ast = diff
-        .ast
-        .as_ref()
-        .with_context(|| format!("codediff produced no AST diff for '{name}'"))?;
-    let node_cache = crate::diff::NodeCache::build(before, after);
+    //
     // Not `TextDiff::from` (which hardcodes both construction-time options to their legacy
     // defaults) - `paint_reindent_only_moves` genuinely differs between `MINIMAL`/`FULL` (unlike
     // `whole_pair_updates`, which never has), so this must resolve `options`'s own value rather
@@ -866,8 +896,8 @@ pub fn compare_painting(
     let text_diff = crate::diff::text::TextDiff::from_with_options(
         before,
         after,
-        ast,
-        &node_cache,
+        &diff.ast,
+        &diff.node_cache,
         options.whole_pair_updates,
         options.paint_reindent_only_moves,
     );
@@ -941,9 +971,13 @@ pub fn compare_painting(
 pub fn assert_matches_human_painting_within_limit(name: &str, max_percent: f64) -> Result<()> {
     use crate::diff::text::RenderOptions;
 
+    // One diff for both presets: they are two renderings of one mapping, and the diff is the
+    // expensive half of each comparison.
+    let (before, after) = &*super::handmade_test_code_pair(name)?;
+    let diff = codediff_diff_for_painting(name, before, after)?;
     let mut failures = Vec::new();
     for options in [RenderOptions::MINIMAL, RenderOptions::FULL] {
-        let comparison = compare_painting(name, options)?;
+        let comparison = compare_painting_with_diff(name, options, before, after, &diff)?;
         if comparison.percent() > max_percent {
             failures.push(format!(
                 "  {} vs '{}': {:.3}% ({} of {} bytes) exceeds the {:.3}% limit",
