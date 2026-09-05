@@ -63,7 +63,9 @@ libc = { version = "0.2", optional = true }
 num_cpus = { version = "1.17.0", optional = true }
 # Only used by src/stats/sampling.rs (feature-gated) and the stats-gated sample_*.rs dev tools.
 rand = { version = "0.8", optional = true }
-regex = "1.12.2"
+# Only used by src/stats.rs and the fixture-loading helpers under src/test/ (`test-fixtures`);
+# also a dev-dependency below because those helpers compile under a plain `cargo test` too.
+regex = { version = "1.12.2", optional = true }
 # Terminal cell widths for `text_range::ScreenColumn`. Already in the lockfile via ratatui, so
 # declaring it directly adds no new dependency - it makes the existing one honest, since the
 # source->screen column conversion needs it outside the TUI too (headless rendering).
@@ -75,8 +77,10 @@ unicode-width = "0.1.14"
 rusqlite = { version = "0.37.0", features = ["bundled"], optional = true }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0"
-tempfile = "3.10.1"
-futures = "0.3"
+# Only used by tests and the `test-fixtures` helpers - gated like regex above, for the same reason.
+tempfile = { version = "3.10.1", optional = true }
+# TUI-only (the event stream) - gated by `tui`.
+futures = { version = "0.3", optional = true }
 # TUI-only, but also used directly by src/bin/commit_stats.rs for concurrent I/O - gated by `tui`,
 # same reasoning as confy above.
 tokio = { version = "1.0", features = ["full"], optional = true }
@@ -108,12 +112,14 @@ tree-sitter-typescript = "0.23"
 tree-sitter-vim = "0.4"
 tree-sitter-xml = "0.7.0"
 tree-sitter-yaml = "0.7"
-walkdir = "2"
+# Only used by src/stats/filesystem.rs - gated by `stats`.
+walkdir = { version = "2", optional = true }
 metrohash = "1.0.7"
 rustc-hash = "2.1"
-tracing = "0.1.44"
-tracing-subscriber = { version = "0.3.23", features = ["env-filter", "serde"]}
-tracing-error = "0.2.1"
+# All three TUI-only (src/tui.rs sets up the subscriber, src/tui/app.rs logs) - gated by `tui`.
+tracing = { version = "0.1.44", optional = true }
+tracing-subscriber = { version = "0.3.23", features = ["env-filter", "serde"], optional = true }
+tracing-error = { version = "0.2.1", optional = true }
 strum = { version = "0.28.0", features = ["derive"] }
 # TUI-only - gated by `tui` below.
 signal-hook = { version = "0.4.4", optional = true }
@@ -121,6 +127,10 @@ syntect = { version = "5.2", features = ["default-fancy"], optional = true }
 two-face = { version = "0.5.2", default-features = false, features = ["syntect-fancy"], optional = true }
 
 [dev-dependencies]
+# The same two crates the `test-fixtures` feature enables, for the `#[cfg(test)]` builds that
+# compile src/test/ without that feature (see lib.rs's gate on `mod test`).
+regex = "1.12.2"
+tempfile = "3.10.1"
 
 [features]
 # `tui` on by default so a bare `cargo build`/`cargo install codediff` keeps producing the working
@@ -133,14 +143,26 @@ default = ["tui"]
 # unrelated purposes (human_solver.rs has its own small ratatui-based debug UI; commit_stats.rs
 # uses tokio for concurrent I/O) - simpler to have every dev-tool feature imply `tui` than to track
 # exactly which of these 6 deps each individual bin happens to need.
-tui = ["dep:ratatui", "dep:crossterm", "dep:tokio", "dep:syntect", "dep:two-face", "dep:signal-hook", "dep:confy"]
+tui = [
+    "dep:ratatui",
+    "dep:crossterm",
+    "dep:tokio",
+    "dep:syntect",
+    "dep:two-face",
+    "dep:signal-hook",
+    "dep:confy",
+    "dep:futures",
+    "dep:tracing",
+    "dep:tracing-subscriber",
+    "dep:tracing-error",
+]
 # Gates `codediff::test` (fixture-loading helpers whose data files under src/test/data/ are
 # excluded from the published crate - see this file's own `exclude` list - so the module itself
 # must not be part of the crate's default public surface either, or a real dependent would see
 # API that's guaranteed to fail at runtime). Needed by every src/bin/ dev tool, not just the three
 # that don't otherwise need `stats` (human_solver.rs, benchmark_optimal_solutions.rs,
 # benchmark_other.rs) - `stats` includes it below so the other six don't need to list it twice.
-test-fixtures = ["dep:csv", "tui"]
+test-fixtures = ["dep:csv", "dep:regex", "dep:tempfile", "tui"]
 # Pulls in git2 (and its openssl/libssh2 build-time deps), rusqlite (a bundled, C-compiled SQLite),
 # and the rest of the git-history stats/sampling tools' dependencies for the src/bin/ tools gated
 # the same way. Not needed by the main codediff binary or a library consumer, so it's opt-in to
@@ -153,6 +175,7 @@ stats = [
     "dep:num_cpus",
     "dep:rand",
     "dep:indoc",
+    "dep:walkdir",
     "test-fixtures",
 ]
 

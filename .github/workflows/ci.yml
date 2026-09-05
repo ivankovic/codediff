@@ -77,17 +77,18 @@ jobs:
         with:
           node-version: 24
 
-      # Both scripts. viewer.js is the larger of the two and went untested until 2026-08-27; see
-      # the Makefile's `test-mapping-site-js` target for what these do and do not cover.
-      - run: node assets/mapping_site/index.test.js
-      - run: node assets/mapping_site/viewer.test.js
+      # The Makefile target, not the two `node` lines by hand: it is what `make test` and the
+      # pre-push hook run, and the three must not drift apart (see the target's own comment for
+      # what the tests do and do not cover).
+      - run: make test-mapping-site-js
 
   # The analysis scripts under research/ compute the numbers that go into the papers, and until
   # 2026-08-27 nothing checked them at all while the Rust half had clippy -D warnings across three
-  # feature configs. The ruff version is pinned for the same reason the rule set is pinned in
-  # research/pyproject.toml: an unpinned linter turns CI red on a day nobody touched the code.
+  # feature configs. The ruff version is pinned for the same reason the rule set is pinned in the
+  # root ruff.toml: an unpinned linter turns CI red on a day nobody touched the code. The three
+  # directories are the same three `make lint-python` covers.
   python-lint:
-    name: ruff (research/, scripts/)
+    name: ruff (research/, scripts/, assets/)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -96,13 +97,13 @@ jobs:
         with:
           version: 0.16.4
           args: check
-          src: research scripts
+          src: research scripts assets
 
       - uses: astral-sh/ruff-action@v3
         with:
           version: 0.16.4
           args: format --check
-          src: research scripts
+          src: research scripts assets
 
   # The release gate, run on every push rather than only at deploy time - a regression is far
   # cheaper to find on the commit that caused it than in the middle of a release. Safe to gate in
@@ -120,7 +121,9 @@ jobs:
         with:
           key: quality
 
-      - run: make check-quality
+      # `test-fixtures`, not the Makefile's default `stats`: the gate needs no git2/rusqlite, and
+      # keeping them out of this job's cache is worth the one override.
+      - run: make check-quality FEATURES=test-fixtures
 
   build-and-test:
     name: build + test (${{ matrix.features == '' && 'default' || matrix.features }})

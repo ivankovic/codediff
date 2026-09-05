@@ -81,9 +81,7 @@ def action_name(uses: str) -> str:
 def check_tool(argv: list[str], what: str) -> None:
     """Fails the run if a tool CI installs for itself is missing here."""
     if shutil.which(argv[0]) is None:
-        raise RuntimeError(
-            f"{what} needs `{argv[0]}` on PATH, which CI installs for itself"
-        )
+        raise RuntimeError(f"{what} needs `{argv[0]}` on PATH, which CI installs for itself")
     result = subprocess.run(argv, capture_output=True, text=True, check=False)
     if result.returncode != 0:
         raise RuntimeError(f"{what}: `{' '.join(argv)}` failed - is it installed?")
@@ -196,9 +194,7 @@ def matrix_combinations(job: dict[str, Any]) -> list[dict[str, Any]]:
         return [{}]
     combinations: list[dict[str, Any]] = [{}]
     for key, values in axes.items():
-        combinations = [
-            {**base, key: value} for base in combinations for value in values
-        ]
+        combinations = [{**base, key: value} for base in combinations for value in values]
     return combinations
 
 
@@ -209,9 +205,7 @@ def label(job_id: str, matrix: dict[str, Any]) -> str:
     return f"{job_id} ({parts})"
 
 
-def run_job(
-    job_id: str, job: dict[str, Any], matrix: dict[str, Any], env: dict[str, str]
-) -> bool:
+def run_job(job_id: str, job: dict[str, Any], matrix: dict[str, Any], env: dict[str, str]) -> bool:
     heading = label(job_id, matrix)
     print(f"\n\033[1m=== {heading} ===\033[0m", flush=True)
     started = time.monotonic()
@@ -253,9 +247,7 @@ def run_job(
             )
             return False
 
-    print(
-        f"\033[32mok\033[0m {heading} ({time.monotonic() - started:.1f}s)", flush=True
-    )
+    print(f"\033[32mok\033[0m {heading} ({time.monotonic() - started:.1f}s)", flush=True)
     return True
 
 

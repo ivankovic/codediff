@@ -14,30 +14,5 @@ dependencies = [
     "seaborn>=0.13.2",
 ]
 
-# Linting for the analysis scripts, run by `make lint` here and by CI's `python` job.
-#
-# `select` is pinned explicitly rather than left on ruff's defaults, which move between releases:
-# an unpinned set means a ruff upgrade can turn CI red on a day nobody touched Python. What is
-# listed is ruff's own default core (E4/E7/E9 + pyflakes) plus the families that were catching real
-# things in this directory when the set was pinned:
-#
-#   I        import order, so a diff of one of these scripts is about the analysis, not the imports
-#   UP       syntax this project's `requires-python = ">=3.12"` makes available
-#   C4       needless generators/comprehensions
-#   ISC      implicit string concatenation, which silently glues two list elements into one
-#   EXE      a shebang and the executable bit have to agree - several of these are PEP 723
-#            inline scripts run as `./analysis/foo.py`
-#
-# The two pylint rules are named individually, not as the `PL` family, for the same
-# version-stability reason: `PLR` in particular grows new opinions (magic values, argument counts)
-# that would fail this directory on a ruff upgrade without a line of it changing.
-[tool.ruff]
-target-version = "py312"
-# 100, not ruff's default 88. It is what these scripts were already written to - 99% of their lines
-# fit in 103 columns and only 1.3% exceed 100 - and it is what the Rust half of the repository uses
-# (rustfmt's own default). Formatting at 88 would rewrap 1376 lines to say the same thing; at 100 it
-# is 989, and none of them because the author picked a different width.
-line-length = 100
-
-[tool.ruff.lint]
-select = ["E4", "E7", "E9", "F", "I", "UP", "C4", "ISC", "EXE", "PLR0402", "PLW1510"]
+# Ruff configuration lives in the repository root's ruff.toml, so that research/, scripts/ and
+# assets/ are linted under one pinned rule set.

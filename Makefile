@@ -36,6 +36,20 @@
 # people to write tests that touch lines, and the number that matters here (`src/diff/`) is
 # already high enough that a floor would only ever fire on the dev tools.
 #
+# One feature set for every local release-binary target, so alternating `make build`,
+# `make check-quality` and `make diff-inventory` does not re-link the fat-LTO binary each time:
+# cargo fingerprints by feature set, and `stats` is a superset of `test-fixtures`. CI's quality
+# job overrides this with the smaller set (see ci.yml) so its cache stays free of git2/rusqlite.
+FEATURES ?= stats
+
+# Usage: make benchmark-ablation [OUT_DIR=path]
+OUT_DIR ?= research/data/ablation
+
+.PHONY: coverage test test-mapping-site-js build install install-hooks benchmark-quality \
+	diff-inventory lint-python ci benchmark-ablation check-quality update-quality-baseline \
+	deploy-checks deploy-crates deploy-github deploy benchmark-speed \
+	benchmark-speed-update-baseline
+
 # `cargo-llvm-cov` drives `cargo nextest` directly, so this runs exactly the suite `make test`
 # does, under the same feature set CI's widest job uses. Around ten minutes and 6GB peak: it
 # rebuilds the whole workspace with instrumentation, which is why it is not wired into anything
@@ -48,7 +62,7 @@ coverage:
 	# invocations can accumulate into one report. Without this the numbers only ever climb, since
 	# each run adds to whatever the last one left behind.
 	cargo llvm-cov clean --workspace
-	cargo llvm-cov nextest --no-report --release --features stats
+	cargo llvm-cov nextest --no-report --release --features $(FEATURES)
 	cargo llvm-cov report --release --html
 	cargo llvm-cov report --release --json --summary-only \
 	  | python3 scripts/coverage_report.py --badge research/data/coverage/badge.json
@@ -72,12 +86,14 @@ test-mapping-site-js:
 	node assets/mapping_site/index.test.js
 	node assets/mapping_site/viewer.test.js
 
-# --features stats: every target below this one (measure-file-stats, measure-commit-stats, sample-pairs,
-# measure-pairs, and the language-specific variants) runs a stats-gated binary
-# (file_stats/commit_stats/sample_code_pairs/benchmark_diff_pairs) that doesn't exist in
-# target/release without it - see Cargo.toml's `stats` feature.
-build: test
-	cargo build --release --features stats
+# $(FEATURES) defaults to `stats` because every research target that depends on this one
+# (measure-file-stats, measure-commit-stats, sample-pairs, measure-pairs, and the language-specific
+# variants) runs a stats-gated binary (file_stats/commit_stats/sample_code_pairs/
+# benchmark_diff_pairs) that doesn't exist in target/release without it - see Cargo.toml's `stats`
+# feature. Deliberately not dependent on `test`: those research targets are measurement runs, and
+# `deploy-checks` gates on `check-quality` explicitly.
+build:
+	cargo build --release --features $(FEATURES)
 
 # Installs codediff from this checkout onto PATH (~/.cargo/bin by default), so `codediff` and any
 # `git difftool`/`git diff` config pointing at it matches this working tree - including
@@ -106,28 +122,30 @@ install-hooks:
 # algorithm (see TODO.md). Named to pair with `check-quality`, which gates on exactly this
 # measurement: benchmark- produces the number, check- fails the build on it.
 #
-# --features test-fixtures: this binary needs codediff::test's fixture-loading helpers, gated
-# separately from `stats` since it needs no git2/rusqlite.
+# The binary needs only `test-fixtures` (codediff::test's fixture-loading helpers), which is
+# what CI passes; locally it runs under $(FEATURES) so it shares `make build`'s target/release.
 benchmark-quality:
-	cargo run --release --features test-fixtures --bin benchmark_optimal_solutions -- --csv
+	$(BENCH_QUALITY) --csv
 
 # Regenerates src/test/data/diffs.csv: one row per fixture with its provenance, size, and how far
 # each of its two ground truths has been taken. Cheap and fully derived from the corpus, so re-run
 # it after adding fixtures, finishing a tree mapping, or painting text ranges - the file is
 # checked in so the inventory is readable without running anything, not because it is authored.
 diff-inventory:
-	cargo run --release --features test-fixtures --bin diff_inventory
+	cargo run --release --features $(FEATURES) --bin diff_inventory
 
-# Lints the analysis scripts under research/. Lives here rather than in research/Makefile so that
-# `make lint` covers everything CI lints from one place; the rule set itself is pinned in
-# research/pyproject.toml (see that file for why it is pinned rather than left on ruff's defaults).
+# Lints every Python file in the repository: the analysis scripts under research/, the CI mirror
+# and coverage report under scripts/, and the bdiff driver under assets/. One target so that this,
+# the pre-push hook and CI cannot lint three different subsets; the rule set is pinned in the root
+# ruff.toml (see that file for why it is pinned rather than left on ruff's defaults).
 #
 # Two passes, mirroring the shape the Rust side already has (`cargo fmt --check` and clippy as
-# separate CI jobs): the formatter decides layout, the linter decides everything else. Width is set
-# to 100 in research/pyproject.toml to match what these scripts were already written to.
+# separate CI jobs): the formatter decides layout, the linter decides everything else.
 lint-python:
-	ruff check research
-	ruff format --check research
+	ruff check $(PYTHON_DIRS)
+	ruff format --check $(PYTHON_DIRS)
+
+PYTHON_DIRS := research scripts assets
 
 # Runs everything .github/workflows/ci.yml runs, here, before the push rather than after it.
 #
@@ -148,15 +166,18 @@ ci:
 # A codediff measurement over this repository's own fixtures, so it lives here rather than in
 # research/ despite having been written there.
 #
-# Usage: make benchmark-ablation [OUT_DIR=path]  (default: research/data/ablation)
+# Usage: make benchmark-ablation [OUT_DIR=path]  (default: research/data/ablation; set above)
 benchmark-ablation:
 	./scripts/ablation_study.sh $(OUT_DIR)
-
-OUT_DIR ?= research/data/ablation
 
 QUALITY_BASELINE := research/data/quality/quality_baseline.csv
 RUNTIME_BASELINE := research/data/quality/quality_baseline.txt
 BENCH_OUTPUT := target/benchmark_optimal_output.txt
+# The one invocation behind benchmark-quality, check-quality and update-quality-baseline; they
+# differ only in the flag they pass it.
+BENCH_QUALITY := cargo run --release --features $(FEATURES) --bin benchmark_optimal_solutions --
+# The "Runtime: N ms/fixture" figure out of $(BENCH_OUTPUT), as a number.
+extract-ms = grep -oE '[0-9.]+ms/fixture' $(BENCH_OUTPUT) | grep -oE '[0-9.]+'
 
 # The release gate: `deploy` runs this before it ever tags or publishes.
 #
@@ -191,9 +212,8 @@ check-quality: SHELL := /bin/bash
 check-quality: .SHELLFLAGS := -o pipefail -c
 check-quality:
 	@mkdir -p $(dir $(BENCH_OUTPUT))
-	cargo run --release --features test-fixtures --bin benchmark_optimal_solutions -- \
-		--compare $(QUALITY_BASELINE) | tee $(BENCH_OUTPUT)
-	@ms=$$(grep -oE '[0-9.]+ms/fixture' $(BENCH_OUTPUT) | grep -oE '[0-9.]+'); \
+	$(BENCH_QUALITY) --compare $(QUALITY_BASELINE) | tee $(BENCH_OUTPUT)
+	@ms=$$($(extract-ms)); \
 	baseline_ms=$$(grep '^MS_PER_FIXTURE=' $(RUNTIME_BASELINE) | cut -d= -f2); \
 	echo ""; \
 	echo "Runtime: $$ms ms/fixture (baseline: $$baseline_ms)"; \
@@ -223,9 +243,8 @@ check-quality:
 # `MS_PER_FIXTURE=` over the runtime baseline.
 update-quality-baseline:
 	@mkdir -p $(dir $(BENCH_OUTPUT))
-	cargo run --release --features test-fixtures --bin benchmark_optimal_solutions -- \
-		--write-baseline $(QUALITY_BASELINE) | tee $(BENCH_OUTPUT)
-	@ms=$$(grep -oE '[0-9.]+ms/fixture' $(BENCH_OUTPUT) | grep -oE '[0-9.]+'); \
+	$(BENCH_QUALITY) --write-baseline $(QUALITY_BASELINE) | tee $(BENCH_OUTPUT)
+	@ms=$$($(extract-ms)); \
 	{ \
 		echo "# Runtime baseline for \`make check-quality\` - see Makefile."; \
 		echo "#"; \

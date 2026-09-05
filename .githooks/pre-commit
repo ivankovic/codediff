@@ -76,7 +76,7 @@ echo "pre-commit: fixtures changed, regenerating $INVENTORY"
 # a couple of seconds optimized and well over a minute unoptimized. The first run after a clean
 # checkout has to compile it, and this crate's release profile is `lto = "fat"` - so say what is
 # happening rather than leaving a silent multi-minute hang at commit time.
-if ! cargo run --quiet --release --features test-fixtures --bin diff_inventory; then
+if ! make --quiet diff-inventory; then
     echo "pre-commit: diff_inventory failed - see the error above" >&2
     echo "  (commit with --no-verify to bypass, then fix the inventory separately)" >&2
     exit 1

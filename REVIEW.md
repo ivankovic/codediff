@@ -22,6 +22,15 @@ done; the §4 typos are fixed except `symetric` (×3).
   replaced by `helper::sample_provenance` (its `language` column now comes from the fixture's
   detected language, which is the same detector `sample.csv` recorded), `dataset.sh`'s project
   filter, R/Scala in `LANGUAGE_CATEGORY`, `[[bench]]` gating.
+- **2026-09-05, section 2** - done: `build` no longer depends on `test`; the seven
+  feature-only dependencies are gated (`tempfile`/`regex` also as dev-dependencies for the
+  `cfg(test)` builds of `src/test/`); one `FEATURES ?= stats` for every local release-binary
+  target, CI's quality job overrides it with `test-fixtures`; `BENCH_QUALITY`/`extract-ms`
+  replace the triplicated invocation; `.PHONY` in the root Makefile; ruff config moved to a root
+  `ruff.toml` and `make lint-python`, the pre-push hook and CI all lint `research scripts
+  assets`; CI's JS job calls `make test-mapping-site-js`. Left open: `research/Makefile`'s own
+  items (no `.PHONY`, `matching-reasons-report`'s benchmark prerequisite, the
+  `measure-apted-budget` blocks) - that file had uncommitted edits at the time.
 
 ## Headline numbers
 
