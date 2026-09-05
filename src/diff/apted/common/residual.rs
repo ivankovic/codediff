@@ -319,34 +319,17 @@ pub(crate) fn resolve_residual_forest_via_myers_lcs(
         if before_seg.is_empty() && after_seg.is_empty() {
             continue;
         }
-        // Never *pooled* (unlike `resolve_flat_tree_pair`'s own leftover recursion, which pools up
-        // to `FLAT_UNMATCHED_RECURSE_LIMIT` entries because its entries are genuine ordered
-        // siblings under one shared parent). Confirmed empirically that pooling here is unsafe:
-        // this residual's maximal-unmatched-roots are scattered, semantically *unrelated*
-        // fragments from anywhere in the file, so handing APTED a pool of several candidates per
-        // side to freely choose among lets it invent a plausible-looking but wrong cross-match
-        // between two merely-similar, unrelated fragments instead of correctly deleting one and
-        // inserting the other - caught on `kotlin-refactor-function` (2026-08-15): an unrelated
-        // deleted function's parameter/return-expression nodes got matched, via reason
-        // `fast_fallback`, to look-alike nodes elsewhere in the same gap, flipping a fixture from 0
-        // to 32 mismatches.
-        //
-        // Equal counts on both sides (2026-08-16) are still handled, just never pooled: each
-        // before/after pair is recursed *individually*, at its fixed document-order position
-        // within the gap (`before_seg[i]` paired only with `after_seg[i]`) - a true, unambiguous
-        // 1:1 "this replaced that" correspondence for every pair, with no room for APTED to invent
-        // a relationship across pairs, since each call only ever sees one candidate per side (the
-        // same reasoning the original exactly-one-entry case already relied on, generalized from
-        // "one pair" to "N independently-recursed pairs"). Mismatched counts (a real insert/delete
-        // happened inside the gap too) fall through unchanged to atomic delete/insert - resolving
-        // *which* subset corresponds needs real alignment info this gap doesn't have without
-        // re-introducing exactly the pooling risk above.
-        //
-        // Uncapped in size, same as `resolve_flat_tree_pair`'s own equal-count branch (2026-08-16):
-        // the since-deleted `RESIDUAL_SEGMENT_MAX_TOTAL_SIZE` bounded a *pool's* cost, but a per-position pair has
-        // nothing to cross-match against regardless of size, so it was never protecting against a
-        // correctness risk here either - only an unconfirmed latency one, and measurement (on the
-        // sibling function) found no fixture worse and no latency movement once removed.
+        // Never pooled: this residual's maximal-unmatched-roots are scattered, semantically
+        // *unrelated* fragments from anywhere in the file, and a pool lets APTED invent a
+        // plausible-looking but wrong cross-match between two merely-similar fragments instead of
+        // deleting one and inserting the other. Equal counts are recursed *per position*
+        // (`before_seg[i]` only against `after_seg[i]`) - a 1:1 "this replaced that" for every
+        // pair, with one candidate per side per call - and uncapped in size, since a per-position
+        // pair has nothing to cross-match against. Mismatched counts (a real insert/delete inside
+        // the gap) fall through to atomic delete/insert: picking *which* subset corresponds needs
+        // alignment information this gap does not have without re-introducing the pooling risk.
+        // The fixtures behind each of these choices are in `src/diff/TODO.md` under "Design
+        // history moved out of source".
         let recursable = !before_seg.is_empty() && before_seg.len() == after_seg.len();
         if recursable {
             let cost_model = UnitCostModel::new(before_meta.language);

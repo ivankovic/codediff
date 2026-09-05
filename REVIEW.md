@@ -114,6 +114,13 @@ done; the §4 typos are fixed except `symetric` (×3).
   lines). The rest is the wide-table case the review allowed for: 48 arms that genuinely differ
   (Rust `impl_item`, Go receivers and specs, C declarators, ...), most carrying the measurement
   that put them there. `make check-quality`: 0 regressed, 0 improved.
+- **2026-09-05/06, section 5 (history narrative)** - done for the four blocks that were pure
+  chronology: `solve_greedy_anchor_blocks`' all-pairs postmortem, `solve_identical_diagnostic_
+  statements`' paragraphs about a deleted pass, `myers.rs`'s two tried-and-reverted accounts and
+  `residual.rs`'s restatement each keep their invariant in source and point at "Design history
+  moved out of source" in `src/diff/TODO.md`, which now holds the dates and fixtures. `nodes.rs`
+  2064-2105 (a table of formerly-wrong kind names) stays: it is a verification record of the
+  current table, not history.
 - **Runtime finding from the same measurement**: over the corpus, AST metadata costs about three
   times the tree-sitter parse, and the parse plus metadata (15.5s) is more than half the diff
   itself (28s per the quality baseline). Section 6's items 1-3 are that cost.

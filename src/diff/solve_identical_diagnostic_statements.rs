@@ -35,21 +35,11 @@ use crate::diff::{ASTDiff, ASTMapping, ASTMappingReason};
 * match a bigger/more-reliable pass would otherwise have made in one piece (e.g. matching a whole
 * function wholesale) into a smaller one anchored on some incidental identical `log::debug!(...)`
 * call inside it. Running it before the later phases means it can still find a diagnostic
-* statement buried inside a function/impl that has no same-named counterpart on the other side -
-* the same reasoning the since-deleted (2026-08-14) `solve_similar_flow_control` used to document
-* for its own placement inside phase 4.
+* statement buried inside a function/impl that has no same-named counterpart on the other side.
 *
-* Note this pass has no effect on the `rust-turbopack-module-rule` fixture that motivated
-* `solve_similar_flow_control` (deleted 2026-08-14): its one `bail!(...)` isn't byte-identical
-* between before/after (the message text changed to list an added "json" module type), so it
-* wouldn't match here regardless. And even if it were identical, the enclosing `match_expression` -
-* `bail!` arm included - gets fully resolved via a real `apted::for_nodes` call on the container
-* regardless (through phase 4's named-group matching on the enclosing declaration, or, when
-* `solve_similar_flow_control` still existed and was enabled, through its own container-wide call),
-* since `for_nodes` computes a complete edit script over the whole subtree, not just the root pair.
-* So this pass is currently validated only by its own unit tests (including non-Rust ones covering
-* C/Python/Go callee extraction) and has no real-fixture coverage yet - worth keeping in mind if it
-* ever needs revisiting.
+* Validated only by its own unit tests (including non-Rust ones covering C/Python/Go callee
+* extraction); no corpus fixture exercises it - see "Design history moved out of source" in
+* `src/diff/TODO.md` for why the fixture that motivated it does not.
 *
 * Matching requires an *exact* full-content hash match (see `ASTMetadata::node_to_full_hash`) - no
 * similarity threshold. A `log::error!("failed: {e}")` that

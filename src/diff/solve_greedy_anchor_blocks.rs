@@ -32,35 +32,18 @@ use crate::diff::{ASTDiff, ASTMappingReason};
 * for a Dice coefficient to count, but whose *content* is still obviously the same block with a few
 * edits.
 *
-* An earlier version of this pass scored *every* candidate pair against every other (an all-pairs
-* B*A search) and regressed 9
-* `optimal_solutions` fixtures: `sequence_edit_cost` only looks at a pair's own direct children, so
-* nothing stopped it scoring two structurally *unrelated* nodes as "cheap to match" whenever their
-* children happened to hash-coincide (e.g. two different `call_expression`s - one in a `for` loop
-* condition, one in a `return` statement - whose `argument_list` both happened to be `()`). Adding
-* `nodes::is_block_container` narrowed the candidate *kinds* enough to fix most of that, but one
-* regression survived: a byte-identical `statement_block` that the human mapping relocates into a
-* newly-inserted `try_statement` wrapper scored a *near-zero* cost ratio - the cheapest possible
-* match by this heuristic's own reckoning - precisely because content-only scoring has no way to
-* tell "same content, same place" from "same content, moved". No `MAX_COST_RATIO` value rejects a
-* ~0-ratio match without rejecting everything, so this needed a different kind of fix, not a
-* stricter threshold (both problems, and this design, are documented in detail in `TODO.md` under
-* "TRIED AND REVERTED (2026-07-12)" and its "2026-07-12, positional anchor" follow-up).
-*
-* The fix: gate candidate pairs on a *positional* signal before cost ever gets consulted -
+* Candidate pairs are gated on a *positional* signal before cost is ever consulted:
 * `positional_key_before`/`positional_key_after` walk each candidate up to its nearest already-
 * matched ancestor (via `ASTMetadata::node_to_parent`) and record the kind of every node passed
 * along the way. Two candidates are only ever compared if that walk lands on a *corresponding*
 * ancestor pair (the before-side ancestor's counterpart, per `diff.before_node_map`, is exactly the
 * after-side ancestor) *and* the kind-path from that ancestor down to each candidate is identical.
-* This directly answers both regressions: the two unrelated `call_expression`s have unrelated
-* ancestor paths (`for_statement > binary_expression > ...` vs. `return_statement >
-* pointer_expression > ...`), so they're never even compared; the relocated `statement_block`'s
-* after-side path gains an extra `try_statement` segment the before-side path doesn't have, so its
-* path no longer matches and the pair is rejected regardless of how cheap its content score is.
-* Nodes with no matched ancestor at all (nothing above them has been resolved yet) fall back to
-* their full path from the file root, which is the same idea one level up: "no better anchor exists,
-* so require literal structural correspondence from the top."
+* Content-only scoring cannot tell "same content, same place" from "same content, moved", and no
+* `MAX_COST_RATIO` rejects a near-zero-ratio match without rejecting everything, so the position
+* gate is the fix, not a stricter threshold. Nodes with no matched ancestor at all fall back to
+* their full path from the file root: "no better anchor exists, so require literal structural
+* correspondence from the top." The all-pairs version this replaced, and the two regressions that
+* forced the gate, are in `src/diff/TODO.md` under "Design history moved out of source".
 *
 * Candidate generation (`collect_candidates` + the two `positional_key_*` functions above) is this
 * pass's own; the grouping, scoring, greedy assignment, and defensive re-check against pairs
