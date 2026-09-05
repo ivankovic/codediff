@@ -161,20 +161,10 @@ pub(crate) fn render_panel(
         let group_marker = if in_group { "g" } else { "" };
         let (algo_glyph, disagrees) = algo_diff
             .map(|diff_ast| {
-                let algo_status = match side {
-                    Side::Before => algo_status_before(node, diff_ast),
-                    Side::After => algo_status_after(node, diff_ast),
-                };
-                let disagrees = match side {
-                    Side::Before => algo_disagrees_before(node, caches, diff_ast),
-                    Side::After => algo_disagrees_after(node, caches, diff_ast),
-                };
+                let algo_status = algo_status(side, node, diff_ast);
+                let disagrees = algo_disagrees(side, node, caches, diff_ast);
                 let reason_suffix = if show_reason {
-                    let reason = match side {
-                        Side::Before => algo_reason_before(node, diff_ast),
-                        Side::After => algo_reason_after(node, diff_ast),
-                    };
-                    reason
+                    algo_reason(side, node, diff_ast)
                         .map(|r| format!(" {}", reason_detail(r)))
                         .unwrap_or_default()
                 } else {

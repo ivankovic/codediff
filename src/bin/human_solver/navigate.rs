@@ -75,28 +75,22 @@ pub(crate) fn advance_both_to_next_unmarked(
     advance_to_next_unmarked(&mut app.after, after_flat, &caches, status_after);
 }
 
-/// Same as [`advance_both_to_next_unmarked`], but only for the Before panel: used after a
-/// delete, which only touches the Before side, so only that cursor should step forward.
-pub(crate) fn advance_before_to_next_unmarked(
+/// Same as [`advance_both_to_next_unmarked`], but for one panel only: used after a delete or an
+/// insert, which touch one side, so only that cursor should step forward. `flat` is that side's
+/// flat index.
+pub(crate) fn advance_side_to_next_unmarked(
     app: &mut App,
-    before_flat: &FlatIndex,
+    side: Side,
+    flat: &FlatIndex,
     before_root: Node,
     after_root: Node,
 ) {
     let caches = rebuild_caches_for_mapping(&app.mapping, before_root, after_root);
-    advance_to_next_unmarked(&mut app.before, before_flat, &caches, status_before);
-}
-
-/// Same as [`advance_both_to_next_unmarked`], but only for the After panel: used after an
-/// insert, which only touches the After side, so only that cursor should step forward.
-pub(crate) fn advance_after_to_next_unmarked(
-    app: &mut App,
-    after_flat: &FlatIndex,
-    before_root: Node,
-    after_root: Node,
-) {
-    let caches = rebuild_caches_for_mapping(&app.mapping, before_root, after_root);
-    advance_to_next_unmarked(&mut app.after, after_flat, &caches, status_after);
+    let (panel, status_fn): (&mut PanelState, fn(Node, &Caches) -> NodeStatus) = match side {
+        Side::Before => (&mut app.before, status_before),
+        Side::After => (&mut app.after, status_after),
+    };
+    advance_to_next_unmarked(panel, flat, &caches, status_fn);
 }
 
 /// Moves `panel`'s cursor to the next (`forward`) or previous node where `disagrees_fn` is true,
@@ -151,7 +145,7 @@ pub(crate) fn action_next_mismatch(
             before_flat,
             caches,
             diff_ast,
-            algo_disagrees_before,
+            |node, caches, diff_ast| algo_disagrees(Side::Before, node, caches, diff_ast),
             forward,
         ),
         Focus::After => advance_to_next_mismatch(
@@ -159,7 +153,7 @@ pub(crate) fn action_next_mismatch(
             after_flat,
             caches,
             diff_ast,
-            algo_disagrees_after,
+            |node, caches, diff_ast| algo_disagrees(Side::After, node, caches, diff_ast),
             forward,
         ),
     };

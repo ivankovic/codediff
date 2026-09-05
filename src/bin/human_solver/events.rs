@@ -692,7 +692,13 @@ pub(crate) fn handle_key(
                 );
                 if res.is_ok() {
                     app.dirty = true;
-                    advance_before_to_next_unmarked(app, before_flat, before_root, after_root);
+                    advance_side_to_next_unmarked(
+                        app,
+                        Side::Before,
+                        before_flat,
+                        before_root,
+                        after_root,
+                    );
                 }
                 Some(res)
             }
@@ -714,7 +720,13 @@ pub(crate) fn handle_key(
                 );
                 if res.is_ok() {
                     app.dirty = true;
-                    advance_after_to_next_unmarked(app, after_flat, before_root, after_root);
+                    advance_side_to_next_unmarked(
+                        app,
+                        Side::After,
+                        after_flat,
+                        before_root,
+                        after_root,
+                    );
                 }
                 Some(res)
             }

@@ -5617,8 +5617,8 @@ fn algo_reason_reports_the_pass_that_produced_each_side_of_a_match() {
     // the root, so both roots should report `IdenticalHash` - and nothing further down should
     // even have its own entry (see `add_delete_mappings`'s sibling passes: a hash-matched
     // subtree's descendants are never visited individually).
-    let before_reason = algo_reason_before(before_ast.root_node(), &diff_ast);
-    let after_reason = algo_reason_after(after_ast.root_node(), &diff_ast);
+    let before_reason = algo_reason(Side::Before, before_ast.root_node(), &diff_ast);
+    let after_reason = algo_reason(Side::After, after_ast.root_node(), &diff_ast);
     assert_eq!(before_reason, Some(ASTMappingReason::IdenticalHash));
     assert_eq!(after_reason, Some(ASTMappingReason::IdenticalHash));
     assert_eq!(reason_label(before_reason.unwrap()), "IdHash");
@@ -5633,8 +5633,8 @@ fn algo_reason_is_none_when_the_diff_has_no_entry_for_the_node() {
     let root = code.ast.as_ref().unwrap().root_node();
     let empty_diff = ASTDiff::default();
 
-    assert_eq!(algo_reason_before(root, &empty_diff), None);
-    assert_eq!(algo_reason_after(root, &empty_diff), None);
+    assert_eq!(algo_reason(Side::Before, root, &empty_diff), None);
+    assert_eq!(algo_reason(Side::After, root, &empty_diff), None);
 }
 
 #[test]

@@ -156,17 +156,30 @@ pub(crate) enum AlgoStatus {
     Unknown,
 }
 
-pub(crate) fn algo_status_before(node: Node, diff_ast: &ASTDiff) -> AlgoStatus {
-    match diff_ast.before_node_map.get(&node.id()) {
-        Some(0) => AlgoStatus::Deleted,
-        Some(_) => AlgoStatus::Matched,
-        None => AlgoStatus::Unknown,
+/// `side`'s node map in `diff_ast`, and the `(before, after)` mapping key that pairs `own` on
+/// that side with `partner` on the other - the two things every before/after twin below used to
+/// differ in.
+fn side_node_map(side: Side, diff_ast: &ASTDiff) -> &rustc_hash::FxHashMap<usize, usize> {
+    match side {
+        Side::Before => &diff_ast.before_node_map,
+        Side::After => &diff_ast.after_node_map,
     }
 }
 
-pub(crate) fn algo_status_after(node: Node, diff_ast: &ASTDiff) -> AlgoStatus {
-    match diff_ast.after_node_map.get(&node.id()) {
-        Some(0) => AlgoStatus::Inserted,
+fn side_mapping_key(side: Side, own: usize, partner: usize) -> (usize, usize) {
+    match side {
+        Side::Before => (own, partner),
+        Side::After => (partner, own),
+    }
+}
+
+/// What codediff did with `node` on `side`.
+pub(crate) fn algo_status(side: Side, node: Node, diff_ast: &ASTDiff) -> AlgoStatus {
+    match side_node_map(side, diff_ast).get(&node.id()) {
+        Some(0) => match side {
+            Side::Before => AlgoStatus::Deleted,
+            Side::After => AlgoStatus::Inserted,
+        },
         Some(_) => AlgoStatus::Matched,
         None => AlgoStatus::Unknown,
     }
@@ -181,25 +194,16 @@ pub(crate) fn algo_status_glyph(status: AlgoStatus) -> &'static str {
     }
 }
 
-/// Which pass produced the Before node's mapping entry, if any -- `diff_ast.mapping` has one entry
-/// per node (see `apted::common::add_delete_mappings`/`add_insert_mappings`), keyed by
+/// Which pass produced `node`'s mapping entry on `side`, if any -- `diff_ast.mapping` has one
+/// entry per node (see `apted::common::add_delete_mappings`/`add_insert_mappings`), keyed by
 /// `(before_id, after_id)` with `0` standing in for "no partner" on whichever side is missing, so
 /// this looks up the entry the same way for a match, a delete, or (in principle) an unresolved
-/// node -- `None` only when `before_node_map` itself has no entry at all (`AlgoStatus::Unknown`).
-pub(crate) fn algo_reason_before(node: Node, diff_ast: &ASTDiff) -> Option<ASTMappingReason> {
-    let after_id = *diff_ast.before_node_map.get(&node.id())?;
+/// node -- `None` only when the side's node map has no entry at all (`AlgoStatus::Unknown`).
+pub(crate) fn algo_reason(side: Side, node: Node, diff_ast: &ASTDiff) -> Option<ASTMappingReason> {
+    let partner = *side_node_map(side, diff_ast).get(&node.id())?;
     diff_ast
         .mapping
-        .get(&(node.id(), after_id))
-        .map(|m| m.reason)
-}
-
-/// Same as [`algo_reason_before`], but for the After tree.
-pub(crate) fn algo_reason_after(node: Node, diff_ast: &ASTDiff) -> Option<ASTMappingReason> {
-    let before_id = *diff_ast.after_node_map.get(&node.id())?;
-    diff_ast
-        .mapping
-        .get(&(before_id, node.id()))
+        .get(&side_mapping_key(side, node.id(), partner))
         .map(|m| m.reason)
 }
 
@@ -230,28 +234,16 @@ pub(crate) fn reason_detail(reason: ASTMappingReason) -> String {
 /// they agree on *what* it's matched to (mirrors the comparison `check_entry` makes for the
 /// `optimal_solutions` tests). A node the human hasn't marked yet has nothing to disagree with, so
 /// it's never flagged, even if codediff already has an opinion.
-pub(crate) fn algo_disagrees_before(node: Node, caches: &Caches, diff_ast: &ASTDiff) -> bool {
-    let algo_partner = diff_ast.before_node_map.get(&node.id()).copied();
-    if let Some(human_after_id) = caches.before_match.get(&node.id()) {
-        return algo_partner != Some(*human_after_id);
+pub(crate) fn algo_disagrees(side: Side, node: Node, caches: &Caches, diff_ast: &ASTDiff) -> bool {
+    let (human_match, human_removed) = match side {
+        Side::Before => (&caches.before_match, &caches.before_removed),
+        Side::After => (&caches.after_match, &caches.after_removed),
+    };
+    let algo_partner = side_node_map(side, diff_ast).get(&node.id()).copied();
+    if let Some(human_partner) = human_match.get(&node.id()) {
+        return algo_partner != Some(*human_partner);
     }
-    if caches.before_removed.contains_key(&node.id())
-        || is_inherited_removed(node, &caches.before_removed)
-    {
-        return algo_partner != Some(0);
-    }
-    false
-}
-
-/// Same as [`algo_disagrees_before`], but for the After tree.
-pub(crate) fn algo_disagrees_after(node: Node, caches: &Caches, diff_ast: &ASTDiff) -> bool {
-    let algo_partner = diff_ast.after_node_map.get(&node.id()).copied();
-    if let Some(human_before_id) = caches.after_match.get(&node.id()) {
-        return algo_partner != Some(*human_before_id);
-    }
-    if caches.after_removed.contains_key(&node.id())
-        || is_inherited_removed(node, &caches.after_removed)
-    {
+    if human_removed.contains_key(&node.id()) || is_inherited_removed(node, human_removed) {
         return algo_partner != Some(0);
     }
     false

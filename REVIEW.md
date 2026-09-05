@@ -130,6 +130,11 @@ done; the §4 typos are fixed except `symetric` (×3).
   gone. Only four warnings ever hid behind them - `pub use x::*` tails re-exporting nothing
   `pub` - which are `pub(crate) use` now; the `use super::*`/`use crate::*` globs themselves
   warn on nothing, so the lint is armed in both subsystems without touching them.
+- **2026-09-06, section 4 item 9 (rest)** - done: `human_solver`'s five mirror pairs are
+  `algo_status`, `algo_reason`, `algo_disagrees`, `advance_side_to_next_unmarked` and
+  `clear_descendants`, each taking a `Side`; `render.rs`'s three `match side` dispatches over
+  them are direct calls. The asymmetry that mattered (`Some(0)` is Deleted on one side and
+  Inserted on the other) is the one `match` left inside `algo_status`.
 - **Runtime finding from the same measurement**: over the corpus, AST metadata costs about three
   times the tree-sitter parse, and the parse plus metadata (15.5s) is more than half the diff
   itself (28s per the quality baseline). Section 6's items 1-3 are that cost.
