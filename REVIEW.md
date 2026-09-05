@@ -155,7 +155,14 @@ done; the §4 typos are fixed except `symetric` (×3).
   `solve_heritage_clause_growth` and the comment-only scan go through `node_to_parent`;
   `sort_deepest_first` uses `sort_by_cached_key`; `ASTNodeMetadata::text` is stored for leaves
   only (every consumer compares leaves). Product binary on the 75k-node fixture: 2.78s to 2.41s;
-  on the 900KB JSON fixture 3.08s to 2.94s. Next on this list: the arena (items 6.2-6.4).
+  on the 900KB JSON fixture 3.08s to 2.94s; total instructions 18.46G to 15.99G. After that,
+  the second profile is: `spf_path` 30% (APTED's core), tree-sitter cursor traversal ~18%
+  (`goto_sibling` 8.4%, `goto_first_child` 5.2%, `cursor_new`/`reset`/`current_node` ~4%; the
+  metadata walks create two cursors per node each and the `NodeCache` one more), malloc/free ~6%,
+  `ContainmentCtx::adjust` 3.7%. The next step is the arena (items 6.2-6.4): one tree-sitter walk
+  filling `node_info` (children, parent, depth, preorder, start byte) and every later step -
+  hashes, subtree sizes, widest child, reference nodes - computed over `node_info`'s ids, which
+  removes six of the eight walks and most of the cursor traffic.
 - **Runtime finding from the same measurement**: over the corpus, AST metadata costs about three
   times the tree-sitter parse, and the parse plus metadata (15.5s) is more than half the diff
   itself (28s per the quality baseline). Section 6's items 1-3 are that cost.
