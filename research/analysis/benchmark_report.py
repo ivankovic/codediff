@@ -25,12 +25,12 @@ Usage (from research/):
 """
 
 import argparse
-import csv
 import re
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
+from _common import read_rows
 from matplotlib import ticker
 
 # Language display order, display names, and hex colours.
@@ -60,11 +60,6 @@ LANG_META = {
     "xml": ("XML", "#0060AC"),
     "yaml": ("YAML", "#CB171E"),
 }
-
-
-def read_rows(csv_path: Path) -> list[dict]:
-    with open(csv_path, newline="") as f:
-        return list(csv.DictReader(f))
 
 
 def lang_key_from_path(path: Path) -> str | None:

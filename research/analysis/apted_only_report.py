@@ -87,23 +87,15 @@ Usage (from research/):
 """
 
 import argparse
-import csv
 import glob
 import re
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
+from _common import GRIDLINE, INK_MUTED, INK_PRIMARY, INK_SECONDARY, SURFACE, read_rows
 from matplotlib import ticker
 
-# Same chart-chrome tokens as benchmark_other_report.py / matching_reasons_report.py, from the
-# dataviz skill's reference palette (light mode) - kept identical across every research/plots/*.png
-# so the paper's figures share one visual language.
-SURFACE = "#fcfcfb"
-INK_PRIMARY = "#0b0b0b"
-INK_SECONDARY = "#52514e"
-INK_MUTED = "#898781"
-GRIDLINE = "#e1e0d9"
 BAR_COLOR = "#2a78d6"  # matches benchmark_other_report.py's "codediff" series color
 
 # This project's LOC buckets, mirroring `LOC_BUCKETS` in src/stats/sampling.rs: (exclusive upper
@@ -221,12 +213,8 @@ def bucket_label(lo: float, hi: float) -> str:
     return f"{lo:,.0f}–{hi:,.0f}"
 
 
-def read_rows(paths: list[Path]) -> list[dict]:
-    rows = []
-    for path in paths:
-        with open(path, newline="") as f:
-            rows.extend(csv.DictReader(f))
-    return rows
+def read_rows_from(paths: list[Path]) -> list[dict]:
+    return [row for path in paths for row in read_rows(path)]
 
 
 def describe_quantiles(loc_max: np.ndarray, loc_combined: np.ndarray) -> None:
@@ -451,7 +439,7 @@ def main() -> None:
     paths = sorted(Path(p) for p in glob.glob(args.results))
     if not paths:
         raise SystemExit(f"no files matched {args.results!r}")
-    rows = read_rows(paths)
+    rows = read_rows_from(paths)
     print(f"Loaded {len(rows)} rows from {len(paths)} file(s): {[p.name for p in paths]}")
 
     status_counts: dict[str, int] = {}

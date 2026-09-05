@@ -71,6 +71,16 @@ done; the §4 typos are fixed except `symetric` (×3).
   `text_range::paint_row_len` for the trimmed paint extent; `OverlayPalette::background_for` is
   the one operation-to-colour table for the ratatui renderers. `make check-quality`: 0 regressed,
   0 improved. Still open: items 2 (`PassCtx`, ~50 call sites incl. tests), 4-9, 10-11.
+- **2026-09-05, sections 2/3/6-7 (research)** - done: `research/analysis/_common.py` holds
+  the CSV readers, `latex_number`, `REPO_ROOT` and the chart chrome (7+3+2+5 copies removed;
+  every fragment the report targets write was checked byte-identical before and after);
+  `optimal_solutions_benchmark_report.py` and its five unreferenced PNGs deleted;
+  `commit_stats.py` no longer plots the six hardcoded-zero churn columns; `research/Makefile`
+  has `.PHONY`, `matching-reasons-report` re-renders from disk, `measure-apted-budget` is one
+  `foreach` over four language-group variables and delegates to `build`; pytest (28 tests over
+  the pure functions in `research/analysis/` and `scripts/`) runs as `make test-python`, in
+  `make test` and in CI. The committed `plots/*.tex` fragments were stale against the committed
+  scripts and data (e.g. `ShapeFixtures` 512 vs 597) and are regenerated.
 - **Runtime finding from the same measurement**: over the corpus, AST metadata costs about three
   times the tree-sitter parse, and the parse plus metadata (15.5s) is more than half the diff
   itself (28s per the quality baseline). Section 6's items 1-3 are that cost.

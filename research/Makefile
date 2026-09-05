@@ -38,6 +38,13 @@ LIST = $(if $(filter tiny,$(MODE)),$(LIST_TINY),$(if $(filter small,$(MODE)),$(L
 REPOSITORIES_DIR = /var/tmp/research/$(MODE)/repositories/
 RESEARCH_DIR = /var/tmp/research/$(MODE)/
 
+.PHONY: build clean clean-db fetch file-stats-report measure-file-stats measure-commit-stats \
+	debug-stats analyze tiny small full sample-pairs sample-pairs-all measure-pairs \
+	measure-code-pair-diffs pairs-diff-report measure-sampled matching-reasons-report \
+	shapes-report measure-edit-shape ambiguity-report rendering-report measure-tools-timing \
+	measure-tools-accuracy timing-report install-bdiff apted-budget-report measure-apted-budget \
+	paper-variables introductory-paper introductory-paper-empirical
+
 # Delegates to the root Makefile so the cargo invocation (and its `--features stats` requirement)
 # lives in exactly one place.
 build:
@@ -250,8 +257,9 @@ measure-sampled:
 
 # Analysis/plotting step for the root Makefile's `benchmark-quality` (which is the product-side
 # regression gate and stays there). Kept here because the report itself is a research artifact.
+# Re-renders from data/quality/optimal_solutions_benchmark.csv on disk, like every other
+# `*-report` target; the root Makefile's `benchmark-quality` is what produces that file.
 matching-reasons-report:
-	$(MAKE) -C .. benchmark-quality
 	uv run ./analysis/matching_reasons_report.py
 
 # Change-shape census over the human-authored mappings: which shapes (reparent, sibling reorder,
@@ -381,29 +389,17 @@ apted-budget-report:
 #
 # MODE selects which checkout root the sampled pairs are resolved against; the sample CSVs
 # themselves (data/samples/sampled_code_pairs_*.csv) are committed, so this needs no re-sampling step.
-measure-apted-budget:
-	cd .. && cargo build --release --features stats --bin apted_only_benchmark --bin apted_only_worker
-	$(BIN_DIR)/apted_only_benchmark \
-		--csv data/samples/sampled_code_pairs_css.csv data/samples/sampled_code_pairs_python.csv \
-			data/samples/sampled_code_pairs_xml.csv data/samples/sampled_code_pairs_c.csv \
-			data/samples/sampled_code_pairs_csharp.csv data/samples/sampled_code_pairs_vimscript.csv \
-		--repo-root $(REPOSITORIES_DIR) --output data/rq1/apted_only_group1.csv
-	$(BIN_DIR)/apted_only_benchmark \
-		--csv data/samples/sampled_code_pairs_json.csv data/samples/sampled_code_pairs_typescript.csv \
-			data/samples/sampled_code_pairs_go.csv data/samples/sampled_code_pairs_cpp.csv \
-			data/samples/sampled_code_pairs_ruby.csv \
-		--repo-root $(REPOSITORIES_DIR) --output data/rq1/apted_only_group2.csv
-	$(BIN_DIR)/apted_only_benchmark \
-		--csv data/samples/sampled_code_pairs_javascript.csv data/samples/sampled_code_pairs_yaml.csv \
-			data/samples/sampled_code_pairs_shellscript.csv data/samples/sampled_code_pairs_swift.csv \
-			data/samples/sampled_code_pairs_java.csv data/samples/sampled_code_pairs_kotlin.csv \
-		--repo-root $(REPOSITORIES_DIR) --output data/rq1/apted_only_group3.csv
-	$(BIN_DIR)/apted_only_benchmark \
-		--csv data/samples/sampled_code_pairs_php.csv data/samples/sampled_code_pairs_tsx.csv \
-			data/samples/sampled_code_pairs_rust.csv data/samples/sampled_code_pairs_html.csv \
-			data/samples/sampled_code_pairs_lua.csv data/samples/sampled_code_pairs_r.csv \
-			data/samples/sampled_code_pairs_scala.csv \
-		--repo-root $(REPOSITORIES_DIR) --output data/rq1/apted_only_group4.csv
+# The four groups, as language keys (the sample CSV is data/samples/sampled_code_pairs_<key>.csv).
+# One variable per group so a re-grouping edits a list, not four copied recipes.
+RQ1_GROUP_1 := css python xml c csharp vimscript
+RQ1_GROUP_2 := json typescript go cpp ruby
+RQ1_GROUP_3 := javascript yaml shellscript swift java kotlin
+RQ1_GROUP_4 := php tsx rust html lua r scala
+rq1-sample-csvs = $(foreach lang,$(1),data/samples/sampled_code_pairs_$(lang).csv)
+measure-apted-budget: build
+	$(foreach g,1 2 3 4,$(BIN_DIR)/apted_only_benchmark \
+		--csv $(call rq1-sample-csvs,$(RQ1_GROUP_$(g))) \
+		--repo-root $(REPOSITORIES_DIR) --output data/rq1/apted_only_group$(g).csv &&) true
 	$(MAKE) apted-budget-report
 
 # ── Papers ──────────────────────────────────────────────────────────────────────────────────────

@@ -57,19 +57,14 @@ Usage (from research/):
 """
 
 import argparse
-import csv
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
+from _common import GRIDLINE, INK_MUTED, INK_PRIMARY, INK_SECONDARY, SURFACE, read_rows
 from matplotlib import ticker
 
 # Same chart-chrome tokens as benchmark_other_report.py / apted_only_report.py.
-SURFACE = "#fcfcfb"
-INK_PRIMARY = "#0b0b0b"
-INK_SECONDARY = "#52514e"
-INK_MUTED = "#898781"
-GRIDLINE = "#e1e0d9"
 
 # The six non-Identical `HumanOperation` variants, in stacking order (bottom to top), with a
 # display label and color. Insert/delete use GitHub's own green/red diff convention (familiar to
@@ -89,9 +84,9 @@ OPERATIONS = [
 ALL_OPS = ["node_op_identical"] + [k for k, _, _ in OPERATIONS]
 
 
-def read_rows(csv_path: Path) -> list[dict]:
-    with open(csv_path, newline="") as f:
-        return [r for r in csv.DictReader(f) if r["has_mapping"] == "true"]
+def mapped_rows(csv_path: Path) -> list[dict]:
+    """Only the fixtures that have a `human_mapping.json`."""
+    return [r for r in read_rows(csv_path) if r["has_mapping"] == "true"]
 
 
 def _int(row: dict, key: str) -> int:
@@ -218,7 +213,7 @@ def main() -> None:
     parser.add_argument("--output-png", default="human_mapping_shapes.png")
     args = parser.parse_args()
 
-    rows = read_rows(args.csv)
+    rows = mapped_rows(args.csv)
     print(f"Loaded {len(rows)} fixtures with a human mapping from {args.csv}")
 
     write_paper_fragment(rows, args.plots_dir / "variables_shapes.tex")

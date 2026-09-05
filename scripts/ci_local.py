@@ -129,6 +129,10 @@ def translate_uses(step: dict[str, Any]) -> list[str] | None:
             )
         raise StepSkipped("using the local node")
 
+    if name == "astral-sh/setup-uv":
+        check_tool(["uv", "--version"], "the Python tests")
+        raise StepSkipped("using the local uv")
+
     if name == "taiki-e/install-action":
         tool = str(inputs.get("tool", "")) or str(step["uses"]).split("@", 1)[1]
         check_tool(["cargo", tool, "--version"], f"the {tool} step")

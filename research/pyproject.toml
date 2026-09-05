@@ -14,5 +14,11 @@ dependencies = [
     "seaborn>=0.13.2",
 ]
 
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "pyyaml>=6.0.3",
+]
+
 # Ruff configuration lives in the repository root's ruff.toml, so that research/, scripts/ and
 # assets/ are linted under one pinned rule set.

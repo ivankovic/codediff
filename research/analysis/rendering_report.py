@@ -92,16 +92,14 @@ import statistics
 from collections import Counter
 from pathlib import Path
 
+from _common import REPO_ROOT
+
 DIFFS_ROOT = "src/test/data/diffs"
 
 # A span holding exactly one of these, and nothing else, is what finding 1 of
 # data/quality/text_painting_findings.md counts as "a single punctuation token" when it accounts
 # for the difference between a Minimal and a Full painting of the same change.
 PUNCTUATION = set("()[]{}<>,;:.=+-*/&|!?%^~'\"`@#$\\")
-
-
-def repo_root(here: Path) -> Path:
-    return here.parent.parent
 
 
 def pct(part: int, whole: int) -> float:
@@ -411,8 +409,7 @@ def main() -> None:
         description="What the ground truth says about the rendered diff: how much of an AST is "
         "visible at all, and how often the visible text has more than one correct rendering."
     )
-    here = Path(__file__).resolve().parent
-    root = repo_root(here)
+    root = REPO_ROOT
     parser.add_argument(
         "--csv",
         type=Path,

@@ -59,6 +59,8 @@ import os
 import subprocess
 import sys
 
+from _common import latex_number
+
 # Extension -> language, covering the languages the fixture corpus and the empirical study use.
 # Written out here rather than shelling into the Rust `detect_language_from_path` because this
 # script's only use for it is the code/not-code split: an edit to a Markdown changelog and an edit
@@ -206,12 +208,6 @@ def percentile(values, q):
         return None
     index = min(len(values) - 1, max(0, round(q / 100 * (len(values) - 1))))
     return values[index]
-
-
-def latex_number(value):
-    """1234567 -> "1{,}234{,}567", this project's papers' LaTeX-safe thousands separator.
-    Mirrors `paper_variables.py::latex_number`."""
-    return f"{value:,}".replace(",", "{,}")
 
 
 class Accumulator:

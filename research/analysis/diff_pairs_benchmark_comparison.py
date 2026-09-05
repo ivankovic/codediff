@@ -22,17 +22,12 @@ Usage (from research/, matching the other analysis scripts' convention):
 """
 
 import argparse
-import csv
 from collections import Counter
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
-
-
-def read_rows(csv_path):
-    with open(csv_path, newline="") as f:
-        return list(csv.DictReader(f))
+from _common import read_rows
 
 
 def key(row):

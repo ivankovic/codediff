@@ -68,12 +68,10 @@ import subprocess
 from collections import Counter
 from pathlib import Path
 
+from _common import REPO_ROOT
+
 # Path prefix every fixture directory lives under, relative to the repository root.
 DIFFS_ROOT = "src/test/data/diffs"
-
-
-def repo_root(here: Path) -> Path:
-    return here.parent.parent
 
 
 def fixture_names_in_scope(csv_path: Path) -> set[str]:
@@ -247,8 +245,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description="Ground-truth ambiguity (multi-map groups) across the human-authored corpus."
     )
-    here = Path(__file__).resolve().parent
-    root = repo_root(here)
+    root = REPO_ROOT
     parser.add_argument(
         "--csv",
         type=Path,

@@ -20,6 +20,7 @@ import sys
 import matplotlib.pyplot as plt
 import numpy as np
 import polars as pl
+from _common import latex_number
 from percentile_report import compute_percentiles_and_plot
 
 
@@ -228,13 +229,6 @@ def write_top_node_kinds_by_language(
     return distribution
 
 
-def _latex_number(value):
-    """Formats an int with this project's papers' own LaTeX-safe thousands-separator convention -
-    e.g. 1234567 -> "1{,}234{,}567" (see research/papers/introductory-paper/main.tex) - a plain
-    comma can trigger LaTeX's comma-in-math spacing rules even in text mode."""
-    return f"{value:,}".replace(",", "{,}")
-
-
 def write_paper_variables(
     repo_count,
     file_count,
@@ -280,8 +274,8 @@ def write_paper_variables(
         "%",
         "% This is a fragment, not the file the paper reads: analysis/paper_variables.py merges it",
         "% with the paper's other numbers into plots/variables.tex (see make introductory-paper).",
-        f"\\newcommand{{\\NumRepos}}{{{_latex_number(repo_count)}}}",
-        f"\\newcommand{{\\NumFiles}}{{{_latex_number(file_count)}}}",
+        f"\\newcommand{{\\NumRepos}}{{{latex_number(repo_count)}}}",
+        f"\\newcommand{{\\NumFiles}}{{{latex_number(file_count)}}}",
         f"\\newcommand{{\\NumFilesMillions}}{{{file_count / 1_000_000:.2f}}}",
         f"\\newcommand{{\\NumLanguages}}{{{language_count}}}",
         f"\\newcommand{{\\CorrelationR}}{{{correlation:.4f}}}",
@@ -299,7 +293,7 @@ def write_paper_variables(
             ("Max", "max"),
         ]:
             lines.append(
-                f"\\newcommand{{\\{prefix}{suffix}}}{{{_latex_number(int(percentiles[key]))}}}"
+                f"\\newcommand{{\\{prefix}{suffix}}}{{{latex_number(int(percentiles[key]))}}}"
             )
 
     os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)

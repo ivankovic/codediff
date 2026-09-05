@@ -75,15 +75,9 @@ import os
 import re
 import sys
 
+from _common import latex_number
+
 PLACEHOLDER = r"\textbf{??}"
-
-
-def latex_number(value):
-    """Formats an int with this project's papers' LaTeX-safe thousands separator - 1234567 ->
-    "1{,}234{,}567". A plain comma can trigger LaTeX's comma-in-math spacing rules even in text
-    mode. Mirrors `file_stats.py::_latex_number`, kept in sync by
-    `test_latex_number_matches_file_stats` below."""
-    return f"{value:,}".replace(",", "{,}")
 
 
 # ---------------------------------------------------------------------------------------------

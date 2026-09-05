@@ -44,6 +44,11 @@ data.
 
 **Per-file unit tests must run in under 1 second.**
 
+The Python under `research/analysis/` and `scripts/` has its own unit tests in `research/tests/`,
+run by `make test-python` (part of `make test` and of CI's python job). They cover the pure
+functions the report scripts are built from; the scripts' shared helpers live in
+`research/analysis/_common.py`.
+
 `src/test/` also holds slower, fixture-driven tests, for example `src/test/fixtures/`.
 These tests check real diffs against a human-verified ground truth. **These tests must run in
 under 5 seconds.**

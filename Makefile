@@ -45,7 +45,7 @@ FEATURES ?= stats
 # Usage: make benchmark-ablation [OUT_DIR=path]
 OUT_DIR ?= research/data/ablation
 
-.PHONY: coverage test test-mapping-site-js build install install-hooks benchmark-quality \
+.PHONY: coverage test test-mapping-site-js test-python build install install-hooks benchmark-quality \
 	diff-inventory lint-python ci benchmark-ablation check-quality update-quality-baseline \
 	deploy-checks deploy-crates deploy-github deploy benchmark-speed \
 	benchmark-speed-update-baseline
@@ -70,8 +70,14 @@ coverage:
 	@echo "Browsable report: target/llvm-cov/html/index.html"
 	@echo "README badge: commit research/data/coverage/badge.json to publish this number"
 
-test: test-mapping-site-js
+test: test-mapping-site-js test-python
 	cargo nextest run --release
+
+# The pure functions under research/analysis/ and scripts/ (CSV readers, LaTeX number format, LOC
+# buckets, CI-matrix expansion, ...) - see research/tests/. Runs in research/'s own uv
+# environment, which is where pytest is a dev dependency.
+test-python:
+	cd research && uv run pytest -q
 
 # Plain-Node regression tests for the human_mapping site's own vanilla JS (assets/mapping_site/) -
 # no npm dependency, no build step, matching that directory's own convention (see index.js's header

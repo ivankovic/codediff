@@ -51,17 +51,13 @@ def load_data(db_path):
     # Extract file extension
     df = df.with_columns(pl.col("relative_file_path").str.split(".").list.last().alias("extension"))
 
-    # Compute derived metrics
+    # Derived metrics. Only the byte and line deltas: `commit_stats.rs` writes the six churn
+    # columns (`lines_added`/`lines_removed`/`lines_changed`, `nodes_*`) as 0 for every row, so
+    # anything aggregated from them is a distribution of zeros - `edit_shape_stats.py` is the
+    # measurement of edit size (see data/README.md).
     df = df.with_columns(
         (pl.col("bytes_after") - pl.col("bytes_before")).alias("bytes_delta"),
         (pl.col("lines_after") - pl.col("lines_before")).alias("lines_delta"),
-        (pl.col("nodes_after") - pl.col("nodes_before")).alias("nodes_delta"),
-        (pl.col("lines_added") + pl.col("lines_removed") + pl.col("lines_changed")).alias(
-            "total_lines_modified"
-        ),
-        (pl.col("nodes_added") + pl.col("nodes_removed") + pl.col("nodes_changed")).alias(
-            "total_nodes_modified"
-        ),
     )
 
     return df
@@ -132,27 +128,6 @@ def compute_change_magnitude_stats(df):
         df, "lines_delta", "lines_delta_distribution.png", log_scale=True
     )
 
-    # Nodes changed
-    nodes_percentiles = compute_percentiles_and_plot(
-        df, "nodes_delta", "nodes_delta_distribution.png", log_scale=True
-    )
-
-    # Total lines modified
-    total_lines_percentiles = compute_percentiles_and_plot(
-        df,
-        "total_lines_modified",
-        "total_lines_modified_distribution.png",
-        log_scale=True,
-    )
-
-    # Total nodes modified
-    total_nodes_percentiles = compute_percentiles_and_plot(
-        df,
-        "total_nodes_modified",
-        "total_nodes_modified_distribution.png",
-        log_scale=True,
-    )
-
     # Unix diff script size
     diff_size_percentiles = compute_percentiles_and_plot(
         df,
@@ -164,9 +139,6 @@ def compute_change_magnitude_stats(df):
     return {
         "bytes": bytes_percentiles,
         "lines": lines_percentiles,
-        "nodes": nodes_percentiles,
-        "total_lines": total_lines_percentiles,
-        "total_nodes": total_nodes_percentiles,
         "diff_size": diff_size_percentiles,
     }
 
@@ -203,22 +175,6 @@ def compute_language_stats(df):
     plt.savefig("plots/top_languages_by_commits.png", dpi=300)
     plt.close()
 
-    # Language-specific change magnitude
-    language_change_stats = (
-        df.filter(pl.col("language") != "Unknown")
-        .group_by("language")
-        .agg(
-            pl.col("total_lines_modified").mean().alias("avg_lines_modified"),
-            pl.col("total_nodes_modified").mean().alias("avg_nodes_modified"),
-            pl.len().alias("commit_count"),
-        )
-        .sort("commit_count", descending=True)
-        .head(10)
-    )
-
-    print("\nAverage change magnitude by language (top 10):")
-    print(language_change_stats)
-
 
 def compute_repository_stats(df):
     """
@@ -239,21 +195,6 @@ def compute_repository_stats(df):
 
     print("Top 10 repositories by commit count:")
     print(commits_per_repo)
-
-    # Average change magnitude per repository
-    repo_change_stats = (
-        df.group_by("repository")
-        .agg(
-            pl.col("total_lines_modified").mean().alias("avg_lines_modified"),
-            pl.col("total_nodes_modified").mean().alias("avg_nodes_modified"),
-            pl.len().alias("commit_count"),
-        )
-        .sort("commit_count", descending=True)
-        .head(10)
-    )
-
-    print("\nAverage change magnitude by repository (top 10):")
-    print(repo_change_stats)
 
 
 if __name__ == "__main__":

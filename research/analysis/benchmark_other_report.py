@@ -83,15 +83,11 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
+from _common import GRIDLINE, INK_MUTED, INK_PRIMARY, INK_SECONDARY, SURFACE, read_rows_with_fields
 from matplotlib import ticker
 
 # Chart chrome, from the dataviz skill's reference palette (light mode) - same tokens
 # matching_reasons_report.py and diff_pairs_benchmark_comparison.py use.
-SURFACE = "#fcfcfb"
-INK_PRIMARY = "#0b0b0b"
-INK_SECONDARY = "#52514e"
-INK_MUTED = "#898781"
-GRIDLINE = "#e1e0d9"
 BASELINE = "#c3c2b7"
 
 # Display name and color for every series this report can plot, keyed by the internal id
@@ -197,13 +193,6 @@ def has_warm(rows: list[dict], id_: str) -> bool:
     `bdiff_warm_batch` in benchmark_other.rs)."""
     column = f"{id_}_ms"
     return bool(rows) and column in rows[0] and any(r[column] != "" for r in rows)
-
-
-def read_rows(csv_path: Path) -> tuple[list[str], list[dict]]:
-    with open(csv_path, newline="") as f:
-        reader = csv.DictReader(f)
-        rows = list(reader)
-        return reader.fieldnames or [], rows
 
 
 def tool_names(fieldnames: list[str]) -> list[str]:
@@ -1050,7 +1039,7 @@ if __name__ == "__main__":
         print("Run:  cargo run --release --bin benchmark_other -- --csv")
         raise SystemExit(1)
 
-    fieldnames, rows = read_rows(csv_path)
+    fieldnames, rows = read_rows_with_fields(csv_path)
     print(f"Loaded {csv_path}: {len(rows)} fixtures")
 
     tools = tool_names(fieldnames)
