@@ -414,10 +414,11 @@ impl<'code> PendingDiff<'code> {
             solve_bottom_up_propagation::solve(before, after, &node_cache, &mut ast_diff);
         }
 
-        // Phase 7: unanchored-move fallback (`solve_moved_subtrees`). Dead last, after even final
-        // APTED, by necessity - not a stylistic choice. Every phase above (1-6) requires *some*
-        // anchor before it will consider a pair: a hash, a name, a shared matched ancestor, an
-        // arm-signature overlap, or containment inside a named item. Content that relocated
+        // Phase 7: unanchored-move fallback (`solve_moved_subtrees`). After the terminal
+        // residual resolution by necessity, not as a stylistic choice - only phases 8-10, which
+        // re-tag matches rather than make them, come later. Every phase above (1-6) requires
+        // *some* anchor before it will consider a pair: a hash, a name, a shared matched
+        // ancestor, or containment inside a named item. Content that relocated
         // between two containers that *both* changed identity (renamed, or one deleted and a new
         // one inserted) has none of those - the old container is gone, the new one has never been
         // seen before, so there is nothing to anchor to on either side until this point, when
@@ -483,7 +484,7 @@ impl<'code> PendingDiff<'code> {
 * A 2026-07-15 leave-one-out ablation study over the `optimal_solutions` benchmark corpus (see
 * `ablation_study.sh`, `research/ablation/`) found two other knobs net-negative when disabled
 * individually (i.e. removing them *improved* the benchmark): the normalized-import-path hash
-* variant in `solve_hash_descent` (`-89`) and the Dice-threshold `solve_bottom_up_expansion` pass
+* variant in `solve_hash_descent` (`-89`) and the Dice-threshold `solve_bottom_up_expansion` pass (deleted)
 * (`-69`, gated both of the old phases 3 and 5). Both had been permanently off by default ever
 * since; removed outright 2026-08-16 rather than kept as always-off dead code. A third knob from
 * the same study, `solver_similar_flow_control` (`-82`), gated `solve_similar_flow_control`
@@ -783,8 +784,8 @@ pub enum ASTMappingReason {
     OptimalIDU,
     /// Mapping determined by the APTED (A Preorder Tree Edit Distance) algorithm. Carries the
     /// exact provenance: a short, call-site-specific label identifying which `apted::for_nodes`/
-    /// `for_roots` call produced this entry (e.g. `"final_pass"`, `"bottom_up_expansion"`,
-    /// `"flow_control_container"`) - threaded all the way from that call site down through
+    /// `for_roots` call produced this entry (e.g. `"fast_fallback"`, `"qualified_name"`,
+    /// `"large_flat_subtree"`) - threaded all the way from that call site down through
     /// `resolve_forest`'s internal emission helpers (`emit_match`, `add_delete_mappings`, ...), so
     /// two mappings both labeled `APTED` can still be told apart by *which* heuristic actually
     /// invoked the tree-edit-distance algorithm to produce them, not just that one did.
@@ -856,7 +857,7 @@ pub enum ASTMappingReason {
 
 impl ASTMappingReason {
     /// Short, stable column/label abbreviation for a mapping reason, independent of `APTED`'s
-    /// provenance payload (bucketed to the bare `"APTED"`). Shared by `src/bin/human_solver.rs`'s
+    /// provenance payload (bucketed to the bare `"APTED"`). Shared by `src/bin/human_solver/`'s
     /// per-node display and `src/bin/benchmark_optimal_solutions.rs`'s reason-count columns, so
     /// the same abbreviation means the same thing in both tools - previously two independently
     /// hand-maintained copies of this match that could silently drift when a variant was added.

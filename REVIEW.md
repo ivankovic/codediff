@@ -55,6 +55,15 @@ done; the §4 typos are fixed except `symetric` (×3).
   calls it); `TextRange::intersects` (harmless API); `ASTMappingReason::OptimalIDU` (its
   `OptIDU` column is read by `matching_reasons_report.py` and lives in the checked-in benchmark
   CSV, so it goes with the next CSV regeneration, not alone); the 22 glob re-exports.
+- **2026-09-05, section 5 (first bullet)** - done: the twelve contradicting or dangling
+  comments listed there are corrected (phase numbering, `final_apted`, the deleted constant, the
+  Myers `FLAT_MIN_CHILDREN` wording, both misattached doc comments, the nonexistent
+  `compute_diff_interactive`, the broken intra-doc links, the `human_solver.rs` paths, the
+  deleted `solve_bottom_up_expansion` described as live, `apted/mod.rs`'s "three files", the
+  `apted/common.rs` citations for items that moved into its submodules, and the `symetric`/
+  `programms` typos). Section 5's remaining bullets (history narrative, module names, boolean
+  parameters, `is_semantically_structural`, doc style) are still open apart from the phase-6
+  history that went to `src/diff/TODO.md` with section 3.
 - **Runtime finding from the same measurement**: over the corpus, AST metadata costs about three
   times the tree-sitter parse, and the parse plus metadata (15.5s) is more than half the diff
   itself (28s per the quality baseline). Section 6's items 1-3 are that cost.

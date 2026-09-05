@@ -965,7 +965,7 @@ fn advance_and_build_range_with_source(
 /// Take the destination range, and merge it into the source range to recover insertions/deletions.
 ///
 /// Inserted node in the destination are invisible in the source AST. This function restores their
-/// ranges and makes the range vectors symetric.
+/// ranges and makes the range vectors symmetric.
 fn merge_ranges(
     source_ranges: &[RangeMatch],
     destination_ranges: &[RangeMatch],

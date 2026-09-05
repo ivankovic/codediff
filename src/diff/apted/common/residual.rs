@@ -343,7 +343,7 @@ pub(crate) fn resolve_residual_forest_via_myers_lcs(
         // re-introducing exactly the pooling risk above.
         //
         // Uncapped in size, same as `resolve_flat_tree_pair`'s own equal-count branch (2026-08-16):
-        // `RESIDUAL_SEGMENT_MAX_TOTAL_SIZE` bounded a *pool's* cost, but a per-position pair has
+        // the since-deleted `RESIDUAL_SEGMENT_MAX_TOTAL_SIZE` bounded a *pool's* cost, but a per-position pair has
         // nothing to cross-match against regardless of size, so it was never protecting against a
         // correctness risk here either - only an unconfirmed latency one, and measurement (on the
         // sibling function) found no fixture worse and no latency movement once removed.

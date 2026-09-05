@@ -1210,12 +1210,12 @@ fn status_bar_paragraph(summary: DiffSummary) -> Paragraph<'static> {
         .alignment(Alignment::Center)
 }
 
-/// Parse both files, applying the `/dev/null` fallback below. Shared prefix of `compute_diff`
-/// (headless/no-prompt callers) and `compute_diff_interactive` (the TUI's pause-capable path).
+/// Parse both files, applying the `/dev/null` fallback below. The shared prefix of every
+/// `compute_diff` variant.
 ///
 /// Does not require either side to have parsed successfully: a side with no tree-sitter grammar
 /// (unrecognized extension, e.g. a `Makefile`) comes back with `ast: None` rather than an error -
-/// `compute_diff`/`compute_diff_interactive` check for that themselves and route to
+/// `compute_diff_with_update_style` checks for that itself and routes to
 /// `diff::text::plain_text_line_diff` instead of the AST pipeline, rather than failing outright.
 /// Before that fallback existed, this bailed with "unsupported or unrecognized file type" here,
 /// which - via `headless`/`json_output`'s non-interactive callers - propagated as a fatal exit;

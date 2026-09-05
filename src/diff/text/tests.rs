@@ -1558,7 +1558,7 @@ fn python_leetcode_1_added_if_block_all_ranges() -> Result<()> {
     assert_eq!(before_ranges[2].destination.end_column, 0);
 
     let after_ranges = text_diff.all(1);
-    // Note the symetric relationships between source and destination ranges in the
+    // Note the symmetric relationships between source and destination ranges in the
     // before_ranges and after_ranges vectors.
     assert_eq!(after_ranges.len(), before_ranges.len());
 

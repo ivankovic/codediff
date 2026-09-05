@@ -16,12 +16,13 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-//! Tree-edit-distance computation, split across three files: `common` (shared
-//! infrastructure - cost model, indexing, delta/forest-distance tables, the
-//! backtrace that turns a populated delta table into an `ASTDiff`, and the public
-//! entry points), `zhang_shasha` (the classic Zhang-Shasha algorithm), and `engine`
-//! (the APTED algorithm: `gted`/`spfL`/`spfR`/`spfA` plus optimal-strategy
-//! computation).
+//! Tree-edit-distance computation. `common` holds the shared infrastructure - the cost model
+//! and indexing (`common.rs`), the residual-forest fallback (`common/residual.rs`), the
+//! `resolve_forest` entry point and backtrace (`common/resolve.rs`), the containment-pruned
+//! slot bookkeeping (`common/slots.rs`), the Myers flat-tree path (`common/myers.rs`) and the
+//! pre-matching of uniquely named locals (`common/prematch.rs`); `engine` is the APTED
+//! algorithm (`gted`/`spfL`/`spfR`/`spfA` plus optimal-strategy computation); `zhang_shasha`
+//! is the classic algorithm, kept as the test oracle.
 
 mod common;
 mod engine;

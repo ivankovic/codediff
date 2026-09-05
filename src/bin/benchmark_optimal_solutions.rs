@@ -17,7 +17,7 @@
  */
 
 //! Repeatable, non-`cargo test` benchmark over every fixture in `src/test/data/diffs/`: for each
-//! one that already has a `human_mapping.json` (see `src/bin/human_solver.rs`), runs codediff and
+//! one that already has a `human_mapping.json` (see `src/bin/human_solver/`), runs codediff and
 //! counts how many nodes disagree with the human-authored mapping; for fixtures that don't have
 //! one yet, counts them separately as "unsolved" rather than silently ignoring them.
 //!
@@ -89,7 +89,7 @@ const NON_APTED_REASON_LABELS: &[&str] = &[
 ];
 
 /// Column label for one `ASTMappingReason`. For every variant except `APTED` this is
-/// `ASTMappingReason::bucket_label` - same abbreviations `src/bin/human_solver.rs`'s
+/// `ASTMappingReason::bucket_label` - same abbreviations `src/bin/human_solver/`'s
 /// `reason_label` uses for its own compact per-node display, shared via that one method so the
 /// two can't drift.
 ///

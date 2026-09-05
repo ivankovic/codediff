@@ -29,7 +29,9 @@ use crate::diff::{
 };
 
 /**
-* Phase 4 of the seven-phase pipeline (`TODO.md`, 2026-07-17/18): "syntax-aware subtree matching".
+* Phase 4 of the matching pipeline (`Diff::pending_with_config` lists all ten phases): "syntax-aware
+* subtree matching", in three sub-passes: named-group matching, positional anchoring
+* (`solve_greedy_anchor_blocks`) and `solve_import_list_overlap`.
 * Named-group matching (below) and positional anchoring (`solve_greedy_anchor_blocks`) turned out,
 * on inspection (`TODO.md`'s "generalization of phase 4" analysis, 2026-07-18), to be the same
 * algorithm with different (candidate predicate, compatibility key, cost function) tuples plugged

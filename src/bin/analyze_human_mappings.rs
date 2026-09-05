@@ -133,7 +133,7 @@ impl OpCounts {
 
 /// Depth-delta histogram: `|before_path.len() - after_path.len()|` for every paired entry
 /// (`Identical`/`Update`/`MatchButNotIdentical`), bucketed 0/1/2/"3+". A delta of exactly 1 is the
-/// wrap/reparent signature `TRIVIAL_ENTRY_MAX_SIZE` (`apted/common.rs`) targets - see that fix's
+/// wrap/reparent signature `TRIVIAL_ENTRY_MAX_SIZE` (`apted/common/residual.rs`) targets - see that fix's
 /// `TODO.md` entry (2026-08-17) for the shape this is measuring the true corpus-wide prevalence of.
 #[derive(Default, Clone, Copy)]
 struct DepthDeltaCounts {

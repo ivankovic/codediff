@@ -192,9 +192,6 @@ impl<'a> ContainmentCtx<'a> {
     }
 }
 
-/// Resolve the mapping for a forest of (possibly already partially mapped) sibling roots on
-/// each side. This is the single entry point that builds the pruned postorder indexers, runs
-/// the keyroot-based forest-distance computation, and translates the result into `diff`.
 /// Largest `before.size * after.size` (pruned node counts) a *single* subtree pair may hand to the
 /// full tree-edit-distance engine. Above it, [`resolve_oversized_pair`] decomposes the pair one
 /// level instead.
@@ -316,6 +313,9 @@ pub enum Algorithm {
 // Each parameter is genuinely distinct context (both root-id lists, both metadata sets, the
 // algorithm choice, the diff) - a params struct here would just relocate the same fields, not
 // reduce them.
+/// Resolve the mapping for a forest of (possibly already partially mapped) sibling roots on
+/// each side. This is the single entry point that builds the pruned postorder indexers, runs
+/// the tree-edit-distance engine, and translates the result into `diff`.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn resolve_forest(
     before_root_ids: Vec<usize>,
@@ -540,7 +540,7 @@ pub(crate) fn resolve_forest(
 /// Compute the optimal tree edit distance using a postorder, single-node-granularity
 /// Zhang-Shasha/APTED-style forest distance, given before/after node id lists.
 ///
-/// `source` is a short, call-site-specific label (e.g. `"final_pass"`, `"bottom_up_expansion"`)
+/// `source` is a short, call-site-specific label (e.g. `"fast_fallback"`, `"qualified_name"`)
 /// recorded on every `ASTMappingReason::APTED` entry this resolution produces - see that variant's
 /// doc comment. Every caller passes a distinct literal identifying which heuristic invoked APTED,
 /// so two `APTED`-reasoned mappings can be told apart by provenance, not just by the fact that

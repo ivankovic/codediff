@@ -34,7 +34,7 @@ use crate::diff::{ASTDiff, ASTMapping, ASTMappingOperation};
 * Depth-first, includes-self search for the first node of a given `kind` at or below `node`
 * (self first, then children in order, recursively). Was independently copy-pasted as
 * `find_first`/`first_child_of_kind` in six different `solve_*.rs` test modules - consolidated
-* here since one of those six copies (`solve_bottom_up_expansion`'s old `first_child_of_kind`)
+* here since one of those six copies (the since-deleted `solve_bottom_up_expansion`'s `first_child_of_kind`)
 * used *strict*-descendant semantics instead (skipping `node` itself), silently disagreeing with
 * the other five whenever called on a node that already was the target kind.
 */
@@ -1024,7 +1024,7 @@ pub fn handmade_test_code_pairs_for(
 /// tree shape, not size (see the 2026-08-07 TODO.md entry: two of these fixtures are 100+ seconds
 /// through `for_roots` despite being small by node count). A caller that only needs to parse this
 /// set (a path<->node round trip, a size check) gets a fast, representative sample; a caller that
-/// runs the actual diff algorithm over it (e.g. `is_always_valid`) should stay `#[ignore = "slow"]`.
+/// runs the actual diff algorithm over it should stay `#[ignore = "slow"]`.
 /// See [`test_path_for_node_round_trips_through_node_for_path`] for the original motivating case (a
 /// handful of multi-hundred-KB fixtures were dominating that test's runtime while adding no
 /// coverage the smaller fixtures in the same language don't already provide).

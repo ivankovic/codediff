@@ -23,7 +23,8 @@
 #[allow(unused_imports)]
 use super::*;
 
-/// Minimum number of leaf children required to trigger the flat-tree optimisation.
+/// Minimum number of still-unmatched direct children (leaves or subtrees - see `flat_children`)
+/// required to trigger the flat-tree optimisation.
 pub(crate) const FLAT_MIN_CHILDREN: usize = 50;
 /// Edit-distance cap for Myers diff. If d exceeds this, we fall back to mark-as-replaced.
 pub(crate) const FLAT_MAX_EDIT: usize = 1000;

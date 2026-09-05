@@ -20,7 +20,7 @@
 * Human-authored ground-truth AST mappings, used to check codediff's output against what a human
 * considers the optimal diff.
 *
-* These are produced by the `human_solver` binary (src/bin/human_solver.rs), which lets a human
+* These are produced by the `human_solver` binary (src/bin/human_solver/), which lets a human
 * walk the before/after ASTs of a test case side by side and mark nodes as matching, deleted or
 * inserted. The result is stored as JSON in
 * `src/test/data/diffs/{handmade,small,full,stratified}/<name>/human_mapping.json` - see
@@ -386,8 +386,8 @@ impl HumanTextEntry {
 ///
 /// * Many nodes carry no visible text of their own (`expression_statement` wrappers and the like),
 ///   so a node-level answer cannot be checked against what appears on screen without an extra,
-///   unvalidated projection step - the same visible-versus-scaffolding split `visible_node_ids`
-///   draws for mismatch counting.
+///   unvalidated projection step - the same visible-versus-scaffolding split
+///   `structurally_visible_node_ids` draws for mismatch counting.
 /// * Even a mapping that is not in doubt anywhere leaves the *rendering* underdetermined. For a
 ///   reorder, "one line moved past five" and "five lines moved past one" describe the identical
 ///   set of matched pairs; the mapping, and any cost function over it, is indifferent between
@@ -590,13 +590,13 @@ pub struct TextMappingCheck {
 /// answer it came closest to, and the name of that answer comes back with the result so a reader
 /// knows which one was used.
 ///
-/// **Deliberately not mode-aware** ([`painting_for_mode`]/[`crate::diff::text::ranges_for_mode`]
+/// **Deliberately not mode-aware** ([`paintings_for_mode`]/[`crate::diff::text::ranges_for_options`]
 /// are the wrong tools here, unlike in [`compare_painting`]). Those exist to validate a *real
 /// product feature* - codediff's own Minimal/Full rendering modes - against the paintings written
 /// for them, which is exactly right when the tree side is `diff_code`'s real output. This function
 /// compares two human-authored ground truths against each other; the tree side never comes from
 /// `diff_code`, only from the human's own `entries` (via [`as_ast_diff_for_mapping`]). Routing that
-/// comparison through `painting_for_mode`/`ranges_for_mode` anyway would make a bug or even just a
+/// comparison through `paintings_for_mode`/`ranges_for_options` anyway would make a bug or even just a
 /// debatable design choice in either function indistinguishable, in the result, from a genuine
 /// disagreement between the two ground truths - the same kind of contamination as using
 /// `diff_code` itself, just relocated into the mode-selection machinery instead of the matcher.
@@ -822,7 +822,7 @@ pub fn paintings_for_mode(
 /// `Minimal (right)`. The qualified form is how a painter records that an edit has **more than one
 /// defensible rendering under the same preset** - deleting one of two identical substrings can be
 /// read as deleting either, and both are correct. `human_solver`'s own help promises that a check
-/// passes on any of them; before this, `painting_for_mode` looked for one exact name and a fixture
+/// passes on any of them; before this, the mode lookup wanted one exact name and a fixture
 /// painted that way failed with "no 'Minimal' painting" despite being painted more carefully than
 /// one that passed.
 fn designates_preset(name: &str, preset: &str) -> bool {
@@ -1067,7 +1067,7 @@ pub fn save(name: &str, mapping: &HumanMapping) -> Result<()> {
     Ok(())
 }
 
-/// `pub`, not private: `src/bin/human_solver.rs` (a separate binary crate that depends on this
+/// `pub`, not private: `src/bin/human_solver/` (a separate binary crate that depends on this
 /// one, so `pub(crate)` wouldn't reach it) needs the identical `Vec<String>` -> `Vec<&str>`
 /// conversion (for the same `node_for_path`/`PathCache::resolve` calls this module makes) and
 /// previously carried its own byte-for-byte copy rather than reusing this one.
@@ -1610,6 +1610,17 @@ fn expected_ast_operation(operation: HumanOperation) -> Option<ASTMappingOperati
     }
 }
 
+/// A node's `owned_text_hash`, or 0 when the node has no metadata entry - the same "absent means
+/// owns nothing" convention `ASTNodeMetadata::owned_text_hash` uses, so a missing entry can never
+/// be mistaken for a change.
+fn owned_text_hash(metadata: &ASTMetadata, id: usize) -> u64 {
+    metadata
+        .node_info
+        .get(&id)
+        .map(|info| info.owned_text_hash)
+        .unwrap_or(0)
+}
+
 /**
 * Total edit cost of a human-authored `HumanMapping` under the same unit-cost model as
 * `crate::diff::cost::diff_cost`, so the two numbers are directly comparable -
@@ -1631,17 +1642,6 @@ fn expected_ast_operation(operation: HumanOperation) -> Option<ASTMappingOperati
 * inflate `diff_cost - human_mapping_cost` for a reason that has nothing to do with the algorithm -
 * worth checking with `--details` before trusting a surprising gap on an unfamiliar fixture.
 */
-/// A node's `owned_text_hash`, or 0 when the node has no metadata entry - the same "absent means
-/// owns nothing" convention `ASTNodeMetadata::owned_text_hash` uses, so a missing entry can never
-/// be mistaken for a change.
-fn owned_text_hash(metadata: &ASTMetadata, id: usize) -> u64 {
-    metadata
-        .node_info
-        .get(&id)
-        .map(|info| info.owned_text_hash)
-        .unwrap_or(0)
-}
-
 pub fn human_mapping_cost(
     mapping: &HumanMapping,
     before_root: Node,

@@ -16,8 +16,8 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-//! MoveDetectionRecovery: the final pass of the pipeline, running after the tree-edit-distance
-//! step has fully decided the diff. Scans what got wholly deleted and wholly inserted and pairs
+//! MoveDetectionRecovery: phase 7 of the pipeline, running after the terminal residual
+//! resolution has decided every match (only the re-tagging phases 8-10 come after it). Scans what got wholly deleted and wholly inserted and pairs
 //! up byte-identical subtrees between the two sets - code that didn't change but *moved*, which
 //! plain ordered tree edit distance structurally cannot express as anything but delete+insert
 //! whenever the move crosses a matched boundary (the classic case: a subtree relocating into a
@@ -25,7 +25,7 @@
 //! rust-turbopack-module-rule analysis in TODO.md).
 //!
 //! This is GumTree's "recovery mappings" phase adapted to this pipeline. It deliberately runs
-//! dead last: every earlier pass (including the DP) gets first claim on all content, so this can
+//! after every matching pass: each of them (including the DP) gets first claim on all content, so this can
 //! only ever convert delete+insert leftovers into matches - it can never take a node away from a
 //! better mapping.
 //!

@@ -22,7 +22,7 @@ use crate::diff::nodes::is_import_kind;
 use crate::diff::{ASTDiff, ASTMappingReason, NodeCache};
 
 /**
-* Phase 1 of the seven-phase pipeline (`TODO.md`, 2026-07-17/18): "hash-based, largest-subtree-
+* Phase 1 of the matching pipeline (`Diff::pending_with_config` lists all ten phases): "hash-based, largest-subtree-
 * first descent". Runs the generalized `hash_tree_matching::solve_with_hash_map` engine twice,
 * once per hash algorithm - each call finds and matches whatever it can, then the next call only
 * sees whatever's left unmatched (`PostorderIndexer`/the engine's own `before_node_map` check skip

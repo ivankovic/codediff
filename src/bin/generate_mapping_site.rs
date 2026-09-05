@@ -16,7 +16,7 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-//! Renders every fixture's `human_mapping.json` (see `src/bin/human_solver.rs`) as a static,
+//! Renders every fixture's `human_mapping.json` (see `src/bin/human_solver/`) as a static,
 //! read-only HTML page - two side-by-side before/after trees with the human-authored
 //! matched/deleted/inserted annotations baked in as `data-*` attributes, click-to-highlight
 //! cross-panel navigation, and a "file an issue" button - all driven by one hand-written vanilla
@@ -286,7 +286,7 @@ fn render_fixture_page(
     // this says what that looks like as code. They answer different questions - a tree node like
     // an `expression_statement` wrapper has no visible text of its own, so a reader scanning the
     // tree cannot tell which annotations correspond to something they would actually see on
-    // screen (the same visible-vs-scaffolding split `visible_node_ids` draws for mismatch
+    // screen (the same visible-vs-scaffolding split `structurally_visible_node_ids` draws for mismatch
     // counting). The code panel is the visible half, rendered directly.
     //
     // Routed through exactly the machinery codediff's own output uses - `as_ast_diff_for_mapping`

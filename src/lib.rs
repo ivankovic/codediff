@@ -40,7 +40,7 @@ use crate::{
 };
 
 /**
-* Compute the difference between two programms, given as strings in a given language.
+* Compute the difference between two programs, given as strings in a given language.
 *
 * TODO: If the language is Unknown, try to auto-detect it. That should be done in from_string.
 * Also, when doing that, check that both strings are in the same language.

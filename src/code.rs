@@ -448,7 +448,7 @@ pub struct ASTMetadata {
     /// hash was built for). Used for byte-identical-subtree matching (`solve_hash_descent`),
     /// alongside `node_to_full_hash` (the order-*dependent* full hash, still used wherever
     /// document-order-sensitive content equality is needed - APTED's own cost model
-    /// (`apted/common.rs`), `solve_moved_subtrees`, `solve_greedy_anchor_blocks`,
+    /// (`apted/common`), `solve_moved_subtrees`, `solve_greedy_anchor_blocks`,
     /// `solve_identical_diagnostic_statements`).
     pub node_to_kind_and_value_hash: rustc_hash::FxHashMap<usize, u64>,
     /// Reverse map for `node_to_kind_and_value_hash`. See `full_hash_to_node` for why this is a
@@ -489,7 +489,7 @@ pub struct ASTMetadata {
     /// than every ancestor/containment check re-deriving its own copy from scratch.
     ///
     /// `FxHashMap`, not `std::collections::HashMap`: this map backs `ContainmentCtx`'s
-    /// `is_ancestor_or_self` ancestor walk (`apted/common.rs`), which does a `.get()` per step of
+    /// `is_ancestor_or_self` ancestor walk (`apted/common/slots.rs`), which does a `.get()` per step of
     /// an O(depth) walk on every `vren_adjusted` call inside APTED's core DP - an enormous number
     /// of lookups on any fixture with real containment. The default hasher (`SipHash`) is
     /// correctness-fine but randomly reseeded per process, so its collision behavior for this

@@ -143,7 +143,7 @@ pub fn row_cells_of(line: &str) -> ScreenColumn {
 * us a neat property: when code is inserted or deleted, the other side of the comparison will not
 * have a matching range at all. However, if we insert a null-range in the appropriate place, we can
 * allow the editor to display a red/green line indicating that something exists on the other side
-* in this place. This also leads to symetric diffs: both sides will always have the same number of
+* in this place. This also leads to symmetric diffs: both sides will always have the same number of
 * ranges, or in case of multi file diffs the sum total of ranges will always be an even number and
 * each range will always have a matching range somewhere.
 *
@@ -380,7 +380,7 @@ fn is_whitespace_between(a: &TextRange, b: &TextRange, code: &SourceText) -> boo
 /// merging took 10.4s.
 ///
 /// With the row offsets computed once, the same lookup is an add and a bounds check. This is the
-/// second instance of this shape in this module; see `ranges_for_mode`'s own "built once for the
+/// second instance of this shape in this module; see `ranges_for_options`'s own "built once for the
 /// whole call rather than rescanning the file per range" note.
 pub struct SourceText<'a> {
     text: &'a str,

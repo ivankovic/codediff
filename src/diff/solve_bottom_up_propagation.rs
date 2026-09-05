@@ -24,7 +24,7 @@ use crate::diff::{COST_INSERT, NodeCache};
 /// `~/.claude/plans/iterative-herding-panda.md`): a strict, unconditional bottom-up propagation
 /// rule, replacing (once measured net-positive-or-neutral and made the default -
 /// `HeuristicConfig::solver_bottom_up_propagation`) the Dice-threshold `solve_bottom_up_expansion`
-/// for this same "a parent's children are already resolved enough to resolve the parent too" role.
+/// (since deleted) for this same "a parent's children are already resolved enough to resolve the parent too" role.
 ///
 /// For an unmatched before-node `B` with children `c1..ck` (`k >= 1`):
 /// 1. Every direct child of `B` must already have a decision (matched or deleted) - if any child
@@ -37,16 +37,16 @@ use crate::diff::{COST_INSERT, NodeCache};
 ///    itself unmapped, and `kind(B)`/`kind(P)` are compatible per `kinds_update_allowed`, `B` is
 ///    proposed to real (but now trivially cheap, since every descendant is already resolved)
 ///    APTED via `anchor_pair_via_apted` - the same "propose a pair, let real tree-edit-distance
-///    confirm and cost it" idiom `solve_bottom_up_expansion`/`solve_greedy_anchor_blocks` use, so
+///    confirm and cost it" idiom `solve_greedy_anchor_blocks` uses, so
 ///    the result's cost/operation is never invented.
 /// 4. Any other case - mixed matched/deleted children, disagreeing after-parents, or kind
 ///    incompatibility - blocks `B` unconditionally. No partial credit, no threshold, no vote.
 ///
-/// This only ever fires on a child-forced, 100%-consistent answer, so - unlike
-/// `solve_bottom_up_expansion`'s Dice-threshold rule, which accepts a parent on 90% descendant
+/// This only ever fires on a child-forced, 100%-consistent answer, so - unlike the deleted
+/// `solve_bottom_up_expansion`'s Dice-threshold rule, which accepted a parent on 90% descendant
 /// coverage and then lets APTED *improvise* a verdict for the uncovered remainder - it never has
 /// an invented decision to fight a later, more precise pass over. Consistent with
-/// `UnitCostModel::ren`'s own premise (`apted/common.rs`): a parent's correctness is validated
+/// `UnitCostModel::ren`'s own premise (`apted/common`): a parent's correctness is validated
 /// bottom-up by its children's real costs, never asserted top-down by a heuristic guess.
 ///
 /// Runs once, at the top of `PendingDiff::finish`, before the terminal Myers-LCS fallback
@@ -64,7 +64,7 @@ pub fn solve(before: &Code, after: &Code, _node_cache: &NodeCache, diff: &mut AS
 
     // Deepest nodes first (ties broken by `preorder_index`, not node id - see
     // `ASTNodeMetadata::start_byte`'s doc comment on why raw ids aren't parse-stable), same
-    // ordering convention as `solve_bottom_up_expansion` - by the time an ancestor is considered,
+    // ordering convention as `solve_greedy_anchor_blocks` - by the time an ancestor is considered,
     // every descendant already had its chance to resolve in this same call, so one call can
     // propagate a resolution several levels up the tree.
     //

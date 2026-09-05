@@ -21,7 +21,7 @@ use crate::diff::{ASTDiff, ASTMappingReason, NodeCache};
 
 /**
 * GreedyAnchorBlock: the pipeline's only *greedy, cost-estimate-driven* matcher. Every other
-* container-pairing heuristic (`solve_syntax_aware_matching`, `solve_bottom_up_expansion`) decides
+* container-pairing heuristic (`solve_syntax_aware_matching`, `solve_bottom_up_propagation`) decides
 * "is this pair the same thing" from some form of identity signal - a shared name, a Dice
 * coefficient over already-matched descendants. This pass instead estimates the actual edit cost of
 * matching each candidate pair (see `sequence_edit_cost`) and accepts whichever pairs are cheap
@@ -92,7 +92,7 @@ const MIN_SUBTREE_SIZE: usize = 4;
 /// module doc comment) does the heavy lifting of rejecting structurally-unrelated pairs.
 ///
 /// Swept 2026-07-25 (`TODO.md`'s hyperparameter-sweep entry) against `benchmark_optimal_solutions`
-/// - the first time this constant was tuned at all, unlike `solve_bottom_up_expansion::
+/// - the first time this constant was tuned at all, unlike the since-deleted `solve_bottom_up_expansion::
 ///   DICE_THRESHOLD`'s 2026-07-11 sweep. `{0.2, 0.35}` both landed at 829 mismatches (worse than
 ///   the old 0.5 default's 816 - too tight a filter rejects legitimate anchors, pushing more work
 ///   onto the final APTED pass), `0.5` (the old default) at 816, `{0.65}` at 813, and

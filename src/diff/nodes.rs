@@ -72,8 +72,7 @@ pub fn map_identical_descendants<'a>(
 /// second match is nested inside the first (e.g. one diagnostic call nested in another's
 /// arguments). Originally factored out of two near-duplicate walks, one of which
 /// (`solve_similar_flow_control`'s `collect_unmatched_containers`) was deleted 2026-08-14;
-/// `solve_identical_diagnostic_statements`'s `collect_unmatched_diagnostic_statements` remains the
-/// current caller.
+/// `solve_identical_diagnostic_statements` is the current caller.
 pub fn collect_unmatched<'a>(
     root: Node<'a>,
     mapped: &rustc_hash::FxHashMap<usize, usize>,
@@ -100,8 +99,8 @@ pub fn collect_unmatched<'a>(
 /// the pair as a match (rather than a separate delete+insert - e.g. if the leftover residual
 /// outweighs reuse), relabels the resulting mapping's reason to `reason` instead of leaving it as
 /// whatever generic label `for_nodes` itself assigns. Shared "propose a pair, then stamp
-/// provenance if it stuck" idiom behind `solve_bottom_up_expansion` and
-/// `solve_greedy_anchor_blocks`, which both anchor single node pairs this same way.
+/// provenance if it stuck" idiom behind `solve_greedy_anchor_blocks` (and the deleted
+/// `solve_bottom_up_expansion`), which anchor single node pairs this same way.
 pub fn anchor_pair_via_apted(
     before_id: usize,
     after_id: usize,
@@ -340,7 +339,7 @@ pub fn is_import_kind(node_kind: &str, language: &Language) -> bool {
 /// must never match a local variable also named `x`).
 ///
 /// Uses only `ASTNodeMetadata` (kind/children/text), not a real `tree_sitter::Node` - consistent
-/// with everything else in `apted/common.rs` this feeds, and sufficient here since every case
+/// with everything else in `apted/common` this feeds, and sufficient here since every case
 /// below only needs to walk to a specific child by *kind*, not by field name.
 ///
 /// Confirmed against real parse trees for each arm below (a throwaway `ascii_visualizer` dump per
@@ -996,7 +995,7 @@ pub fn is_semantically_structural<'a>(
 /// function's 12 subtests, individually renamed/restructured internally but keeping the same 12
 /// subtest names, had no identity signal at all before this - `call_expression` isn't a
 /// declaration `is_semantically_structural` otherwise recognizes - so the *entire* surrounding
-/// test function (whichever one happened to contain them) fell to `final_apted` as one 3,286-node
+/// test function (whichever one happened to contain them) fell to the old whole-file `final_pass` APTED as one 3,286-node
 /// blob on every edit (24s wall-clock) instead of 12 small, independently-anchored ~130-270-node
 /// diffs. Only a mismatched (wrong-position, wrong-content) false positive elsewhere could make
 /// this heuristic *wrong* rather than merely a no-op miss, and even then only affects match
@@ -2159,7 +2158,7 @@ pub fn is_commutative_container(node_kind: &str, language: &Language) -> bool {
         // (`hash_tree_matching.rs`) always took the plain positional-zip path for every JSON object
         // and YAML mapping. A single inserted/deleted key anywhere in a large flat object (e.g. one
         // new string added to a localization file) then desyncs every subsequent key's position,
-        // orphaning the whole rest of the object onto the expensive `final_apted` fallback - this is
+        // orphaning the whole rest of the object onto the expensive the old whole-file `final_pass` APTED fallback - this is
         // confirmed to be the exact mechanism behind a real observed case (jellyfin-jellyfin's
         // `cs.json`, one deleted key out of ~140: 1.2s and 100% `APTED`-attributed mappings for a
         // 3,075-combined-node file before this fix).

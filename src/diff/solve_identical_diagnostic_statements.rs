@@ -28,9 +28,9 @@ use crate::diff::{ASTDiff, ASTMapping, ASTMappingOperation, ASTMappingReason, No
 * is byte-for-byte identical on both sides. See [`crate::diff::nodes::is_diagnostic_statement`] for
 * exactly what counts.
 *
-* Runs as part of phase 2 in the seven-phase pipeline (`TODO.md`, 2026-07-17/18), right after
-* phase 1's hash descent and before phases 3-7 (bottom-up expansion, syntax-aware matching, final
-* APTED, the move-detection fallback). Running it after phase 1 means it only ever picks up
+* Runs as part of phase 2 of the matching pipeline (`Diff::pending_with_config` lists all ten
+* phases), right after phase 1's hash descent and before phase 4's syntax-aware matching, the
+* terminal residual resolution and the move-detection fallback. Running it after phase 1 means it only ever picks up
 * statements phase 1's byte-identical/structural hash matching left behind, so it can't fragment a
 * match a bigger/more-reliable pass would otherwise have made in one piece (e.g. matching a whole
 * function wholesale) into a smaller one anchored on some incidental identical `log::debug!(...)`

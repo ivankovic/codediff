@@ -59,7 +59,7 @@ const FLAT_CONTAINER_MIN_CHILDREN: usize = 50;
 * used to do nothing for such files (2026-07-23 gap, since fixed): `only_named_child` gives the
 * file's one real top-level value an implicit identity when there's exactly one on each side and
 * nothing already matched by name, so a large flat object/mapping at the very top of the file
-* still gets the same Myers fast path instead of the whole file falling to `final_apted` on every
+* still gets the same Myers fast path instead of the whole file falling to the old whole-file `final_pass` APTED on every
 * edit (see this pass's own git history / `nodes::is_commutative_container`'s doc comment for the
 * concrete case this fixes).
 */
@@ -86,7 +86,7 @@ pub fn solve(before: &Code, after: &Code, node_cache: &NodeCache, diff: &mut AST
     // nothing for such files whatsoever. That's a real gap, not just a missed optimization:
     // confirmed against a live case (jellyfin-jellyfin's `cs.json`, a single deleted key out of
     // ~140 in a flat object) that the *entire* file then falls through every other pass onto
-    // `final_apted`'s unconstrained tree-edit-distance - 1.2s and 100% `APTED`-attributed mappings
+    // the old whole-file `final_pass` APTED's unconstrained tree-edit-distance - 1.2s and 100% `APTED`-attributed mappings
     // for a 3,075-combined-node file, versus 0.6ms when the same top-level object is fed through
     // this pass's existing Myers machinery directly.
     //
@@ -238,7 +238,7 @@ fn top_level_identities(
     // arbitrarily deep inside such a wrapper (an `if`/`try` guard around most of a script's body,
     // say) with nothing above it in the tree to name-match on - confirmed against a live case
     // (`vimscript-neovim-neovim-i-have-no-idea-what-this-diff-does`: a single top-level
-    // `if_statement` wrapping a 370-direct-child `dictionnary` 8 levels down; `final_apted` alone
+    // `if_statement` wrapping a 370-direct-child `dictionnary` 8 levels down; the old whole-file `final_pass` APTED alone
     // took ~30s per diff with this pass unable to reach it, ~instant once matched here - see
     // TODO.md's 2026-08-08 entry).
     if root_node.named_child_count() > 1 {
@@ -445,7 +445,7 @@ mod tests {
     /// top-level declaration to key off - its whole content is one anonymous `object` - so this
     /// pass used to never fire for such files at all, no matter how large the top-level object
     /// was. Confirmed against a real case (a single deleted key out of ~140 in a jellyfin
-    /// localization file) that this used to send the *entire* file through `final_apted`'s
+    /// localization file) that this used to send the *entire* file through the old whole-file `final_pass` APTED's
     /// unconstrained tree-edit-distance: 1.2s and 100% `APTED`-attributed mappings for a
     /// 3,075-combined-node file, vs. ~2ms once this pass can see it.
     #[test]

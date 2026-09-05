@@ -42,7 +42,7 @@ codegen-units = 1
 [dependencies]
 anyhow = "1.0.100"
 clap = { version = "4.5.51", features = ["derive"] }
-# TUI-only, but also used directly by src/bin/human_solver.rs's own small debug UI - gated by the
+# TUI-only, but also used directly by src/bin/human_solver/'s own small debug UI - gated by the
 # `tui` feature (see [features] below), not unconditional: a pure library consumer of
 # `codediff::diff`/`codediff::code` has no use for it.
 confy = { version = "2.0.0", optional = true }
@@ -85,7 +85,7 @@ futures = { version = "0.3", optional = true }
 # same reasoning as confy above.
 tokio = { version = "1.0", features = ["full"], optional = true }
 tree-sitter = "0.25"
-# TUI-only (see `tui` feature below) - also used directly by src/bin/human_solver.rs's own small
+# TUI-only (see `tui` feature below) - also used directly by src/bin/human_solver/'s own small
 # debug UI, same as confy/crossterm's siblings above.
 ratatui = { version = "0.26.3", features = ["serde", "macros"], optional = true }
 crossterm = { version = "0.27.0", features = ["serde", "event-stream"], optional = true }

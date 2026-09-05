@@ -33,7 +33,7 @@ use crate::tui::theme::OverlayTheme;
 /// Static reference sheet of every keybinding plus an About section (copyright, license,
 /// repository), kept in one place so the keybindings can't drift out of sync with individual
 /// handlers the way a comment scattered across several files could. Mirrors (and should be kept
-/// in sync with) README.md's "Using the TUI" section and `src/bin/human_solver.rs`'s own
+/// in sync with) README.md's "Using the TUI" section and `src/bin/human_solver/`'s own
 /// `HELP_TEXT`/`?` modal, which this is modeled on. The diff-color legend is *not* part of this
 /// static text: the actual colors are theme-dependent, so `draw` renders it from the live
 /// `OverlayTheme` palette instead (see `legend_lines`) - a fixed "Green means inserted"
