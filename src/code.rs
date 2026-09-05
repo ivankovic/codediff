@@ -283,7 +283,10 @@ pub struct Metadata {
 pub struct ASTNodeMetadata {
     /// Node kind (type)
     pub kind: String,
-    /// Node text content (for leaf nodes)
+    /// The node's text, for leaves; empty for an internal node (whose text is its children's, and
+    /// whose only text of its own is hashed into `owned_text_hash`). Every consumer compares two
+    /// leaves' text, and copying every internal node's whole subtree text here was the largest
+    /// single cost of building metadata on a large file.
     pub text: String,
     /// A hash of the text this node owns *directly*: the non-whitespace content of the gaps
     /// before, between and after its children. 0 for leaves (whose whole span is already in

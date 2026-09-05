@@ -142,6 +142,20 @@ done; the §4 typos are fixed except `symetric` (×3).
   grows another concern. Also left: `CodeViewer` vs `CodeViewerWidget`/`CodeViewerState`.
   What remains of the review is section 6 (performance): profile with `make benchmark-speed`
   (buildable again since section 1), then the metadata arena.
+- **2026-09-06, section 6 (profile + first fixes)** - `perf` is locked down here
+  (`perf_event_paranoid` 4), so the profile is callgrind on the product binary diffing the 75k-node
+  Rust fixture, plus a per-step corpus timing. Findings: APTED's `spf_path` is 26% self (expected);
+  **`Node::parent()` was 12% of all instructions** - tree-sitter's parent lookup descends from
+  the root, and `solve_wrap_growth` asked for a parent once per shifted internal node (542k calls
+  in `finish`); `sort_deepest_first` did two hash lookups per comparison, 6.7%; metadata is 3.6x
+  the parse on that file (`compute_ast_metadata` 24.7% vs `ts_parser_parse` 6.8%), spread over
+  the eight walks' per-node cursor creation, `Vec<Node>` collects and hash-map inserts rather than
+  any single step - the leaf-only `text` change (below) moved the corpus number 11.85s to 11.64s,
+  so the copy was not the cost. Fixed: parent lookups in `solve_wrap_growth`,
+  `solve_heritage_clause_growth` and the comment-only scan go through `node_to_parent`;
+  `sort_deepest_first` uses `sort_by_cached_key`; `ASTNodeMetadata::text` is stored for leaves
+  only (every consumer compares leaves). Product binary on the 75k-node fixture: 2.78s to 2.41s;
+  on the 900KB JSON fixture 3.08s to 2.94s. Next on this list: the arena (items 6.2-6.4).
 - **Runtime finding from the same measurement**: over the corpus, AST metadata costs about three
   times the tree-sitter parse, and the parse plus metadata (15.5s) is more than half the diff
   itself (28s per the quality baseline). Section 6's items 1-3 are that cost.

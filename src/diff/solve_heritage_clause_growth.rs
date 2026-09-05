@@ -65,10 +65,21 @@ pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
         if !is_body_kind(before_body.kind()) || before_body.kind() != after_body.kind() {
             continue;
         }
-        let Some(before_class) = before_body.parent() else {
+        // Parent ids from the metadata, not `Node::parent()` (an O(depth) walk from the root).
+        let Some(&before_class) = ctx
+            .before_metadata()
+            .node_to_parent
+            .get(&before_body.id())
+            .and_then(|id| node_cache.before.get(id))
+        else {
             continue;
         };
-        let Some(after_class) = after_body.parent() else {
+        let Some(&after_class) = ctx
+            .after_metadata()
+            .node_to_parent
+            .get(&after_body.id())
+            .and_then(|id| node_cache.after.get(id))
+        else {
             continue;
         };
         if !is_declaration_kind(before_class.kind()) || before_class.kind() != after_class.kind() {

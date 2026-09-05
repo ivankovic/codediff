@@ -226,22 +226,16 @@ pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
 /// iteration order - see `ASTNodeMetadata::start_byte`'s doc comment on why raw node ids aren't
 /// parse-stable sort/tiebreak keys.
 fn sort_deepest_first(candidates: &mut [usize], metadata: &crate::code::ASTMetadata) {
-    candidates.sort_by(|&a, &b| {
-        let depth_a = metadata.node_to_depth.get(&a).copied().unwrap_or(0);
-        let depth_b = metadata.node_to_depth.get(&b).copied().unwrap_or(0);
-        depth_b.cmp(&depth_a).then_with(|| {
-            let pre_a = metadata
-                .node_info
-                .get(&a)
-                .map(|i| i.preorder_index)
-                .unwrap_or(0);
-            let pre_b = metadata
-                .node_info
-                .get(&b)
-                .map(|i| i.preorder_index)
-                .unwrap_or(0);
-            pre_a.cmp(&pre_b)
-        })
+    // The key is looked up once per candidate, not once per comparison: with two hash lookups
+    // per comparison this sort was 6.7% of a 75k-node file's whole diff (callgrind, 2026-09-06).
+    candidates.sort_by_cached_key(|&id| {
+        let depth = metadata.node_to_depth.get(&id).copied().unwrap_or(0);
+        let preorder = metadata
+            .node_info
+            .get(&id)
+            .map(|i| i.preorder_index)
+            .unwrap_or(0);
+        (std::cmp::Reverse(depth), preorder)
     });
 }
 

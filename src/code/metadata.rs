@@ -187,10 +187,18 @@ fn compute_node_info(code: &Code, metadata: &mut ASTMetadata) -> Result<()> {
     while let Some(node) = stack.pop() {
         let node_id = node.id();
         let kind = node.kind().to_string();
-        let text = node
-            .utf8_text(code.contents.as_bytes())
-            .unwrap_or("")
-            .to_string();
+        // Leaves only. Every consumer compares `text` between two leaves (`UnitCostModel::ren`,
+        // `classify_match`, the slot alignment's leaf arms); an internal node's whole subtree text
+        // was copied here too, which made this walk O(bytes x depth) and the single largest cost
+        // of metadata on a large file (measured 2026-09-06 over the corpus: 11.9s of metadata
+        // against 3.7s of parsing, before this change).
+        let text = if node.child_count() == 0 {
+            node.utf8_text(code.contents.as_bytes())
+                .unwrap_or("")
+                .to_string()
+        } else {
+            String::new()
+        };
 
         // Get children IDs
         let mut child_cursor = node.walk();

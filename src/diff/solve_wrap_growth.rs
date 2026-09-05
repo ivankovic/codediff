@@ -53,6 +53,12 @@ use crate::diff::{ASTDiff, ASTMappingOperation, ASTMappingReason, NodeCache};
 /// in `before` that *isn't* the reused node's own original sibling disqualifies the whole climb.
 pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
     let node_cache = ctx.node_cache;
+    // `node_to_parent`, never `Node::parent()`: tree-sitter's parent lookup walks down from the
+    // root (O(depth) per call), and this pass asks for a parent once per shifted node in the
+    // file - on a 75k-node file that was half a million such walks, 10% of the whole diff
+    // (callgrind, 2026-09-06). The metadata already holds every parent id.
+    let before_parents = &ctx.before_metadata().node_to_parent;
+    let after_parents = &ctx.after_metadata().node_to_parent;
     let candidates: Vec<(usize, usize)> = diff
         .mapping
         .iter()
@@ -83,11 +89,18 @@ pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
             continue;
         }
 
-        let Some(before_parent) = before_node.parent() else {
+        let Some(&before_parent_id) = before_parents.get(&before_id) else {
             continue;
         };
 
-        if !verify_pure_wrap(after_node, before_parent.id(), diff, node_cache) {
+        if !verify_pure_wrap(
+            after_node,
+            before_parent_id,
+            diff,
+            node_cache,
+            before_parents,
+            after_parents,
+        ) {
             continue;
         }
 
@@ -114,10 +127,15 @@ fn verify_pure_wrap(
     before_parent_id: usize,
     diff: &ASTDiff,
     node_cache: &NodeCache,
+    before_parents: &rustc_hash::FxHashMap<usize, usize>,
+    after_parents: &rustc_hash::FxHashMap<usize, usize>,
 ) -> bool {
     let mut current = after_node;
     for climbed in 0..MAX_WRAP_DEPTH {
-        let Some(parent) = current.parent() else {
+        let Some(&parent) = after_parents
+            .get(&current.id())
+            .and_then(|id| node_cache.after.get(id))
+        else {
             return false;
         };
 
@@ -126,7 +144,7 @@ fn verify_pure_wrap(
             if sibling.id() == current.id() {
                 continue;
             }
-            if !is_safe_wrapper_sibling(sibling, diff, node_cache, before_parent_id) {
+            if !is_safe_wrapper_sibling(sibling, diff, before_parents, before_parent_id) {
                 return false;
             }
         }
@@ -152,12 +170,8 @@ fn verify_pure_wrap(
         // already *is* the file's root) needs this as its own success path: both files' roots
         // correspond to each other by construction, the same trivial correspondence a real mapping
         // entry would otherwise represent.
-        if parent.parent().is_none() {
-            return climbed > 0
-                && node_cache
-                    .before
-                    .get(&before_parent_id)
-                    .is_some_and(|before_root| before_root.parent().is_none());
+        if !after_parents.contains_key(&parent.id()) {
+            return climbed > 0 && !before_parents.contains_key(&before_parent_id);
         }
         current = parent;
     }
@@ -179,7 +193,7 @@ fn verify_pure_wrap(
 fn is_safe_wrapper_sibling(
     sibling: Node,
     diff: &ASTDiff,
-    node_cache: &NodeCache,
+    before_parents: &rustc_hash::FxHashMap<usize, usize>,
     before_parent_id: usize,
 ) -> bool {
     if sibling.child_count() == 0 {
@@ -188,12 +202,7 @@ fn is_safe_wrapper_sibling(
     if let Some(&before_id) = diff.after_node_map.get(&sibling.id())
         && before_id != 0
     {
-        return node_cache
-            .before
-            .get(&before_id)
-            .and_then(|n| n.parent())
-            .map(|p| p.id())
-            == Some(before_parent_id);
+        return before_parents.get(&before_id) == Some(&before_parent_id);
     }
     // The sibling's own root carries no reused identity - every descendant must be equally free of
     // one, or something with a real identity elsewhere in `before` would be smuggled through as

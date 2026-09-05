@@ -300,13 +300,20 @@ pub fn is_comment_only_diff(
     // tree of its own (the `//` marker is its own child, confirmed empirically), so the specific
     // node carrying an Insert/Delete/Update mapping can be a non-comment-kind piece *of* a
     // comment, not the comment node itself. Walking up finds the enclosing comment either way.
-    fn is_comment_or_inside_comment(node: Node) -> bool {
-        let mut current = Some(node);
-        while let Some(n) = current {
-            if nodes::is_comment(n.kind()) {
+    //
+    // Walks `node_to_parent` ids rather than `Node::parent()`, which is an O(depth) descent from
+    // the root per call.
+    fn is_comment_or_inside_comment(node_id: usize, meta: &crate::code::ASTMetadata) -> bool {
+        let mut current = Some(node_id);
+        while let Some(id) = current {
+            if meta
+                .node_info
+                .get(&id)
+                .is_some_and(|info| nodes::is_comment(&info.kind))
+            {
                 return true;
             }
-            current = n.parent();
+            current = meta.node_to_parent.get(&id).copied();
         }
         false
     }
@@ -318,6 +325,7 @@ pub fn is_comment_only_diff(
         root: Node,
         diff: &ASTDiff,
         node_cache: &NodeCache,
+        own_meta: &crate::code::ASTMetadata,
         own_bytes: &[u8],
         other_bytes: &[u8],
     ) -> (bool, bool) {
@@ -329,7 +337,7 @@ pub fn is_comment_only_diff(
             let mut descend = true;
             let mut mark_found = || {
                 found_any = true;
-                if !is_comment_or_inside_comment(node) {
+                if !is_comment_or_inside_comment(node.id(), own_meta) {
                     all_comments = false;
                 }
             };
@@ -368,10 +376,13 @@ pub fn is_comment_only_diff(
 
     let before_bytes = before.contents.as_bytes();
     let after_bytes = after.contents.as_bytes();
+    let before_meta = crate::code::metadata::metadata_of(before);
+    let after_meta = crate::code::metadata::metadata_of(after);
     let (before_found, before_all_comments) = scan(
         before_ast.root_node(),
         diff,
         node_cache,
+        &before_meta,
         before_bytes,
         after_bytes,
     );
@@ -379,6 +390,7 @@ pub fn is_comment_only_diff(
         after_ast.root_node(),
         diff,
         node_cache,
+        &after_meta,
         after_bytes,
         before_bytes,
     );
