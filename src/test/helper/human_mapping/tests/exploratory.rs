@@ -205,50 +205,111 @@ fn exploratory_mapping_vs_painting_disagreement_detail() -> Result<()> {
     Ok(())
 }
 
-/// EXPLORATORY: measures `compare_painting` (Minimal + Full) for every handmade fixture and
-/// prints a report ranked by absolute mismatched bytes, plus the aggregate rate across the
-/// whole handmade corpus. Run with `cargo test --lib --features test-fixtures
-/// handmade_painting_disagreement_report -- --ignored --nocapture`.
+/// EXPLORATORY: measures `compare_painting` (Minimal + Full) for every painted fixture in the
+/// corpus and prints a report ranked by absolute mismatched bytes, plus three aggregate rates.
+/// Run with `cargo test --lib --features test-fixtures painting_disagreement_report -- --ignored
+/// --nocapture`.
 ///
 /// Ranked by bytes rather than percent: the `/goal` this backs (fewer than 1% character
-/// painting disagreement on handmade, in aggregate) is a bytes-summed rate, so a big fixture's
+/// painting disagreement, in aggregate) is a bytes-summed rate, so a big fixture's
 /// small percentage can outweigh a tiny fixture's big one - see this test's own printed rows
 /// for a caller wanting the ranking, not the theory.
+///
+/// **Widened from `handmade` to the whole corpus on 2026-09-05**, when 84 `stratified` fixtures
+/// became painted and measured at once. Until then this scanned `diffs/handmade` alone, which was
+/// defensible while every painted fixture was handmade and became a silent under-report the moment
+/// that stopped being true.
+///
+/// Three aggregates, because one number cannot carry what the corpus now holds:
+///
+///   * **whole corpus** - every painted fixture, the honest headline.
+///   * **excluding parse errors** - the same, minus fixtures tree-sitter reports a parse error on
+///     (`Node::has_error` on either side's root). A painting can only be as good as the tree under
+///     it, so a fixture whose parse failed is not evidence about the renderer. Derived rather than
+///     listed, so a fixture leaves this bucket the day its parse is fixed and nothing needs editing.
+///
+///     **Read this bucket for what it is, not for what it sounds like.** It flags 8 fixtures, and
+///     they are mostly ordinary C headers whose macros tree-sitter-c stumbles on. It does *not*
+///     catch the family that actually motivates the question - files named for one language that
+///     hold another. Checked directly on 2026-09-05: of the four `.html` fixtures that are really
+///     Go templates, three (`html-gohugoio-hugo-template-not-pure-html`, its `-2`, and
+///     `html-prettier-prettier-not-pure-html-includes-yaml-as-well`) parse **clean**, because
+///     tree-sitter-html is happy to read `{{ ... }}` as ordinary text. They carry four of the five
+///     worst rates in the corpus and this bucket does not exclude them. Excluding parse errors in
+///     fact *raises* the aggregate slightly, which is the tell: parse failure is not what drives
+///     painting disagreement here.
+///   * **handmade only** - the population every painting measurement before 2026-09-05 was made
+///     against, kept so the historical series stays comparable rather than silently rebased.
 #[test]
 #[ignore]
-fn handmade_painting_disagreement_report() -> Result<()> {
+fn painting_disagreement_report() -> Result<()> {
     use crate::diff::text::RenderOptions;
 
-    let handmade_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+    let diffs_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("src")
         .join("test")
         .join("data")
-        .join("diffs")
-        .join("handmade");
-    let mut names: Vec<String> = fs::read_dir(&handmade_dir)?
-        .filter_map(|entry| entry.ok())
-        .filter(|entry| entry.path().is_dir())
-        .map(|entry| entry.file_name().to_string_lossy().into_owned())
-        .collect();
+        .join("diffs");
+    // Every dataset, not just `handmade` - see this function's doc comment. `DIFF_DATASETS` rather
+    // than a `read_dir` of `diffs/` so this cannot drift from the split the rest of the suite
+    // resolves names against.
+    let mut names: Vec<(String, String)> = Vec::new();
+    for dataset in crate::test::helper::DIFF_DATASETS {
+        let dir = diffs_dir.join(dataset);
+        if !dir.is_dir() {
+            continue;
+        }
+        for entry in fs::read_dir(&dir)?.filter_map(|entry| entry.ok()) {
+            if entry.path().is_dir() {
+                names.push((
+                    (*dataset).to_string(),
+                    entry.file_name().to_string_lossy().into_owned(),
+                ));
+            }
+        }
+    }
     names.sort();
 
     struct Row {
         name: String,
+        dataset: String,
         minimal: PaintingComparison,
         full: PaintingComparison,
+        parse_error: bool,
     }
     let mut rows = Vec::new();
     let mut errors = Vec::new();
-    for name in &names {
+    for (dataset, name) in &names {
         let minimal = compare_painting(name, RenderOptions::MINIMAL);
         let full = compare_painting(name, RenderOptions::FULL);
         match (minimal, full) {
-            (Ok(minimal), Ok(full)) => rows.push(Row {
-                name: name.clone(),
-                minimal,
-                full,
-            }),
+            (Ok(minimal), Ok(full)) => {
+                // Derived, not listed: a fixture counts as a parse error when tree-sitter reports
+                // one on either side's root. A pair that fails to load at all is not a parse error
+                // in this sense - it never reaches here, it lands in `errors` below.
+                let parse_error = match crate::test::helper::handmade_test_code_pair(name) {
+                    Ok(pair) => {
+                        let (before, after) = &*pair;
+                        [before, after].iter().any(|code| {
+                            code.ast
+                                .as_ref()
+                                .is_some_and(|tree| tree.root_node().has_error())
+                        })
+                    }
+                    Err(_) => false,
+                };
+                rows.push(Row {
+                    name: name.clone(),
+                    dataset: dataset.clone(),
+                    minimal,
+                    full,
+                    parse_error,
+                });
+            }
             (minimal, full) => {
+                // A fixture with no painting reports an error here; that is the overwhelmingly
+                // common case now that this scans every dataset, so it is counted rather than
+                // listed one line at a time.
                 let msg = minimal.err().or(full.err()).unwrap();
                 errors.push(format!("{name}: {msg:#}"));
             }
@@ -259,38 +320,67 @@ fn handmade_painting_disagreement_report() -> Result<()> {
         std::cmp::Reverse(row.minimal.mismatched_bytes + row.full.mismatched_bytes)
     });
 
-    let mut total_mismatched = 0usize;
-    let mut total_bytes = 0usize;
     eprintln!(
-        "{:<70} {:>10} {:>10} {:>10}",
-        "fixture", "minimal%", "full%", "sum_bytes"
+        "{:<70} {:>11} {:>10} {:>10} {:>10}",
+        "fixture", "dataset", "minimal%", "full%", "sum_bytes"
     );
     for row in &rows {
         let sum_bytes = row.minimal.mismatched_bytes + row.full.mismatched_bytes;
-        total_mismatched += sum_bytes;
-        total_bytes += row.minimal.total_bytes + row.full.total_bytes;
         eprintln!(
-            "{:<70} {:>10.3} {:>10.3} {:>10}",
+            "{:<70} {:>11} {:>10.3} {:>10.3} {:>10}{}",
             row.name,
+            row.dataset,
             row.minimal.percent(),
             row.full.percent(),
             sum_bytes,
+            if row.parse_error {
+                "  [parse error]"
+            } else {
+                ""
+            },
         );
     }
-    let aggregate_percent = if total_bytes == 0 {
-        0.0
-    } else {
-        100.0 * total_mismatched as f64 / total_bytes as f64
+
+    // One closure, three populations - so the three numbers cannot drift apart in how they are
+    // computed, only in who they are computed over.
+    let aggregate = |label: &str, keep: &dyn Fn(&Row) -> bool, note: &str| {
+        let kept: Vec<&Row> = rows.iter().filter(|row| keep(row)).collect();
+        let mismatched: usize = kept
+            .iter()
+            .map(|row| row.minimal.mismatched_bytes + row.full.mismatched_bytes)
+            .sum();
+        let total: usize = kept
+            .iter()
+            .map(|row| row.minimal.total_bytes + row.full.total_bytes)
+            .sum();
+        let percent = if total == 0 {
+            0.0
+        } else {
+            100.0 * mismatched as f64 / total as f64
+        };
+        eprintln!(
+            "  {label:<28} {:>3} fixtures  {mismatched:>7} / {total:<8} bytes = {percent:>7.4}%{note}",
+            kept.len()
+        );
     };
-    eprintln!(
-        "\naggregate: {total_mismatched} / {total_bytes} bytes = {aggregate_percent:.4}% \
-         (goal: < 1%)"
+
+    // The goal marker rides on the whole-corpus line alone. The other two are context: one measures
+    // something narrower than its name suggests (see the doc comment), the other exists only to keep
+    // the pre-2026-09-05 series comparable. Neither is the bar.
+    eprintln!("\naggregate:");
+    aggregate("whole corpus", &|_| true, "  (goal: < 1%)");
+    aggregate("excluding parse errors", &|row: &Row| !row.parse_error, "");
+    aggregate(
+        "handmade only (historical)",
+        &|row: &Row| row.dataset == "handmade",
+        "",
     );
+
     if !errors.is_empty() {
-        eprintln!("\n{} fixture(s) could not be measured:", errors.len());
-        for e in &errors {
-            eprintln!("  {e}");
-        }
+        eprintln!(
+            "\n{} fixture(s) could not be measured (overwhelmingly: no painting)",
+            errors.len()
+        );
     }
     Ok(())
 }
@@ -332,9 +422,12 @@ fn mapping_vs_painting_disagreement_detail_for_fixture() -> Result<()> {
 }
 
 /// EXPLORATORY: prints just the Minimal/Full percentages for fixtures named by the
-/// `FIXTURES` env var (comma-separated) - for measuring stub tests outside the handmade
-/// dataset, where `handmade_painting_disagreement_report` doesn't reach: `FIXTURES=a,b,c
-/// cargo test --lib --features test-fixtures measure_stub_fixtures -- --ignored --nocapture`.
+/// `FIXTURES` env var (comma-separated): `FIXTURES=a,b,c cargo test --lib --features test-fixtures
+/// measure_stub_fixtures -- --ignored --nocapture`.
+///
+/// Narrower than `painting_disagreement_report`, which since 2026-09-05 covers every dataset and no
+/// longer leaves a gap for this to fill. Kept because naming a handful of fixtures is still the
+/// fastest way to re-measure after a change, without paying for the whole corpus.
 #[test]
 #[ignore]
 fn measure_stub_fixtures() -> Result<()> {
@@ -466,7 +559,7 @@ fn painting_disagreement_detail_batch() -> Result<()> {
 /// EXPLORATORY: prints every run of bytes where codediff's rendering (under `options`)
 /// disagrees with the human painting for one fixture - the `compare_painting` byte-projection
 /// itself, not `text_mapping_disagreements`' separate node-vs-painting comparison. Fixture and
-/// mode are read from env vars so this can be pointed at any `handmade_painting_disagreement_report`
+/// mode are read from env vars so this can be pointed at any `painting_disagreement_report`
 /// offender without editing this function: `FIXTURE=<name> MODE=<minimal|full> cargo test --lib
 /// --features test-fixtures painting_disagreement_detail -- --ignored --nocapture`.
 #[test]

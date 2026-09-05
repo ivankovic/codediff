@@ -288,8 +288,8 @@ measure-edit-shape:
 # paper's RQ3, and it mentions no diffing tool at all - unlike shapes-report above, nothing here
 # joins against codediff's own result. Reads the mapping JSON files directly, scoped to the fixture
 # set in data/quality/human_mapping_analysis.csv, so re-run `analyze_human_mappings --csv` first if
-# fixtures were added. Also reads git history of those files (the multi-map facility postdates part
-# of the corpus - see the script's own doc comment), so it needs a real checkout, not an export.
+# fixtures were added. One rate over every in-scope fixture: the annotation-era split this used to
+# report was removed on 2026-09-05, see the script's own doc comment.
 ambiguity-report:
 	uv run ./analysis/ambiguity_report.py
 

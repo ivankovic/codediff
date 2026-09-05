@@ -29,10 +29,9 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test, read the rate it
-    // reports for both modes, and record that instead.
+    // measured 2026-09-05: minimal 64.394%, full 50.758%
     assert_matches_human_painting_within_limit(
         "css-wordpress-wordpress-reformat-and-fix-lint-errors",
-        100.0,
+        64.41,
     )
 }

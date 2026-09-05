@@ -29,7 +29,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test, read the rate it
-    // reports for both modes, and record that instead.
-    assert_matches_human_painting_within_limit("json-puppeteer-puppeteer-version-update", 100.0)
+    // measured 2026-09-05: minimal 0.000%, full 0.000% (measured, unexamined)
+    assert_matches_human_painting_within_limit("json-puppeteer-puppeteer-version-update", 0.0)
 }

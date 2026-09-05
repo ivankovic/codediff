@@ -20,9 +20,11 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
+    // 2026-09-05: the human mapping was cleared and is being re-solved from scratch, so
+    // `human_mapping.json` currently grades nothing at all. Held at 0/0 rather than left at the
+    // old 23/19: against an empty mapping any positive limit passes vacuously, and a limit that
+    // cannot fail is worse than no test. Raise it to the real counts when the mapping is redone.
+    test::helper::human_mapping::assert_matches_human_mapping(
         "vimscript-neovim-neovim-test-debian-package-parsing-awful-string-matching",
-        23,
-        19,
     )
 }

@@ -82,8 +82,8 @@ the measurements found.
 
 \emph{Viability.} We built a corpus of \NumFixtures{} real-world changes in
 \NumFixtureLanguages{} languages, each carrying a human-authored AST mapping, and
-\PaintingFixtures{} of them a human-painted rendering. Among the changes annotated with the
-facility to record it, \AmbiguityFullFreshPct{}\% on the larger repository list require a
+\PaintingFixtures{} of them a human-painted rendering. \AmbiguityFullPct{}\% of the changes on the
+larger repository list require a
 correspondence in which several nodes on one side answer to one or several on the other, which
 insert, delete, update and move cannot express; and on at least \CostHumanHigherPct{}\% the
 mapping the annotators judged correct costs strictly more, under unit operation costs, than one
@@ -92,8 +92,9 @@ an algorithm found. \emph{Speed.} Across \RqOnePairsAttempted{} file pairs sampl
 within one second for \RqOneCodePct{}\% of code pairs, and the collapse falls between two
 adjacent, entirely ordinary file sizes. \emph{Uniqueness.} \InvisibleNodeShare{}\% of AST nodes
 carry no text of their own and never reach the screen, so a node-level metric scores heavily on
-decisions no reader can see; and where the rendering was painted by hand, \PaintingDualPct{}\% of
-changes admit two equally correct renderings of one settled mapping. \emph{Implementation.}
+decisions no reader can see; and where the rendering was painted by hand, \PaintingSampledDualPct{}\%
+of changes sampled from real commits---and \PaintingHandmadeDualPct{}\% of small hand-written
+examples---admit two equally correct renderings of one settled mapping. \emph{Implementation.}
 Against the same ground truth, nine established tools---Unix \texttt{diff}, four \texttt{git}
 algorithms, BDiff, Neovim, GumTree, difftastic and diffsitter---show line-level mismatch rates
 from \GitMyersLineRate{}\% to \GumTreeLineRate{}\%, with no AST-aware tool among them beating
@@ -356,8 +357,8 @@ software development, and have reviewed tens of thousands of real world code cha
 environments. Based on this experience, we did not even attempt to find a unique solution for each diff.
 Instead, the dataset supports multiple correct solutions for each diff, and it supports marking diffs
 that cannot be solved at all using the standard set of AST diff operations (Insert, Delete, Update and Move).
-In particular, \AmbiguityFullFreshWith{} of the Full list's \AmbiguityFullFreshTotal{} diffs
-(\AmbiguityFullFreshPct{}\%) require a N:M mapping, i.e. one or more nodes from one side maps to one or
+In particular, \AmbiguityFullWith{} of the Full list's \AmbiguityFullTotal{} diffs
+(\AmbiguityFullPct{}\%) require a N:M mapping, i.e. one or more nodes from one side maps to one or
  more nodes from the other side.~\footnote{ The most common cause of an N:M mapping is a refactoring,
  where two or more similar blocks of code are moved to a common function. The correct solution is the
  one that maps all nodes as moved.}.
@@ -394,7 +395,7 @@ cannot be expressed using common AST diff operations (Insert, Delete, Update, Mo
 \end{table}
 
 \begin{resultbox}{RA1.1.}
-  \AmbiguityFullFreshPct{}\% (\AmbiguityFullFreshWith{} of \AmbiguityFullFreshTotal{}) diffs have
+  \AmbiguityFullPct{}\% (\AmbiguityFullWith{} of \AmbiguityFullTotal{}) diffs have
   optimal solutions that cannot be expressed at all using the common AST diff operations
   (Insert, Delete, Update, Move).
 \end{resultbox}
@@ -493,8 +494,7 @@ also a site where several one-to-one mappings are equally correct---one of two i
 removed, a member is appended to an expression chain, an argument is added to a list of similar
 arguments---and choosing between them is arbitrary rather than correct. A diffing algorithm can
 still emit a correct answer here; what fails is the assumption that the correct answer is unique.
-The rates are the ones Table~\ref{tab:ambiguity} reports: \AmbiguityFreshPct{}\% of the fixtures
-annotated with the facility available contain such a site, and the sites account for
+\AmbiguityAnyPct{}\% of the corpus's fixtures contain such a site, and the sites account for
 \AmbiguityPairsPct{}\% of all non-identical mapping decisions.
 
 The second is independent of the annotation format, and comes from the cost comparison behind
@@ -506,10 +506,10 @@ changes on which the cost function alone under-determines the answer, and the fi
 bound of the same kind as RA1.2's, since only one alternative mapping per change was examined.
 
 \begin{resultbox}{RA3.1 (Mapping uniqueness)}
-A correct AST mapping is often not unique. In \AmbiguityFreshPct{}\% of the fixtures annotated
-with multi-mapping available (\AmbiguityFreshFixtures{} of \AmbiguityFreshScored{}), at least one
-set of nodes admits several equally correct pairings, with the corpus-wide \AmbiguityAnyPct{}\%
-standing as a floor; weighted by mapping decisions rather than fixtures, that is \AmbiguityPairs{}
+A correct AST mapping is often not unique. In \AmbiguityAnyPct{}\% of the corpus's fixtures
+(\AmbiguityAnyFixtures{} of \AmbiguityScored{}), at least one
+set of nodes admits several equally correct pairings;
+weighted by mapping decisions rather than fixtures, that is \AmbiguityPairs{}
 of \AmbiguityPairedDecisions{} non-identical node pairs, \AmbiguityPairsPct{}\%. Independently, on
 \CostTieDifferentPct{}\% of changes a second, different mapping exists at exactly the human
 mapping's cost, so the cost model by itself does not single out an answer either. An evaluation
@@ -517,7 +517,7 @@ that scores a tool against one fixed pairing therefore risks marking correct out
 roughly one change in seven, whenever the tool picks a different, equally valid pairing.
 \end{resultbox}
 
-Both rates in Table~\ref{tab:ambiguity} remain lower bounds for the reason RA1.1 gives: a group
+Both rates remain lower bounds for the reason RA1.1 gives: a group
 exists only where an annotator noticed that a choice was a choice. That the count is conservative
 in this direction is what makes it usable---an over-count would be an argument about annotation
 discipline, whereas an under-count still establishes that the phenomenon is common enough to
@@ -542,10 +542,14 @@ the same diff and the choice never reaches the reader. The painted portion of th
 (Section~\ref{sec:dataset}) is what tests that hope, because it records the rendering directly
 instead of deriving it from a mapping.
 
-It does not wash out. Of the \PaintingFixtures{} painted fixtures, \PaintingDual{}---%
-\PaintingDualPct{}\%---carry two paintings, the annotator's finding that both are correct
-renderings of the same change; the remaining \PaintingSingle{} carry one, the annotator's finding
-that this change renders one way. Both cells are findings. A single painting is not a fixture
+It does not wash out. Of the \PaintingSampledPainted{} painted changes sampled from real commits,
+\PaintingSampledDual{}---\PaintingSampledDualPct{}\%---carry two paintings, the annotator's finding
+that both are correct renderings of the same change; among the \PaintingHandmadePainted{} small
+hand-written examples the figure is \PaintingHandmadeDualPct{}\%. We quote the two separately
+throughout, for a reason the limits below develop: the pooled rate over all \PaintingFixtures{}
+painted fixtures is \PaintingDualPct{}\%, and that number moves with how many of each kind have
+been painted rather than with anything about code. A fixture that carries one painting carries the
+annotator's finding that this change renders one way. Both cells are findings. A single painting is not a fixture
 nobody got round to painting twice, and this is worth stating because the two are indistinguishable
 in a file listing: the annotation tool records a single painting only where the painter examined
 the change and judged its rendering unambiguous.
@@ -561,25 +565,37 @@ bracket unpainted disagrees with \emph{Full} and agrees with \emph{Minimal}, and
 precisely so that this is not scored as an error.
 
 \begin{resultbox}{RA3.2 (Visualization uniqueness)}
-Settling the mapping does not settle the rendering. Of the \PaintingFixtures{} changes whose
-rendering was painted by hand, \PaintingDualPct{}\% (\PaintingDual{}) admit two equally correct
-renderings, differing systematically over whether punctuation dragged along by a change counts as
-part of it: \PaintingFullExtraPunctuationPct{}\% of the spans separating the two styles hold
-punctuation alone. Line-based and syntax-aware tools alike are therefore scored, on those changes,
-against one of two right answers.
+Settling the mapping does not settle the rendering. Of the \PaintingSampledPainted{} painted changes
+taken from real commits, \PaintingSampledDualPct{}\% (\PaintingSampledDual{}) admit two equally
+correct renderings; among \PaintingHandmadePainted{} small hand-written examples it is
+\PaintingHandmadeDualPct{}\%. The two differ systematically over whether punctuation dragged along
+by a change counts as part of it: \PaintingFullExtraPunctuationPct{}\% of the spans separating the
+two styles hold punctuation alone. Line-based and syntax-aware tools alike are therefore scored, on
+those changes, against one of two right answers. We report the two populations separately rather
+than the pooled \PaintingDualPct{}\%, which is a mixture set by annotation order.
 \end{resultbox}
 
-Two limits bound that rate, and they run in opposite directions. The painted subset is not a random
-sample: painting is manual, and it was done on the hand-written portion of the corpus first, so
-nearly every painted fixture is a small, curated example of a single change pattern---median
-\PaintingLocMedian{} lines, at most \PaintingLocMax{}, across \PaintingLanguages{} of the corpus's
-\NumFixtureLanguages{} languages. That is a real restriction on what the rate describes. But it is
-a restriction toward the conservative side of the claim being made: a minimal example of one
-change pattern offers the least room for two renderings to diverge, and the rate is measured
-there. Whether it holds on the corpus's large, multi-site real-world changes is open, and the
-direction we would expect is upward. The second limit is the one RA3.1 already names: a painting
-records what an annotator noticed, so a change whose second rendering nobody saw is filed as
-unambiguous.
+Two limits bound that rate. The first is that the painted subset is not a random sample: painting
+is manual, and it was done on the hand-written portion of the corpus first, so the painted set is
+weighted toward small, curated examples of a single change pattern---median \PaintingLocMedian{}
+lines, though as large as \PaintingLocMax{}, across \PaintingLanguages{} of the corpus's
+\NumFixtureLanguages{} languages.
+
+That weighting is not neutral, and the corpus is now large enough to say which way it runs. Of the
+\PaintingFixtures{} painted changes, \PaintingHandmadePainted{} are hand-written examples and
+\PaintingSampledPainted{} are captured from real commits, and the two disagree sharply:
+\PaintingHandmadeDualPct{}\% of the hand-written ones carry two paintings against
+\PaintingSampledDualPct{}\% of the sampled ones. The aggregate \PaintingDualPct{}\% is therefore a
+mixture whose proportions are an artifact of the order the annotators worked in, and the honest
+reading is the lower of the two figures: on changes taken from real commits, rendering ambiguity is
+common but not the majority case. We had expected the opposite---that a minimal example of one
+change pattern offers the least room for two renderings to diverge, so that the rate would rise on
+larger changes---and it does not. Why a curated single-pattern example should admit a second
+rendering three times as often as a real commit is open; the most likely explanation is that a
+small change is small enough for an annotator to see both readings at once.
+
+The second limit is the one RA3.1 already names: a painting records what an annotator noticed, so a
+change whose second rendering nobody saw is filed as unambiguous.
 
 \subsection{How much of the mapping reaches the reader}
 
@@ -1092,11 +1108,11 @@ Future work includes widening the robustness corpus beyond Rust and extending th
 comparison to more languages GumTree also supports, but the clearest directions are the ones RA1.1,
 RA1.2 and RA3.2 open. The uniqueness rates are floors: the corpus establishes that ambiguity is
 common, and establishes it only where an annotator noticed and recorded it. Detecting candidate
-ambiguity automatically, and re-annotating the \AmbiguityPreFixtures{} fixtures that predate the
-multi-mapping facility, would turn a floor into a census. RA3.2's floor is narrower still and
-easier to raise: painting is manual, and the \PaintingFixtures{} changes painted so far are the
-corpus's small curated ones, so whether \PaintingDualPct{}\% holds on large, multi-site real-world
-changes is simply unmeasured. The $N{:}M$ result needs more than annotation effort. The painted
+ambiguity automatically would turn a floor into a census. RA3.2's floor now rests on a
+mixture: of the \PaintingFixtures{} changes painted so far, the hand-written ones carry two
+renderings \PaintingHandmadeDualPct{}\% of the time and the ones sampled from real commits
+\PaintingSampledDualPct{}\%, and why the curated cases should be three times as ambiguous is
+unexplained. The $N{:}M$ result needs more than annotation effort. The painted
 format can express such a correspondence and finds \PaintingNmPct{}\% of matched regions carrying
 one; the mapping format records the site but only its one-to-one approximation, and no algorithm
 in the family measured here can emit anything else, so an output language and a ground truth that

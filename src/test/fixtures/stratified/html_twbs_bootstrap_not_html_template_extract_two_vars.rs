@@ -40,10 +40,9 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test, read the rate it
-    // reports for both modes, and record that instead.
+    // measured 2026-09-05: minimal 24.734%, full 24.127%
     assert_matches_human_painting_within_limit(
         "html-twbs-bootstrap-not-html-template-extract-two-vars",
-        100.0,
+        24.75,
     )
 }

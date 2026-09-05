@@ -8,4 +8,4 @@
 # beside this file, because no single number over a corpus that keeps gaining hard
 # fixtures can tell a real regression apart from new data - measured, see the
 # quality-gate section in src/bin/benchmark_optimal_solutions.rs.
-MS_PER_FIXTURE=249.3
+MS_PER_FIXTURE=255.0

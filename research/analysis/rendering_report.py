@@ -71,11 +71,14 @@ gives at length: a rate whose denominator drifts from the rest of the paper's is
 with any of them.
 
 Within that scope the painted set is *not* a random sample, and the report prints the evidence
-rather than leaving a reader to assume otherwise. Every painted fixture is from the `handmade`
-category - small, curated examples of a single common change pattern - and none is one of the
-fixtures captured from a real commit. Painting is manual and slow, and it was done on the small
-curated cases first. The report therefore emits both the rate and the characterisation (category
-split, median size, language coverage) so the paper can state what the rate is over.
+rather than leaving a reader to assume otherwise. Painting is manual and slow, and it was done on
+the small curated `handmade` cases first, so for a long time *every* painted fixture was one of
+those. That is no longer true: as of 2026-09-05 the sampled datasets carry the majority of the
+painted set, and the two populations answer the question differently enough that a single
+aggregate rate hides it. So the split is emitted as macros of its own (`PaintingHandmade*` /
+`PaintingSampled*`) alongside the aggregate, together with the characterisation (category split,
+median size, language coverage), so the paper states what the rate is over rather than implying
+a population it no longer has.
 
 Usage (from research/):
     uv run ./analysis/rendering_report.py
@@ -252,11 +255,22 @@ def collect(root: Path, rows: dict[str, dict]) -> dict:
         return [int(rows[n]["before_loc"]) for n in names]
 
     unpainted = [n for n in rows if n not in painted]
+
+    # The painted set splits into the hand-written examples painting started on and the fixtures
+    # captured from real commits. Reported separately because the aggregate rate is a mixture of
+    # two very different ones, and the mixing proportion is an artifact of annotation order.
+    handmade = [n for n in painted if rows[n]["category"] == "handmade"]
+    sampled = [n for n in painted if rows[n]["category"] != "handmade"]
+    dual_set = set(dual)
     return {
         "scored": len(rows),
         "painted": len(painted),
         "single": len(single),
         "dual": len(dual),
+        "handmade_painted": len(handmade),
+        "handmade_dual": len([n for n in handmade if n in dual_set]),
+        "sampled_painted": len(sampled),
+        "sampled_dual": len([n for n in sampled if n in dual_set]),
         "categories": Counter(rows[n]["category"] for n in painted),
         "category_totals": Counter(r["category"] for r in rows.values()),
         "languages": len({rows[n]["language"] for n in painted}),
@@ -282,6 +296,12 @@ def report(s: dict) -> None:
     print(
         f"Painted fixtures: {s['painted']} of {s['scored']} in scope "
         f"({pct(s['painted'], s['scored']):.1f}%)"
+    )
+    print(
+        f"  hand-written: {s['handmade_dual']}/{s['handmade_painted']} dual "
+        f"({pct(s['handmade_dual'], s['handmade_painted']):.1f}%); "
+        f"sampled from real commits: {s['sampled_dual']}/{s['sampled_painted']} dual "
+        f"({pct(s['sampled_dual'], s['sampled_painted']):.1f}%)"
     )
     print(
         f"  one painting  (rendering judged unique): {s['single']} "
@@ -351,6 +371,13 @@ def write_paper_fragment(s: dict, output_path: Path) -> None:
         "PaintingSinglePct": f"{pct(s['single'], s['painted']):.1f}",
         "PaintingDual": s["dual"],
         "PaintingDualPct": f"{pct(s['dual'], s['painted']):.1f}",
+        # The two populations behind that aggregate - see `collect`.
+        "PaintingHandmadePainted": s["handmade_painted"],
+        "PaintingHandmadeDual": s["handmade_dual"],
+        "PaintingHandmadeDualPct": f"{pct(s['handmade_dual'], s['handmade_painted']):.1f}",
+        "PaintingSampledPainted": s["sampled_painted"],
+        "PaintingSampledDual": s["sampled_dual"],
+        "PaintingSampledDualPct": f"{pct(s['sampled_dual'], s['sampled_painted']):.1f}",
         # What the painted set is, so the paper can state the population rather than imply one.
         "PaintingHandmadeTotal": s["category_totals"]["handmade"],
         "PaintingLanguages": s["languages"],

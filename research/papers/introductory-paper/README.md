@@ -157,19 +157,30 @@ by accident:
   a separate methodology section: the painted text ground truth needed describing before either
   could be stated. Two properties of that script matter. It scopes itself to
   `human_mapping_analysis.csv` exactly as `ambiguity_report.py` does, so its denominators match the
-  rest of the paper. And **the painted subset is not a random sample** - painting is manual, and
-  all 43 painted fixtures are from the `handmade` category, median 14 LOC against 219 for the rest
-  of the corpus. Section 5 states that limit explicitly and argues it runs conservative; do not
-  quote `\PaintingDualPct{}` as a corpus-wide rate.
+  rest of the paper. And **the painted subset is not a random sample** - painting is manual, so it
+  started on the `handmade` fixtures. Do not quote `\PaintingDualPct{}` as a corpus-wide rate.
 
-Two properties of `ambiguity_report.py` are load-bearing and easy to break. It scopes itself to
-the fixture set in `data/quality/human_mapping_analysis.csv`, so Section 5 keeps describing one
-corpus state. And it reads each fixture's annotation era from the committed
-`data/quality/ambiguity_eras.csv` rather than re-deriving it from `git log` on every run: the
-multi-mapping facility postdates part of the corpus, so the headline rate depends on that
-classification, and without the committed record one formatting sweep over `src/test/data/diffs/`
-would move every pre-facility fixture into "revisited" and change the rate with no corpus change
-at all. `--refresh-eras` re-derives deliberately.
+  **Changed 2026-09-05, and it reverses what Section 5 used to argue.** The painted set is no
+  longer handmade-only: 149 fixtures now, 57 hand-written and 92 sampled from real commits, and the
+  two populations disagree sharply - 86.0% of the hand-written ones carry two paintings against
+  27.2% of the sampled ones. `\PaintingDualPct{}` fell 82.5% -> 49.7% purely from that mixture
+  shifting, not from any painting changing. Section 5 previously said the handmade weighting ran
+  *conservative* and that the rate should rise on larger real-world changes; measured, it falls by
+  a factor of three. The split is now emitted as `\PaintingHandmadeDualPct{}` /
+  `\PaintingSampledDualPct{}` and Section 5 quotes both, because the aggregate's value is set by
+  annotation order rather than by the corpus. Quote the sampled figure when the claim is about
+  real-world code.
+
+One property of `ambiguity_report.py` is load-bearing and easy to break: it scopes itself to the
+fixture set in `data/quality/human_mapping_analysis.csv`, so Section 5 keeps describing one corpus
+state.
+
+**Removed 2026-09-05: the annotation-era split.** The script used to hold apart the fixtures whose
+mapping file had not been touched since the multi-mapping facility landed, on the grounds that they
+could not have recorded an ambiguity. Every fixture has since been reviewed by an annotator with
+multi-mapping available, and a review that finds nothing to add leaves the file untouched - so a
+file date was never evidence about the annotation, and splitting on it understated the corpus. One
+rate now, over every in-scope fixture. Do not reintroduce it: it measures file timestamps, not code.
 
 ### The comparison covers nine tools, and since 2026-09-02 the paper's tables show all of them
 
@@ -255,9 +266,12 @@ took 19m50s, 1.35M files, 1,133 files/sec). Swapping in the real full-corpus num
 finishes, is `make measure-file-stats MODE=full` (slow, run once) followed by `make
 introductory-paper-empirical MODE=full` (fast, re-renders and rebuilds) - no hand-editing required.
 
-**Every ground-truth number was refreshed on 2026-08-20** against the current 468-fixture corpus
-(469 fixture directories, 468 of them carrying a `human_mapping.json`), replacing numbers measured
-on 98 fixtures. Refreshed together, deliberately: AST-node accuracy, the ablation study, the
+**The ground-truth corpus block was refreshed on 2026-09-05** to 597 fixtures (598 directories, 597
+of them carrying a `human_mapping.json`), moving `NumFixtures`, the node-accuracy totals, and the
+generated ambiguity and rendering blocks together. The refresh before it was 2026-09-02 (512), and
+before that **2026-08-20** against a 468-fixture corpus, replacing numbers measured on 98 fixtures.
+The ablation study, the per-tool comparison, the speed percentiles and the robustness run were
+**not** re-measured on 2026-09-05 and still describe the corpus states their own blocks name. Refreshed together, deliberately: AST-node accuracy, the ablation study, the
 per-tool line-level comparison, the speed percentiles, and the robustness run were all measured
 against the same corpus, so refreshing one block alone would leave the paper internally
 inconsistent. Keep that property on the next refresh. **Those numbers are now spread across

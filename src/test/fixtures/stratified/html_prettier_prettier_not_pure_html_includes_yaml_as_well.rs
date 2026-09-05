@@ -29,10 +29,9 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test, read the rate it
-    // reports for both modes, and record that instead.
+    // measured 2026-09-05: minimal 39.227%, full 41.436%
     assert_matches_human_painting_within_limit(
         "html-prettier-prettier-not-pure-html-includes-yaml-as-well",
-        100.0,
+        41.45,
     )
 }

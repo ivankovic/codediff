@@ -97,3 +97,29 @@ prose and left unencoded.
 `swift-apple-swift-argument-parser-refactor-and-improve-tests` - so they are outside the fixture
 set every rate in the paper's Section 5 is measured against. Because this list is an existence
 result and feeds no denominator, they are listed anyway, with the fact stated in the paper.
+
+## 2026-09-05: the sweep has drifted past this table - not yet triaged
+
+Re-running the grep above now hits four fixtures the table does not list, none of which carries a
+group at the site (`groups: 0` in all four):
+
+* `full/python_aboutcode_org_license_expression_excellent_test_case.rs` -
+  "True solution requires a N:M multi-map because two strings should map to one"
+* `small/tsx_apache_superset_error_handling_change.rs` -
+  "down with N:M support, not with a better matcher"
+* `stratified/html_gohugoio_hugo_template_not_pure_html.rs` -
+  "requires N:M mapping for the AST, but wouldn't if it parsed correctly"
+* `stratified/html_twbs_bootstrap_not_html_template_extract_two_vars.rs`
+
+Separately, and outside what any grep over `src/test/fixtures/` can reach: **`src/test/data/diffs.csv`'s
+`comment` column is now a second, independent detector**, and it names three more -
+`csharp-jellyfin-add-function` ("Requires N:M (2:2) mapping", `groups: 0`),
+`rust-vercel-nextjs-refactoring-would-require-mulitmap-mapping` ("Requires N:M multi-map",
+`groups: 3`) and `tsx-excalidraw-excalidraw-huge-file-with-real-logic-change` ("Requiers N:M
+mapping", `groups: 15`). Those comments are written by the annotator in `human_solver` and are
+where the unmarked residual of an N:M fixture gets explained, so they belong in the methodology
+above; the stub grep alone is no longer "the only detector that exists".
+
+Left as a note rather than seven new rows because the table is Table 4's provenance and each row is
+a reading of the change itself, not of its comment. Whoever triages these should widen the "How the
+list was found" section to cover the CSV before adding any of them.

@@ -31,24 +31,20 @@ genuinely interchangeable. It does not mean the annotator was unsure - it means 
 established that more than one pairing is equally correct, and the fixture's validation accepts
 any of them.
 
-=== Why this script splits the corpus by annotation era ===
+=== One corpus-wide rate, and why there is no longer a split ===
 
-`groups` was added to the annotation tool partway through corpus construction (commit a8109f6,
-2026-08-09). A fixture annotated before that date could not record an ambiguity even where one
-existed, and most were never revisited. Reporting one corpus-wide rate would therefore measure
-*annotation practice*, not the phenomenon - the difference between a prevalence claim and an
-artifact of tooling history. So every fixture is classified into one of three eras, from git
-history of its own `human_mapping.json`:
+`groups` was added to the annotation tool partway through corpus construction, so for a while this
+script reported three rates instead of one: fixtures whose mapping file had not been touched since
+the facility landed were held apart from those that had, on the ground that the former could not
+have recorded an ambiguity even where one existed. That split was a statement about git history,
+not about the corpus, and it is no longer true of it: **every fixture has since been reviewed by an
+annotator with multi-mapping available**. A review that found nothing to add leaves the file
+untouched, so "last modified before date D" stopped being evidence of anything about the
+annotation, and reporting it as though it were understated the corpus by counting reviewed
+fixtures as unexamined ones.
 
-* `pre`       - last touched before the facility existed. Structurally cannot contain a group.
-* `fresh`     - the file first appears on or after that date, i.e. annotated from the start by
-                someone who had multi-mapping available. This is the only unbiased population.
-* `revisited` - existed before the facility, edited after it. Selection-biased in the obvious
-                direction (a fixture gets reopened *because* something needed fixing there), so
-                it is reported separately and excluded from the headline rate.
-
-The paper quotes the `fresh` rate as the estimate and the corpus-wide rate as a floor. Even the
-`fresh` rate is a lower bound: an annotator can miss an ambiguity that is really there.
+So there is one rate, over every fixture in scope. It remains a lower bound, for the reason it
+always did and the only one that survives: an annotator can miss an ambiguity that is really there.
 
 === Corpus state ===
 
@@ -72,12 +68,6 @@ import subprocess
 from collections import Counter
 from pathlib import Path
 
-# Commit a8109f6, "Add multi-map groups to human_mapping ground truth". Every mapping file whose
-# last commit predates this could not have recorded a group, whatever its content. Kept as a date
-# rather than a hash so the comparison against `git log --date=short` output is a plain string
-# compare, and so a reader can check it without resolving a hash.
-GROUPS_LANDED = "2026-08-09"
-
 # Path prefix every fixture directory lives under, relative to the repository root.
 DIFFS_ROOT = "src/test/data/diffs"
 
@@ -90,102 +80,6 @@ def fixture_names_in_scope(csv_path: Path) -> set[str]:
     """The fixture set Section 5 is measured against - see this script's "Corpus state" note."""
     with open(csv_path, newline="") as f:
         return {r["name"] for r in csv.DictReader(f) if r["has_mapping"] == "true"}
-
-
-def _log_dates(root: Path) -> tuple[dict[str, str], dict[str, str]]:
-    """(newest, oldest) commit date per repo-relative path, from one `git log --name-only` walk.
-
-    Deliberately not `--diff-filter=A`: that walk reports a path only where it was *added*, and a
-    file moved into its current directory appears as a rename instead, so 232 of this corpus's 471
-    mapping files are absent from it (the fixtures predate the small/full/handmade split). Taking
-    the oldest date the path itself appears under is rename-robust and classifies the corpus
-    identically, without a lookup that silently returns nothing for half the files.
-    """
-    out = subprocess.run(
-        ["git", "log", "--format=@@%ad", "--date=short", "--name-only", "--", DIFFS_ROOT],
-        capture_output=True,
-        text=True,
-        cwd=root,
-        check=True,
-    ).stdout
-    newest: dict[str, str] = {}
-    oldest: dict[str, str] = {}
-    date = ""
-    for line in out.splitlines():
-        if line.startswith("@@"):
-            date = line[2:]
-        elif line.strip():
-            newest.setdefault(line, date)
-            oldest[line] = date  # the walk is newest-first, so the last write is the oldest commit
-    return newest, oldest
-
-
-def derive_eras(root: Path, names: set[str]) -> dict[str, str]:
-    """Fixture name -> "pre" | "fresh" | "revisited", from git history. See the doc comment.
-
-    Raises on a tracked mapping file that `git log` did not date. That combination should be
-    impossible, and swallowing it would silently move a fixture into `pre` - i.e. into the
-    denominator of the paper's headline rate - on a data gap rather than on a measurement.
-    """
-    tracked = subprocess.run(
-        ["git", "ls-files", DIFFS_ROOT],
-        capture_output=True,
-        text=True,
-        cwd=root,
-        check=True,
-    ).stdout.split()
-    mappings = [p for p in tracked if p.endswith("human_mapping.json")]
-    newest, oldest = _log_dates(root)
-
-    eras = {}
-    for path in mappings:
-        name = path.split("/")[-2]
-        if name not in names:
-            continue
-        if path not in newest:
-            raise RuntimeError(
-                f"{path} is tracked but git log did not date it; refusing to classify its "
-                f"annotation era by default (see derive_eras)"
-            )
-        if newest[path] < GROUPS_LANDED:
-            eras[name] = "pre"
-        elif oldest[path] >= GROUPS_LANDED:
-            eras[name] = "fresh"
-        else:
-            eras[name] = "revisited"
-    return eras
-
-
-def load_or_record_eras(root: Path, names: set[str], cache_path: Path, refresh: bool) -> dict:
-    """The era classification, read from its committed record and extended only for new fixtures.
-
-    Deriving this from `git log` on every run would make the paper's headline rate a function of
-    mutable history: one formatting sweep over src/test/data/diffs/ moves every `pre` fixture into
-    `revisited` and changes the AmbiguityFreshPct macro with no corpus change at all. So the derived
-    classification is committed to data/quality/ambiguity_eras.csv and treated as the record;
-    fixtures absent from it (i.e. added since) are derived and appended, and `--refresh-eras`
-    re-derives everything from scratch for the one case where that is actually wanted.
-    """
-    recorded: dict[str, str] = {}
-    if cache_path.exists() and not refresh:
-        with open(cache_path, newline="") as f:
-            recorded = {r["name"]: r["era"] for r in csv.DictReader(f)}
-
-    missing = sorted(names - set(recorded))
-    if missing or refresh:
-        derived = derive_eras(root, names if refresh else set(missing))
-        if missing and not refresh:
-            print(
-                f"note: {len(missing)} fixture(s) not in {cache_path.name}; classifying from "
-                f"git history and appending"
-            )
-        recorded.update(derived)
-        rows = sorted((n, e) for n, e in recorded.items() if n in names)
-        with open(cache_path, "w", newline="") as f:
-            w = csv.writer(f)
-            w.writerow(["name", "era"])
-            w.writerows(rows)
-    return {n: e for n, e in recorded.items() if n in names}
 
 
 def read_groups(root: Path, names: set[str]) -> dict[str, list[dict]]:
@@ -249,7 +143,6 @@ def datasets_for(root: Path, names: set[str]) -> dict[str, str]:
 
 def summarize(
     groups_by_fixture: dict[str, list[dict]],
-    eras: dict[str, str],
     paired: int,
     datasets: dict[str, str] | None = None,
 ) -> dict:
@@ -257,29 +150,16 @@ def summarize(
     names = sorted(groups_by_fixture)
     with_groups = [n for n in names if groups_by_fixture[n]]
 
-    by_era = {
-        era: [n for n in names if eras.get(n) == era] for era in ("pre", "fresh", "revisited")
-    }
-    era_rates = {
-        era: (len([n for n in members if groups_by_fixture[n]]), len(members))
-        for era, members in by_era.items()
-    }
-
-    # Per repository list, restricted to the `fresh` era. Section 4 wants to compare the Curated
-    # and Full lists, and the raw per-list rate cannot support that: the Curated list was annotated
-    # almost entirely before multi-map groups existed, so most of its fixtures are structurally
-    # incapable of showing one, while the Full list is uniformly `fresh`. Comparing the raw rates
-    # would report a difference in annotation history as a difference in the phenomenon. The `pre`
-    # count is carried alongside so the size of that gap is visible rather than implied.
+    # Per repository list, over every fixture in it. Section 4 compares the Curated and Full lists,
+    # and the raw rate is what supports that now: both lists have been annotated end to end by
+    # someone with multi-mapping available, so a difference between them is a difference in the
+    # code, not in when the files happened to be written.
     per_list = {}
     for label, dataset in (("Curated", "small"), ("Full", "full")):
         members = [n for n in names if (datasets or {}).get(n) == dataset]
-        fresh = [n for n in members if eras.get(n) == "fresh"]
         per_list[label] = {
             "total": len(members),
-            "pre": len([n for n in members if eras.get(n) == "pre"]),
-            "fresh_total": len(fresh),
-            "fresh_with": len([n for n in fresh if groups_by_fixture[n]]),
+            "with": len([n for n in members if groups_by_fixture[n]]),
         }
 
     all_groups = [g for n in with_groups for g in groups_by_fixture[n]]
@@ -301,7 +181,6 @@ def summarize(
         "scored": len(names),
         "any_fixtures": len(with_groups),
         "any_pct": pct(len(with_groups), len(names)),
-        "era_rates": era_rates,
         "per_list": per_list,
         "groups": len(all_groups),
         "with_children": sum(1 for g in all_groups if g.get("with_children")),
@@ -326,26 +205,13 @@ def write_paper_fragment(s: dict, output_path: Path) -> None:
     Merged into plots/variables.tex by analysis/paper_variables.py; regenerate with
     `make ambiguity-report` (from research/). Rates carry no percent sign - the paper adds \\%.
     """
-    fresh_with, fresh_total = s["era_rates"]["fresh"]
-    rev_with, rev_total = s["era_rates"]["revisited"]
-    pre_with, pre_total = s["era_rates"]["pre"]
-
     per_list = s.get("per_list", {})
     macros = {
-        # Corpus-wide, i.e. the floor: includes fixtures annotated before groups existed.
+        # Corpus-wide, over every fixture in scope - see this script's doc comment for why there
+        # is one rate here rather than a split by when the mapping file was last written.
         "AmbiguityScored": s["scored"],
         "AmbiguityAnyFixtures": s["any_fixtures"],
         "AmbiguityAnyPct": f"{s['any_pct']:.1f}",
-        # The three annotation eras (see this script's doc comment). `fresh` carries the estimate.
-        "AmbiguityFreshFixtures": fresh_with,
-        "AmbiguityFreshScored": fresh_total,
-        "AmbiguityFreshPct": f"{pct(fresh_with, fresh_total):.1f}",
-        "AmbiguityPreFixtures": pre_total,
-        "AmbiguityPreWith": pre_with,
-        "AmbiguityPrePct": f"{pct(pre_with, pre_total):.1f}",
-        "AmbiguityRevisitedFixtures": rev_total,
-        "AmbiguityRevisitedWith": rev_with,
-        "AmbiguityRevisitedPct": f"{pct(rev_with, rev_total):.1f}",
         # What the ambiguous cases look like.
         "AmbiguityGroups": s["groups"],
         "AmbiguityGroupsWithChildren": s["with_children"],
@@ -366,17 +232,11 @@ def write_paper_fragment(s: dict, output_path: Path) -> None:
         "% regenerate: make ambiguity-report (from research/). Merged into plots/variables.tex",
         "% by analysis/paper_variables.py; see that script's module doc comment.",
     ]
-    # Per repository list, `fresh` era only - see `summarize`. `Pre` is emitted so the paper can
-    # state how much of each list is structurally unable to show a group, which is the whole
-    # reason the raw per-list rates are not comparable to one another.
+    # Per repository list - see `summarize`.
     for label, stats in sorted(per_list.items()):
         macros[f"Ambiguity{label}Total"] = stats["total"]
-        macros[f"Ambiguity{label}Pre"] = stats["pre"]
-        macros[f"Ambiguity{label}FreshTotal"] = stats["fresh_total"]
-        macros[f"Ambiguity{label}FreshWith"] = stats["fresh_with"]
-        macros[f"Ambiguity{label}FreshPct"] = (
-            f"{pct(stats['fresh_with'], stats['fresh_total']):.1f}"
-        )
+        macros[f"Ambiguity{label}With"] = stats["with"]
+        macros[f"Ambiguity{label}Pct"] = f"{pct(stats['with'], stats['total']):.1f}"
 
     lines += [f"\\newcommand{{\\{k}}}{{{v}}}" for k, v in macros.items()]
     output_path.write_text("\n".join(lines) + "\n")
@@ -396,19 +256,6 @@ def main() -> None:
         help="defines which fixtures are in scope (Section 5's corpus state)",
     )
     parser.add_argument("--plots-dir", type=Path, default=root / "research/plots")
-    parser.add_argument(
-        "--eras",
-        type=Path,
-        default=root / "research/data/quality/ambiguity_eras.csv",
-        help="committed record of each fixture's annotation era (see load_or_record_eras)",
-    )
-    parser.add_argument(
-        "--refresh-eras",
-        action="store_true",
-        help="re-derive every fixture's era from git history, overwriting the record. Changes the "
-        "paper's headline rate whenever src/test/data/diffs/ has been touched since - only "
-        "use this deliberately.",
-    )
     args = parser.parse_args()
 
     names = fixture_names_in_scope(args.csv)
@@ -420,46 +267,20 @@ def main() -> None:
             f"{sorted(missing)[:5]}"
         )
     in_scope = set(groups_by_fixture)
-    eras = load_or_record_eras(root, in_scope, args.eras, args.refresh_eras)
-
-    # A `pre` fixture that contains a group is a contradiction: `pre` means "last touched before
-    # the facility existed, and so structurally cannot record one", which is exactly the claim the
-    # paper makes about that row of the table. The recorded classification is deliberately frozen
-    # (see `load_or_record_eras`) so that rewriting history cannot move the headline rate - but
-    # that also means a fixture annotated with a group *after* being recorded keeps the stale
-    # label, and the table then prints a non-zero count in a row defined as impossible. Four
-    # fixtures had drifted that way by 2026-09-02.
-    #
-    # Correcting them here rather than re-deriving from git keeps the frozen-record design intact:
-    # this is implied by the mapping file's own contents, not by mutable history. Such a fixture
-    # necessarily existed before the facility and was edited after it, which is the definition of
-    # `revisited` - the era that is already reported separately and excluded from the headline
-    # rate precisely because it is selection-biased.
-    contradictory = sorted(n for n in in_scope if eras.get(n) == "pre" and groups_by_fixture[n])
-    if contradictory:
-        print(
-            f"note: {len(contradictory)} fixture(s) recorded as `pre` now contain a group, so they "
-            f"were edited after the facility landed; reclassifying as `revisited`: "
-            f"{', '.join(contradictory[:4])}{' ...' if len(contradictory) > 4 else ''}"
-        )
-        for name in contradictory:
-            eras[name] = "revisited"
     s = summarize(
         groups_by_fixture,
-        eras,
         paired_decisions(args.csv, in_scope),
         datasets_for(root, in_scope),
     )
 
     print(f"=== Ground-truth ambiguity, {s['scored']} fixtures in scope ===")
-    print(
-        f"Fixtures with >=1 multi-map group: {s['any_fixtures']} ({s['any_pct']:.1f}%) "
-        f"- corpus-wide, a floor"
-    )
-    print(f"\nBy annotation era (groups landed {GROUPS_LANDED}):")
-    for era in ("pre", "fresh", "revisited"):
-        with_g, total = s["era_rates"][era]
-        print(f"  {era:<10} {with_g:>3}/{total:<3} ({pct(with_g, total):5.1f}%)")
+    print(f"Fixtures with >=1 multi-map group: {s['any_fixtures']} ({s['any_pct']:.1f}%)")
+    print("\nBy repository list:")
+    for label, stats in sorted(s["per_list"].items()):
+        print(
+            f"  {label:<10} {stats['with']:>3}/{stats['total']:<3} "
+            f"({pct(stats['with'], stats['total']):5.1f}%)"
+        )
     print(
         f"\nGroups: {s['groups']} total, {s['with_children']} with_children, "
         f"{s['op_identical']} identical / {s['op_match']} match-but-not-identical"

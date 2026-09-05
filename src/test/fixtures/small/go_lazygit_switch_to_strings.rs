@@ -30,7 +30,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test, read the rate it
-    // reports for both modes, and record that instead.
-    assert_matches_human_painting_within_limit("go-lazygit-switch-to-strings", 100.0)
+    // measured 2026-09-05: minimal 2.564%, full 3.812%
+    assert_matches_human_painting_within_limit("go-lazygit-switch-to-strings", 3.83)
 }

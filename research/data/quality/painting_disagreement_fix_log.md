@@ -1,5 +1,7 @@
 # Fix log for painting_disagreement_census_2026_09_01.md
 
+> **Naming note (2026-09-05):** `handmade_painting_disagreement_report`, named throughout this file, is now `painting_disagreement_report` and scans every dataset rather than `diffs/handmade` alone. Its handmade-only aggregate is still printed, so the numbers recorded here remain comparable. Left otherwise as written — this is a record of what was measured when.
+
 Working log, not a findings doc - updated live while attempting a fix for every row in the census
 table, Minimal and Full separately, per instruction: nothing is too small, skip only rows that
 require N:M mapping. Status per row: `todo` / `fixed` / `reverted` (attempted, regressed something

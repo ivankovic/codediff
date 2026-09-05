@@ -41,10 +41,9 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test, read the rate it
-    // reports for both modes, and record that instead.
+    // measured 2026-09-05: minimal 4.314%, full 5.392%
     assert_matches_human_painting_within_limit(
         "c-genymobile-scrcpy-add-to-import-path-and-move-imports-around",
-        100.0,
+        5.41,
     )
 }

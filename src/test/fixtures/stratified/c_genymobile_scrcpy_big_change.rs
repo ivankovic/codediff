@@ -22,12 +22,17 @@ use crate::test::helper::human_mapping::assert_matches_human_painting_within_lim
 
 #[test]
 fn mapping() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("c-genymobile-scrcpy-big-change")
+    // First baseline (2026-09-05), not a regression: this fixture was promoted with its human
+    // mapping already written, so the stub's generated 0/0 never reflected a measurement.
+    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
+        "c-genymobile-scrcpy-big-change",
+        102,
+        69,
+    )
 }
 
 #[test]
 fn painting() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test, read the rate it
-    // reports for both modes, and record that instead.
-    assert_matches_human_painting_within_limit("c-genymobile-scrcpy-big-change", 100.0)
+    // measured 2026-09-05: minimal 28.975%, full 40.424%
+    assert_matches_human_painting_within_limit("c-genymobile-scrcpy-big-change", 40.44)
 }

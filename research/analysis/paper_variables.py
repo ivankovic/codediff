@@ -98,26 +98,29 @@ SAMPLE_PER_LANGUAGE = 10
 # Ground-truth corpus size and AST-node accuracy.
 # source: cargo run --release --features test-fixtures --bin benchmark_optimal_solutions -- --csv
 #         (research/data/quality/optimal_solutions_benchmark.csv), totalled over solved fixtures.
-# Measured 2026-09-02. The corpus directory holds 513 fixtures; 512 of them carry a
-# human_mapping.json and are what every accuracy number in the paper is scored against. The 513th
+# Measured 2026-09-05. The corpus directory holds 598 fixtures; 597 of them carry a
+# human_mapping.json and are what every accuracy number in the paper is scored against. The 598th
 # (rust-completely-unrelated-main-files) is deliberately ground-truth-free - it exists as a
 # pathological-latency case, not an accuracy case - and reports `human_unsolved` in the CSV.
 #
-# NumFixtures is therefore the ground-truth-bearing count, 512, which is the denominator of every
+# NumFixtures is therefore the ground-truth-bearing count, 597, which is the denominator of every
 # per-tool row, the ablation study, and the node accuracy below.
 #
-# Refreshed together, from one corpus state, on 2026-09-02 (previously 2026-08-20 / 468 fixtures).
-# These four move as a set and must be refreshed as a set: re-run the benchmark with --csv, re-run
-# `analyze_human_mappings --csv` so the scope artifact agrees with it, then recompute here. The
-# check at the bottom of this file compares NumFixtures against the corpus on disk precisely
-# because the previous values silently outlived the corpus they described.
+# Refreshed together, from one corpus state, on 2026-09-05 (previously 2026-09-02 / 512 fixtures,
+# before that 2026-08-20 / 468). These four move as a set and must be refreshed as a set: re-run
+# the benchmark with --csv, re-run `analyze_human_mappings --csv` so the scope artifact agrees with
+# it, then recompute here. Order matters in one direction: human_mapping_analysis.csv carries a
+# `current_mismatches` column read back from optimal_solutions_benchmark.csv, so the benchmark runs
+# first. The check at the bottom of this file compares NumFixtures against the corpus on disk
+# precisely because the previous values silently outlived the corpus they described.
 CORPUS = {
-    "NumFixtures": 512,
-    "NodesMatched": 5_713_065,
-    "NodesTotal": 5_719_183,
+    "NumFixtures": 597,
+    "NodesMatched": 5_721_852,
+    "NodesTotal": 5_729_262,
     # Distinct languages across the fixture corpus, from `analyze_human_mappings`' own "By
-    # language" census (24 as of 2026-09-02). Not the same number as the empirical study's
-    # \NumLanguages, which counts languages in the 100-repository measure-file-stats corpus.
+    # language" census (24 as of 2026-09-05, unchanged from 2026-09-02 - the 85 fixtures added
+    # since fall in languages the corpus already covered). Not the same number as the empirical
+    # study's \NumLanguages, which counts languages in the 100-repository measure-file-stats corpus.
     "NumFixtureLanguages": 24,
 }
 
@@ -126,8 +129,8 @@ CORPUS = {
 # alongside the all-node figure because the all-node denominator includes every ancestor of every
 # change up to the root, so it partly measures how deep a grammar's tree is.
 CORPUS_VISIBLE = {
-    "VisibleNodesMatched": 3_904_275,
-    "VisibleNodesTotal": 3_908_441,
+    "VisibleNodesMatched": 3_910_086,
+    "VisibleNodesTotal": 3_915_157,
 }
 
 # Leave-one-out ablation deltas, in mismatches, against an all-enabled baseline. A positive number
@@ -319,22 +322,19 @@ COMPARISON_MACROS = (
 )
 
 # Every macro the ambiguity fragment (ambiguity_report.py's write_paper_fragment) is expected to
-# define: RQ3's prevalence of ground-truth ambiguity, split by annotation era, plus the shape of
-# the ambiguous cases themselves. No diffing tool appears in any of these - RQ3 is a property of
-# the corpus alone.
+# define: RQ3's prevalence of ground-truth ambiguity, corpus-wide and per repository list, plus the
+# shape of the ambiguous cases themselves. No diffing tool appears in any of these - RQ3 is a
+# property of the corpus alone.
 AMBIGUITY_MACROS = [
     "AmbiguityScored",
     "AmbiguityAnyFixtures",
     "AmbiguityAnyPct",
-    "AmbiguityFreshFixtures",
-    "AmbiguityFreshScored",
-    "AmbiguityFreshPct",
-    "AmbiguityPreFixtures",
-    "AmbiguityPreWith",
-    "AmbiguityPrePct",
-    "AmbiguityRevisitedFixtures",
-    "AmbiguityRevisitedWith",
-    "AmbiguityRevisitedPct",
+    "AmbiguityCuratedTotal",
+    "AmbiguityCuratedWith",
+    "AmbiguityCuratedPct",
+    "AmbiguityFullTotal",
+    "AmbiguityFullWith",
+    "AmbiguityFullPct",
     "AmbiguityGroups",
     "AmbiguityGroupsWithChildren",
     "AmbiguityIdenticalGroups",
@@ -365,6 +365,12 @@ RENDERING_MACROS = [
     "PaintingSinglePct",
     "PaintingDual",
     "PaintingDualPct",
+    "PaintingHandmadePainted",
+    "PaintingHandmadeDual",
+    "PaintingHandmadeDualPct",
+    "PaintingSampledPainted",
+    "PaintingSampledDual",
+    "PaintingSampledDualPct",
     "PaintingHandmadeTotal",
     "PaintingLanguages",
     "PaintingLocMedian",
@@ -727,8 +733,9 @@ def build(
     out += [
         "",
         "% --- RQ3: how often the ground truth itself admits no unique mapping (multi-map groups),",
-        "% split by annotation era. Generated by analysis/ambiguity_report.py from the mapping JSON",
-        "% files themselves; refresh with `make ambiguity-report`. Rates carry no percent sign.",
+        "% corpus-wide and per repository list. Generated by analysis/ambiguity_report.py from the",
+        "% mapping JSON files themselves; refresh with `make ambiguity-report`. Rates carry no",
+        "% percent sign.",
     ]
     out += emit_block(
         ambiguity_lines,

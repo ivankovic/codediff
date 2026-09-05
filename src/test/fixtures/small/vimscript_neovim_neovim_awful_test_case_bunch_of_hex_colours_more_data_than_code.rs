@@ -28,9 +28,14 @@ fn mapping() -> Result<()> {
     // deliberately rather than silently. The guard now consults the similarity sketch before
     // refusing (`disambiguate_by_context`), which recovers most of that here and takes the file
     // below where it started. See `TODO.md`'s 2026-08-18 similarity-sketch section.
+    //
+    // 2026-09-05: the mapping was re-solved (9317 unmarked nodes down to 5677, the remainder an
+    // N:M correspondence), and 19/15 -> 1072/761 is that annotation arriving rather than the
+    // sketch tiebreak above coming undone. The narrative in the paragraph above still describes
+    // the mechanism; only the nodes it is measured over changed.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "vimscript-neovim-neovim-awful-test-case-bunch-of-hex-colours-more-data-than-code",
-        19,
-        15,
+        1072,
+        761,
     )
 }

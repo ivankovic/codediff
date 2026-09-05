@@ -1,5 +1,7 @@
 # Rendering vs. painting: a full census of the `painting_agreement` corpus, 2026-09-01
 
+> **Naming note (2026-09-05):** `handmade_painting_disagreement_report`, named throughout this file, is now `painting_disagreement_report` and scans every dataset rather than `diffs/handmade` alone. Its handmade-only aggregate is still printed, so the numbers recorded here remain comparable. Left otherwise as written — this is a record of what was measured when.
+
 **What this is.** For every fixture in `src/test/fixtures/` (the ones with both a
 `Minimal` and/or `Full` hand-painted text ground truth), how much codediff's own rendering
 disagrees with that painting under each preset, and - read by hand, one fixture at a time - *why*.
