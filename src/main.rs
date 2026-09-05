@@ -22,7 +22,6 @@ use std::path::PathBuf;
 use anyhow::Context;
 use clap::{Parser, Subcommand};
 
-use codediff::diff::DiffMode;
 use codediff::tui;
 
 mod configure_prompt;
@@ -101,13 +100,10 @@ struct Args {
     #[arg(long, alias = "batch")]
     headless: bool,
 
-    /// Deprecated no-op, kept so existing scripts don't break: since the phases-4-7 pipeline
-    /// rearchitecture, the diff pipeline runs the same bounded, region-scoped analysis
-    /// regardless of mode (`PendingDiff::finish` ignores `DiffMode` - see its phase-6 comment),
-    /// so there is no separate "exact" path for this flag to select anymore. Currently its only
-    /// observable effect is suppressing headless mode's large-residual note. Slated for removal
-    /// together with `DiffMode` itself once the pipeline cleanup that owns that decision lands.
-    #[arg(long)]
+    /// Deprecated no-op, hidden from `--help` and kept only so existing scripts don't break: the
+    /// pipeline runs the same bounded, region-scoped analysis for every diff, so there is no
+    /// separate "exact" path to select. Remove at the next minor release.
+    #[arg(long, hide = true)]
     exact: bool,
 
     /// Paint only the ranges that carry meaning: drop standalone brackets/separators and trim
@@ -442,12 +438,7 @@ async fn main() -> Result<()> {
     if should_run_json(&args) {
         let (before, after) = before_after
             .context("`--mode json` needs BEFORE and AFTER - pass two files to diff")?;
-        let mode = if args.exact {
-            DiffMode::Exact
-        } else {
-            DiffMode::Fast
-        };
-        match tui::json_output::run(&before, &after, mode, render_options(&args)) {
+        match tui::json_output::run(&before, &after, render_options(&args)) {
             Ok(differed) => std::process::exit(exit_code_for(
                 differed,
                 args.exit_code,
@@ -465,16 +456,10 @@ async fn main() -> Result<()> {
             "stdout is not a terminal and no files were given - pass BEFORE and AFTER to run in \
             text mode, or run from a real terminal to use the interactive viewer",
         )?;
-        let mode = if args.exact {
-            DiffMode::Exact
-        } else {
-            DiffMode::Fast
-        };
         match tui::headless::run(
             &before,
             &after,
             use_color(args.color),
-            mode,
             args.context,
             render_options(&args),
         ) {

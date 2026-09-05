@@ -2383,4 +2383,62 @@ needs branch-level move detection, not a blanket commutativity rule, and is not 
 
 ---
 
-*Last updated: 2026-07-13*
+## Phase 6 history (moved out of `PendingDiff::finish` on 2026-09-05)
+
+The comment below sat inline above the phase-6 call in `diff.rs` until the 2026-09-05 code
+health pass; it is the record of why the whole-residual full-APTED pass went away and what that
+cost at the time. `DiffMode`/`--exact`, which it refers to, were removed in that pass - `finish`
+takes no mode, and JSON output's `fallback_used` became `large_residual`.
+
+Phase 6: pre-match top-level scope-locally-named entities (e.g. shell variable
+assignments with no enclosing named container at all, so `solve_syntax_aware_matching`'s
+own call to this never fires for them) whose name is unique and survives a position
+shift caused by an unrelated insertion elsewhere in the file - see
+`apted::prematch_unique_named_locals`'s doc comment ("shift-due-to-insertion") - then
+resolve the whole-file residual via the cheap Myers-LCS-based fallback
+(`apted::for_roots_fallback`), unconditionally, regardless of `_mode`.
+
+Until the phases-4-7 rearchitecture (`TODO.md`, `~/.claude/plans/iterative-herding-
+panda.md`), this branched: `DiffMode::Exact` (or `Fast` below `EXPENSIVE_RESIDUAL_
+THRESHOLD`) ran unconditional whole-residual full APTED (`apted::for_roots(...,
+Algorithm::Apted, "final_pass", ...)`) instead. That call is deleted as of this commit
+(Step 1 of the rearchitecture, not to be confused with this file's own outer Phase 1):
+its Θ(n1×n2) dense-matrix cost is driven by residual
+shape, not size, and cannot meet the project's p99<400ms target no matter how it's
+gated - see the measured pathology (`vimscript-neovim-...add-two-functions`: 87s at
+11,647 nodes, vs. `json-iwalton3-jellyfin-web-...`: 9.4s at 258,504 nodes) recorded in
+`TODO.md`'s "Architecture rethink: target goals" section.
+
+MEASURED QUALITY COST AT THE TIME (2026-08-15, see TODO.md): this alone regressed
+249/257 fixtures that then relied on real APTED (175 dropped from 0 mismatches to
+nonzero, net +4880 mismatches on that subset) - `resolve_residual_forest_via_myers_lcs`
+only recovers whole-subtree byte-identical matches, so any residual with even one
+genuinely-changed node lost partial credit for everything around it. This is why the
+change first landed on the `phases-4-7-rearchitecture` branch rather than `main`
+directly: Steps 2-3 of the rearchitecture (bottom-up propagation, region-scoped real
+APTED dispatch) had to
+land alongside it first, replacing what real tree-edit-distance-quality matching this
+call provided with bounded, per-region matching.
+
+STATUS (2026-08-17): that branch is merged into `main` (`git merge-base --is-ancestor
+phases-4-7-rearchitecture main` confirms it) - this is not branch-only behavior, it is
+what `main` does today. Quality is back at or above the pre-Phase-1 baseline (see
+`research/data/quality/optimal_solutions_benchmark.csv` and TODO.md's later 2026-08-16/17 entries:
+kind-only sub-anchoring, trivial-entry filtering) - the regression described above was
+real but transient, measured mid-migration before Steps 2-3 of the rearchitecture
+shipped, not a standing
+cost of this design.
+
+`prematch_unique_named_locals` now runs unconditionally too (previously only in the
+deleted `else` arm) - measured in isolation and found NOT to be a meaningful
+contributor to the regression above (nearly identical delta with/without it: +4880 vs
++4860) - the fallback's own lossiness dominates.
+
+`DiffMode`/`_mode` no longer changes behavior - kept on the signature for API
+compatibility (the `--exact` CLI flag still constructs one; the TUI's old
+`SelectDiffMode` prompt was removed in the 2026-08-19 usability pass) pending a
+follow-up commit that decides whether to remove it now that quality has recovered.
+
+---
+
+*Last updated: 2026-09-05*

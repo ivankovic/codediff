@@ -34,7 +34,7 @@
 //!     ]
 //!   },
 //!   "after": { "path": "new.rs", "language": "Rust", "hunks": [ ... ] },
-//!   "fallback_used": false,
+//!   "large_residual": false,
 //!   "summary": "comment_only"
 //! }
 //! ```
@@ -66,7 +66,6 @@ use serde::Serialize;
 
 use crate::code::Code;
 use crate::code::language::{language_for_path, language_for_path_and_content};
-use crate::diff::DiffMode;
 use crate::diff::text::{
     DiffSummary, RangeMatch, RenderOptions, TextOperation, ranges_for_options,
     summarize_diff_with_comment_check,
@@ -182,11 +181,13 @@ struct JsonSide {
 struct JsonDiff {
     before: JsonSide,
     after: JsonSide,
-    /// Whether `DiffMode::Fast`'s guard silently substituted a cheaper, less precise fallback for
-    /// phase 6 (see `compute_diff`'s doc comment). `headless::run` reports this as a one-line
-    /// stderr note; JSON mode is meant for machine consumption, so it is a field here instead - a
-    /// script parsing stdout as JSON shouldn't also have to watch stderr for a caveat.
-    fallback_used: bool,
+    /// Whether the diff left an unusually large unmatched residual after the heuristic passes
+    /// (`PendingDiff::large_residual`), so the terminal pass's coarser whole-subtree matching
+    /// covered more of the file than usual. `headless::run` reports this as a one-line stderr
+    /// note; JSON mode is meant for machine consumption, so it is a field here instead - a script
+    /// parsing stdout as JSON shouldn't also have to watch stderr for a caveat. Named
+    /// `fallback_used` until 2026-09-05, when it described a substitution that no longer happened.
+    large_residual: bool,
     /// The diff's overall shape (see `JsonDiffSummary`) - `None` for the ordinary case (a genuine
     /// mix of edits that doesn't cleanly fit one of `DiffSummary`'s special cases), same as
     /// `headless::run` printing no header line at all in that case.
@@ -237,7 +238,7 @@ fn build_side(contents: &str, path: &Path, ranges: &[RangeMatch]) -> JsonSide {
     }
 }
 
-fn build_diff(data: &DiffSessionData, fallback_used: bool) -> JsonDiff {
+fn build_diff(data: &DiffSessionData, large_residual: bool) -> JsonDiff {
     let summary = summarize_diff_with_comment_check(
         &data.before_contents,
         &data.after_contents,
@@ -254,7 +255,7 @@ fn build_diff(data: &DiffSessionData, fallback_used: bool) -> JsonDiff {
             &data.before_ranges,
         ),
         after: build_side(&data.after_contents, &data.after_path, &data.after_ranges),
-        fallback_used,
+        large_residual,
         summary,
         binary: false,
     }
@@ -278,7 +279,7 @@ pub fn binary_diff_json(before: &Path, after: &Path) -> Result<String> {
     let diff = JsonDiff {
         before: side(before),
         after: side(after),
-        fallback_used: false,
+        large_residual: false,
         summary: None,
         binary: true,
     };
@@ -291,16 +292,10 @@ pub fn binary_diff_json(before: &Path, after: &Path) -> Result<String> {
 /// the schema.
 /// Returns whether the two files differ at all (raw byte comparison, same convention as
 /// `headless::run`) so `main.rs` can turn it into a `diff`-style exit code.
-pub fn run(
-    before: &Path,
-    after: &Path,
-    mode: DiffMode,
-    render_options: RenderOptions,
-) -> Result<bool> {
-    let (mut data, fallback_used) = compute_diff_with_update_style(
+pub fn run(before: &Path, after: &Path, render_options: RenderOptions) -> Result<bool> {
+    let (mut data, large_residual) = compute_diff_with_update_style(
         before,
         after,
-        mode,
         render_options.whole_pair_updates,
         render_options.paint_reindent_only_moves,
     )?;
@@ -309,7 +304,7 @@ pub fn run(
         ranges_for_options(&data.before_ranges, &data.before_contents, render_options);
     data.after_ranges =
         ranges_for_options(&data.after_ranges, &data.after_contents, render_options);
-    let diff = build_diff(&data, fallback_used);
+    let diff = build_diff(&data, large_residual);
     println!("{}", serde_json::to_string_pretty(&diff)?);
     Ok(std::fs::read(before)? != std::fs::read(after)?)
 }
@@ -362,7 +357,6 @@ mod tests {
                 },
             ],
             comment_only: false,
-            mode: DiffMode::Fast,
             plain_text_fallback: false,
         }
     }
@@ -414,9 +408,9 @@ mod tests {
     }
 
     #[test]
-    fn build_diff_carries_the_fallback_used_flag_through_as_a_field() {
-        assert!(build_diff(&sample_data(), true).fallback_used);
-        assert!(!build_diff(&sample_data(), false).fallback_used);
+    fn build_diff_carries_the_large_residual_flag_through_as_a_field() {
+        assert!(build_diff(&sample_data(), true).large_residual);
+        assert!(!build_diff(&sample_data(), false).large_residual);
     }
 
     #[test]
@@ -461,13 +455,13 @@ mod tests {
         std::fs::write(&before_path, "fn main() {\n    old();\n}\n").unwrap();
         std::fs::write(&after_path, "fn main() {\n    new();\n}\n").unwrap();
 
-        let (data, fallback_used) = compute_diff(&before_path, &after_path, DiffMode::Fast)?;
-        let diff = build_diff(&data, fallback_used);
+        let (data, large_residual) = compute_diff(&before_path, &after_path)?;
+        let diff = build_diff(&data, large_residual);
         let json = serde_json::to_value(&diff)?;
 
         assert!(json.get("before").is_some());
         assert!(json.get("after").is_some());
-        assert!(json.get("fallback_used").is_some());
+        assert!(json.get("large_residual").is_some());
         // `old()` -> `new()` is a single-identifier rename, which the diff pipeline reports as an
         // Update (not a Delete+Insert pair) - same real-file behavior `headless.rs`'s own
         // equivalent test observes by checking rendered content rather than assuming an operation.

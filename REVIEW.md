@@ -42,6 +42,19 @@ done; the §4 typos are fixed except `symetric` (×3).
   now dominated by reading 1.4GB of `human_mapping.json`), the picker scan test (12.6s), the
   invariants pass (16s), and the largest fixtures' own mapping tests. Left open: `NodeCache`
   rebuilt outside `diff_code` (the transmuted `'static` cache would have to travel in `Diff`).
+- **2026-09-05, section 3** - done: `DiffMode`, `--exact`'s effect and the `fallback_used`
+  field are gone (`PendingDiff::finish()` takes no mode; `--exact` stays as a hidden no-op for
+  one release; JSON output's field is `large_residual`, which is what it always measured, and
+  the TUI never read it at all); the `Suspend`/`Resume` action chain, `Ui::suspend`/`resume` and
+  with them the `signal-hook` dependency; `ASTMappingOperation::{DoNothing, Move}` and
+  `COST_MOVE`; `Diff::is_node_mapped`; `ScreenRow`; `Sketch::is_exact` and
+  `PendingDiff::unmatched_counts` are `#[cfg(test)]`; `zhang_shasha.rs`, `Algorithm::ZhangShasha`
+  and the indexer's `pre_to_post`/`keyroots` are compiled only for the oracle tests; the three
+  `debug_dump_*` tests are `#[ignore]`d. The phase-6 history comment moved to
+  `src/diff/TODO.md`. Left open: `stats::is_generated` (the survey was wrong - `expand_stats`
+  calls it); `TextRange::intersects` (harmless API); `ASTMappingReason::OptimalIDU` (its
+  `OptIDU` column is read by `matching_reasons_report.py` and lives in the checked-in benchmark
+  CSV, so it goes with the next CSV regeneration, not alone); the 22 glob re-exports.
 - **Runtime finding from the same measurement**: over the corpus, AST metadata costs about three
   times the tree-sitter parse, and the parse plus metadata (15.5s) is more than half the diff
   itself (28s per the quality baseline). Section 6's items 1-3 are that cost.

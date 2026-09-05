@@ -29,7 +29,7 @@ use std::path::{Path, PathBuf};
 
 use crate::code::{Code, Language};
 use crate::diff::{
-    Diff, DiffMode, NodeCache,
+    Diff, NodeCache,
     text::{
         ChangeCounts, DiffSummary, RenderOptions, TextDiff, change_counts, is_comment_only_diff,
         plain_text_line_diff, summarize_diff_with_comment_check,
@@ -185,7 +185,6 @@ pub struct App {
     plain_text_fallback: bool,
 
     should_exit: bool,
-    should_suspend: bool,
 }
 
 impl App {
@@ -223,7 +222,6 @@ impl App {
             change_counts: None,
             plain_text_fallback: false,
             should_exit: false,
-            should_suspend: false,
         })
     }
 
@@ -261,19 +259,13 @@ impl App {
             .register_action_handler(self.action_tx.clone())?;
         self.diff_viewer.init(ui.size()?)?;
 
-        let action_tx = self.action_tx.clone();
         loop {
             self.handle_events(&mut ui).await?;
             self.handle_actions(&mut ui)?;
             if let Some((path, line)) = self.pending_editor.take() {
                 self.run_editor(&mut ui, &path, line)?;
             }
-            if self.should_suspend {
-                ui.suspend()?;
-                action_tx.send(Action::Resume)?;
-                action_tx.send(Action::ClearScreen)?;
-                ui.enter()?;
-            } else if self.should_exit {
+            if self.should_exit {
                 break;
             }
         }
@@ -325,7 +317,7 @@ impl App {
                         (self.before_path.clone(), self.after_path.clone())
                     {
                         self.remember_cursor_for_restore();
-                        action_tx.send(Action::StartDiff(before, after, DiffMode::Fast))?;
+                        action_tx.send(Action::StartDiff(before, after))?;
                     }
                     globally_handled = true;
                 }
@@ -484,20 +476,18 @@ impl App {
             match &action {
                 Action::Tick => self.tick_summary_toast(),
                 Action::Quit => self.should_exit = true,
-                Action::Suspend => self.should_suspend = true,
-                Action::Resume => self.should_suspend = false,
                 Action::ClearScreen => ui.terminal.clear()?,
                 Action::Resize(w, h) => self.handle_resize(ui, *w, *h)?,
                 Action::Render => self.render(ui)?,
                 Action::FileSelected(path) => self.handle_file_selected(path.clone())?,
                 Action::DialogCancelled => self.handle_dialog_cancelled(),
-                Action::StartDiff(before, after, mode) => {
+                Action::StartDiff(before, after) => {
                     self.screen = AppScreen::Diffing;
                     self.diff_started_at = Some(std::time::Instant::now());
                     self.diff_summary = None;
                     self.change_counts = None;
                     self.plain_text_fallback = false;
-                    self.start_diff(before.clone(), after.clone(), *mode);
+                    self.start_diff(before.clone(), after.clone());
                 }
                 // Every background diff reports back through here; only the result matching the
                 // current generation is re-dispatched as `DiffReady`/`DiffFailed` (which is what
@@ -509,7 +499,7 @@ impl App {
                 } => {
                     if *generation == self.diff_generation {
                         match outcome {
-                            DiffOutcome::Ready { data, .. } => {
+                            DiffOutcome::Ready(data) => {
                                 self.action_tx.send(Action::DiffReady(data.clone()))?;
                             }
                             DiffOutcome::Failed(message) => {
@@ -643,8 +633,7 @@ impl App {
             && let (Some(before), Some(after)) = (self.before_path.clone(), self.after_path.clone())
         {
             self.remember_cursor_for_restore();
-            self.action_tx
-                .send(Action::StartDiff(before, after, DiffMode::Fast))?;
+            self.action_tx.send(Action::StartDiff(before, after))?;
         }
         Ok(())
     }
@@ -671,8 +660,7 @@ impl App {
         }
         if let (Some(before), Some(after)) = (self.before_path.clone(), self.after_path.clone()) {
             self.remember_cursor_for_restore();
-            self.action_tx
-                .send(Action::StartDiff(before, after, DiffMode::Fast))?;
+            self.action_tx.send(Action::StartDiff(before, after))?;
         }
         self.action_tx.send(Action::Render)?;
         Ok(())
@@ -710,8 +698,7 @@ impl App {
         }
 
         if let (Some(before), Some(after)) = (self.before_path.clone(), self.after_path.clone()) {
-            self.action_tx
-                .send(Action::StartDiff(before, after, DiffMode::Fast))?;
+            self.action_tx.send(Action::StartDiff(before, after))?;
         }
         Ok(())
     }
@@ -787,12 +774,12 @@ impl App {
     /// assumes a parsed AST further down the call chain), and a panic on a `spawn_blocking`
     /// thread would otherwise just vanish, leaving the UI stuck on "Diffing…" forever. Catching
     /// it here turns that into a reported failure instead.
-    fn start_diff(&mut self, before: PathBuf, after: PathBuf, mode: DiffMode) {
+    fn start_diff(&mut self, before: PathBuf, after: PathBuf) {
         self.diff_generation += 1;
         let generation = self.diff_generation;
         let tx = self.action_tx.clone();
         // Read off the live viewer rather than threaded through `Action::StartDiff`: every caller
-        // of `start_diff` (file selection, `x`'s exact-mode re-run, the external-editor reload,
+        // of `start_diff` (file selection, the external-editor reload,
         // and `Action::RenderOptionsChanged` below) should compute with whatever
         // `whole_pair_updates`/`paint_reindent_only_moves` currently are, not have to know to pass
         // them along individually.
@@ -804,16 +791,12 @@ impl App {
                 compute_diff_with_update_style(
                     &before,
                     &after,
-                    mode,
                     whole_pair_updates,
                     paint_reindent_only_moves,
                 )
             }));
             let outcome = match result {
-                Ok(Ok((data, fallback_used))) => DiffOutcome::Ready {
-                    data,
-                    fallback_used,
-                },
+                Ok(Ok((data, _large_residual))) => DiffOutcome::Ready(data),
                 Ok(Err(err)) => DiffOutcome::Failed(err.to_string()),
                 Err(panic) => DiffOutcome::Failed(format!(
                     "internal error while diffing: {}",
@@ -963,10 +946,7 @@ impl App {
             left_parts.push(format!("change {index}/{total}"));
         }
         // `[plain text]` flags that no AST algorithm ran at all (unrecognized language on one
-        // side). The old `[fast]`/`[exact]` mode label is gone along with the Fast/Exact prompt:
-        // since the phases-4-7 rearchitecture, `PendingDiff::finish` runs the same pipeline
-        // regardless of `DiffMode` (see its phase-6 comment), so a mode label described a
-        // distinction that no longer exists.
+        // side).
         if self.plain_text_fallback {
             left_parts.push("[plain text]".to_string());
         }
@@ -1270,7 +1250,6 @@ fn assemble_diff_session_data(
     before_code: &Code,
     after_code: &Code,
     diff: &Diff,
-    mode: DiffMode,
     // [`RenderOptions::whole_pair_updates`]/[`RenderOptions::paint_reindent_only_moves`] - unlike
     // the rest of `RenderOptions`, these change which ranges `TextDiff` itself builds rather than
     // which of an already-built list get painted, so they have to reach in here rather than
@@ -1301,7 +1280,6 @@ fn assemble_diff_session_data(
         before_ranges: text_diff.all(0),
         after_ranges: text_diff.all(1),
         comment_only,
-        mode,
         plain_text_fallback: false,
     })
 }
@@ -1337,7 +1315,6 @@ fn assemble_plain_text_diff_session_data(
     after_path: &Path,
     before_code: &Code,
     after_code: &Code,
-    mode: DiffMode,
 ) -> DiffSessionData {
     let (before_ranges, after_ranges) =
         plain_text_line_diff(&before_code.contents, &after_code.contents);
@@ -1349,17 +1326,14 @@ fn assemble_plain_text_diff_session_data(
         before_ranges,
         after_ranges,
         comment_only: false,
-        mode,
         plain_text_fallback: true,
     }
 }
 
-/// Parse, diff and compute the textual ranges needed to display the result, using `mode`
-/// unconditionally - no prompting, for callers with no interactive UI to ask (headless mode, and
-/// any caller that just wants a diff). Returns whether `DiffMode::Fast`'s guard silently
-/// substituted the cheaper fallback for phase 6 (always `false` under `DiffMode::Exact`, and
-/// under the plain-text fallback below - no AST algorithm ran at all, so the guard never had a
-/// chance to trip), so headless mode can warn about it.
+/// Parse, diff and compute the textual ranges needed to display the result. Also returns whether
+/// the diff left an unusually large unmatched residual (`PendingDiff::large_residual`; always
+/// `false` under the plain-text fallback below, where no AST algorithm ran at all), so headless
+/// and JSON mode can say so.
 ///
 /// `pub(crate)` rather than private: `tui::headless` calls this directly too, since it's the same
 /// terminal-independent diff computation either way - only what happens to the result (draw it
@@ -1373,12 +1347,8 @@ fn assemble_plain_text_diff_session_data(
 /// gated, purely so the many tests across this module and `headless`/`json_output` that predate
 /// that option don't all need updating just to keep passing `false`.
 #[cfg(test)]
-pub(crate) fn compute_diff(
-    before: &Path,
-    after: &Path,
-    mode: DiffMode,
-) -> Result<(DiffSessionData, bool)> {
-    compute_diff_with_update_style(before, after, mode, false, true)
+pub(crate) fn compute_diff(before: &Path, after: &Path) -> Result<(DiffSessionData, bool)> {
+    compute_diff_with_update_style(before, after, false, true)
 }
 
 /// Stack size for the thread [`compute_diff_with_update_style`] runs the actual pipeline on.
@@ -1410,7 +1380,6 @@ const DIFF_COMPUTE_STACK_SIZE: usize = 256 * 1024 * 1024;
 pub(crate) fn compute_diff_with_update_style(
     before: &Path,
     after: &Path,
-    mode: DiffMode,
     whole_pair_updates: bool,
     paint_reindent_only_moves: bool,
 ) -> Result<(DiffSessionData, bool)> {
@@ -1422,7 +1391,6 @@ pub(crate) fn compute_diff_with_update_style(
             compute_diff_with_update_style_inner(
                 &before,
                 &after,
-                mode,
                 whole_pair_updates,
                 paint_reindent_only_moves,
             )
@@ -1438,30 +1406,27 @@ pub(crate) fn compute_diff_with_update_style(
 fn compute_diff_with_update_style_inner(
     before: &Path,
     after: &Path,
-    mode: DiffMode,
     whole_pair_updates: bool,
     paint_reindent_only_moves: bool,
 ) -> Result<(DiffSessionData, bool)> {
     let (before_code, after_code) = parse_before_after(before, after)?;
     if before_code.ast.is_none() || after_code.ast.is_none() {
-        let data =
-            assemble_plain_text_diff_session_data(before, after, &before_code, &after_code, mode);
+        let data = assemble_plain_text_diff_session_data(before, after, &before_code, &after_code);
         return Ok((data, false));
     }
     let pending = Diff::pending(&before_code, &after_code);
-    let fallback_used = mode == DiffMode::Fast && pending.looks_expensive();
-    let diff = pending.finish(mode);
+    let large_residual = pending.large_residual();
+    let diff = pending.finish();
     let data = assemble_diff_session_data(
         before,
         after,
         &before_code,
         &after_code,
         &diff,
-        mode,
         whole_pair_updates,
         paint_reindent_only_moves,
     )?;
-    Ok((data, fallback_used))
+    Ok((data, large_residual))
 }
 
 /// If `code` has no detected language and no content (the `/dev/null` case handled by
@@ -1541,11 +1506,7 @@ mod tests {
             .expect("StartDiff must fire once both sides are set");
         assert_eq!(
             action,
-            Action::StartDiff(
-                before.path().to_path_buf(),
-                after.path().to_path_buf(),
-                DiffMode::Fast
-            )
+            Action::StartDiff(before.path().to_path_buf(), after.path().to_path_buf())
         );
         Ok(())
     }
@@ -1563,8 +1524,7 @@ mod tests {
             .expect("create temp file");
         std::fs::write(after.path(), "fn main() {}\n").expect("write temp file");
 
-        let (data, _fallback_used) =
-            compute_diff(Path::new("/dev/null"), after.path(), DiffMode::Fast)?;
+        let (data, _large_residual) = compute_diff(Path::new("/dev/null"), after.path())?;
 
         assert_eq!(data.before_contents, "");
         assert_eq!(data.after_contents, "fn main() {}\n");
@@ -1584,8 +1544,7 @@ mod tests {
             .expect("create temp file");
         std::fs::write(before.path(), "fn main() {}\n").expect("write temp file");
 
-        let (data, _fallback_used) =
-            compute_diff(before.path(), Path::new("/dev/null"), DiffMode::Fast)?;
+        let (data, _large_residual) = compute_diff(before.path(), Path::new("/dev/null"))?;
 
         assert_eq!(data.before_contents, "fn main() {}\n");
         assert_eq!(data.after_contents, "");
@@ -1609,15 +1568,14 @@ mod tests {
         let before = write_temp_file("hello");
         let after = write_temp_file("world");
 
-        let (data, fallback_used) = compute_diff(before.path(), after.path(), DiffMode::Fast)?;
+        let (data, large_residual) = compute_diff(before.path(), after.path())?;
         assert!(
             data.plain_text_fallback,
             "an unrecognized language on both sides should route through plain_text_line_diff"
         );
         assert!(
-            !fallback_used,
-            "fallback_used means DiffMode::Fast's phase-6 guard tripped, which never applies \
-             here - no AST algorithm ran at all"
+            !large_residual,
+            "large_residual is a property of the AST residual, and no AST algorithm ran here"
         );
         assert_eq!(data.before_contents, "hello");
         assert_eq!(data.after_contents, "world");
@@ -1732,7 +1690,7 @@ mod tests {
         assert!(
             matches!(
                 queued.as_slice(),
-                [Action::StartDiff(before, after, DiffMode::Fast)]
+                [Action::StartDiff(before, after)]
                     if before == Path::new("before.rs") && after == Path::new("after.rs")
             ),
             "expected exactly one StartDiff reload, got {queued:?}"
@@ -1827,7 +1785,6 @@ mod tests {
             before_ranges: Vec::new(),
             after_ranges: Vec::new(),
             comment_only: false,
-            mode: DiffMode::Fast,
             plain_text_fallback: false,
         });
 
@@ -2104,7 +2061,6 @@ mod tests {
             before_ranges: Vec::new(),
             after_ranges: Vec::new(),
             comment_only: false,
-            mode: DiffMode::Fast,
             plain_text_fallback: false,
         });
 
@@ -2205,7 +2161,6 @@ mod tests {
             before_ranges: Vec::new(),
             after_ranges: Vec::new(),
             comment_only: false,
-            mode: DiffMode::Fast,
             plain_text_fallback: false,
         });
 
@@ -2338,7 +2293,6 @@ mod tests {
                 operation: crate::diff::text::TextOperation::Update,
             }],
             comment_only: false,
-            mode: DiffMode::Fast,
             plain_text_fallback: false,
         });
 
@@ -2379,7 +2333,6 @@ mod tests {
                 operation: crate::diff::text::TextOperation::Update,
             }],
             comment_only: false,
-            mode: DiffMode::Fast,
             plain_text_fallback: false,
         });
         app.diff_viewer.search("bar");
@@ -2467,7 +2420,6 @@ mod tests {
                 operation: crate::diff::text::TextOperation::Insert,
             }],
             comment_only: false,
-            mode: DiffMode::Fast,
             plain_text_fallback: false,
         };
 
@@ -2501,7 +2453,6 @@ mod tests {
             before_ranges: ranges.clone(),
             after_ranges: ranges,
             comment_only: true,
-            mode: DiffMode::Fast,
             plain_text_fallback: false,
         };
 
@@ -2535,7 +2486,7 @@ mod tests {
             .expect("create temp file");
         std::fs::write(after.path(), "// a comment\nfn main() {}\n").expect("write temp file");
 
-        let (data, _fallback_used) = compute_diff(before.path(), after.path(), DiffMode::Exact)?;
+        let (data, _large_residual) = compute_diff(before.path(), after.path())?;
         assert!(
             data.comment_only,
             "inserting only a comment should set comment_only"
@@ -2572,7 +2523,7 @@ mod tests {
         // The fixture must actually contain a raw tab for this test to mean anything.
         assert!(std::fs::read_to_string(before)?.contains('\t'));
 
-        let (data, _fallback) = compute_diff(before, after, DiffMode::Fast)?;
+        let (data, _large_residual) = compute_diff(before, after)?;
 
         assert!(
             !data.before_contents.contains('\t'),

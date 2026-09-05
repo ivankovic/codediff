@@ -774,6 +774,7 @@ fn debug_dump_case(
 }
 
 #[test]
+#[ignore = "debug dump: prints, asserts nothing"]
 fn debug_dump_tiny_repro() {
     let before = meta_from_owned(&[
         (1, "c".into(), "z".into(), vec![]),
@@ -788,6 +789,7 @@ fn debug_dump_tiny_repro() {
 }
 
 #[test]
+#[ignore = "debug dump: prints, asserts nothing"]
 fn debug_dump_n7_repro() {
     let before = meta_from_owned(&[
         (1, "c".into(), "z".into(), vec![]),
@@ -804,6 +806,7 @@ fn debug_dump_n7_repro() {
 }
 
 #[test]
+#[ignore = "debug dump: prints, asserts nothing"]
 fn debug_dump_minimal_repro() {
     let before = meta_from_owned(&[
         (2, "a".into(), "x".into(), vec![]),

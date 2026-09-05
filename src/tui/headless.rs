@@ -28,7 +28,6 @@ use anyhow::Result;
 
 use crate::code::Code;
 use crate::code::language::language_for_path_and_content;
-use crate::diff::DiffMode;
 use crate::diff::nodes::is_semantically_structural;
 use crate::diff::text::{
     RangeMatch, RenderOptions, TextOperation, ranges_for_options, summarize_diff_with_comment_check,
@@ -539,8 +538,8 @@ pub(crate) fn render_text_diff(data: &DiffSessionData, use_color: bool, context:
 /// TUI does (`app::compute_diff` - same parsing, same `ASTDiff`, same `TextDiff`), then prints it
 /// as text on stdout instead of drawing an interactive terminal UI.
 ///
-/// Under `DiffMode::Fast` (the default), if the diff left an unusually large unmatched residual
-/// (`PendingDiff::looks_expensive`), a one-line note goes to stderr (plain `eprintln!`, not
+/// If the diff left an unusually large unmatched residual (`PendingDiff::large_residual`), a
+/// one-line note goes to stderr (plain `eprintln!`, not
 /// `tracing` - headless mode never calls `tui::initialize_logging`, so there's no subscriber
 /// installed to receive it) so a script invoking this isn't left wondering why the structural
 /// matching looks coarser than usual for that portion.
@@ -550,14 +549,12 @@ pub fn run(
     before: &Path,
     after: &Path,
     use_color: bool,
-    mode: DiffMode,
     context: usize,
     render_options: RenderOptions,
 ) -> Result<bool> {
-    let (mut data, fallback_used) = compute_diff_with_update_style(
+    let (mut data, large_residual) = compute_diff_with_update_style(
         before,
         after,
-        mode,
         render_options.whole_pair_updates,
         render_options.paint_reindent_only_moves,
     )?;
@@ -567,11 +564,9 @@ pub fn run(
         ranges_for_options(&data.before_ranges, &data.before_contents, render_options);
     data.after_ranges =
         ranges_for_options(&data.after_ranges, &data.after_contents, render_options);
-    if fallback_used {
-        // Deliberately no "--exact fixes this" suggestion: since the phases-4-7
-        // rearchitecture, `PendingDiff::finish` runs the same pipeline regardless of mode, so
-        // that flag would not change the result - this is a heads-up about input shape, not a
-        // pointer to a more precise alternative.
+    if large_residual {
+        // A heads-up about input shape, not a pointer to a more precise alternative: there is
+        // no flag that would change the result.
         eprintln!(
             "codediff: this diff left an unusually large unmatched residual after the \
              heuristic passes; the structural matching for that portion may be coarser than \
@@ -987,7 +982,6 @@ mod tests {
                 },
             ],
             comment_only: false,
-            mode: DiffMode::Fast,
             plain_text_fallback: false,
         }
     }
@@ -1076,7 +1070,7 @@ mod tests {
         std::fs::write(&before_path, "fn main() {\n    old();\n}\n").unwrap();
         std::fs::write(&after_path, "fn main() {\n    new();\n}\n").unwrap();
 
-        let (data, _fallback_used) = compute_diff(&before_path, &after_path, DiffMode::Fast)?;
+        let (data, _large_residual) = compute_diff(&before_path, &after_path)?;
         let text = render_text_diff(&data, false, CONTEXT_LINES);
 
         assert!(text.contains("old();"), "before content missing: {text}");
@@ -1104,7 +1098,7 @@ mod tests {
         std::fs::write(&before_path, "fn main() {\n    same();\n}\n").unwrap();
         std::fs::write(&after_path, "fn main() {\n    same();\n}\n").unwrap();
 
-        let (data, _fallback_used) = compute_diff(&before_path, &after_path, DiffMode::Fast)?;
+        let (data, _large_residual) = compute_diff(&before_path, &after_path)?;
         let text = render_text_diff(&data, false, CONTEXT_LINES);
 
         assert!(
@@ -1130,7 +1124,7 @@ mod tests {
             .expect("create temp file");
         std::fs::write(after.path(), "// a comment\nfn main() {}\n").expect("write temp file");
 
-        let (data, _fallback_used) = compute_diff(before.path(), after.path(), DiffMode::Exact)?;
+        let (data, _large_residual) = compute_diff(before.path(), after.path())?;
         let text = render_text_diff(&data, false, CONTEXT_LINES);
 
         assert!(

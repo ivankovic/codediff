@@ -25,6 +25,8 @@
 
 mod common;
 mod engine;
+// Test oracle only: the fuzz tests in `common/tests.rs` compare the APTED engine against it.
+#[cfg(test)]
 mod zhang_shasha;
 
 pub use common::{Algorithm, for_nodes, for_roots};
@@ -35,8 +37,8 @@ pub(crate) use common::{
 use crate::code::Code;
 use crate::diff::ASTDiff;
 
-/// Cheaper `DiffMode::Fast` substitute for [`for_roots`]'s phase-6 whole-tree APTED, used when
-/// `PendingDiff::looks_expensive()` trips: a Myers-LCS alignment of the still-unmatched residual
+/// The phase-6 terminal fallback, cheaper than [`for_roots`]'s whole-tree APTED and run
+/// unconditionally: a Myers-LCS alignment of the still-unmatched residual
 /// forest instead of full tree-edit-distance. See `common::resolve_residual_forest_via_myers_lcs`
 /// for how the residual is collected and aligned.
 pub fn for_roots_fallback(before: &Code, after: &Code, source: &'static str, diff: &mut ASTDiff) {

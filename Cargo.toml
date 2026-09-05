@@ -121,8 +121,6 @@ tracing = { version = "0.1.44", optional = true }
 tracing-subscriber = { version = "0.3.23", features = ["env-filter", "serde"], optional = true }
 tracing-error = { version = "0.2.1", optional = true }
 strum = { version = "0.28.0", features = ["derive"] }
-# TUI-only - gated by `tui` below.
-signal-hook = { version = "0.4.4", optional = true }
 syntect = { version = "5.2", features = ["default-fancy"], optional = true }
 two-face = { version = "0.5.2", default-features = false, features = ["syntect-fancy"], optional = true }
 
@@ -149,7 +147,6 @@ tui = [
     "dep:tokio",
     "dep:syntect",
     "dep:two-face",
-    "dep:signal-hook",
     "dep:confy",
     "dep:futures",
     "dep:tracing",

@@ -121,6 +121,7 @@ impl SimilaritySketch {
 
     /// True when this sketch holds the subtree's complete set of distinct leaf hashes, so
     /// [`jaccard`](Self::jaccard) against another complete sketch is exact rather than estimated.
+    #[cfg(test)]
     pub fn is_exact(&self) -> bool {
         (self.len as usize) < SKETCH_WIDTH
     }

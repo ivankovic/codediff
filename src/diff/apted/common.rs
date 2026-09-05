@@ -26,6 +26,7 @@ use crate::diff::{
 };
 
 use super::engine::compute_delta;
+#[cfg(test)]
 use super::zhang_shasha::compute_delta_zhang_shasha;
 
 /// Cost for updating a literal leaf's value (string/number/etc. contents changed).
@@ -178,12 +179,16 @@ pub(crate) struct PostorderIndexer {
     pub(crate) post_to_node_id: Vec<usize>,
     /// 0-based postorder index -> 0-based preorder index.
     pub(crate) post_to_pre: Vec<usize>,
-    /// 0-based preorder index -> 0-based postorder index.
+    /// 0-based preorder index -> 0-based postorder index. Read only by the Zhang-Shasha test
+    /// oracle (`zhang_shasha.rs`); the APTED engine builds its own indexer.
+    #[cfg(test)]
     pub(crate) pre_to_post: Vec<usize>,
     /// 0-based postorder index -> 0-based postorder index of the leftmost leaf descendant.
     pub(crate) post_to_lld: Vec<usize>,
     /// 0-based preorder indices of the keyroots: the forest's own roots, plus every node that
-    /// has a left sibling. Drives the bottom-up `delta` computation.
+    /// has a left sibling. Drives the Zhang-Shasha oracle's bottom-up `delta` computation - test
+    /// only, like `pre_to_post`.
+    #[cfg(test)]
     pub(crate) keyroots: Vec<usize>,
 }
 
@@ -249,20 +254,27 @@ impl PostorderIndexer {
         }
 
         // A node is a keyroot iff it's one of the forest's own roots, or it has a left sibling.
-        let mut has_left_sibling = vec![false; size];
-        for children in &pre_children {
-            for (idx, &child_pre) in children.iter().enumerate() {
-                if idx > 0 {
+        // Only the Zhang-Shasha test oracle reads them.
+        #[cfg(test)]
+        let keyroots: Vec<usize> = {
+            let mut has_left_sibling = vec![false; size];
+            for children in &pre_children {
+                for &child_pre in children.iter().skip(1) {
                     has_left_sibling[child_pre] = true;
                 }
             }
-        }
-        let mut keyroots: Vec<usize> = root_pres.clone();
-        for (pre, &has_sibling) in has_left_sibling.iter().enumerate() {
-            if has_sibling {
-                keyroots.push(pre);
-            }
-        }
+            root_pres
+                .iter()
+                .copied()
+                .chain(
+                    has_left_sibling
+                        .iter()
+                        .enumerate()
+                        .filter(|&(_, &has_sibling)| has_sibling)
+                        .map(|(pre, _)| pre),
+                )
+                .collect()
+        };
 
         // Postorder traversal + leftmost-leaf-descendant, computed together: children are
         // finalized (and their `post_to_lld` written) strictly before their parent.
@@ -298,8 +310,10 @@ impl PostorderIndexer {
             size,
             post_to_node_id,
             post_to_pre,
+            #[cfg(test)]
             pre_to_post,
             post_to_lld,
+            #[cfg(test)]
             keyroots,
         }
     }

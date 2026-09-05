@@ -69,7 +69,7 @@ pub(crate) const TRIVIAL_ENTRY_MAX_SIZE: usize = 1;
 /// "reference node" or "big enough" for `solve_hash_descent`'s own selector) was silently marked
 /// delete/insert instead of matched. Invisible before Phase 1 of this rearchitecture, which
 /// promoted this function's caller (`resolve_residual_forest_via_myers_lcs`) from a rare
-/// `DiffMode::Fast` safety-valve substitute to the unconditional terminal step - now each node's
+/// size-gated safety-valve substitute to the unconditional terminal step - now each node's
 /// "does descending still have a chance of finding something" question is answered by a single
 /// postorder pass (`subtree_has_any_match`) computed once per call, so the fix stays O(n) like the
 /// walk it replaces.
@@ -126,8 +126,7 @@ pub(crate) fn subtree_has_any_match(
     any_matched
 }
 
-/// `DiffMode::Fast`'s substitute for full whole-tree APTED (phase 6) when
-/// `PendingDiff::looks_expensive()` trips: collects every maximal still-unmatched subtree root on
+/// The terminal fallback (phase 6, unconditional since the phases-4-7 rearchitecture): collects every maximal still-unmatched subtree root on
 /// each side (`maximal_unmatched_roots`), hashes each with its existing full-subtree content hash
 /// (`ASTMetadata::node_to_full_hash`), and runs the same `myers_lcs` primitive
 /// `resolve_flat_tree_pair` already uses for one parent's flat children - generalized here to the

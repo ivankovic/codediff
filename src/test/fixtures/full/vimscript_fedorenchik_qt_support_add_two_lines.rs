@@ -21,8 +21,8 @@ use anyhow::Result;
 #[test]
 fn mapping() -> Result<()> {
     // 19 mismatches: the whole script_file root plus its 18 leading (license-header) comment
-    // lines all come back `reason=APTED("fast_fallback")` - DiffMode::Fast's cheap Myers-LCS
-    // substitute for full APTED (see EXPENSIVE_RESIDUAL_THRESHOLD/PendingDiff::looks_expensive in
+    // lines all come back `reason=APTED("fast_fallback")` - the terminal `fast_fallback` pass's cheap Myers-LCS
+    // substitute for full APTED (see LARGE_RESIDUAL_THRESHOLD/PendingDiff::looks_expensive in
     // diff.rs), triggered because this two-line addition still leaves a large enough unmatched
     // residual. The fallback deletes+reinserts every one of the 18 identical comment lines instead
     // of matching them, rather than paying for exact tree-edit-distance. Not yet root-caused

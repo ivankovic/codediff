@@ -17,7 +17,6 @@
  */
 use std::path::PathBuf;
 
-use crate::diff::DiffMode;
 use crate::diff::text::{RangeMatch, RenderOptions};
 use crate::tui::theme::OverlayTheme;
 
@@ -47,31 +46,20 @@ pub struct DiffSessionData {
     /// itself is gone, so this can't be recomputed later from `before_ranges`/`after_ranges` alone
     /// the way `diff::text::summarize_diff`'s other cases can.
     pub comment_only: bool,
-    /// Which `DiffMode` actually produced this result - `Fast` unless the user re-ran the pair
-    /// through full analysis with the `x` key (or `--exact` in batch mode). Meaningless when
-    /// `plain_text_fallback` is set (no AST algorithm ran at all), same as `comment_only` in that
-    /// case. Shown in `app.rs`'s footer so a user can't forget which one they're looking at.
-    pub mode: DiffMode,
     /// Set when either side has no tree-sitter grammar (e.g. an extension-less `Makefile`), so
     /// `before_ranges`/`after_ranges` came from `diff::text::plain_text_line_diff` (a plain
     /// line-level Myers diff) instead of the AST-aware pipeline - see `app::compute_diff`'s
     /// branch. Everything downstream (overlay rendering, `headless`, `json_output`,
     /// `change_counts`, `DiffSummary`) already works on a plain `RangeMatch` list regardless of
     /// where it came from; this field exists purely so `app.rs`'s footer can show `[plain text]`
-    /// instead of a `DiffMode` label that would otherwise misleadingly imply a structural diff ran.
+    /// instead of nothing, which would otherwise imply a structural diff ran.
     pub plain_text_fallback: bool,
 }
 
 /// The result of one background diff computation - the payload of `Action::DiffComputed`.
 #[derive(Debug, Clone, PartialEq)]
 pub enum DiffOutcome {
-    Ready {
-        data: DiffSessionData,
-        /// Whether `DiffMode::Fast`'s guard silently substituted the cheaper fallback for the
-        /// expensive final pass (see `compute_diff`) - surfaced in the footer as a hint that `x`
-        /// (re-run exact) is worth pressing.
-        fallback_used: bool,
-    },
+    Ready(DiffSessionData),
     Failed(String),
 }
 
@@ -80,8 +68,6 @@ pub enum Action {
     Tick,
     Render,
     Resize(u16, u16),
-    Suspend,
-    Resume,
     Quit,
     ClearScreen,
     /// A recoverable, non-fatal failure the user should be told about (e.g. a failed frame draw)
@@ -93,10 +79,8 @@ pub enum Action {
     FileSelected(PathBuf),
     /// The user cancelled the file dialog.
     DialogCancelled,
-    /// Both before/after files are known; kick off the (background) diff computation in the given
-    /// mode (`Fast` for every ordinary file pick; `Exact` when the `x` key re-runs the current
-    /// pair through full analysis).
-    StartDiff(PathBuf, PathBuf, DiffMode),
+    /// Both before/after files are known; kick off the (background) diff computation.
+    StartDiff(PathBuf, PathBuf),
     /// A background diff computation returned - success or failure - tagged with the generation
     /// counter `App::start_diff` captured when it launched. `App` compares it against the current
     /// generation and simply drops a stale result: this is what makes Esc-during-Diffing a real

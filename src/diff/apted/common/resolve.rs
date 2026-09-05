@@ -304,9 +304,11 @@ pub(crate) fn resolve_oversized_pair(
 
 /// Which tree-edit-distance algorithm `resolve_forest` should run to populate the delta table
 /// that `compute_edit_mapping` then backtraces through. Both produce optimal distances; this is
-/// purely a backend choice threaded through from `for_roots`/`for_nodes`.
+/// purely a backend choice threaded through from `for_roots`/`for_nodes`. `ZhangShasha` is the
+/// test oracle the fuzz tests compare `Apted` against, and exists only under `cfg(test)`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Algorithm {
+    #[cfg(test)]
     ZhangShasha,
     Apted,
 }
@@ -435,6 +437,7 @@ pub(crate) fn resolve_forest(
     // Zhang-Shasha-with-containment) plus a manual check that each of the three `vren_adjusted`
     // sites, when individually disabled, makes that fuzz test fail on a real cost divergence.
     let mut delta = match algorithm {
+        #[cfg(test)]
         Algorithm::ZhangShasha => compute_delta_zhang_shasha(
             &before_idx,
             &after_idx,

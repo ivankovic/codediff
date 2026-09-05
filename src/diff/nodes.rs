@@ -279,7 +279,7 @@ pub fn is_reference(node_kind: &str, language: &Language) -> bool {
         // that - confirmed 2026-08-05 (`TODO.md`) on `xml-nextcloud-android-delete-element`, a
         // ~1200-entry Android `strings.xml` file where every entry parses to ~16 nodes. Without
         // this, phases 1-5 left 94% of the file (20124/21396 nodes) unmatched despite being
-        // 99.9% byte-identical text, tripping `EXPENSIVE_RESIDUAL_THRESHOLD` and substituting the
+        // 99.9% byte-identical text, tripping `LARGE_RESIDUAL_THRESHOLD` and substituting the
         // crude Myers fallback for the whole file. Safe the same way every other reference-node
         // exception here is: this only ever *enables candidacy* for exact-hash matching, which
         // still requires byte-identical subtrees to actually match anything - it can widen what's

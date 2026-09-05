@@ -39,7 +39,7 @@
 * mismatch count.
 */
 use crate::code::ASTMetadata;
-use crate::diff::{ASTDiff, ASTMappingOperation, COST_DELETE, COST_INSERT, COST_MOVE, COST_UPDATE};
+use crate::diff::{ASTDiff, ASTMappingOperation, COST_DELETE, COST_INSERT, COST_UPDATE};
 
 /**
 * Unit cost of one mapping entry with the given `operation`, whose subtree has `subtree_size`
@@ -50,7 +50,7 @@ use crate::diff::{ASTDiff, ASTMappingOperation, COST_DELETE, COST_INSERT, COST_M
 * Mirrors `apted::common::UnitCostModel`'s per-operation costs, generalized from "match/rename a
 * pair of node labels" (what APTED's DP evaluates candidate by candidate) to "here is the fully
 * resolved operation for this entry" (what a finished mapping already records):
-* - `Identical`, `Move`, `DoNothing`, `NotYetSet` -> 0, and `MatchButNotIdentical` -> 0 *unless*
+* - `Identical` and `NotYetSet` -> 0, and `MatchButNotIdentical` -> 0 *unless*
 *   `owned_text_changed`. A same-kind internal-node match costs nothing at the root because the
 *   real cost of any difference inside the subtree shows up as its own, separate entries for the
 *   differing descendants, and double-charging the ancestor would count it twice - the same premise
@@ -80,9 +80,7 @@ pub fn operation_cost(
         ASTMappingOperation::MatchButNotIdentical if owned_text_changed => COST_UPDATE,
         ASTMappingOperation::Identical
         | ASTMappingOperation::MatchButNotIdentical
-        | ASTMappingOperation::DoNothing
         | ASTMappingOperation::NotYetSet => 0,
-        ASTMappingOperation::Move => COST_MOVE,
         ASTMappingOperation::Update => COST_UPDATE,
         ASTMappingOperation::Delete => COST_DELETE,
         ASTMappingOperation::Insert => COST_INSERT,
@@ -162,10 +160,6 @@ mod tests {
         assert_eq!(
             operation_cost(&ASTMappingOperation::MatchButNotIdentical, 50, false),
             0
-        );
-        assert_eq!(
-            operation_cost(&ASTMappingOperation::Move, 50, false),
-            COST_MOVE
         );
     }
 

@@ -20,8 +20,9 @@ use tree_sitter::Range;
 /// A row in the source document: the index of a `\n`-delimited line.
 ///
 /// Rows have only one unit - a line index is a line index however the bytes on it are encoded -
-/// so there is deliberately no byte/character/cell variant of this type. The distinction that
-/// *does* exist for rows is source vs screen: see [`ScreenRow`].
+/// so there is deliberately no byte/character/cell variant of this type. (Source vs. screen row,
+/// which differ once long lines wrap, is a distinction the renderers keep locally; no shared
+/// newtype for it has had a caller.)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 pub struct SourceRow(usize);
 
@@ -47,15 +48,6 @@ pub struct SourceColumn(usize);
 /// mixed at slicing sites.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 pub struct SourceOffset(usize);
-
-/// A row in the rendered viewport: a line index *after* wrapping.
-///
-/// Distinct from [`SourceRow`] because one source row can occupy several screen rows once long
-/// lines wrap, so "keep the cursor within N rows" means two different things depending on which
-/// one is meant - `human_solver`'s `scroll_into_view` keeps a *source*-row window while the
-/// viewport is a *screen*-row window, and needs an explicit walk to reconcile them.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
-pub struct ScreenRow(usize);
 
 /// A column in the rendered viewport: a terminal **cell** offset within its screen row.
 ///
@@ -84,7 +76,6 @@ macro_rules! position_newtype {
 position_newtype!(SourceRow);
 position_newtype!(SourceColumn);
 position_newtype!(SourceOffset);
-position_newtype!(ScreenRow);
 position_newtype!(ScreenColumn);
 
 /// The extent of `line` as a source column - its length in **bytes**, which is the column one past

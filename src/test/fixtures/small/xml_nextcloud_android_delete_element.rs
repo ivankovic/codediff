@@ -22,7 +22,7 @@ use anyhow::Result;
 fn mapping() -> Result<()> {
     // 2026-08-05: dropped 1141 -> 856 by teaching `nodes::is_reference` that XML's `element` is a
     // reference node (see that function's own doc comment) - this ~1200-entry Android
-    // `strings.xml` file was tripping `EXPENSIVE_RESIDUAL_THRESHOLD` (94% of the file unmatched
+    // `strings.xml` file was tripping `LARGE_RESIDUAL_THRESHOLD` (94% of the file unmatched
     // despite being 99.9% byte-identical to `after`) purely because every `<string name="...">
     // ...</string>` entry is far smaller than `min_subtree_size` (45), so exact-hash matching
     // never got the chance to find them. The remaining mismatches were all `CharData` whitespace

@@ -290,6 +290,6 @@ pub(crate) fn prematch_unique_named_locals(
     }
 }
 
-// --- DiffMode::Fast's whole-residual fallback: Myers O(ND) sequence diff, generalized from
+// --- The terminal whole-residual fallback: Myers O(ND) sequence diff, generalized from
 // `resolve_flat_tree_pair`'s one-parent's-direct-children scope to the entire still-unmatched
 // forest under a root pair. ---
