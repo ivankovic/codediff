@@ -121,6 +121,11 @@ done; the §4 typos are fixed except `symetric` (×3).
   moved out of source" in `src/diff/TODO.md`, which now holds the dates and fixtures. `nodes.rs`
   2064-2105 (a table of formerly-wrong kind names) stays: it is a verification record of the
   current table, not history.
+- **2026-09-06, section 5 (module names)** - done for the cheap ones: `src/metadata.rs` is
+  `src/anomalous_paths.rs` (six call sites), and the crate's two `mod.rs` files are the sibling
+  files `diff/apted.rs` and `tui/widgets.rs` like every other module. Left open: splitting the
+  kind taxonomy out of `diff/nodes.rs`, `apted/common.rs`'s glob re-export tail (and the 22
+  `#[allow(unused_imports)]` globs behind it), and the `CodeViewer`/`CodeViewerWidget` naming.
 - **Runtime finding from the same measurement**: over the corpus, AST metadata costs about three
   times the tree-sitter parse, and the parse plus metadata (15.5s) is more than half the diff
   itself (28s per the quality baseline). Section 6's items 1-3 are that cost.

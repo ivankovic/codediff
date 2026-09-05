@@ -201,7 +201,7 @@ only how it looks up metadata/text/ids. Migrate one file at a time, full suite a
 
 ### 4. `apted::for_roots_fallback` needs the same multi-root generalization - found via direct read, not assumed
 
-`for_roots_fallback` (`src/diff/apted/mod.rs:39-54`, the `DiffMode::Fast` cheap-fallback path) is
+`for_roots_fallback` (`src/diff/apted.rs`, the terminal cheap-fallback path) is
 currently hardcoded to exactly one root per side:
 ```rust
 let before_root_id = before.ast.as_ref().unwrap().root_node().id();
@@ -319,7 +319,7 @@ identity property means they need no changes.
 - `src/code/metadata.rs` - `compute_ast_metadata`/`compute_node_info`
 - `src/diff/merge.rs` (new) - `merge_metadata`/`FileOrigins`
 - `src/diff/apted/common.rs` - `UnitCostModel` language fix, `resolve_residual_forest_via_myers_lcs`
-- `src/diff/apted/mod.rs` - `for_roots_fallback`
+- `src/diff/apted.rs` - `for_roots_fallback`
 - `src/diff/nodes.rs` - `map_identical_descendants`
 - `src/diff/solve_moved_subtrees.rs`, `solve_hash_descent.rs`, `solve_bottom_up_expansion.rs`,
   `solve_greedy_anchor_blocks.rs` (Group A)

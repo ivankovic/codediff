@@ -15,10 +15,10 @@
  *  You should have received a copy of the GNU Affero General Public License
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
+#[cfg(feature = "stats")]
+pub mod anomalous_paths;
 pub mod code;
 pub mod diff;
-#[cfg(feature = "stats")]
-pub mod metadata;
 #[cfg(feature = "stats")]
 pub mod stats;
 #[cfg(feature = "tui")]

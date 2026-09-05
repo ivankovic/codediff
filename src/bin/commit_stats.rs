@@ -17,8 +17,8 @@
  */
 use anyhow::Result;
 use clap::Parser;
+use codediff::anomalous_paths;
 use codediff::code::{Code, Language};
-use codediff::metadata;
 use codediff::stats::DiffStats;
 use crossbeam_channel::{Receiver, Sender, bounded};
 use rusqlite::{Connection, params};
@@ -316,7 +316,7 @@ fn process_delta(stats: &DiffStats, before: &str, after: &str) -> Result<DiffSta
     let mut result = stats.clone();
 
     let file_path = Path::new(&result.relative_file_path);
-    if metadata::is_anomalous(file_path) {
+    if anomalous_paths::is_anomalous(file_path) {
         return Ok(result);
     }
 

@@ -36,9 +36,9 @@ use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use codediff::anomalous_paths;
 use codediff::code::Language;
 use codediff::code::language::{language_for_path, language_for_path_and_content, to_treesitter};
-use codediff::metadata;
 use codediff::stats::filesystem::{find_git_repositories, for_each_repository};
 use codediff::stats::git::{text_loc_if_in_range, walk_single_parent_commit_diffs};
 use codediff::stats::sampling::{Reservoir, loc_bucket};
@@ -350,7 +350,7 @@ fn sample_repository(
         let Some(path) = delta.new_file().path() else {
             return Ok(());
         };
-        if metadata::is_anomalous(path) {
+        if anomalous_paths::is_anomalous(path) {
             return Ok(());
         }
 

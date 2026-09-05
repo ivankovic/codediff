@@ -15,6 +15,10 @@
  *  You should have received a copy of the GNU Affero General Public License
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
+
+//! Paths the corpus tools skip on sight - vendored trees, minified bundles, generated files -
+//! so a sample is drawn from code somebody wrote. Was `src/metadata.rs`, a name that collided
+//! with `code::metadata` (the AST metadata) while describing neither.
 use std::path::Path;
 
 static WELL_KNOWN_ANOMALOUS_PATHS: &[&str] = &[
