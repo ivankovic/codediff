@@ -23,10 +23,10 @@
 use tree_sitter::Node;
 
 use crate::code::Code;
-use crate::diff::{ASTDiff, ASTMappingOperation, NodeCache, nodes};
+use crate::diff::{ASTDiff, NodeCache, nodes};
 
-use super::own_content;
 use super::render_options::{RangeMatch, TextOperation};
+use super::{NodeChange, classify_node};
 
 /// Assigns one `TextOperation` to each of `line_count` lines, from one side's `RangeMatch` list
 /// (`TextDiff::all`).
@@ -334,34 +334,24 @@ pub fn is_comment_only_diff(
                 }
             };
 
+            // The same classification `ranges` paints from, so "is this a visible change" and
+            // "what gets painted" cannot drift apart.
             if let Some((mapped_id, mapping)) = diff.mapping_for_node(&node.id()) {
-                match mapping.operation {
-                    ASTMappingOperation::Identical => descend = false,
-                    ASTMappingOperation::DeleteWithChildren
-                    | ASTMappingOperation::InsertWithChildren => {
+                match classify_node(
+                    node,
+                    mapped_id,
+                    &mapping.operation,
+                    node_cache,
+                    own_bytes,
+                    other_bytes,
+                ) {
+                    NodeChange::Identical(_) => descend = false,
+                    NodeChange::PrunedSubtree(_) | NodeChange::OwnContentChanged(_) => {
                         descend = false;
                         mark_found();
                     }
-                    ASTMappingOperation::Delete | ASTMappingOperation::Insert
-                        if node.child_count() == 0 =>
-                    {
-                        mark_found();
-                    }
-                    ASTMappingOperation::Update => mark_found(),
-                    // Same criterion as `ranges`'s own `MatchButNotIdentical` arm - see that
-                    // arm's doc comment for why `own_content`, not the node's whole text.
-                    ASTMappingOperation::MatchButNotIdentical => {
-                        if let Some(&other_node) = node_cache.get_in_any(&mapped_id)
-                            && !whitespace_stripped_equal(
-                                &own_content(node, own_bytes),
-                                &own_content(other_node, other_bytes),
-                            )
-                        {
-                            descend = false;
-                            mark_found();
-                        }
-                    }
-                    _ => {}
+                    NodeChange::Leaf(_) | NodeChange::Update(_) => mark_found(),
+                    NodeChange::Descend => {}
                 }
             }
 

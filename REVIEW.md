@@ -95,6 +95,12 @@ done; the §4 typos are fixed except `symetric` (×3).
   private `Side` twin is the `human_mapping::Side` re-exported. Its five small mirror pairs
   (`algo_status_*`, `algo_reason_*`, `algo_disagrees_*`, `advance_*_to_next_unmarked`,
   `clear_*_descendants`) are still open.
+- **2026-09-05, section 4 item 6** - done: `diff/text.rs ranges` is 57 lines over a
+  `RangeWalk` whose methods are the former arms (`identical_or_move`, `update_ranges`,
+  `own_content_update_ranges`, `whole_content_prune` + `own_gap_ranges`, `placed`, `push`),
+  with the measurement narratives carried over as each method's doc comment; `classify_node`/
+  `NodeChange` is the one operation-to-visible-change classification, used by both `ranges` and
+  `summary::scan`.
 - **Runtime finding from the same measurement**: over the corpus, AST metadata costs about three
   times the tree-sitter parse, and the parse plus metadata (15.5s) is more than half the diff
   itself (28s per the quality baseline). Section 6's items 1-3 are that cost.

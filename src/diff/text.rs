@@ -368,32 +368,133 @@ fn intra_node_update_ranges(
     result
 }
 
+/// How one source node renders, decided from its mapping alone. Shared by [`ranges`] (which turns
+/// it into painted ranges) and `summary::scan` (which only asks whether it is a visible change),
+/// so the two cannot disagree about what counts as one.
+pub(crate) enum NodeChange<'c> {
+    /// Mapped `Identical` - the counterpart, when the cache knows it. [`ranges`] still has to
+    /// decide whether the node's *position* makes it a `Move`.
+    Identical(Option<Node<'c>>),
+    /// The whole subtree was deleted or inserted: one range, never descended.
+    PrunedSubtree(TextOperation),
+    /// A childless node deleted or inserted; the walk still descends (there is nothing below).
+    Leaf(TextOperation),
+    /// Mapped `Update` - the counterpart, when the cache knows it.
+    Update(Option<Node<'c>>),
+    /// Mapped `MatchButNotIdentical` with its *own* gap text changed beyond whitespace (see
+    /// [`own_content`]): the counterpart. A container whose children changed but whose own gaps
+    /// did not is [`NodeChange::Descend`] instead, so the walk finds the smaller real change.
+    OwnContentChanged(Node<'c>),
+    /// Nothing to paint at this node; its children decide.
+    Descend,
+}
+
+/// Classifies `node` per its mapping `operation` to `mapped_id`. `own_bytes`/`other_bytes` are
+/// the two files' contents, for the `MatchButNotIdentical` gap-text comparison.
+///
+/// `MatchButNotIdentical` deliberately compares `own_content`, not the node's whole text: a
+/// container (e.g. a function `block` that gained a statement) also maps `MatchButNotIdentical`,
+/// and its whole text almost always differs too - but comparing only the gap text between its
+/// children correctly finds nothing (containers rarely have real content outside their named
+/// children), so the existing descent finds the real, much smaller change instead. Confirmed as
+/// a real false positive during development: an earlier version compared each child's own
+/// `mapping.operation` instead, which missed a statement moving one level deeper (still mapped
+/// `Identical` at the AST level - only its rendered `TextOperation` becomes `Move`, from the
+/// column shift) and wrongly treated the whole enclosing block as one giant `Update`.
+pub(crate) fn classify_node<'c>(
+    node: Node,
+    mapped_id: usize,
+    operation: &ASTMappingOperation,
+    node_cache: &'c NodeCache,
+    own_bytes: &[u8],
+    other_bytes: &[u8],
+) -> NodeChange<'c> {
+    let counterpart = || node_cache.get_in_any(&mapped_id).copied();
+    match operation {
+        ASTMappingOperation::Identical => NodeChange::Identical(counterpart()),
+        ASTMappingOperation::DeleteWithChildren => NodeChange::PrunedSubtree(TextOperation::Delete),
+        ASTMappingOperation::InsertWithChildren => NodeChange::PrunedSubtree(TextOperation::Insert),
+        ASTMappingOperation::Delete if node.child_count() == 0 => {
+            NodeChange::Leaf(TextOperation::Delete)
+        }
+        ASTMappingOperation::Insert if node.child_count() == 0 => {
+            NodeChange::Leaf(TextOperation::Insert)
+        }
+        ASTMappingOperation::Update => NodeChange::Update(counterpart()),
+        ASTMappingOperation::MatchButNotIdentical => match counterpart() {
+            Some(other)
+                if !whitespace_stripped_equal(
+                    &own_content(node, own_bytes),
+                    &own_content(other, other_bytes),
+                ) =>
+            {
+                NodeChange::OwnContentChanged(other)
+            }
+            _ => NodeChange::Descend,
+        },
+        _ => NodeChange::Descend,
+    }
+}
+
+/// The state of one [`ranges`] traversal: the two sides and their row tables, the options, the
+/// `last_non_move_range` anchor every placed range is positioned against, and the output with
+/// its same-operation-neighbour accumulator.
+struct RangeWalk<'a> {
+    source: &'a Code,
+    destination: &'a Code,
+    diff: &'a ASTDiff,
+    node_cache: &'a NodeCache,
+    source_columns: Vec<usize>,
+    destination_columns: Vec<usize>,
+    // Row offsets for both sides, built once for the whole traversal. `RangeMatch::extends`
+    // needs them for every merge decision it makes, and rebuilding them per decision is exactly
+    // the cost this replaced.
+    source_text: SourceText<'a>,
+    destination_text: SourceText<'a>,
+    // Which file `source` is. Only `intra_node_update_ranges` needs it, and only to tell an
+    // insertion from a deletion - see its doc comment. Everything else in here is symmetric.
+    source_is_before: bool,
+    // [`RenderOptions::whole_pair_updates`], forwarded straight through to every
+    // `intra_node_update_ranges` call - see that parameter's own doc comment.
+    whole_pair_updates: bool,
+    // [`RenderOptions::paint_reindent_only_moves`] - see that field's own doc comment and
+    // `known_pure_reindent` in `identical_or_move`.
+    paint_reindent_only_moves: bool,
+    /// Where the last range that is part of the normal sequential flow ended on the destination
+    /// side: a deleted/inserted/updated node has no real destination counterpart, so its range
+    /// is anchored here (see `advance_and_build_range`); a `Move`'s destination is out of the
+    /// flow and never becomes the anchor.
+    last_non_move_range: TextRange,
+    ranges: Vec<RangeMatch>,
+    current_range: RangeMatch,
+}
+
 /// Returns the RangeMatches from source to destination.
 fn ranges(
     source: &Code,
     destination: &Code,
     diff: &ASTDiff,
     node_cache: &NodeCache,
-    // Which file `source` is. Only `intra_node_update_ranges` needs it, and only to tell an
-    // insertion from a deletion - see its doc comment. Everything else in here is symmetric.
     source_is_before: bool,
-    // [`RenderOptions::whole_pair_updates`], forwarded straight through to every
-    // `intra_node_update_ranges` call below - see that parameter's own doc comment.
     whole_pair_updates: bool,
-    // [`RenderOptions::paint_reindent_only_moves`] - see that field's own doc comment and
-    // `known_pure_reindent` below.
     paint_reindent_only_moves: bool,
 ) -> Vec<RangeMatch> {
-    let mut ranges = Vec::new();
-
-    // Compute columns per row for source and destination
-    let source_columns = compute_row_byte_lengths(&source.contents);
-    let destination_columns = compute_row_byte_lengths(&destination.contents);
-    // Row offsets for both sides, built once for the whole traversal. `RangeMatch::extends` below
-    // needs them for every merge decision it makes, and rebuilding them per decision is exactly the
-    // cost this replaced.
-    let source_text = SourceText::new(&source.contents);
-    let destination_text = SourceText::new(&destination.contents);
+    let mut walk = RangeWalk {
+        source,
+        destination,
+        diff,
+        node_cache,
+        source_columns: compute_row_byte_lengths(&source.contents),
+        destination_columns: compute_row_byte_lengths(&destination.contents),
+        source_text: SourceText::new(&source.contents),
+        destination_text: SourceText::new(&destination.contents),
+        source_is_before,
+        whole_pair_updates,
+        paint_reindent_only_moves,
+        last_non_move_range: TextRange::zero(),
+        ranges: Vec::new(),
+        current_range: RangeMatch::zero(),
+    };
 
     match (&source.ast, &destination.ast) {
         (None, None) => {
@@ -402,494 +503,418 @@ fn ranges(
         }
         (Some(source_tree), None) => {
             let source_root = source_tree.root_node();
-            let source_range =
-                TextRange::from_treesitter_range(source_root.range(), &source_columns);
-
-            ranges.push(RangeMatch {
-                source: source_range.clone(),
+            walk.ranges.push(RangeMatch {
+                source: TextRange::from_treesitter_range(source_root.range(), &walk.source_columns),
                 destination: TextRange::zero(),
                 operation: TextOperation::Delete,
             });
         }
         (None, Some(destination_tree)) => {
             let destination_root = destination_tree.root_node();
-            let destination_range =
-                TextRange::from_treesitter_range(destination_root.range(), &destination_columns);
-
-            ranges.push(RangeMatch {
+            walk.ranges.push(RangeMatch {
                 source: TextRange::zero(),
-                destination: destination_range.clone(),
+                destination: TextRange::from_treesitter_range(
+                    destination_root.range(),
+                    &walk.destination_columns,
+                ),
                 operation: TextOperation::Insert,
             });
         }
         (Some(source_tree), Some(_destination_tree)) => {
-            let root_node = source_tree.root_node();
+            walk.visit_tree(source_tree.root_node());
+        }
+    }
 
-            // We perform a pre-order traversal of the source tree and look for nodes with known
-            // TextRanges.
-            let mut stack = Vec::new();
-            stack.push(root_node);
+    walk.ranges
+}
 
-            let mut last_non_move_range = TextRange::zero();
-
-            let mut current_range = RangeMatch::zero();
-
-            while let Some(node) = stack.pop() {
-                if let Some((mapped_id, mapping)) = diff.mapping_for_node(&node.id()) {
-                    let mut new_ranges: Vec<RangeMatch> = Vec::new();
-                    let mut descend = true;
-
-                    match mapping.operation {
-                        ASTMappingOperation::Identical => {
-                            if let Some(destination_node) = node_cache.get_in_any(&mapped_id) {
-                                let s =
-                                    TextRange::from_treesitter_range(node.range(), &source_columns);
-                                let d = TextRange::from_treesitter_range(
-                                    destination_node.range(),
-                                    &destination_columns,
-                                );
-
-                                // A matched node whose column changed wasn't just shifted down by
-                                // unrelated insertions/deletions elsewhere in the file (which
-                                // leaves its column untouched) - it was actually relocated (e.g.
-                                // reindented because it's now nested inside a new block). That's
-                                // a Move, not an Identical range, and its destination must not
-                                // become the new `last_non_move_range` anchor since its position
-                                // is out of the normal sequential flow.
-                                //
-                                // A second, column-preserving relocation also counts: a node whose
-                                // destination starts *before* the last sequential anchor crossed
-                                // over earlier content - siblings reordered (e.g. two top-level
-                                // functions swapped). Same-column row shifts from unrelated edits
-                                // elsewhere never run backwards, so this can't fire for them.
-                                // Restricted to nodes spanning a row boundary: sub-line tokens
-                                // (a `}`, an operator) can legitimately match an earlier identical
-                                // occurrence when matching is imperfect, and flagging those would
-                                // paint noise, while a multi-row (or full-line) match landing
-                                // backwards is a real reorder. Before this check, a pure sibling
-                                // reorder produced no non-Identical range at all - the diff
-                                // rendered as completely unchanged (the gap `DiffSummary::
-                                // RefactorMovedOnly`'s doc comment used to describe).
-                                let crossed_backwards = s.end_row > s.start_row
-                                    && (d.start_row, d.start_column)
-                                        < (
-                                            last_non_move_range.start_row,
-                                            last_non_move_range.start_column,
-                                        );
-                                // A column change means the node was relocated - *unless* it is a
-                                // multi-row node that stayed on its own starting row, in which
-                                // case the shift is text inserted earlier on that line pushing it
-                                // rightwards, and only its first row moved at all.
-                                //
-                                // Marking the whole subtree moved on that evidence over-reports by
-                                // the size of the subtree: adding `const ` to one parameter used
-                                // to paint an entire function body as moved
-                                // (`cpp-add-const-correctness`, where the human paints only the
-                                // inserted `const`).
-                                //
-                                // The two exclusions are both load-bearing, and each was put here
-                                // by a measurement:
-                                //
-                                // * single-row nodes keep the old treatment - the painted corpus
-                                //   holds 16 human-painted moves that are column-only on one row,
-                                //   across six fixtures, so the rule is right there;
-                                // * a multi-row node that *also* changed rows keeps it too - that
-                                //   is a real relocation, and excluding it regressed
-                                //   `rust-add-if` (a block genuinely moved into a new `if`) from
-                                //   0.7% to 56.5% disagreement with its painting.
-                                let shifted_within_its_own_line =
-                                    s.start_row == d.start_row && s.end_row > s.start_row;
-                                // A single-row node pushed sideways by an edit *elsewhere on its
-                                // own row* is not a Move either: `void process(int x)` ->
-                                // `void process(const int x)` shifts `int x` by six columns, and
-                                // the human paints only the inserted `const`. The test is that
-                                // the node lies wholly inside the common prefix or common suffix
-                                // of its source row and destination row - its own text is
-                                // untouched and the row's one edit is beside it. A node inside
-                                // the *rewritten* part of the row keeps the Move treatment:
-                                // `function fetchData(callback: ...): void {` ->
-                                // `async function fetchData(): Promise<string> {` shifts
-                                // `function fetchData(` the same way, but the row was rewritten
-                                // around it and its painter calls the surviving fragments moved
-                                // (`typescript-async-await`, which a plain same-row-same-indent
-                                // rule regressed 27.5% -> 36.1% on 2026-09-01, the fourth attempt
-                                // at this shape; the three before it are in the fix log).
-                                // Restricted to nodes that stayed on their own row and were not
-                                // reindented, so a reindent-only move keeps reaching
-                                // `paint_reindent_only_moves` below.
-                                let shifted_by_an_edit_beside_it = s.end_row == s.start_row
-                                    && s.start_row == d.start_row
-                                    && node_untouched_on_its_row(
-                                        &source.contents,
-                                        &destination.contents,
-                                        &s,
-                                        &d,
-                                    );
-                                let column_shift_is_meaningful = s.start_column != d.start_column
-                                    && !shifted_within_its_own_line
-                                    && !shifted_by_an_edit_beside_it;
-                                // `NestedConditionCollapse`/`WrapGrowth` mark a node whose
-                                // relocation is *known*, by construction, to be a pure reindent -
-                                // see `solve_nested_condition_collapse`'s and `solve_wrap_growth`'s
-                                // own doc comments. Deliberately narrow (only these specific,
-                                // pre-verified reasons, never a bare column-shift check): the
-                                // general heuristic above cannot tell a pure reindent from a genuine
-                                // relocation by position alone - `rust-add-if`'s own shape is
-                                // exactly the counter-example that ruled that out, which is why it's
-                                // included here by *verified reason* (`WrapGrowth`) rather than by
-                                // loosening the position-based heuristic itself.
-                                let known_pure_reindent = !paint_reindent_only_moves
-                                    && matches!(
-                                        mapping.reason,
-                                        ASTMappingReason::NestedConditionCollapse
-                                            | ASTMappingReason::WrapGrowth
-                                    );
-                                // Unlike `NestedConditionCollapse` above, not gated by
-                                // `paint_reindent_only_moves`: this tag only fires when a class's
-                                // or interface's body is byte-identical and its shift is verified
-                                // to come entirely from a newly-inserted heritage clause (see
-                                // `solve_heritage_clause_growth`'s doc comment), and both `MINIMAL`
-                                // and `FULL` ground truth agree it should never paint `Move`
-                                // (measured on `typescript-refactor-interface`) - a correctness
-                                // fix, not a preference.
-                                let known_pure_relocation =
-                                    mapping.reason == ASTMappingReason::HeritageClauseGrowth;
-                                if (!column_shift_is_meaningful && !crossed_backwards)
-                                    || known_pure_reindent
-                                    || known_pure_relocation
-                                {
-                                    last_non_move_range = d.clone();
-
-                                    new_ranges.push(RangeMatch {
-                                        source: s,
-                                        destination: d,
-                                        operation: TextOperation::Identical,
-                                    });
-                                } else {
-                                    new_ranges.push(RangeMatch {
-                                        source: s,
-                                        destination: d,
-                                        operation: TextOperation::Move,
-                                    });
-                                }
-
-                                descend = false;
-                            }
-                        }
-                        ASTMappingOperation::DeleteWithChildren => {
-                            new_ranges.push(advance_and_build_range(
-                                &mut last_non_move_range,
-                                node,
-                                &source_columns,
-                                TextOperation::Delete,
-                            ));
-                            descend = false;
-                        }
-                        ASTMappingOperation::InsertWithChildren => {
-                            new_ranges.push(advance_and_build_range(
-                                &mut last_non_move_range,
-                                node,
-                                &source_columns,
-                                TextOperation::Insert,
-                            ));
-                            descend = false;
-                        }
-                        ASTMappingOperation::Delete if node.child_count() == 0 => {
-                            new_ranges.push(advance_and_build_range(
-                                &mut last_non_move_range,
-                                node,
-                                &source_columns,
-                                TextOperation::Delete,
-                            ));
-                        }
-                        ASTMappingOperation::Insert if node.child_count() == 0 => {
-                            new_ranges.push(advance_and_build_range(
-                                &mut last_non_move_range,
-                                node,
-                                &source_columns,
-                                TextOperation::Insert,
-                            ));
-                        }
-                        // A wholly-new-or-removed content node (a comment, e.g. `// Early
-                        // termination optimization`) whose grammar splits it into a marker leaf
-                        // (`//`) plus un-decomposed trailing text - the same shape
-                        // `own_content`/`own_content_span` exist for on the `MatchButNotIdentical`
-                        // arm below, but for a *whole* node insertion/deletion rather than a
-                        // changed one. Without this arm, the childless-leaf arms above only ever
-                        // painted the marker (`//`), and the comment's actual words - not covered
-                        // by any child - were silently dropped: confirmed on
-                        // `rust-cost-optimization`, where a brand-new `// Early termination
-                        // optimization` comment rendered with only its `//` highlighted and the
-                        // rest in plain, unpainted text.
-                        //
-                        // Scoped tightly to avoid the ordering hazard a naive fix would hit: this
-                        // node's own gap text sits *after* its children in the file, but the
-                        // surrounding pre-order stack walk would visit those children in a later
-                        // iteration, so pushing the gap range here (during the parent's own turn)
-                        // and the children's ranges later (in theirs) would insert the gap into
-                        // `ranges` out of byte order - corrupting every `last_non_move_range`
-                        // anchor computed afterward. Instead, when every direct child is itself a
-                        // leaf (`child_count() == 0` - true for a marker token like `//` or a
-                        // quote character, false for anything with real internal structure this
-                        // arm has no business re-deciding), this computes the *whole* ordered
-                        // range list - each child's own range interleaved with any real (non-
-                        // whitespace) gap text around it - in one pass here, and skips the normal
-                        // per-child descent (`descend = false`) so those children aren't visited
-                        // (and painted) a second time.
-                        //
-                        // `is_content_node` gates this the same way it gates
-                        // `intra_node_update_ranges`'s affix split: only comments/literals/strings
-                        // have meaningful text living in a node's own gaps rather than in a named
-                        // child, so this never fires for a container (a `block`, a `class_body`)
-                        // gaining or losing a whole child - that shape already renders correctly
-                        // via the childless-leaf arms recursing normally.
-                        //
-                        // `own_content_span(node).is_some_and(...)` in the guard - not just inside
-                        // the body - matters: it's what keeps this arm from firing on a node whose
-                        // children already fully reconstruct it with no real gap at all (a Java
-                        // `string_literal` node made of a `"` / `string_fragment` / `"` triple with
-                        // nothing between them, extremely common, unlike a genuinely gappy comment).
-                        // Confirmed as a real regression, not a hypothetical one: an earlier version
-                        // of this arm fired there too and, despite painting every one of those
-                        // three children correctly on their own, its `new_ranges.len() > 1` bypass
-                        // (below) skips the normal same-operation-neighbor merge accumulator that
-                        // silently absorbs a *whitespace-only* gap into an adjacent Insert/Delete
-                        // range (see the comment where `new_ranges.len() > 1` is checked, further
-                        // down) - so cutting a no-gap node like this over to the bypass path dropped
-                        // whitespace at its *boundary* with a sibling (a single space between a
-                        // string literal and a `+` in `"Dividing " + a`) that isn't part of this
-                        // node at all. Regressed `java-add-logging` from exact agreement to six
-                        // dropped bytes before this guard was added.
-                        ASTMappingOperation::Insert | ASTMappingOperation::Delete
-                            if node.child_count() > 0
-                                && is_content_node(node.kind())
-                                && node
-                                    .children(&mut node.walk())
-                                    .all(|c| c.child_count() == 0)
-                                && own_content_span(node).is_some_and(|(_, from, to)| {
-                                    !source.contents[from..to].trim().is_empty()
-                                }) =>
-                        {
-                            let operation = match mapping.operation {
-                                ASTMappingOperation::Insert => TextOperation::Insert,
-                                _ => TextOperation::Delete,
-                            };
-                            let mut pos = node.start_byte();
-                            let mut gap_start_point = node.start_position();
-                            let mut child_cursor = node.walk();
-                            for child in node.children(&mut child_cursor) {
-                                if child.start_byte() > pos
-                                    && !source.contents[pos..child.start_byte()].trim().is_empty()
-                                {
-                                    let gap_text = &source.contents[pos..child.start_byte()];
-                                    let gap_end = point_at_byte_offset(
-                                        gap_text,
-                                        gap_start_point,
-                                        gap_text.len(),
-                                    );
-                                    new_ranges.push(advance_and_build_range_with_source(
-                                        &mut last_non_move_range,
-                                        text_range_from_points(
-                                            gap_start_point,
-                                            gap_end,
-                                            &source_columns,
-                                        ),
-                                        operation.clone(),
-                                    ));
-                                }
-                                new_ranges.push(advance_and_build_range(
-                                    &mut last_non_move_range,
-                                    child,
-                                    &source_columns,
-                                    operation.clone(),
-                                ));
-                                pos = pos.max(child.end_byte());
-                                gap_start_point = child.end_position();
-                            }
-                            if node.end_byte() > pos
-                                && !source.contents[pos..node.end_byte()].trim().is_empty()
-                            {
-                                let gap_text = &source.contents[pos..node.end_byte()];
-                                let gap_end =
-                                    point_at_byte_offset(gap_text, gap_start_point, gap_text.len());
-                                new_ranges.push(advance_and_build_range_with_source(
-                                    &mut last_non_move_range,
-                                    text_range_from_points(
-                                        gap_start_point,
-                                        gap_end,
-                                        &source_columns,
-                                    ),
-                                    operation,
-                                ));
-                            }
-                            descend = false;
-                        }
-                        // See `intra_node_update_ranges`'s own doc comment for the sub-range
-                        // split (common prefix/middle/suffix) and why the prefix/suffix
-                        // `Identical` pieces get `destination_node`'s real position instead of
-                        // the placeholder `last_non_move_range` anchor every other arm here uses.
-                        ASTMappingOperation::Update => {
-                            if let Some(&destination_node) = node_cache.get_in_any(&mapped_id) {
-                                let source_text =
-                                    node.utf8_text(source.contents.as_bytes()).unwrap_or("");
-                                let destination_text = destination_node
-                                    .utf8_text(destination.contents.as_bytes())
-                                    .unwrap_or("");
-                                new_ranges = intra_node_update_ranges(
-                                    &mut last_non_move_range,
-                                    TextRange::from_treesitter_range(node.range(), &source_columns),
-                                    TextSpan {
-                                        text: source_text,
-                                        start: node.start_position(),
-                                        columns: &source_columns,
-                                    },
-                                    TextSpan {
-                                        text: destination_text,
-                                        start: destination_node.start_position(),
-                                        columns: &destination_columns,
-                                    },
-                                    source_is_before,
-                                    is_content_node(node.kind()),
-                                    whole_pair_updates,
-                                );
-                            } else {
-                                new_ranges.push(advance_and_build_range(
-                                    &mut last_non_move_range,
-                                    node,
-                                    &source_columns,
-                                    TextOperation::Update,
-                                ));
-                            }
-                        }
-                        // A node (e.g. a comment) whose *own* un-decomposed content differs from
-                        // its match - content not claimed by any of its children (`own_content`) -
-                        // beyond whitespace. Without this arm, the difference was invisible in the
-                        // rendered diff entirely: `MatchButNotIdentical` had no arm here at all
-                        // before, so a changed comment (real case: tree-sitter-rust's
-                        // `line_comment` has its own `//`-marker child, so the node carrying the
-                        // comment's actual words is this node itself, not a leaf `is_comment`-kind
-                        // node the `Update`/childless-`Delete`/childless-`Insert` arms above would
-                        // already catch) produced literally no range at all, confirmed by running
-                        // `codediff --headless` against a real file pair and seeing no diff
-                        // whatsoever for a comment-only text change.
-                        //
-                        // Deliberately `own_content`, not this node's *whole* text: a container
-                        // (e.g. a function `block` that gained a statement) also has
-                        // `MatchButNotIdentical` mappings, and its whole text almost always
-                        // differs too - but comparing only the gap text between its children
-                        // correctly finds nothing (containers rarely have real content outside
-                        // their named children), so this arm doesn't fire for them and the
-                        // existing descent finds the real, much smaller change instead. Confirmed
-                        // as a real, not hypothetical, false positive during development: an
-                        // earlier version of this fix compared each child's own `mapping.operation`
-                        // instead, which missed a statement moving one level deeper (still mapped
-                        // `Identical` at the AST level - only its rendered `TextOperation` becomes
-                        // `Move`, from the column shift, see the `Identical` arm above) and wrongly
-                        // treated the whole enclosing block as one giant `Update`.
-                        // See `intra_node_update_ranges`'s own doc comment for the sub-range
-                        // split. `own_content_span` (unlike `own_content`) needs the node's
-                        // content to sit in a single contiguous gap to report precise positions -
-                        // when it doesn't (multiple gaps), fall back to the pre-existing
-                        // whole-node placeholder behavior below.
-                        ASTMappingOperation::MatchButNotIdentical => {
-                            if let Some(&destination_node) = node_cache.get_in_any(&mapped_id) {
-                                let source_content = own_content(node, source.contents.as_bytes());
-                                let destination_content =
-                                    own_content(destination_node, destination.contents.as_bytes());
-                                if !whitespace_stripped_equal(&source_content, &destination_content)
-                                {
-                                    new_ranges = match (
-                                        own_content_span(node),
-                                        own_content_span(destination_node),
-                                    ) {
-                                        (
-                                            Some((s_start, s_from, s_to)),
-                                            Some((d_start, d_from, d_to)),
-                                        ) => intra_node_update_ranges(
-                                            &mut last_non_move_range,
-                                            TextRange::from_treesitter_range(
-                                                node.range(),
-                                                &source_columns,
-                                            ),
-                                            TextSpan {
-                                                text: &source.contents[s_from..s_to],
-                                                start: s_start,
-                                                columns: &source_columns,
-                                            },
-                                            TextSpan {
-                                                text: &destination.contents[d_from..d_to],
-                                                start: d_start,
-                                                columns: &destination_columns,
-                                            },
-                                            source_is_before,
-                                            is_content_node(node.kind()),
-                                            whole_pair_updates,
-                                        ),
-                                        _ => vec![advance_and_build_range(
-                                            &mut last_non_move_range,
-                                            node,
-                                            &source_columns,
-                                            TextOperation::Update,
-                                        )],
-                                    };
-                                    descend = false;
-                                }
-                            }
-                        }
-                        _ => {
-                            // For other operations, just allow the descent into the tree
-                        }
-                    }
-
-                    // A node that decomposed into more than one sub-range (see
-                    // `intra_node_update_ranges`) is pushed straight into `ranges`, bypassing the
-                    // usual same-operation-neighbor-merging accumulator below: that merging
-                    // depends on each side's own surrounding text via `can_extend_with_whitespace`,
-                    // which can differ between the before->after and after->before traversals and
-                    // would risk making the two sides' final range counts diverge even though
-                    // `intra_node_update_ranges` itself always produces a symmetric sub-range
-                    // count - see that function's doc comment. A single-range result (every other
-                    // arm, plus `intra_node_update_ranges`'s own no-common-affix fallback) is
-                    // exactly the pre-existing behavior and keeps going through the accumulator.
-                    if new_ranges.len() > 1 {
-                        if !current_range.is_zero() {
-                            ranges.push(current_range);
-                        }
-                        ranges.extend(new_ranges);
-                        current_range = RangeMatch::zero();
-                    } else {
-                        for new_range in new_ranges {
-                            if new_range.extends(&current_range, &source_text, &destination_text) {
-                                current_range.extend_into(&new_range);
-                            } else {
-                                if !current_range.is_zero() {
-                                    ranges.push(current_range);
-                                }
-                                current_range = new_range;
-                            }
-                        }
-                    }
-
-                    if !descend {
-                        continue;
-                    }
-                }
-
-                // Reverse order to ensure the stack is in tree pre-order.
-                let mut child_cursor = node.walk();
-                let children: Vec<_> = node.children(&mut child_cursor).collect();
-                for child in children.into_iter().rev() {
-                    stack.push(child);
-                }
+impl RangeWalk<'_> {
+    /// Pre-order traversal of the source tree, painting every node with a known mapping and
+    /// descending only where [`Self::visit`] says the children still have to decide.
+    fn visit_tree(&mut self, root: Node) {
+        let mut stack = vec![root];
+        while let Some(node) = stack.pop() {
+            if !self.visit(node) {
+                continue;
             }
+            // Reverse order to ensure the stack is in tree pre-order.
+            let mut child_cursor = node.walk();
+            let children: Vec<_> = node.children(&mut child_cursor).collect();
+            for child in children.into_iter().rev() {
+                stack.push(child);
+            }
+        }
+        if !self.current_range.is_zero() {
+            let finished = std::mem::replace(&mut self.current_range, RangeMatch::zero());
+            self.ranges.push(finished);
+        }
+    }
 
-            if !current_range.is_zero() {
-                ranges.push(current_range);
+    /// Paints one node. Returns whether the traversal should descend into its children.
+    fn visit(&mut self, node: Node) -> bool {
+        let Some((mapped_id, mapping)) = self.diff.mapping_for_node(&node.id()) else {
+            return true;
+        };
+        let change = classify_node(
+            node,
+            mapped_id,
+            &mapping.operation,
+            self.node_cache,
+            self.source.contents.as_bytes(),
+            self.destination.contents.as_bytes(),
+        );
+        let (new_ranges, descend) = match change {
+            NodeChange::Identical(Some(destination_node)) => (
+                vec![self.identical_or_move(node, destination_node, mapping.reason)],
+                false,
+            ),
+            NodeChange::Identical(None) => (Vec::new(), true),
+            NodeChange::PrunedSubtree(operation) => (vec![self.placed(node, operation)], false),
+            NodeChange::Leaf(operation) => (vec![self.placed(node, operation)], true),
+            NodeChange::Update(Some(destination_node)) => {
+                (self.update_ranges(node, destination_node), true)
+            }
+            NodeChange::Update(None) => (vec![self.placed(node, TextOperation::Update)], true),
+            NodeChange::OwnContentChanged(destination_node) => (
+                self.own_content_update_ranges(node, destination_node),
+                false,
+            ),
+            NodeChange::Descend => match self.whole_content_prune(node, &mapping.operation) {
+                Some(operation) => (self.own_gap_ranges(node, operation), false),
+                None => (Vec::new(), true),
+            },
+        };
+        self.push(new_ranges);
+        descend
+    }
+
+    /// The `RangeMatch` for a non-Identical, non-Move node: anchored at `last_non_move_range`'s
+    /// right limit, since the node has no real destination-side counterpart to point at.
+    fn placed(&mut self, node: Node, operation: TextOperation) -> RangeMatch {
+        advance_and_build_range(
+            &mut self.last_non_move_range,
+            node,
+            &self.source_columns,
+            operation,
+        )
+    }
+
+    /// Appends a node's ranges to the output, merging same-operation neighbours.
+    ///
+    /// A node that decomposed into more than one sub-range (see `intra_node_update_ranges`) is
+    /// pushed straight into `ranges`, bypassing the usual same-operation-neighbor-merging
+    /// accumulator: that merging depends on each side's own surrounding text via
+    /// `can_extend_with_whitespace`, which can differ between the before->after and
+    /// after->before traversals and would risk making the two sides' final range counts diverge
+    /// even though `intra_node_update_ranges` itself always produces a symmetric sub-range count;
+    /// see that function's doc comment. A single-range result (every other arm, plus
+    /// `intra_node_update_ranges`'s own no-common-affix fallback) is exactly the pre-existing
+    /// behavior and keeps going through the accumulator.
+    fn push(&mut self, new_ranges: Vec<RangeMatch>) {
+        if new_ranges.len() > 1 {
+            if !self.current_range.is_zero() {
+                let finished = std::mem::replace(&mut self.current_range, RangeMatch::zero());
+                self.ranges.push(finished);
+            }
+            self.ranges.extend(new_ranges);
+            return;
+        }
+        for new_range in new_ranges {
+            if new_range.extends(
+                &self.current_range,
+                &self.source_text,
+                &self.destination_text,
+            ) {
+                self.current_range.extend_into(&new_range);
+            } else {
+                if !self.current_range.is_zero() {
+                    let finished = std::mem::replace(&mut self.current_range, RangeMatch::zero());
+                    self.ranges.push(finished);
+                }
+                self.current_range = new_range;
             }
         }
     }
 
-    ranges
+    /// An `Identical` node is rendered `Identical` when it sits where the sequential flow puts
+    /// it, and `Move` when its position says it was relocated. Only an `Identical` range
+    /// advances the `last_non_move_range` anchor.
+    fn identical_or_move(
+        &mut self,
+        node: Node,
+        destination_node: Node,
+        reason: ASTMappingReason,
+    ) -> RangeMatch {
+        let s = TextRange::from_treesitter_range(node.range(), &self.source_columns);
+        let d =
+            TextRange::from_treesitter_range(destination_node.range(), &self.destination_columns);
+
+        // A matched node whose column changed wasn't just shifted down by unrelated
+        // insertions/deletions elsewhere in the file (which leaves its column untouched) - it was
+        // actually relocated (e.g. reindented because it's now nested inside a new block). That's
+        // a Move, not an Identical range, and its destination must not become the new
+        // `last_non_move_range` anchor since its position is out of the normal sequential flow.
+        //
+        // A second, column-preserving relocation also counts: a node whose destination starts
+        // *before* the last sequential anchor crossed over earlier content - siblings reordered
+        // (e.g. two top-level functions swapped). Same-column row shifts from unrelated edits
+        // elsewhere never run backwards, so this can't fire for them. Restricted to nodes
+        // spanning a row boundary: sub-line tokens (a `}`, an operator) can legitimately match an
+        // earlier identical occurrence when matching is imperfect, and flagging those would
+        // paint noise, while a multi-row (or full-line) match landing backwards is a real
+        // reorder. Before this check, a pure sibling reorder produced no non-Identical range at
+        // all - the diff rendered as completely unchanged (the gap `DiffSummary::
+        // RefactorMovedOnly`'s doc comment used to describe).
+        let crossed_backwards = s.end_row > s.start_row
+            && (d.start_row, d.start_column)
+                < (
+                    self.last_non_move_range.start_row,
+                    self.last_non_move_range.start_column,
+                );
+        // A column change means the node was relocated - *unless* it is a multi-row node that
+        // stayed on its own starting row, in which case the shift is text inserted earlier on
+        // that line pushing it rightwards, and only its first row moved at all.
+        //
+        // Marking the whole subtree moved on that evidence over-reports by the size of the
+        // subtree: adding `const ` to one parameter used to paint an entire function body as
+        // moved (`cpp-add-const-correctness`, where the human paints only the inserted `const`).
+        //
+        // The two exclusions are both load-bearing, and each was put here by a measurement:
+        //
+        // * single-row nodes keep the old treatment - the painted corpus holds 16 human-painted
+        //   moves that are column-only on one row, across six fixtures, so the rule is right
+        //   there;
+        // * a multi-row node that *also* changed rows keeps it too - that is a real relocation,
+        //   and excluding it regressed `rust-add-if` (a block genuinely moved into a new `if`)
+        //   from 0.7% to 56.5% disagreement with its painting.
+        let shifted_within_its_own_line = s.start_row == d.start_row && s.end_row > s.start_row;
+        // A single-row node pushed sideways by an edit *elsewhere on its own row* is not a Move
+        // either: `void process(int x)` -> `void process(const int x)` shifts `int x` by six
+        // columns, and the human paints only the inserted `const`. The test is that the node lies
+        // wholly inside the common prefix or common suffix of its source row and destination row
+        // - its own text is untouched and the row's one edit is beside it. A node inside the
+        // *rewritten* part of the row keeps the Move treatment: `function fetchData(callback:
+        // ...): void {` -> `async function fetchData(): Promise<string> {` shifts `function
+        // fetchData(` the same way, but the row was rewritten around it and its painter calls
+        // the surviving fragments moved (`typescript-async-await`, which a plain
+        // same-row-same-indent rule regressed 27.5% -> 36.1% on 2026-09-01, the fourth attempt
+        // at this shape; the three before it are in the fix log). Restricted to nodes that
+        // stayed on their own row and were not reindented, so a reindent-only move keeps
+        // reaching `paint_reindent_only_moves` below.
+        let shifted_by_an_edit_beside_it = s.end_row == s.start_row
+            && s.start_row == d.start_row
+            && node_untouched_on_its_row(&self.source.contents, &self.destination.contents, &s, &d);
+        let column_shift_is_meaningful = s.start_column != d.start_column
+            && !shifted_within_its_own_line
+            && !shifted_by_an_edit_beside_it;
+        // `NestedConditionCollapse`/`WrapGrowth` mark a node whose relocation is *known*, by
+        // construction, to be a pure reindent - see `solve_nested_condition_collapse`'s and
+        // `solve_wrap_growth`'s own doc comments. Deliberately narrow (only these specific,
+        // pre-verified reasons, never a bare column-shift check): the general heuristic above
+        // cannot tell a pure reindent from a genuine relocation by position alone -
+        // `rust-add-if`'s own shape is exactly the counter-example that ruled that out, which is
+        // why it's included here by *verified reason* (`WrapGrowth`) rather than by loosening the
+        // position-based heuristic itself.
+        let known_pure_reindent = !self.paint_reindent_only_moves
+            && matches!(
+                reason,
+                ASTMappingReason::NestedConditionCollapse | ASTMappingReason::WrapGrowth
+            );
+        // Unlike `NestedConditionCollapse` above, not gated by `paint_reindent_only_moves`: this
+        // tag only fires when a class's or interface's body is byte-identical and its shift is
+        // verified to come entirely from a newly-inserted heritage clause (see
+        // `solve_heritage_clause_growth`'s doc comment), and both `MINIMAL` and `FULL` ground
+        // truth agree it should never paint `Move` (measured on `typescript-refactor-interface`)
+        // - a correctness fix, not a preference.
+        let known_pure_relocation = reason == ASTMappingReason::HeritageClauseGrowth;
+        let operation = if (!column_shift_is_meaningful && !crossed_backwards)
+            || known_pure_reindent
+            || known_pure_relocation
+        {
+            self.last_non_move_range = d.clone();
+            TextOperation::Identical
+        } else {
+            TextOperation::Move
+        };
+        RangeMatch {
+            source: s,
+            destination: d,
+            operation,
+        }
+    }
+
+    /// An `Update` node: the common prefix/middle/suffix split of `intra_node_update_ranges`
+    /// (see its doc comment for why the prefix/suffix `Identical` pieces get the destination
+    /// node's real position instead of the placeholder `last_non_move_range` anchor every other
+    /// placed range uses).
+    fn update_ranges(&mut self, node: Node, destination_node: Node) -> Vec<RangeMatch> {
+        let source_text = node
+            .utf8_text(self.source.contents.as_bytes())
+            .unwrap_or("");
+        let destination_text = destination_node
+            .utf8_text(self.destination.contents.as_bytes())
+            .unwrap_or("");
+        intra_node_update_ranges(
+            &mut self.last_non_move_range,
+            TextRange::from_treesitter_range(node.range(), &self.source_columns),
+            TextSpan {
+                text: source_text,
+                start: node.start_position(),
+                columns: &self.source_columns,
+            },
+            TextSpan {
+                text: destination_text,
+                start: destination_node.start_position(),
+                columns: &self.destination_columns,
+            },
+            self.source_is_before,
+            is_content_node(node.kind()),
+            self.whole_pair_updates,
+        )
+    }
+
+    /// A node (e.g. a comment) whose *own* un-decomposed content differs from its match - content
+    /// not claimed by any of its children (`own_content`) - beyond whitespace. Without this, the
+    /// difference was invisible in the rendered diff entirely: a changed comment (real case:
+    /// tree-sitter-rust's `line_comment` has its own `//`-marker child, so the node carrying the
+    /// comment's actual words is this node itself, not a leaf `is_comment`-kind node the
+    /// `Update`/childless-`Delete`/childless-`Insert` cases would already catch) produced
+    /// literally no range at all, confirmed by running `codediff --headless` against a real file
+    /// pair and seeing no diff whatsoever for a comment-only text change.
+    ///
+    /// `own_content_span` (unlike `own_content`) needs the node's content to sit in a single
+    /// contiguous gap to report precise positions - when it doesn't (multiple gaps), this falls
+    /// back to the whole-node placeholder range.
+    fn own_content_update_ranges(&mut self, node: Node, destination_node: Node) -> Vec<RangeMatch> {
+        match (own_content_span(node), own_content_span(destination_node)) {
+            (Some((s_start, s_from, s_to)), Some((d_start, d_from, d_to))) => {
+                intra_node_update_ranges(
+                    &mut self.last_non_move_range,
+                    TextRange::from_treesitter_range(node.range(), &self.source_columns),
+                    TextSpan {
+                        text: &self.source.contents[s_from..s_to],
+                        start: s_start,
+                        columns: &self.source_columns,
+                    },
+                    TextSpan {
+                        text: &self.destination.contents[d_from..d_to],
+                        start: d_start,
+                        columns: &self.destination_columns,
+                    },
+                    self.source_is_before,
+                    is_content_node(node.kind()),
+                    self.whole_pair_updates,
+                )
+            }
+            _ => vec![self.placed(node, TextOperation::Update)],
+        }
+    }
+
+    /// Whether a non-leaf `Insert`/`Delete` node is a wholly-new-or-removed *content* node - a
+    /// comment, e.g. `// Early termination optimization`, whose grammar splits it into a marker
+    /// leaf (`//`) plus un-decomposed trailing text - and so has to be painted by
+    /// [`Self::own_gap_ranges`] rather than by descending. The same shape `own_content`/
+    /// `own_content_span` exist for on the `MatchButNotIdentical` case, but for a *whole* node
+    /// insertion/deletion rather than a changed one. Without this, the childless-leaf case only
+    /// ever painted the marker (`//`), and the comment's actual words (not covered by any child)
+    /// were silently dropped: confirmed on `rust-cost-optimization`, where a brand-new `// Early
+    /// termination optimization` comment rendered with only its `//` highlighted and the rest in
+    /// plain, unpainted text.
+    ///
+    /// Three guards, each load-bearing:
+    ///
+    /// * every direct child must itself be a leaf (`child_count() == 0` - true for a marker token
+    ///   like `//` or a quote character, false for anything with real internal structure this
+    ///   has no business re-deciding);
+    /// * `is_content_node` gates this the same way it gates `intra_node_update_ranges`'s affix
+    ///   split: only comments/literals/strings have meaningful text living in a node's own gaps
+    ///   rather than in a named child, so this never fires for a container (a `block`, a
+    ///   `class_body`) gaining or losing a whole child - that shape already renders correctly via
+    ///   the childless-leaf case recursing normally;
+    /// * `own_content_span(node).is_some_and(...)` keeps this from firing on a node whose
+    ///   children already fully reconstruct it with no real gap at all (a Java `string_literal`
+    ///   made of a `"` / `string_fragment` / `"` triple with nothing between them, extremely
+    ///   common, unlike a genuinely gappy comment). Confirmed as a real regression: an earlier
+    ///   version fired there too and, despite painting every one of those three children
+    ///   correctly on their own, the multi-range bypass in [`Self::push`] skipped the accumulator
+    ///   that silently absorbs a *whitespace-only* gap into an adjacent Insert/Delete range - so
+    ///   cutting a no-gap node over to the bypass path dropped whitespace at its *boundary* with
+    ///   a sibling (a single space between a string literal and a `+` in `"Dividing " + a`) that
+    ///   isn't part of this node at all. Regressed `java-add-logging` from exact agreement to six
+    ///   dropped bytes before this guard was added.
+    fn whole_content_prune(
+        &self,
+        node: Node,
+        operation: &ASTMappingOperation,
+    ) -> Option<TextOperation> {
+        let operation = match operation {
+            ASTMappingOperation::Insert => TextOperation::Insert,
+            ASTMappingOperation::Delete => TextOperation::Delete,
+            _ => return None,
+        };
+        let fires = node.child_count() > 0
+            && is_content_node(node.kind())
+            && node
+                .children(&mut node.walk())
+                .all(|c| c.child_count() == 0)
+            && own_content_span(node)
+                .is_some_and(|(_, from, to)| !self.source.contents[from..to].trim().is_empty());
+        fires.then_some(operation)
+    }
+
+    /// The ordered ranges of a [`Self::whole_content_prune`] node: each child's own range
+    /// interleaved with any real (non-whitespace) gap text around it, computed in one pass here so
+    /// the children are not visited (and painted) a second time.
+    ///
+    /// One pass, not the gap here and the children on their own turns: this node's own gap text
+    /// sits *after* its children in the file, but the surrounding pre-order walk would visit
+    /// those children in a later iteration, so pushing the gap range now and the children's
+    /// ranges later would insert the gap into `ranges` out of byte order - corrupting every
+    /// `last_non_move_range` anchor computed afterward.
+    fn own_gap_ranges(&mut self, node: Node, operation: TextOperation) -> Vec<RangeMatch> {
+        let mut new_ranges = Vec::new();
+        let mut pos = node.start_byte();
+        let mut gap_start_point = node.start_position();
+        let mut child_cursor = node.walk();
+        for child in node.children(&mut child_cursor) {
+            if child.start_byte() > pos {
+                new_ranges.extend(self.gap_range(
+                    pos,
+                    child.start_byte(),
+                    gap_start_point,
+                    &operation,
+                ));
+            }
+            new_ranges.push(self.placed(child, operation.clone()));
+            pos = pos.max(child.end_byte());
+            gap_start_point = child.end_position();
+        }
+        if node.end_byte() > pos {
+            new_ranges.extend(self.gap_range(pos, node.end_byte(), gap_start_point, &operation));
+        }
+        new_ranges
+    }
+
+    /// The range for the gap text `from..to` starting at `start`, if it holds anything but
+    /// whitespace.
+    fn gap_range(
+        &mut self,
+        from: usize,
+        to: usize,
+        start: Point,
+        operation: &TextOperation,
+    ) -> Option<RangeMatch> {
+        let gap_text = &self.source.contents[from..to];
+        if gap_text.trim().is_empty() {
+            return None;
+        }
+        let gap_end = point_at_byte_offset(gap_text, start, gap_text.len());
+        Some(advance_and_build_range_with_source(
+            &mut self.last_non_move_range,
+            text_range_from_points(start, gap_end, &self.source_columns),
+            operation.clone(),
+        ))
+    }
 }
 
 /// True if the single-row node at `s` (in `source`) / `d` (in `destination`) lies wholly inside
