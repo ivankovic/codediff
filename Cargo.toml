@@ -74,7 +74,7 @@ unicode-width = "0.1.14"
 # tools (commit_stats.rs, file_stats.rs) - gated the same way for the same reason: the main
 # codediff binary/library has no use for it, so it shouldn't be a mandatory build-time cost for
 # every `cargo install`/library consumer.
-rusqlite = { version = "0.37.0", features = ["bundled"], optional = true }
+rusqlite = { version = "0.40.2", features = ["bundled"], optional = true }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0"
 # Only used by tests and the `test-fixtures` helpers - gated like regex above, for the same reason.
