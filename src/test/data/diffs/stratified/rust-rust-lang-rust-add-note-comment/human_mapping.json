@@ -1,0 +1,1373 @@
+{
+  "entries": [
+    {
+      "operation": "insert_with_children",
+      "after_path": [
+        "struct_item:1",
+        "line_comment:4"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [],
+      "after_path": []
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "line_comment:1"
+      ],
+      "after_path": [
+        "line_comment:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "line_comment:1",
+        "//:1"
+      ],
+      "after_path": [
+        "line_comment:1",
+        "//:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "line_comment:2"
+      ],
+      "after_path": [
+        "line_comment:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "line_comment:2",
+        "//:1"
+      ],
+      "after_path": [
+        "line_comment:2",
+        "//:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "inner_attribute_item:1"
+      ],
+      "after_path": [
+        "inner_attribute_item:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "inner_attribute_item:1",
+        "#:1"
+      ],
+      "after_path": [
+        "inner_attribute_item:1",
+        "#:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "inner_attribute_item:1",
+        "!:1"
+      ],
+      "after_path": [
+        "inner_attribute_item:1",
+        "!:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "inner_attribute_item:1",
+        "[:1"
+      ],
+      "after_path": [
+        "inner_attribute_item:1",
+        "[:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "inner_attribute_item:1",
+        "attribute:1"
+      ],
+      "after_path": [
+        "inner_attribute_item:1",
+        "attribute:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "inner_attribute_item:1",
+        "attribute:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "inner_attribute_item:1",
+        "attribute:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "inner_attribute_item:1",
+        "attribute:1",
+        "token_tree:1"
+      ],
+      "after_path": [
+        "inner_attribute_item:1",
+        "attribute:1",
+        "token_tree:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "inner_attribute_item:1",
+        "attribute:1",
+        "token_tree:1",
+        "(:1"
+      ],
+      "after_path": [
+        "inner_attribute_item:1",
+        "attribute:1",
+        "token_tree:1",
+        "(:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "inner_attribute_item:1",
+        "attribute:1",
+        "token_tree:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "inner_attribute_item:1",
+        "attribute:1",
+        "token_tree:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "inner_attribute_item:1",
+        "attribute:1",
+        "token_tree:1",
+        "):1"
+      ],
+      "after_path": [
+        "inner_attribute_item:1",
+        "attribute:1",
+        "token_tree:1",
+        "):1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "inner_attribute_item:1",
+        "]:1"
+      ],
+      "after_path": [
+        "inner_attribute_item:1",
+        "]:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "inner_attribute_item:2"
+      ],
+      "after_path": [
+        "inner_attribute_item:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "inner_attribute_item:2",
+        "#:1"
+      ],
+      "after_path": [
+        "inner_attribute_item:2",
+        "#:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "inner_attribute_item:2",
+        "!:1"
+      ],
+      "after_path": [
+        "inner_attribute_item:2",
+        "!:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "inner_attribute_item:2",
+        "[:1"
+      ],
+      "after_path": [
+        "inner_attribute_item:2",
+        "[:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "inner_attribute_item:2",
+        "attribute:1"
+      ],
+      "after_path": [
+        "inner_attribute_item:2",
+        "attribute:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "inner_attribute_item:2",
+        "attribute:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "inner_attribute_item:2",
+        "attribute:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "inner_attribute_item:2",
+        "attribute:1",
+        "token_tree:1"
+      ],
+      "after_path": [
+        "inner_attribute_item:2",
+        "attribute:1",
+        "token_tree:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "inner_attribute_item:2",
+        "attribute:1",
+        "token_tree:1",
+        "(:1"
+      ],
+      "after_path": [
+        "inner_attribute_item:2",
+        "attribute:1",
+        "token_tree:1",
+        "(:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "inner_attribute_item:2",
+        "attribute:1",
+        "token_tree:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "inner_attribute_item:2",
+        "attribute:1",
+        "token_tree:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "inner_attribute_item:2",
+        "attribute:1",
+        "token_tree:1",
+        "):1"
+      ],
+      "after_path": [
+        "inner_attribute_item:2",
+        "attribute:1",
+        "token_tree:1",
+        "):1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "inner_attribute_item:2",
+        "]:1"
+      ],
+      "after_path": [
+        "inner_attribute_item:2",
+        "]:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "attribute_item:1"
+      ],
+      "after_path": [
+        "attribute_item:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "attribute_item:1",
+        "#:1"
+      ],
+      "after_path": [
+        "attribute_item:1",
+        "#:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "attribute_item:1",
+        "[:1"
+      ],
+      "after_path": [
+        "attribute_item:1",
+        "[:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "attribute_item:1",
+        "attribute:1"
+      ],
+      "after_path": [
+        "attribute_item:1",
+        "attribute:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "attribute_item:1",
+        "attribute:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "attribute_item:1",
+        "attribute:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "attribute_item:1",
+        "]:1"
+      ],
+      "after_path": [
+        "attribute_item:1",
+        "]:1"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "struct_item:1"
+      ],
+      "after_path": [
+        "struct_item:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "struct:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "struct:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "type_identifier:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "type_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "type_parameters:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "type_parameters:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "type_parameters:1",
+        "<:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "type_parameters:1",
+        "<:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "type_parameters:1",
+        "const_parameter:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "type_parameters:1",
+        "const_parameter:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "type_parameters:1",
+        "const_parameter:1",
+        "const:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "type_parameters:1",
+        "const_parameter:1",
+        "const:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "type_parameters:1",
+        "const_parameter:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "type_parameters:1",
+        "const_parameter:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "type_parameters:1",
+        "const_parameter:1",
+        "::1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "type_parameters:1",
+        "const_parameter:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "type_parameters:1",
+        "const_parameter:1",
+        "reference_type:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "type_parameters:1",
+        "const_parameter:1",
+        "reference_type:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "type_parameters:1",
+        "const_parameter:1",
+        "reference_type:1",
+        "&:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "type_parameters:1",
+        "const_parameter:1",
+        "reference_type:1",
+        "&:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "type_parameters:1",
+        "const_parameter:1",
+        "reference_type:1",
+        "lifetime:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "type_parameters:1",
+        "const_parameter:1",
+        "reference_type:1",
+        "lifetime:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "type_parameters:1",
+        "const_parameter:1",
+        "reference_type:1",
+        "lifetime:1",
+        "':1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "type_parameters:1",
+        "const_parameter:1",
+        "reference_type:1",
+        "lifetime:1",
+        "':1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "type_parameters:1",
+        "const_parameter:1",
+        "reference_type:1",
+        "lifetime:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "type_parameters:1",
+        "const_parameter:1",
+        "reference_type:1",
+        "lifetime:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "type_parameters:1",
+        "const_parameter:1",
+        "reference_type:1",
+        "array_type:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "type_parameters:1",
+        "const_parameter:1",
+        "reference_type:1",
+        "array_type:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "type_parameters:1",
+        "const_parameter:1",
+        "reference_type:1",
+        "array_type:1",
+        "[:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "type_parameters:1",
+        "const_parameter:1",
+        "reference_type:1",
+        "array_type:1",
+        "[:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "type_parameters:1",
+        "const_parameter:1",
+        "reference_type:1",
+        "array_type:1",
+        "pointer_type:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "type_parameters:1",
+        "const_parameter:1",
+        "reference_type:1",
+        "array_type:1",
+        "pointer_type:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "type_parameters:1",
+        "const_parameter:1",
+        "reference_type:1",
+        "array_type:1",
+        "pointer_type:1",
+        "*:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "type_parameters:1",
+        "const_parameter:1",
+        "reference_type:1",
+        "array_type:1",
+        "pointer_type:1",
+        "*:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "type_parameters:1",
+        "const_parameter:1",
+        "reference_type:1",
+        "array_type:1",
+        "pointer_type:1",
+        "mutable_specifier:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "type_parameters:1",
+        "const_parameter:1",
+        "reference_type:1",
+        "array_type:1",
+        "pointer_type:1",
+        "mutable_specifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "type_parameters:1",
+        "const_parameter:1",
+        "reference_type:1",
+        "array_type:1",
+        "pointer_type:1",
+        "primitive_type:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "type_parameters:1",
+        "const_parameter:1",
+        "reference_type:1",
+        "array_type:1",
+        "pointer_type:1",
+        "primitive_type:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "type_parameters:1",
+        "const_parameter:1",
+        "reference_type:1",
+        "array_type:1",
+        ";:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "type_parameters:1",
+        "const_parameter:1",
+        "reference_type:1",
+        "array_type:1",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "type_parameters:1",
+        "const_parameter:1",
+        "reference_type:1",
+        "array_type:1",
+        "integer_literal:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "type_parameters:1",
+        "const_parameter:1",
+        "reference_type:1",
+        "array_type:1",
+        "integer_literal:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "type_parameters:1",
+        "const_parameter:1",
+        "reference_type:1",
+        "array_type:1",
+        "]:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "type_parameters:1",
+        "const_parameter:1",
+        "reference_type:1",
+        "array_type:1",
+        "]:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "type_parameters:1",
+        ">:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "type_parameters:1",
+        ">:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "line_comment:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "line_comment:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "line_comment:1",
+        "//:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "line_comment:1",
+        "//:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "line_comment:2"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "line_comment:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "line_comment:2",
+        "//:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "line_comment:2",
+        "//:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "line_comment:3"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "line_comment:3"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "line_comment:3",
+        "//:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "line_comment:3",
+        "//:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "ERROR:1",
+        "where_clause:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "ERROR:1",
+        "where_clause:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "ERROR:1",
+        "where_clause:1",
+        "where:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "ERROR:1",
+        "where_clause:1",
+        "where:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "ERROR:1",
+        "where_clause:1",
+        "where_predicate:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "ERROR:1",
+        "where_clause:1",
+        "where_predicate:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "ERROR:1",
+        "where_clause:1",
+        "where_predicate:1",
+        "generic_type:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "ERROR:1",
+        "where_clause:1",
+        "where_predicate:1",
+        "generic_type:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "ERROR:1",
+        "where_clause:1",
+        "where_predicate:1",
+        "generic_type:1",
+        "type_identifier:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "ERROR:1",
+        "where_clause:1",
+        "where_predicate:1",
+        "generic_type:1",
+        "type_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "ERROR:1",
+        "where_clause:1",
+        "where_predicate:1",
+        "generic_type:1",
+        "type_arguments:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "ERROR:1",
+        "where_clause:1",
+        "where_predicate:1",
+        "generic_type:1",
+        "type_arguments:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "ERROR:1",
+        "where_clause:1",
+        "where_predicate:1",
+        "generic_type:1",
+        "type_arguments:1",
+        "<:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "ERROR:1",
+        "where_clause:1",
+        "where_predicate:1",
+        "generic_type:1",
+        "type_arguments:1",
+        "<:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "ERROR:1",
+        "where_clause:1",
+        "where_predicate:1",
+        "generic_type:1",
+        "type_arguments:1",
+        "string_literal:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "ERROR:1",
+        "where_clause:1",
+        "where_predicate:1",
+        "generic_type:1",
+        "type_arguments:1",
+        "string_literal:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "ERROR:1",
+        "where_clause:1",
+        "where_predicate:1",
+        "generic_type:1",
+        "type_arguments:1",
+        "string_literal:1",
+        "\":1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "ERROR:1",
+        "where_clause:1",
+        "where_predicate:1",
+        "generic_type:1",
+        "type_arguments:1",
+        "string_literal:1",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "ERROR:1",
+        "where_clause:1",
+        "where_predicate:1",
+        "generic_type:1",
+        "type_arguments:1",
+        "string_literal:1",
+        "string_content:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "ERROR:1",
+        "where_clause:1",
+        "where_predicate:1",
+        "generic_type:1",
+        "type_arguments:1",
+        "string_literal:1",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "ERROR:1",
+        "where_clause:1",
+        "where_predicate:1",
+        "generic_type:1",
+        "type_arguments:1",
+        "string_literal:1",
+        "\":2"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "ERROR:1",
+        "where_clause:1",
+        "where_predicate:1",
+        "generic_type:1",
+        "type_arguments:1",
+        "string_literal:1",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "ERROR:1",
+        "where_clause:1",
+        "where_predicate:1",
+        "generic_type:1",
+        "type_arguments:1",
+        ">:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "ERROR:1",
+        "where_clause:1",
+        "where_predicate:1",
+        "generic_type:1",
+        "type_arguments:1",
+        ">:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "ERROR:1",
+        "where_clause:1",
+        "where_predicate:1",
+        "trait_bounds:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "ERROR:1",
+        "where_clause:1",
+        "where_predicate:1",
+        "trait_bounds:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "ERROR:1",
+        "where_clause:1",
+        "where_predicate:1",
+        "trait_bounds:1",
+        "::1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "ERROR:1",
+        "where_clause:1",
+        "where_predicate:1",
+        "trait_bounds:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "ERROR:1",
+        "where_clause:1",
+        "where_predicate:1",
+        "trait_bounds:1",
+        "type_identifier:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "ERROR:1",
+        "where_clause:1",
+        "where_predicate:1",
+        "trait_bounds:1",
+        "type_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        ";:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "line_comment:3"
+      ],
+      "after_path": [
+        "line_comment:3"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "line_comment:3",
+        "//:1"
+      ],
+      "after_path": [
+        "line_comment:3",
+        "//:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "line_comment:4"
+      ],
+      "after_path": [
+        "line_comment:4"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "line_comment:4",
+        "//:1"
+      ],
+      "after_path": [
+        "line_comment:4",
+        "//:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "line_comment:5"
+      ],
+      "after_path": [
+        "line_comment:5"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "line_comment:5",
+        "//:1"
+      ],
+      "after_path": [
+        "line_comment:5",
+        "//:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "line_comment:6"
+      ],
+      "after_path": [
+        "line_comment:6"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "line_comment:6",
+        "//:1"
+      ],
+      "after_path": [
+        "line_comment:6",
+        "//:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "function_item:1"
+      ],
+      "after_path": [
+        "function_item:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "function_item:1",
+        "fn:1"
+      ],
+      "after_path": [
+        "function_item:1",
+        "fn:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "function_item:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "function_item:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "function_item:1",
+        "parameters:1"
+      ],
+      "after_path": [
+        "function_item:1",
+        "parameters:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "function_item:1",
+        "parameters:1",
+        "(:1"
+      ],
+      "after_path": [
+        "function_item:1",
+        "parameters:1",
+        "(:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "function_item:1",
+        "parameters:1",
+        "):1"
+      ],
+      "after_path": [
+        "function_item:1",
+        "parameters:1",
+        "):1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "function_item:1",
+        "block:1"
+      ],
+      "after_path": [
+        "function_item:1",
+        "block:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "function_item:1",
+        "block:1",
+        "{:1"
+      ],
+      "after_path": [
+        "function_item:1",
+        "block:1",
+        "{:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "function_item:1",
+        "block:1",
+        "}:1"
+      ],
+      "after_path": [
+        "function_item:1",
+        "block:1",
+        "}:1"
+      ]
+    }
+  ],
+  "text_mappings": [
+    {
+      "name": "Only one solution",
+      "entries": [
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 11,
+              "start_column": 0,
+              "end_row": 11,
+              "end_column": 2
+            }
+          ]
+        },
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 11,
+              "start_column": 2,
+              "end_row": 12,
+              "end_column": 0
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

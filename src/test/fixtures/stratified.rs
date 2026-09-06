@@ -193,9 +193,25 @@ mod rust_gyulyvgc_sniffnet_add_mod_3;
 #[cfg(test)]
 mod rust_gyulyvgc_sniffnet_remoev_attribute;
 #[cfg(test)]
+mod rust_rust_lang_rust_add_note_comment;
+#[cfg(test)]
 mod rust_rust_lang_rust_change_use;
 #[cfg(test)]
+mod rust_rust_lang_rust_remove_min_version_comment;
+#[cfg(test)]
+mod rust_rust_lang_rust_remove_starting_comment;
+#[cfg(test)]
+mod rust_rust_lang_rust_remove_warn_comment;
+#[cfg(test)]
+mod rust_rust_lang_rust_remove_warn_comment_2;
+#[cfg(test)]
+mod rust_rust_lang_rust_remove_warn_comment_3;
+#[cfg(test)]
+mod rust_rust_lang_rust_remove_warn_comments;
+#[cfg(test)]
 mod rust_rust_lang_rust_update_comment;
+#[cfg(test)]
+mod rust_tauri_apps_tauri_add_use_and_function;
 #[cfg(test)]
 mod rust_tauri_apps_tauri_rename_mod;
 #[cfg(test)]

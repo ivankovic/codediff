@@ -1,0 +1,1817 @@
+{
+  "entries": [
+    {
+      "operation": "insert",
+      "after_path": [
+        "use_declaration:1",
+        "scoped_use_list:1",
+        "use_list:1",
+        "identifier:2"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "use_declaration:1",
+        "scoped_use_list:1",
+        "use_list:1",
+        ",:2"
+      ]
+    },
+    {
+      "operation": "insert_with_children",
+      "after_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "line_comment:5"
+      ]
+    },
+    {
+      "operation": "insert_with_children",
+      "after_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "field_declaration:4"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        ",:4"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [],
+      "after_path": []
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "line_comment:1"
+      ],
+      "after_path": [
+        "line_comment:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "line_comment:1",
+        "//:1"
+      ],
+      "after_path": [
+        "line_comment:1",
+        "//:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "line_comment:2"
+      ],
+      "after_path": [
+        "line_comment:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "line_comment:2",
+        "//:1"
+      ],
+      "after_path": [
+        "line_comment:2",
+        "//:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "line_comment:3"
+      ],
+      "after_path": [
+        "line_comment:3"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "line_comment:3",
+        "//:1"
+      ],
+      "after_path": [
+        "line_comment:3",
+        "//:1"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "use_declaration:1"
+      ],
+      "after_path": [
+        "use_declaration:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "use_declaration:1",
+        "use:1"
+      ],
+      "after_path": [
+        "use_declaration:1",
+        "use:1"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "use_declaration:1",
+        "scoped_use_list:1"
+      ],
+      "after_path": [
+        "use_declaration:1",
+        "scoped_use_list:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "use_declaration:1",
+        "scoped_use_list:1",
+        "scoped_identifier:1"
+      ],
+      "after_path": [
+        "use_declaration:1",
+        "scoped_use_list:1",
+        "scoped_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "use_declaration:1",
+        "scoped_use_list:1",
+        "scoped_identifier:1",
+        "crate:1"
+      ],
+      "after_path": [
+        "use_declaration:1",
+        "scoped_use_list:1",
+        "scoped_identifier:1",
+        "crate:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "use_declaration:1",
+        "scoped_use_list:1",
+        "scoped_identifier:1",
+        ":::1"
+      ],
+      "after_path": [
+        "use_declaration:1",
+        "scoped_use_list:1",
+        "scoped_identifier:1",
+        ":::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "use_declaration:1",
+        "scoped_use_list:1",
+        "scoped_identifier:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "use_declaration:1",
+        "scoped_use_list:1",
+        "scoped_identifier:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "use_declaration:1",
+        "scoped_use_list:1",
+        ":::1"
+      ],
+      "after_path": [
+        "use_declaration:1",
+        "scoped_use_list:1",
+        ":::1"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "use_declaration:1",
+        "scoped_use_list:1",
+        "use_list:1"
+      ],
+      "after_path": [
+        "use_declaration:1",
+        "scoped_use_list:1",
+        "use_list:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "use_declaration:1",
+        "scoped_use_list:1",
+        "use_list:1",
+        "{:1"
+      ],
+      "after_path": [
+        "use_declaration:1",
+        "scoped_use_list:1",
+        "use_list:1",
+        "{:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "use_declaration:1",
+        "scoped_use_list:1",
+        "use_list:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "use_declaration:1",
+        "scoped_use_list:1",
+        "use_list:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "use_declaration:1",
+        "scoped_use_list:1",
+        "use_list:1",
+        ",:1"
+      ],
+      "after_path": [
+        "use_declaration:1",
+        "scoped_use_list:1",
+        "use_list:1",
+        ",:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "use_declaration:1",
+        "scoped_use_list:1",
+        "use_list:1",
+        "identifier:2"
+      ],
+      "after_path": [
+        "use_declaration:1",
+        "scoped_use_list:1",
+        "use_list:1",
+        "identifier:3"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "use_declaration:1",
+        "scoped_use_list:1",
+        "use_list:1",
+        "}:1"
+      ],
+      "after_path": [
+        "use_declaration:1",
+        "scoped_use_list:1",
+        "use_list:1",
+        "}:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "use_declaration:1",
+        ";:1"
+      ],
+      "after_path": [
+        "use_declaration:1",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "line_comment:4"
+      ],
+      "after_path": [
+        "line_comment:4"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "line_comment:4",
+        "//:1"
+      ],
+      "after_path": [
+        "line_comment:4",
+        "//:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "line_comment:4",
+        "outer_doc_comment_marker:1"
+      ],
+      "after_path": [
+        "line_comment:4",
+        "outer_doc_comment_marker:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "line_comment:4",
+        "outer_doc_comment_marker:1",
+        "/:1"
+      ],
+      "after_path": [
+        "line_comment:4",
+        "outer_doc_comment_marker:1",
+        "/:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "line_comment:4",
+        "doc_comment:1"
+      ],
+      "after_path": [
+        "line_comment:4",
+        "doc_comment:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "attribute_item:1"
+      ],
+      "after_path": [
+        "attribute_item:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "attribute_item:1",
+        "#:1"
+      ],
+      "after_path": [
+        "attribute_item:1",
+        "#:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "attribute_item:1",
+        "[:1"
+      ],
+      "after_path": [
+        "attribute_item:1",
+        "[:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "attribute_item:1",
+        "attribute:1"
+      ],
+      "after_path": [
+        "attribute_item:1",
+        "attribute:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "attribute_item:1",
+        "attribute:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "attribute_item:1",
+        "attribute:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "attribute_item:1",
+        "attribute:1",
+        "token_tree:1"
+      ],
+      "after_path": [
+        "attribute_item:1",
+        "attribute:1",
+        "token_tree:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "attribute_item:1",
+        "attribute:1",
+        "token_tree:1",
+        "(:1"
+      ],
+      "after_path": [
+        "attribute_item:1",
+        "attribute:1",
+        "token_tree:1",
+        "(:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "attribute_item:1",
+        "attribute:1",
+        "token_tree:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "attribute_item:1",
+        "attribute:1",
+        "token_tree:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "attribute_item:1",
+        "attribute:1",
+        "token_tree:1",
+        ",:1"
+      ],
+      "after_path": [
+        "attribute_item:1",
+        "attribute:1",
+        "token_tree:1",
+        ",:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "attribute_item:1",
+        "attribute:1",
+        "token_tree:1",
+        "identifier:2"
+      ],
+      "after_path": [
+        "attribute_item:1",
+        "attribute:1",
+        "token_tree:1",
+        "identifier:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "attribute_item:1",
+        "attribute:1",
+        "token_tree:1",
+        "):1"
+      ],
+      "after_path": [
+        "attribute_item:1",
+        "attribute:1",
+        "token_tree:1",
+        "):1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "attribute_item:1",
+        "]:1"
+      ],
+      "after_path": [
+        "attribute_item:1",
+        "]:1"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "struct_item:1"
+      ],
+      "after_path": [
+        "struct_item:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "visibility_modifier:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "visibility_modifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "visibility_modifier:1",
+        "pub:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "visibility_modifier:1",
+        "pub:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "struct:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "struct:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "type_identifier:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "type_identifier:1"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "struct_item:1",
+        "field_declaration_list:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "field_declaration_list:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "{:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "{:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "line_comment:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "line_comment:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "line_comment:1",
+        "//:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "line_comment:1",
+        "//:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "line_comment:1",
+        "outer_doc_comment_marker:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "line_comment:1",
+        "outer_doc_comment_marker:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "line_comment:1",
+        "outer_doc_comment_marker:1",
+        "/:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "line_comment:1",
+        "outer_doc_comment_marker:1",
+        "/:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "line_comment:1",
+        "doc_comment:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "line_comment:1",
+        "doc_comment:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "line_comment:2"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "line_comment:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "line_comment:2",
+        "//:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "line_comment:2",
+        "//:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "line_comment:2",
+        "outer_doc_comment_marker:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "line_comment:2",
+        "outer_doc_comment_marker:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "line_comment:2",
+        "outer_doc_comment_marker:1",
+        "/:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "line_comment:2",
+        "outer_doc_comment_marker:1",
+        "/:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "line_comment:2",
+        "doc_comment:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "line_comment:2",
+        "doc_comment:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "field_declaration:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "field_declaration:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "visibility_modifier:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "visibility_modifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "visibility_modifier:1",
+        "pub:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "visibility_modifier:1",
+        "pub:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "field_identifier:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "field_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "::1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "generic_type:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "generic_type:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "generic_type:1",
+        "type_identifier:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "generic_type:1",
+        "type_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "generic_type:1",
+        "type_arguments:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "generic_type:1",
+        "type_arguments:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "generic_type:1",
+        "type_arguments:1",
+        "<:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "generic_type:1",
+        "type_arguments:1",
+        "<:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "generic_type:1",
+        "type_arguments:1",
+        "type_identifier:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "generic_type:1",
+        "type_arguments:1",
+        "type_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "generic_type:1",
+        "type_arguments:1",
+        ">:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "generic_type:1",
+        "type_arguments:1",
+        ">:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        ",:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        ",:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "line_comment:3"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "line_comment:3"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "line_comment:3",
+        "//:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "line_comment:3",
+        "//:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "line_comment:3",
+        "outer_doc_comment_marker:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "line_comment:3",
+        "outer_doc_comment_marker:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "line_comment:3",
+        "outer_doc_comment_marker:1",
+        "/:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "line_comment:3",
+        "outer_doc_comment_marker:1",
+        "/:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "line_comment:3",
+        "doc_comment:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "line_comment:3",
+        "doc_comment:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "field_declaration:2"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "field_declaration:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "visibility_modifier:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "visibility_modifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "visibility_modifier:1",
+        "pub:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "visibility_modifier:1",
+        "pub:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "field_identifier:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "field_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "::1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "generic_type:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "generic_type:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "generic_type:1",
+        "type_identifier:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "generic_type:1",
+        "type_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "generic_type:1",
+        "type_arguments:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "generic_type:1",
+        "type_arguments:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "generic_type:1",
+        "type_arguments:1",
+        "<:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "generic_type:1",
+        "type_arguments:1",
+        "<:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "generic_type:1",
+        "type_arguments:1",
+        "primitive_type:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "generic_type:1",
+        "type_arguments:1",
+        "primitive_type:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "generic_type:1",
+        "type_arguments:1",
+        ">:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "generic_type:1",
+        "type_arguments:1",
+        ">:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        ",:2"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        ",:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "line_comment:4"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "line_comment:4"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "line_comment:4",
+        "//:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "line_comment:4",
+        "//:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "line_comment:4",
+        "outer_doc_comment_marker:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "line_comment:4",
+        "outer_doc_comment_marker:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "line_comment:4",
+        "outer_doc_comment_marker:1",
+        "/:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "line_comment:4",
+        "outer_doc_comment_marker:1",
+        "/:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "line_comment:4",
+        "doc_comment:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "line_comment:4",
+        "doc_comment:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "field_declaration:3"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "field_declaration:3"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "field_declaration:3",
+        "visibility_modifier:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "field_declaration:3",
+        "visibility_modifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "field_declaration:3",
+        "visibility_modifier:1",
+        "pub:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "field_declaration:3",
+        "visibility_modifier:1",
+        "pub:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "field_declaration:3",
+        "field_identifier:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "field_declaration:3",
+        "field_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "field_declaration:3",
+        "::1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "field_declaration:3",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "field_declaration:3",
+        "generic_type:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "field_declaration:3",
+        "generic_type:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "field_declaration:3",
+        "generic_type:1",
+        "type_identifier:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "field_declaration:3",
+        "generic_type:1",
+        "type_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "field_declaration:3",
+        "generic_type:1",
+        "type_arguments:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "field_declaration:3",
+        "generic_type:1",
+        "type_arguments:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "field_declaration:3",
+        "generic_type:1",
+        "type_arguments:1",
+        "<:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "field_declaration:3",
+        "generic_type:1",
+        "type_arguments:1",
+        "<:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "field_declaration:3",
+        "generic_type:1",
+        "type_arguments:1",
+        "primitive_type:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "field_declaration:3",
+        "generic_type:1",
+        "type_arguments:1",
+        "primitive_type:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "field_declaration:3",
+        "generic_type:1",
+        "type_arguments:1",
+        ">:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "field_declaration:3",
+        "generic_type:1",
+        "type_arguments:1",
+        ">:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        ",:3"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        ",:3"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "line_comment:5"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "line_comment:6"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "line_comment:5",
+        "//:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "line_comment:6",
+        "//:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "line_comment:5",
+        "outer_doc_comment_marker:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "line_comment:6",
+        "outer_doc_comment_marker:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "line_comment:5",
+        "outer_doc_comment_marker:1",
+        "/:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "line_comment:6",
+        "outer_doc_comment_marker:1",
+        "/:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "line_comment:5",
+        "doc_comment:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "line_comment:6",
+        "doc_comment:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "field_declaration:4"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "field_declaration:5"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "field_declaration:4",
+        "visibility_modifier:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "field_declaration:5",
+        "visibility_modifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "field_declaration:4",
+        "visibility_modifier:1",
+        "pub:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "field_declaration:5",
+        "visibility_modifier:1",
+        "pub:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "field_declaration:4",
+        "field_identifier:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "field_declaration:5",
+        "field_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "field_declaration:4",
+        "::1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "field_declaration:5",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "field_declaration:4",
+        "primitive_type:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "field_declaration:5",
+        "primitive_type:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        ",:4"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        ",:5"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "}:1"
+      ],
+      "after_path": [
+        "struct_item:1",
+        "field_declaration_list:1",
+        "}:1"
+      ]
+    }
+  ],
+  "text_mappings": [
+    {
+      "name": "Minimal",
+      "entries": [
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 4,
+              "start_column": 35,
+              "end_row": 4,
+              "end_column": 48
+            }
+          ]
+        },
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 16,
+              "start_column": 2,
+              "end_row": 16,
+              "end_column": 30
+            }
+          ]
+        },
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 17,
+              "start_column": 2,
+              "end_row": 17,
+              "end_column": 40
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Full",
+      "entries": [
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 4,
+              "start_column": 35,
+              "end_row": 4,
+              "end_column": 48
+            }
+          ]
+        },
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 16,
+              "start_column": 2,
+              "end_row": 16,
+              "end_column": 30
+            }
+          ]
+        },
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 17,
+              "start_column": 2,
+              "end_row": 17,
+              "end_column": 40
+            }
+          ]
+        },
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 16,
+              "start_column": 0,
+              "end_row": 16,
+              "end_column": 2
+            },
+            {
+              "start_row": 17,
+              "start_column": 0,
+              "end_row": 17,
+              "end_column": 2
+            }
+          ]
+        },
+        {
+          "operation": "Match",
+          "before": [
+            {
+              "start_row": 4,
+              "start_column": 34,
+              "end_row": 4,
+              "end_column": 47
+            }
+          ],
+          "after": [
+            {
+              "start_row": 4,
+              "start_column": 48,
+              "end_row": 4,
+              "end_column": 61
+            }
+          ]
+        },
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 4,
+              "start_column": 34,
+              "end_row": 4,
+              "end_column": 35
+            }
+          ]
+        },
+        {
+          "operation": "Match",
+          "before": [
+            {
+              "start_row": 4,
+              "start_column": 17,
+              "end_row": 4,
+              "end_column": 34
+            }
+          ],
+          "after": [
+            {
+              "start_row": 4,
+              "start_column": 17,
+              "end_row": 4,
+              "end_column": 34
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
