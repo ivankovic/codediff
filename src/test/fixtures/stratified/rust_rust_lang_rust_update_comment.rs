@@ -19,7 +19,7 @@ use anyhow::Result;
 
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants_with_known_violations;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 
 #[test]
 fn mapping() -> Result<()> {
@@ -28,13 +28,12 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-05: minimal 0.064%, full 4.499%
+    // remeasured 2026-09-06 after `Minimal (right)`'s Delete on row 17 was pulled back off a
+    // space: minimal 0.064% -> 0.000%, full unchanged at 4.499%
     assert_matches_human_painting_within_limit("rust-rust-lang-rust-update-comment", 4.51)
 }
 
 #[test]
 fn invariants() -> Result<()> {
-    // measured 2026-09-06: 1 painted row ends on a space, in the `Minimal (right)` alternative.
-    // The comment's trailing space is inside the repainted run.
-    assert_ground_truth_invariants_with_known_violations("rust-rust-lang-rust-update-comment", 1)
+    assert_ground_truth_invariants("rust-rust-lang-rust-update-comment")
 }

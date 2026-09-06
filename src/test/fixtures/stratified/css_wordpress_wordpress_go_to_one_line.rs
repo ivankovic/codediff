@@ -19,7 +19,7 @@ use anyhow::Result;
 
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants_with_known_violations;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 
 #[test]
 fn mapping() -> Result<()> {
@@ -36,12 +36,5 @@ fn painting() -> Result<()> {
 
 #[test]
 fn invariants() -> Result<()> {
-    // measured 2026-09-06: 2 painted brace pairs disagree.
-    // A rule collapsed onto one line: under Full the painter marked the `}` as moved (it did
-    // move, to the end of the line) and left the `{` alone (it did not). Defensible as painted,
-    // and the rule says the two braces should read alike - recorded rather than repainted.
-    assert_ground_truth_invariants_with_known_violations(
-        "css-wordpress-wordpress-go-to-one-line",
-        2,
-    )
+    assert_ground_truth_invariants("css-wordpress-wordpress-go-to-one-line")
 }

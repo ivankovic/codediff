@@ -27,7 +27,7 @@
 //!
 //! * [`rows_end_on_visible_characters`] - no painted run on a row may end on whitespace.
 //! * [`full_painting_covers_minimal`] - every byte painted under `Minimal` is painted under `Full`.
-//! * [`delimiter_pairs_agree`] - a painted or mapped bracket and its partner carry one verdict.
+//! * [`delimiter_pairs_agree`] - a bracket and its partner carry one verdict in the tree mapping.
 //!
 //! **Per fixture, not corpus-wide.** These are wired in as a third `invariants()` test in each
 //! `src/test/fixtures/**` file, next to that fixture's `mapping()` and `painting()`, so a fixture
@@ -73,7 +73,7 @@ pub fn ground_truth_invariant_violations_for(
         violations.extend(rows_end_on_visible_characters(name, labels, before, after));
     }
     violations.extend(full_painting_covers_minimal(mapping, before, after)?);
-    violations.extend(delimiter_pairs_agree(mapping, before, after, &paintings));
+    violations.extend(delimiter_pairs_agree(mapping, before, after));
 
     Ok(violations)
 }
@@ -275,13 +275,17 @@ fn is_closer(kind: &str) -> bool {
         .any(|(_, closers)| closers.contains(&kind))
 }
 
-/// Paint or mark one delimiter and you have said something about the construct it opens, so its
-/// partner must say the same thing.
+/// Mark one delimiter in the tree mapping and you have said something about the construct it
+/// opens, so its partner must say the same thing: nobody deletes a `(` and keeps its `)`.
 ///
-/// Nobody deletes a `(` and keeps its `)`; a reader shown one highlighted brace and not the other
-/// is being told the block half-changed, which is not a thing that can happen. This is the one
-/// invariant that reads the tree mapping as well as the painting, because the tree mapping can
-/// express the same contradiction: a matched `{` whose `}` is marked inserted.
+/// **The tree mapping only - the painting is deliberately not checked this way.** It was, and the
+/// corpus answered: a delimiter can be *replaced by a different delimiter*, and a painting that
+/// says so correctly looks like a contradiction here. `<tag>` becoming `<tag/>` makes the `/>`
+/// genuinely new while the `<` it closes is not, and a CSS rule collapsing onto one line moves its
+/// `}` without moving its `{`. Both were painted right and both were reported. The tree mapping
+/// cannot express that shape - a node is one node, matched or not - so a `{` marked inserted whose
+/// `}` is matched really is two claims about one construct. The rule holds where identity is the
+/// subject and fails where motion and content are, so it is asked only of the mapping.
 ///
 /// **Pairing is structural, within one parent's direct children.** A stack over those children in
 /// order pairs each closer with the nearest unclosed opener that admits it, so a parent holding
@@ -293,7 +297,7 @@ fn is_closer(kind: &str) -> bool {
 /// asks: tree-sitter's recovery invents structure, and a `{` it paired with a `}` three functions
 /// away is not a pair a human ever saw. 6819 of the corpus's ~42k pairs are skipped this way.
 ///
-/// The mapping half compares **status only** - deleted, inserted, or matched - and not the derived
+/// Compares **status only** - deleted, inserted, or matched - and not the derived
 /// move flag or the recorded operation. `moved` is `before_path != after_path`, a consequence of
 /// where a node landed rather than a judgement anyone entered, and a `{` whose path shifted while
 /// its `}`'s did not is a numbering artifact, not a claim that half a block moved. A node the
@@ -304,7 +308,6 @@ fn delimiter_pairs_agree(
     mapping: &super::HumanMapping,
     before: &Code,
     after: &Code,
-    paintings: &[(&str, [Vec<Option<TextLabel>>; 2])],
 ) -> Vec<String> {
     let (Some(before_tree), Some(after_tree)) = (before.ast.as_ref(), after.ast.as_ref()) else {
         return Vec::new();
@@ -322,26 +325,6 @@ fn delimiter_pairs_agree(
             let (from, to) = (open.end_byte(), close.start_byte());
             if errors.iter().any(|&(start, end)| start < to && end > from) {
                 continue;
-            }
-
-            for (painting, labels) in paintings {
-                let (opened, closed) = (
-                    labels[side][open.start_byte()],
-                    labels[side][close.start_byte()],
-                );
-                if opened != closed {
-                    violations.push(format!(
-                        "painting '{painting}' {} paints {:?} on row {} as {} but its matching \
-                         {:?} on row {} as {}",
-                        side_name(side),
-                        open.kind(),
-                        open.start_position().row + 1,
-                        verdict_name(opened),
-                        close.kind(),
-                        close.start_position().row + 1,
-                        verdict_name(closed),
-                    ));
-                }
             }
 
             let (opened, closed) = (mark_of(open, side, &caches), mark_of(close, side, &caches));
@@ -430,10 +413,6 @@ fn mark_of(node: Node, side: usize, caches: &Caches) -> Option<&'static str> {
             ..
         } => Some("inserted"),
     }
-}
-
-fn verdict_name(label: Option<TextLabel>) -> &'static str {
-    label.map_or("unpainted", TextLabel::name)
 }
 
 fn side_name(side: usize) -> &'static str {
@@ -645,28 +624,13 @@ mod tests {
     // ── Invariant 3, the painted half ───────────────────────────────────────────────────────
 
     #[test]
-    fn a_painted_opening_brace_whose_closing_brace_is_unpainted_is_reported() {
+    fn a_painting_that_marks_one_half_of_a_pair_is_not_a_violation() {
+        // The rule is asked of the tree mapping alone - see `delimiter_pairs_agree`. A painting is
+        // free to say the `{` went and the `}` stayed, because that is a claim about text moving
+        // and changing rather than about which node is which.
         let before = rust("fn f() { g(); }\n");
         let after = rust("\n");
         let mapping = painted(vec![("Only one solution", vec![deleted(7, 1)])]);
-
-        let found = violations(&mapping, &before, &after);
-        assert!(
-            found
-                .iter()
-                .any(|v| v.contains("as delete but its matching")),
-            "got {found:#?}"
-        );
-    }
-
-    #[test]
-    fn painting_both_halves_of_a_pair_the_same_way_is_accepted() {
-        let before = rust("fn f() { g(); }\n");
-        let after = rust("\n");
-        let mapping = painted(vec![(
-            "Only one solution",
-            vec![deleted(7, 1), deleted(14, 1)],
-        )]);
 
         assert!(violations(&mapping, &before, &after).is_empty());
     }

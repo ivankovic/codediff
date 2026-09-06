@@ -17,7 +17,7 @@
  */
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants_with_known_violations;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 use anyhow::Result;
 
 #[test]
@@ -27,14 +27,16 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-08-26: minimal 26.505%, full 27.945%
-    assert_matches_human_painting_within_limit("python-api-change", 25.0)
+    // remeasured 2026-09-06 after `Full`'s Match over the untouched indentation of
+    // `        return response.json()` was dropped - it painted eight spaces on a row whose own
+    // text neither changed nor shifted, which is the one Full indentation entry here that was not
+    // an insert or a re-indent: minimal 1.047%, full 4.188% -> 3.141%. The 25.0 it replaces was
+    // recorded against the 2026-08-26 renderer and its own comment (26.505%/27.945%) had been
+    // impossible for some time.
+    assert_matches_human_painting_within_limit("python-api-change", 3.16)
 }
 
 #[test]
 fn invariants() -> Result<()> {
-    // measured 2026-09-06: 2 painted rows end on a space.
-    // On both sides the Full painting's run ends inside the leading indentation of
-    // `        return response.json()`, whose own text is unchanged.
-    assert_ground_truth_invariants_with_known_violations("python-api-change", 2)
+    assert_ground_truth_invariants("python-api-change")
 }

@@ -19,7 +19,7 @@ use anyhow::Result;
 
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants_with_known_violations;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 
 #[test]
 fn mapping() -> Result<()> {
@@ -30,21 +30,15 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-06: minimal 0.111%, full 0.055%
+    // remeasured 2026-09-06 after the Delete on rows 1-2 was pulled back off the space in the
+    // comment's ` * ` prefix: minimal 0.111% -> 0.055%, full 0.055% -> 0.000%.
     assert_matches_human_painting_within_limit(
         "cpp-mozilla-firefox-firefox-update-file-comment",
-        0.13,
+        0.07,
     )
 }
 
 #[test]
 fn invariants() -> Result<()> {
-    // measured 2026-09-06: 1 painted row ends on a space.
-    // The licence header's second line is repainted to its trailing space; the visible text on
-    // that row is unchanged, so trimming the span would move where the paint ends rather than
-    // just shortening it.
-    assert_ground_truth_invariants_with_known_violations(
-        "cpp-mozilla-firefox-firefox-update-file-comment",
-        1,
-    )
+    assert_ground_truth_invariants("cpp-mozilla-firefox-firefox-update-file-comment")
 }

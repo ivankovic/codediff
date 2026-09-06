@@ -19,7 +19,7 @@ use anyhow::Result;
 
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants_with_known_violations;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 
 #[test]
 fn mapping() -> Result<()> {
@@ -29,17 +29,18 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-05: minimal 8.173%, full 8.173%
-    assert_matches_human_painting_within_limit("c-openssl-openssl-whitepsace-only", 8.19)
+    // repainted 2026-09-06, and the limit went UP: 8.19 -> 21.12 (minimal 21.109%, full 21.109%).
+    // The whole commit is the alignment run between `NULL,` and `/* opener */` collapsing to one
+    // space, and the painting used to be exactly that - five whitespace-only Delete spans, each
+    // ending on a space. There is no narrower painting that ends on a visible character, so the
+    // five rows are now painted whole, as the Updates a reader sees. The bigger number is the
+    // honest one: it measures codediff painting nothing at all here, because interior whitespace
+    // lives in the gaps between AST nodes where no painting can reach (same wall as
+    // c-openssl-openssl-format-only-change). Recorded as the distance it is, not as a target.
+    assert_matches_human_painting_within_limit("c-openssl-openssl-whitepsace-only", 21.12)
 }
 
 #[test]
 fn invariants() -> Result<()> {
-    // measured 2026-09-06: 5 painted rows end on a space.
-    // This commit re-aligns the trailing `/* opener */`-style comments in a table of `NULL,`
-    // entries, so on each of five rows the only thing that changed is the run of spaces between
-    // the comma and the comment. The painter covered that run, which is the whole edit there and
-    // the one place the "end on something visible" rule has nothing to offer: narrowing the span
-    // to a visible character would paint the unchanged `NULL,` instead of the change.
-    assert_ground_truth_invariants_with_known_violations("c-openssl-openssl-whitepsace-only", 5)
+    assert_ground_truth_invariants("c-openssl-openssl-whitepsace-only")
 }

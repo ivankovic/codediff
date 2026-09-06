@@ -19,7 +19,7 @@ use anyhow::Result;
 
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants_with_known_violations;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 
 #[test]
 fn mapping() -> Result<()> {
@@ -30,7 +30,8 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-05: minimal 39.227%, full 41.436%
+    // measured 2026-09-05, unchanged when `Full`'s Insert on row 4 was pulled back off the
+    // source line's own trailing space on 2026-09-06: minimal 39.227%, full 41.436%
     assert_matches_human_painting_within_limit(
         "html-prettier-prettier-not-pure-html-includes-yaml-as-well",
         41.45,
@@ -39,11 +40,5 @@ fn painting() -> Result<()> {
 
 #[test]
 fn invariants() -> Result<()> {
-    // measured 2026-09-06: 1 painted row ends on a space.
-    // The row is `because: ` - the source line itself ends in a space, and the painted run covers
-    // the whole line.
-    assert_ground_truth_invariants_with_known_violations(
-        "html-prettier-prettier-not-pure-html-includes-yaml-as-well",
-        1,
-    )
+    assert_ground_truth_invariants("html-prettier-prettier-not-pure-html-includes-yaml-as-well")
 }

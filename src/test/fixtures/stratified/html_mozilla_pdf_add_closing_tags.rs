@@ -19,7 +19,7 @@ use anyhow::Result;
 
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants_with_known_violations;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 
 #[test]
 fn mapping() -> Result<()> {
@@ -34,9 +34,5 @@ fn painting() -> Result<()> {
 
 #[test]
 fn invariants() -> Result<()> {
-    // measured 2026-09-06: 2 painted tag-delimiter pairs disagree, both on the after side.
-    // `<tag>` becomes `<tag/>`, so the `/>` is genuinely new while the `<` it closes is not. The
-    // painting is right and the invariant is stating the case it cannot distinguish: a delimiter
-    // replaced by a different delimiter.
-    assert_ground_truth_invariants_with_known_violations("html-mozilla-pdf-add-closing-tags", 2)
+    assert_ground_truth_invariants("html-mozilla-pdf-add-closing-tags")
 }
