@@ -79,6 +79,24 @@ mod c_postgres_postgres_update_copyright_year;
 #[cfg(test)]
 mod c_rust_lang_rust_add_two_consts;
 #[cfg(test)]
+mod cpp_electron_electron_add_imports;
+#[cfg(test)]
+mod cpp_godotengine_godot_add_include;
+#[cfg(test)]
+mod cpp_ladybirdbrowser_ladybird_add_real_logic;
+#[cfg(test)]
+mod cpp_ladybirdbrowser_ladybird_change_inherited_class_name;
+#[cfg(test)]
+mod cpp_libreoffice_add_const_2;
+#[cfg(test)]
+mod cpp_libreoffice_add_imports_and_function_param;
+#[cfg(test)]
+mod cpp_libreoffice_delete_function;
+#[cfg(test)]
+mod cpp_mozilla_firefox_firefox_update_file_comment;
+#[cfg(test)]
+mod cpp_mozilla_firefox_firefox_update_file_comment_2;
+#[cfg(test)]
 mod cpp_nzbgetcom_nzbget_add_include;
 #[cfg(test)]
 mod cpp_ollama_ollama_update_commit_hash;
@@ -98,6 +116,12 @@ mod cpp_ollama_ollama_update_commit_hash_7;
 mod cpp_ollama_ollama_update_commit_hash_8;
 #[cfg(test)]
 mod cpp_ollama_ollama_update_commit_hash_string_constant;
+#[cfg(test)]
+mod cpp_opencv_opencv_delete_string_const_from_preprocessor;
+#[cfg(test)]
+mod cpp_paddlepaddle_paddleocr_add_namespace_closing_comment;
+#[cfg(test)]
+mod cpp_protocolbuffers_protobuf_add_preprocessor_commands;
 #[cfg(test)]
 mod csharp_jellyfin_jellyfin_update_version_string;
 #[cfg(test)]
