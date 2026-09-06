@@ -282828,6 +282828,110 @@
         "block:1",
         "}:1"
       ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "impl_item:5",
+        "declaration_list:1",
+        "function_item:2",
+        "block:1",
+        "expression_statement:1",
+        "if_expression:1",
+        "block:1",
+        "let_declaration:1",
+        "if_expression:1",
+        "block:1",
+        "macro_invocation:1",
+        "token_tree:1",
+        "token_tree:1",
+        "token_tree:1",
+        "(:1"
+      ],
+      "after_path": [
+        "impl_item:5",
+        "declaration_list:1",
+        "function_item:2",
+        "block:1",
+        "let_declaration:3",
+        "if_expression:1",
+        "block:1",
+        "macro_invocation:1",
+        "token_tree:1",
+        "token_tree:1",
+        "(:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "impl_item:5",
+        "declaration_list:1",
+        "function_item:2",
+        "block:1",
+        "expression_statement:1",
+        "if_expression:1",
+        "block:1",
+        "let_declaration:1",
+        "if_expression:1",
+        "block:1",
+        "macro_invocation:1",
+        "token_tree:1",
+        "token_tree:1",
+        "token_tree:1",
+        "):1"
+      ],
+      "after_path": [
+        "impl_item:5",
+        "declaration_list:1",
+        "function_item:2",
+        "block:1",
+        "let_declaration:3",
+        "if_expression:1",
+        "block:1",
+        "macro_invocation:1",
+        "token_tree:1",
+        "token_tree:1",
+        "):1"
+      ]
+    },
+    {
+      "operation": "delete",
+      "before_path": [
+        "impl_item:5",
+        "declaration_list:1",
+        "function_item:2",
+        "block:1",
+        "expression_statement:1",
+        "if_expression:1",
+        "block:1",
+        "let_declaration:1",
+        "if_expression:1",
+        "block:1",
+        "macro_invocation:1",
+        "token_tree:1",
+        "token_tree:1",
+        "):1"
+      ]
+    },
+    {
+      "operation": "delete",
+      "before_path": [
+        "impl_item:5",
+        "declaration_list:1",
+        "function_item:2",
+        "block:1",
+        "expression_statement:1",
+        "if_expression:1",
+        "block:1",
+        "let_declaration:1",
+        "if_expression:1",
+        "block:1",
+        "macro_invocation:1",
+        "token_tree:1",
+        "token_tree:1",
+        "(:1"
+      ]
     }
   ],
   "groups": [
@@ -282880,114 +282984,6 @@
         ]
       ],
       "operation": "match_but_not_identical",
-      "with_children": false
-    },
-    {
-      "before_paths": [
-        [
-          "impl_item:5",
-          "declaration_list:1",
-          "function_item:2",
-          "block:1",
-          "expression_statement:1",
-          "if_expression:1",
-          "block:1",
-          "let_declaration:1",
-          "if_expression:1",
-          "block:1",
-          "macro_invocation:1",
-          "token_tree:1",
-          "token_tree:1",
-          "(:1"
-        ],
-        [
-          "impl_item:5",
-          "declaration_list:1",
-          "function_item:2",
-          "block:1",
-          "expression_statement:1",
-          "if_expression:1",
-          "block:1",
-          "let_declaration:1",
-          "if_expression:1",
-          "block:1",
-          "macro_invocation:1",
-          "token_tree:1",
-          "token_tree:1",
-          "token_tree:1",
-          "(:1"
-        ]
-      ],
-      "after_paths": [
-        [
-          "impl_item:5",
-          "declaration_list:1",
-          "function_item:2",
-          "block:1",
-          "let_declaration:3",
-          "if_expression:1",
-          "block:1",
-          "macro_invocation:1",
-          "token_tree:1",
-          "token_tree:1",
-          "(:1"
-        ]
-      ],
-      "operation": "identical",
-      "with_children": false
-    },
-    {
-      "before_paths": [
-        [
-          "impl_item:5",
-          "declaration_list:1",
-          "function_item:2",
-          "block:1",
-          "expression_statement:1",
-          "if_expression:1",
-          "block:1",
-          "let_declaration:1",
-          "if_expression:1",
-          "block:1",
-          "macro_invocation:1",
-          "token_tree:1",
-          "token_tree:1",
-          "token_tree:1",
-          "):1"
-        ],
-        [
-          "impl_item:5",
-          "declaration_list:1",
-          "function_item:2",
-          "block:1",
-          "expression_statement:1",
-          "if_expression:1",
-          "block:1",
-          "let_declaration:1",
-          "if_expression:1",
-          "block:1",
-          "macro_invocation:1",
-          "token_tree:1",
-          "token_tree:1",
-          "):1"
-        ]
-      ],
-      "after_paths": [
-        [
-          "impl_item:5",
-          "declaration_list:1",
-          "function_item:2",
-          "block:1",
-          "let_declaration:3",
-          "if_expression:1",
-          "block:1",
-          "macro_invocation:1",
-          "token_tree:1",
-          "token_tree:1",
-          "):1"
-        ]
-      ],
-      "operation": "identical",
       "with_children": false
     }
   ]
