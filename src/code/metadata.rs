@@ -15,31 +15,12 @@
  *  You should have received a copy of the GNU Affero General Public License
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
-use anyhow::Result;
+use anyhow::{Context, Result};
 
 use crate::code::language;
 use crate::code::tip;
 use crate::code::{ASTMetadata, ASTNodeMetadata, Code, Metadata};
 use crate::diff::nodes;
-
-/// Pre-order stack walk (children pushed in document order, so the LIFO stack pops them back out
-/// in reverse - fine here since `visit` doesn't care) over every node in `root`'s subtree, calling
-/// `visit` once per node. Shared by `discover_reference_nodes` and
-/// `discover_semantic_structure_nodes`, whose results don't depend on visitation order (the
-/// former sorts its collected nodes afterward; the latter keys a map by node type, and this AST
-/// has at most one node of each semantically-structural type per the type's own invariant). Not
-/// shared with `compute_node_depths` (needs each node's depth threaded through the walk) or
-/// `compute_subtree_sizes`/`compute_node_info` (need true post-order/preorder-indexed traversal).
-fn walk_preorder<'a>(root: tree_sitter::Node<'a>, mut visit: impl FnMut(tree_sitter::Node<'a>)) {
-    let mut stack = vec![root];
-    while let Some(node) = stack.pop() {
-        visit(node);
-        let mut cursor = node.walk();
-        for child in node.children(&mut cursor) {
-            stack.push(child);
-        }
-    }
-}
 
 /// The length of each row of `contents` in **bytes** - the column one past its last character,
 /// in the unit every column in this codebase uses (see `diff::text_range::SourceColumn`).
@@ -99,14 +80,85 @@ pub fn hermetic_expand(m: &mut Metadata) {
 pub fn compute_ast_metadata(code: &Code) -> Result<ASTMetadata> {
     let mut metadata = ASTMetadata::default();
     metadata.language = code.metadata.language.unwrap_or_default();
-    crate::code::hash::hash_code(code, &mut metadata)?;
-    compute_subtree_sizes(code, &mut metadata)?;
-    compute_node_info(code, &mut metadata)?;
+    let ast = code
+        .ast
+        .as_ref()
+        .context("AST must be parsed before computing metadata")?;
+    // One walk of the tree-sitter tree; every step below works over this table. Each walk used
+    // to create two cursors per node, and with eight of them the cursor traffic was a fifth of a
+    // large file's whole diff (callgrind, 2026-09-06).
+    let nodes = collect_nodes(ast.root_node());
+    let source = code.contents.as_bytes();
+    crate::code::hash::hash_nodes(&nodes, source, metadata.language, &mut metadata);
+    compute_subtree_sizes(&nodes, &mut metadata);
+    compute_node_info(&nodes, source, &mut metadata);
     compute_widest_subtree_node(code, &mut metadata);
-    compute_node_depths(code, &mut metadata)?;
-    compute_node_parents(&mut metadata);
-    discover_reference_nodes(code, &mut metadata)?;
+    for record in &nodes {
+        metadata.node_to_depth.insert(record.id, record.depth);
+        if let Some(parent) = record.parent {
+            metadata.node_to_parent.insert(record.id, nodes[parent].id);
+        }
+    }
+    discover_reference_nodes(&nodes, &mut metadata);
     Ok(metadata)
+}
+
+/// One node of the parsed tree as captured by [`collect_nodes`]: everything the metadata steps
+/// read, so that none of them has to walk the tree-sitter tree itself.
+pub(crate) struct NodeRecord {
+    pub(crate) id: usize,
+    pub(crate) kind: &'static str,
+    pub(crate) kind_id: u16,
+    pub(crate) start_byte: usize,
+    pub(crate) end_byte: usize,
+    pub(crate) is_named: bool,
+    pub(crate) depth: usize,
+    /// Index into the same table; `None` for the root.
+    pub(crate) parent: Option<usize>,
+    /// Indices into the same table, in document order.
+    pub(crate) children: Vec<usize>,
+}
+
+/// Every node under `root` in left-to-right preorder (so a record's index is its
+/// `preorder_index`, and every descendant's index is greater than its ancestor's), from a single
+/// cursor traversal. All children, anonymous tokens included - the same set
+/// `Node::children` yields and `Node::child_count` counts.
+pub(crate) fn collect_nodes(root: tree_sitter::Node) -> Vec<NodeRecord> {
+    let mut records: Vec<NodeRecord> = Vec::new();
+    let mut ancestors: Vec<usize> = Vec::new();
+    let mut cursor = root.walk();
+    loop {
+        let node = cursor.node();
+        let index = records.len();
+        let parent = ancestors.last().copied();
+        records.push(NodeRecord {
+            id: node.id(),
+            kind: node.kind(),
+            kind_id: node.kind_id(),
+            start_byte: node.start_byte(),
+            end_byte: node.end_byte(),
+            is_named: node.is_named(),
+            depth: ancestors.len(),
+            parent,
+            children: Vec::new(),
+        });
+        if let Some(parent) = parent {
+            records[parent].children.push(index);
+        }
+        if cursor.goto_first_child() {
+            ancestors.push(index);
+            continue;
+        }
+        loop {
+            if cursor.goto_next_sibling() {
+                break;
+            }
+            if !cursor.goto_parent() {
+                return records;
+            }
+            ancestors.pop();
+        }
+    }
 }
 
 /**
@@ -126,88 +178,35 @@ pub fn metadata_of(code: &Code) -> std::borrow::Cow<'_, ASTMetadata> {
     }
 }
 
-/// Populates `node_to_parent` from `node_info`'s children lists. Must run after
-/// `compute_node_info`.
-fn compute_node_parents(metadata: &mut ASTMetadata) {
-    for (&id, info) in &metadata.node_info {
-        for &child in &info.children {
-            metadata.node_to_parent.insert(child, id);
-        }
+fn compute_subtree_sizes(nodes: &[NodeRecord], metadata: &mut ASTMetadata) {
+    // Reverse preorder visits every child before its parent.
+    let mut sizes = vec![0usize; nodes.len()];
+    for (index, record) in nodes.iter().enumerate().rev() {
+        let size = 1 + record.children.iter().map(|&c| sizes[c]).sum::<usize>();
+        sizes[index] = size;
+        metadata.node_to_subtree_size.insert(record.id, size);
     }
-}
-
-fn compute_subtree_sizes(code: &Code, metadata: &mut ASTMetadata) -> Result<()> {
-    let ast = code.ast.as_ref().expect("AST must be parsed");
-    let root_node = ast.root_node();
-
-    // Perform post-order traversal to compute subtree sizes efficiently
-    let mut stack = Vec::new();
-    stack.push((root_node, false)); // (node, processed)
-
-    while let Some((node, processed)) = stack.pop() {
-        if processed {
-            // Post-order processing: compute subtree size
-            let node_id = node.id();
-            let mut size = 1; // Count this node itself
-
-            // Add sizes of all children
-            let mut child_cursor = node.walk();
-            for child in node.children(&mut child_cursor) {
-                if let Some(&child_size) = metadata.node_to_subtree_size.get(&child.id()) {
-                    size += child_size;
-                }
-            }
-
-            metadata.node_to_subtree_size.insert(node_id, size);
-        } else {
-            // Pre-order: push back as processed, then push children
-            stack.push((node, true));
-
-            // Push children in reverse order for proper traversal
-            let mut child_cursor = node.walk();
-            let children: Vec<_> = node.children(&mut child_cursor).collect();
-            for child in children.into_iter().rev() {
-                stack.push((child, false));
-            }
-        }
-    }
-
-    Ok(())
 }
 
 /// Compute node information (kind, text, children) for all nodes
-fn compute_node_info(code: &Code, metadata: &mut ASTMetadata) -> Result<()> {
-    let ast = code.ast.as_ref().expect("AST must be parsed");
-    let root_node = ast.root_node();
-
-    let mut stack = Vec::new();
-    stack.push(root_node);
-    let mut preorder_index = 0usize;
-
-    while let Some(node) = stack.pop() {
-        let node_id = node.id();
-        let kind = node.kind().to_string();
+fn compute_node_info(nodes: &[NodeRecord], source: &[u8], metadata: &mut ASTMetadata) {
+    for (preorder_index, record) in nodes.iter().enumerate() {
+        let kind = record.kind.to_string();
         // Leaves only. Every consumer compares `text` between two leaves (`UnitCostModel::ren`,
-        // `classify_match`, the slot alignment's leaf arms); an internal node's whole subtree text
-        // was copied here too, which made this walk O(bytes x depth) and the single largest cost
-        // of metadata on a large file (measured 2026-09-06 over the corpus: 11.9s of metadata
-        // against 3.7s of parsing, before this change).
-        let text = if node.child_count() == 0 {
-            node.utf8_text(code.contents.as_bytes())
+        // `classify_match`, the slot alignment's leaf arms); an internal node's text is its
+        // children's.
+        let text = if record.children.is_empty() {
+            std::str::from_utf8(&source[record.start_byte..record.end_byte])
                 .unwrap_or("")
                 .to_string()
         } else {
             String::new()
         };
-
-        // Get children IDs
-        let mut child_cursor = node.walk();
-        let child_nodes: Vec<tree_sitter::Node> = node.children(&mut child_cursor).collect();
-        let owned_text_hash = owned_text_hash_of(&node, code.contents.as_bytes(), &child_nodes);
-        let children: Vec<usize> = child_nodes.iter().map(|c| c.id()).collect();
+        let owned_text_hash = owned_text_hash_of(record, source, nodes);
+        let children: Vec<usize> = record.children.iter().map(|&c| nodes[c].id).collect();
 
         metadata.node_info.insert(
-            node_id,
+            record.id,
             ASTNodeMetadata {
                 kind_cost_class: crate::code::KindCostClass {
                     identifier_like: nodes::is_identifier_kind(&kind),
@@ -218,27 +217,12 @@ fn compute_node_info(code: &Code, metadata: &mut ASTMetadata) -> Result<()> {
                 text,
                 owned_text_hash,
                 children,
-                start_byte: node.start_byte(),
+                start_byte: record.start_byte,
                 preorder_index,
-                is_named: node.is_named(),
+                is_named: record.is_named,
             },
         );
-        preorder_index += 1;
-
-        // Push children in reverse so the stack (LIFO) pops them back out left-to-right, keeping
-        // `preorder_index` a genuine preorder (root, then children in document order).
-        let mut child_cursor = node.walk();
-        for child in node
-            .children(&mut child_cursor)
-            .collect::<Vec<_>>()
-            .into_iter()
-            .rev()
-        {
-            stack.push(child);
-        }
     }
-
-    Ok(())
 }
 
 /// A hash of the text a node owns *directly* - the non-whitespace content in the gaps before,
@@ -254,13 +238,9 @@ fn compute_node_info(code: &Code, metadata: &mut ASTMetadata) -> Result<()> {
 ///
 /// A leaf owns its whole span, but that is already `ASTNodeMetadata::text`, which `ren` compares
 /// directly - so this reports 0 for leaves rather than duplicating it.
-fn owned_text_hash_of(
-    node: &tree_sitter::Node,
-    source: &[u8],
-    children: &[tree_sitter::Node],
-) -> u64 {
+fn owned_text_hash_of(record: &NodeRecord, source: &[u8], nodes: &[NodeRecord]) -> u64 {
     use std::hash::Hasher;
-    if children.is_empty() {
+    if record.children.is_empty() {
         return 0;
     }
     let mut hasher = metrohash::MetroHash64::new();
@@ -276,12 +256,12 @@ fn owned_text_hash_of(
             any_content = true;
         }
     };
-    let mut gap_start = node.start_byte();
-    for child in children {
-        hash_gap(&mut hasher, gap_start, child.start_byte());
-        gap_start = child.end_byte();
+    let mut gap_start = record.start_byte;
+    for &child in &record.children {
+        hash_gap(&mut hasher, gap_start, nodes[child].start_byte);
+        gap_start = nodes[child].end_byte;
     }
-    hash_gap(&mut hasher, gap_start, node.end_byte());
+    hash_gap(&mut hasher, gap_start, record.end_byte);
     if !any_content {
         return 0;
     }
@@ -332,23 +312,6 @@ fn compute_widest_subtree_node(code: &Code, metadata: &mut ASTMetadata) {
     }
 }
 
-/// Compute the depth of every node (root = 0, its children = 1, ...).
-fn compute_node_depths(code: &Code, metadata: &mut ASTMetadata) -> Result<()> {
-    let ast = code.ast.as_ref().expect("AST must be parsed");
-
-    let mut stack = vec![(ast.root_node(), 0)];
-    while let Some((node, depth)) = stack.pop() {
-        metadata.node_to_depth.insert(node.id(), depth);
-
-        let mut cursor = node.walk();
-        for child in node.children(&mut cursor) {
-            stack.push((child, depth + 1));
-        }
-    }
-
-    Ok(())
-}
-
 /**
 * Discover all reference nodes in the AST and order them by subtree size.
 *
@@ -357,30 +320,27 @@ fn compute_node_depths(code: &Code, metadata: &mut ASTMetadata) -> Result<()> {
 *
 * To speed up the algorithm, we sort the nodes by tree size.
 */
-fn discover_reference_nodes(code: &Code, metadata: &mut ASTMetadata) -> Result<()> {
-    let ast = code.ast.as_ref().expect("AST must be parsed");
-    let root_node = ast.root_node();
+fn discover_reference_nodes(nodes: &[NodeRecord], metadata: &mut ASTMetadata) {
     // `metadata.language`, not `code.metadata.language` - the former is already fail-safed to
-    // `Language::Unknown` by `compute_ast_metadata` (this function's only caller) a few lines
-    // before calling here; re-reading the latter and `.expect()`-ing it was inconsistent with
-    // that and could panic in a case the caller had already made safe (found in a 2026-07
-    // code-health pass).
+    // `Language::Unknown` by `compute_ast_metadata` (this function's only caller).
     let language = &metadata.language;
 
-    // Collect reference nodes with their subtree sizes
+    // Collected in the order the old tree walk visited them (preorder, children right to left)
+    // so the stable sort below breaks size ties exactly as before.
     let mut reference_nodes_with_sizes = Vec::new();
-
-    walk_preorder(root_node, |node| {
-        let node_id = node.id();
+    let mut stack = vec![0usize];
+    while let Some(index) = stack.pop() {
+        let record = &nodes[index];
         // `is_named`: an anonymous keyword token can share its kind string with the statement it
         // introduces (Kotlin's `import`), and must not be listed as a reference node itself.
-        if node.is_named()
-            && nodes::is_reference(node.kind(), language)
-            && let Some(&subtree_size) = metadata.node_to_subtree_size.get(&node_id)
+        if record.is_named
+            && nodes::is_reference(record.kind, language)
+            && let Some(&subtree_size) = metadata.node_to_subtree_size.get(&record.id)
         {
-            reference_nodes_with_sizes.push((node_id, subtree_size));
+            reference_nodes_with_sizes.push((record.id, subtree_size));
         }
-    });
+        stack.extend(record.children.iter().copied());
+    }
 
     // Sort reference nodes by subtree size in descending order
     reference_nodes_with_sizes.sort_by_key(|&(_, subtree_size)| std::cmp::Reverse(subtree_size));
@@ -390,8 +350,6 @@ fn discover_reference_nodes(code: &Code, metadata: &mut ASTMetadata) -> Result<(
         .into_iter()
         .map(|(node_id, _)| node_id)
         .collect();
-
-    Ok(())
 }
 
 #[cfg(test)]

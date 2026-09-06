@@ -21,6 +21,7 @@ use metrohash::MetroHash64;
 use crate::code::similarity::SimilaritySketch;
 use std::hash::Hasher;
 
+use crate::code::metadata::NodeRecord;
 use crate::code::{ASTMetadata, Code, Language};
 use crate::diff::nodes::is_commutative_container;
 
@@ -60,7 +61,7 @@ use crate::diff::nodes::is_commutative_container;
 /// Inserts `node_id -> hash` into `forward` and appends `node_id` to `reverse`'s bucket for
 /// `hash` - the same "store both directions of one hash map" pair `hash_code` below repeats once
 /// per hash kind (full/structural/kind-and-value/kind-only).
-fn record(
+fn record_hash(
     forward: &mut rustc_hash::FxHashMap<usize, u64>,
     reverse: &mut rustc_hash::FxHashMap<u64, Vec<usize>>,
     node_id: usize,
@@ -71,7 +72,39 @@ fn record(
 }
 
 pub fn hash_code(code: &Code, metadata: &mut ASTMetadata) -> Result<()> {
-    // Clear existing data in the metadata
+    let ast = code
+        .ast
+        .as_ref()
+        .context("AST must be parsed before hashing")?;
+    let nodes = crate::code::metadata::collect_nodes(ast.root_node());
+    hash_nodes(
+        &nodes,
+        code.contents.as_bytes(),
+        metadata.language,
+        metadata,
+    );
+    Ok(())
+}
+
+/// [`hash_code`] over an already collected node table (see `metadata::collect_nodes`), which is
+/// how `compute_ast_metadata` calls it - one walk of the tree serves every step.
+///
+/// Visits the table in reverse preorder, which is post-order with children right to left: every
+/// descendant's hashes are stored before its ancestor needs them, and the order nodes are
+/// appended to the `*_hash_to_node` buckets - the last-resort tie-break `solve_moved_subtrees`
+/// and `hash_tree_matching` fall back on for an exact-distance tie - is the same order the
+/// explicit-stack walk this replaced produced.
+///
+/// This replaces an earlier version where each of the four `compute_*_hash` functions recursed
+/// into every descendant itself, on every node - O(n * average nested-subtree size), quadratic
+/// on a deeply nested tree (a synthetic deeply-nested expression went from 35ms at 616 nodes to
+/// 8.46s at 9616 nodes before the post-order rewrite, and linear after).
+pub(crate) fn hash_nodes(
+    nodes: &[NodeRecord],
+    source: &[u8],
+    language: Language,
+    metadata: &mut ASTMetadata,
+) {
     metadata.node_to_full_hash.clear();
     metadata.full_hash_to_node.clear();
     metadata.node_to_structural_hash.clear();
@@ -82,115 +115,66 @@ pub fn hash_code(code: &Code, metadata: &mut ASTMetadata) -> Result<()> {
     metadata.kind_only_hash_to_node.clear();
     metadata.node_to_similarity_sketch.clear();
 
-    let ast = code
-        .ast
-        .as_ref()
-        .context("AST must be parsed before hashing")?;
-    let root_node = ast.root_node();
-    let language = metadata.language;
-    let source = code.contents.as_bytes();
+    // Per-table-index hashes, so a child's hash is an indexed read rather than a map lookup.
+    let n = nodes.len();
+    let mut full = vec![0u64; n];
+    let mut structural = vec![0u64; n];
+    let mut kind_and_value = vec![0u64; n];
+    let mut kind_only = vec![0u64; n];
 
-    let mut cursor = root_node.walk();
-    // Post-order traversal via an explicit stack: each node is pushed once "unexpanded" (to
-    // discover and stack its children first) and, once popped a second time as "expanded", every
-    // one of its descendants has already had its four hashes computed and stored below - so this
-    // node's own hash can be computed by looking up each child's hash directly instead of
-    // recursing back into it.
-    //
-    // This replaces an earlier version where each of the four `compute_*_hash` functions
-    // recursed into every descendant itself, on every node, independent of the fact that the very
-    // same subtree had just been fully hashed a moment earlier as part of its parent's own
-    // computation - i.e. one call per node here, but each call doing O(that node's subtree size)
-    // work, made the whole pass O(n * average nested-subtree size): quadratic or worse on a
-    // deeply left/right-nested tree (long chained method calls, deeply nested conditionals - all
-    // realistic in real code). Found during a 2026-07 code-health pass; confirmed empirically
-    // before this fix (a synthetic deeply-nested expression went from 35ms at 616 nodes to 8.46s
-    // at 9616 nodes) and after (linear in node count, matching this function's own "under 50ms"
-    // goal documented above).
-    //
-    // Changing the traversal order does change which of several hash-colliding nodes ends up
-    // first in `full_hash_to_node`/etc.'s per-hash `Vec` (previously a pre-order, rightmost-child-
-    // first walk; now post-order) - confirmed safe: both real consumers of that ordering
-    // (`solve_moved_subtrees.rs`, `hash_tree_matching.rs`) already explicitly re-sort by document
-    // position/proximity rather than relying on raw insertion order, using it only as a last-
-    // resort tiebreak for an exact-distance tie.
-    let mut stack: Vec<(tree_sitter::Node, bool)> = vec![(root_node, false)];
+    for (index, record) in nodes.iter().enumerate().rev() {
+        let full_child_hashes: Vec<u64> = record.children.iter().map(|&c| full[c]).collect();
+        let structural_child_hashes: Vec<u64> =
+            record.children.iter().map(|&c| structural[c]).collect();
+        let kind_and_value_child_hashes: Vec<u64> =
+            record.children.iter().map(|&c| kind_and_value[c]).collect();
+        let kind_only_child_hashes: Vec<u64> =
+            record.children.iter().map(|&c| kind_only[c]).collect();
 
-    while let Some((node, expanded)) = stack.pop() {
-        if !expanded {
-            stack.push((node, true));
-            for child in node.children(&mut cursor) {
-                stack.push((child, false));
-            }
-            continue;
-        }
-
-        let node_id = node.id();
-        let children: Vec<tree_sitter::Node> = node.children(&mut cursor).collect();
-
-        // Every child already has all four hashes computed and stored (post-order guarantee) -
-        // look them up (missing only if some pathological grammar reports children that aren't
-        // fully behaved nodes; falling back to 0 keeps this a lookup, never a panic).
-        let child_hash = |map: &rustc_hash::FxHashMap<usize, u64>, child: &tree_sitter::Node| {
-            map.get(&child.id()).copied().unwrap_or(0)
-        };
-        let full_child_hashes: Vec<u64> = children
-            .iter()
-            .map(|c| child_hash(&metadata.node_to_full_hash, c))
-            .collect();
-        let structural_child_hashes: Vec<u64> = children
-            .iter()
-            .map(|c| child_hash(&metadata.node_to_structural_hash, c))
-            .collect();
-        let kind_and_value_child_hashes: Vec<u64> = children
-            .iter()
-            .map(|c| child_hash(&metadata.node_to_kind_and_value_hash, c))
-            .collect();
-        let kind_only_child_hashes: Vec<u64> = children
-            .iter()
-            .map(|c| child_hash(&metadata.node_to_kind_only_hash, c))
-            .collect();
-
-        let full_hash = compute_full_hash(&node, source, &children, &full_child_hashes);
-        let structural_hash = compute_structural_hash(&node, &structural_child_hashes);
+        let full_hash = compute_full_hash(record, source, nodes, &full_child_hashes);
+        let structural_hash = compute_structural_hash(record, &structural_child_hashes);
         let kind_and_value_hash = compute_kind_and_value_hash(
-            &node,
+            record,
             source,
-            &children,
+            nodes,
             &kind_and_value_child_hashes,
             language,
         );
-        let kind_only_hash = compute_kind_only_hash(&node, &kind_only_child_hashes, language);
+        let kind_only_hash = compute_kind_only_hash(record, &kind_only_child_hashes, language);
+        full[index] = full_hash;
+        structural[index] = structural_hash;
+        kind_and_value[index] = kind_and_value_hash;
+        kind_only[index] = kind_only_hash;
 
-        record(
+        record_hash(
             &mut metadata.node_to_full_hash,
             &mut metadata.full_hash_to_node,
-            node_id,
+            record.id,
             full_hash,
         );
-        record(
+        record_hash(
             &mut metadata.node_to_structural_hash,
             &mut metadata.structural_hash_to_node,
-            node_id,
+            record.id,
             structural_hash,
         );
-        record(
+        record_hash(
             &mut metadata.node_to_kind_and_value_hash,
             &mut metadata.kind_and_value_hash_to_node,
-            node_id,
+            record.id,
             kind_and_value_hash,
         );
-        record(
+        record_hash(
             &mut metadata.node_to_kind_only_hash,
             &mut metadata.kind_only_hash_to_node,
-            node_id,
+            record.id,
             kind_only_hash,
         );
 
         // The similarity sketch rides along on the same post-order guarantee as the four hashes
         // above: a leaf seeds a one-element sketch from its own full hash, an internal node merges
         // its children's already-computed sketches. `SimilaritySketch` has no reverse map, so it
-        // isn't `record`ed. Children are merged in document order for determinism's sake, though
+        // isn't recorded. Children are merged in document order for determinism's sake, though
         // `merge` sorts and dedups and so is order-independent by construction anyway.
         //
         // The extra element for owned gap text is not an embellishment - without it the sketch is
@@ -200,25 +184,23 @@ pub fn hash_code(code: &Code, metadata: &mut ASTMetadata) -> Result<()> {
         // 2026-08-18; every pairing scored 1.00). Any node owning non-whitespace text contributes
         // it, exactly like a leaf does, which is what makes "the set of content tokens in this
         // subtree" a faithful description of it rather than a description of its tokenization.
-        let mut elements = Vec::with_capacity(children.len() + 1);
-        if children.is_empty() {
+        let mut elements = Vec::with_capacity(record.children.len() + 1);
+        if record.children.is_empty() {
             elements.push(SimilaritySketch::leaf(full_hash));
         } else {
-            for child in &children {
-                if let Some(sketch) = metadata.node_to_similarity_sketch.get(&child.id()) {
+            for &child in &record.children {
+                if let Some(sketch) = metadata.node_to_similarity_sketch.get(&nodes[child].id) {
                     elements.push(sketch.clone());
                 }
             }
-            if let Some(own_text_hash) = compute_owned_text_hash(&node, source, &children) {
+            if let Some(own_text_hash) = compute_owned_text_hash(record, source, nodes) {
                 elements.push(SimilaritySketch::leaf(own_text_hash));
             }
         }
         metadata
             .node_to_similarity_sketch
-            .insert(node_id, SimilaritySketch::merge(elements));
+            .insert(record.id, SimilaritySketch::merge(elements));
     }
-
-    Ok(())
 }
 
 /**
@@ -237,24 +219,24 @@ pub fn hash_code(code: &Code, metadata: &mut ASTMetadata) -> Result<()> {
 * is trailing spaces before a `\n` escape would trim down to the same gap and falsely collide).
 */
 fn compute_full_hash(
-    node: &tree_sitter::Node,
+    record: &NodeRecord,
     source_code: &[u8],
-    children: &[tree_sitter::Node],
+    nodes: &[NodeRecord],
     child_hashes: &[u64],
 ) -> u64 {
     let mut hasher = MetroHash64::new();
 
     // Hash node type and child count
-    hasher.write(node.kind_id().to_le_bytes().as_slice());
-    hasher.write(node.child_count().to_le_bytes().as_slice());
+    hasher.write(record.kind_id.to_le_bytes().as_slice());
+    hasher.write(record.children.len().to_le_bytes().as_slice());
 
-    let mut gap_start = node.start_byte();
-    for (child, &child_hash) in children.iter().zip(child_hashes) {
-        hash_gap(&mut hasher, source_code, gap_start, child.start_byte());
+    let mut gap_start = record.start_byte;
+    for (&child, &child_hash) in record.children.iter().zip(child_hashes) {
+        hash_gap(&mut hasher, source_code, gap_start, nodes[child].start_byte);
         hasher.write(child_hash.to_le_bytes().as_slice());
-        gap_start = child.end_byte();
+        gap_start = nodes[child].end_byte;
     }
-    hash_gap(&mut hasher, source_code, gap_start, node.end_byte());
+    hash_gap(&mut hasher, source_code, gap_start, record.end_byte);
 
     hasher.finish()
 }
@@ -268,12 +250,12 @@ fn compute_full_hash(
 /// chooses the latter for quoted strings), and a similarity measure must not depend on which choice
 /// a grammar made.
 fn compute_owned_text_hash(
-    node: &tree_sitter::Node,
+    record: &NodeRecord,
     source_code: &[u8],
-    children: &[tree_sitter::Node],
+    nodes: &[NodeRecord],
 ) -> Option<u64> {
     let mut hasher = MetroHash64::new();
-    hasher.write(node.kind_id().to_le_bytes().as_slice());
+    hasher.write(record.kind_id.to_le_bytes().as_slice());
 
     let mut any_content = false;
     let mut hash_if_content = |hasher: &mut MetroHash64, start: usize, end: usize| {
@@ -286,12 +268,12 @@ fn compute_owned_text_hash(
         }
     };
 
-    let mut gap_start = node.start_byte();
-    for child in children {
-        hash_if_content(&mut hasher, gap_start, child.start_byte());
-        gap_start = child.end_byte();
+    let mut gap_start = record.start_byte;
+    for &child in &record.children {
+        hash_if_content(&mut hasher, gap_start, nodes[child].start_byte);
+        gap_start = nodes[child].end_byte;
     }
-    hash_if_content(&mut hasher, gap_start, node.end_byte());
+    hash_if_content(&mut hasher, gap_start, record.end_byte);
 
     any_content.then(|| hasher.finish())
 }
@@ -314,12 +296,12 @@ fn hash_gap(hasher: &mut MetroHash64, source: &[u8], start: usize, end: usize) {
 * This is a recursive function that hashes only the node type and child structure,
 * ignoring the actual values and positions.
 */
-fn compute_structural_hash(node: &tree_sitter::Node, child_hashes: &[u64]) -> u64 {
+fn compute_structural_hash(record: &NodeRecord, child_hashes: &[u64]) -> u64 {
     let mut hasher = MetroHash64::new();
 
     // Hash only node type and child count (structure), not position or values
-    hasher.write(node.kind_id().to_le_bytes().as_slice());
-    hasher.write(node.child_count().to_le_bytes().as_slice());
+    hasher.write(record.kind_id.to_le_bytes().as_slice());
+    hasher.write(record.children.len().to_le_bytes().as_slice());
 
     for &child_hash in child_hashes {
         hasher.write(child_hash.to_le_bytes().as_slice());
@@ -345,17 +327,17 @@ fn compute_structural_hash(node: &tree_sitter::Node, child_hashes: &[u64]) -> u6
 * `pair_children_for_descent`), or reordered children get re-mangled by a positional `zip`.
 */
 fn compute_kind_and_value_hash(
-    node: &tree_sitter::Node,
+    record: &NodeRecord,
     source_code: &[u8],
-    children: &[tree_sitter::Node],
+    nodes: &[NodeRecord],
     child_hashes: &[u64],
     language: Language,
 ) -> u64 {
     let mut hasher = MetroHash64::new();
-    hasher.write(node.kind_id().to_le_bytes().as_slice());
-    hasher.write(node.child_count().to_le_bytes().as_slice());
+    hasher.write(record.kind_id.to_le_bytes().as_slice());
+    hasher.write(record.children.len().to_le_bytes().as_slice());
 
-    if is_commutative_container(node.kind(), &language) {
+    if is_commutative_container(record.kind, &language) {
         // Order-independent: sort (child_hash) pairs, drop gap text (gap order/identity is
         // itself a document-order artifact that doesn't make sense to preserve once children are
         // allowed to reorder).
@@ -365,13 +347,13 @@ fn compute_kind_and_value_hash(
             hasher.write(hash.to_le_bytes().as_slice());
         }
     } else {
-        let mut gap_start = node.start_byte();
-        for (child, &child_hash) in children.iter().zip(child_hashes) {
-            hash_gap(&mut hasher, source_code, gap_start, child.start_byte());
+        let mut gap_start = record.start_byte;
+        for (&child, &child_hash) in record.children.iter().zip(child_hashes) {
+            hash_gap(&mut hasher, source_code, gap_start, nodes[child].start_byte);
             hasher.write(child_hash.to_le_bytes().as_slice());
-            gap_start = child.end_byte();
+            gap_start = nodes[child].end_byte;
         }
-        hash_gap(&mut hasher, source_code, gap_start, node.end_byte());
+        hash_gap(&mut hasher, source_code, gap_start, record.end_byte);
     }
 
     hasher.finish()
@@ -387,17 +369,13 @@ fn compute_kind_and_value_hash(
 * ignore both) - `KindOnlyHash` collapses all of that into the single coarsest tier (any leaf
 * value, since leaf values aren't hashed at all), an accepted precision loss - see `TODO.md`.
 */
-fn compute_kind_only_hash(
-    node: &tree_sitter::Node,
-    child_hashes: &[u64],
-    language: Language,
-) -> u64 {
+fn compute_kind_only_hash(record: &NodeRecord, child_hashes: &[u64], language: Language) -> u64 {
     let mut hasher = MetroHash64::new();
-    hasher.write(node.kind_id().to_le_bytes().as_slice());
-    hasher.write(node.child_count().to_le_bytes().as_slice());
+    hasher.write(record.kind_id.to_le_bytes().as_slice());
+    hasher.write(record.children.len().to_le_bytes().as_slice());
 
     let mut child_hashes = child_hashes.to_vec();
-    if is_commutative_container(node.kind(), &language) {
+    if is_commutative_container(record.kind, &language) {
         child_hashes.sort_unstable();
     }
     for hash in child_hashes {

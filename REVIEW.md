@@ -163,6 +163,16 @@ done; the §4 typos are fixed except `symetric` (×3).
   filling `node_info` (children, parent, depth, preorder, start byte) and every later step -
   hashes, subtree sizes, widest child, reference nodes - computed over `node_info`'s ids, which
   removes six of the eight walks and most of the cursor traffic.
+- **2026-09-06, section 6 (arena)** - done: `metadata::collect_nodes` is the one tree-sitter
+  walk (a single cursor, no per-node cursor creation), producing a preorder `NodeRecord` table;
+  hashing, sketches, subtree sizes, node info, depths, parents and reference discovery all run
+  over the table's indices. The two orders the old walks produced by accident - right-to-left
+  post-order for the hash buckets (the exact-tie fallback in two passes), right-to-left preorder
+  for reference discovery's stable sort - are reproduced deliberately, and the benchmark CSV is
+  identical in every column but timing. 75k-node fixture 2.41s to 2.14s (2.78s before the
+  section), the JSON fixture 2.94s to 2.44s (3.08s), instructions 15.99G to 13.80G (18.46G).
+  What is left is APTED's own core (`spf_path` 35%, `spf_a`, `ContainmentCtx::adjust` 4%) and
+  malloc (~5%); items 6.4-6.8 in the list above cover those, and each needs its own profile.
 - **Runtime finding from the same measurement**: over the corpus, AST metadata costs about three
   times the tree-sitter parse, and the parse plus metadata (15.5s) is more than half the diff
   itself (28s per the quality baseline). Section 6's items 1-3 are that cost.
