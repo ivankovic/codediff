@@ -22,12 +22,17 @@ use crate::test::helper::human_mapping::assert_matches_human_painting_within_lim
 
 #[test]
 fn mapping() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("c-postgres-postgres-preprocessor-heavy-change")
+    test::helper::human_mapping::assert_matches_human_mapping(
+        "c-postgres-postgres-preprocessor-heavy-change",
+    )
 }
 
 #[test]
 fn painting() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test, read the rate it
-    // reports for both modes, and record that instead.
-    assert_matches_human_painting_within_limit("c-postgres-postgres-preprocessor-heavy-change", 100.0)
+    // measured 2026-09-06: minimal 0.725%, full 0.518%
+    // The only fixture in the 2026-09-06 batch where Minimal disagrees more than Full.
+    assert_matches_human_painting_within_limit(
+        "c-postgres-postgres-preprocessor-heavy-change",
+        0.74,
+    )
 }

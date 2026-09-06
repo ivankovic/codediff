@@ -22,12 +22,13 @@ use crate::test::helper::human_mapping::assert_matches_human_painting_within_lim
 
 #[test]
 fn mapping() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("rust-tauri-apps-tauri-add-use-and-function")
+    test::helper::human_mapping::assert_matches_human_mapping(
+        "rust-tauri-apps-tauri-add-use-and-function",
+    )
 }
 
 #[test]
 fn painting() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test, read the rate it
-    // reports for both modes, and record that instead.
-    assert_matches_human_painting_within_limit("rust-tauri-apps-tauri-add-use-and-function", 100.0)
+    // measured 2026-09-06: minimal 1.592%, full 2.454%
+    assert_matches_human_painting_within_limit("rust-tauri-apps-tauri-add-use-and-function", 2.47)
 }

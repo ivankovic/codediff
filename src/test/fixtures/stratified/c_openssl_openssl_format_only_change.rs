@@ -23,12 +23,17 @@ use crate::test::helper::human_mapping::assert_matches_human_painting_within_lim
 #[test]
 fn mapping() -> Result<()> {
     // Whitespace only. Minimal painting is empty.
-    test::helper::human_mapping::assert_matches_human_mapping("c-openssl-openssl-format-only-change")
+    test::helper::human_mapping::assert_matches_human_mapping(
+        "c-openssl-openssl-format-only-change",
+    )
 }
 
 #[test]
 fn painting() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test, read the rate it
-    // reports for both modes, and record that instead.
-    assert_matches_human_painting_within_limit("c-openssl-openssl-format-only-change", 100.0)
+    // measured 2026-09-06: minimal 4.800%, full 11.189%
+    // The largest disagreement among the fixtures added on 2026-09-06, and not a mapping defect:
+    // this commit only reflows whitespace, and interior whitespace lives in the gaps between AST
+    // nodes, where no painting can reach it. codediff paints the reflowed statements themselves;
+    // the human painted nothing under Minimal. Recorded as the distance it is, not as a target.
+    assert_matches_human_painting_within_limit("c-openssl-openssl-format-only-change", 11.20)
 }

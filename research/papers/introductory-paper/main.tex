@@ -520,10 +520,10 @@ def is_even(x):
   return isinstance(x, int) and x > 0 and x % 2 == 0
 \end{verbatim}
 
-The AST of the first snippet contains two \texttt{binary_expression} nodes, one a direct child of the other.
-The second snippet contains three. There is no objective way to determine which of the three \texttt{binary_expression}
+The AST of the first snippet contains two \texttt{binary\_expression} nodes, one a direct child of the other.
+The second snippet contains three. There is no objective way to determine which of the three \texttt{binary\_expression}
 nodes in the second AST is added and which two should be matched. The edit distance cost of all mappings is
-exactly equal, and since \texttt{binary_expression} is an internal node with no rendering, all mappings will
+exactly equal, and since \texttt{binary\_expression} is an internal node with no rendering, all mappings will
 also result in exact same visualization, so the human subjective evaluation cannot be used to determine the best
 mapping either.
 
