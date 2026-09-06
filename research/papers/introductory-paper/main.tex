@@ -258,22 +258,25 @@ alignment over a smaller, hand-picked set of compiled-in grammars.
 \section{Empirical Dataset}
 \label{sec:dataset}
 
-To understand the real-world environment code diffing tools are used in, we built a dataset of
-\NumFixtures{} real open source code changes.
+To understand the real-world environment code diffing tools are used in, we built a dataset of \NumFiles{}
+code files in \NumLanguages{}. Of these, we sampled \NumFixtures{} real open source code changes and
+examined them in depth.
 
 To ensure good coverage, we built two sets of open-source repositories:
 
 \begin{itemize}
   \item The Curated list - 100 open source repositories, selected manually from several lists of
     most popular repositories, enhanced further by repositories we, the authors, were already
-    aware of. The Curated list was used as a smaller list to repeatedly test the analysis infrastructure
-    although it does represent good coverage of most popular programming languages.
-  \item The Full List - \NumRepos{} repositories. This list was created by expanding the Curated list
-    with all repositories present in the Gentoo Linux distribution's package list.
+    aware of. This biased the list towards active, widely used codebases, with good coverage in
+    many programming languages. The Curated list was also used as a smaller list to repeatedly
+    test the papers own codebase, including in automated test infrastructure.
+  \item The Full List - \NumRepos{} repositories, created by expanding the Curated list
+    with all repositories present in the Gentoo Linux distribution's package list. This includes
+    a wide array of codebases of different activity, code quality, userbase and progarmming language
+    mixes.
 \end{itemize}
 
-We cloned each repository to a depth of \CorpusCloneDepth{} commits from every main branch. The resulting
-dataset has \NumFiles{} files in \NumLanguages{} languages. While we cannot guarantee that all repositories
+We cloned each repository to a depth of \CorpusCloneDepth{} commits from every main branch. While we cannot guarantee that all repositories
 remain accessible, the entire list of repositories, the cloning script and all analysis is available from
 the projects repository and can be replicated by readers, if desired.
 
@@ -312,6 +315,10 @@ Byte size and AST node count have a strong correlation, Pearson $r = \Correlatio
 $|\text{AST}| \approx \text{bytes} / 5$ for quick estimates.
 
 \subsection{Shape of real-world file edits}
+\label{sec:edit-shape}
+
+TODO: Run for the full dataset as well
+TODO: Present two datasets side by side
 
 In the Curated dataset, we analyzed \EditsCommits{} commits, touching \EditsCodeFileEdits{} code files, of
 which \EditsCodeSharePct{} were code files. Of the code-file edits, \EditsModifiedSharePct{}\% were file
@@ -321,6 +328,7 @@ from skewing the results each repository was only analyzed up to \CorpusCloneDep
 To allow for comparison with existing research, \texttt{git diff} was used to compute the number of
 changed lines.
 
+TODO: Add percentage of lines changed, per file, to the table
 \begin{table}
   \caption{Size of real-world edits}
   \label{tab:edit-shape}
@@ -330,7 +338,6 @@ changed lines.
     \midrule
     Lines changed, per file   & \EditsLinesPerFilePFifty{}   & \EditsLinesPerFilePNinety{}   & \EditsLinesPerFilePNinetyNine{}   & \EditsLinesPerFileMax{} \\
     Lines changed, per commit & \EditsLinesPerCommitPFifty{} & \EditsLinesPerCommitPNinety{} & \EditsLinesPerCommitPNinetyNine{} & \EditsLinesPerCommitMax{} \\
-    TODO: Percentage of lines changed, per file
     \bottomrule
   \end{tabular}
 \end{table}
@@ -346,11 +353,16 @@ lines.
 From both Curated and Full list of repositories, we fully randomly sampled \SampleDiffsPerLanguage{}
 diffs per language. That gave \SampleCuratedSampled{} diffs from the Curated list across
 \SampleCuratedLanguages{} languages, and \SampleFullSampled{} from the Full list across
-\SampleFullLanguages{} languages. Every sampled diff was first manually inspected for any errors.
-At this stage, \SampleRejectedTotal{} diffs were rejected, mostly because of errors in sampling where,
-in particular TypeScript (\SampleRejectedTypeScript{} rejected) and R (\SampleRejectedR{}), file extensions were
-used for other languages. This resulted in a dataset of \SampleCuratedPromoted{} diffs from the
-Curated and \SampleFullPromoted{} diffs from the Full list.
+\SampleFullLanguages{} languages. Every sampled diff was first manually inspected for sampling errors.
+At this stage, \SampleRejectedTotal{} diffs were rejected, mostly because programming language detection detected
+the wrong language. In particular TypeScript (\SampleRejectedTypeScript{} rejected) and R (\SampleRejectedR{}) file
+extensions were used for other languages or data. This resulted in a dataset of \SampleCuratedPromoted{} diffs from the
+Curated and \SampleFullPromoted{} diffs from the Full list. As shown in Section~\ref{sec:edit-shape}, a pure random
+sample would be heavily slanted towards small changes. To account for this, the fully random sample was further
+augmented by a stratified sample based on the lines of code of the files being changed. The larger of the two sizes was used.
+The strata were: 1 to 10 lines, 11 to 30, 31 to 100, 101 to 300, 301 to 1000, 1001 to 3000 and more than 3000 lines
+of code. In each strata, 10 diffs were randomly sampled, per language. The same inspection was done which resulted in
+TODO: variable diffs.
 
 Each diff was then solved by hand by us, the authors. We have each at least 15 years of experience in
 software development, and have reviewed tens of thousands of real world code changes in industrial
@@ -363,7 +375,7 @@ In particular, \AmbiguityFullWith{} of the Full list's \AmbiguityFullTotal{} dif
  where two or more similar blocks of code are moved to a common function. The correct solution is the
  one that maps all nodes as moved.}.
 
-Note, diffing multiple files and detecting cross-file code moves is out of scope of this paper.
+Please note, diffing multiple files and detecting cross-file code moves is out of scope of this paper.
 
 \section{Viability}
 \label{sec:viability}
@@ -453,7 +465,8 @@ used to instant diffs using existing tools, so any AST diffing tool that expects
 meet a similar bar.
 
 We sampled \RqOnePairsAttempted{} real (before, after) file pairs from single-parent commits in the
-dataset, stratified per language and per size bucket. On each pair, we ran our highly optimized,
+dataset, stratified per language and per size bucket. The buckets used in this stratification were the same
+as defined in Section~\ref{sec:diff-shape}. On each pair, we ran our highly optimized,
 state of the art APTED implementation, with a one second runtime budget enforced using common operating
 system runtime limits.
 
@@ -466,81 +479,64 @@ system runtime limits.
 \end{figure*}
 
 Figure~\ref{fig:rq1} shows the fraction of pairs completed within one second, per size bucket.
+Note that the figure also provides an indication on how much the algorithm performance depends
+on the shape of the inputs. Scripting languages can be diffed signifficantly faster than normal
+code and diffing data files is slightly slower than code.
 
 \begin{resultbox}{RA2 (Speed)}
-  Within one second, pure tree edit distance algorithms can find the optimal diff for
-  \RqOneCodeTenToThirtyPct{}\% of files between 10 and 30 LOC. For larger files, fewer than a
-  third of files can be processed within one second. In total, only \RqOneCodePct{}\% of diffs
+  Within one second, pure tree edit distance algorithms can find the optimal diff for almost
+  all pairs of code files smaller than 30 lines of code. For larger files, fewer than a
+  third of diffs can be processed within one second. In total, only \RqOneCodePct{}\% of diffs
   compute under one second.
 \end{resultbox}
-
-The data also makes the algorithms dependence on the tree shape visible. Scripting languages perform
-slightly better, and data and configuration slightly worse.
 
 \section{Uniqueness}
 \label{sec:uniqueness}
 
+Existing tools all provide a single diff. Line based tools mark lines as inserted, deleted or match lines
+1:1. Tree based tools and algorithms have 4 basic operations: insert node, delete node, update node
+and match nodes 1:1. Some algorithms extend the basic operations with tree equivalents, e.g. insert tree or
+delete tree. No tool allows for a set of lines or nodes to match a set of lines or nodes, i.e. a N:M mapping.
+
+Manually examining real-world inputs, we found that these operations cannot correctly express
+diffs that humans would identify as subjectively optimal. There are two ways in which set mappings manifest:
+
+\begin{itemize}
+  \item Multiple equally correct 1:1 mappings within a given N:M mapping must cover one side of the mapping
+    completely. The remaining nodes on the other side should be marked as inserted or deleted, as appropriate.
+  \item Multiple nodes truly map to multiple nodes simultaneously.
+\end{itemize}
+
+As a motivating example, consider the following Python code snippets:
+
+TODO: put these side by side
+\begin{verbatim}
+def is_even(x):
+  return x > 0 and x % 2 == 0
+\end{verbatim}
+
+\begin{verbatim}
+def is_even(x):
+  return isinstance(x, int) and x > 0 and x % 2 == 0
+\end{verbatim}
+
+The AST of the first snippet contains two \texttt{binary_expression} nodes, one a direct child of the other.
+The second snippet contains three. There is no objective way to determine which of the three \texttt{binary_expression}
+nodes in the second AST is added and which two should be matched. The edit distance cost of all mappings is
+exactly equal, and since \texttt{binary_expression} is an internal node with no rendering, all mappings will
+also result in exact same visualization, so the human subjective evaluation cannot be used to determine the best
+mapping either.
+
 \textbf{RQ3.1.} What percentage of real-world code changes have multiple optimal AST node
 mappings?
 
-Any accuracy metric of the usual kind rests on an assumption worth testing before any tool is
-measured by it: that for a given change there is one correct mapping to recover. The corpus shows
-it failing in two ways, and we keep them apart because they rest on different evidence.
-
-The first follows from RA1.1. At every site the ground truth records as $N{:}M$, the format
-accepts any consistent pairing of $\min(N, M)$ pairs as correct, and there is more than one such
-pairing whenever $N$ or $M$ exceeds one, which is every group. Each of those sites is therefore
-also a site where several one-to-one mappings are equally correct---one of two identical calls is
-removed, a member is appended to an expression chain, an argument is added to a list of similar
-arguments---and choosing between them is arbitrary rather than correct. A diffing algorithm can
-still emit a correct answer here; what fails is the assumption that the correct answer is unique.
-\AmbiguityAnyPct{}\% of the corpus's fixtures contain such a site, and the sites account for
-\AmbiguityPairsPct{}\% of all non-identical mapping decisions.
-
-The second is independent of the annotation format, and comes from the cost comparison behind
-RA1.2. On \CostTieDifferentFixtures{} of the \CostScored{} fixtures---\CostTieDifferentPct{}\%---%
-the automated matcher produced a mapping that differs from the human's and costs exactly the same.
-Under the cost model the two are indistinguishable; the annotator, asked for the mapping a reader
-would draw, chose one of them. These are not sites the ground truth marks as ambiguous. They are
-changes on which the cost function alone under-determines the answer, and the figure is a lower
-bound of the same kind as RA1.2's, since only one alternative mapping per change was examined.
-
 \begin{resultbox}{RA3.1 (Mapping uniqueness)}
-A correct AST mapping is often not unique. In \AmbiguityAnyPct{}\% of the corpus's fixtures
-(\AmbiguityAnyFixtures{} of \AmbiguityScored{}), at least one
-set of nodes admits several equally correct pairings;
-weighted by mapping decisions rather than fixtures, that is \AmbiguityPairs{}
-of \AmbiguityPairedDecisions{} non-identical node pairs, \AmbiguityPairsPct{}\%. Independently, on
-\CostTieDifferentPct{}\% of changes a second, different mapping exists at exactly the human
-mapping's cost, so the cost model by itself does not single out an answer either. An evaluation
-that scores a tool against one fixed pairing therefore risks marking correct output wrong on
-roughly one change in seven, whenever the tool picks a different, equally valid pairing.
+  In \AmbiguityAnyPct{}\% of the corpus's fixtures (\AmbiguityAnyFixtures{} of \AmbiguityScored{}),
+  at least one set of nodes admits several equally correct pairings.
 \end{resultbox}
-
-Both rates remain lower bounds for the reason RA1.1 gives: a group
-exists only where an annotator noticed that a choice was a choice. That the count is conservative
-in this direction is what makes it usable---an over-count would be an argument about annotation
-discipline, whereas an under-count still establishes that the phenomenon is common enough to
-affect how accuracy is measured. The practical consequence is a claim about methodology rather
-than about any tool. Scoring against a single pairing is the default in this area, and on a corpus
-like this one it puts a measurable error term into every reported rate: on the affected changes, a
-tool that picks a different valid pairing is recorded as wrong for a choice that was never wrong.
-The corpus in this paper avoids that by validating any consistent pairing within a group, which is
-why the accuracy numbers reported in Section~\ref{sec:tools} do not inherit its error term. For the
-$N{:}M$ sites themselves it has no such escape, and neither does any corpus built on one-to-one
-mappings. Reporting a fixed-pairing metric is still defensible, but the rate belongs alongside it.
-
-\subsection{Multiple correct visualizations}
 
 \textbf{RQ3.2.} What percentage of real-world code changes have multiple equally correct textual
 visualizations of the diff?
-
-RQ3.1 asked whether the mapping is unique. RQ3.2 asks whether the text a reader sees is. It is the
-natural place to hope the ambiguity of RQ3.1 washes out: several mappings may be equally correct,
-but perhaps they project onto the same highlighted text, so a tool that picks any of them renders
-the same diff and the choice never reaches the reader. The painted portion of the corpus
-(Section~\ref{sec:dataset}) is what tests that hope, because it records the rendering directly
-instead of deriving it from a mapping.
 
 It does not wash out. Of the \PaintingSampledPainted{} painted changes sampled from real commits,
 \PaintingSampledDual{}---\PaintingSampledDualPct{}\%---carry two paintings, the annotator's finding
