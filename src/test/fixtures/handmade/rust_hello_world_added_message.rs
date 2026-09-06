@@ -19,6 +19,7 @@ use crate::diff;
 use crate::diff::ASTMappingOperation;
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 use anyhow::Result;
 
 #[test]
@@ -67,4 +68,9 @@ fn painting() -> Result<()> {
     // structural punctuation and whitespace Minimal drops, so it has strictly more bytes to be
     // wrong about. The clamp records the worse of the two.
     assert_matches_human_painting_within_limit("rust-hello-world-added-message", 0.69)
+}
+
+#[test]
+fn invariants() -> Result<()> {
+    assert_ground_truth_invariants("rust-hello-world-added-message")
 }

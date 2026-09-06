@@ -19,6 +19,7 @@ use anyhow::Result;
 
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants_with_known_violations;
 
 #[test]
 fn mapping() -> Result<()> {
@@ -30,4 +31,15 @@ fn mapping() -> Result<()> {
 fn painting() -> Result<()> {
     // measured 2026-09-05: minimal 8.173%, full 8.173%
     assert_matches_human_painting_within_limit("c-openssl-openssl-whitepsace-only", 8.19)
+}
+
+#[test]
+fn invariants() -> Result<()> {
+    // measured 2026-09-06: 5 painted rows end on a space.
+    // This commit re-aligns the trailing `/* opener */`-style comments in a table of `NULL,`
+    // entries, so on each of five rows the only thing that changed is the run of spaces between
+    // the comma and the comment. The painter covered that run, which is the whole edit there and
+    // the one place the "end on something visible" rule has nothing to offer: narrowing the span
+    // to a visible character would paint the unchanged `NULL,` instead of the change.
+    assert_ground_truth_invariants_with_known_violations("c-openssl-openssl-whitepsace-only", 5)
 }

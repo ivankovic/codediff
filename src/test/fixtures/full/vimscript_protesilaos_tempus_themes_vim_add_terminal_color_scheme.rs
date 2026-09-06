@@ -16,6 +16,7 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 use crate::test;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 use anyhow::Result;
 
 #[test]
@@ -30,5 +31,12 @@ fn mapping() -> Result<()> {
         "vimscript-protesilaos-tempus-themes-vim-add-terminal-color-scheme",
         19,
         15,
+    )
+}
+
+#[test]
+fn invariants() -> Result<()> {
+    assert_ground_truth_invariants(
+        "vimscript-protesilaos-tempus-themes-vim-add-terminal-color-scheme",
     )
 }

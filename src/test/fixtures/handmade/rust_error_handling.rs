@@ -17,6 +17,7 @@
  */
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 use anyhow::Result;
 
 #[test]
@@ -94,4 +95,9 @@ fn painting() -> Result<()> {
     // fraction and 43/698 is 6.16046% - a first pass recorded 6.16 from the displayed 6.160%
     // and failed on the very run that set it.
     assert_matches_human_painting_within_limit("rust-error-handling", 6.17)
+}
+
+#[test]
+fn invariants() -> Result<()> {
+    assert_ground_truth_invariants("rust-error-handling")
 }

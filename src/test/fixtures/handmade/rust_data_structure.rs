@@ -17,6 +17,7 @@
  */
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 use anyhow::Result;
 
 #[test]
@@ -29,4 +30,9 @@ fn painting() -> Result<()> {
     // limit set 2026-08-28 (commit bd84cd3, a rendering fix, not this stub's own measurement);
     // re-measured 2026-09-01, unchanged: minimal 13.793%, full 7.635%
     assert_matches_human_painting_within_limit("rust-data-structure", 13.8)
+}
+
+#[test]
+fn invariants() -> Result<()> {
+    assert_ground_truth_invariants("rust-data-structure")
 }

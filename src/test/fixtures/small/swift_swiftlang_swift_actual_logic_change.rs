@@ -16,6 +16,7 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 use crate::test;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants_with_known_violations;
 use anyhow::Result;
 
 #[test]
@@ -31,5 +32,17 @@ fn mapping() -> Result<()> {
         "swift-swiftlang-swift-actual-logic-change",
         37,
         20,
+    )
+}
+
+#[test]
+fn invariants() -> Result<()> {
+    // measured 2026-09-06: 2 mapped brace pairs disagree, one per side: a `{` marked deleted
+    // (before, row 126) or inserted (after, row 144) whose closing brace is matched. Unlike the
+    // other fixtures clamped here these two are not a crossed pairing - each is a single pair
+    // whose halves were marked differently.
+    assert_ground_truth_invariants_with_known_violations(
+        "swift-swiftlang-swift-actual-logic-change",
+        2,
     )
 }

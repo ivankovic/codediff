@@ -19,6 +19,7 @@ use anyhow::Result;
 
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 
 #[test]
 fn mapping() -> Result<()> {
@@ -29,4 +30,9 @@ fn mapping() -> Result<()> {
 fn painting() -> Result<()> {
     // measured 2026-09-06: minimal 0.000%, full 0.000% (measured, unexamined)
     assert_matches_human_painting_within_limit("cpp-electron-electron-add-imports", 0.0)
+}
+
+#[test]
+fn invariants() -> Result<()> {
+    assert_ground_truth_invariants("cpp-electron-electron-add-imports")
 }

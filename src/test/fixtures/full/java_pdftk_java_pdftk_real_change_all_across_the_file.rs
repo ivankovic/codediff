@@ -16,6 +16,7 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 use crate::test;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants_with_known_violations;
 use anyhow::Result;
 
 #[test]
@@ -41,5 +42,15 @@ fn mapping() -> Result<()> {
         "java-pdftk-java-pdftk-real-change-all-across-the-file",
         362,
         251,
+    )
+}
+
+#[test]
+fn invariants() -> Result<()> {
+    // measured 2026-09-06: 2 mapped brace pairs disagree, both on the after side - the same
+    // crossed inner/outer pairing as cpp-godot-small-bugfix, around an inserted block.
+    assert_ground_truth_invariants_with_known_violations(
+        "java-pdftk-java-pdftk-real-change-all-across-the-file",
+        2,
     )
 }

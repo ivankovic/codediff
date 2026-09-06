@@ -17,6 +17,7 @@
  */
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 use anyhow::Result;
 
 #[test]
@@ -35,4 +36,9 @@ fn painting() -> Result<()> {
     // If this ever rises, something has broken in the unchanged path, which is worth a hard
     // failure.
     assert_matches_human_painting_within_limit("rust-no-change", 0.0)
+}
+
+#[test]
+fn invariants() -> Result<()> {
+    assert_ground_truth_invariants("rust-no-change")
 }

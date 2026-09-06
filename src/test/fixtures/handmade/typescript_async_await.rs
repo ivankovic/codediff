@@ -17,6 +17,7 @@
  */
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants_with_known_violations;
 use anyhow::Result;
 
 #[test]
@@ -46,4 +47,11 @@ fn painting() -> Result<()> {
     // insert - a defensible but not the only reading; not a regression in the rule this option
     // now actually honors.
     assert_matches_human_painting_within_limit("typescript-async-await", 34.32)
+}
+
+#[test]
+fn invariants() -> Result<()> {
+    // measured 2026-09-06: 4 painted brace pairs disagree, two per side: under Full the opening
+    // `{` of a rewritten function body is painted as a move and its `}` is left unpainted.
+    assert_ground_truth_invariants_with_known_violations("typescript-async-await", 4)
 }

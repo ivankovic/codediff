@@ -19,6 +19,7 @@ use crate::diff;
 use crate::diff::ASTMappingOperation;
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 use anyhow::Result;
 
 #[test]
@@ -67,4 +68,9 @@ fn painting() -> Result<()> {
     // the useful part: the same edit read backwards costs the same, so nothing here is
     // direction-dependent.
     assert_matches_human_painting_within_limit("rust-hello-world-removed-message", 0.69)
+}
+
+#[test]
+fn invariants() -> Result<()> {
+    assert_ground_truth_invariants("rust-hello-world-removed-message")
 }

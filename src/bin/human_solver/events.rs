@@ -1514,6 +1514,9 @@ pub(crate) fn action_save(
     if !mapping.text_mappings.is_empty() {
         ensure_painting_stub_test(name)?;
     }
+    // Unconditional, unlike the painting stub above: the invariants cover the tree mapping too,
+    // which every saved fixture has.
+    ensure_invariants_stub_test(name)?;
     *dirty = false;
     Ok(if created {
         format!(

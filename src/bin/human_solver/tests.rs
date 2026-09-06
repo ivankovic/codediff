@@ -2182,6 +2182,27 @@ fn a_fresh_painting_test_passes_and_says_it_means_nothing_yet() {
     assert!(block.starts_with("\n#[test]"), "got: {block}");
 }
 
+/// Unlike the painting stub above, this one is generated in its strict form: an invariant is a
+/// property the data either has or does not, so there is no placeholder to forget to replace.
+#[test]
+fn a_fresh_invariants_test_is_generated_strict_with_no_number_to_fill_in() {
+    let block = invariants_test_block("rust-add-if");
+
+    assert!(
+        block.contains(r#"assert_ground_truth_invariants("rust-add-if")"#),
+        "got: {block}"
+    );
+    assert!(
+        !block.contains("within_limit"),
+        "the generated form must be the strict one: {block}"
+    );
+    assert!(
+        block.contains("fn invariants()"),
+        "the test name has to match the module's convention: {block}"
+    );
+    assert!(block.starts_with("\n#[test]"), "got: {block}");
+}
+
 /// A bare `App` for the text-painting action tests: they only touch `mapping`, `dirty` and
 /// `status`, so the AST panels' node ids are irrelevant and a dummy pair keeps the setup to
 /// one line.

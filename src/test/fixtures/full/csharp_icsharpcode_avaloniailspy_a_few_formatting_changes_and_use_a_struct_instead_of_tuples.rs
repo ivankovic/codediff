@@ -16,6 +16,7 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 use crate::test;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants_with_known_violations;
 use anyhow::Result;
 
 #[test]
@@ -27,5 +28,18 @@ fn mapping() -> Result<()> {
         "csharp-icsharpcode-avaloniailspy-a-few-formatting-changes-and-use-a-struct-instead-of-tuples",
         5,
         5,
+    )
+}
+
+#[test]
+fn invariants() -> Result<()> {
+    // measured 2026-09-06: 2 mapped parenthesis pairs disagree, both on row 506.
+    // The line holds two pairs - a tuple and a `(List<PartialTypeInfo>)` cast - and becomes a
+    // single `new ProjectItemInfo(...)` call. The human's pairing crosses them: each surviving
+    // `(` is matched while the `)` that closes it is deleted, and vice versa. Re-pairing is a
+    // mapping edit, not a mechanical fix.
+    assert_ground_truth_invariants_with_known_violations(
+        "csharp-icsharpcode-avaloniailspy-a-few-formatting-changes-and-use-a-struct-instead-of-tuples",
+        2,
     )
 }

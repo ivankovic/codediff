@@ -16,6 +16,7 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 use crate::test;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants_with_known_violations;
 use anyhow::Result;
 
 #[test]
@@ -24,5 +25,15 @@ fn mapping() -> Result<()> {
         "rust-vercel-nextjs-refactoring-would-require-mulitmap-mapping",
         6,
         4,
+    )
+}
+
+#[test]
+fn invariants() -> Result<()> {
+    // measured 2026-09-06: 2 mapped parenthesis pairs disagree, rows 1114/1117 - the crossed
+    // kept-with-deleted pairing this fixture's name already warns about.
+    assert_ground_truth_invariants_with_known_violations(
+        "rust-vercel-nextjs-refactoring-would-require-mulitmap-mapping",
+        2,
     )
 }

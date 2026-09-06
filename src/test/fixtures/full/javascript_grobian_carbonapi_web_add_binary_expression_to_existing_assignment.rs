@@ -16,6 +16,7 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 use crate::test;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 use anyhow::Result;
 
 #[test]
@@ -28,6 +29,13 @@ fn mapping() -> Result<()> {
     // `quality_baseline.csv` was the only thing still holding this fixture to its real number. Any
     // counts above describe a residual that no longer exists.
     test::helper::human_mapping::assert_matches_human_mapping(
+        "javascript-grobian-carbonapi-web-add-binary-expression-to-existing-assignment",
+    )
+}
+
+#[test]
+fn invariants() -> Result<()> {
+    assert_ground_truth_invariants(
         "javascript-grobian-carbonapi-web-add-binary-expression-to-existing-assignment",
     )
 }

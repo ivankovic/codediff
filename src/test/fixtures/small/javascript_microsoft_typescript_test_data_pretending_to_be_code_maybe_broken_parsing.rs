@@ -16,6 +16,7 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 use crate::test;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 use anyhow::Result;
 
 #[test]
@@ -28,5 +29,12 @@ fn mapping() -> Result<()> {
         "javascript-microsoft-typescript-test-data-pretending-to-be-code-maybe-broken-parsing",
         2,
         2,
+    )
+}
+
+#[test]
+fn invariants() -> Result<()> {
+    assert_ground_truth_invariants(
+        "javascript-microsoft-typescript-test-data-pretending-to-be-code-maybe-broken-parsing",
     )
 }

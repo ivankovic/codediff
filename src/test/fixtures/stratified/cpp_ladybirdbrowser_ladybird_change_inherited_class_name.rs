@@ -19,6 +19,7 @@ use anyhow::Result;
 
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 
 #[test]
 fn mapping() -> Result<()> {
@@ -34,4 +35,9 @@ fn painting() -> Result<()> {
         "cpp-ladybirdbrowser-ladybird-change-inherited-class-name",
         0.0,
     )
+}
+
+#[test]
+fn invariants() -> Result<()> {
+    assert_ground_truth_invariants("cpp-ladybirdbrowser-ladybird-change-inherited-class-name")
 }

@@ -17,6 +17,7 @@
  */
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants_with_known_violations;
 use anyhow::Result;
 
 #[test]
@@ -41,4 +42,14 @@ fn painting() -> Result<()> {
     // measured 2026-09-01: minimal 6.537%, full 22.212% (measured, unexamined) - minimal dropped
     // from 37.788% after paint_reindent_only_moves shipped (see solve_nested_condition_collapse)
     assert_matches_human_painting_within_limit("rust-next-font-imports-generator", 22.24)
+}
+
+#[test]
+fn invariants() -> Result<()> {
+    // measured 2026-09-06: 4 mapped brace pairs and 2 painted parenthesis pairs disagree.
+    // The mapped four are crossed inner/outer pairings around deleted blocks; the painted two are
+    // a `(` left unpainted whose `)` eleven rows later is painted as a move. This fixture is
+    // already the corpus's largest painting residual (see the painting limit above), and both
+    // shapes are part of the same unreviewed region.
+    assert_ground_truth_invariants_with_known_violations("rust-next-font-imports-generator", 6)
 }

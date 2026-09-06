@@ -17,6 +17,7 @@
  */
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 use anyhow::Result;
 
 #[test]
@@ -32,4 +33,9 @@ fn painting() -> Result<()> {
     // own row for this fixture: a genuine matching gap, not a rendering-option question - human
     // marks shifted name/age parameter names Move, codediff leaves them Identical - not attempted.
     assert_matches_human_painting_within_limit("kotlin-add-data-class", 9.93)
+}
+
+#[test]
+fn invariants() -> Result<()> {
+    assert_ground_truth_invariants("kotlin-add-data-class")
 }

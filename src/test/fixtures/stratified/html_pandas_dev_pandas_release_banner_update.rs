@@ -18,10 +18,16 @@
 use anyhow::Result;
 
 use crate::test;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 
 #[test]
 fn mapping() -> Result<()> {
     test::helper::human_mapping::assert_matches_human_mapping(
         "html-pandas-dev-pandas-release-banner-update",
     )
+}
+
+#[test]
+fn invariants() -> Result<()> {
+    assert_ground_truth_invariants("html-pandas-dev-pandas-release-banner-update")
 }

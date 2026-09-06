@@ -17,6 +17,7 @@
  */
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 use anyhow::Result;
 
 #[test]
@@ -30,4 +31,9 @@ fn painting() -> Result<()> {
     // solve_heritage_clause_growth shipped (class/interface gaining a heritage clause no longer
     // paints its untouched body as Move)
     assert_matches_human_painting_within_limit("typescript-refactor-interface", 2.24)
+}
+
+#[test]
+fn invariants() -> Result<()> {
+    assert_ground_truth_invariants("typescript-refactor-interface")
 }

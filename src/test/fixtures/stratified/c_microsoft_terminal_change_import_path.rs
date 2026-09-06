@@ -19,6 +19,7 @@ use anyhow::Result;
 
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 
 #[test]
 fn mapping() -> Result<()> {
@@ -31,4 +32,9 @@ fn mapping() -> Result<()> {
 fn painting() -> Result<()> {
     // measured 2026-09-06: minimal 0.000%, full 0.430%
     assert_matches_human_painting_within_limit("c-microsoft-terminal-change-import-path", 0.45)
+}
+
+#[test]
+fn invariants() -> Result<()> {
+    assert_ground_truth_invariants("c-microsoft-terminal-change-import-path")
 }

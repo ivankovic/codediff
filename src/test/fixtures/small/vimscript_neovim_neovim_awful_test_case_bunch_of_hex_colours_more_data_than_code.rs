@@ -16,6 +16,7 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 use crate::test;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 use anyhow::Result;
 
 #[test]
@@ -37,5 +38,12 @@ fn mapping() -> Result<()> {
         "vimscript-neovim-neovim-awful-test-case-bunch-of-hex-colours-more-data-than-code",
         1072,
         761,
+    )
+}
+
+#[test]
+fn invariants() -> Result<()> {
+    assert_ground_truth_invariants(
+        "vimscript-neovim-neovim-awful-test-case-bunch-of-hex-colours-more-data-than-code",
     )
 }

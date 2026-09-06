@@ -16,11 +16,19 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 use crate::test;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
     test::helper::human_mapping::assert_matches_human_mapping(
+        "java-protocolbuffers-protobuf-add-import-and-update-field-access",
+    )
+}
+
+#[test]
+fn invariants() -> Result<()> {
+    assert_ground_truth_invariants(
         "java-protocolbuffers-protobuf-add-import-and-update-field-access",
     )
 }

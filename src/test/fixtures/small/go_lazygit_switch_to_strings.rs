@@ -17,6 +17,7 @@
  */
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 use anyhow::Result;
 
 #[test]
@@ -32,4 +33,9 @@ fn mapping() -> Result<()> {
 fn painting() -> Result<()> {
     // measured 2026-09-05: minimal 2.564%, full 3.812%
     assert_matches_human_painting_within_limit("go-lazygit-switch-to-strings", 3.83)
+}
+
+#[test]
+fn invariants() -> Result<()> {
+    assert_ground_truth_invariants("go-lazygit-switch-to-strings")
 }

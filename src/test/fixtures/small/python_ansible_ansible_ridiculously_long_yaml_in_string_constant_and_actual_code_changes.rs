@@ -16,6 +16,7 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 use crate::test;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 use anyhow::Result;
 
 #[test]
@@ -24,5 +25,12 @@ fn mapping() -> Result<()> {
         "python-ansible-ansible-ridiculously-long-yaml-in-string-constant-and-actual-code-changes",
         13,
         9,
+    )
+}
+
+#[test]
+fn invariants() -> Result<()> {
+    assert_ground_truth_invariants(
+        "python-ansible-ansible-ridiculously-long-yaml-in-string-constant-and-actual-code-changes",
     )
 }

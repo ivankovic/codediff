@@ -17,6 +17,7 @@
  */
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 use anyhow::Result;
 
 #[test]
@@ -28,4 +29,9 @@ fn mapping() -> Result<()> {
 fn painting() -> Result<()> {
     // measured 2026-09-01: minimal 55.947%, full 52.423% (measured, unexamined)
     assert_matches_human_painting_within_limit("typescript-add-type-annotations", 55.97)
+}
+
+#[test]
+fn invariants() -> Result<()> {
+    assert_ground_truth_invariants("typescript-add-type-annotations")
 }

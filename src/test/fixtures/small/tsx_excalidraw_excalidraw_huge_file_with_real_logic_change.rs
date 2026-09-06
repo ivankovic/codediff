@@ -16,6 +16,7 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 use crate::test;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants_with_known_violations;
 use anyhow::Result;
 
 #[test]
@@ -36,5 +37,15 @@ fn mapping() -> Result<()> {
         "tsx-excalidraw-excalidraw-huge-file-with-real-logic-change",
         229,
         155,
+    )
+}
+
+#[test]
+fn invariants() -> Result<()> {
+    // measured 2026-09-06: 2 mapped brace pairs disagree around rows 5551-5558, crossed
+    // inner/outer around a deleted block.
+    assert_ground_truth_invariants_with_known_violations(
+        "tsx-excalidraw-excalidraw-huge-file-with-real-logic-change",
+        2,
     )
 }

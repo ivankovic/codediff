@@ -19,6 +19,7 @@ use crate::diff;
 use crate::diff::ASTMappingOperation;
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 use anyhow::{Ok, Result};
 
 #[test]
@@ -142,4 +143,9 @@ fn mapping_details_reversed() -> Result<()> {
 fn painting() -> Result<()> {
     // measured 2026-08-26: minimal 0.000%, full 0.069%
     assert_matches_human_painting_within_limit("rust-add-value-to-enum", 0.08)
+}
+
+#[test]
+fn invariants() -> Result<()> {
+    assert_ground_truth_invariants("rust-add-value-to-enum")
 }

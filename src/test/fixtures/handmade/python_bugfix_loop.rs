@@ -17,6 +17,7 @@
  */
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 use anyhow::Result;
 
 #[test]
@@ -34,4 +35,9 @@ fn painting() -> Result<()> {
     // Move while the human matches the whole rewritten skeleton as one wider Move - a
     // match-granularity gap, not a rendering-option question - not attempted.
     assert_matches_human_painting_within_limit("python-bugfix-loop", 1.71)
+}
+
+#[test]
+fn invariants() -> Result<()> {
+    assert_ground_truth_invariants("python-bugfix-loop")
 }

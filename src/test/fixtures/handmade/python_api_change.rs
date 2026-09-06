@@ -17,6 +17,7 @@
  */
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants_with_known_violations;
 use anyhow::Result;
 
 #[test]
@@ -28,4 +29,12 @@ fn mapping() -> Result<()> {
 fn painting() -> Result<()> {
     // measured 2026-08-26: minimal 26.505%, full 27.945%
     assert_matches_human_painting_within_limit("python-api-change", 25.0)
+}
+
+#[test]
+fn invariants() -> Result<()> {
+    // measured 2026-09-06: 2 painted rows end on a space.
+    // On both sides the Full painting's run ends inside the leading indentation of
+    // `        return response.json()`, whose own text is unchanged.
+    assert_ground_truth_invariants_with_known_violations("python-api-change", 2)
 }

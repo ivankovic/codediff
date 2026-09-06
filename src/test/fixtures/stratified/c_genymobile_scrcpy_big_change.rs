@@ -19,6 +19,7 @@ use anyhow::Result;
 
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 
 #[test]
 fn mapping() -> Result<()> {
@@ -35,4 +36,9 @@ fn mapping() -> Result<()> {
 fn painting() -> Result<()> {
     // measured 2026-09-05: minimal 28.975%, full 40.424%
     assert_matches_human_painting_within_limit("c-genymobile-scrcpy-big-change", 40.44)
+}
+
+#[test]
+fn invariants() -> Result<()> {
+    assert_ground_truth_invariants("c-genymobile-scrcpy-big-change")
 }

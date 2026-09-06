@@ -16,6 +16,7 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 use crate::test;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants_with_known_violations;
 use anyhow::Result;
 
 #[test]
@@ -25,4 +26,13 @@ fn mapping() -> Result<()> {
         11,
         5,
     )
+}
+
+#[test]
+fn invariants() -> Result<()> {
+    // measured 2026-09-06: 2 mapped brace pairs disagree, both on the after side.
+    // An inserted block is nested inside a kept one, and the human paired the outer `{` with the
+    // inner `}` and vice versa, so each pair reads half-matched half-inserted. Crossed rather
+    // than wrong-in-one-place: re-pairing them is a mapping edit, not a mechanical fix.
+    assert_ground_truth_invariants_with_known_violations("cpp-godot-small-bugfix", 2)
 }

@@ -16,6 +16,7 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 use crate::test;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 use anyhow::Result;
 
 #[test]
@@ -31,5 +32,12 @@ fn mapping() -> Result<()> {
         "rust-rustdesk-rustdesk-actual-logic-change-in-io-loop-medium-sized-file",
         76,
         48,
+    )
+}
+
+#[test]
+fn invariants() -> Result<()> {
+    assert_ground_truth_invariants(
+        "rust-rustdesk-rustdesk-actual-logic-change-in-io-loop-medium-sized-file",
     )
 }

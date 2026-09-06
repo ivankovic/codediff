@@ -17,6 +17,7 @@
  */
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 use anyhow::Result;
 
 #[test]
@@ -33,4 +34,9 @@ fn painting() -> Result<()> {
     // code in new error-handling structure. That is the shape codediff renders least like a
     // human does, and three fixtures now say so.
     assert_matches_human_painting_within_limit("typescript-add-error-handling", 35.61)
+}
+
+#[test]
+fn invariants() -> Result<()> {
+    assert_ground_truth_invariants("typescript-add-error-handling")
 }

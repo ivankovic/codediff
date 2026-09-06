@@ -19,6 +19,7 @@ use anyhow::Result;
 
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 
 #[test]
 fn mapping() -> Result<()> {
@@ -31,4 +32,9 @@ fn mapping() -> Result<()> {
 fn painting() -> Result<()> {
     // measured 2026-09-05: minimal 0.193%, full 0.193%
     assert_matches_human_painting_within_limit("css-wordpress-wordpress-remove-webkit-prefix", 0.21)
+}
+
+#[test]
+fn invariants() -> Result<()> {
+    assert_ground_truth_invariants("css-wordpress-wordpress-remove-webkit-prefix")
 }

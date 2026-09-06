@@ -19,6 +19,7 @@ use anyhow::Result;
 
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 
 #[test]
 fn mapping() -> Result<()> {
@@ -44,4 +45,9 @@ fn painting() -> Result<()> {
         "cpp-protocolbuffers-protobuf-add-preprocessor-commands",
         0.0,
     )
+}
+
+#[test]
+fn invariants() -> Result<()> {
+    assert_ground_truth_invariants("cpp-protocolbuffers-protobuf-add-preprocessor-commands")
 }

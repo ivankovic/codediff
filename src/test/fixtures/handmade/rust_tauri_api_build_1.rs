@@ -17,6 +17,7 @@
  */
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 use anyhow::Result;
 
 #[test]
@@ -28,4 +29,9 @@ fn mapping() -> Result<()> {
 fn painting() -> Result<()> {
     // measured 2026-08-26: minimal 0.000%, full 0.028%
     assert_matches_human_painting_within_limit("rust-tauri-api-build-1", 0.04)
+}
+
+#[test]
+fn invariants() -> Result<()> {
+    assert_ground_truth_invariants("rust-tauri-api-build-1")
 }

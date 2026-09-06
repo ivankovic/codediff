@@ -16,6 +16,7 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 use crate::test;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 use anyhow::Result;
 
 #[test]
@@ -32,5 +33,12 @@ fn mapping() -> Result<()> {
         "kotlin-nextcloud-android-move-from-one-mocking-library-to-other",
         24,
         12,
+    )
+}
+
+#[test]
+fn invariants() -> Result<()> {
+    assert_ground_truth_invariants(
+        "kotlin-nextcloud-android-move-from-one-mocking-library-to-other",
     )
 }

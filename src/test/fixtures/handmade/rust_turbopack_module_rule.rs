@@ -18,6 +18,7 @@
 use crate::diff;
 use crate::diff::ASTMappingOperation;
 use crate::test;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 use anyhow::{Ok, Result};
 
 #[test]
@@ -435,4 +436,9 @@ fn mapping_details() -> Result<()> {
     );
 
     Ok(())
+}
+
+#[test]
+fn invariants() -> Result<()> {
+    assert_ground_truth_invariants("rust-turbopack-module-rule")
 }

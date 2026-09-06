@@ -19,6 +19,7 @@ use anyhow::Result;
 
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 
 #[test]
 fn mapping() -> Result<()> {
@@ -36,4 +37,9 @@ fn painting() -> Result<()> {
     // nodes, where no painting can reach it. codediff paints the reflowed statements themselves;
     // the human painted nothing under Minimal. Recorded as the distance it is, not as a target.
     assert_matches_human_painting_within_limit("c-openssl-openssl-format-only-change", 11.20)
+}
+
+#[test]
+fn invariants() -> Result<()> {
+    assert_ground_truth_invariants("c-openssl-openssl-format-only-change")
 }

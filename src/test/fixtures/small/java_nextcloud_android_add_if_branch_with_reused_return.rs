@@ -16,6 +16,7 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 use crate::test;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 use anyhow::Result;
 
 #[test]
@@ -29,4 +30,9 @@ fn mapping() -> Result<()> {
         54,
         38,
     )
+}
+
+#[test]
+fn invariants() -> Result<()> {
+    assert_ground_truth_invariants("java-nextcloud-android-add-if-branch-with-reused-return")
 }

@@ -19,6 +19,7 @@ use anyhow::Result;
 
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 
 #[test]
 fn mapping() -> Result<()> {
@@ -32,4 +33,9 @@ fn mapping() -> Result<()> {
 fn painting() -> Result<()> {
     // measured 2026-09-05: minimal 77.670%, full 77.670%
     assert_matches_human_painting_within_limit("html-gohugoio-hugo-template-not-pure-html-2", 77.68)
+}
+
+#[test]
+fn invariants() -> Result<()> {
+    assert_ground_truth_invariants("html-gohugoio-hugo-template-not-pure-html-2")
 }

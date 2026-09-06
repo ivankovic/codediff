@@ -17,6 +17,7 @@
  */
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 use anyhow::Result;
 
 #[test]
@@ -28,4 +29,9 @@ fn mapping() -> Result<()> {
 fn painting() -> Result<()> {
     // measured 2026-08-26: minimal 5.288%, full 5.495%
     assert_matches_human_painting_within_limit("rust-cost-optimization", 5.51)
+}
+
+#[test]
+fn invariants() -> Result<()> {
+    assert_ground_truth_invariants("rust-cost-optimization")
 }

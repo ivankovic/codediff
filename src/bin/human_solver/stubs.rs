@@ -210,6 +210,60 @@ pub(crate) fn painting_test_block(name: &str) -> String {
     )
 }
 
+/// Appends an `invariants()` test to the fixture's own file, the third of the three a fixture
+/// carries. Returns whether one was actually added.
+///
+/// Unlike [`ensure_painting_stub_test`], this is written for **every** fixture, painted or not:
+/// the invariants it asserts cover the tree mapping as well as the painting (see
+/// `human_mapping::invariants`), and every saved fixture has a tree mapping. A fixture with no
+/// painting simply has nothing for the two painting invariants to look at, which is a pass rather
+/// than a gap.
+///
+/// Also unlike the painting stub, the generated call carries **no number to fill in**. Ground
+/// truth that contradicts itself is a defect rather than a distance, so the generated form is the
+/// strict one and a fixture that fails it is telling the truth about itself from the first run -
+/// there is no unconditionally-passing placeholder here to forget to replace. Clamping to a
+/// recorded count is a deliberate edit afterwards, with a note saying what the violations are.
+///
+/// Idempotent, on the same terms as the painting stub: a file that already has an `invariants()`
+/// test is left exactly as it is, clamp and prose included.
+pub(crate) fn ensure_invariants_stub_test(name: &str) -> Result<bool> {
+    let dataset = case_dataset(name).unwrap_or_else(legacy_dataset);
+    let module = module_name(name);
+    let path = fixtures_dir(&dataset).join(format!("{module}.rs"));
+    let existing = fs::read_to_string(&path)
+        .with_context(|| format!("reading the fixture test file {:?}", path))?;
+    if existing.contains("fn invariants()") {
+        return Ok(false);
+    }
+
+    const USE_LINE: &str =
+        "use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;\n";
+    let anchor = "use crate::test;\n";
+    let mut updated = if existing.contains(USE_LINE) {
+        existing.clone()
+    } else if let Some(at) = existing.find(anchor) {
+        let cut = at + anchor.len();
+        format!("{}{USE_LINE}{}", &existing[..cut], &existing[cut..])
+    } else {
+        format!("{existing}{USE_LINE}")
+    };
+    if !updated.ends_with('\n') {
+        updated.push('\n');
+    }
+    updated.push_str(&invariants_test_block(name));
+    fs::write(&path, updated).with_context(|| format!("writing {:?}", path))?;
+    Ok(true)
+}
+
+/// The `invariants()` test appended by [`ensure_invariants_stub_test`] - pure string building, no
+/// filesystem access, so it is directly unit-testable.
+pub(crate) fn invariants_test_block(name: &str) -> String {
+    format!(
+        "\n#[test]\nfn invariants() -> Result<()> {{\n    assert_ground_truth_invariants(\"{name}\")\n}}\n"
+    )
+}
+
 /// Adds `#[cfg(test)]\nmod <module>;` to `fixtures/<dataset>.rs`, keeping the list
 /// sorted, unless it's already present.
 pub(crate) fn insert_mod_declaration(dataset: &str, module: &str) -> Result<()> {

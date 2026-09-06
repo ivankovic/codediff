@@ -19,6 +19,7 @@ use crate::diff;
 use crate::diff::ASTMappingOperation;
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 use anyhow::Result;
 
 #[test]
@@ -278,4 +279,9 @@ fn mapping_details() -> Result<()> {
 fn painting() -> Result<()> {
     // measured 2026-09-01: minimal 13.914%, full 6.697% (measured, unexamined)
     assert_matches_human_painting_within_limit("rust-hash-optimization", 13.94)
+}
+
+#[test]
+fn invariants() -> Result<()> {
+    assert_ground_truth_invariants("rust-hash-optimization")
 }

@@ -17,6 +17,7 @@
  */
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 use anyhow::Result;
 
 #[test]
@@ -39,4 +40,9 @@ fn mapping() -> Result<()> {
 fn painting() -> Result<()> {
     // measured 2026-08-26: minimal 29.615%, full 6.288%
     assert_matches_human_painting_within_limit("cpp-add-templates", 29.63)
+}
+
+#[test]
+fn invariants() -> Result<()> {
+    assert_ground_truth_invariants("cpp-add-templates")
 }

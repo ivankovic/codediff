@@ -45,6 +45,10 @@ use crate::diff::cost::operation_cost;
 use crate::diff::{ASTDiff, ASTMapping, ASTMappingOperation, ASTMappingReason, NodeCache};
 use crate::test::helper::{PathCache, path_for_node};
 
+/// Properties the ground truth must hold on its own, independently of what codediff does with it -
+/// see the module's own doc comment.
+pub mod invariants;
+
 /// What a human decided should happen to a node (or pair of nodes) between before and after.
 ///
 /// `Identical`, `Update` and `MatchButNotIdentical` all pair a before node with an after node

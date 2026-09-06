@@ -16,6 +16,7 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 use crate::test;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 use anyhow::Result;
 
 #[test]
@@ -33,5 +34,12 @@ fn mapping() -> Result<()> {
         "css-horst3180-vertex-theme-add-spaces-to-change-class-selector-into-descendant-selectors",
         16,
         8,
+    )
+}
+
+#[test]
+fn invariants() -> Result<()> {
+    assert_ground_truth_invariants(
+        "css-horst3180-vertex-theme-add-spaces-to-change-class-selector-into-descendant-selectors",
     )
 }
