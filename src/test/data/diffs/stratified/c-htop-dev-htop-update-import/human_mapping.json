@@ -1,0 +1,3761 @@
+{
+  "entries": [
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [],
+      "after_path": []
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "preproc_ifdef:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "#ifndef:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "#ifndef:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "preproc_def:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "preproc_def:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "preproc_def:1",
+        "#define:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "preproc_def:1",
+        "#define:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "preproc_def:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "preproc_def:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "comment:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "comment:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "preproc_include:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "preproc_include:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "preproc_include:1",
+        "#include:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "preproc_include:1",
+        "#include:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "preproc_include:1",
+        "system_lib_string:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "preproc_include:1",
+        "system_lib_string:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "preproc_include:1",
+        "comment:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "preproc_include:1",
+        "comment:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "preproc_include:2"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "preproc_include:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "preproc_include:2",
+        "#include:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "preproc_include:2",
+        "#include:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "preproc_include:2",
+        "system_lib_string:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "preproc_include:2",
+        "system_lib_string:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "preproc_include:3"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "preproc_include:3"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "preproc_include:3",
+        "#include:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "preproc_include:3",
+        "#include:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "preproc_include:3",
+        "system_lib_string:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "preproc_include:3",
+        "system_lib_string:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "preproc_include:4"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "preproc_include:4"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "preproc_include:4",
+        "#include:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "preproc_include:4",
+        "#include:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "preproc_include:4",
+        "system_lib_string:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "preproc_include:4",
+        "system_lib_string:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "preproc_include:5"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "preproc_include:5"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "preproc_include:5",
+        "#include:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "preproc_include:5",
+        "#include:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "preproc_include:5",
+        "system_lib_string:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "preproc_include:5",
+        "system_lib_string:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "preproc_include:6"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "preproc_include:6"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "preproc_include:6",
+        "#include:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "preproc_include:6",
+        "#include:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "preproc_include:6",
+        "system_lib_string:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "preproc_include:6",
+        "system_lib_string:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "preproc_include:7"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "preproc_include:7"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "preproc_include:7",
+        "#include:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "preproc_include:7",
+        "#include:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "preproc_include:7",
+        "system_lib_string:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "preproc_include:7",
+        "system_lib_string:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "preproc_include:8"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "preproc_include:8"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "preproc_include:8",
+        "#include:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "preproc_include:8",
+        "#include:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "preproc_include:8",
+        "system_lib_string:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "preproc_include:8",
+        "system_lib_string:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "preproc_include:9"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "preproc_include:9"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "preproc_include:9",
+        "#include:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "preproc_include:9",
+        "#include:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "preproc_include:9",
+        "string_literal:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "preproc_include:9",
+        "string_literal:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "preproc_include:9",
+        "string_literal:1",
+        "\":1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "preproc_include:9",
+        "string_literal:1",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "preproc_include:9",
+        "string_literal:1",
+        "string_content:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "preproc_include:9",
+        "string_literal:1",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "preproc_include:9",
+        "string_literal:1",
+        "\":2"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "preproc_include:9",
+        "string_literal:1",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "preproc_include:10"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "preproc_include:10"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "preproc_include:10",
+        "#include:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "preproc_include:10",
+        "#include:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "preproc_include:10",
+        "string_literal:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "preproc_include:10",
+        "string_literal:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "preproc_include:10",
+        "string_literal:1",
+        "\":1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "preproc_include:10",
+        "string_literal:1",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "preproc_include:10",
+        "string_literal:1",
+        "string_content:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "preproc_include:10",
+        "string_literal:1",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "preproc_include:10",
+        "string_literal:1",
+        "\":2"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "preproc_include:10",
+        "string_literal:1",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "preproc_include:11"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "preproc_include:11"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "preproc_include:11",
+        "#include:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "preproc_include:11",
+        "#include:1"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "preproc_include:11",
+        "string_literal:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "preproc_include:11",
+        "string_literal:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "preproc_include:11",
+        "string_literal:1",
+        "\":1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "preproc_include:11",
+        "string_literal:1",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "update",
+      "before_path": [
+        "preproc_ifdef:1",
+        "preproc_include:11",
+        "string_literal:1",
+        "string_content:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "preproc_include:11",
+        "string_literal:1",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "preproc_include:11",
+        "string_literal:1",
+        "\":2"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "preproc_include:11",
+        "string_literal:1",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "preproc_include:12"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "preproc_include:12"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "preproc_include:12",
+        "#include:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "preproc_include:12",
+        "#include:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "preproc_include:12",
+        "string_literal:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "preproc_include:12",
+        "string_literal:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "preproc_include:12",
+        "string_literal:1",
+        "\":1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "preproc_include:12",
+        "string_literal:1",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "preproc_include:12",
+        "string_literal:1",
+        "string_content:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "preproc_include:12",
+        "string_literal:1",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "preproc_include:12",
+        "string_literal:1",
+        "\":2"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "preproc_include:12",
+        "string_literal:1",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:1",
+        "typedef:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:1",
+        "typedef:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:1",
+        "struct_specifier:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:1",
+        "struct_specifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:1",
+        "struct_specifier:1",
+        "struct:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:1",
+        "struct_specifier:1",
+        "struct:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:1",
+        "struct_specifier:1",
+        "type_identifier:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:1",
+        "struct_specifier:1",
+        "type_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:1",
+        "struct_specifier:1",
+        "field_declaration_list:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:1",
+        "struct_specifier:1",
+        "field_declaration_list:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:1",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "{:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:1",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "{:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:1",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:1",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:1",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "primitive_type:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:1",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "primitive_type:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:1",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "field_identifier:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:1",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "field_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:1",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        ";:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:1",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:1",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:1",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:1",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "primitive_type:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:1",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "primitive_type:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:1",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "field_identifier:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:1",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "field_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:1",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        ";:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:1",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:1",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:3"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:1",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:3"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:1",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:3",
+        "primitive_type:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:1",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:3",
+        "primitive_type:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:1",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:3",
+        "field_identifier:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:1",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:3",
+        "field_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:1",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:3",
+        ";:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:1",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:3",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:1",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:4"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:1",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:4"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:1",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:4",
+        "primitive_type:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:1",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:4",
+        "primitive_type:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:1",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:4",
+        "field_identifier:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:1",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:4",
+        "field_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:1",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:4",
+        ";:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:1",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:4",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:1",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:5"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:1",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:5"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:1",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:5",
+        "primitive_type:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:1",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:5",
+        "primitive_type:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:1",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:5",
+        "field_identifier:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:1",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:5",
+        "field_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:1",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:5",
+        ";:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:1",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:5",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:1",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:6"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:1",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:6"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:1",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:6",
+        "primitive_type:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:1",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:6",
+        "primitive_type:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:1",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:6",
+        "field_identifier:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:1",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:6",
+        "field_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:1",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:6",
+        ";:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:1",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:6",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:1",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "}:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:1",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "}:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:1",
+        "type_identifier:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:1",
+        "type_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:1",
+        ";:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:1",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "typedef:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "typedef:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "struct:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "struct:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "type_identifier:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "type_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "{:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "{:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "type_identifier:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "type_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "field_identifier:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        "field_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        ";:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:1",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "type_identifier:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "type_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "pointer_declarator:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "pointer_declarator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "pointer_declarator:1",
+        "*:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "pointer_declarator:1",
+        "*:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "pointer_declarator:1",
+        "field_identifier:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        "pointer_declarator:1",
+        "field_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        ";:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:2",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:3"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:3"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:3",
+        "type_identifier:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:3",
+        "type_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:3",
+        "pointer_declarator:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:3",
+        "pointer_declarator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:3",
+        "pointer_declarator:1",
+        "*:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:3",
+        "pointer_declarator:1",
+        "*:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:3",
+        "pointer_declarator:1",
+        "field_identifier:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:3",
+        "pointer_declarator:1",
+        "field_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:3",
+        ";:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:3",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:4"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:4"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:4",
+        "primitive_type:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:4",
+        "primitive_type:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:4",
+        "field_identifier:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:4",
+        "field_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:4",
+        ";:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:4",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:5"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:5"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:5",
+        "primitive_type:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:5",
+        "primitive_type:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:5",
+        "field_identifier:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:5",
+        "field_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:5",
+        ";:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:5",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:6"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:6"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:6",
+        "primitive_type:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:6",
+        "primitive_type:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:6",
+        "field_identifier:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:6",
+        "field_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:6",
+        ";:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:6",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:7"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:7"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:7",
+        "sized_type_specifier:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:7",
+        "sized_type_specifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:7",
+        "sized_type_specifier:1",
+        "unsigned:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:7",
+        "sized_type_specifier:1",
+        "unsigned:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:7",
+        "sized_type_specifier:1",
+        "long:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:7",
+        "sized_type_specifier:1",
+        "long:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:7",
+        "sized_type_specifier:1",
+        "long:2"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:7",
+        "sized_type_specifier:1",
+        "long:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:7",
+        "sized_type_specifier:1",
+        "primitive_type:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:7",
+        "sized_type_specifier:1",
+        "primitive_type:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:7",
+        "field_identifier:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:7",
+        "field_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:7",
+        ";:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:7",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:8"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:8"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:8",
+        "sized_type_specifier:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:8",
+        "sized_type_specifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:8",
+        "sized_type_specifier:1",
+        "unsigned:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:8",
+        "sized_type_specifier:1",
+        "unsigned:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:8",
+        "sized_type_specifier:1",
+        "long:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:8",
+        "sized_type_specifier:1",
+        "long:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:8",
+        "sized_type_specifier:1",
+        "long:2"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:8",
+        "sized_type_specifier:1",
+        "long:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:8",
+        "sized_type_specifier:1",
+        "primitive_type:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:8",
+        "sized_type_specifier:1",
+        "primitive_type:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:8",
+        "field_identifier:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:8",
+        "field_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:8",
+        ";:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:8",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:9"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:9"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:9",
+        "sized_type_specifier:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:9",
+        "sized_type_specifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:9",
+        "sized_type_specifier:1",
+        "unsigned:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:9",
+        "sized_type_specifier:1",
+        "unsigned:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:9",
+        "sized_type_specifier:1",
+        "long:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:9",
+        "sized_type_specifier:1",
+        "long:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:9",
+        "sized_type_specifier:1",
+        "long:2"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:9",
+        "sized_type_specifier:1",
+        "long:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:9",
+        "sized_type_specifier:1",
+        "primitive_type:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:9",
+        "sized_type_specifier:1",
+        "primitive_type:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:9",
+        "field_identifier:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:9",
+        "field_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:9",
+        ";:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:9",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:10"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:10"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:10",
+        "sized_type_specifier:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:10",
+        "sized_type_specifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:10",
+        "sized_type_specifier:1",
+        "unsigned:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:10",
+        "sized_type_specifier:1",
+        "unsigned:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:10",
+        "sized_type_specifier:1",
+        "long:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:10",
+        "sized_type_specifier:1",
+        "long:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:10",
+        "sized_type_specifier:1",
+        "long:2"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:10",
+        "sized_type_specifier:1",
+        "long:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:10",
+        "sized_type_specifier:1",
+        "primitive_type:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:10",
+        "sized_type_specifier:1",
+        "primitive_type:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:10",
+        "field_identifier:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:10",
+        "field_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:10",
+        ";:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:10",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:11"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:11"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:11",
+        "type_identifier:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:11",
+        "type_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:11",
+        "pointer_declarator:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:11",
+        "pointer_declarator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:11",
+        "pointer_declarator:1",
+        "*:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:11",
+        "pointer_declarator:1",
+        "*:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:11",
+        "pointer_declarator:1",
+        "field_identifier:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:11",
+        "pointer_declarator:1",
+        "field_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:11",
+        ";:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:11",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:12"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:12"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:12",
+        "sized_type_specifier:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:12",
+        "sized_type_specifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:12",
+        "sized_type_specifier:1",
+        "unsigned:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:12",
+        "sized_type_specifier:1",
+        "unsigned:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:12",
+        "sized_type_specifier:1",
+        "long:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:12",
+        "sized_type_specifier:1",
+        "long:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:12",
+        "pointer_declarator:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:12",
+        "pointer_declarator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:12",
+        "pointer_declarator:1",
+        "*:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:12",
+        "pointer_declarator:1",
+        "*:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:12",
+        "pointer_declarator:1",
+        "field_identifier:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:12",
+        "pointer_declarator:1",
+        "field_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:12",
+        ";:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:12",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:13"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:13"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:13",
+        "sized_type_specifier:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:13",
+        "sized_type_specifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:13",
+        "sized_type_specifier:1",
+        "unsigned:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:13",
+        "sized_type_specifier:1",
+        "unsigned:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:13",
+        "sized_type_specifier:1",
+        "long:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:13",
+        "sized_type_specifier:1",
+        "long:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:13",
+        "pointer_declarator:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:13",
+        "pointer_declarator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:13",
+        "pointer_declarator:1",
+        "*:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:13",
+        "pointer_declarator:1",
+        "*:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:13",
+        "pointer_declarator:1",
+        "field_identifier:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:13",
+        "pointer_declarator:1",
+        "field_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:13",
+        ";:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:13",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:14"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:14"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:14",
+        "sized_type_specifier:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:14",
+        "sized_type_specifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:14",
+        "sized_type_specifier:1",
+        "unsigned:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:14",
+        "sized_type_specifier:1",
+        "unsigned:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:14",
+        "sized_type_specifier:1",
+        "long:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:14",
+        "sized_type_specifier:1",
+        "long:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:14",
+        "pointer_declarator:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:14",
+        "pointer_declarator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:14",
+        "pointer_declarator:1",
+        "*:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:14",
+        "pointer_declarator:1",
+        "*:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:14",
+        "pointer_declarator:1",
+        "field_identifier:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:14",
+        "pointer_declarator:1",
+        "field_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:14",
+        ";:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:14",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:15"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:15"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:15",
+        "sized_type_specifier:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:15",
+        "sized_type_specifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:15",
+        "sized_type_specifier:1",
+        "unsigned:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:15",
+        "sized_type_specifier:1",
+        "unsigned:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:15",
+        "sized_type_specifier:1",
+        "long:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:15",
+        "sized_type_specifier:1",
+        "long:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:15",
+        "pointer_declarator:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:15",
+        "pointer_declarator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:15",
+        "pointer_declarator:1",
+        "*:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:15",
+        "pointer_declarator:1",
+        "*:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:15",
+        "pointer_declarator:1",
+        "field_identifier:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:15",
+        "pointer_declarator:1",
+        "field_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:15",
+        ";:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "field_declaration:15",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "}:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "struct_specifier:1",
+        "field_declaration_list:1",
+        "}:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "type_identifier:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        "type_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        ";:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "type_definition:2",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:1",
+        "primitive_type:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:1",
+        "primitive_type:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:1",
+        "pointer_declarator:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:1",
+        "pointer_declarator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:1",
+        "pointer_declarator:1",
+        "*:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:1",
+        "pointer_declarator:1",
+        "*:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:1",
+        "pointer_declarator:1",
+        "function_declarator:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:1",
+        "pointer_declarator:1",
+        "function_declarator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:1",
+        "pointer_declarator:1",
+        "function_declarator:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:1",
+        "pointer_declarator:1",
+        "function_declarator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:1",
+        "pointer_declarator:1",
+        "function_declarator:1",
+        "parameter_list:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:1",
+        "pointer_declarator:1",
+        "function_declarator:1",
+        "parameter_list:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:1",
+        "pointer_declarator:1",
+        "function_declarator:1",
+        "parameter_list:1",
+        "(:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:1",
+        "pointer_declarator:1",
+        "function_declarator:1",
+        "parameter_list:1",
+        "(:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:1",
+        "pointer_declarator:1",
+        "function_declarator:1",
+        "parameter_list:1",
+        "parameter_declaration:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:1",
+        "pointer_declarator:1",
+        "function_declarator:1",
+        "parameter_list:1",
+        "parameter_declaration:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:1",
+        "pointer_declarator:1",
+        "function_declarator:1",
+        "parameter_list:1",
+        "parameter_declaration:1",
+        "type_identifier:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:1",
+        "pointer_declarator:1",
+        "function_declarator:1",
+        "parameter_list:1",
+        "parameter_declaration:1",
+        "type_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:1",
+        "pointer_declarator:1",
+        "function_declarator:1",
+        "parameter_list:1",
+        "parameter_declaration:1",
+        "pointer_declarator:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:1",
+        "pointer_declarator:1",
+        "function_declarator:1",
+        "parameter_list:1",
+        "parameter_declaration:1",
+        "pointer_declarator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:1",
+        "pointer_declarator:1",
+        "function_declarator:1",
+        "parameter_list:1",
+        "parameter_declaration:1",
+        "pointer_declarator:1",
+        "*:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:1",
+        "pointer_declarator:1",
+        "function_declarator:1",
+        "parameter_list:1",
+        "parameter_declaration:1",
+        "pointer_declarator:1",
+        "*:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:1",
+        "pointer_declarator:1",
+        "function_declarator:1",
+        "parameter_list:1",
+        "parameter_declaration:1",
+        "pointer_declarator:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:1",
+        "pointer_declarator:1",
+        "function_declarator:1",
+        "parameter_list:1",
+        "parameter_declaration:1",
+        "pointer_declarator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:1",
+        "pointer_declarator:1",
+        "function_declarator:1",
+        "parameter_list:1",
+        ",:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:1",
+        "pointer_declarator:1",
+        "function_declarator:1",
+        "parameter_list:1",
+        ",:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:1",
+        "pointer_declarator:1",
+        "function_declarator:1",
+        "parameter_list:1",
+        "parameter_declaration:2"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:1",
+        "pointer_declarator:1",
+        "function_declarator:1",
+        "parameter_list:1",
+        "parameter_declaration:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:1",
+        "pointer_declarator:1",
+        "function_declarator:1",
+        "parameter_list:1",
+        "parameter_declaration:2",
+        "primitive_type:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:1",
+        "pointer_declarator:1",
+        "function_declarator:1",
+        "parameter_list:1",
+        "parameter_declaration:2",
+        "primitive_type:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:1",
+        "pointer_declarator:1",
+        "function_declarator:1",
+        "parameter_list:1",
+        "parameter_declaration:2",
+        "identifier:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:1",
+        "pointer_declarator:1",
+        "function_declarator:1",
+        "parameter_list:1",
+        "parameter_declaration:2",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:1",
+        "pointer_declarator:1",
+        "function_declarator:1",
+        "parameter_list:1",
+        "):1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:1",
+        "pointer_declarator:1",
+        "function_declarator:1",
+        "parameter_list:1",
+        "):1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:1",
+        ";:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:1",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "#endif:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "#endif:1"
+      ]
+    }
+  ],
+  "text_mappings": [
+    {
+      "name": "Minimal",
+      "entries": [
+        {
+          "operation": "Match",
+          "before": [
+            {
+              "start_row": 21,
+              "start_column": 17,
+              "end_row": 21,
+              "end_column": 21
+            }
+          ],
+          "after": [
+            {
+              "start_row": 21,
+              "start_column": 17,
+              "end_row": 21,
+              "end_column": 22
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Full",
+      "entries": [
+        {
+          "operation": "Match",
+          "before": [
+            {
+              "start_row": 21,
+              "start_column": 10,
+              "end_row": 21,
+              "end_column": 23
+            }
+          ],
+          "after": [
+            {
+              "start_row": 21,
+              "start_column": 10,
+              "end_row": 21,
+              "end_column": 24
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -19,6 +19,8 @@
 // `sample_test_diffs --stratified`) - `human_solver`'s `insert_mod_declaration` adds entries here
 // the same way it does for `handmade.rs`/`small.rs`/`full.rs`.
 #[cfg(test)]
+mod c_freeciv_freeciv_update_version;
+#[cfg(test)]
 mod c_genymobile_scrcpy_add_a_define;
 #[cfg(test)]
 mod c_genymobile_scrcpy_add_a_define_;
@@ -37,7 +39,15 @@ mod c_htop_dev_htop_add_comment;
 #[cfg(test)]
 mod c_htop_dev_htop_add_function;
 #[cfg(test)]
+mod c_htop_dev_htop_update_import;
+#[cfg(test)]
+mod c_ladybirdbrowser_ladybird_change_to_a_different_class;
+#[cfg(test)]
+mod c_ladybirdbrowser_ladybird_move_to_a_different_class;
+#[cfg(test)]
 mod c_microsoft_terminal_add_two_includes;
+#[cfg(test)]
+mod c_microsoft_terminal_change_import_path;
 #[cfg(test)]
 mod c_mozilla_firefox_firefox_remove_two_comments;
 #[cfg(test)]
@@ -51,9 +61,19 @@ mod c_openssl_openssl_add_import;
 #[cfg(test)]
 mod c_openssl_openssl_add_two_clang_comments;
 #[cfg(test)]
+mod c_openssl_openssl_format_only_change;
+#[cfg(test)]
 mod c_openssl_openssl_whitepsace_only;
 #[cfg(test)]
 mod c_openssl_openssl_whitespace_only;
+#[cfg(test)]
+mod c_postgres_postgres_copyright_year_update;
+#[cfg(test)]
+mod c_postgres_postgres_copyright_year_update_2;
+#[cfg(test)]
+mod c_postgres_postgres_copyright_year_update_3;
+#[cfg(test)]
+mod c_postgres_postgres_preprocessor_heavy_change;
 #[cfg(test)]
 mod c_postgres_postgres_update_copyright_year;
 #[cfg(test)]

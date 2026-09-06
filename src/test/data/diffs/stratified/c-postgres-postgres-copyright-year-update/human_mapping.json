@@ -1,0 +1,1252 @@
+{
+  "entries": [
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [],
+      "after_path": []
+    },
+    {
+      "operation": "update",
+      "before_path": [
+        "comment:1"
+      ],
+      "after_path": [
+        "comment:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "#ifndef:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "#ifndef:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "preproc_def:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "preproc_def:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "preproc_def:1",
+        "#define:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "preproc_def:1",
+        "#define:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "preproc_def:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "preproc_def:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "comment:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "comment:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:1",
+        "storage_class_specifier:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:1",
+        "storage_class_specifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:1",
+        "storage_class_specifier:1",
+        "extern:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:1",
+        "storage_class_specifier:1",
+        "extern:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:1",
+        "type_identifier:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:1",
+        "type_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:1",
+        "function_declarator:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:1",
+        "function_declarator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:1",
+        "function_declarator:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:1",
+        "function_declarator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:1",
+        "function_declarator:1",
+        "parameter_list:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:1",
+        "function_declarator:1",
+        "parameter_list:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:1",
+        "function_declarator:1",
+        "parameter_list:1",
+        "(:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:1",
+        "function_declarator:1",
+        "parameter_list:1",
+        "(:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:1",
+        "function_declarator:1",
+        "parameter_list:1",
+        "parameter_declaration:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:1",
+        "function_declarator:1",
+        "parameter_list:1",
+        "parameter_declaration:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:1",
+        "function_declarator:1",
+        "parameter_list:1",
+        "parameter_declaration:1",
+        "primitive_type:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:1",
+        "function_declarator:1",
+        "parameter_list:1",
+        "parameter_declaration:1",
+        "primitive_type:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:1",
+        "function_declarator:1",
+        "parameter_list:1",
+        "):1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:1",
+        "function_declarator:1",
+        "parameter_list:1",
+        "):1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:1",
+        ";:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:1",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:2"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:2",
+        "storage_class_specifier:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:2",
+        "storage_class_specifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:2",
+        "storage_class_specifier:1",
+        "extern:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:2",
+        "storage_class_specifier:1",
+        "extern:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:2",
+        "primitive_type:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:2",
+        "primitive_type:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:2",
+        "function_declarator:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:2",
+        "function_declarator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:2",
+        "function_declarator:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:2",
+        "function_declarator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:2",
+        "function_declarator:1",
+        "parameter_list:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:2",
+        "function_declarator:1",
+        "parameter_list:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:2",
+        "function_declarator:1",
+        "parameter_list:1",
+        "(:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:2",
+        "function_declarator:1",
+        "parameter_list:1",
+        "(:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:2",
+        "function_declarator:1",
+        "parameter_list:1",
+        "parameter_declaration:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:2",
+        "function_declarator:1",
+        "parameter_list:1",
+        "parameter_declaration:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:2",
+        "function_declarator:1",
+        "parameter_list:1",
+        "parameter_declaration:1",
+        "primitive_type:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:2",
+        "function_declarator:1",
+        "parameter_list:1",
+        "parameter_declaration:1",
+        "primitive_type:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:2",
+        "function_declarator:1",
+        "parameter_list:1",
+        "):1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:2",
+        "function_declarator:1",
+        "parameter_list:1",
+        "):1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:2",
+        ";:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:2",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:3"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:3"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:3",
+        "storage_class_specifier:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:3",
+        "storage_class_specifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:3",
+        "storage_class_specifier:1",
+        "extern:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:3",
+        "storage_class_specifier:1",
+        "extern:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:3",
+        "primitive_type:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:3",
+        "primitive_type:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:3",
+        "function_declarator:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:3",
+        "function_declarator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:3",
+        "function_declarator:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:3",
+        "function_declarator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:3",
+        "function_declarator:1",
+        "parameter_list:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:3",
+        "function_declarator:1",
+        "parameter_list:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:3",
+        "function_declarator:1",
+        "parameter_list:1",
+        "(:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:3",
+        "function_declarator:1",
+        "parameter_list:1",
+        "(:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:3",
+        "function_declarator:1",
+        "parameter_list:1",
+        "parameter_declaration:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:3",
+        "function_declarator:1",
+        "parameter_list:1",
+        "parameter_declaration:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:3",
+        "function_declarator:1",
+        "parameter_list:1",
+        "parameter_declaration:1",
+        "primitive_type:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:3",
+        "function_declarator:1",
+        "parameter_list:1",
+        "parameter_declaration:1",
+        "primitive_type:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:3",
+        "function_declarator:1",
+        "parameter_list:1",
+        "):1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:3",
+        "function_declarator:1",
+        "parameter_list:1",
+        "):1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:3",
+        ";:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:3",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "comment:2"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "comment:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:4"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:4"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:4",
+        "storage_class_specifier:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:4",
+        "storage_class_specifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:4",
+        "storage_class_specifier:1",
+        "extern:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:4",
+        "storage_class_specifier:1",
+        "extern:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:4",
+        "primitive_type:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:4",
+        "primitive_type:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:4",
+        "function_declarator:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:4",
+        "function_declarator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:4",
+        "function_declarator:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:4",
+        "function_declarator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:4",
+        "function_declarator:1",
+        "parameter_list:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:4",
+        "function_declarator:1",
+        "parameter_list:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:4",
+        "function_declarator:1",
+        "parameter_list:1",
+        "(:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:4",
+        "function_declarator:1",
+        "parameter_list:1",
+        "(:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:4",
+        "function_declarator:1",
+        "parameter_list:1",
+        "parameter_declaration:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:4",
+        "function_declarator:1",
+        "parameter_list:1",
+        "parameter_declaration:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:4",
+        "function_declarator:1",
+        "parameter_list:1",
+        "parameter_declaration:1",
+        "primitive_type:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:4",
+        "function_declarator:1",
+        "parameter_list:1",
+        "parameter_declaration:1",
+        "primitive_type:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:4",
+        "function_declarator:1",
+        "parameter_list:1",
+        "):1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:4",
+        "function_declarator:1",
+        "parameter_list:1",
+        "):1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:4",
+        ";:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:4",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:5"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:5"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:5",
+        "storage_class_specifier:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:5",
+        "storage_class_specifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:5",
+        "storage_class_specifier:1",
+        "extern:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:5",
+        "storage_class_specifier:1",
+        "extern:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:5",
+        "primitive_type:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:5",
+        "primitive_type:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:5",
+        "function_declarator:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:5",
+        "function_declarator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:5",
+        "function_declarator:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:5",
+        "function_declarator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:5",
+        "function_declarator:1",
+        "parameter_list:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:5",
+        "function_declarator:1",
+        "parameter_list:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:5",
+        "function_declarator:1",
+        "parameter_list:1",
+        "(:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:5",
+        "function_declarator:1",
+        "parameter_list:1",
+        "(:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:5",
+        "function_declarator:1",
+        "parameter_list:1",
+        "parameter_declaration:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:5",
+        "function_declarator:1",
+        "parameter_list:1",
+        "parameter_declaration:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:5",
+        "function_declarator:1",
+        "parameter_list:1",
+        "parameter_declaration:1",
+        "primitive_type:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:5",
+        "function_declarator:1",
+        "parameter_list:1",
+        "parameter_declaration:1",
+        "primitive_type:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:5",
+        "function_declarator:1",
+        "parameter_list:1",
+        "parameter_declaration:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:5",
+        "function_declarator:1",
+        "parameter_list:1",
+        "parameter_declaration:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:5",
+        "function_declarator:1",
+        "parameter_list:1",
+        "):1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:5",
+        "function_declarator:1",
+        "parameter_list:1",
+        "):1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:5",
+        ";:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:5",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "comment:3"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "comment:3"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:6"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:6"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:6",
+        "storage_class_specifier:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:6",
+        "storage_class_specifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:6",
+        "storage_class_specifier:1",
+        "extern:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:6",
+        "storage_class_specifier:1",
+        "extern:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:6",
+        "primitive_type:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:6",
+        "primitive_type:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:6",
+        "function_declarator:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:6",
+        "function_declarator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:6",
+        "function_declarator:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:6",
+        "function_declarator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:6",
+        "function_declarator:1",
+        "parameter_list:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:6",
+        "function_declarator:1",
+        "parameter_list:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:6",
+        "function_declarator:1",
+        "parameter_list:1",
+        "(:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:6",
+        "function_declarator:1",
+        "parameter_list:1",
+        "(:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:6",
+        "function_declarator:1",
+        "parameter_list:1",
+        "parameter_declaration:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:6",
+        "function_declarator:1",
+        "parameter_list:1",
+        "parameter_declaration:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:6",
+        "function_declarator:1",
+        "parameter_list:1",
+        "parameter_declaration:1",
+        "primitive_type:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:6",
+        "function_declarator:1",
+        "parameter_list:1",
+        "parameter_declaration:1",
+        "primitive_type:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:6",
+        "function_declarator:1",
+        "parameter_list:1",
+        "):1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:6",
+        "function_declarator:1",
+        "parameter_list:1",
+        "):1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "declaration:6",
+        ";:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "declaration:6",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "preproc_ifdef:1",
+        "#endif:1"
+      ],
+      "after_path": [
+        "preproc_ifdef:1",
+        "#endif:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "comment:2"
+      ],
+      "after_path": [
+        "comment:2"
+      ]
+    }
+  ],
+  "text_mappings": [
+    {
+      "name": "Only one solution",
+      "entries": [
+        {
+          "operation": "Match",
+          "before": [
+            {
+              "start_row": 10,
+              "start_column": 34,
+              "end_row": 10,
+              "end_column": 35
+            }
+          ],
+          "after": [
+            {
+              "start_row": 10,
+              "start_column": 34,
+              "end_row": 10,
+              "end_column": 35
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
