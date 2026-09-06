@@ -22,12 +22,16 @@ use crate::test::helper::human_mapping::assert_matches_human_painting_within_lim
 
 #[test]
 fn mapping() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("cpp-mozilla-firefox-firefox-update-file-comment")
+    test::helper::human_mapping::assert_matches_human_mapping(
+        "cpp-mozilla-firefox-firefox-update-file-comment",
+    )
 }
 
 #[test]
 fn painting() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test, read the rate it
-    // reports for both modes, and record that instead.
-    assert_matches_human_painting_within_limit("cpp-mozilla-firefox-firefox-update-file-comment", 100.0)
+    // measured 2026-09-06: minimal 0.111%, full 0.055%
+    assert_matches_human_painting_within_limit(
+        "cpp-mozilla-firefox-firefox-update-file-comment",
+        0.13,
+    )
 }
