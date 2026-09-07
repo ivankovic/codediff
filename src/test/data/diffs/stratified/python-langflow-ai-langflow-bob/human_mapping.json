@@ -1,0 +1,92 @@
+{
+  "entries": [
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [],
+      "after_path": []
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1"
+      ],
+      "after_path": [
+        "expression_statement:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "string:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "string:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "string:1",
+        "string_start:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "string:1",
+        "string_start:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "string:1",
+        "string_content:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "string:1",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "string:1",
+        "string_end:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "string:1",
+        "string_end:1"
+      ]
+    },
+    {
+      "operation": "delete",
+      "before_path": [
+        "comment:1"
+      ]
+    }
+  ],
+  "text_mappings": [
+    {
+      "name": "Only one solution",
+      "entries": [
+        {
+          "operation": "Delete",
+          "before": [
+            {
+              "start_row": 2,
+              "start_column": 0,
+              "end_row": 3,
+              "end_column": 0
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

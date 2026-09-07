@@ -1,0 +1,136 @@
+{
+  "entries": [
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [],
+      "after_path": []
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "comment:1"
+      ],
+      "after_path": [
+        "comment:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_from_statement:1"
+      ],
+      "after_path": [
+        "import_from_statement:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_from_statement:1",
+        "from:1"
+      ],
+      "after_path": [
+        "import_from_statement:2",
+        "from:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_from_statement:1",
+        "relative_import:1",
+        "import_prefix:1",
+        ".:1"
+      ],
+      "after_path": [
+        "import_from_statement:2",
+        "relative_import:1",
+        "import_prefix:1",
+        ".:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_from_statement:1",
+        "relative_import:1",
+        "import_prefix:1"
+      ],
+      "after_path": [
+        "import_from_statement:2",
+        "relative_import:1",
+        "import_prefix:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_from_statement:1",
+        "relative_import:1"
+      ],
+      "after_path": [
+        "import_from_statement:2",
+        "relative_import:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_from_statement:1",
+        "import:1"
+      ],
+      "after_path": [
+        "import_from_statement:2",
+        "import:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_from_statement:1",
+        "dotted_name:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "import_from_statement:2",
+        "dotted_name:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_from_statement:1",
+        "dotted_name:1"
+      ],
+      "after_path": [
+        "import_from_statement:2",
+        "dotted_name:1"
+      ]
+    },
+    {
+      "operation": "insert_with_children",
+      "after_path": [
+        "import_from_statement:1"
+      ]
+    }
+  ],
+  "text_mappings": [
+    {
+      "name": "Only one solution",
+      "entries": [
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 2,
+              "start_column": 0,
+              "end_row": 3,
+              "end_column": 0
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,431 @@
+{
+  "entries": [
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [],
+      "after_path": []
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_from_statement:1"
+      ],
+      "after_path": [
+        "import_from_statement:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_from_statement:1",
+        "from:1"
+      ],
+      "after_path": [
+        "import_from_statement:1",
+        "from:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_from_statement:1",
+        "relative_import:1"
+      ],
+      "after_path": [
+        "import_from_statement:1",
+        "relative_import:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_from_statement:1",
+        "relative_import:1",
+        "import_prefix:1"
+      ],
+      "after_path": [
+        "import_from_statement:1",
+        "relative_import:1",
+        "import_prefix:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_from_statement:1",
+        "relative_import:1",
+        "import_prefix:1",
+        ".:1"
+      ],
+      "after_path": [
+        "import_from_statement:1",
+        "relative_import:1",
+        "import_prefix:1",
+        ".:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_from_statement:1",
+        "import:1"
+      ],
+      "after_path": [
+        "import_from_statement:1",
+        "import:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_from_statement:1",
+        "dotted_name:1"
+      ],
+      "after_path": [
+        "import_from_statement:1",
+        "dotted_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_from_statement:1",
+        "dotted_name:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "import_from_statement:1",
+        "dotted_name:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_from_statement:2"
+      ],
+      "after_path": [
+        "import_from_statement:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_from_statement:2",
+        "from:1"
+      ],
+      "after_path": [
+        "import_from_statement:2",
+        "from:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_from_statement:2",
+        "relative_import:1"
+      ],
+      "after_path": [
+        "import_from_statement:2",
+        "relative_import:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_from_statement:2",
+        "relative_import:1",
+        "import_prefix:1"
+      ],
+      "after_path": [
+        "import_from_statement:2",
+        "relative_import:1",
+        "import_prefix:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_from_statement:2",
+        "relative_import:1",
+        "import_prefix:1",
+        ".:1"
+      ],
+      "after_path": [
+        "import_from_statement:2",
+        "relative_import:1",
+        "import_prefix:1",
+        ".:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_from_statement:2",
+        "import:1"
+      ],
+      "after_path": [
+        "import_from_statement:2",
+        "import:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_from_statement:2",
+        "dotted_name:1"
+      ],
+      "after_path": [
+        "import_from_statement:2",
+        "dotted_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_from_statement:2",
+        "dotted_name:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "import_from_statement:2",
+        "dotted_name:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_from_statement:3"
+      ],
+      "after_path": [
+        "import_from_statement:3"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_from_statement:3",
+        "from:1"
+      ],
+      "after_path": [
+        "import_from_statement:3",
+        "from:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_from_statement:3",
+        "relative_import:1"
+      ],
+      "after_path": [
+        "import_from_statement:3",
+        "relative_import:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_from_statement:3",
+        "relative_import:1",
+        "import_prefix:1"
+      ],
+      "after_path": [
+        "import_from_statement:3",
+        "relative_import:1",
+        "import_prefix:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_from_statement:3",
+        "relative_import:1",
+        "import_prefix:1",
+        ".:1"
+      ],
+      "after_path": [
+        "import_from_statement:3",
+        "relative_import:1",
+        "import_prefix:1",
+        ".:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_from_statement:3",
+        "import:1"
+      ],
+      "after_path": [
+        "import_from_statement:3",
+        "import:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_from_statement:3",
+        "dotted_name:1"
+      ],
+      "after_path": [
+        "import_from_statement:3",
+        "dotted_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_from_statement:3",
+        "dotted_name:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "import_from_statement:3",
+        "dotted_name:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_from_statement:4"
+      ],
+      "after_path": [
+        "import_from_statement:4"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_from_statement:4",
+        "from:1"
+      ],
+      "after_path": [
+        "import_from_statement:4",
+        "from:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_from_statement:4",
+        "relative_import:1"
+      ],
+      "after_path": [
+        "import_from_statement:4",
+        "relative_import:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_from_statement:4",
+        "relative_import:1",
+        "import_prefix:1"
+      ],
+      "after_path": [
+        "import_from_statement:4",
+        "relative_import:1",
+        "import_prefix:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_from_statement:4",
+        "relative_import:1",
+        "import_prefix:1",
+        ".:1"
+      ],
+      "after_path": [
+        "import_from_statement:4",
+        "relative_import:1",
+        "import_prefix:1",
+        ".:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_from_statement:4",
+        "import:1"
+      ],
+      "after_path": [
+        "import_from_statement:4",
+        "import:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_from_statement:4",
+        "dotted_name:1"
+      ],
+      "after_path": [
+        "import_from_statement:4",
+        "dotted_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_from_statement:4",
+        "dotted_name:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "import_from_statement:4",
+        "dotted_name:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "insert_with_children",
+      "after_path": [
+        "import_from_statement:5"
+      ]
+    },
+    {
+      "operation": "insert_with_children",
+      "after_path": [
+        "import_from_statement:6"
+      ]
+    }
+  ],
+  "text_mappings": [
+    {
+      "name": "Minimal",
+      "entries": [
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 4,
+              "start_column": 0,
+              "end_row": 6,
+              "end_column": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Only one solution",
+      "entries": [
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 4,
+              "start_column": 0,
+              "end_row": 6,
+              "end_column": 0
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

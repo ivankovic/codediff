@@ -193,6 +193,8 @@ mod javascript_microsoft_typescript_add_use_strict;
 #[cfg(test)]
 mod javascript_microsoft_typescript_add_use_strict_2;
 #[cfg(test)]
+mod javascript_microsoft_typescript_concat_to_template;
+#[cfg(test)]
 mod javascript_mozilla_firefox_firefox_remove_one_comment;
 #[cfg(test)]
 mod javascript_mui_material_ui_delete_one_import;
@@ -201,6 +203,8 @@ mod javascript_vercel_next_add_doccomment;
 #[cfg(test)]
 mod json_microsoft_playwright_version_update;
 #[cfg(test)]
+mod json_puppeteer_puppeteer_update_version;
+#[cfg(test)]
 mod json_puppeteer_puppeteer_version_update;
 #[cfg(test)]
 mod json_puppeteer_puppeteer_version_update_2;
@@ -208,6 +212,46 @@ mod json_puppeteer_puppeteer_version_update_2;
 mod lua_awesomewm_awesome_add_to_table_constructor;
 #[cfg(test)]
 mod lua_awesomewm_awesome_update_comment;
+#[cfg(test)]
+mod python_langchain_ai_langchain_version_change;
+#[cfg(test)]
+mod python_langflow_ai_langflow_bob;
+#[cfg(test)]
+mod python_nvbn_thefuck_add_three_arguments;
+#[cfg(test)]
+mod python_odoo_odoo_add_import;
+#[cfg(test)]
+mod python_odoo_odoo_add_import_2;
+#[cfg(test)]
+mod python_odoo_odoo_add_two_imports;
+#[cfg(test)]
+mod python_paddlepaddle_paddleocr_remove_import;
+#[cfg(test)]
+mod python_paddlepaddle_paddleocr_whitespace_only_change;
+#[cfg(test)]
+mod python_ytdl_org_youtube_dl_version_update;
+#[cfg(test)]
+mod python_ytdl_org_youtube_dl_version_update_2;
+#[cfg(test)]
+mod ruby_jekyll_jekyll_version;
+#[cfg(test)]
+mod ruby_jekyll_jekyll_version_2;
+#[cfg(test)]
+mod ruby_jekyll_jekyll_version_3;
+#[cfg(test)]
+mod ruby_jekyll_jekyll_version_4;
+#[cfg(test)]
+mod ruby_jekyll_jekyll_version_5;
+#[cfg(test)]
+mod ruby_jekyll_jekyll_version_6;
+#[cfg(test)]
+mod ruby_jekyll_jekyll_version_7;
+#[cfg(test)]
+mod ruby_jekyll_jekyll_whitespace_only;
+#[cfg(test)]
+mod ruby_jekyll_jekyll_whitespace_only_2;
+#[cfg(test)]
+mod ruby_mastodon_mastodon_add_method;
 #[cfg(test)]
 mod rust_gyulyvgc_sniffnet_add_mod;
 #[cfg(test)]
@@ -248,3 +292,5 @@ mod rust_zed_industries_zed_add_mod;
 mod rust_zed_industries_zed_change_mod_and_use;
 #[cfg(test)]
 mod rust_zed_industries_zed_change_mods;
+#[cfg(test)]
+mod shellscript_ansible_ansible_add_commadn;
