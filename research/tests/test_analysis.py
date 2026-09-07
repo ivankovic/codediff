@@ -139,6 +139,19 @@ def test_percentile_by_nearest_rank(values, q, expected):
     assert edit_shape_stats.percentile(values, q) == expected
 
 
+def test_shallow_boundary_commits_reads_the_graft_points(tmp_path):
+    git_dir = tmp_path / ".git"
+    git_dir.mkdir()
+    (git_dir / "shallow").write_text("aaa111\nbbb222\n\n")
+    assert edit_shape_stats.shallow_boundary_commits(tmp_path) == {"aaa111", "bbb222"}
+
+
+def test_shallow_boundary_commits_is_empty_for_a_complete_clone(tmp_path):
+    # No .git/shallow at all: a full clone has no graft points, and reading it must not raise.
+    (tmp_path / ".git").mkdir()
+    assert edit_shape_stats.shallow_boundary_commits(tmp_path) == set()
+
+
 # --- scripts/ci_local.py -----------------------------------------------------------------------
 
 

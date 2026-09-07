@@ -280,6 +280,16 @@ We cloned each repository to a depth of \CorpusCloneDepth{} commits from every m
 remain accessible, the entire list of repositories, the cloning script and all analysis is available from
 the projects repository and can be replicated by readers, if desired.
 
+We fetched, parsed and measured the corpus on a single machine: an \MachineCpu{}
+(\MachineCpuMicroarch{}, \MachineCpuCores{}~cores / \MachineCpuThreads{}~threads,
+\MachineCpuClockGhz{}\,GHz base and \MachineCpuTurboGhz{}\,GHz turbo, \MachineCpuCacheMb{}\,MiB
+L3) with \MachineRamGb{}\,GB of RAM, running \MachineOs{}. The checkouts and the measurement
+database sit on \MachineDiskCount{} \MachineDiskSizeTb{}\,TB \MachineDiskModel{} rotational drives
+in \MachineDiskArray{} (\MachineDiskUsableTb{}\,TiB usable, \MachineFilesystem{}), not on flash.
+We record this because some results are hardware-bound: the wall-clock budget we hold whole-tree
+APTED to in Section~\ref{sec:speed} is a statement about this CPU, and parsing a corpus of this
+size off rotational storage is I/O-bound in a way it would not be on an SSD.
+
 This section describes the overall shape of the resulting dataset.
 
 \subsection{Shape of real-world files}
@@ -752,6 +762,7 @@ favour or against it.
 \end{table}
 
 \input{figures/benchmark_other_buckets.tex}
+\input{figures/benchmark_other_buckets_node.tex}
 
 \textbf{Cost.} RQ4.2 asks the same nine tools a different question. Table~\ref{tab:speed-vs-others}
 reports wall-clock percentiles, sorted fastest to slowest by median. Each tool is measured over
