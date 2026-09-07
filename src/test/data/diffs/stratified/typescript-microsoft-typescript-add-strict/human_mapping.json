@@ -1,0 +1,768 @@
+{
+  "entries": [
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [],
+      "after_path": []
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "comment:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "let:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "let:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "=:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "=:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "object:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "object:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "object:1",
+        "{:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "object:1",
+        "{:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "object:1",
+        "pair:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "object:1",
+        "pair:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "object:1",
+        "pair:1",
+        "property_identifier:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "object:1",
+        "pair:1",
+        "property_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "object:1",
+        "pair:1",
+        "::1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "object:1",
+        "pair:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "object:1",
+        "pair:1",
+        "number:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "object:1",
+        "pair:1",
+        "number:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "object:1",
+        ",:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "object:1",
+        ",:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "object:1",
+        "pair:2"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "object:1",
+        "pair:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "object:1",
+        "pair:2",
+        "property_identifier:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "object:1",
+        "pair:2",
+        "property_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "object:1",
+        "pair:2",
+        "::1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "object:1",
+        "pair:2",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "object:1",
+        "pair:2",
+        "number:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "object:1",
+        "pair:2",
+        "number:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "object:1",
+        "}:1"
+      ],
+      "after_path": [
+        "lexical_declaration:1",
+        "variable_declarator:1",
+        "object:1",
+        "}:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:2"
+      ],
+      "after_path": [
+        "lexical_declaration:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:2",
+        "let:1"
+      ],
+      "after_path": [
+        "lexical_declaration:2",
+        "let:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:2",
+        "variable_declarator:1"
+      ],
+      "after_path": [
+        "lexical_declaration:2",
+        "variable_declarator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:2",
+        "variable_declarator:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "lexical_declaration:2",
+        "variable_declarator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:2",
+        "variable_declarator:1",
+        "type_annotation:1"
+      ],
+      "after_path": [
+        "lexical_declaration:2",
+        "variable_declarator:1",
+        "type_annotation:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:2",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "::1"
+      ],
+      "after_path": [
+        "lexical_declaration:2",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:2",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "object_type:1"
+      ],
+      "after_path": [
+        "lexical_declaration:2",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "object_type:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:2",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "object_type:1",
+        "{:1"
+      ],
+      "after_path": [
+        "lexical_declaration:2",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "object_type:1",
+        "{:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:2",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "object_type:1",
+        "property_signature:1"
+      ],
+      "after_path": [
+        "lexical_declaration:2",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "object_type:1",
+        "property_signature:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:2",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "object_type:1",
+        "property_signature:1",
+        "property_identifier:1"
+      ],
+      "after_path": [
+        "lexical_declaration:2",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "object_type:1",
+        "property_signature:1",
+        "property_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:2",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "object_type:1",
+        ",:1"
+      ],
+      "after_path": [
+        "lexical_declaration:2",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "object_type:1",
+        ",:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:2",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "object_type:1",
+        "property_signature:2"
+      ],
+      "after_path": [
+        "lexical_declaration:2",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "object_type:1",
+        "property_signature:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:2",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "object_type:1",
+        "property_signature:2",
+        "property_identifier:1"
+      ],
+      "after_path": [
+        "lexical_declaration:2",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "object_type:1",
+        "property_signature:2",
+        "property_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:2",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "object_type:1",
+        "}:1"
+      ],
+      "after_path": [
+        "lexical_declaration:2",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "object_type:1",
+        "}:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:2",
+        "variable_declarator:1",
+        "=:1"
+      ],
+      "after_path": [
+        "lexical_declaration:2",
+        "variable_declarator:1",
+        "=:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:2",
+        "variable_declarator:1",
+        "object:1"
+      ],
+      "after_path": [
+        "lexical_declaration:2",
+        "variable_declarator:1",
+        "object:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:2",
+        "variable_declarator:1",
+        "object:1",
+        "{:1"
+      ],
+      "after_path": [
+        "lexical_declaration:2",
+        "variable_declarator:1",
+        "object:1",
+        "{:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:2",
+        "variable_declarator:1",
+        "object:1",
+        "pair:1"
+      ],
+      "after_path": [
+        "lexical_declaration:2",
+        "variable_declarator:1",
+        "object:1",
+        "pair:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:2",
+        "variable_declarator:1",
+        "object:1",
+        "pair:1",
+        "property_identifier:1"
+      ],
+      "after_path": [
+        "lexical_declaration:2",
+        "variable_declarator:1",
+        "object:1",
+        "pair:1",
+        "property_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:2",
+        "variable_declarator:1",
+        "object:1",
+        "pair:1",
+        "::1"
+      ],
+      "after_path": [
+        "lexical_declaration:2",
+        "variable_declarator:1",
+        "object:1",
+        "pair:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:2",
+        "variable_declarator:1",
+        "object:1",
+        "pair:1",
+        "number:1"
+      ],
+      "after_path": [
+        "lexical_declaration:2",
+        "variable_declarator:1",
+        "object:1",
+        "pair:1",
+        "number:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:2",
+        "variable_declarator:1",
+        "object:1",
+        ",:1"
+      ],
+      "after_path": [
+        "lexical_declaration:2",
+        "variable_declarator:1",
+        "object:1",
+        ",:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:2",
+        "variable_declarator:1",
+        "object:1",
+        "spread_element:1"
+      ],
+      "after_path": [
+        "lexical_declaration:2",
+        "variable_declarator:1",
+        "object:1",
+        "spread_element:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:2",
+        "variable_declarator:1",
+        "object:1",
+        "spread_element:1",
+        "...:1"
+      ],
+      "after_path": [
+        "lexical_declaration:2",
+        "variable_declarator:1",
+        "object:1",
+        "spread_element:1",
+        "...:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:2",
+        "variable_declarator:1",
+        "object:1",
+        "spread_element:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "lexical_declaration:2",
+        "variable_declarator:1",
+        "object:1",
+        "spread_element:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:2",
+        "variable_declarator:1",
+        "object:1",
+        ",:2"
+      ],
+      "after_path": [
+        "lexical_declaration:2",
+        "variable_declarator:1",
+        "object:1",
+        ",:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:2",
+        "variable_declarator:1",
+        "object:1",
+        "pair:2"
+      ],
+      "after_path": [
+        "lexical_declaration:2",
+        "variable_declarator:1",
+        "object:1",
+        "pair:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:2",
+        "variable_declarator:1",
+        "object:1",
+        "pair:2",
+        "property_identifier:1"
+      ],
+      "after_path": [
+        "lexical_declaration:2",
+        "variable_declarator:1",
+        "object:1",
+        "pair:2",
+        "property_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:2",
+        "variable_declarator:1",
+        "object:1",
+        "pair:2",
+        "::1"
+      ],
+      "after_path": [
+        "lexical_declaration:2",
+        "variable_declarator:1",
+        "object:1",
+        "pair:2",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:2",
+        "variable_declarator:1",
+        "object:1",
+        "pair:2",
+        "number:1"
+      ],
+      "after_path": [
+        "lexical_declaration:2",
+        "variable_declarator:1",
+        "object:1",
+        "pair:2",
+        "number:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:2",
+        "variable_declarator:1",
+        "object:1",
+        "}:1"
+      ],
+      "after_path": [
+        "lexical_declaration:2",
+        "variable_declarator:1",
+        "object:1",
+        "}:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "lexical_declaration:2",
+        "comment:1"
+      ],
+      "after_path": [
+        "lexical_declaration:2",
+        "comment:1"
+      ]
+    }
+  ],
+  "text_mappings": [
+    {
+      "name": "Only one solution",
+      "entries": [
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 0,
+              "start_column": 0,
+              "end_row": 0,
+              "end_column": 17
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

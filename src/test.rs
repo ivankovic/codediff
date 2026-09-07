@@ -34,7 +34,6 @@ mod tests {
     #[cfg(feature = "test-fixtures")]
     const CLAMPS_WITHOUT_AN_EXPLANATION: &[&str] = &[
         "c-linux-small-change-struct-to-char",
-        "cpp-godot-small-bugfix",
         "cpp-ladybird-refactor-variables-if-changes",
         "cpp-tensorflow-switch-to-primitive-types",
         "csharp-cyanfish-naps2-add-condition-to-if",
@@ -49,7 +48,6 @@ mod tests {
         "php-zetacomponents-consoletools-file-with-parse-errors-and-a-few-deletions",
         "python-ansible-ansible-ridiculously-long-yaml-in-string-constant-and-actual-code-changes",
         "python-portagefilelist-client-remove-one-import-and-update-one-const-string",
-        "rust-vercel-nextjs-refactoring-would-require-mulitmap-mapping",
         "scala-com-lihaoyi-mill-add-a-function-call",
         "scala-com-lihaoyi-mill-small-refactoring",
         "shellscript-scikit-learn-scikit-learn-string-to-regex",

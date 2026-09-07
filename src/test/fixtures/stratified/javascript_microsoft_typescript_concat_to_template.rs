@@ -18,19 +18,28 @@
 use anyhow::Result;
 
 use crate::test;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 
 #[test]
 fn mapping() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("javascript-microsoft-typescript-concat-to-template")
+    // First baseline (2026-09-07), a measured gap and not a regression: rewriting `"a" + x + "b"`
+    // as a template literal moves both string_fragments under a template_string, and the
+    // qualified_name APTED pass deletes them instead of matching them across the rewrite.
+    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
+        "javascript-microsoft-typescript-concat-to-template",
+        2,
+        2,
+    )
 }
 
 #[test]
 fn painting() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test, read the rate it
-    // reports for both modes, and record that instead.
-    assert_matches_human_painting_within_limit("javascript-microsoft-typescript-concat-to-template", 100.0)
+    // measured 2026-09-07: minimal 8.541%, full 2.135%
+    assert_matches_human_painting_within_limit(
+        "javascript-microsoft-typescript-concat-to-template",
+        8.56,
+    )
 }
 
 #[test]

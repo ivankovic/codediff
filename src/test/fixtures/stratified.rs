@@ -145,6 +145,10 @@ mod css_wordpress_wordpress_remove_one_rule;
 #[cfg(test)]
 mod css_wordpress_wordpress_remove_webkit_prefix;
 #[cfg(test)]
+mod go_fatedier_frp_build_comment_insert_only;
+#[cfg(test)]
+mod go_gin_gonic_gin_one_space_removed_in_a_comment;
+#[cfg(test)]
 mod go_gin_gonic_gin_update_version_string;
 #[cfg(test)]
 mod go_gin_gonic_gin_update_version_string_;
@@ -158,6 +162,8 @@ mod go_gin_gonic_gin_update_version_string_4;
 mod go_gin_gonic_gin_update_version_string_5;
 #[cfg(test)]
 mod go_gin_gonic_gin_update_version_string_6;
+#[cfg(test)]
+mod go_gohugoio_hugo_version;
 #[cfg(test)]
 mod go_golang_go_update_copyright_year;
 #[cfg(test)]
@@ -212,6 +218,26 @@ mod json_puppeteer_puppeteer_version_update_2;
 mod lua_awesomewm_awesome_add_to_table_constructor;
 #[cfg(test)]
 mod lua_awesomewm_awesome_update_comment;
+#[cfg(test)]
+mod php_wordpress_wordpress_one_line_file_insert_and_update;
+#[cfg(test)]
+mod php_wordpress_wordpress_one_line_file_with_real_insert_and_update;
+#[cfg(test)]
+mod php_wordpress_wordpress_version;
+#[cfg(test)]
+mod php_wordpress_wordpress_version_2;
+#[cfg(test)]
+mod php_wordpress_wordpress_version_3;
+#[cfg(test)]
+mod php_wordpress_wordpress_version_4;
+#[cfg(test)]
+mod php_wordpress_wordpress_version_5;
+#[cfg(test)]
+mod php_wordpress_wordpress_version_6;
+#[cfg(test)]
+mod php_wordpress_wordpress_version_7;
+#[cfg(test)]
+mod php_wordpress_wordpress_version_8;
 #[cfg(test)]
 mod python_langchain_ai_langchain_version_change;
 #[cfg(test)]
@@ -293,4 +319,78 @@ mod rust_zed_industries_zed_change_mod_and_use;
 #[cfg(test)]
 mod rust_zed_industries_zed_change_mods;
 #[cfg(test)]
+mod shellscript_ansible_ansible_a_small_add;
+#[cfg(test)]
 mod shellscript_ansible_ansible_add_commadn;
+#[cfg(test)]
+mod shellscript_ansible_ansible_small_add;
+#[cfg(test)]
+mod shellscript_jesseduffield_lazygit_version;
+#[cfg(test)]
+mod shellscript_microsoft_playwright_version;
+#[cfg(test)]
+mod shellscript_openhands_openhands_update_string_value;
+#[cfg(test)]
+mod shellscript_paddlepaddle_paddleocr_insert_inside_a_string;
+#[cfg(test)]
+mod shellscript_stgpetrovic_stacuist_pure_add;
+#[cfg(test)]
+mod shellscript_stgpetrovic_stacuist_pure_add_2;
+#[cfg(test)]
+mod shellscript_vercel_next_change_command_params;
+#[cfg(test)]
+mod swift_swiftlang_swift_add_to_typecheck_comment;
+#[cfg(test)]
+mod swift_swiftlang_swift_add_to_typecheck_comment_1;
+#[cfg(test)]
+mod swift_swiftlang_swift_add_to_typecheck_comment_2;
+#[cfg(test)]
+mod swift_swiftlang_swift_add_to_typecheck_comment_4;
+#[cfg(test)]
+mod swift_swiftlang_swift_add_to_typecheck_comment_5;
+#[cfg(test)]
+mod swift_swiftlang_swift_add_to_typecheck_comment_6;
+#[cfg(test)]
+mod swift_swiftlang_swift_add_to_typecheck_comment_7;
+#[cfg(test)]
+mod swift_swiftlang_swift_delete_and_insert_in_the_typecheck_comment;
+#[cfg(test)]
+mod swift_swiftlang_swift_update_leading_comment;
+#[cfg(test)]
+mod swift_swiftlang_swift_update_typecheck_comment;
+#[cfg(test)]
+mod tsx_excalidraw_excalidraw_add_type_to_import;
+#[cfg(test)]
+mod tsx_langflow_ai_langflow_add_type_to_import;
+#[cfg(test)]
+mod tsx_langflow_ai_langflow_split_import;
+#[cfg(test)]
+mod tsx_mui_material_ui_add_to_empty_block;
+#[cfg(test)]
+mod tsx_mui_material_ui_remove_import;
+#[cfg(test)]
+mod tsx_mui_material_ui_remove_import_2;
+#[cfg(test)]
+mod tsx_mui_material_ui_remove_import_3;
+#[cfg(test)]
+mod tsx_mui_material_ui_remove_import_4;
+#[cfg(test)]
+mod typescript_microsoft_typescript_add_es_target;
+#[cfg(test)]
+mod typescript_microsoft_typescript_add_es_target_2;
+#[cfg(test)]
+mod typescript_microsoft_typescript_add_es_target_3;
+#[cfg(test)]
+mod typescript_microsoft_typescript_add_es_target_4;
+#[cfg(test)]
+mod typescript_microsoft_typescript_add_es_target_5;
+#[cfg(test)]
+mod typescript_microsoft_typescript_add_es_target_6;
+#[cfg(test)]
+mod typescript_microsoft_typescript_add_eslint;
+#[cfg(test)]
+mod typescript_microsoft_typescript_add_strict;
+#[cfg(test)]
+mod typescript_microsoft_typescript_add_strict_2;
+#[cfg(test)]
+mod typescript_microsoft_typescript_add_strict_false;

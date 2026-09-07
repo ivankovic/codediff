@@ -1,0 +1,461 @@
+{
+  "entries": [
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [],
+      "after_path": []
+    },
+    {
+      "operation": "update",
+      "before_path": [
+        "comment:1"
+      ],
+      "after_path": [
+        "comment:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "comment:2"
+      ],
+      "after_path": [
+        "comment:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1"
+      ],
+      "after_path": [
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "struct:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "struct:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "simple_identifier:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "simple_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "type_parameters:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "type_parameters:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "type_parameters:1",
+        "<:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "type_parameters:1",
+        "<:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "type_parameters:1",
+        "type_parameter:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "type_parameters:1",
+        "type_parameter:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "type_parameters:1",
+        "type_parameter:1",
+        "type_identifier:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "type_parameters:1",
+        "type_parameter:1",
+        "type_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "type_parameters:1",
+        ">:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "type_parameters:1",
+        ">:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "{:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "{:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "ERROR:1",
+        "protocol:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "ERROR:1",
+        "protocol:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "ERROR:1",
+        "simple_identifier:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "ERROR:1",
+        "simple_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "ERROR:1",
+        "{:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "ERROR:1",
+        "{:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "struct:2"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "struct:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "simple_identifier:2"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "simple_identifier:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "{:2"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "{:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "ERROR:2"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "ERROR:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "ERROR:2",
+        "protocol:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "ERROR:2",
+        "protocol:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "ERROR:2",
+        "simple_identifier:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "ERROR:2",
+        "simple_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "ERROR:2",
+        "struct:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "ERROR:2",
+        "struct:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "ERROR:2",
+        "simple_identifier:2"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "ERROR:2",
+        "simple_identifier:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "ERROR:2",
+        "<:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "ERROR:2",
+        "<:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "ERROR:2",
+        "type_identifier:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "ERROR:2",
+        "type_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "func:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "func:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "simple_identifier:3"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "simple_identifier:3"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "ERROR:3"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "ERROR:3"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "ERROR:3",
+        "->:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "ERROR:3",
+        "->:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "ERROR:3",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "ERROR:3",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "type_parameters:2"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "type_parameters:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "type_parameters:2",
+        "<:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "type_parameters:2",
+        "<:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "type_parameters:2",
+        "type_parameter:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "type_parameters:2",
+        "type_parameter:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "type_parameters:2",
+        "type_parameter:1",
+        "type_identifier:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "type_parameters:2",
+        "type_parameter:1",
+        "type_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "type_parameters:2",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "type_parameters:2",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "type_parameters:2",
+        ">:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "type_parameters:2",
+        ">:1"
+      ]
+    }
+  ],
+  "text_mappings": [
+    {
+      "name": "Only one solution",
+      "entries": [
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 0,
+              "start_column": 119,
+              "end_row": 0,
+              "end_column": 174
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

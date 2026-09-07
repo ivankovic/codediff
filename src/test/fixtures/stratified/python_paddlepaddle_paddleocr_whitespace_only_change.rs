@@ -22,7 +22,9 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("python-paddlepaddle-paddleocr-whitespace-only-change")
+    test::helper::human_mapping::assert_matches_human_mapping(
+        "python-paddlepaddle-paddleocr-whitespace-only-change",
+    )
 }
 
 #[test]
