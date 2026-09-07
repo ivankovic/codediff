@@ -111,6 +111,27 @@ def language_of(path):
     return CODE_EXTENSIONS.get(ext.lower())
 
 
+def shallow_boundary_commits(repo):
+    """The commits in `repo`'s `.git/shallow`, i.e. the graft points of a shallow clone.
+
+    A shallow clone truncates history by telling git these commits have no parents. `git log
+    --numstat` therefore reports each of them as *creating* every file in its tree, because from
+    git's point of view nothing precedes it. That is a property of how the corpus was cloned, not
+    an edit anybody made, and it dwarfs the real edits: measured over a 60-repository sample of
+    this corpus on 2026-09-07, 90.9% of all numstat rows in a 50-commit walk came from these
+    commits, which drove the modified-edit share to 7.2% against the 90.5% the (depth-1000)
+    Curated corpus reports for the same 50-commit window.
+
+    Returns an empty set for a complete clone, where the file does not exist.
+    """
+    path = os.path.join(repo, ".git", "shallow")
+    try:
+        with open(path) as f:
+            return {line.strip() for line in f if line.strip()}
+    except OSError:
+        return set()
+
+
 def numstat_rows(repo, max_commits):
     """Every (commit, path, added, removed) in `repo`'s cloned history, non-merge commits only.
 
@@ -119,10 +140,15 @@ def numstat_rows(repo, max_commits):
     lines and hundreds of megabytes; `capture_output=True` holds all of that in memory at once,
     which is most of what made the first version of this script peak at 7.7 GB.
 
+    Rows from shallow-boundary commits are skipped entirely - see `shallow_boundary_commits`. They
+    would otherwise be counted as file creations, and a corpus cloned at the same depth this walk
+    is long consists mostly of them.
+
     `--numstat` reports `-\t-\t<path>` for a binary file; those carry no line counts and are
     skipped. A rename is reported with a brace-expanded path (`a/{b => c}/d`); the post-rename
     path is what the row is attributed to, since that is the file the edit produced.
     """
+    shallow = shallow_boundary_commits(repo)
     proc = subprocess.Popen(
         ["git", "-C", repo, "log", "--no-merges", "--numstat", "--format=C%H"]
         + ([f"-n{max_commits}"] if max_commits else []),
@@ -139,7 +165,7 @@ def numstat_rows(repo, max_commits):
             if line.startswith("C"):
                 commit = line[1:]
                 continue
-            if not line.strip() or commit is None:
+            if not line.strip() or commit is None or commit in shallow:
                 continue
             parts = line.split("\t", 2)
             if len(parts) != 3:

@@ -207,6 +207,39 @@ TARGETS = {
     "GumTreeVersion": "v4.0.0-beta8",
 }
 
+# The machine every corpus-wide measurement in this paper was run on, read off it on 2026-09-07
+# (`lscpu`, `/proc/meminfo`, `lsblk`, `/proc/mdstat`). Descriptive facts, like TARGETS above: a
+# refresh means someone moved the measurement to different hardware, not a re-run.
+#
+# It belongs in the paper because two of its numbers are load- and I/O-bound and cannot be read
+# without it. RQ1 scores whole-tree APTED against a fixed 1-second wall-clock budget (see
+# `measure-apted-budget`), so "timed out" is a statement about this CPU; and the corpus is parsed
+# off four spinning disks in RAID 5 behind LUKS, which is the relevant fact for anyone comparing
+# `file_stats` wall-clock against a run on NVMe. Deliberately NOT the machine for the per-tool
+# comparison table - `data/comparison/PROVENANCE.md` records no machine per row, so nothing here
+# may be quoted as the hardware behind those timings.
+#
+# RAM is the installed capacity, not `MemTotal` (62.45 GiB): the difference is firmware-reserved.
+# Disk size is the vendor's decimal TB per drive; MachineDiskUsableTb is the binary TiB the RAID 5
+# array actually presents, which is why 4 x 16 does not equal 43.7.
+MACHINE = {
+    "MachineCpu": "Intel Xeon E3-1275~v5",
+    "MachineCpuMicroarch": "Skylake",
+    "MachineCpuCores": "4",
+    "MachineCpuThreads": "8",
+    "MachineCpuClockGhz": "3.60",
+    "MachineCpuTurboGhz": "4.00",
+    "MachineCpuCacheMb": "8",
+    "MachineRamGb": "64",
+    "MachineDiskCount": "4",
+    "MachineDiskSizeTb": "16",
+    "MachineDiskModel": "WDC Ultrastar DC HC550",
+    "MachineDiskArray": "RAID~5",
+    "MachineDiskUsableTb": "43.7",
+    "MachineFilesystem": "ext4",
+    "MachineOs": "Linux~6.8",
+}
+
 
 def read_newcommands(path, only=None):
     """Returns the `\\newcommand` lines of a generated .tex file, or None if it doesn't exist or
@@ -820,6 +853,12 @@ def build(
         "% --- Design targets and fixed descriptive facts (AUTHORED - see script's TARGETS block).",
     ]
     out += [command(name, value) for name, value in TARGETS.items()]
+
+    out += [
+        "",
+        "% --- Measurement machine (AUTHORED - see script's MACHINE block).",
+    ]
+    out += [command(name, value) for name, value in MACHINE.items()]
 
     out += [
         "",
