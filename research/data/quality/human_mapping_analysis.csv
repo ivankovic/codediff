@@ -59,7 +59,7 @@ cpp-bolero-murakami-sprout-copyright-update-3,full,CPP,243,243,9967,9967,2268,22
 cpp-cgdb-cgdb-struct-to-pointer,full,CPP,1185,1189,35391,35441,5708,5728,true,5623,2,43,2,3,4,2,11246,4,86,2,38,4,56,0,5668,5667,1,0,0,0,0,0,110
 cpp-electron-electron-add-imports,stratified,CPP,18,23,589,758,85,109,true,84,0,1,0,0,0,4,168,0,2,0,0,0,24,0,85,85,0,0,0,0,0,0,0
 cpp-fix-segfault,handmade,CPP,19,19,391,390,170,170,true,164,0,6,0,0,0,0,328,0,12,0,0,0,0,0,170,170,0,0,0,0,0,0,0
-cpp-godot-small-bugfix,small,CPP,685,687,20670,20684,5826,5832,true,5814,0,9,2,0,7,0,11631,0,18,2,0,7,0,3,5823,5797,10,16,0,0,1,0,11
+cpp-godot-small-bugfix,small,CPP,685,687,20670,20684,5826,5832,true,5815,0,9,2,0,8,0,11630,0,18,2,0,8,0,0,5824,5799,10,15,0,0,0,0,13
 cpp-godotengine-godot-add-include,stratified,CPP,59,61,2868,2903,176,182,true,175,0,1,0,0,0,1,350,0,2,0,0,0,6,0,176,176,0,0,0,0,0,0,0
 cpp-jpnurmi-znc-playback-adding-new-feature,full,CPP,268,307,8890,10147,2768,3151,true,2743,0,25,0,0,8,7,5486,0,50,0,0,8,375,0,2768,2768,0,0,0,0,0,0,0
 cpp-ladybird-refactor-variables-if-changes,small,CPP,564,590,27975,29948,6028,6630,true,5932,1,38,55,0,145,5,11870,2,76,55,0,145,510,6,5971,5757,55,158,1,0,2,0,111
@@ -73,7 +73,7 @@ cpp-libreoffice-add-imports-and-function-param,stratified,CPP,40,44,1564,1722,12
 cpp-libreoffice-delete-function,stratified,CPP,97,89,3694,3444,537,470,true,469,0,1,0,1,0,0,938,0,2,0,67,0,0,0,470,470,0,0,0,0,0,0,0
 cpp-libreoffice-remove-return-value,small,CPP,483,482,15254,15194,3435,3428,true,3423,0,5,7,0,0,0,6846,0,10,7,0,0,0,0,3428,3428,0,0,0,0,0,0,0
 cpp-llnl-sundials-comment-change,full,CPP,749,752,28035,28238,7425,7425,true,7423,1,1,0,0,0,0,14846,2,2,0,0,0,0,0,7425,7425,0,0,0,0,0,0,0
-cpp-mikepopoloski-slang-remove-if-condition-and-brackets,full,CPP,722,719,30533,30391,6842,6818,true,6809,2,7,9,1,0,0,13618,4,14,9,15,0,0,0,6818,6792,13,13,0,0,0,0,2
+cpp-mikepopoloski-slang-remove-if-condition-and-brackets,full,CPP,722,719,30533,30391,6842,6818,true,6809,2,7,9,1,0,0,13618,4,14,9,15,0,0,0,6818,6792,13,13,0,0,0,0,0
 cpp-mozilla-firefox-firefox-update-file-comment,stratified,CPP,26,25,941,863,123,123,true,121,1,1,0,0,0,0,242,2,2,0,0,0,0,0,123,123,0,0,0,0,0,0,0
 cpp-mozilla-firefox-firefox-update-file-comment-2,stratified,CPP,15,13,515,393,76,74,true,73,0,1,2,0,0,0,146,0,2,2,0,0,0,0,74,74,0,0,0,0,0,0,0
 cpp-nextcloud-add-test-case,small,CPP,203,338,7740,14196,1850,3442,true,1846,0,4,0,0,6,1,3692,0,8,0,0,6,1586,0,1850,1850,0,0,0,0,0,0,0
@@ -103,7 +103,7 @@ csharp-glibsharp-gtksharp-interesting-case-where-most-should-be-flagged-as-inser
 csharp-glibsharp-gtksharp-whitespace-only-change,full,CSharp,52,51,1491,1485,240,240,true,240,0,0,0,0,0,0,480,0,0,0,0,0,0,0,240,240,0,0,0,0,0,0,0
 csharp-glibsharp-gtksharp-whitespace-only-change-2,full,CSharp,63,62,1770,1761,282,282,true,282,0,0,0,0,0,0,564,0,0,0,0,0,0,0,282,282,0,0,0,0,0,0,0
 csharp-glibsharp-gtksharp-whitespace-only-change-3,full,CSharp,100,89,2443,2400,513,513,true,513,0,0,0,0,0,0,1026,0,0,0,0,0,0,0,513,513,0,0,0,0,0,0,0
-csharp-icsharpcode-avaloniailspy-a-few-formatting-changes-and-use-a-struct-instead-of-tuples,full,CSharp,720,722,35682,35637,7093,7066,true,7040,2,18,27,0,3,0,14089,4,36,27,0,3,0,9,7060,7051,7,0,2,0,3,0,5
+csharp-icsharpcode-avaloniailspy-a-few-formatting-changes-and-use-a-struct-instead-of-tuples,full,CSharp,720,722,35682,35637,7093,7066,true,7043,1,18,31,0,4,0,14086,2,36,31,0,4,0,0,7062,7051,10,0,1,0,0,0,4
 csharp-jellyfin-add-function,small,CSharp,316,335,11291,12079,2280,2367,true,2216,3,19,23,0,105,0,4475,6,38,23,0,105,0,43,2238,2234,0,0,4,0,0,0,14
 csharp-jellyfin-jellyfin-update-version-string,stratified,CSharp,4,4,108,108,38,38,true,25,2,11,0,0,0,0,50,4,22,0,0,0,0,0,38,38,0,0,0,0,0,0,0
 csharp-jellyfin-sql-query-fix,small,CSharp,73,74,2614,2829,609,640,true,583,2,15,8,0,13,2,1170,4,30,8,0,13,24,4,600,578,0,0,22,0,1,0,0
@@ -223,7 +223,7 @@ java-junit-pioneer-junit-pioneer-add-block-comment,full,Java,82,89,2721,2955,640
 java-nextcloud-android-add-if-branch-with-reused-return,small,Java,2303,2312,90755,91179,17922,18005,true,17884,3,35,0,0,11,3,35768,6,70,0,0,11,72,0,17922,17921,1,0,0,0,0,0,54
 java-nextcloud-android-add-two-function-calls,small,Java,1772,1778,76277,76503,14331,14357,true,14318,0,13,0,0,2,2,28636,0,26,0,0,2,24,0,14331,14331,0,0,0,0,0,0,0
 java-pdftk-java-pdftk-license-comment-change,full,Java,174,179,6930,7425,1291,1291,true,1289,1,1,0,0,0,0,2578,2,2,0,0,0,0,0,1291,1291,0,0,0,0,0,0,0
-java-pdftk-java-pdftk-real-change-all-across-the-file,full,Java,722,697,22295,22709,4423,4564,true,3747,58,243,191,16,234,19,7519,116,486,191,174,234,267,25,4048,3671,254,93,30,11,5,0,362
+java-pdftk-java-pdftk-real-change-all-across-the-file,full,Java,722,697,22295,22709,4423,4564,true,3747,58,243,191,16,234,19,7519,116,486,191,174,234,267,25,4048,3672,253,93,30,11,5,0,360
 java-protobuf-add-two-annotations,small,Java,703,705,24419,24467,4067,4073,true,4060,0,7,0,0,0,2,8120,0,14,0,0,0,6,0,4067,4067,0,0,0,0,0,0,0
 java-protocolbuffers-protobuf-add-a-method,small,Java,704,717,24425,24896,4054,4084,true,4051,0,3,0,0,1,1,8102,0,6,0,0,1,29,0,4054,4054,0,0,0,0,0,0,0
 java-protocolbuffers-protobuf-add-import-and-update-field-access,small,Java,4884,4885,187744,187794,41413,41426,true,41395,1,17,0,0,0,1,82790,2,34,0,0,0,13,0,41413,41413,0,0,0,0,0,0,0
@@ -245,7 +245,7 @@ javascript-microsoft-typescript-add-use-strict,stratified,JavaScript,2,3,37,52,5
 javascript-microsoft-typescript-add-use-strict-2,stratified,JavaScript,8,9,140,155,22,28,true,21,0,1,0,0,0,1,42,0,2,0,0,0,6,0,22,22,0,0,0,0,0,0,0
 javascript-microsoft-typescript-another-test-case-marked-with-strict,small,JavaScript,29,30,815,830,196,202,true,195,0,1,0,0,0,1,390,0,2,0,0,0,6,0,196,196,0,0,0,0,0,0,0
 javascript-microsoft-typescript-broken-js-remove-string-fragment,small,JavaScript,940,939,40890,40725,14836,14817,true,14779,0,38,19,0,0,0,29558,0,76,19,0,0,0,0,14817,14817,0,0,0,0,0,0,464
-javascript-microsoft-typescript-test-data-pretending-to-be-code-maybe-broken-parsing,small,JavaScript,514,510,18751,18666,4436,4389,true,4379,1,9,3,3,0,0,8758,2,18,3,44,0,0,0,4389,4389,0,0,0,0,0,0,2
+javascript-microsoft-typescript-test-data-pretending-to-be-code-maybe-broken-parsing,small,JavaScript,514,510,18751,18666,4436,4389,true,4379,1,9,3,3,0,0,8758,2,18,3,44,0,0,0,4389,4389,0,0,0,0,0,0,0
 javascript-mozilla-firefox-add-comment,small,JavaScript,400,402,11236,11334,1877,1879,true,1876,0,1,0,0,2,0,3752,0,2,0,0,2,0,0,1877,1877,0,0,0,0,0,0,0
 javascript-mozilla-firefox-firefox-remove-one-comment,stratified,JavaScript,5,4,238,201,13,12,true,11,0,1,1,0,0,0,22,0,2,1,0,0,0,0,12,12,0,0,0,0,0,0,0
 javascript-mui-material-ui-delete-one-import,stratified,JavaScript,7,6,303,271,64,51,true,50,0,1,0,1,0,0,100,0,2,0,13,0,0,0,51,51,0,0,0,0,0,0,0
@@ -290,7 +290,7 @@ kotlin-jetbrains-kotlin-add-single-const,full,Kotlin,29,30,1911,1988,279,291,tru
 kotlin-jetbrains-kotlin-remove-one-comment-line,full,Kotlin,32,31,884,806,183,182,true,179,2,1,0,1,0,0,358,4,2,0,1,0,0,0,182,182,0,0,0,0,0,0,1
 kotlin-jetbrains-kotlin-remove-some-deprecation,full,Kotlin,37,21,1319,667,252,128,true,120,0,6,2,5,0,1,240,0,12,2,124,0,2,0,126,126,0,0,0,0,0,0,0
 kotlin-jetbrains-kotlin-remove-typealias-with-annotations,full,Kotlin,33,29,998,848,193,148,true,147,0,1,7,2,0,0,294,0,2,7,38,0,0,0,148,148,0,0,0,0,0,0,0
-kotlin-nextcloud-a-few-small-removals,small,Kotlin,438,418,17339,16507,3540,3352,true,3318,0,24,6,10,10,0,6636,0,48,6,192,10,0,0,3342,3342,0,0,0,0,0,0,4
+kotlin-nextcloud-a-few-small-removals,small,Kotlin,438,418,17339,16507,3540,3352,true,3318,0,24,6,10,10,0,6636,0,48,6,192,10,0,0,3342,3342,0,0,0,0,0,0,2
 kotlin-nextcloud-android-add-a-feature,small,Kotlin,518,530,20407,20923,3500,3588,true,3492,0,8,0,0,0,4,6984,0,16,0,0,0,88,0,3500,3500,0,0,0,0,0,0,0
 kotlin-nextcloud-android-dot-to-question-mark-dot,small,Kotlin,195,195,6577,6584,1792,1792,true,1763,0,29,0,0,0,0,3526,0,58,0,0,0,0,0,1792,1792,0,0,0,0,0,0,0
 kotlin-nextcloud-android-extract-argument-into-variable,small,Kotlin,201,202,7722,7824,1912,1946,true,1898,0,11,3,0,37,0,3796,0,22,3,0,37,0,0,1909,1908,1,0,0,0,0,0,3
@@ -306,7 +306,7 @@ kotlin-yairm210-unciv-move-from-vec2-to-hexexpression,full,Kotlin,580,580,25246,
 kotlin-yairm210-unciv-remove-tovector2-from-multiple-callsites,full,Kotlin,588,588,25896,25824,5331,5289,true,5240,0,41,36,0,0,0,10502,0,82,36,0,0,0,22,5281,5259,0,22,0,0,6,0,0
 kotlin-yairm210-unciv-small-change,full,Kotlin,147,148,4079,4110,785,797,true,761,1,19,4,0,4,1,1522,2,38,4,0,4,12,0,781,781,0,0,0,0,0,0,0
 kotlin-yairm210-unciv-vector2-to-hexgrid,full,Kotlin,248,249,8725,8708,1922,1934,true,1790,1,95,36,0,36,1,3580,2,190,36,0,36,12,0,1886,1886,0,0,0,0,0,0,0
-kotlin-yairm210-unciv-yet-another-vector2-removal,full,Kotlin,209,210,9504,9531,2205,2211,true,2117,7,71,3,0,0,1,4245,14,142,3,0,0,12,11,2195,2192,0,0,3,0,3,0,1
+kotlin-yairm210-unciv-yet-another-vector2-removal,full,Kotlin,209,210,9504,9531,2205,2211,true,2119,7,73,6,0,0,1,4238,14,146,6,0,0,12,0,2199,2194,0,0,5,0,0,0,1
 lua-awesome-only-comment-change,small,LUA,719,719,24513,24514,4644,4644,true,4641,1,2,0,0,0,0,9282,2,4,0,0,0,0,0,4644,4644,0,0,0,0,0,0,0
 lua-awesomewm-awesome-add-to-table-constructor,stratified,LUA,3,4,49,115,20,33,true,15,0,4,1,0,2,1,30,0,8,1,0,2,12,0,19,19,0,0,0,0,0,0,0
 lua-awesomewm-awesome-align-to-halign,small,LUA,82,82,1999,1999,483,483,true,458,2,23,0,0,0,0,916,4,46,0,0,0,0,0,483,483,0,0,0,0,0,0,0
@@ -323,7 +323,7 @@ lua-neovim-neovim-add-if-around-one-line,small,LUA,1074,1076,30273,30304,7839,78
 lua-neovim-neovim-add-new-logic,small,LUA,2098,2103,59887,59998,16255,16285,true,16240,0,13,2,0,13,3,32480,0,26,2,0,13,19,0,16253,16212,4,0,37,0,0,0,10
 lua-neovim-neovim-constant-changes,small,LUA,264,264,11178,11170,1054,1054,true,1037,2,15,0,0,0,0,2074,4,30,0,0,0,0,0,1054,1054,0,0,0,0,0,0,0
 lua-neovim-neovim-if-flips-two-branches,small,LUA,1521,1521,51759,51759,11903,11903,true,11891,0,12,0,0,0,0,23782,0,24,0,0,0,0,0,11903,11828,75,0,0,0,0,0,68
-lua-neovim-neovim-logic-change-with-some-code-re-use,small,LUA,1441,1479,49823,51712,9694,10008,true,9584,2,53,40,1,37,14,19198,4,106,40,3,37,314,30,9639,9615,21,2,1,0,1,0,9
+lua-neovim-neovim-logic-change-with-some-code-re-use,small,LUA,1441,1479,49823,51712,9694,10008,true,9584,2,53,40,1,37,14,19198,4,106,40,3,37,314,30,9639,9615,21,2,1,0,1,0,7
 lua-neovim-one-added-line,small,LUA,239,240,6076,6116,1989,2006,true,1982,0,7,0,0,0,1,3964,0,14,0,0,0,17,0,1989,1989,0,0,0,0,0,0,0
 lua-return-to-the-roots-s25client-add-two-items-to-list,full,LUA,526,528,22274,22339,4529,4549,true,4523,0,6,0,0,2,2,9046,0,12,0,0,2,18,0,4529,4529,0,0,0,0,0,0,0
 lua-return-to-the-roots-s25client-few-added-lines,full,LUA,80,86,2576,2798,714,816,true,711,0,3,0,0,0,6,1422,0,6,0,0,0,102,0,714,714,0,0,0,0,0,0,0
@@ -381,7 +381,7 @@ r-oracle-dtrace-utils-i-have-no-idea-what-this-change-actually-does,full,R,13,13
 ruby-homebrew-add-or-expression,small,Ruby,299,300,10991,11110,3070,3076,true,3058,0,12,0,0,5,1,6116,0,24,0,0,5,1,0,3070,3049,21,0,0,0,0,0,0
 ruby-homebrew-brew-actual-logic-change,small,Ruby,623,633,25328,25781,4728,4848,true,4690,0,26,5,1,13,9,9389,0,52,5,4,13,113,9,4716,4698,14,0,4,0,2,0,15
 ruby-homebrew-brew-change-heredoc-to-string,small,Ruby,297,295,9978,9956,2101,2106,true,2084,0,10,7,0,12,0,4168,0,20,7,0,12,0,0,2094,2069,0,25,0,0,0,0,2
-ruby-homebrew-brew-decent-amount-of-new-code-and-some-changes,small,Ruby,384,434,14602,16831,2777,3452,true,2670,8,58,21,5,18,17,5340,16,116,21,20,18,698,0,2736,2728,1,0,7,0,0,0,26
+ruby-homebrew-brew-decent-amount-of-new-code-and-some-changes,small,Ruby,384,434,14602,16831,2777,3452,true,2670,8,58,21,5,18,17,5340,16,116,21,20,18,698,0,2736,2728,1,0,7,0,0,0,24
 ruby-homebrew-brew-enclose-block-in-rescue,small,Ruby,225,229,9402,9494,1427,1440,true,1416,0,11,0,0,3,1,2832,0,22,0,0,3,10,0,1427,1357,70,0,0,0,0,0,0
 ruby-homebrew-brew-function-callsite-argument-change,small,Ruby,695,690,24802,24627,5148,5125,true,5090,1,25,3,3,0,1,10180,2,50,3,29,0,9,0,5116,5116,0,0,0,0,0,0,0
 ruby-homebrew-brew-real-small-change,small,Ruby,231,222,7510,7282,1580,1551,true,1496,2,49,17,2,4,0,2992,4,98,17,16,4,0,0,1547,1532,15,0,0,0,0,0,1
@@ -410,7 +410,7 @@ rust-completely-unrelated-main-files,handmade,Rust,240,899,9860,35694,1806,8462,
 rust-cost-optimization,handmade,Rust,29,34,672,784,201,217,true,194,0,7,0,0,16,0,388,0,14,0,0,16,0,0,201,201,0,0,0,0,0,0,0
 rust-data-structure,handmade,Rust,16,28,268,544,104,212,true,69,1,16,18,0,34,1,138,2,32,18,0,34,92,0,86,86,0,0,0,0,0,0,0
 rust-error-handling,handmade,Rust,14,15,322,376,133,168,true,108,0,8,11,0,49,0,225,0,16,11,0,49,0,9,116,87,27,2,0,0,3,0,5
-rust-firefox-webrenderer-borders,handmade,Rust,368,368,11681,11651,2472,2444,true,2386,8,44,22,0,0,0,4790,16,88,22,0,0,0,18,2438,2426,0,12,0,0,6,0,0
+rust-firefox-webrenderer-borders,handmade,Rust,368,368,11681,11651,2472,2444,true,2388,8,44,24,0,0,0,4788,16,88,24,0,0,0,12,2440,2428,0,12,0,0,4,0,0
 rust-fornwall-rust-script-add-lifecycle-management,full,Rust,1360,1360,31319,31331,7116,7137,true,7103,0,13,0,0,3,3,14206,0,26,0,0,3,18,0,7116,7113,3,0,0,0,0,0,0
 rust-gyulyvgc-sniffnet-add-mod,stratified,Rust,3,4,62,87,19,25,true,18,0,1,0,0,0,1,36,0,2,0,0,0,6,0,19,19,0,0,0,0,0,0,0
 rust-gyulyvgc-sniffnet-add-mod-2,stratified,Rust,3,4,66,89,19,25,true,18,0,1,0,0,0,1,36,0,2,0,0,0,6,0,19,19,0,0,0,0,0,0,0
@@ -421,7 +421,7 @@ rust-hello-world-added-message,handmade,Rust,3,4,43,103,22,34,true,19,0,3,0,0,0,
 rust-hello-world-removed-message,handmade,Rust,4,3,103,43,34,22,true,19,0,3,0,1,0,0,38,0,6,0,12,0,0,0,22,22,0,0,0,0,0,0,0
 rust-leetcode-1-bugfix,handmade,Rust,26,30,665,758,220,261,true,215,0,5,0,0,41,0,430,0,10,0,0,41,0,0,220,220,0,0,0,0,0,0,0
 rust-multi-map-duplicate-calls,handmade,Rust,6,5,58,47,38,31,true,13,0,3,0,0,0,0,63,0,6,0,0,0,0,37,16,16,0,0,0,0,0,0,0
-rust-next-font-imports-generator,handmade,Rust,274,274,10889,10266,2389,2372,true,2322,0,42,25,0,8,0,4644,0,84,25,0,8,0,0,2364,1316,48,53,947,2,0,0,4
+rust-next-font-imports-generator,handmade,Rust,274,274,10889,10266,2389,2372,true,2322,0,42,25,0,8,0,4644,0,84,25,0,8,0,0,2364,1315,48,53,948,2,0,0,2
 rust-no-change,handmade,Rust,49,49,1213,1213,383,383,true,383,0,0,0,0,0,0,766,0,0,0,0,0,0,0,383,383,0,0,0,0,0,0,0
 rust-quietvoid-dovi_tool-change-to-templated-call,full,Rust,110,110,2982,3018,828,861,true,770,6,43,9,0,42,0,1540,12,86,9,0,42,0,0,819,777,42,0,0,0,0,0,6
 rust-rbspy-rbspy-add-two-test-cases,full,Rust,3283,3320,133472,134595,24899,25152,true,24896,0,3,0,0,0,7,49792,0,6,0,0,0,253,0,24899,24899,0,0,0,0,0,0,0
@@ -458,7 +458,7 @@ rust-tursodatabase-turso-unwrap-to-expect,full,Rust,101,103,2937,3023,817,825,tr
 rust-vercel-next-add-mode,stratified,Rust,4,5,92,115,37,46,true,36,0,1,0,0,0,1,72,0,2,0,0,0,9,0,37,37,0,0,0,0,0,0,0
 rust-vercel-next-remove-mod,stratified,Rust,2,1,36,16,13,7,true,6,0,1,0,1,0,0,12,0,2,0,6,0,0,0,7,7,0,0,0,0,0,0,0
 rust-vercel-nextjs-move-from-one-struct-to-another-and-add-some-code,small,Rust,219,227,6934,7193,1344,1380,true,1272,13,56,2,1,1,2,2544,26,112,2,1,1,38,0,1341,1341,0,0,0,0,0,0,0
-rust-vercel-nextjs-refactoring-would-require-mulitmap-mapping,small,Rust,1220,1203,46885,46289,9089,9073,true,8909,9,15,8,0,10,1,18090,18,30,8,0,10,6,272,8933,8856,3,3,71,0,3,0,6
+rust-vercel-nextjs-refactoring-would-require-mulitmap-mapping,small,Rust,1220,1203,46885,46289,9089,9073,true,8911,9,15,10,0,10,1,18088,18,30,10,0,10,6,266,8935,8856,3,3,73,0,1,0,10
 rust-weggli-rs-weggli-move-import-around-and-formatting-change,full,Rust,473,472,15464,15490,3861,3861,true,3860,0,1,0,0,0,0,7720,0,2,0,0,0,0,0,3861,3861,0,0,0,1,0,0,0
 rust-xou816-spot-add-Some-around-existing-code,full,Rust,283,283,8419,8425,2383,2388,true,2375,0,8,0,0,5,0,4750,0,16,0,0,5,0,0,2383,2377,0,6,0,0,0,0,0
 rust-yannjor-krabby-actual-normal-change,full,Rust,232,118,6926,3086,2139,783,true,510,7,42,13,5,65,3,1336,14,84,13,1395,65,15,316,559,551,8,0,0,0,0,0,147
@@ -467,7 +467,7 @@ rust-zed-industries-zed-add-argument,small,Rust,6142,6148,219899,220123,53901,53
 rust-zed-industries-zed-add-mod,stratified,Rust,5,6,103,125,31,37,true,30,0,1,0,0,0,1,60,0,2,0,0,0,6,0,31,31,0,0,0,0,0,0,0
 rust-zed-industries-zed-change-mod-and-use,stratified,Rust,5,7,99,160,27,40,true,26,0,1,0,0,0,2,52,0,2,0,0,0,13,0,27,27,0,0,0,0,0,0,0
 rust-zed-industries-zed-change-mods,stratified,Rust,8,9,164,183,60,53,true,39,0,1,0,1,0,2,78,0,2,0,20,0,13,0,40,40,0,0,0,0,0,0,0
-rust-zed-workspace-tasks,handmade,Rust,136,330,4568,11735,1077,2998,true,1010,5,35,26,0,42,5,2023,10,70,26,0,42,1904,3,1050,819,11,0,220,0,1,0,117
+rust-zed-workspace-tasks,handmade,Rust,136,330,4568,11735,1077,2998,true,1010,5,35,26,0,42,5,2023,10,70,26,0,42,1904,3,1050,820,11,0,219,0,1,0,117
 scala-com-lihaoyi-mill-add-a-function-call,full,Scala,38,43,1125,1216,312,330,true,304,0,8,0,0,18,0,608,0,16,0,0,18,0,0,312,311,0,1,0,0,0,0,2
 scala-com-lihaoyi-mill-add-a-member-to-expression-chains,full,Scala,467,470,16669,16836,3276,3345,true,3198,2,54,1,0,58,0,6450,4,108,1,0,58,0,54,3254,3232,9,0,13,0,9,0,3
 scala-com-lihaoyi-mill-add-one-argument,full,Scala,42,43,906,930,233,238,true,228,0,5,0,0,1,1,456,0,10,0,0,1,4,0,233,233,0,0,0,0,0,0,0
@@ -476,7 +476,7 @@ scala-com-lihaoyi-mill-change-from-one-function-to-other-and-delete-a-function,f
 scala-com-lihaoyi-mill-expand-import-path,full,Scala,254,254,9033,9042,2245,2247,true,2243,0,2,0,0,2,0,4486,0,4,0,0,2,0,0,2245,2245,0,0,0,0,0,0,0
 scala-com-lihaoyi-mill-new-import-used-to-remove-a-lot-of-code,full,Scala,249,214,8791,6797,2087,1492,true,1265,2,36,45,20,106,2,2533,4,72,45,738,106,81,3,1303,1213,12,74,4,0,1,0,53
 scala-com-lihaoyi-mill-only-change-failure-strings,full,Scala,83,83,3363,3383,632,632,true,577,3,52,0,0,0,0,1154,6,104,0,0,0,0,0,632,632,0,0,0,0,0,0,0
-scala-com-lihaoyi-mill-real-small-change,full,Scala,92,108,2769,3198,971,1150,true,924,2,21,8,0,7,4,1872,4,42,8,0,7,188,24,947,947,0,0,0,0,8,0,2
+scala-com-lihaoyi-mill-real-small-change,full,Scala,92,108,2769,3198,971,1150,true,928,4,21,14,0,7,4,1862,8,42,14,0,7,188,6,953,951,0,2,0,0,2,0,2
 scala-com-lihaoyi-mill-small-change,full,Scala,117,117,4366,4371,808,814,true,795,2,9,0,0,2,0,1598,4,18,0,0,2,0,8,806,806,0,0,0,0,2,0,4
 scala-com-lihaoyi-mill-small-refactoring,full,Scala,74,74,2358,2370,571,576,true,549,1,18,1,0,4,0,1104,2,36,1,0,4,0,6,568,562,6,0,0,0,2,0,2
 scala-com-lihaoyi-mill-split-import,full,Scala,610,611,20331,20361,5602,5609,true,5597,0,3,1,0,7,0,11197,0,6,1,0,7,0,3,5600,5600,0,0,0,0,1,0,1
@@ -530,7 +530,7 @@ swift-tree-sitter-tree-sitter-haskell-remove-a-list-item,full,Swift,60,37,1700,1
 swift-zeroc-ice-ice-add-an-if-block-and-variable,full,Swift,207,218,9149,9644,1448,1588,true,1444,0,4,0,0,0,3,2888,0,8,0,0,0,140,0,1448,1448,0,0,0,0,0,0,0
 tsx-apache-superset-add-test-case,small,TSX,790,798,21832,21994,6447,6532,true,6446,0,1,0,0,0,1,12892,0,2,0,0,0,85,0,6447,6447,0,0,0,0,0,0,0
 tsx-apache-superset-error-handling-change,small,TSX,391,399,12250,12546,2614,2678,true,2589,0,24,0,0,7,6,5181,0,48,0,0,7,56,3,2613,2610,3,0,0,0,0,0,6
-tsx-excalidraw-excalidraw-huge-file-with-real-logic-change,small,TSX,9326,9390,291221,293313,64404,64841,true,64238,1,71,33,4,62,13,128555,2,142,33,18,62,433,79,64310,64269,31,9,1,0,15,0,229
+tsx-excalidraw-excalidraw-huge-file-with-real-logic-change,small,TSX,9326,9390,291221,293313,64404,64841,true,64241,1,71,38,3,65,13,128551,2,142,38,14,65,433,69,64313,64269,34,9,1,0,11,0,228
 tsx-excalidraw-excalidraw-import-path-change,small,TSX,45,45,1629,1623,369,369,true,362,2,5,0,0,0,0,724,4,10,0,0,0,0,0,369,369,0,0,0,0,0,0,0
 tsx-excalidraw-excalidraw-move-from-one-struct-to-other,small,TSX,394,395,11055,11121,2746,2765,true,2706,1,30,9,0,10,1,5412,2,60,9,0,10,18,0,2737,2731,6,0,0,0,0,0,2
 tsx-greenbone-gsa-add-import-and-use-it,full,TSX,308,311,9176,9234,2999,3003,true,2979,0,19,1,0,3,1,5958,0,38,1,0,3,2,0,2998,2998,0,0,0,0,0,0,0

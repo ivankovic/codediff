@@ -1570,6 +1570,38 @@ fn families_for_language(language: &Language) -> &'static [&'static [&'static st
 /// something other than "start of a grouped/parenthesized thing".
 const GENERIC_PUNCTUATION: &[&str] = &["(", ")", "{", "}", "[", "]", ";", ",", ":", "::", "."];
 
+/// Delimiters that come in pairs, opener to the closers that may end it.
+///
+/// Read off the corpus rather than any one grammar: over all 628 fixtures, every anonymous leaf
+/// whose kind *is* its own text and that closes or opens something is one of these twelve. `<`
+/// takes `/>` as well as `>`, because a self-closing tag ends with one.
+///
+/// The table is only meaningful together with [`delimiter_complement_kinds`]' "is the other half
+/// actually here" test: `<` is a tag opener in HTML and a comparison operator in Rust, and the kind
+/// string cannot tell them apart - the presence of a `>` among the same parent's children can.
+pub const PAIRED_DELIMITERS: &[(&str, &[&str])] = &[
+    ("(", &[")"]),
+    ("[", &["]"]),
+    ("{", &["}"]),
+    ("<", &[">", "/>"]),
+    ("</", &[">"]),
+    ("<?", &["?>"]),
+];
+
+/// The kinds that would pair with `kind` - its closers if it is an opener, its openers if it is a
+/// closer - or `None` if `kind` is not a paired delimiter at all.
+pub fn delimiter_complement_kinds(kind: &str) -> Option<Vec<&'static str>> {
+    if let Some((_, closers)) = PAIRED_DELIMITERS.iter().find(|(open, _)| *open == kind) {
+        return Some(closers.to_vec());
+    }
+    let openers: Vec<&'static str> = PAIRED_DELIMITERS
+        .iter()
+        .filter(|(_, closers)| closers.contains(&kind))
+        .map(|(open, _)| *open)
+        .collect();
+    (!openers.is_empty()).then_some(openers)
+}
+
 /// Literal-value leaf kinds (string, number, boolean, ...), shared by every consumer that needs
 /// to distinguish "this leaf's identity is its value" (a literal) from "this leaf's identity is
 /// its name" (an identifier, see `IDENTIFIER_KINDS`) - e.g. the APTED rename-cost model and the

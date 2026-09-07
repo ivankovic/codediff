@@ -16,23 +16,24 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 use crate::test;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants_with_known_violations;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
+    // Re-baselined 2026-09-07 from 11/5, and NOT an algorithm regression: this fixture's human
+    // mapping was re-paired by hand on 2026-09-06 (the crossed inner/outer braces its
+    // `invariants()` test used to record), so the limits now score codediff against a different,
+    // corrected ground truth. The residual is the nested `if` this commit did not touch - the
+    // container choice, not the delimiters.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "cpp-godot-small-bugfix",
-        11,
-        5,
+        13,
+        7,
     )
 }
 
 #[test]
 fn invariants() -> Result<()> {
-    // measured 2026-09-06: 2 mapped brace pairs disagree, both on the after side.
-    // An inserted block is nested inside a kept one, and the human paired the outer `{` with the
-    // inner `}` and vice versa, so each pair reads half-matched half-inserted. Crossed rather
-    // than wrong-in-one-place: re-pairing them is a mapping edit, not a mechanical fix.
-    assert_ground_truth_invariants_with_known_violations("cpp-godot-small-bugfix", 2)
+    assert_ground_truth_invariants("cpp-godot-small-bugfix")
 }

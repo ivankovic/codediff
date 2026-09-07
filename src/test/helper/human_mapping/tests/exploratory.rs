@@ -794,3 +794,47 @@ fn dump_top_level_mapping() -> Result<()> {
     }
     Ok(())
 }
+
+/// DIAGNOSTIC: every ground-truth invariant `invariants()` would report, for the fixtures named in
+/// the comma-separated `FIXTURES` env var, or for the whole corpus when it is unset.
+/// `FIXTURES=a,b cargo test --lib --features test-fixtures invariant_violations -- --ignored
+/// --nocapture`.
+///
+/// The per-fixture test only ever says how many there are (its recorded count is exact, so a repair
+/// makes it fail with the new number), which is the right thing for a gate and useless while
+/// actually repairing one. This prints what they are. The corpus-wide form is the worklist.
+#[test]
+#[ignore]
+fn invariant_violations() -> Result<()> {
+    let wanted = std::env::var("FIXTURES").unwrap_or_default();
+    let wanted: Vec<&str> = wanted
+        .split(',')
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .collect();
+
+    let mut total = 0;
+    for (name, dir) in crate::test::helper::handmade_test_case_dirs()? {
+        if !wanted.is_empty() && !wanted.contains(&name.as_str()) {
+            continue;
+        }
+        let Some((before, after)) = crate::test::helper::code_pair_from_dir(&dir)? else {
+            continue;
+        };
+        let Ok(mapping) = load(&name) else { continue };
+        let violations =
+            crate::test::helper::human_mapping::invariants::ground_truth_invariant_violations_for(
+                &mapping, &before, &after,
+            )?;
+        if violations.is_empty() {
+            continue;
+        }
+        total += violations.len();
+        eprintln!("{name} ({})", violations.len());
+        for violation in &violations {
+            eprintln!("    {violation}");
+        }
+    }
+    eprintln!("{total} violation(s)");
+    Ok(())
+}

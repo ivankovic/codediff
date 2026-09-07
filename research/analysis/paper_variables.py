@@ -100,8 +100,8 @@ SAMPLE_PER_LANGUAGE = 10
 # NumFixtures is therefore the ground-truth-bearing count, 627, which is the denominator of every
 # per-tool row, the ablation study, and the node accuracy below.
 #
-# Refreshed together, from one corpus state, on 2026-09-06 (previously, the same day, 615 fixtures,
-# before that 2026-09-05 / 597, 2026-09-02 / 512 and 2026-08-20 / 468). These four move as a set and must be
+# Refreshed together, from one corpus state, on 2026-09-07 (previously 2026-09-06 / 627 and, the
+# same day, 615; before that 2026-09-05 / 597, 2026-09-02 / 512 and 2026-08-20 / 468). These four move as a set and must be
 # refreshed as a set: re-run the benchmark with --csv, re-run `analyze_human_mappings --csv` so the
 # scope artifact agrees with it, then recompute here. Order matters in one direction: human_mapping_analysis.csv carries a
 # `current_mismatches` column read back from optimal_solutions_benchmark.csv, so the benchmark runs
@@ -109,7 +109,7 @@ SAMPLE_PER_LANGUAGE = 10
 # precisely because the previous values silently outlived the corpus they described.
 CORPUS = {
     "NumFixtures": 627,
-    "NodesMatched": 5_732_062,
+    "NodesMatched": 5_732_072,
     "NodesTotal": 5_739_510,
     # Distinct languages across the fixture corpus, from `analyze_human_mappings`' own "By
     # language" census (24 as of 2026-09-06, unchanged since 2026-09-02 - the 115 fixtures added
@@ -123,7 +123,7 @@ CORPUS = {
 # alongside the all-node figure because the all-node denominator includes every ancestor of every
 # change up to the root, so it partly measures how deep a grammar's tree is.
 CORPUS_VISIBLE = {
-    "VisibleNodesMatched": 3_916_981,
+    "VisibleNodesMatched": 3_916_991,
     "VisibleNodesTotal": 3_922_076,
 }
 

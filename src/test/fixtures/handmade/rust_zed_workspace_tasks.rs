@@ -16,7 +16,7 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 use crate::test;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants_with_known_violations;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 use anyhow::Result;
 
 #[test]
@@ -38,7 +38,5 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn invariants() -> Result<()> {
-    // measured 2026-09-06: 2 mapped brace pairs disagree on the after side, crossed around an
-    // inserted block.
-    assert_ground_truth_invariants_with_known_violations("rust-zed-workspace-tasks", 2)
+    assert_ground_truth_invariants("rust-zed-workspace-tasks")
 }

@@ -239,6 +239,17 @@ pub(crate) fn improve_slot_alignment(
     // when the outer `user_type` takes over the slot). Re-validate so those get re-checked
     // against the post-pull-up decisions; promotion below then re-adds anything slot-consistent.
     validate_fresh_matches(&ctx, before_decision, after_decision);
+    // After the pull-up, so a pair it has already moved to its slot is not moved again, and before
+    // promotion, whose containment guards then see the corrected ownership.
+    reclaim_slot_level_twins(
+        before_meta,
+        after_meta,
+        diff,
+        before_parents,
+        after_parents,
+        before_decision,
+        after_decision,
+    );
     promote_same_slot_pairs(
         before_meta,
         after_meta,
@@ -515,6 +526,156 @@ pub(crate) fn pull_up_wrapped_matches(
                 before_decision.insert(c, BeforeDecision::Match(a));
                 after_decision.insert(a, AfterDecision::Match(c));
             }
+        }
+    }
+}
+
+/// The delimiter directly under `slot_parent` that `node` should have been matched to instead:
+/// same kind, same text, currently unmatched (so taking it is free), and genuinely one half of a
+/// pair `slot_parent` holds - `slot_parent` must also contain the complementary delimiter.
+///
+/// **Restricted to paired delimiters**, not every identical leaf, and that restriction is the
+/// difference between a fix and a regression. A `)` means "the end of *this* construct", so which
+/// construct owns it is a fact about the tree; a `.` or a `,` is a separator between siblings,
+/// whose identity is its position and nothing else. Widening this to any identical leaf breaks
+/// `java-genymobile-scrcpy-change-some-android-version-constant`, where
+/// `Build.VERSION_CODES.R` -> `AndroidVersions.API_30_ANDROID_11` drops one `.` of three and the
+/// human reads the surviving pair left to right, keeping the *first* dot - the opposite of what
+/// slot ownership would say, and just as defensible, because a separator has no construct to own
+/// it.
+///
+/// The complement test is also what keeps Rust's comparison `<` out while admitting HTML's tag
+/// `<`: same kind string, but only one of them has a `>` among its parent's children.
+///
+/// Ordered by `start_byte` then `preorder_index`, never by node id - the same parse-stability
+/// requirement every other tie-break in this file has (see `ASTNodeMetadata::start_byte`). Where a
+/// parent holds two identical unmatched delimiters, the first in the source wins, deterministically.
+fn slot_level_twin<D: SideDecision>(
+    slot_parent: usize,
+    node: &crate::code::ASTNodeMetadata,
+    meta: &ASTMetadata,
+    decisions: &HashMap<usize, D>,
+) -> Option<usize> {
+    let complements = nodes::delimiter_complement_kinds(&node.kind)?;
+    let parent_info = meta.node_info.get(&slot_parent)?;
+    let holds_complement = parent_info.children.iter().any(|child| {
+        meta.node_info
+            .get(child)
+            .is_some_and(|info| complements.contains(&info.kind.as_str()))
+    });
+    if !holds_complement {
+        return None;
+    }
+    parent_info
+        .children
+        .iter()
+        .filter(|&&child| {
+            decisions
+                .get(&child)
+                .is_some_and(|decision| decision.match_target().is_none())
+        })
+        .filter_map(|&child| meta.node_info.get(&child).map(|info| (child, info)))
+        .filter(|(_, info)| {
+            info.children.is_empty() && info.kind == node.kind && info.text == node.text
+        })
+        .min_by_key(|(_, info)| (info.start_byte, info.preorder_index))
+        .map(|(child, _)| child)
+}
+
+/// Post-DP repair for a match that reached *out of* a subtree nothing else survives, when an
+/// identical leaf was sitting in the slot all along.
+///
+/// The neighbouring case to `pull_up_wrapped_matches`, and not covered by it: there the right
+/// partner is an *ancestor* of the node the DP picked (a wrapper it descended through), here it is
+/// a *sibling* of that node's ancestor, so `ancestor_child_of` finds a container of the wrong kind
+/// and the pull-up declines. `f(a, g())` -> `f(a, b)` is the whole shape: the before side has two
+/// `)`, the after side one, and matching either costs the same, so the DP matched the `)` belonging
+/// to the deleted `g()` and deleted the `)` of the call that survives. What a reader is shown is an
+/// outer call losing its closing parenthesis to a call that is no longer there.
+///
+/// **Leaves with identical text only.** That is what makes the swap free rather than a judgement:
+/// `ren` is by definition the same for both candidates, so the mapping's cost does not move, and
+/// the only thing being decided is which of two interchangeable tokens keeps the pairing - exactly
+/// the decision the cost function cannot express. Anything wider (same kind, different text) would
+/// be re-deciding a rename the DP had reasons for.
+///
+/// Found by `human_mapping::invariants`' delimiter rule, which asks that a bracket and its partner
+/// carry one verdict. Two fixtures' ground truth had been hand-annotated to agree with this bug
+/// before that rule pointed at it.
+///
+/// **This makes the delimiters follow their container, always - including where the container
+/// itself is matched wrongly.** `rust-vercel-nextjs-refactoring-would-require-mulitmap-mapping`
+/// pays 4 mismatches for that: its nested `token_tree`s are matched one level off (the multimap
+/// gap its name records), and its delimiters used to disagree with that decision in a way that
+/// happened to land on the human's answer. They now agree with it, and are wrong for the same
+/// reason the container is. That is the honest arrangement - a delimiter that contradicts its own
+/// parent is not a better diff, it is two bugs cancelling - and the alternative, only moving a
+/// delimiter whose opposite number already agrees, leaves the original defect live in
+/// `scala-com-lihaoyi-mill-real-small-change`, where the DP got *both* ends wrong at once.
+// Each parameter is genuinely distinct read/mutable state - same rationale as its neighbours.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn reclaim_slot_level_twins(
+    before_meta: &ASTMetadata,
+    after_meta: &ASTMetadata,
+    diff: &ASTDiff,
+    before_parents: &rustc_hash::FxHashMap<usize, usize>,
+    after_parents: &rustc_hash::FxHashMap<usize, usize>,
+    before_decision: &mut HashMap<usize, BeforeDecision>,
+    after_decision: &mut HashMap<usize, AfterDecision>,
+) {
+    // Ordered by document position, then preorder index, not node id - see `validate_fresh_matches`.
+    let mut pairs: Vec<(usize, usize, usize, usize, usize, usize)> = before_decision
+        .iter()
+        .filter_map(|(&b, decision)| match decision {
+            BeforeDecision::Match(a) => {
+                let before_info = before_meta.node_info.get(&b)?;
+                let after_info = after_meta.node_info.get(a)?;
+                Some((
+                    before_info.start_byte,
+                    after_info.start_byte,
+                    before_info.preorder_index,
+                    after_info.preorder_index,
+                    b,
+                    *a,
+                ))
+            }
+            BeforeDecision::Delete => None,
+        })
+        .collect();
+    pairs.sort_unstable();
+
+    for (_, _, _, _, b, a) in pairs {
+        // An earlier iteration may have retargeted this pair.
+        if before_decision.get(&b) != Some(&BeforeDecision::Match(a)) {
+            continue;
+        }
+
+        // Before-side: a sits directly under a parent whose partner is `pb_target`, but `b` does
+        // not - and `pb_target` has an identical leaf of its own going spare.
+        if let Some(&pa) = after_parents.get(&a)
+            && let Some(pb_target) = after_match_target(pa, after_decision, diff)
+            && before_parents.get(&b) != Some(&pb_target)
+            && let Some(before_info) = before_meta.node_info.get(&b)
+            && before_info.children.is_empty()
+            && let Some(c) = slot_level_twin(pb_target, before_info, before_meta, before_decision)
+        {
+            before_decision.insert(b, BeforeDecision::Delete);
+            before_decision.insert(c, BeforeDecision::Match(a));
+            after_decision.insert(a, AfterDecision::Match(c));
+            continue;
+        }
+
+        // After-side: the mirror image, an inserted twin under the partner of b's parent.
+        if let Some(&pb) = before_parents.get(&b)
+            && let Some(pa_target) = before_match_target(pb, before_decision, diff)
+            && after_parents.get(&a) != Some(&pa_target)
+            && let Some(after_info) = after_meta.node_info.get(&a)
+            && after_info.children.is_empty()
+            && let Some(c) = slot_level_twin(pa_target, after_info, after_meta, after_decision)
+        {
+            after_decision.insert(a, AfterDecision::Insert);
+            after_decision.insert(c, AfterDecision::Match(b));
+            before_decision.insert(b, BeforeDecision::Match(c));
         }
     }
 }
@@ -1019,4 +1180,92 @@ pub(crate) fn longest_increasing_by_second(pairs: &[(usize, usize)]) -> Vec<(usi
     }
     result.reverse();
     result
+}
+
+#[cfg(test)]
+mod reclaim_tests {
+    use crate::code::{Code, Language};
+
+    /// Every before-side leaf whose text is `text`, in source order, paired with what the diff maps
+    /// it to (`None` for a delete).
+    fn leaf_targets(
+        before_src: &str,
+        after_src: &str,
+        language: &Language,
+        text: &str,
+    ) -> Vec<Option<usize>> {
+        let before = Code::from_string(before_src, language);
+        let after = Code::from_string(after_src, language);
+        let diff = crate::diff::diff_code(&before, &after);
+        let ast = diff.ast.as_ref().expect("an AST diff");
+        let root = before
+            .ast
+            .as_ref()
+            .expect("a parsed before tree")
+            .root_node();
+
+        let mut leaves = Vec::new();
+        let mut stack = vec![root];
+        while let Some(node) = stack.pop() {
+            if node.child_count() == 0 && &before_src[node.byte_range()] == text {
+                leaves.push(node);
+            }
+            for index in 0..node.child_count() {
+                stack.push(node.child(index).expect("child in range"));
+            }
+        }
+        leaves.sort_by_key(|node| node.start_byte());
+        leaves
+            .into_iter()
+            .map(|node| {
+                ast.before_node_map
+                    .get(&node.id())
+                    .copied()
+                    .filter(|&target| target != 0)
+            })
+            .collect()
+    }
+
+    #[test]
+    fn a_surviving_call_keeps_its_own_closing_paren_when_a_nested_call_is_removed() {
+        // `f(a, g())` -> `f(a, b)`. Two `)` before, one after, and matching either costs the same;
+        // the DP used to keep the one belonging to the *removed* `g()` and delete the outer call's.
+        let targets = leaf_targets(
+            "fn m() {\n    self.f(&mut w, common.prim_rect.size());\n}\n",
+            "fn m() {\n    self.f(&mut w, common.prim_size);\n}\n",
+            &Language::Rust,
+            ")",
+        );
+
+        // `m()`'s own `)`, then the removed `.size()`'s, then the surviving call's.
+        assert_eq!(targets.len(), 3, "expected three `)` in the before tree");
+        assert!(targets[0].is_some(), "the signature's `)` is untouched");
+        assert_eq!(
+            targets[1], None,
+            "the `)` of the removed `.size()` call must go with it"
+        );
+        assert!(
+            targets[2].is_some(),
+            "the surviving call's own `)` must keep the pairing"
+        );
+    }
+
+    #[test]
+    fn a_separator_is_left_where_the_dp_put_it() {
+        // `Build.VERSION_CODES.R` -> `AndroidVersions.API_30`: three dots become two, and which one
+        // survives is a positional reading, not an ownership one - a `.` has no construct to close.
+        // `slot_level_twin` must decline, or this reads the pair right to left instead.
+        let targets = leaf_targets(
+            "class C {\n    int x = Build.VERSION_CODES.R;\n}\n",
+            "class C {\n    int x = AndroidVersions.API_30;\n}\n",
+            &Language::Java,
+            ".",
+        );
+
+        assert_eq!(targets.len(), 2, "expected two `.` in the before tree");
+        assert!(
+            targets[0].is_some() && targets[1].is_none(),
+            "the first `.` should keep the pairing and the second should go, got {targets:?}"
+        );
+    }
 }

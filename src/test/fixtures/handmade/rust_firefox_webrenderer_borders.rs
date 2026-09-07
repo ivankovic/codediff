@@ -17,7 +17,7 @@
  */
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants_with_known_violations;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 use anyhow::Result;
 
 #[test]
@@ -61,9 +61,5 @@ fn painting() -> Result<()> {
 
 #[test]
 fn invariants() -> Result<()> {
-    // measured 2026-09-06: 4 mapped parenthesis pairs disagree, on rows 69 and 301.
-    // Both rows drop a nested call (`common.prim_rect.size()` -> `common.prim_size`) inside a
-    // call that survives, and the human crossed the two pairs: the kept outer `(` is matched
-    // while the `)` closing it is deleted, and the other way round.
-    assert_ground_truth_invariants_with_known_violations("rust-firefox-webrenderer-borders", 4)
+    assert_ground_truth_invariants("rust-firefox-webrenderer-borders")
 }

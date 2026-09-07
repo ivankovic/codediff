@@ -46,8 +46,9 @@ fn painting() -> Result<()> {
 
 #[test]
 fn invariants() -> Result<()> {
-    // measured 2026-09-06: 4 mapped brace pairs disagree, on rows 22/86, 24/84, 92/144 and
-    // 97/143 - two nested `if let` blocks, outer kept and inner deleted, with the human's pairing
-    // crossed at each. Part of the same unreviewed region as this fixture's painting residual.
-    assert_ground_truth_invariants_with_known_violations("rust-next-font-imports-generator", 4)
+    // measured 2026-09-07, down from 4 on 2026-09-06: 2 mapped brace pairs still disagree, on
+    // rows 92/144 and 97/143 - the `if let Some(decl)` / `if let Some(expr)` nesting, with the
+    // human's pairing crossed between them. The 22/86 and 24/84 pair was re-paired by hand on
+    // 2026-09-06. Part of the same unreviewed region as this fixture's painting residual.
+    assert_ground_truth_invariants_with_known_violations("rust-next-font-imports-generator", 2)
 }

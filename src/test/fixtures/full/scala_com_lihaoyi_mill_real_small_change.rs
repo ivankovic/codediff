@@ -16,7 +16,7 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 use crate::test;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants_with_known_violations;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 use anyhow::Result;
 
 #[test]
@@ -37,10 +37,5 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn invariants() -> Result<()> {
-    // measured 2026-09-06: 4 mapped parenthesis pairs disagree, on rows 66 and 84, each a kept
-    // `(` paired with a deleted `)` and the reverse.
-    assert_ground_truth_invariants_with_known_violations(
-        "scala-com-lihaoyi-mill-real-small-change",
-        4,
-    )
+    assert_ground_truth_invariants("scala-com-lihaoyi-mill-real-small-change")
 }
