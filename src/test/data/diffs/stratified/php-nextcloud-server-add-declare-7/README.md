@@ -1,0 +1,26 @@
+# Sample provenance
+
+- **Repository:** https://github.com/nextcloud/server.git (`nextcloud-server.git`)
+- **Commit:** `f12cecb68470ad970eed430b019a1baaac6bf28a`
+- **File:** `apps/user_ldap/lib/Migration/UUIDFixUser.php`
+- **Research dataset:** stratified
+
+`before.*.test`/`after.*.test` in this directory are an unmodified excerpt of the file above, copied verbatim from the source repository at the commit above (and its single parent) for use as codediff test-fixture input. This content is **not** part of codediff's own codebase and is **not** covered by codediff's own AGPL-3.0 license - it remains under whatever license the source repository itself applies, linked below exactly as it read in that repository at this commit.
+
+## License
+
+- `COPYING` - GNU Affero General Public License v3.0 (https://github.com/nextcloud/server/blob/f12cecb68470ad970eed430b019a1baaac6bf28a/COPYING)
+- `COPYING-README` - Unrecognized license text (see linked file) (https://github.com/nextcloud/server/blob/f12cecb68470ad970eed430b019a1baaac6bf28a/COPYING-README)
+- `LICENSES/LicenseRef-AppleAppStoreBadge.txt` - Unrecognized license text (see linked file) (https://github.com/nextcloud/server/blob/f12cecb68470ad970eed430b019a1baaac6bf28a/LICENSES/LicenseRef-AppleAppStoreBadge.txt)
+- `LICENSES/LicenseRef-CollaboraTrademarks.txt` - Unrecognized license text (see linked file) (https://github.com/nextcloud/server/blob/f12cecb68470ad970eed430b019a1baaac6bf28a/LICENSES/LicenseRef-CollaboraTrademarks.txt)
+- `LICENSES/LicenseRef-DCO.txt` - Unrecognized license text (see linked file) (https://github.com/nextcloud/server/blob/f12cecb68470ad970eed430b019a1baaac6bf28a/LICENSES/LicenseRef-DCO.txt)
+- `LICENSES/LicenseRef-DiasporaTrademarks.txt` - Unrecognized license text (see linked file) (https://github.com/nextcloud/server/blob/f12cecb68470ad970eed430b019a1baaac6bf28a/LICENSES/LicenseRef-DiasporaTrademarks.txt)
+- `LICENSES/LicenseRef-FacebookTrademarks.txt` - Unrecognized license text (see linked file) (https://github.com/nextcloud/server/blob/f12cecb68470ad970eed430b019a1baaac6bf28a/LICENSES/LicenseRef-FacebookTrademarks.txt)
+- `LICENSES/LicenseRef-GooglePlayBadge.txt` - Unrecognized license text (see linked file) (https://github.com/nextcloud/server/blob/f12cecb68470ad970eed430b019a1baaac6bf28a/LICENSES/LicenseRef-GooglePlayBadge.txt)
+- `LICENSES/LicenseRef-MastodonTrademarks.txt` - Unrecognized license text (see linked file) (https://github.com/nextcloud/server/blob/f12cecb68470ad970eed430b019a1baaac6bf28a/LICENSES/LicenseRef-MastodonTrademarks.txt)
+- `LICENSES/LicenseRef-Nasa.txt` - Unrecognized license text (see linked file) (https://github.com/nextcloud/server/blob/f12cecb68470ad970eed430b019a1baaac6bf28a/LICENSES/LicenseRef-Nasa.txt)
+- `LICENSES/LicenseRef-NextcloudTrademarks.txt` - Unrecognized license text (see linked file) (https://github.com/nextcloud/server/blob/f12cecb68470ad970eed430b019a1baaac6bf28a/LICENSES/LicenseRef-NextcloudTrademarks.txt)
+- `LICENSES/LicenseRef-Unsplash.txt` - Unrecognized license text (see linked file) (https://github.com/nextcloud/server/blob/f12cecb68470ad970eed430b019a1baaac6bf28a/LICENSES/LicenseRef-Unsplash.txt)
+- `LICENSES/LicenseRef-XTrademarks.txt` - Unrecognized license text (see linked file) (https://github.com/nextcloud/server/blob/f12cecb68470ad970eed430b019a1baaac6bf28a/LICENSES/LicenseRef-XTrademarks.txt)
+
+License text is not reproduced here - follow the link(s) above (or the repository listed at the top of this file, at the commit above) for the full terms.

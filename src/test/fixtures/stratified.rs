@@ -223,7 +223,19 @@ mod html_gohugoio_hugo_template_not_pure_html_2;
 #[cfg(test)]
 mod html_gohugoio_hugo_update_href_template;
 #[cfg(test)]
+mod html_ladybirdbrowser_ladybird_remove_meta_attribute;
+#[cfg(test)]
 mod html_ladybirdbrowser_ladybird_update_pixel_value;
+#[cfg(test)]
+mod html_ladybirdbrowser_ladybird_update_two_pixel_numbers;
+#[cfg(test)]
+mod html_mozilla_firefox_firefox_href_path;
+#[cfg(test)]
+mod html_mozilla_firefox_firefox_interesting_case;
+#[cfg(test)]
+mod html_mozilla_firefox_firefox_path;
+#[cfg(test)]
+mod html_mozilla_firefox_firefox_test_span;
 #[cfg(test)]
 mod html_mozilla_pdf_add_closing_tags;
 #[cfg(test)]
@@ -255,6 +267,8 @@ mod java_protocolbuffers_protobuf_update_comment;
 #[cfg(test)]
 mod java_protocolbuffers_protobuf_update_comment_2;
 #[cfg(test)]
+mod javascript_axios_axios_real_small_change;
+#[cfg(test)]
 mod javascript_facebook_react_update_comment_only;
 #[cfg(test)]
 mod javascript_microsoft_typescript_add_use_strict;
@@ -269,6 +283,12 @@ mod javascript_mui_material_ui_delete_one_import;
 #[cfg(test)]
 mod javascript_vercel_next_add_doccomment;
 #[cfg(test)]
+mod json_apache_superset_js_to_ts;
+#[cfg(test)]
+mod json_gorhill_ublock_version;
+#[cfg(test)]
+mod json_grafana_grafana_add_pair;
+#[cfg(test)]
 mod json_microsoft_playwright_version_update;
 #[cfg(test)]
 mod json_puppeteer_puppeteer_update_version;
@@ -277,9 +297,71 @@ mod json_puppeteer_puppeteer_version_update;
 #[cfg(test)]
 mod json_puppeteer_puppeteer_version_update_2;
 #[cfg(test)]
+mod json_vercel_next_version;
+#[cfg(test)]
+mod kotlin_mozilla_firefox_firefox_rename;
+#[cfg(test)]
+mod kotlin_nextcloud_android_add_param;
+#[cfg(test)]
+mod kotlin_nextcloud_android_add_param_to_class;
+#[cfg(test)]
+mod kotlin_nextcloud_android_different_function;
+#[cfg(test)]
+mod kotlin_nextcloud_android_real_small_change;
+#[cfg(test)]
+mod kotlin_nextcloud_android_remove_function;
+#[cfg(test)]
+mod kotlin_nextcloud_android_rename;
+#[cfg(test)]
+mod kotlin_nextcloud_android_rename_field;
+#[cfg(test)]
+mod kotlin_nextcloud_android_small_change;
+#[cfg(test)]
+mod kotlin_rustdesk_rustdesk_add_func;
+#[cfg(test)]
+mod lua_awesomewm_awesome_add_comment;
+#[cfg(test)]
+mod lua_awesomewm_awesome_add_func;
+#[cfg(test)]
+mod lua_awesomewm_awesome_add_func_call;
+#[cfg(test)]
+mod lua_awesomewm_awesome_add_h_to_align;
+#[cfg(test)]
 mod lua_awesomewm_awesome_add_to_table_constructor;
 #[cfg(test)]
+mod lua_awesomewm_awesome_comment_only;
+#[cfg(test)]
+mod lua_awesomewm_awesome_comment_only_2;
+#[cfg(test)]
+mod lua_awesomewm_awesome_halign;
+#[cfg(test)]
+mod lua_awesomewm_awesome_insert;
+#[cfg(test)]
+mod lua_awesomewm_awesome_insert_only;
+#[cfg(test)]
 mod lua_awesomewm_awesome_update_comment;
+#[cfg(test)]
+mod lua_neovim_neovim_rename;
+#[cfg(test)]
+mod php_nextcloud_server_add_a_few_types;
+#[cfg(test)]
+mod php_nextcloud_server_add_declare;
+#[cfg(test)]
+mod php_nextcloud_server_add_declare_2;
+#[cfg(test)]
+mod php_nextcloud_server_add_declare_3;
+#[cfg(test)]
+mod php_nextcloud_server_add_declare_4;
+#[cfg(test)]
+mod php_nextcloud_server_add_declare_5;
+#[cfg(test)]
+mod php_nextcloud_server_add_declare_6;
+#[cfg(test)]
+mod php_nextcloud_server_add_declare_7;
+#[cfg(test)]
+mod php_nextcloud_server_add_readonly;
+#[cfg(test)]
+mod php_nextcloud_server_real_small_change;
 #[cfg(test)]
 mod php_wordpress_wordpress_one_line_file_insert_and_update;
 #[cfg(test)]
@@ -301,11 +383,23 @@ mod php_wordpress_wordpress_version_7;
 #[cfg(test)]
 mod php_wordpress_wordpress_version_8;
 #[cfg(test)]
+mod python_ansible_ansible_add_comment;
+#[cfg(test)]
 mod python_langchain_ai_langchain_version_change;
 #[cfg(test)]
 mod python_langflow_ai_langflow_bob;
 #[cfg(test)]
+mod python_langflow_ai_langflow_real_small_change;
+#[cfg(test)]
 mod python_nvbn_thefuck_add_three_arguments;
+#[cfg(test)]
+mod python_nvbn_thefuck_small_change;
+#[cfg(test)]
+mod python_nvbn_thefuck_small_change_2;
+#[cfg(test)]
+mod python_nvbn_thefuck_small_change_3;
+#[cfg(test)]
+mod python_nvbn_thefuck_stdout_stderr_change;
 #[cfg(test)]
 mod python_odoo_odoo_add_import;
 #[cfg(test)]
@@ -313,13 +407,23 @@ mod python_odoo_odoo_add_import_2;
 #[cfg(test)]
 mod python_odoo_odoo_add_two_imports;
 #[cfg(test)]
+mod python_odoo_odoo_version;
+#[cfg(test)]
+mod python_openhands_openhands_small_change;
+#[cfg(test)]
 mod python_paddlepaddle_paddleocr_remove_import;
 #[cfg(test)]
+mod python_paddlepaddle_paddleocr_whitespace_only;
+#[cfg(test)]
 mod python_paddlepaddle_paddleocr_whitespace_only_change;
+#[cfg(test)]
+mod python_scrapy_scrapy_comment_update;
 #[cfg(test)]
 mod python_ytdl_org_youtube_dl_version_update;
 #[cfg(test)]
 mod python_ytdl_org_youtube_dl_version_update_2;
+#[cfg(test)]
+mod ruby_homebrew_brew_version;
 #[cfg(test)]
 mod ruby_jekyll_jekyll_version;
 #[cfg(test)]
@@ -339,7 +443,25 @@ mod ruby_jekyll_jekyll_whitespace_only;
 #[cfg(test)]
 mod ruby_jekyll_jekyll_whitespace_only_2;
 #[cfg(test)]
+mod ruby_jekyll_jekyll_whitespace_only_3;
+#[cfg(test)]
+mod ruby_mastodon_mastodon_add_func_and_attribute;
+#[cfg(test)]
 mod ruby_mastodon_mastodon_add_method;
+#[cfg(test)]
+mod ruby_mastodon_mastodon_add_one_line;
+#[cfg(test)]
+mod ruby_mastodon_mastodon_insert_only;
+#[cfg(test)]
+mod ruby_mastodon_mastodon_move;
+#[cfg(test)]
+mod ruby_mastodon_mastodon_normal_change;
+#[cfg(test)]
+mod ruby_mastodon_mastodon_one_operator;
+#[cfg(test)]
+mod ruby_mastodon_mastodon_rare_example_of_true_move;
+#[cfg(test)]
+mod ruby_mastodon_mastodon_smal_change;
 #[cfg(test)]
 mod rust_gyulyvgc_sniffnet_add_mod;
 #[cfg(test)]
@@ -385,7 +507,13 @@ mod shellscript_ansible_ansible_a_small_add;
 #[cfg(test)]
 mod shellscript_ansible_ansible_add_commadn;
 #[cfg(test)]
+mod shellscript_ansible_ansible_only_insert;
+#[cfg(test)]
 mod shellscript_ansible_ansible_small_add;
+#[cfg(test)]
+mod shellscript_ansible_ansible_small_change;
+#[cfg(test)]
+mod shellscript_genymobile_scrcpy_version;
 #[cfg(test)]
 mod shellscript_jesseduffield_lazygit_version;
 #[cfg(test)]
