@@ -46,6 +46,11 @@ use super::{
 use crate::code::Code;
 use crate::diff::text::RenderOptions;
 
+/// One painting projected to per-byte labels, `[before, after]` - `None` where nothing paints that
+/// byte. Named because every check here passes it around and `clippy::type_complexity` is right
+/// that the raw form reads badly in a signature.
+type PaintedLabels = [Vec<Option<TextLabel>>; 2];
+
 /// Every way `name`'s ground truth contradicts itself, one human-readable line each, in a stable
 /// order. Empty is a pass.
 pub fn ground_truth_invariant_violations(name: &str) -> Result<Vec<String>> {
@@ -64,7 +69,7 @@ pub fn ground_truth_invariant_violations_for(
     // One byte-label vector per painting per side, built once: all three checks that read the
     // painting read it through exactly the projection the scorer does (`label_bytes`), so an
     // invariant can never fire on a byte no comparison would ever look at.
-    let mut paintings: Vec<(&str, [Vec<Option<TextLabel>>; 2])> = Vec::new();
+    let mut paintings: Vec<(&str, PaintedLabels)> = Vec::new();
     for named in &mapping.text_mappings {
         paintings.push((named.name.as_str(), painted_labels(named, before, after)?));
     }
@@ -79,11 +84,7 @@ pub fn ground_truth_invariant_violations_for(
 }
 
 /// One painting reduced to per-byte labels, `[before, after]`.
-fn painted_labels(
-    named: &NamedTextMapping,
-    before: &Code,
-    after: &Code,
-) -> Result<[Vec<Option<TextLabel>>; 2]> {
+fn painted_labels(named: &NamedTextMapping, before: &Code, after: &Code) -> Result<PaintedLabels> {
     let mut spans: [Vec<(HumanTextSpan, TextLabel)>; 2] = [Vec::new(), Vec::new()];
     for entry in &named.mapping.entries {
         let label = TextLabel::from_verdict(entry.verdict(&before.contents, &after.contents)?);
@@ -127,7 +128,7 @@ fn painted_labels(
 /// what a reader would actually see coloured.
 fn rows_end_on_visible_characters(
     painting: &str,
-    labels: &[Vec<Option<TextLabel>>; 2],
+    labels: &PaintedLabels,
     before: &Code,
     after: &Code,
 ) -> Vec<String> {
@@ -263,7 +264,7 @@ pub(crate) fn full_paintings_with_labels<'a>(
     mapping: &'a super::HumanMapping,
     before: &Code,
     after: &Code,
-) -> Result<Vec<(&'a str, [Vec<Option<TextLabel>>; 2])>> {
+) -> Result<Vec<(&'a str, PaintedLabels)>> {
     let Ok(full) = paintings_for_mode(mapping, RenderOptions::FULL) else {
         return Ok(Vec::new());
     };
@@ -330,7 +331,7 @@ fn rows_of(contents: &str) -> impl Iterator<Item = (usize, usize, &str)> {
 /// declines to judge.
 fn full_paints_a_wholly_changed_line_whole(
     painting: &str,
-    labels: &[Vec<Option<TextLabel>>; 2],
+    labels: &PaintedLabels,
     before: &Code,
     after: &Code,
 ) -> Vec<String> {
@@ -403,7 +404,7 @@ fn full_paints_a_wholly_changed_line_whole(
 /// line closes nothing across the newline.
 fn no_unpainted_whitespace_between_painted_regions(
     painting: &str,
-    labels: &[Vec<Option<TextLabel>>; 2],
+    labels: &PaintedLabels,
     before: &Code,
     after: &Code,
 ) -> Vec<String> {
