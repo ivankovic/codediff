@@ -2013,34 +2013,108 @@
   ],
   "text_mappings": [
     {
-      "name": "Only one solution",
+      "name": "Minimal",
       "entries": [
         {
           "operation": "Insert",
-          "after": {
-            "start_row": 3,
-            "start_column": 17,
-            "end_row": 3,
-            "end_column": 22
-          }
+          "after": [
+            {
+              "start_row": 3,
+              "start_column": 17,
+              "end_row": 3,
+              "end_column": 22
+            }
+          ]
         },
         {
           "operation": "Insert",
-          "after": {
-            "start_row": 11,
-            "start_column": 4,
-            "end_row": 11,
-            "end_column": 9
-          }
+          "after": [
+            {
+              "start_row": 11,
+              "start_column": 4,
+              "end_row": 11,
+              "end_column": 9
+            }
+          ]
         },
         {
           "operation": "Insert",
-          "after": {
-            "start_row": 3,
-            "start_column": 39,
-            "end_row": 3,
-            "end_column": 40
-          }
+          "after": [
+            {
+              "start_row": 3,
+              "start_column": 39,
+              "end_row": 3,
+              "end_column": 40
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Full",
+      "entries": [
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 3,
+              "start_column": 17,
+              "end_row": 3,
+              "end_column": 22
+            }
+          ]
+        },
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 11,
+              "start_column": 4,
+              "end_row": 11,
+              "end_column": 9
+            }
+          ]
+        },
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 3,
+              "start_column": 39,
+              "end_row": 3,
+              "end_column": 40
+            }
+          ]
+        },
+        {
+          "operation": "Match",
+          "before": [
+            {
+              "start_row": 3,
+              "start_column": 17,
+              "end_row": 3,
+              "end_column": 33
+            }
+          ],
+          "after": [
+            {
+              "start_row": 3,
+              "start_column": 23,
+              "end_row": 3,
+              "end_column": 39
+            }
+          ]
+        },
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 3,
+              "start_column": 22,
+              "end_row": 3,
+              "end_column": 23
+            }
+          ]
         }
       ]
     }

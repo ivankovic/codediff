@@ -240,6 +240,191 @@ fn full_painting_covers_minimal(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────
+// Candidate invariants 4 and 5: `Full`'s two whitespace-closure rules
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+
+/// Every painting of `mapping` that `FULL`'s own rules can be held to, paired with its per-byte
+/// labels.
+///
+/// `paintings_for_mode` answers with the fixture's single painting when it has only one, so a
+/// fixture painted once is measured here too: that one painting is what `FULL` is scored against,
+/// so it is what `FULL`'s rules have to hold for.
+///
+/// **Except when that sole painting is explicitly named `Minimal`.** Five fixtures are painted
+/// once and name it for the tight preset anyway (`cpp-ollama-ollama-update-commit-hash-3`
+/// through `-6`, `javascript-typescript-interesting-small-edit-refactor`); `paintings_for_mode`
+/// hands it back for `FULL` regardless, because a lone painting has to answer for both. Holding a
+/// reading the painter labelled *minimal* to the generous preset's closure rules would be
+/// asserting something they never claimed - `Full` closes over the whitespace between two painted
+/// regions precisely because it is the generous reading, and `Minimal` is free not to. Reported
+/// as a naming defect instead of silently measured: a fixture painted once should be
+/// `Only one solution`.
+pub(crate) fn full_paintings_with_labels<'a>(
+    mapping: &'a super::HumanMapping,
+    before: &Code,
+    after: &Code,
+) -> Result<Vec<(&'a str, [Vec<Option<TextLabel>>; 2])>> {
+    let Ok(full) = paintings_for_mode(mapping, RenderOptions::FULL) else {
+        return Ok(Vec::new());
+    };
+    full.iter()
+        .filter(|named| !(full.len() == 1 && designates_minimal(&named.name)))
+        .map(|named| Ok((named.name.as_str(), painted_labels(named, before, after)?)))
+        .collect()
+}
+
+/// Whether a painting's name declares it the `Minimal` reading - exactly the name, or the name
+/// followed by a qualifier, matching `human_mapping::designates_preset`'s own rule.
+pub(crate) fn designates_minimal(name: &str) -> bool {
+    name == "Minimal"
+        || name
+            .strip_prefix("Minimal")
+            .is_some_and(|r| r.starts_with(' '))
+}
+
+/// Rows of `contents` as `(row index, byte offset of the row, the row itself)`.
+fn rows_of(contents: &str) -> impl Iterator<Item = (usize, usize, &str)> {
+    let mut offset = 0usize;
+    contents.split('\n').enumerate().map(move |(row, line)| {
+        let start = offset;
+        offset += line.len() + 1;
+        (row, start, line)
+    })
+}
+
+/// **Candidate invariant 4.** If a `Full` painting calls the first visible character on a line
+/// inserted or deleted, it must call that line's own indentation inserted or deleted too.
+///
+/// A whole line entering or leaving the file takes its indentation with it - the indentation is
+/// not a survivor sitting on an inserted line, it is part of what was inserted. Painting the code
+/// but not the whitespace in front of it draws the highlight starting in the middle of the line,
+/// which reads as "this line was edited here" rather than "this line is new". This is the same
+/// closure `RenderOptions::leading_whitespace` already applies on the rendering side under `FULL`
+/// (see that field's doc comment, and `extend_leading_whitespace`); this is the data side of it.
+///
+/// Scoped to `Insert`/`Delete` deliberately. A `Move` or an `Update` is a *surviving* line whose
+/// indentation genuinely may not have changed - `Full` widening a `Move` over a reindented block
+/// is exactly the case `paint_reindent_only_moves` exists for, and it has no business claiming
+/// the old indentation as part of the move.
+///
+/// A line with no visible character at all is skipped: there is no first character to test, and
+/// an all-whitespace line's own painting is what invariant 1 already declines to judge.
+fn full_paints_leading_whitespace_of_a_changed_line(
+    painting: &str,
+    labels: &[Vec<Option<TextLabel>>; 2],
+    before: &Code,
+    after: &Code,
+) -> Vec<String> {
+    let mut violations = Vec::new();
+    for (side, contents) in [(0usize, &before.contents), (1usize, &after.contents)] {
+        for (row, start, line) in rows_of(contents) {
+            let Some(first) = line.find(|c: char| !c.is_whitespace()) else {
+                continue;
+            };
+            if first == 0 {
+                continue;
+            }
+            let Some(label) = labels[side][start + first] else {
+                continue;
+            };
+            if !matches!(label, TextLabel::Insert | TextLabel::Delete) {
+                continue;
+            }
+            let unpainted: Vec<usize> = (0..first)
+                .filter(|&i| labels[side][start + i] != Some(label))
+                .collect();
+            // The exact columns, not just how many: this list is read by a human repairing the
+            // painting by hand, and "12 of 16" does not say *which* twelve - the four already
+            // painted in `rust-next-font-imports-generator` are a deliberate-looking dedent.
+            if let (Some(&low), Some(&high)) = (unpainted.first(), unpainted.last()) {
+                violations.push(format!(
+                    "painting '{painting}' {} row {} paints its first visible character \
+                     {label:?} but leaves columns {low}..{} of its 0..{first} indentation \
+                     unpainted ({} byte(s)): {line:?}",
+                    side_name(side),
+                    row + 1,
+                    high + 1,
+                    unpainted.len(),
+                ));
+            }
+        }
+    }
+    violations
+}
+
+/// **Candidate invariant 5.** A `Full` painting never leaves a run of whitespace unpainted
+/// between two painted regions on the same line.
+///
+/// `Full` is the generous reading: once both sides of a gap are highlighted, the space between
+/// them is not a third, untouched thing - leaving it unpainted breaks one highlight into two and
+/// reads as two separate edits. Only runs that are *entirely* whitespace are reported; an
+/// unpainted run holding any visible character is a real gap between two real edits and this rule
+/// has nothing to say about it.
+///
+/// Both painted neighbours have to exist on the same row, so a painted run reaching the end of a
+/// line closes nothing across the newline.
+fn no_unpainted_whitespace_between_painted_regions(
+    painting: &str,
+    labels: &[Vec<Option<TextLabel>>; 2],
+    before: &Code,
+    after: &Code,
+) -> Vec<String> {
+    let mut violations = Vec::new();
+    for (side, contents) in [(0usize, &before.contents), (1usize, &after.contents)] {
+        for (row, start, line) in rows_of(contents) {
+            let painted: Vec<usize> = (0..line.len())
+                .filter(|&i| labels[side][start + i].is_some())
+                .collect();
+            let (Some(&first), Some(&last)) = (painted.first(), painted.last()) else {
+                continue;
+            };
+            let mut run: Option<usize> = None;
+            for i in first..=last {
+                if labels[side][start + i].is_some() {
+                    if let Some(run_start) = run.take()
+                        && line[run_start..i].chars().all(char::is_whitespace)
+                    {
+                        violations.push(format!(
+                            "painting '{painting}' {} row {} leaves columns {}..{} unpainted \
+                             between two painted regions, and they are only whitespace: {line:?}",
+                            side_name(side),
+                            row + 1,
+                            run_start,
+                            i,
+                        ));
+                    }
+                } else if run.is_none() {
+                    run = Some(i);
+                }
+            }
+        }
+    }
+    violations
+}
+
+/// Both candidate invariants over every `Full` painting, as `(invariant 4, invariant 5)`.
+///
+/// Separate from [`ground_truth_invariant_violations_for`] until the corpus has been repaired
+/// against them - see `measure_full_painting_whitespace_invariants`.
+pub fn full_painting_whitespace_violations(
+    mapping: &super::HumanMapping,
+    before: &Code,
+    after: &Code,
+) -> Result<(Vec<String>, Vec<String>)> {
+    let mut leading = Vec::new();
+    let mut interior = Vec::new();
+    for (painting, labels) in full_paintings_with_labels(mapping, before, after)? {
+        leading.extend(full_paints_leading_whitespace_of_a_changed_line(
+            painting, &labels, before, after,
+        ));
+        interior.extend(no_unpainted_whitespace_between_painted_regions(
+            painting, &labels, before, after,
+        ));
+    }
+    Ok((leading, interior))
+}
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────
 // Invariant 3: a delimiter and its partner carry one verdict
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 

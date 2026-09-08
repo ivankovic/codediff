@@ -138,6 +138,7 @@ mod tests {
                 structural_punctuation: false,
                 whole_pair_updates: false,
                 paint_reindent_only_moves: false,
+                paint_displaced_moves: false,
             }))
         );
     }
@@ -156,6 +157,7 @@ mod tests {
                 structural_punctuation: true,
                 whole_pair_updates: false,
                 paint_reindent_only_moves: false,
+                paint_displaced_moves: false,
             }))
         );
     }

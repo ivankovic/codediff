@@ -52,7 +52,12 @@ fn mapping() -> Result<()> {
 #[test]
 fn painting() -> Result<()> {
     // measured 2026-08-26: minimal 60.888%, full 61.605%
-    assert_matches_human_painting_within_limit("kotlin-refactor-function", 61.62)
+    // re-measured 2026-09-08 after `RenderOptions::paint_displaced_moves` stopped `MINIMAL` painting a
+    // span that kept its own text and its own place and shifted only because of an edit before it:
+    // minimal 57.307% -> 55.014%. The option is off under `FULL`, which this fix leaves byte-identical
+    // at 58.596%, so `FULL` sets the limit now. Any earlier number in this comment that disagrees with
+    // these two predates unrelated rendering and ground-truth fixes and was never re-measured.
+    assert_matches_human_painting_within_limit("kotlin-refactor-function", 58.61)
 }
 
 #[test]

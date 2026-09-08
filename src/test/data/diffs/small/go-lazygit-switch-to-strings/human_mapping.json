@@ -5443,25 +5443,6 @@
           ]
         },
         {
-          "operation": "Match",
-          "before": [
-            {
-              "start_row": 17,
-              "start_column": 2,
-              "end_row": 17,
-              "end_column": 16
-            }
-          ],
-          "after": [
-            {
-              "start_row": 23,
-              "start_column": 2,
-              "end_row": 23,
-              "end_column": 16
-            }
-          ]
-        },
-        {
           "operation": "Delete",
           "before": [
             {
@@ -5577,13 +5558,40 @@
           ]
         },
         {
-          "operation": "Insert",
+          "operation": "Match",
+          "before": [
+            {
+              "start_row": 19,
+              "start_column": 0,
+              "end_row": 19,
+              "end_column": 3
+            }
+          ],
+          "after": [
+            {
+              "start_row": 21,
+              "start_column": 0,
+              "end_row": 21,
+              "end_column": 3
+            }
+          ]
+        },
+        {
+          "operation": "Match",
+          "before": [
+            {
+              "start_row": 17,
+              "start_column": 0,
+              "end_row": 17,
+              "end_column": 16
+            }
+          ],
           "after": [
             {
               "start_row": 23,
               "start_column": 0,
               "end_row": 23,
-              "end_column": 2
+              "end_column": 16
             }
           ]
         }

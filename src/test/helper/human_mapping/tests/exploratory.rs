@@ -838,3 +838,78 @@ fn invariant_violations() -> Result<()> {
     eprintln!("{total} violation(s)");
     Ok(())
 }
+
+/// EXPLORATORY: how much of the corpus's ground truth satisfies the two `Full` whitespace-closure
+/// rules in `invariants.rs` - "a line whose first visible character is inserted or deleted paints
+/// its own indentation too" and "no unpainted whitespace between two painted regions on one line".
+///
+/// Run before wiring either into `ground_truth_invariant_violations`, so the repair cost is known
+/// first: `cargo test --release --lib --features test-fixtures
+/// measure_full_painting_whitespace_invariants -- --ignored --nocapture`.
+#[test]
+#[ignore]
+fn measure_full_painting_whitespace_invariants() -> Result<()> {
+    let diffs_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("src")
+        .join("test")
+        .join("data")
+        .join("diffs");
+    let mut names: Vec<(String, String)> = Vec::new();
+    for dataset in crate::test::helper::DIFF_DATASETS {
+        let dir = diffs_dir.join(dataset);
+        if !dir.is_dir() {
+            continue;
+        }
+        for entry in fs::read_dir(&dir)?.filter_map(|entry| entry.ok()) {
+            if entry.path().is_dir() {
+                names.push((
+                    (*dataset).to_string(),
+                    entry.file_name().to_string_lossy().into_owned(),
+                ));
+            }
+        }
+    }
+    names.sort();
+
+    let (mut painted, mut leading_bad, mut interior_bad) = (0usize, 0usize, 0usize);
+    let (mut leading_total, mut interior_total) = (0usize, 0usize);
+    for (dataset, name) in &names {
+        let dir = diffs_dir.join(dataset).join(name);
+        let Some((before, after)) = crate::test::helper::code_pair_from_dir(&dir)? else {
+            continue;
+        };
+        let Ok(mapping) = load(name) else { continue };
+        if mapping.text_mappings.is_empty() {
+            continue;
+        }
+        painted += 1;
+        let (leading, interior) =
+            crate::test::helper::human_mapping::invariants::full_painting_whitespace_violations(
+                &mapping, &before, &after,
+            )?;
+        if !leading.is_empty() {
+            leading_bad += 1;
+            leading_total += leading.len();
+        }
+        if !interior.is_empty() {
+            interior_bad += 1;
+            interior_total += interior.len();
+        }
+        if leading.is_empty() && interior.is_empty() {
+            continue;
+        }
+        eprintln!(
+            "{name} [leading {} / interior {}]",
+            leading.len(),
+            interior.len()
+        );
+        for violation in leading.iter().chain(interior.iter()) {
+            eprintln!("    {violation}");
+        }
+    }
+    eprintln!(
+        "\nPAINTED {painted}\nLEADING  {leading_bad} fixture(s), {leading_total} violation(s)\n\
+         INTERIOR {interior_bad} fixture(s), {interior_total} violation(s)"
+    );
+    Ok(())
+}

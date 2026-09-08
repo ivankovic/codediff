@@ -599,7 +599,7 @@
   ],
   "text_mappings": [
     {
-      "name": "Minimal",
+      "name": "Only one solution",
       "entries": [
         {
           "operation": "Match",

@@ -136,6 +136,70 @@ fn paint_reindent_only_moves_gates_only_tagged_nodes() {
     );
 }
 
+/// `paint_displaced_moves` is the second axis the two presets disagree on, and the polarity
+/// matters: `MINIMAL` suppresses a displacement-only `Move`, `FULL` keeps painting it.
+#[test]
+fn minimal_and_full_disagree_on_paint_displaced_moves() {
+    const { assert!(!RenderOptions::MINIMAL.paint_displaced_moves) };
+    const { assert!(RenderOptions::FULL.paint_displaced_moves) };
+}
+
+/// The gate `paint_displaced_moves` controls, in the shape the corpus found it in
+/// (`shellscript-ansible-ansible-a-small-add`): a single-row node keeps its own text *and* its
+/// own place beside the one edit on its row, but lands on a different row index because a line
+/// was inserted above it. `FULL` paints that `Move`, `MINIMAL` does not.
+///
+/// Before 2026-09-08 `shifted_by_an_edit_beside_it` additionally required `s.start_row ==
+/// d.start_row`, so the check could not fire at all here and *both* presets painted `Move` -
+/// which is why the `FULL` half of this test is as load-bearing as the `MINIMAL` half. It pins
+/// that the fix stayed a preset split rather than becoming a blanket suppression.
+#[test]
+fn paint_displaced_moves_gates_a_node_pushed_down_by_an_insertion_above_it() {
+    let before = Code::from_string(
+        "fn main() {\n         \x20   let total = compute(first, second);\n         }\n",
+        &crate::code::Language::Rust,
+    );
+    let after = Code::from_string(
+        "fn main() {\n         \x20   setup();\n         \x20   let total = compute(extra, first, second);\n         }\n",
+        &crate::code::Language::Rust,
+    );
+    let ast = crate::diff::diff_code(&before, &after);
+    let node_cache = crate::diff::NodeCache::build(&before, &after);
+
+    // The tail of the call's own row - unchanged text, pushed one row down by `setup();` above
+    // it and rightwards by `extra, ` beside it. Neither displacement is a relocation.
+    //
+    // Asserted as "is there an `Identical` range starting there at all", not as "is that one
+    // range `Move` vs `Identical`": under `FULL` the span is not a range of its own, it is
+    // swallowed into the multi-row `Move` that runs from it to the closing brace, so there is
+    // nothing at that position to compare an operation against.
+    let identical_tail_on_the_call_row = |options| {
+        TextDiff::from_with_options(
+            &before,
+            &after,
+            ast.ast.as_ref().unwrap(),
+            &node_cache,
+            options,
+        )
+        .all(0)
+        .iter()
+        .any(|r| {
+            r.operation == TextOperation::Identical
+                && r.source.start_row == 1
+                && r.source.start_column == 33
+        })
+    };
+
+    assert!(
+        !identical_tail_on_the_call_row(RenderOptions::FULL),
+        "paint_displaced_moves: true must keep painting the displaced tail Move"
+    );
+    assert!(
+        identical_tail_on_the_call_row(RenderOptions::MINIMAL),
+        "paint_displaced_moves: false must leave the purely displaced tail unpainted"
+    );
+}
+
 /// The exact tokens the painted corpus showed `Full` adding over `Minimal` - eight `(`, five
 /// `)`, two `):` and one `;` across ten fixtures. If `Minimal` does not drop these, it is not
 /// modelling the style it is named after.
@@ -406,6 +470,7 @@ fn structural_punctuation_off_alone_still_keeps_leading_whitespace() {
         structural_punctuation: false,
         whole_pair_updates: false,
         paint_reindent_only_moves: true,
+        paint_displaced_moves: true,
     };
     let result = ranges_for_options(&ranges, source, options);
 
@@ -427,6 +492,7 @@ fn leading_whitespace_off_alone_still_keeps_a_range_containing_punctuation() {
         structural_punctuation: true,
         whole_pair_updates: false,
         paint_reindent_only_moves: true,
+        paint_displaced_moves: true,
     };
     let result = ranges_for_options(&ranges, source, options);
 

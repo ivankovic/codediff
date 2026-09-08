@@ -42,7 +42,12 @@ fn mapping() -> Result<()> {
 #[test]
 fn painting() -> Result<()> {
     // measured 2026-09-05: minimal 7.092%, full 7.008%
-    assert_matches_human_painting_within_limit("rust-rust-lang-rust-change-use", 7.11)
+    // re-measured 2026-09-08 after `RenderOptions::paint_displaced_moves` stopped `MINIMAL` painting a
+    // span that kept its own text and its own place and shifted only because of an edit before it:
+    // minimal 7.092% -> 6.420%. The option is off under `FULL`, which this fix leaves byte-identical
+    // at 7.008%, so `FULL` sets the limit now. Any earlier number in this comment that disagrees with
+    // these two predates unrelated rendering and ground-truth fixes and was never re-measured.
+    assert_matches_human_painting_within_limit("rust-rust-lang-rust-change-use", 7.02)
 }
 
 #[test]

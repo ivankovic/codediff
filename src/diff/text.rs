@@ -697,8 +697,21 @@ impl RangeWalk<'_> {
         // at this shape; the three before it are in the fix log). Restricted to nodes that
         // stayed on their own row and were not reindented, so a reindent-only move keeps
         // reaching `paint_reindent_only_moves` below.
+        //
+        // The node also has to still *be* on a row whose content places it beside the edit - but
+        // not necessarily on the row it started on. Requiring `s.start_row == d.start_row` here
+        // (as this did until 2026-09-08) made the whole check unreachable for a node that had
+        // additionally been pushed down the file by an insertion above it, which is the ordinary
+        // case rather than a corner one: in `shellscript-ansible-ansible-a-small-add` a
+        // `set -eux -o pipefail` two lines up moved `diff -w <(...)` from row 3 to row 5 and the
+        // untouched tail of the command painted `Move` under both presets. The row *indices* are
+        // not the evidence; `node_untouched_on_its_row` already compares the two rows' own
+        // content, and it reads whichever rows the two sides actually sit on. Dropping the index
+        // requirement is gated on `paint_displaced_moves` because the two presets disagree about
+        // it - see that option's doc comment for the corpus measurement (17 `MINIMAL` fixtures
+        // improved and none regressed; `FULL` net worse).
         let shifted_by_an_edit_beside_it = s.end_row == s.start_row
-            && s.start_row == d.start_row
+            && (s.start_row == d.start_row || !self.options.paint_displaced_moves)
             && node_untouched_on_its_row(&self.source.contents, &self.destination.contents, &s, &d);
         let column_shift_is_meaningful = s.start_column != d.start_column
             && !shifted_within_its_own_line

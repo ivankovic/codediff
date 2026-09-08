@@ -28,7 +28,12 @@ fn mapping() -> Result<()> {
 #[test]
 fn painting() -> Result<()> {
     // measured 2026-09-01: minimal 1.784%, full 1.124% (measured, unexamined)
-    assert_matches_human_painting_within_limit("c-freeciv-add-parameter-to-function", 1.81)
+    // re-measured 2026-09-08 after `RenderOptions::paint_displaced_moves` stopped `MINIMAL` painting a
+    // span that kept its own text and its own place and shifted only because of an edit before it:
+    // minimal 1.784% -> 0.000%. The option is off under `FULL`, which this fix leaves byte-identical
+    // at 1.124%, so `FULL` sets the limit now. Any earlier number in this comment that disagrees with
+    // these two predates unrelated rendering and ground-truth fixes and was never re-measured.
+    assert_matches_human_painting_within_limit("c-freeciv-add-parameter-to-function", 1.14)
 }
 
 #[test]

@@ -39,7 +39,12 @@ fn mapping() -> Result<()> {
 #[test]
 fn painting() -> Result<()> {
     // measured 2026-08-26: minimal 29.615%, full 6.288%
-    assert_matches_human_painting_within_limit("cpp-add-templates", 29.63)
+    // re-measured 2026-09-08 after `RenderOptions::paint_displaced_moves` stopped `MINIMAL` painting a
+    // span that kept its own text and its own place and shifted only because of an edit before it:
+    // minimal 29.615% -> 10.548%. The option is off under `FULL`, which this fix leaves byte-identical
+    // at 5.882%, so `MINIMAL` sets the limit now. Any earlier number in this comment that disagrees
+    // with these two predates unrelated rendering and ground-truth fixes and was never re-measured.
+    assert_matches_human_painting_within_limit("cpp-add-templates", 10.56)
 }
 
 #[test]

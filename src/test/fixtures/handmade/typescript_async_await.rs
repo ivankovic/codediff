@@ -46,7 +46,12 @@ fn painting() -> Result<()> {
     // fixture's ground truth happens to leave unpainted even though the line is a whole new
     // insert - a defensible but not the only reading; not a regression in the rule this option
     // now actually honors.
-    assert_matches_human_painting_within_limit("typescript-async-await", 34.32)
+    // re-measured 2026-09-08 after `RenderOptions::paint_displaced_moves` stopped `MINIMAL` painting a
+    // span that kept its own text and its own place and shifted only because of an edit before it:
+    // minimal 27.540% -> 2.709%. The option is off under `FULL`, which this fix leaves byte-identical
+    // at 10.835%, so `FULL` sets the limit now. Any earlier number in this comment that disagrees with
+    // these two predates unrelated rendering and ground-truth fixes and was never re-measured.
+    assert_matches_human_painting_within_limit("typescript-async-await", 10.85)
 }
 
 #[test]

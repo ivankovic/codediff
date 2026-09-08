@@ -1606,6 +1606,17 @@
               "end_column": 13
             }
           ]
+        },
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 13,
+              "start_column": 0,
+              "end_row": 13,
+              "end_column": 4
+            }
+          ]
         }
       ]
     },

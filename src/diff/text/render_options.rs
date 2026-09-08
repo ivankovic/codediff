@@ -224,11 +224,53 @@ pub struct RenderOptions {
     /// here (that field already had a non-derived default before the merge).
     #[serde(default = "paint_reindent_only_moves_default")]
     pub paint_reindent_only_moves: bool,
+    /// Whether a matched node that kept its own text and its own place in the sequence, and
+    /// changed position only because text was inserted or removed *before* it, still paints as
+    /// `Move`.
+    ///
+    /// The same axis as [`Self::paint_reindent_only_moves`] - "does a relocation with no
+    /// semantic content still get painted?" - but a different phenomenon, which is why it is a
+    /// separate field rather than a widening of that one: a reindent changes the node's
+    /// indentation, a displacement does not change the node's row *content* around it at all.
+    /// `matched_range`'s `shifted_by_an_edit_beside_it` already recognises the shape via
+    /// `node_untouched_on_its_row`; until 2026-09-08 it additionally required the node to have
+    /// stayed on the *same row index*, so it never fired for a node that had also been pushed
+    /// down the file by an insertion above it. `shellscript-ansible-ansible-a-small-add` is the
+    /// clean case: `diff -w <(...)` keeps its text and its place, `set -eux -o pipefail` is
+    /// inserted two lines above, and the whole tail of the command painted `Move` under both
+    /// presets against a ground truth that paints it not at all.
+    ///
+    /// **`MINIMAL` false, `FULL` true, and the split is measured, not assumed.** Dropping the
+    /// row-index requirement unconditionally moved 17 painted fixtures under `MINIMAL` with **no
+    /// regression** (aggregate disagreement 1083.677 -> 961.184 over the 249 painted fixtures),
+    /// and under `FULL` improved 15 while regressing 8 for a net loss (1009.437 -> 1024.108).
+    /// That is the two presets' own conventions disagreeing, exactly as they do on
+    /// `paint_reindent_only_moves`: `MINIMAL` paints as few bytes as it can and does not want a
+    /// pure displacement painted, while `FULL` keeps the displaced span painted along with the
+    /// construct that contains it. Measured 2026-09-08 with
+    /// `painting_disagreement_detail_batch` over every painted fixture, both presets.
+    ///
+    /// **Construction-time, like [`Self::paint_reindent_only_moves`].** It decides
+    /// `TextOperation::Move` vs. `Identical` while `ranges` builds its list, so
+    /// `ranges_for_options` cannot apply it as a post-filter and the `M` panel triggers a full
+    /// diff reload when it changes.
+    ///
+    /// `#[serde(default = "paint_displaced_moves_default")]` for the same reason
+    /// `paint_reindent_only_moves` has one: a `.codediff.toml` written before this field existed
+    /// must keep the behaviour every prior release had, which is `true` (always paint the
+    /// `Move`), not `bool::default()`'s `false`.
+    #[serde(default = "paint_displaced_moves_default")]
+    pub paint_displaced_moves: bool,
 }
 
 /// [`RenderOptions::paint_reindent_only_moves`]'s serde default - see that field's own doc
 /// comment.
 pub(crate) fn paint_reindent_only_moves_default() -> bool {
+    true
+}
+
+/// [`RenderOptions::paint_displaced_moves`]'s serde default - see that field's own doc comment.
+pub(crate) fn paint_displaced_moves_default() -> bool {
     true
 }
 
@@ -243,6 +285,7 @@ impl RenderOptions {
         structural_punctuation: false,
         whole_pair_updates: false,
         paint_reindent_only_moves: false,
+        paint_displaced_moves: false,
     };
     /// Every option on: the fullest reading of a diff, short of trailing whitespace, which no
     /// combination of options ever paints. `whole_pair_updates` stays off even here - see that
@@ -252,6 +295,7 @@ impl RenderOptions {
         structural_punctuation: true,
         whole_pair_updates: false,
         paint_reindent_only_moves: true,
+        paint_displaced_moves: true,
     };
 
     /// Every option, paired with its label and current value, in the order a settings UI should
@@ -263,7 +307,7 @@ impl RenderOptions {
     /// whether a settings UI can offer it. The `M` panel toggling this one now goes through a
     /// diff reload rather than `DiffViewer::set_render_options`'s plain re-filter (see
     /// `tui::app`'s `Action::RenderOptionsChanged` handler) precisely so it's safe to list here.
-    pub fn options(&self) -> [(&'static str, bool); 4] {
+    pub fn options(&self) -> [(&'static str, bool); 5] {
         [
             ("Leading whitespace", self.leading_whitespace),
             (
@@ -272,6 +316,7 @@ impl RenderOptions {
             ),
             ("Whole-pair updates", self.whole_pair_updates),
             ("Paint reindent-only moves", self.paint_reindent_only_moves),
+            ("Paint displaced moves", self.paint_displaced_moves),
         ]
     }
 
@@ -284,6 +329,7 @@ impl RenderOptions {
             1 => self.structural_punctuation = !self.structural_punctuation,
             2 => self.whole_pair_updates = !self.whole_pair_updates,
             3 => self.paint_reindent_only_moves = !self.paint_reindent_only_moves,
+            4 => self.paint_displaced_moves = !self.paint_displaced_moves,
             _ => {}
         }
     }
