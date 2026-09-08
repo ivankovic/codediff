@@ -1286,21 +1286,37 @@ fn assemble_diff_session_data(
 /// offset computed against the original tab-containing text upstream of this function stays
 /// exactly as valid against the space-substituted text it returns.
 ///
-/// **Every ASCII control character, not just `\t`.** The one that actually reaches this in the wild
-/// is `\r`: a Windows CRLF file carries one at the end of every row, and it is worse than a tab -
-/// a terminal receiving `\r` returns its cursor to column 0 of the current line, so the row is
-/// overwritten from its start rather than merely shifted. `render_side` (headless) prints these
-/// rows verbatim and a real CRLF fixture emitted a literal `^M` on every line; the TUI's
-/// `code_viewer` puts them in a `Buffer` cell that `ratatui` believes is one column wide.
+/// **Every ASCII control character, not just `\t`** - each is one UTF-8 byte, so the substitution
+/// stays as strictly offset-preserving as the tab case above. `is_ascii_control` and not
+/// `is_control`: the latter also covers the C1 block (U+0080-U+009F), whose code points are *two*
+/// UTF-8 bytes, and swapping one of those for a one-byte space would break the very
+/// offset-preservation this function exists to guarantee.
 ///
-/// `is_ascii_control`, not `is_control`: the latter also covers the C1 block (U+0080-U+009F),
-/// whose code points are *two* UTF-8 bytes, and swapping one of those for a one-byte space would
-/// break the offset-preservation this function's whole contract rests on.
+/// **Two exemptions, both line terminators.** `\n` because this runs over whole file contents and
+/// every caller downstream splits them into rows on it. And a `\r` that immediately precedes one,
+/// because that `\r` is *part of the terminator* on a Windows CRLF file, not a column of the row:
+/// the renderers drop it where they split rows (`str::lines` in `code_viewer`,
+/// `strip_suffix('\r')` in `headless::render_side` and the solver's `render_paint_side`), and
+/// turning it into a space here instead would make it indistinguishable from real trailing
+/// whitespace and hand every row of such a file one phantom column for the cursor to rest on.
 ///
-/// `\n` is deliberately exempt: this runs over whole file contents, and every caller downstream
-/// splits them into rows on it.
+/// A *lone* `\r` - not followed by `\n` - is not a terminator anything downstream recognises, so
+/// it is substituted like any other control character. It is the worse one to leave in: a terminal
+/// receiving it returns its cursor to column 0 of the line being drawn, so the row is overwritten
+/// from its start rather than merely shifted along.
 fn display_safe(text: &str) -> String {
-    text.replace(|c: char| c.is_ascii_control() && c != '\n', " ")
+    let bytes = text.as_bytes();
+    text.char_indices()
+        .map(|(index, character)| {
+            let terminator =
+                character == '\n' || (character == '\r' && bytes.get(index + 1) == Some(&b'\n'));
+            if !terminator && character.is_ascii_control() {
+                ' '
+            } else {
+                character
+            }
+        })
+        .collect()
 }
 
 /// `assemble_diff_session_data`'s counterpart for the plain-text fallback (see
@@ -2531,10 +2547,11 @@ mod tests {
     /// `^M` on every line of this fixture before `display_safe` covered the whole ASCII control
     /// range.
     ///
-    /// Row and column offsets must survive it: `\r` and `' '` are both one byte, and the row
-    /// count must not change, which is why `\n` is exempt.
+    /// The CRLF `\r` itself is exempt from the substitution and comes off where rows are split -
+    /// what this pins is that nothing *else* in a Windows file reaches a terminal raw, and that
+    /// the contents keep every byte offset and row boundary they had.
     #[test]
-    fn compute_diff_never_puts_a_raw_carriage_return_into_diff_session_data_contents() -> Result<()>
+    fn compute_diff_leaves_a_crlf_file_offset_stable_and_free_of_other_control_bytes() -> Result<()>
     {
         let before = Path::new(
             "src/test/data/diffs/small/typescript-microsoft-typescript-add-target-comment/before.ts.test",
@@ -2548,14 +2565,19 @@ mod tests {
 
         let (data, _large_residual) = compute_diff(before, after)?;
 
-        assert!(
-            !data.before_contents.contains('\r'),
-            "before_contents still has a raw carriage return"
-        );
-        assert!(
-            !data.after_contents.contains('\r'),
-            "after_contents still has a raw carriage return"
-        );
+        for contents in [&data.before_contents, &data.after_contents] {
+            assert!(
+                !contents
+                    .as_bytes()
+                    .windows(2)
+                    .any(|pair| pair[0] == b'\r' && pair[1] != b'\n'),
+                "a carriage return that is not a CRLF terminator survived"
+            );
+            assert!(
+                !contents.contains('\t'),
+                "a raw tab survived in a CRLF file"
+            );
+        }
         assert_eq!(
             (
                 data.before_contents.len(),
@@ -2572,9 +2594,18 @@ mod tests {
     /// tab substitution was designed never to cause.
     #[test]
     fn display_safe_leaves_multi_byte_control_code_points_alone() {
-        let text = "a\u{9c}b\r\n";
+        let text = "a\u{9c}b\x07\n";
         let safe = display_safe(text);
         assert_eq!(safe, "a\u{9c}b \n");
         assert_eq!(safe.len(), text.len());
+    }
+
+    /// A CRLF terminator's `\r` belongs to the line break and comes off where rows are split; a
+    /// lone `\r` is a control character like any other and must not reach a terminal, where it
+    /// would send the cursor back to column 0 of the row being drawn.
+    #[test]
+    fn display_safe_keeps_a_crlf_terminator_and_substitutes_a_lone_carriage_return() {
+        assert_eq!(display_safe("a\r\nb\rc\n"), "a\r\nb c\n");
+        assert_eq!(display_safe("trailing\r"), "trailing ");
     }
 }

@@ -366,7 +366,14 @@ fn render_side(
     path: &Path,
     context: usize,
 ) -> String {
-    let lines: Vec<&str> = contents.split('\n').collect();
+    // Rows without their CRLF `\r`: `display_safe` deliberately leaves that byte alone (it is part
+    // of the line terminator, not a column - see its doc comment), so this is where it comes off.
+    // Printed verbatim it emitted a literal `^M` on every line of a Windows file, and a terminal
+    // reading one returns its cursor to column 0 of the row it is drawing.
+    let lines: Vec<&str> = contents
+        .split('\n')
+        .map(|line| line.strip_suffix('\r').unwrap_or(line))
+        .collect();
     let (flags, spans) = row_overlay(ranges, &lines);
     let keep = lines_to_keep(&flags, context);
 

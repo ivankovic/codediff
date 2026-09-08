@@ -748,7 +748,13 @@ pub(crate) fn render_paint_side(
     let focused = state.side == side;
     let top = state.scroll[side];
 
-    let lines: Vec<&str> = source.split('\n').collect();
+    // Rows without their CRLF `\r`, matching `TextPaintState::row_text` - see its doc comment for
+    // why that byte is not a column. Every offset below (`char_indices`, `line.len()`, the
+    // `span_covers` row length) is then the reader's own column model.
+    let lines: Vec<&str> = source
+        .split('\n')
+        .map(|line| line.strip_suffix('\r').unwrap_or(line))
+        .collect();
     let gutter_width = lines.len().to_string().len().max(3);
 
     // Bucketed by row once, rather than scanning every span for every byte of every visible row.

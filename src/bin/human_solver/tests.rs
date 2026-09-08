@@ -6493,6 +6493,36 @@ fn the_text_view_never_puts_a_carriage_return_in_the_buffer() {
     }
 }
 
+/// A CRLF row's `\r` is part of the line terminator, not a column of the row. Left in, it gives
+/// every row of a Windows file one phantom column past its last visible character: `$` lands on
+/// it, a selection can cover it, and a multi-row painted span runs into it - so a painted region
+/// draws one highlighted cell wider on every row than the reader asked for.
+#[test]
+fn a_crlf_row_ends_at_its_last_visible_character() {
+    let source = "let x = 1;\r\nlet y = 2;\r\n";
+
+    assert_eq!(TextPaintState::row_text(source, 0), "let x = 1;");
+    assert_eq!(
+        TextPaintState::row_text(source, 0).len(),
+        source.split('\n').next().unwrap().len() - 1,
+        "the row must be exactly one byte shorter than what split('\\n') hands back"
+    );
+
+    // A span covering the whole first row must not reach a column the row no longer has.
+    let span = HumanTextSpan {
+        start_row: 0,
+        start_column: 0,
+        end_row: 1,
+        end_column: 0,
+    };
+    let row_len = TextPaintState::row_text(source, 0).len();
+    assert!(span_covers(span, 0, row_len - 1, row_len));
+    assert!(
+        !span_covers(span, 0, row_len, row_len),
+        "the terminator is not a paintable column"
+    );
+}
+
 /// The substitution has to stay one byte for one byte, which `is_control` would not be: a C1 code
 /// point (U+0080-U+009F) is two UTF-8 bytes, and every `HumanTextSpan` is stored in byte columns
 /// of the untouched source.

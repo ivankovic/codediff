@@ -565,7 +565,12 @@ pub(crate) fn overlay_disagreement_spans(
 ) -> [Vec<(HumanTextSpan, HumanTextVerdict)>; 2] {
     let mut out = [Vec::new(), Vec::new()];
     for (side, source) in [(0usize, before_src), (1usize, after_src)] {
-        let lines: Vec<&str> = source.split('\n').collect();
+        // Rows without their CRLF `\r`, matching `TextPaintState::row_text` - a disagreement run
+        // must not be able to start on a byte the reader cannot see.
+        let lines: Vec<&str> = source
+            .split('\n')
+            .map(|line| line.strip_suffix('\r').unwrap_or(line))
+            .collect();
         for (row, line) in lines.iter().enumerate() {
             // One pass per row, coalescing adjacent disagreeing columns into a single span so a
             // whole differing line shows as one range rather than eighty.
@@ -690,8 +695,19 @@ impl Default for TextPaintState {
 
 impl TextPaintState {
     /// The row's text, or `""` past the end of the file.
+    ///
+    /// Without its trailing `\r`, if it has one. A Windows CRLF file's rows keep that byte through
+    /// `split('\n')`, and it is part of the line *terminator*, not of the row: leaving it in gives
+    /// every row one phantom column past its last visible character - one the cursor can rest on,
+    /// `$` jumps to, a selection can cover, and a multi-row painted span runs into. Only a
+    /// trailing `\r` is dropped, and it is the row's last byte, so every stored `HumanTextSpan`
+    /// column stays exactly where it was.
     pub(crate) fn row_text(source: &str, row: usize) -> &str {
-        source.split('\n').nth(row).unwrap_or("")
+        source
+            .split('\n')
+            .nth(row)
+            .map(|line| line.strip_suffix('\r').unwrap_or(line))
+            .unwrap_or("")
     }
 
     pub(crate) fn row_count(source: &str) -> usize {
