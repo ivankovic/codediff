@@ -1,0 +1,1551 @@
+{
+  "entries": [
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [],
+      "after_path": []
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "element:1"
+      ],
+      "after_path": [
+        "element:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "element:1",
+        "STag:1"
+      ],
+      "after_path": [
+        "element:1",
+        "STag:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "element:1",
+        "STag:1",
+        "<:1"
+      ],
+      "after_path": [
+        "element:1",
+        "STag:1",
+        "<:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "element:1",
+        "STag:1",
+        "Name:1"
+      ],
+      "after_path": [
+        "element:1",
+        "STag:1",
+        "Name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "element:1",
+        "STag:1",
+        "Attribute:1"
+      ],
+      "after_path": [
+        "element:1",
+        "STag:1",
+        "Attribute:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "element:1",
+        "STag:1",
+        "Attribute:1",
+        "Name:1"
+      ],
+      "after_path": [
+        "element:1",
+        "STag:1",
+        "Attribute:1",
+        "Name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "element:1",
+        "STag:1",
+        "Attribute:1",
+        "=:1"
+      ],
+      "after_path": [
+        "element:1",
+        "STag:1",
+        "Attribute:1",
+        "=:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "element:1",
+        "STag:1",
+        "Attribute:1",
+        "AttValue:1"
+      ],
+      "after_path": [
+        "element:1",
+        "STag:1",
+        "Attribute:1",
+        "AttValue:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "element:1",
+        "STag:1",
+        "Attribute:1",
+        "AttValue:1",
+        "\":1"
+      ],
+      "after_path": [
+        "element:1",
+        "STag:1",
+        "Attribute:1",
+        "AttValue:1",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "element:1",
+        "STag:1",
+        "Attribute:1",
+        "AttValue:1",
+        "\":2"
+      ],
+      "after_path": [
+        "element:1",
+        "STag:1",
+        "Attribute:1",
+        "AttValue:1",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "element:1",
+        "STag:1",
+        ">:1"
+      ],
+      "after_path": [
+        "element:1",
+        "STag:1",
+        ">:1"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "element:1",
+        "content:1"
+      ],
+      "after_path": [
+        "element:1",
+        "content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "element:1",
+        "content:1",
+        "CharData:1"
+      ],
+      "after_path": [
+        "element:1",
+        "content:1",
+        "CharData:1"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "element:1",
+        "content:1",
+        "element:1"
+      ],
+      "after_path": [
+        "element:1",
+        "content:1",
+        "element:1"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "STag:1"
+      ],
+      "after_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "STag:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "STag:1",
+        "<:1"
+      ],
+      "after_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "STag:1",
+        "<:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "STag:1",
+        "Name:1"
+      ],
+      "after_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "STag:1",
+        "Name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "STag:1",
+        "Attribute:1"
+      ],
+      "after_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "STag:1",
+        "Attribute:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "STag:1",
+        "Attribute:1",
+        "Name:1"
+      ],
+      "after_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "STag:1",
+        "Attribute:1",
+        "Name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "STag:1",
+        "Attribute:1",
+        "=:1"
+      ],
+      "after_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "STag:1",
+        "Attribute:1",
+        "=:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "STag:1",
+        "Attribute:1",
+        "AttValue:1"
+      ],
+      "after_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "STag:1",
+        "Attribute:1",
+        "AttValue:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "STag:1",
+        "Attribute:1",
+        "AttValue:1",
+        "\":1"
+      ],
+      "after_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "STag:1",
+        "Attribute:1",
+        "AttValue:1",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "STag:1",
+        "Attribute:1",
+        "AttValue:1",
+        "\":2"
+      ],
+      "after_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "STag:1",
+        "Attribute:1",
+        "AttValue:1",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "STag:1",
+        "Attribute:2"
+      ],
+      "after_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "STag:1",
+        "Attribute:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "STag:1",
+        "Attribute:2",
+        "Name:1"
+      ],
+      "after_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "STag:1",
+        "Attribute:2",
+        "Name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "STag:1",
+        "Attribute:2",
+        "=:1"
+      ],
+      "after_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "STag:1",
+        "Attribute:2",
+        "=:1"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "STag:1",
+        "Attribute:2",
+        "AttValue:1"
+      ],
+      "after_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "STag:1",
+        "Attribute:2",
+        "AttValue:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "STag:1",
+        "Attribute:2",
+        "AttValue:1",
+        "\":1"
+      ],
+      "after_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "STag:1",
+        "Attribute:2",
+        "AttValue:1",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "STag:1",
+        "Attribute:2",
+        "AttValue:1",
+        "\":2"
+      ],
+      "after_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "STag:1",
+        "Attribute:2",
+        "AttValue:1",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "STag:1",
+        "Attribute:3"
+      ],
+      "after_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "STag:1",
+        "Attribute:3"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "STag:1",
+        "Attribute:3",
+        "Name:1"
+      ],
+      "after_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "STag:1",
+        "Attribute:3",
+        "Name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "STag:1",
+        "Attribute:3",
+        "=:1"
+      ],
+      "after_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "STag:1",
+        "Attribute:3",
+        "=:1"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "STag:1",
+        "Attribute:3",
+        "AttValue:1"
+      ],
+      "after_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "STag:1",
+        "Attribute:3",
+        "AttValue:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "STag:1",
+        "Attribute:3",
+        "AttValue:1",
+        "\":1"
+      ],
+      "after_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "STag:1",
+        "Attribute:3",
+        "AttValue:1",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "STag:1",
+        "Attribute:3",
+        "AttValue:1",
+        "\":2"
+      ],
+      "after_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "STag:1",
+        "Attribute:3",
+        "AttValue:1",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "STag:1",
+        ">:1"
+      ],
+      "after_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "STag:1",
+        ">:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "content:1"
+      ],
+      "after_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "content:1",
+        "CharData:1"
+      ],
+      "after_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "content:1",
+        "CharData:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "content:1",
+        "element:1"
+      ],
+      "after_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "content:1",
+        "element:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "content:1",
+        "element:1",
+        "EmptyElemTag:1"
+      ],
+      "after_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "content:1",
+        "element:1",
+        "EmptyElemTag:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "content:1",
+        "element:1",
+        "EmptyElemTag:1",
+        "<:1"
+      ],
+      "after_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "content:1",
+        "element:1",
+        "EmptyElemTag:1",
+        "<:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "content:1",
+        "element:1",
+        "EmptyElemTag:1",
+        "Name:1"
+      ],
+      "after_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "content:1",
+        "element:1",
+        "EmptyElemTag:1",
+        "Name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "content:1",
+        "element:1",
+        "EmptyElemTag:1",
+        "Attribute:1"
+      ],
+      "after_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "content:1",
+        "element:1",
+        "EmptyElemTag:1",
+        "Attribute:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "content:1",
+        "element:1",
+        "EmptyElemTag:1",
+        "Attribute:1",
+        "Name:1"
+      ],
+      "after_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "content:1",
+        "element:1",
+        "EmptyElemTag:1",
+        "Attribute:1",
+        "Name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "content:1",
+        "element:1",
+        "EmptyElemTag:1",
+        "Attribute:1",
+        "=:1"
+      ],
+      "after_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "content:1",
+        "element:1",
+        "EmptyElemTag:1",
+        "Attribute:1",
+        "=:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "content:1",
+        "element:1",
+        "EmptyElemTag:1",
+        "Attribute:1",
+        "AttValue:1"
+      ],
+      "after_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "content:1",
+        "element:1",
+        "EmptyElemTag:1",
+        "Attribute:1",
+        "AttValue:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "content:1",
+        "element:1",
+        "EmptyElemTag:1",
+        "Attribute:1",
+        "AttValue:1",
+        "\":1"
+      ],
+      "after_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "content:1",
+        "element:1",
+        "EmptyElemTag:1",
+        "Attribute:1",
+        "AttValue:1",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "content:1",
+        "element:1",
+        "EmptyElemTag:1",
+        "Attribute:1",
+        "AttValue:1",
+        "\":2"
+      ],
+      "after_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "content:1",
+        "element:1",
+        "EmptyElemTag:1",
+        "Attribute:1",
+        "AttValue:1",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "content:1",
+        "element:1",
+        "EmptyElemTag:1",
+        "/>:1"
+      ],
+      "after_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "content:1",
+        "element:1",
+        "EmptyElemTag:1",
+        "/>:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "content:1",
+        "CharData:2"
+      ],
+      "after_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "content:1",
+        "CharData:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "content:1",
+        "element:2"
+      ],
+      "after_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "content:1",
+        "element:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "content:1",
+        "element:2",
+        "STag:1"
+      ],
+      "after_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "content:1",
+        "element:2",
+        "STag:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "content:1",
+        "element:2",
+        "STag:1",
+        "<:1"
+      ],
+      "after_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "content:1",
+        "element:2",
+        "STag:1",
+        "<:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "content:1",
+        "element:2",
+        "STag:1",
+        "Name:1"
+      ],
+      "after_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "content:1",
+        "element:2",
+        "STag:1",
+        "Name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "content:1",
+        "element:2",
+        "STag:1",
+        "Attribute:1"
+      ],
+      "after_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "content:1",
+        "element:2",
+        "STag:1",
+        "Attribute:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "content:1",
+        "element:2",
+        "STag:1",
+        "Attribute:1",
+        "Name:1"
+      ],
+      "after_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "content:1",
+        "element:2",
+        "STag:1",
+        "Attribute:1",
+        "Name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "content:1",
+        "element:2",
+        "STag:1",
+        "Attribute:1",
+        "=:1"
+      ],
+      "after_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "content:1",
+        "element:2",
+        "STag:1",
+        "Attribute:1",
+        "=:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "content:1",
+        "element:2",
+        "STag:1",
+        "Attribute:1",
+        "AttValue:1"
+      ],
+      "after_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "content:1",
+        "element:2",
+        "STag:1",
+        "Attribute:1",
+        "AttValue:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "content:1",
+        "element:2",
+        "STag:1",
+        "Attribute:1",
+        "AttValue:1",
+        "\":1"
+      ],
+      "after_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "content:1",
+        "element:2",
+        "STag:1",
+        "Attribute:1",
+        "AttValue:1",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "content:1",
+        "element:2",
+        "STag:1",
+        "Attribute:1",
+        "AttValue:1",
+        "\":2"
+      ],
+      "after_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "content:1",
+        "element:2",
+        "STag:1",
+        "Attribute:1",
+        "AttValue:1",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "content:1",
+        "element:2",
+        "STag:1",
+        ">:1"
+      ],
+      "after_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "content:1",
+        "element:2",
+        "STag:1",
+        ">:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "content:1",
+        "element:2",
+        "content:1"
+      ],
+      "after_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "content:1",
+        "element:2",
+        "content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "content:1",
+        "element:2",
+        "content:1",
+        "CharData:1"
+      ],
+      "after_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "content:1",
+        "element:2",
+        "content:1",
+        "CharData:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "content:1",
+        "element:2",
+        "ETag:1"
+      ],
+      "after_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "content:1",
+        "element:2",
+        "ETag:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "content:1",
+        "element:2",
+        "ETag:1",
+        "</:1"
+      ],
+      "after_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "content:1",
+        "element:2",
+        "ETag:1",
+        "</:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "content:1",
+        "element:2",
+        "ETag:1",
+        "Name:1"
+      ],
+      "after_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "content:1",
+        "element:2",
+        "ETag:1",
+        "Name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "content:1",
+        "element:2",
+        "ETag:1",
+        ">:1"
+      ],
+      "after_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "content:1",
+        "element:2",
+        "ETag:1",
+        ">:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "content:1",
+        "CharData:3"
+      ],
+      "after_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "content:1",
+        "CharData:3"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "ETag:1"
+      ],
+      "after_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "ETag:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "ETag:1",
+        "</:1"
+      ],
+      "after_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "ETag:1",
+        "</:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "ETag:1",
+        "Name:1"
+      ],
+      "after_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "ETag:1",
+        "Name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "ETag:1",
+        ">:1"
+      ],
+      "after_path": [
+        "element:1",
+        "content:1",
+        "element:1",
+        "ETag:1",
+        ">:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "element:1",
+        "content:1",
+        "CharData:2"
+      ],
+      "after_path": [
+        "element:1",
+        "content:1",
+        "CharData:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "element:1",
+        "ETag:1"
+      ],
+      "after_path": [
+        "element:1",
+        "ETag:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "element:1",
+        "ETag:1",
+        "</:1"
+      ],
+      "after_path": [
+        "element:1",
+        "ETag:1",
+        "</:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "element:1",
+        "ETag:1",
+        "Name:1"
+      ],
+      "after_path": [
+        "element:1",
+        "ETag:1",
+        "Name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "element:1",
+        "ETag:1",
+        ">:1"
+      ],
+      "after_path": [
+        "element:1",
+        "ETag:1",
+        ">:1"
+      ]
+    }
+  ],
+  "text_mappings": [
+    {
+      "name": "Minimal",
+      "entries": [
+        {
+          "operation": "Match",
+          "before": [
+            {
+              "start_row": 1,
+              "start_column": 50,
+              "end_row": 1,
+              "end_column": 53
+            }
+          ],
+          "after": [
+            {
+              "start_row": 1,
+              "start_column": 50,
+              "end_row": 1,
+              "end_column": 53
+            }
+          ]
+        },
+        {
+          "operation": "Match",
+          "before": [
+            {
+              "start_row": 1,
+              "start_column": 78,
+              "end_row": 1,
+              "end_column": 81
+            }
+          ],
+          "after": [
+            {
+              "start_row": 1,
+              "start_column": 78,
+              "end_row": 1,
+              "end_column": 81
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Full",
+      "entries": [
+        {
+          "operation": "Match",
+          "before": [
+            {
+              "start_row": 1,
+              "start_column": 50,
+              "end_row": 1,
+              "end_column": 55
+            }
+          ],
+          "after": [
+            {
+              "start_row": 1,
+              "start_column": 50,
+              "end_row": 1,
+              "end_column": 55
+            }
+          ]
+        },
+        {
+          "operation": "Match",
+          "before": [
+            {
+              "start_row": 1,
+              "start_column": 78,
+              "end_row": 1,
+              "end_column": 83
+            }
+          ],
+          "after": [
+            {
+              "start_row": 1,
+              "start_column": 78,
+              "end_row": 1,
+              "end_column": 83
+            }
+          ]
+        },
+        {
+          "operation": "Match",
+          "before": [
+            {
+              "start_row": 1,
+              "start_column": 55,
+              "end_row": 1,
+              "end_column": 78
+            }
+          ],
+          "after": [
+            {
+              "start_row": 1,
+              "start_column": 55,
+              "end_row": 1,
+              "end_column": 78
+            }
+          ]
+        },
+        {
+          "operation": "Match",
+          "before": [
+            {
+              "start_row": 1,
+              "start_column": 83,
+              "end_row": 1,
+              "end_column": 84
+            }
+          ],
+          "after": [
+            {
+              "start_row": 1,
+              "start_column": 83,
+              "end_row": 1,
+              "end_column": 84
+            }
+          ]
+        },
+        {
+          "operation": "Match",
+          "before": [
+            {
+              "start_row": 1,
+              "start_column": 34,
+              "end_row": 1,
+              "end_column": 50
+            }
+          ],
+          "after": [
+            {
+              "start_row": 1,
+              "start_column": 34,
+              "end_row": 1,
+              "end_column": 50
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,114 @@
+{
+  "entries": [
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [],
+      "after_path": []
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "prolog:1"
+      ],
+      "after_path": [
+        "prolog:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "prolog:1",
+        "Comment:1"
+      ],
+      "after_path": [
+        "prolog:1",
+        "Comment:1"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "element:1"
+      ],
+      "after_path": [
+        "element:1"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "element:1",
+        "EmptyElemTag:1"
+      ],
+      "after_path": [
+        "element:1",
+        "EmptyElemTag:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "element:1",
+        "EmptyElemTag:1",
+        "<:1"
+      ],
+      "after_path": [
+        "element:1",
+        "EmptyElemTag:1",
+        "<:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "element:1",
+        "EmptyElemTag:1",
+        "Name:1"
+      ],
+      "after_path": [
+        "element:1",
+        "EmptyElemTag:1",
+        "Name:1"
+      ]
+    },
+    {
+      "operation": "delete_with_children",
+      "before_path": [
+        "element:1",
+        "EmptyElemTag:1",
+        "Attribute:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "element:1",
+        "EmptyElemTag:1",
+        "/>:1"
+      ],
+      "after_path": [
+        "element:1",
+        "EmptyElemTag:1",
+        "/>:1"
+      ]
+    }
+  ],
+  "text_mappings": [
+    {
+      "name": "Only one solution",
+      "entries": [
+        {
+          "operation": "Delete",
+          "before": [
+            {
+              "start_row": 1,
+              "start_column": 10,
+              "end_row": 1,
+              "end_column": 41
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -295,8 +295,11 @@ This section describes the overall shape of the resulting dataset.
 \subsection{Shape of real-world files}
 
 The first thing to note about the dataset is that only two-thirds of the files are actually code files.
-The rest is configuration, data, and documentation (Figure~\ref{fig:tips}).~\footnote{Note however that any
-``code'' diffing tool still must support visualizing changes to non-code files as well.}
+The rest is configuration, data, and documentation.
+
+(Figure~\ref{fig:tips}).
+Note however that any ``code'' diffing tool still must support visualizing changes to non-code files as well.
+
 Restricted to code files, Table~\ref{tab:file-size-percentiles} reports a choice of size percentiles of bytes,
 lines of code, and AST nodes.
 
@@ -312,11 +315,11 @@ lines of code, and AST nodes.
   \label{tab:file-size-percentiles}
   \begin{tabular}{lrrrrr}
     \toprule
-    Metric & p50 & p90 & p99 & p99.9 & Max \\
+    Metric & p50 & p90 & p99 & Max \\
     \midrule
-    Bytes      & \BytesPFifty{} & \BytesPNinety{} & \BytesPNinetyNine{} & \BytesPNineNineNine{} & \BytesMax{} \\
-    LOC        & \LocPFifty{}   & \LocPNinety{}   & \LocPNinetyNine{}   & \LocPNineNineNine{}   & \LocMax{} \\
-    AST nodes  & \AstPFifty{}   & \AstPNinety{}   & \AstPNinetyNine{}   & \AstPNineNineNine{}   & \AstMax{} \\
+    Bytes      & \BytesPFifty{} & \BytesPNinety{} & \BytesPNinetyNine{} &  \BytesMax{} \\
+    LOC        & \LocPFifty{}   & \LocPNinety{}   & \LocPNinetyNine{}   &  \LocMax{} \\
+    AST nodes  & \AstPFifty{}   & \AstPNinety{}   & \AstPNinetyNine{}   &  \AstMax{} \\
     \bottomrule
   \end{tabular}
 \end{table}
@@ -326,9 +329,6 @@ $|\text{AST}| \approx \text{bytes} / 5$ for quick estimates.
 
 \subsection{Shape of real-world file edits}
 \label{sec:edit-shape}
-
-TODO: Run for the full dataset as well
-TODO: Present two datasets side by side
 
 In the Curated dataset, we analyzed \EditsCommits{} commits, touching \EditsCodeFileEdits{} code files, of
 which \EditsCodeSharePct{} were code files. Of the code-file edits, \EditsModifiedSharePct{}\% were file

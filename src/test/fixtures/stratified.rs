@@ -127,13 +127,33 @@ mod csharp_jellyfin_jellyfin_update_version_string;
 #[cfg(test)]
 mod csharp_lidarr_lidarr_add_enum_value;
 #[cfg(test)]
+mod csharp_lidarr_lidarr_add_function;
+#[cfg(test)]
 mod csharp_lidarr_lidarr_add_function_signature_to_class;
 #[cfg(test)]
+mod csharp_lidarr_lidarr_add_import_and_func;
+#[cfg(test)]
 mod csharp_lidarr_lidarr_add_method_to_class;
+#[cfg(test)]
+mod csharp_radarr_radarr_add_base_class;
+#[cfg(test)]
+mod csharp_radarr_radarr_add_func;
+#[cfg(test)]
+mod csharp_radarr_radarr_remove_import_and_func;
 #[cfg(test)]
 mod csharp_sonarr_sonarr_add_attribute;
 #[cfg(test)]
 mod csharp_sonarr_sonarr_add_attribute_2;
+#[cfg(test)]
+mod csharp_sonarr_sonarr_add_func;
+#[cfg(test)]
+mod csharp_sonarr_sonarr_add_import_and_annotation;
+#[cfg(test)]
+mod csharp_sonarr_sonarr_add_list_item;
+#[cfg(test)]
+mod csharp_sonarr_sonarr_delete_func;
+#[cfg(test)]
+mod csharp_sonarr_sonarr_use_a_different_class;
 #[cfg(test)]
 mod css_wordpress_wordpress_go_to_one_line;
 #[cfg(test)]
@@ -163,13 +183,29 @@ mod go_gin_gonic_gin_update_version_string_5;
 #[cfg(test)]
 mod go_gin_gonic_gin_update_version_string_6;
 #[cfg(test)]
+mod go_gohugoio_hugo_add_and_upadate_list_items;
+#[cfg(test)]
+mod go_gohugoio_hugo_update_and_add_list_items;
+#[cfg(test)]
+mod go_gohugoio_hugo_update_and_add_some_values;
+#[cfg(test)]
 mod go_gohugoio_hugo_version;
 #[cfg(test)]
 mod go_golang_go_update_copyright_year;
 #[cfg(test)]
+mod go_grafana_grafana_real_small_change_with_a_move;
+#[cfg(test)]
+mod go_jesseduffield_lazygit_add_a_func;
+#[cfg(test)]
+mod go_junegunn_fzf_real_small_change;
+#[cfg(test)]
 mod go_ollama_ollama_add_go_build_comment;
 #[cfg(test)]
 mod go_ollama_ollama_remove_go_build_comment;
+#[cfg(test)]
+mod go_prometheus_prometheus_remove_copyright_year;
+#[cfg(test)]
+mod html_axios_axios_add_script_element;
 #[cfg(test)]
 mod html_fatedier_frp_update_hashes;
 #[cfg(test)]
@@ -179,9 +215,15 @@ mod html_fatedier_frp_update_hashes_3;
 #[cfg(test)]
 mod html_fatedier_frp_update_hashes_4;
 #[cfg(test)]
+mod html_fatedier_frp_version;
+#[cfg(test)]
 mod html_gohugoio_hugo_template_not_pure_html;
 #[cfg(test)]
 mod html_gohugoio_hugo_template_not_pure_html_2;
+#[cfg(test)]
+mod html_gohugoio_hugo_update_href_template;
+#[cfg(test)]
+mod html_ladybirdbrowser_ladybird_update_pixel_value;
 #[cfg(test)]
 mod html_mozilla_pdf_add_closing_tags;
 #[cfg(test)]
@@ -191,7 +233,27 @@ mod html_prettier_prettier_not_pure_html_includes_yaml_as_well;
 #[cfg(test)]
 mod html_twbs_bootstrap_not_html_template_extract_two_vars;
 #[cfg(test)]
+mod java_genymobile_scrcpy_add_enum_value;
+#[cfg(test)]
+mod java_genymobile_scrcpy_add_func;
+#[cfg(test)]
+mod java_genymobile_scrcpy_add_func_2;
+#[cfg(test)]
 mod java_genymobile_scrcpy_add_parameter;
+#[cfg(test)]
+mod java_genymobile_scrcpy_char_to_string_bugfix;
+#[cfg(test)]
+mod java_genymobile_scrcpy_only_insert;
+#[cfg(test)]
+mod java_genymobile_scrcpy_whitespace_only;
+#[cfg(test)]
+mod java_paddlepaddle_paddleocr_whitespace_only;
+#[cfg(test)]
+mod java_paddlepaddle_paddleocr_whitespace_only_2;
+#[cfg(test)]
+mod java_protocolbuffers_protobuf_update_comment;
+#[cfg(test)]
+mod java_protocolbuffers_protobuf_update_comment_2;
 #[cfg(test)]
 mod javascript_facebook_react_update_comment_only;
 #[cfg(test)]
@@ -365,6 +427,10 @@ mod tsx_langflow_ai_langflow_add_type_to_import;
 #[cfg(test)]
 mod tsx_langflow_ai_langflow_split_import;
 #[cfg(test)]
+mod tsx_langflow_ai_langflow_split_import_2;
+#[cfg(test)]
+mod tsx_langflow_ai_langflow_split_import_3;
+#[cfg(test)]
 mod tsx_mui_material_ui_add_to_empty_block;
 #[cfg(test)]
 mod tsx_mui_material_ui_remove_import;
@@ -394,3 +460,31 @@ mod typescript_microsoft_typescript_add_strict;
 mod typescript_microsoft_typescript_add_strict_2;
 #[cfg(test)]
 mod typescript_microsoft_typescript_add_strict_false;
+#[cfg(test)]
+mod xml_genymobile_scrcpy_remove_package_attribute;
+#[cfg(test)]
+mod xml_jellyfin_jellyfin_update_attribute_values;
+#[cfg(test)]
+mod xml_mozilla_firefox_firefox_update_value;
+#[cfg(test)]
+mod xml_paddlepaddle_paddleocr_whitespace_only_change;
+#[cfg(test)]
+mod yaml_ansible_ansible_add_block_sequence;
+#[cfg(test)]
+mod yaml_ansible_ansible_add_item_to_sequence;
+#[cfg(test)]
+mod yaml_ansible_ansible_add_item_to_sequence_2;
+#[cfg(test)]
+mod yaml_ansible_ansible_add_mapping_pair;
+#[cfg(test)]
+mod yaml_ansible_ansible_change_in_string_scalar;
+#[cfg(test)]
+mod yaml_ansible_ansible_rename_string_scalar;
+#[cfg(test)]
+mod yaml_ansible_ansible_version;
+#[cfg(test)]
+mod yaml_gyulyvgc_sniffnet_version;
+#[cfg(test)]
+mod yaml_jekyll_jekyll_true_to_false;
+#[cfg(test)]
+mod yaml_puppeteer_puppeteer_false_to_true;

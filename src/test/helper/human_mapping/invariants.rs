@@ -21,13 +21,23 @@
 //! `assert_matches_human_painting_within_limit` both ask "is codediff right?", and both answer it
 //! against data whose own internal consistency nothing checks - a painting that ends a highlight
 //! in the middle of a run of spaces, or paints an opening brace and not its closing one, grades
-//! codediff against a claim its author would not defend if it were pointed out. These three
+//! codediff against a claim its author would not defend if it were pointed out. These five
 //! invariants are that missing half: they can fail only because the hand-authored data disagrees
 //! with itself.
 //!
 //! * [`rows_end_on_visible_characters`] - no painted run on a row may end on whitespace.
 //! * [`full_painting_covers_minimal`] - every byte painted under `Minimal` is painted under `Full`.
 //! * [`delimiter_pairs_agree`] - a bracket and its partner carry one verdict in the tree mapping.
+//! * [`full_paints_a_wholly_changed_line_whole`] - a `Full` line whose every visible character is
+//!   inserted, or every one deleted, has no unpainted byte before its last visible character.
+//! * [`no_unpainted_whitespace_between_painted_regions`] - a `Full` painting never breaks one
+//!   highlight in two over whitespace.
+//!
+//! The last two were added on 2026-09-08 and wired in the same day, at **zero violations across
+//! all 249 painted fixtures** - so unlike the first three they arrive with no clamped fixtures
+//! behind them. Both are scoped to the paintings `FULL` is answerable to, via
+//! [`paintings_with_labels`]; `MINIMAL` is the tight reading and is free to leave whitespace
+//! alone.
 //!
 //! **Per fixture, not corpus-wide.** These are wired in as a third `invariants()` test in each
 //! `src/test/fixtures/**` file, next to that fixture's `mapping()` and `painting()`, so a fixture
@@ -66,8 +76,8 @@ pub fn ground_truth_invariant_violations_for(
 ) -> Result<Vec<String>> {
     let mut violations = Vec::new();
 
-    // One byte-label vector per painting per side, built once: all three checks that read the
-    // painting read it through exactly the projection the scorer does (`label_bytes`), so an
+    // One byte-label vector per painting per side, built once: every check that reads the
+    // painting reads it through exactly the projection the scorer does (`label_bytes`), so an
     // invariant can never fire on a byte no comparison would ever look at.
     let mut paintings: Vec<(&str, PaintedLabels)> = Vec::new();
     for named in &mapping.text_mappings {
@@ -79,6 +89,14 @@ pub fn ground_truth_invariant_violations_for(
     }
     violations.extend(full_painting_covers_minimal(mapping, before, after)?);
     violations.extend(delimiter_pairs_agree(mapping, before, after));
+    // Invariants 4 and 5 read only the paintings `FULL` answers to, so they take their own pass
+    // over `paintings_with_labels` rather than the `paintings` list above - which holds every
+    // painting, `Minimal` ones included, and those two rules have nothing to say about those.
+    let (leading, interior, minimal_indentation) =
+        full_painting_whitespace_violations(mapping, before, after)?;
+    violations.extend(leading);
+    violations.extend(interior);
+    violations.extend(minimal_indentation);
 
     Ok(violations)
 }
@@ -241,35 +259,44 @@ fn full_painting_covers_minimal(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────
-// Candidate invariants 4 and 5: `Full`'s two whitespace-closure rules
+// Invariants 4, 5 and 6: what each preset may and may not do with whitespace
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 
-/// Every painting of `mapping` that `FULL`'s own rules can be held to, paired with its per-byte
+/// Every painting of `mapping` that `options`' own rules can be held to, paired with its per-byte
 /// labels.
 ///
 /// `paintings_for_mode` answers with the fixture's single painting when it has only one, so a
-/// fixture painted once is measured here too: that one painting is what `FULL` is scored against,
-/// so it is what `FULL`'s rules have to hold for.
+/// fixture painted once is measured here too: that one painting is what the preset is scored
+/// against, so it is what the preset's rules have to hold for.
 ///
-/// **Except when that sole painting is explicitly named `Minimal`.** Five fixtures are painted
-/// once and name it for the tight preset anyway (`cpp-ollama-ollama-update-commit-hash-3`
-/// through `-6`, `javascript-typescript-interesting-small-edit-refactor`); `paintings_for_mode`
-/// hands it back for `FULL` regardless, because a lone painting has to answer for both. Holding a
-/// reading the painter labelled *minimal* to the generous preset's closure rules would be
-/// asserting something they never claimed - `Full` closes over the whitespace between two painted
-/// regions precisely because it is the generous reading, and `Minimal` is free not to. Reported
-/// as a naming defect instead of silently measured: a fixture painted once should be
-/// `Only one solution`.
-pub(crate) fn full_paintings_with_labels<'a>(
+/// **Except when that sole painting is explicitly named for the *other* preset.** Six fixtures
+/// were in that state on 2026-09-08 - five named `Minimal` (`cpp-ollama-ollama-update-commit-hash-3`
+/// through `-6`, `javascript-typescript-interesting-small-edit-refactor`) and one named `Full`
+/// (`c-openssl-openssl-whitespace-only`) - and `paintings_for_mode` hands a lone painting back for
+/// both presets regardless of its name, because a lone painting has to answer for both. Holding a
+/// reading the painter labelled *minimal* to the generous preset's closure rules, or one they
+/// labelled *full* to the tight preset's prohibition, asserts something they never claimed. All
+/// six have since been renamed to `Only one solution`; the filter stays as a guard against the
+/// state recurring.
+pub(crate) fn paintings_with_labels<'a>(
     mapping: &'a super::HumanMapping,
     before: &Code,
     after: &Code,
+    options: RenderOptions,
 ) -> Result<Vec<(&'a str, PaintedLabels)>> {
-    let Ok(full) = paintings_for_mode(mapping, RenderOptions::FULL) else {
+    let Ok(paintings) = paintings_for_mode(mapping, options) else {
         return Ok(Vec::new());
     };
-    full.iter()
-        .filter(|named| !(full.len() == 1 && designates_minimal(&named.name)))
+    // Only a *lone* painting can be misnamed in the way this guards against: with two or more,
+    // `paintings_for_mode` has already filtered to the ones named for this preset.
+    let wanted_minimal = options == RenderOptions::MINIMAL;
+    paintings
+        .iter()
+        .filter(|named| {
+            paintings.len() > 1
+                || !(designates_minimal(&named.name) || designates_full(&named.name))
+                || designates_minimal(&named.name) == wanted_minimal
+        })
         .map(|named| Ok((named.name.as_str(), painted_labels(named, before, after)?)))
         .collect()
 }
@@ -277,9 +304,18 @@ pub(crate) fn full_paintings_with_labels<'a>(
 /// Whether a painting's name declares it the `Minimal` reading - exactly the name, or the name
 /// followed by a qualifier, matching `human_mapping::designates_preset`'s own rule.
 pub(crate) fn designates_minimal(name: &str) -> bool {
-    name == "Minimal"
+    designates(name, "Minimal")
+}
+
+/// Whether a painting's name declares it the `Full` reading. See [`designates_minimal`].
+pub(crate) fn designates_full(name: &str) -> bool {
+    designates(name, "Full")
+}
+
+fn designates(name: &str, preset: &str) -> bool {
+    name == preset
         || name
-            .strip_prefix("Minimal")
+            .strip_prefix(preset)
             .is_some_and(|r| r.starts_with(' '))
 }
 
@@ -293,7 +329,7 @@ fn rows_of(contents: &str) -> impl Iterator<Item = (usize, usize, &str)> {
     })
 }
 
-/// **Candidate invariant 4.** If a `Full` painting calls *every* visible character on a line
+/// **Invariant 4.** If a `Full` painting calls *every* visible character on a line
 /// inserted, or every one of them deleted, the whole line - its whitespace included - carries that
 /// verdict.
 ///
@@ -391,7 +427,7 @@ fn full_paints_a_wholly_changed_line_whole(
     violations
 }
 
-/// **Candidate invariant 5.** A `Full` painting never leaves a run of whitespace unpainted
+/// **Invariant 5.** A `Full` painting never leaves a run of whitespace unpainted
 /// between two painted regions on the same line.
 ///
 /// `Full` is the generous reading: once both sides of a gap are highlighted, the space between
@@ -441,18 +477,73 @@ fn no_unpainted_whitespace_between_painted_regions(
     violations
 }
 
-/// Both candidate invariants over every `Full` painting, as `(invariant 4, invariant 5)`.
+/// **Invariant 6.** A `Minimal` painting never paints a line's leading whitespace.
 ///
-/// Separate from [`ground_truth_invariant_violations_for`] until the corpus has been repaired
-/// against them - see `measure_full_painting_whitespace_invariants`.
+/// The mirror of invariant 4, and the reason the two presets need separate rules rather than one
+/// shared one. `Minimal` is the tightest defensible reading of an edit: nobody marking up a diff
+/// by hand draws the highlight through the indentation in front of the code they are pointing at,
+/// on any line, whether that line is new or edited in place. `RenderOptions::leading_whitespace`
+/// is off under `MINIMAL` for exactly this reason and its own doc comment carries the corpus
+/// measurement behind it (flipping the then-separate interior-indentation half to `false` alone
+/// moved the handmade aggregate 1.2590% -> 1.1811% across ~40 fixtures). This is the data side of
+/// that setting: a `Minimal` painting that claims the indentation is grading codediff against a
+/// reading `MINIMAL` will never produce.
+///
+/// **Unconditional on the verdict, unlike invariant 4.** Invariant 4 has to ask what the rest of
+/// the line says before it can conclude anything about the whitespace, because on a *surviving*
+/// line the indentation genuinely may be untouched. Here there is nothing to ask: `Minimal` paints
+/// as few bytes as it can, so leading whitespace is out under every verdict - `Insert` on a new
+/// line included, which is precisely where `Full` and `Minimal` part company.
+///
+/// A line with no visible character is skipped, as in invariants 1 and 4. Its whole content is
+/// whitespace, so "leading whitespace" is not a distinguishable part of it, and condemning every
+/// possible painting of such a line is not a claim this rule is making.
+fn minimal_never_paints_leading_whitespace(
+    painting: &str,
+    labels: &PaintedLabels,
+    before: &Code,
+    after: &Code,
+) -> Vec<String> {
+    let mut violations = Vec::new();
+    for (side, contents) in [(0usize, &before.contents), (1usize, &after.contents)] {
+        for (row, start, line) in rows_of(contents) {
+            let Some(first) = line.find(|c: char| !c.is_whitespace()) else {
+                continue;
+            };
+            let painted: Vec<usize> = (0..first)
+                .filter(|&i| labels[side][start + i].is_some())
+                .collect();
+            if let (Some(&low), Some(&high)) = (painted.first(), painted.last()) {
+                violations.push(format!(
+                    "painting '{painting}' {} row {} paints columns {low}..{} of its own leading \
+                     whitespace ({} byte(s)) - Minimal never claims a line's indentation: {line:?}",
+                    side_name(side),
+                    row + 1,
+                    high + 1,
+                    painted.len(),
+                ));
+            }
+        }
+    }
+    violations
+}
+
+/// The three preset-scoped whitespace rules, as `(invariant 4, invariant 5, invariant 6)`.
+///
+/// [`ground_truth_invariant_violations_for`] calls this and flattens all three into its own list;
+/// they stay separate here for `measure_full_painting_whitespace_invariants`, which reports the
+/// counts apart so a corpus-wide sweep says which rule a fixture is failing. The first two read
+/// the paintings `FULL` answers to and the third those `MINIMAL` answers to, which on a
+/// two-painting fixture are different objects entirely.
 pub fn full_painting_whitespace_violations(
     mapping: &super::HumanMapping,
     before: &Code,
     after: &Code,
-) -> Result<(Vec<String>, Vec<String>)> {
+) -> Result<(Vec<String>, Vec<String>, Vec<String>)> {
     let mut leading = Vec::new();
     let mut interior = Vec::new();
-    for (painting, labels) in full_paintings_with_labels(mapping, before, after)? {
+    let mut minimal_indentation = Vec::new();
+    for (painting, labels) in paintings_with_labels(mapping, before, after, RenderOptions::FULL)? {
         leading.extend(full_paints_a_wholly_changed_line_whole(
             painting, &labels, before, after,
         ));
@@ -460,7 +551,13 @@ pub fn full_painting_whitespace_violations(
             painting, &labels, before, after,
         ));
     }
-    Ok((leading, interior))
+    for (painting, labels) in paintings_with_labels(mapping, before, after, RenderOptions::MINIMAL)?
+    {
+        minimal_indentation.extend(minimal_never_paints_leading_whitespace(
+            painting, &labels, before, after,
+        ));
+    }
+    Ok((leading, interior, minimal_indentation))
 }
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────

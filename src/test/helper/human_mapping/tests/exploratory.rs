@@ -871,8 +871,9 @@ fn measure_full_painting_whitespace_invariants() -> Result<()> {
     }
     names.sort();
 
-    let (mut painted, mut leading_bad, mut interior_bad) = (0usize, 0usize, 0usize);
-    let (mut leading_total, mut interior_total) = (0usize, 0usize);
+    let (mut painted, mut leading_bad, mut interior_bad, mut minimal_bad) =
+        (0usize, 0usize, 0usize, 0usize);
+    let (mut leading_total, mut interior_total, mut minimal_total) = (0usize, 0usize, 0usize);
     for (dataset, name) in &names {
         let dir = diffs_dir.join(dataset).join(name);
         let Some((before, after)) = crate::test::helper::code_pair_from_dir(&dir)? else {
@@ -883,7 +884,7 @@ fn measure_full_painting_whitespace_invariants() -> Result<()> {
             continue;
         }
         painted += 1;
-        let (leading, interior) =
+        let (leading, interior, minimal) =
             crate::test::helper::human_mapping::invariants::full_painting_whitespace_violations(
                 &mapping, &before, &after,
             )?;
@@ -895,21 +896,27 @@ fn measure_full_painting_whitespace_invariants() -> Result<()> {
             interior_bad += 1;
             interior_total += interior.len();
         }
-        if leading.is_empty() && interior.is_empty() {
+        if !minimal.is_empty() {
+            minimal_bad += 1;
+            minimal_total += minimal.len();
+        }
+        if leading.is_empty() && interior.is_empty() && minimal.is_empty() {
             continue;
         }
         eprintln!(
-            "{name} [leading {} / interior {}]",
+            "{name} [leading {} / interior {} / minimal-indent {}]",
             leading.len(),
-            interior.len()
+            interior.len(),
+            minimal.len()
         );
-        for violation in leading.iter().chain(interior.iter()) {
+        for violation in leading.iter().chain(interior.iter()).chain(minimal.iter()) {
             eprintln!("    {violation}");
         }
     }
     eprintln!(
         "\nPAINTED {painted}\nLEADING  {leading_bad} fixture(s), {leading_total} violation(s)\n\
-         INTERIOR {interior_bad} fixture(s), {interior_total} violation(s)"
+         INTERIOR {interior_bad} fixture(s), {interior_total} violation(s)\n\
+         MINIMAL-INDENT {minimal_bad} fixture(s), {minimal_total} violation(s)"
     );
     Ok(())
 }

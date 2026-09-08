@@ -1545,25 +1545,6 @@
           "before": [
             {
               "start_row": 0,
-              "start_column": 7,
-              "end_row": 0,
-              "end_column": 12
-            }
-          ],
-          "after": [
-            {
-              "start_row": 0,
-              "start_column": 12,
-              "end_row": 0,
-              "end_column": 17
-            }
-          ]
-        },
-        {
-          "operation": "Match",
-          "before": [
-            {
-              "start_row": 0,
               "start_column": 29,
               "end_row": 0,
               "end_column": 41

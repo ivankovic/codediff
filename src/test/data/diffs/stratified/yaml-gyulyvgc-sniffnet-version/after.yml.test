@@ -1,0 +1,9 @@
+app: Sniffnet
+ingredients:
+  dist: trixie
+  packages:
+    - libpcap0.8t64
+  sources:
+    - deb https://deb.debian.org/debian stable main
+  debs:
+    - /target/REPLACE_TAG
