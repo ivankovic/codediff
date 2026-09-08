@@ -1,0 +1,2585 @@
+{
+  "entries": [
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [],
+      "after_path": []
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "comment:1"
+      ],
+      "after_path": [
+        "comment:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "comment:2"
+      ],
+      "after_path": [
+        "comment:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1"
+      ],
+      "after_path": [
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "export:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "export:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "expression_statement:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "expression_statement:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "<:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "<:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "ERROR:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "ERROR:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "ERROR:1",
+        "identifier:2"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "ERROR:1",
+        "identifier:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "identifier:2"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "identifier:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        ",:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        ",:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ERROR:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ERROR:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ERROR:1",
+        "identifier:2"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ERROR:1",
+        "identifier:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "binary_expression:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "binary_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        ">:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        ">:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "ERROR:1",
+        "=:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "ERROR:1",
+        "=:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "parenthesized_expression:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "parenthesized_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "parenthesized_expression:1",
+        "(:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "parenthesized_expression:1",
+        "(:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "parenthesized_expression:1",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "parenthesized_expression:1",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "parenthesized_expression:1",
+        "ERROR:1",
+        "jsx_opening_element:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "parenthesized_expression:1",
+        "ERROR:1",
+        "jsx_opening_element:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "parenthesized_expression:1",
+        "ERROR:1",
+        "jsx_opening_element:1",
+        "<:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "parenthesized_expression:1",
+        "ERROR:1",
+        "jsx_opening_element:1",
+        "<:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "parenthesized_expression:1",
+        "ERROR:1",
+        "jsx_opening_element:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "parenthesized_expression:1",
+        "ERROR:1",
+        "jsx_opening_element:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "parenthesized_expression:1",
+        "ERROR:1",
+        "jsx_opening_element:1",
+        ">:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "parenthesized_expression:1",
+        "ERROR:1",
+        "jsx_opening_element:1",
+        ">:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "parenthesized_expression:1",
+        "ERROR:1",
+        "jsx_text:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "parenthesized_expression:1",
+        "ERROR:1",
+        "jsx_text:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "parenthesized_expression:1",
+        "ERROR:1",
+        ">:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "parenthesized_expression:1",
+        "ERROR:1",
+        ">:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "parenthesized_expression:1",
+        "ERROR:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "parenthesized_expression:1",
+        "ERROR:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "parenthesized_expression:1",
+        "ERROR:1",
+        "extends:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "parenthesized_expression:1",
+        "ERROR:1",
+        "extends:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "parenthesized_expression:1",
+        "ternary_expression:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "parenthesized_expression:1",
+        "ternary_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "parenthesized_expression:1",
+        "ternary_expression:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "parenthesized_expression:1",
+        "ternary_expression:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "parenthesized_expression:1",
+        "ternary_expression:1",
+        "?:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "parenthesized_expression:1",
+        "ternary_expression:1",
+        "?:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "parenthesized_expression:1",
+        "ternary_expression:1",
+        "number:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "parenthesized_expression:1",
+        "ternary_expression:1",
+        "number:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "parenthesized_expression:1",
+        "ternary_expression:1",
+        "::1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "parenthesized_expression:1",
+        "ternary_expression:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "parenthesized_expression:1",
+        "ternary_expression:1",
+        "number:2"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "parenthesized_expression:1",
+        "ternary_expression:1",
+        "number:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "parenthesized_expression:1",
+        "):1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "parenthesized_expression:1",
+        "):1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "binary_expression:1",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "binary_expression:1",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "binary_expression:1",
+        "ERROR:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "binary_expression:1",
+        "ERROR:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "binary_expression:1",
+        "ERROR:1",
+        "(:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "binary_expression:1",
+        "ERROR:1",
+        "(:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "binary_expression:1",
+        "ERROR:1",
+        "jsx_opening_element:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "binary_expression:1",
+        "ERROR:1",
+        "jsx_opening_element:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "binary_expression:1",
+        "ERROR:1",
+        "jsx_opening_element:1",
+        "<:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "binary_expression:1",
+        "ERROR:1",
+        "jsx_opening_element:1",
+        "<:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "binary_expression:1",
+        "ERROR:1",
+        "jsx_opening_element:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "binary_expression:1",
+        "ERROR:1",
+        "jsx_opening_element:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "binary_expression:1",
+        "ERROR:1",
+        "jsx_opening_element:1",
+        ">:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "binary_expression:1",
+        "ERROR:1",
+        "jsx_opening_element:1",
+        ">:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "binary_expression:1",
+        "ERROR:1",
+        "jsx_text:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "binary_expression:1",
+        "ERROR:1",
+        "jsx_text:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "binary_expression:1",
+        ">:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "binary_expression:1",
+        ">:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "binary_expression:1",
+        "ERROR:2"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "binary_expression:1",
+        "ERROR:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "binary_expression:1",
+        "ERROR:2",
+        "identifier:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "binary_expression:1",
+        "ERROR:2",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "binary_expression:1",
+        "ERROR:2",
+        "identifier:2"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "binary_expression:1",
+        "ERROR:2",
+        "identifier:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "binary_expression:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "binary_expression:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "?:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "?:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "number:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "number:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "::1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "ERROR:1",
+        "number:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "ERROR:1",
+        "number:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "ERROR:1",
+        "):1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "ERROR:1",
+        "):1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "ERROR:1",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "ERROR:1",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "ERROR:1",
+        "number:2"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "ERROR:1",
+        "number:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "ERROR:1",
+        "::1"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "ERROR:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "number:2"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "ternary_expression:1",
+        "number:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:1",
+        "identifier:2"
+      ],
+      "after_path": [
+        "ERROR:1",
+        "identifier:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1"
+      ],
+      "after_path": [
+        "expression_statement:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "binary_expression:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "binary_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "binary_expression:1",
+        "binary_expression:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "binary_expression:1",
+        "binary_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "<:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "<:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "identifier:2"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "identifier:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "binary_expression:1",
+        ">:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "binary_expression:1",
+        ">:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "binary_expression:1",
+        "object:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "binary_expression:1",
+        "object:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "binary_expression:1",
+        "object:1",
+        "{:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "binary_expression:1",
+        "object:1",
+        "{:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "binary_expression:1",
+        "object:1",
+        "pair:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "binary_expression:1",
+        "object:1",
+        "pair:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "binary_expression:1",
+        "object:1",
+        "pair:1",
+        "property_identifier:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "binary_expression:1",
+        "object:1",
+        "pair:1",
+        "property_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "binary_expression:1",
+        "object:1",
+        "pair:1",
+        "::1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "binary_expression:1",
+        "object:1",
+        "pair:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "binary_expression:1",
+        "object:1",
+        "pair:1",
+        "arrow_function:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "binary_expression:1",
+        "object:1",
+        "pair:1",
+        "arrow_function:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "binary_expression:1",
+        "object:1",
+        "pair:1",
+        "arrow_function:1",
+        "formal_parameters:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "binary_expression:1",
+        "object:1",
+        "pair:1",
+        "arrow_function:1",
+        "formal_parameters:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "binary_expression:1",
+        "object:1",
+        "pair:1",
+        "arrow_function:1",
+        "formal_parameters:1",
+        "(:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "binary_expression:1",
+        "object:1",
+        "pair:1",
+        "arrow_function:1",
+        "formal_parameters:1",
+        "(:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "binary_expression:1",
+        "object:1",
+        "pair:1",
+        "arrow_function:1",
+        "formal_parameters:1",
+        "):1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "binary_expression:1",
+        "object:1",
+        "pair:1",
+        "arrow_function:1",
+        "formal_parameters:1",
+        "):1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "binary_expression:1",
+        "object:1",
+        "pair:1",
+        "arrow_function:1",
+        "=>:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "binary_expression:1",
+        "object:1",
+        "pair:1",
+        "arrow_function:1",
+        "=>:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "binary_expression:1",
+        "object:1",
+        "pair:1",
+        "arrow_function:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "binary_expression:1",
+        "object:1",
+        "pair:1",
+        "arrow_function:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "expression_statement:1",
+        "binary_expression:1",
+        "object:1",
+        "}:1"
+      ],
+      "after_path": [
+        "expression_statement:1",
+        "binary_expression:1",
+        "object:1",
+        "}:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:2"
+      ],
+      "after_path": [
+        "ERROR:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:2",
+        "identifier:1"
+      ],
+      "after_path": [
+        "ERROR:2",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ERROR:2",
+        "identifier:2"
+      ],
+      "after_path": [
+        "ERROR:2",
+        "identifier:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:1"
+      ],
+      "after_path": [
+        "labeled_statement:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:1",
+        "statement_identifier:1"
+      ],
+      "after_path": [
+        "labeled_statement:1",
+        "statement_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:1",
+        "::1"
+      ],
+      "after_path": [
+        "labeled_statement:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:1",
+        "expression_statement:1"
+      ],
+      "after_path": [
+        "labeled_statement:1",
+        "expression_statement:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1"
+      ],
+      "after_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1"
+      ],
+      "after_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "binary_expression:1"
+      ],
+      "after_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "binary_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1"
+      ],
+      "after_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1"
+      ],
+      "after_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "<:1"
+      ],
+      "after_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "<:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "identifier:2"
+      ],
+      "after_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "identifier:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        ">:1"
+      ],
+      "after_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        ">:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "ERROR:1",
+        ";:1"
+      ],
+      "after_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "ERROR:1",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "ERROR:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "ERROR:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "ERROR:1",
+        "identifier:2"
+      ],
+      "after_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "ERROR:1",
+        "identifier:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "ERROR:1",
+        "identifier:3"
+      ],
+      "after_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "ERROR:1",
+        "identifier:3"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "ERROR:1",
+        "::1"
+      ],
+      "after_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "ERROR:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "<:1"
+      ],
+      "after_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "<:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "binary_expression:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "|:1"
+      ],
+      "after_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "|:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "binary_expression:2"
+      ],
+      "after_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "binary_expression:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "binary_expression:2",
+        "null:1"
+      ],
+      "after_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "binary_expression:2",
+        "null:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "binary_expression:2",
+        ">:1"
+      ],
+      "after_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "binary_expression:2",
+        ">:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "binary_expression:2",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "binary_expression:2",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "binary_expression:2",
+        "ERROR:1",
+        ";:1"
+      ],
+      "after_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "binary_expression:2",
+        "ERROR:1",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "binary_expression:2",
+        "comment:1"
+      ],
+      "after_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "binary_expression:2",
+        "comment:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "binary_expression:2",
+        "ERROR:2"
+      ],
+      "after_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "binary_expression:2",
+        "ERROR:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "binary_expression:2",
+        "ERROR:2",
+        "identifier:1"
+      ],
+      "after_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "binary_expression:2",
+        "ERROR:2",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "binary_expression:2",
+        "assignment_expression:1"
+      ],
+      "after_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "binary_expression:2",
+        "assignment_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "binary_expression:2",
+        "assignment_expression:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "binary_expression:2",
+        "assignment_expression:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "binary_expression:2",
+        "assignment_expression:1",
+        "=:1"
+      ],
+      "after_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "binary_expression:2",
+        "assignment_expression:1",
+        "=:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "binary_expression:2",
+        "assignment_expression:1",
+        "binary_expression:1"
+      ],
+      "after_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "binary_expression:2",
+        "assignment_expression:1",
+        "binary_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "binary_expression:2",
+        "assignment_expression:1",
+        "binary_expression:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "binary_expression:2",
+        "assignment_expression:1",
+        "binary_expression:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "binary_expression:2",
+        "assignment_expression:1",
+        "binary_expression:1",
+        "<:1"
+      ],
+      "after_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "binary_expression:2",
+        "assignment_expression:1",
+        "binary_expression:1",
+        "<:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "binary_expression:2",
+        "assignment_expression:1",
+        "binary_expression:1",
+        "unary_expression:1"
+      ],
+      "after_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "binary_expression:2",
+        "assignment_expression:1",
+        "binary_expression:1",
+        "unary_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "binary_expression:2",
+        "assignment_expression:1",
+        "binary_expression:1",
+        "unary_expression:1",
+        "typeof:1"
+      ],
+      "after_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "binary_expression:2",
+        "assignment_expression:1",
+        "binary_expression:1",
+        "unary_expression:1",
+        "typeof:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "binary_expression:2",
+        "assignment_expression:1",
+        "binary_expression:1",
+        "unary_expression:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "binary_expression:1",
+        "binary_expression:2",
+        "assignment_expression:1",
+        "binary_expression:1",
+        "unary_expression:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        ",:1"
+      ],
+      "after_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        ",:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "unary_expression:1"
+      ],
+      "after_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "unary_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "unary_expression:1",
+        "typeof:1"
+      ],
+      "after_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "unary_expression:1",
+        "typeof:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "unary_expression:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "sequence_expression:1",
+        "unary_expression:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "ERROR:1"
+      ],
+      "after_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "ERROR:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "ERROR:1",
+        ">:1"
+      ],
+      "after_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        "ERROR:1",
+        ">:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        ";:1"
+      ],
+      "after_path": [
+        "labeled_statement:1",
+        "expression_statement:1",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "comment:3"
+      ],
+      "after_path": [
+        "comment:3"
+      ]
+    },
+    {
+      "operation": "delete_with_children",
+      "before_path": [
+        "expression_statement:2"
+      ]
+    },
+    {
+      "operation": "delete_with_children",
+      "before_path": [
+        "expression_statement:3"
+      ]
+    },
+    {
+      "operation": "insert_with_children",
+      "after_path": [
+        "export_statement:1"
+      ]
+    }
+  ],
+  "text_mappings": [
+    {
+      "name": "Only one solution",
+      "entries": [
+        {
+          "operation": "Delete",
+          "before": [
+            {
+              "start_row": 19,
+              "start_column": 0,
+              "end_row": 20,
+              "end_column": 62
+            }
+          ]
+        },
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 19,
+              "start_column": 0,
+              "end_row": 19,
+              "end_column": 10
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

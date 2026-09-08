@@ -93,6 +93,10 @@ mod cpp_libreoffice_add_imports_and_function_param;
 #[cfg(test)]
 mod cpp_libreoffice_delete_function;
 #[cfg(test)]
+mod cpp_microsoft_terminal_add_only;
+#[cfg(test)]
+mod cpp_microsoft_terminal_delete_only;
+#[cfg(test)]
 mod cpp_mozilla_firefox_firefox_update_file_comment;
 #[cfg(test)]
 mod cpp_mozilla_firefox_firefox_update_file_comment_2;
@@ -276,6 +280,22 @@ mod javascript_microsoft_typescript_add_use_strict;
 mod javascript_microsoft_typescript_add_use_strict_2;
 #[cfg(test)]
 mod javascript_microsoft_typescript_concat_to_template;
+#[cfg(test)]
+mod javascript_microsoft_typescript_refactor;
+#[cfg(test)]
+mod javascript_microsoft_typescript_small_change;
+#[cfg(test)]
+mod javascript_microsoft_typescript_small_change_2;
+#[cfg(test)]
+mod javascript_microsoft_typescript_small_change_3;
+#[cfg(test)]
+mod javascript_microsoft_typescript_use_strict;
+#[cfg(test)]
+mod javascript_microsoft_typescript_use_strict_2;
+#[cfg(test)]
+mod javascript_microsoft_typescript_use_strict_3;
+#[cfg(test)]
+mod javascript_microsoft_typescript_use_strict_4;
 #[cfg(test)]
 mod javascript_mozilla_firefox_firefox_remove_one_comment;
 #[cfg(test)]
@@ -513,21 +533,33 @@ mod shellscript_ansible_ansible_small_add;
 #[cfg(test)]
 mod shellscript_ansible_ansible_small_change;
 #[cfg(test)]
+mod shellscript_genymobile_scrcpy_insert_only;
+#[cfg(test)]
 mod shellscript_genymobile_scrcpy_version;
+#[cfg(test)]
+mod shellscript_genymobile_scrcpy_version_2;
 #[cfg(test)]
 mod shellscript_jesseduffield_lazygit_version;
 #[cfg(test)]
 mod shellscript_microsoft_playwright_version;
 #[cfg(test)]
+mod shellscript_mongodb_mongo_small_change;
+#[cfg(test)]
 mod shellscript_openhands_openhands_update_string_value;
 #[cfg(test)]
 mod shellscript_paddlepaddle_paddleocr_insert_inside_a_string;
+#[cfg(test)]
+mod shellscript_pi_hole_pi_hole_add_comment;
+#[cfg(test)]
+mod shellscript_scikit_learn_scikit_learn_version;
 #[cfg(test)]
 mod shellscript_stgpetrovic_stacuist_pure_add;
 #[cfg(test)]
 mod shellscript_stgpetrovic_stacuist_pure_add_2;
 #[cfg(test)]
 mod shellscript_vercel_next_change_command_params;
+#[cfg(test)]
+mod swift_nextcloud_ios_different_func;
 #[cfg(test)]
 mod swift_swiftlang_swift_add_to_typecheck_comment;
 #[cfg(test)]
@@ -544,6 +576,10 @@ mod swift_swiftlang_swift_add_to_typecheck_comment_6;
 mod swift_swiftlang_swift_add_to_typecheck_comment_7;
 #[cfg(test)]
 mod swift_swiftlang_swift_delete_and_insert_in_the_typecheck_comment;
+#[cfg(test)]
+mod swift_swiftlang_swift_insert_delete_comment;
+#[cfg(test)]
+mod swift_swiftlang_swift_small_change_mostly_add;
 #[cfg(test)]
 mod swift_swiftlang_swift_update_leading_comment;
 #[cfg(test)]
@@ -593,7 +629,19 @@ mod xml_genymobile_scrcpy_remove_package_attribute;
 #[cfg(test)]
 mod xml_jellyfin_jellyfin_update_attribute_values;
 #[cfg(test)]
+mod xml_libreoffice_unicode;
+#[cfg(test)]
 mod xml_mozilla_firefox_firefox_update_value;
+#[cfg(test)]
+mod xml_odoo_odoo_insert_only;
+#[cfg(test)]
+mod xml_paddlepaddle_paddleocr_whitespace_only;
+#[cfg(test)]
+mod xml_paddlepaddle_paddleocr_whitespace_only_2;
+#[cfg(test)]
+mod xml_paddlepaddle_paddleocr_whitespace_only_3;
+#[cfg(test)]
+mod xml_paddlepaddle_paddleocr_whitespace_only_4;
 #[cfg(test)]
 mod xml_paddlepaddle_paddleocr_whitespace_only_change;
 #[cfg(test)]

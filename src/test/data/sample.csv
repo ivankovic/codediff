@@ -134,11 +134,11 @@ CPP,microsoft-terminal.git,8bbf00e0540ee67bbb4ba30cda66647a0bf8daa4,src/cascadia
 CPP,microsoft-terminal.git,99042d2f0cce6b6ede989aa630d391609c42729b,src/cascadia/TerminalSettingsModel/FontConfig.cpp,,stratified,SAMPLED,,30-100
 CPP,microsoft-terminal.git,99061ee272b72c6d565802068f7b09ab12e4173e,src/cascadia/TerminalApp/TitlebarControl.cpp,,stratified,SAMPLED,,100-300
 CPP,microsoft-terminal.git,a46fac25d3264fdb29dd2b70ec33f3b5e4f3540f,src/cascadia/TerminalSettingsEditor/Launch.cpp,,stratified,SAMPLED,,30-100
-CPP,microsoft-terminal.git,a65d5f321f72daaf80d30b2ce4dc8547c1c282b3,src/host/telemetry.cpp,,stratified,SAMPLED,,10-30
+CPP,microsoft-terminal.git,a65d5f321f72daaf80d30b2ce4dc8547c1c282b3,src/host/telemetry.cpp,cpp-microsoft-terminal-delete-only,stratified,PROMOTED,,10-30
 CPP,microsoft-terminal.git,b25fe55e94197be667625acef00506ef1636d137,src/host/VtIo.cpp,,stratified,SAMPLED,,300-1000
 CPP,microsoft-terminal.git,c8549bebedb992d7014e9f8f84783e067141d7c0,src/terminal/adapter/adaptDispatchGraphics.cpp,,stratified,SAMPLED,,300-1000
 CPP,microsoft-terminal.git,de0f702c74a27e2423e7f9dd19a2b40a9ec6c3bf,src/cascadia/LocalTests_SettingsModel/SerializationTests.cpp,,stratified,SAMPLED,,300-1000
-CPP,microsoft-terminal.git,e2f3e53064cb6cc22149881b6f32cf0f022bbaae,src/cascadia/TerminalSettingsEditor/Interaction.cpp,,stratified,SAMPLED,,10-30
+CPP,microsoft-terminal.git,e2f3e53064cb6cc22149881b6f32cf0f022bbaae,src/cascadia/TerminalSettingsEditor/Interaction.cpp,cpp-microsoft-terminal-add-only,stratified,PROMOTED,,10-30
 CPP,mongodb-mongo.git,7ce441d2c6589f8dd6543fa16ad3aad273aa7260,src/mongo/db/pipeline/percentile_algo_accurate.cpp,,stratified,SAMPLED,,100-300
 CPP,mongodb-mongo.git,8582c5080e1105812a24dcfd81d0e21e38eaccd5,src/mongo/db/replicated_fast_count/replicated_fast_count_test.cpp,,stratified,SAMPLED,,1000-3000
 CPP,mongodb-mongo.git,bf251444a13489f6f6b357e37c8749e9f2359266,src/mongo/db/query/plan_ranking/cbr_for_no_mp_results_test.cpp,,stratified,SAMPLED,,300-1000
@@ -732,26 +732,26 @@ JavaScript,jquery-ui-rails-jquery-ui-rails,78b0983b3da01383c77d14a3d7ac812cb8e8e
 JavaScript,microsoft-TypeScript.git,01c23d68b1113a4b71acb8484f1bf78a98307933,tests/baselines/reference/AmbientModuleAndAmbientFunctionWithTheSameNameAndCommonRoot.js,javascript-typescript-add-use-strict,small,PROMOTED,,
 JavaScript,microsoft-TypeScript.git,01c23d68b1113a4b71acb8484f1bf78a98307933,tests/baselines/reference/arrayToLocaleStringES5(target=es5).js,javascript-typescript-add-strict-3,small,PROMOTED,,
 JavaScript,microsoft-TypeScript.git,01c23d68b1113a4b71acb8484f1bf78a98307933,tests/baselines/reference/constEnums.js,,stratified,SAMPLED,,100-300
-JavaScript,microsoft-TypeScript.git,01c23d68b1113a4b71acb8484f1bf78a98307933,tests/baselines/reference/declareDottedExtend.js,,stratified,SAMPLED,,10-30
+JavaScript,microsoft-TypeScript.git,01c23d68b1113a4b71acb8484f1bf78a98307933,tests/baselines/reference/declareDottedExtend.js,javascript-microsoft-typescript-use-strict,stratified,PROMOTED,,10-30
 JavaScript,microsoft-TypeScript.git,01c23d68b1113a4b71acb8484f1bf78a98307933,tests/baselines/reference/genericCallWithConstructorTypedArguments5.js,,stratified,SAMPLED,,30-100
 JavaScript,microsoft-TypeScript.git,01c23d68b1113a4b71acb8484f1bf78a98307933,tests/baselines/reference/genericDefaults.js,,stratified,SAMPLED,,1000-3000
-JavaScript,microsoft-TypeScript.git,01c23d68b1113a4b71acb8484f1bf78a98307933,tests/baselines/reference/staticAutoAccessors(target=es2022).js,,stratified,SAMPLED,,10-30
-JavaScript,microsoft-TypeScript.git,01c23d68b1113a4b71acb8484f1bf78a98307933,tests/baselines/reference/symbolProperty45.js,,stratified,SAMPLED,,10-30
+JavaScript,microsoft-TypeScript.git,01c23d68b1113a4b71acb8484f1bf78a98307933,tests/baselines/reference/staticAutoAccessors(target=es2022).js,javascript-microsoft-typescript-use-strict-2,stratified,PROMOTED,,10-30
+JavaScript,microsoft-TypeScript.git,01c23d68b1113a4b71acb8484f1bf78a98307933,tests/baselines/reference/symbolProperty45.js,javascript-microsoft-typescript-use-strict-3,stratified,PROMOTED,,10-30
 JavaScript,microsoft-TypeScript.git,01c23d68b1113a4b71acb8484f1bf78a98307933,tests/baselines/reference/transpile/Supports setting out.js,javascript-microsoft-typescript-add-use-strict,stratified,PROMOTED,,0-10
 JavaScript,microsoft-TypeScript.git,01c23d68b1113a4b71acb8484f1bf78a98307933,tests/baselines/reference/typeSatisfaction_propNameConstraining.js,javascript-microsoft-typescript-another-test-case-marked-with-strict,small,PROMOTED,,
 JavaScript,microsoft-TypeScript.git,01c23d68b1113a4b71acb8484f1bf78a98307933,tests/baselines/reference/typingsSuggestion2.js,javascript-microsoft-typescript-add-use-strict-2,stratified,PROMOTED,,0-10
 JavaScript,microsoft-TypeScript.git,01c23d68b1113a4b71acb8484f1bf78a98307933,tests/baselines/reference/unicodeExtendedEscapesInTemplates17(target=es6).js,javascript-typescript-very-interesting-brokn-code,small,PROMOTED,,
 JavaScript,microsoft-TypeScript.git,206ed1a00ffde637d821bbb3172d1488e3d949e8,tests/baselines/reference/nodeModulesImportTypeModeDeclarationEmit1(module=node20).js,,stratified,SAMPLED,,30-100
-JavaScript,microsoft-TypeScript.git,3fc1f264de2aacae0c008eb4295e66833ade36d9,tests/baselines/reference/ArrowFunction4.js,,stratified,SAMPLED,,10-30
-JavaScript,microsoft-TypeScript.git,3fc1f264de2aacae0c008eb4295e66833ade36d9,tests/baselines/reference/conditionalEqualityTestingNullability.js,,stratified,SAMPLED,,10-30
+JavaScript,microsoft-TypeScript.git,3fc1f264de2aacae0c008eb4295e66833ade36d9,tests/baselines/reference/ArrowFunction4.js,javascript-microsoft-typescript-small-change,stratified,PROMOTED,,10-30
+JavaScript,microsoft-TypeScript.git,3fc1f264de2aacae0c008eb4295e66833ade36d9,tests/baselines/reference/conditionalEqualityTestingNullability.js,javascript-microsoft-typescript-small-change-2,stratified,PROMOTED,,10-30
 JavaScript,microsoft-TypeScript.git,3fc1f264de2aacae0c008eb4295e66833ade36d9,tests/baselines/reference/genericClasses4.js,,stratified,SAMPLED,,30-100
 JavaScript,microsoft-TypeScript.git,3fc1f264de2aacae0c008eb4295e66833ade36d9,tests/baselines/reference/genericTypeAssertions4.js,,stratified,SAMPLED,,30-100
-JavaScript,microsoft-TypeScript.git,3fc1f264de2aacae0c008eb4295e66833ade36d9,tests/baselines/reference/noImplicitAnyInContextuallyTypesFunctionParamter.js,,stratified,SAMPLED,,10-30
+JavaScript,microsoft-TypeScript.git,3fc1f264de2aacae0c008eb4295e66833ade36d9,tests/baselines/reference/noImplicitAnyInContextuallyTypesFunctionParamter.js,javascript-microsoft-typescript-small-change-3,stratified,PROMOTED,,10-30
 JavaScript,microsoft-TypeScript.git,3fc1f264de2aacae0c008eb4295e66833ade36d9,tests/baselines/reference/relatedViaDiscriminatedTypeNoError.js,,stratified,SAMPLED,,30-100
 JavaScript,microsoft-TypeScript.git,3fc1f264de2aacae0c008eb4295e66833ade36d9,tests/baselines/reference/stringLiteralTypesOverloadAssignability03.js,,stratified,SAMPLED,,30-100
 JavaScript,microsoft-TypeScript.git,3fc1f264de2aacae0c008eb4295e66833ade36d9,tests/baselines/reference/templateStringWithEmbeddedConditional.js,javascript-microsoft-typescript-concat-to-template,stratified,PROMOTED,,0-10
 JavaScript,microsoft-TypeScript.git,3fc1f264de2aacae0c008eb4295e66833ade36d9,tests/baselines/reference/tupleElementTypes3.js,javascript-typescript-interesting-small-edit-refactor,small,PROMOTED,,
-JavaScript,microsoft-TypeScript.git,42f6576e83a739d3a5e20e03712252abb6f448dc,tests/baselines/reference/exportDeclareClass1.js,,stratified,SAMPLED,,10-30
+JavaScript,microsoft-TypeScript.git,42f6576e83a739d3a5e20e03712252abb6f448dc,tests/baselines/reference/exportDeclareClass1.js,javascript-microsoft-typescript-refactor,stratified,PROMOTED,,10-30
 JavaScript,microsoft-TypeScript.git,42f6576e83a739d3a5e20e03712252abb6f448dc,tests/baselines/reference/tsbuild/noEmit/outFile/changes-incremental.js,,stratified,SAMPLED,,1000-3000
 JavaScript,microsoft-TypeScript.git,95e3aaa90341b516e868bf2300b1da5d07103f1e,tests/baselines/reference/tsc/incremental/when-file-is-deleted.js,,stratified,SAMPLED,,100-300
 JavaScript,microsoft-TypeScript.git,95e3aaa90341b516e868bf2300b1da5d07103f1e,tests/baselines/reference/tscWatch/resolveJsonModule/incremental-always-prefers-declaration-file-over-document.js,,stratified,SAMPLED,,100-300
@@ -773,7 +773,7 @@ JavaScript,microsoft-TypeScript.git,f09a0e598a798102826d4a86a4d29446a5557d9b,tes
 JavaScript,microsoft-TypeScript.git,f09a0e598a798102826d4a86a4d29446a5557d9b,tests/baselines/reference/tsserver/projectReferencesSourcemap/dependencyAndUsage/disabledSourceRef/dependency-dts-change-as-rename-timeout-after-delete.js,,stratified,SAMPLED,,1000-3000
 JavaScript,microsoft-TypeScript.git,f5ccf4345d6ac01f47be84db99fde50b98accbb5,tests/baselines/reference/arithmeticOperatorWithUndefinedValueAndValidOperands.js,,stratified,SAMPLED,,100-300
 JavaScript,microsoft-TypeScript.git,ffd1c3a1986e2f87ac79bde065432ec81144cfde,tests/baselines/reference/functionLiteralForOverloads.js,,stratified,SAMPLED,,30-100
-JavaScript,microsoft-TypeScript.git,ffd1c3a1986e2f87ac79bde065432ec81144cfde,tests/baselines/reference/inheritanceStaticMembersCompatible.js,,stratified,SAMPLED,,10-30
+JavaScript,microsoft-TypeScript.git,ffd1c3a1986e2f87ac79bde065432ec81144cfde,tests/baselines/reference/inheritanceStaticMembersCompatible.js,javascript-microsoft-typescript-use-strict-4,stratified,PROMOTED,,10-30
 JavaScript,mozilla-firefox-firefox.git,56a439fc7470e23fcf79e09be06cbc95aa6ede2d,tools/lint/stylelint/stylelint-plugin-mozilla/tests/use-design-tokens.background-color.tests.mjs,,stratified,SAMPLED,,300-1000
 JavaScript,mozilla-firefox-firefox.git,7fc79073377db7556ba2c55a8c39cda5be9a2b94,js/src/tests/test262/built-ins/TypedArray/prototype/subarray/minus-zero.js,,stratified,SAMPLED,,30-100
 JavaScript,mozilla-firefox-firefox.git,7fc79073377db7556ba2c55a8c39cda5be9a2b94,js/src/tests/test262/language/module-code/instn-star-props-dflt-skip-star-prod_FIXTURE.js,javascript-mozilla-firefox-firefox-remove-one-comment,stratified,PROMOTED,,0-10
@@ -1354,9 +1354,9 @@ Scala,ymnk-jzlib,0fa43afe6be292cca0d545acf00b1771681bfa60,project/Build.scala,sc
 Scala,ymnk-jzlib,389af328c466fdcdcf36249e99b82ceed92d5b97,src/test/scala/WrapperTypeTest.scala,scala-ymnk-jzlib-add-one-test-case,full,PROMOTED,,
 Scala,ymnk-jzlib,8b205d660d37503f71d4b1bbbc9779925ed14e8d,src/test/scala/GZIPIOStreamTest.scala,scala-ymnk-jzlib-add-a-test-case,full,PROMOTED,,
 ShellScript,Genymobile-scrcpy.git,67f93350f679e40ba979198753f4c657fe589c87,install_release.sh,shellscript-genymobile-scrcpy-version,stratified,PROMOTED,,10-30
-ShellScript,Genymobile-scrcpy.git,baa10ed0a36ec775712be85f22d3db3f0a6e19f2,install_release.sh,,stratified,SAMPLED,,10-30
+ShellScript,Genymobile-scrcpy.git,baa10ed0a36ec775712be85f22d3db3f0a6e19f2,install_release.sh,shellscript-genymobile-scrcpy-version-2,stratified,PROMOTED,,10-30
 ShellScript,Genymobile-scrcpy.git,c0e2e27cf9eb38a95b324ba9aeeb34dab6d2e72f,server/build_without_gradle.sh,shellscript-genymobile-scrcpy-add-two-flags,small,PROMOTED,,
-ShellScript,Genymobile-scrcpy.git,cb19686d7950113039f4f478998df8d9ae7ed985,release/generate_checksums.sh,,stratified,SAMPLED,,10-30
+ShellScript,Genymobile-scrcpy.git,cb19686d7950113039f4f478998df8d9ae7ed985,release/generate_checksums.sh,shellscript-genymobile-scrcpy-insert-only,stratified,PROMOTED,,10-30
 ShellScript,Genymobile-scrcpy.git,dd1bfae4e00e5756e5f4f43649ce9d6a824cf028,app/deps/libusb.sh,,stratified,SAMPLED,,30-100
 ShellScript,Genymobile-scrcpy.git,f30fd963a104649e7d388cc68f3fbc5d635baa4a,app/prebuilt-deps/prepare-ffmpeg.sh,,stratified,SAMPLED,,30-100
 ShellScript,OpenHands-OpenHands.git,0ad411e16209e36276ab50631c6cb36420ed82c3,containers/app/config.sh,shellscript-openhands-openhands-update-string-value,stratified,PROMOTED,,0-10
@@ -1393,7 +1393,7 @@ ShellScript,microsoft-playwright.git,d0b1fc27ccf83cdaa4feff1acc873443617e96e8,br
 ShellScript,mongodb-mongo.git,2727dc4d9f34b494828f817838828a3f74ae5297,evergreen/bazel_evergreen_shutils.sh,,stratified,SAMPLED,,300-1000
 ShellScript,mongodb-mongo.git,b87368be3a37715b6fdca692f7dfeb2d1265ba8c,evergreen/garasign_gpg_sign.sh,,stratified,SAMPLED,,30-100
 ShellScript,mongodb-mongo.git,d6d3f9bf9415ba62cf7942d1e5bbeb9811952b93,evergreen/fetch_remote_test_results.sh,,stratified,SAMPLED,,300-1000
-ShellScript,mongodb-mongo.git,f3675175b01e9aaad80d1f3c185f271e5e88baa1,src/mongo/shell/debugger/vscode/install.sh,,stratified,SAMPLED,,10-30
+ShellScript,mongodb-mongo.git,f3675175b01e9aaad80d1f3c185f271e5e88baa1,src/mongo/shell/debugger/vscode/install.sh,shellscript-mongodb-mongo-small-change,stratified,PROMOTED,,10-30
 ShellScript,nextcloud-server.git,9741f5f17d95418178c64a106624f8e525a59e75,autotest.sh,shellscript-nextcloud-server-change-invocation-string,small,PROMOTED,,
 ShellScript,nicolargo-glances,50818213b1876314d7817d68c57482911551f941,docs/build.sh,shellscript-nicolargo-glances-add-shebang,full,PROMOTED,,
 ShellScript,nomad-software-vend,15bdc7b83f8daeb208faeb2622aa91a2c3f32c03,vendor/golang.org/x/sys/unix/mkerrors.sh,shellscript-nomad-software-vend-huge-multi-line-strings-updated,full,PROMOTED,,
@@ -1429,7 +1429,7 @@ ShellScript,pi-hole-pi-hole.git,72a52807d1ab42ced45bdf893376cdadee9611c4,gravity
 ShellScript,pi-hole-pi-hole.git,95ae51bbdbb028625b541466c2f1caabfeb2301c,advanced/Scripts/piholeDebug.sh,shellscript-pi-hole-pi-hole-sql-code-in-string-constant,small,PROMOTED,,
 ShellScript,pi-hole-pi-hole.git,9da1e9ab88f3a694adce3eda9fff2a3ee74bb91f,gravity.sh,,stratified,SAMPLED,,1000-3000
 ShellScript,pi-hole-pi-hole.git,a2a22c4e138398499d649135ccc7c53a3fcf019a,automated install/basic-install.sh,,stratified,SAMPLED,,1000-3000
-ShellScript,pi-hole-pi-hole.git,ca1bab3c1b012533844a8c5c3586886e131bf716,advanced/Templates/pihole-FTL-poststop.sh,,stratified,SAMPLED,,10-30
+ShellScript,pi-hole-pi-hole.git,ca1bab3c1b012533844a8c5c3586886e131bf716,advanced/Templates/pihole-FTL-poststop.sh,shellscript-pi-hole-pi-hole-add-comment,stratified,PROMOTED,,10-30
 ShellScript,pi-hole-pi-hole.git,d15beff4ba2d7b65724b07be91ff8f18924a55a6,automated install/basic-install.sh,,stratified,SAMPLED,,1000-3000
 ShellScript,pi-hole-pi-hole.git,d2828310f240aed098e5b3d787f5d63f47575a7a,advanced/Scripts/database_migration/gravity-db.sh,,stratified,SAMPLED,,100-300
 ShellScript,pi-hole-pi-hole.git,f50a4c1c89fabbd87cf5922e830188e5f166d20c,automated install/basic-install.sh,,stratified,SAMPLED,,1000-3000
@@ -1437,7 +1437,7 @@ ShellScript,pytorch-pytorch.git,1c6eb4d746e8eb769f60fc9071ffa1ad6cccb7db,.ci/pyt
 ShellScript,pytorch-pytorch.git,fa8028ada56dd49831539ac0612e47167030087f,.ci/pytorch/check_binary.sh,shellscript-pytorch-pytorch-change-invocation-string,small,PROMOTED,,
 ShellScript,ropery-ffcast,e56688008be0a6a588251f77d7e517f2ae2b5917,src/subcmd.bash,shellscript-ropery-ffcast-comment-only-change,full,PROMOTED,,
 ShellScript,scikit-learn-scikit-learn.git,5464d9a6ce1fc872282bf943c8f40b0829f43ed2,build_tools/azure/install.sh,shellscript-scikit-learn-scikit-learn-string-to-regex,small,PROMOTED,,
-ShellScript,scikit-learn-scikit-learn.git,ef4885fc6dc1f7a071d847d7f42702cf090352bc,maint_tools/vendor_array_api_extra.sh,,stratified,SAMPLED,,10-30
+ShellScript,scikit-learn-scikit-learn.git,ef4885fc6dc1f7a071d847d7f42702cf090352bc,maint_tools/vendor_array_api_extra.sh,shellscript-scikit-learn-scikit-learn-version,stratified,PROMOTED,,10-30
 ShellScript,stgpetrovic-stacuist.com.git,997308799c3bde4bebc4b90da5a71d5945504a80,deploy.sh,shellscript-stgpetrovic-stacuist-pure-add,stratified,PROMOTED,,0-10
 ShellScript,stgpetrovic-stacuist.com.git,c5e6bad7dfe9ddb1bf5c7c989d2cdbc5519d4b03,deploy.sh,shellscript-stgpetrovic-stacuist-pure-add-2,stratified,PROMOTED,,0-10
 ShellScript,torvalds-linux.git,3b4a3a00de8770f3a60c1fa483921ce37415132d,scripts/kconfig/merge_config.sh,shellscript-torvalds-linux-double-equals-to-equals,small,PROMOTED,,
@@ -1456,7 +1456,7 @@ Swift,nextcloud-desktop.git,5c286d30c48bbb9150a57db080a6c32f7fb986e9,Sources/Nex
 Swift,nextcloud-desktop.git,5c286d30c48bbb9150a57db080a6c32f7fb986e9,Sources/NextcloudFileProviderKit/Log/FileProviderLogMessage.swift,,stratified,SAMPLED,,30-100
 Swift,nextcloud-desktop.git,e545f06f3c70192acfa687892ac856405a3f1d21,Sources/NextcloudFileProviderKit/Utilities/IgnoredFilesMatcher.swift,,stratified,SAMPLED,,30-100
 Swift,nextcloud-desktop.git,ee149aed45a1dab9bdcf9b83270ad850111bcfcc,Sources/NextcloudFileProviderKit/Item/Item+KeepDownloaded.swift,,stratified,SAMPLED,,30-100
-Swift,nextcloud-ios.git,03a4d5c5dc912d03c191018e5111c52dd9fa0f51,iOSClient/Activity/NCActivityNavigationController.swift,,stratified,SAMPLED,,10-30
+Swift,nextcloud-ios.git,03a4d5c5dc912d03c191018e5111c52dd9fa0f51,iOSClient/Activity/NCActivityNavigationController.swift,swift-nextcloud-ios-different-func,stratified,PROMOTED,,10-30
 Swift,nextcloud-ios.git,1e91b55889f7d63fe1fe31bdf568b5d77bd5e934,iOSClient/Networking/NCNetworking+Download.swift,,stratified,SAMPLED,,300-1000
 Swift,nextcloud-ios.git,2ebaa5c696990129a9888f9caa76a0fc43b98159,iOSClient/Menu/NCMainNavigationControllerMenu.swift,,stratified,SAMPLED,,100-300
 Swift,nextcloud-ios.git,32ed733e1dfce03a799571b4b7406a74355b3dcf,iOSClient/Share/NCShareNetworking.swift,,stratified,SAMPLED,,100-300
@@ -1495,11 +1495,11 @@ Swift,swiftlang-swift.git,12f8d9c6c94ba944771baed4ed42bfe6717d9e74,test/ClangImp
 Swift,swiftlang-swift.git,34b17dd3e44b2a6645bbbf952fdfe0b2bf435e71,test/abi/macOS/x86_64/stdlib.swift,,stratified,SAMPLED,,1000-3000
 Swift,swiftlang-swift.git,39521e18c2f53e4890a4e7e6905434a20b801d32,utils/swift-dev-utils/Sources/CrashReduce/CrashLog.swift,swift-swiftlang-swift-actual-logic-change,small,PROMOTED,,
 Swift,swiftlang-swift.git,425d13bf8630b8947e3824721ebeb28bcb950bbc,stdlib/public/core/Optional.swift,,stratified,SAMPLED,,1000-3000
-Swift,swiftlang-swift.git,630601701a99c44fa002ad4e43cdea8741ab0225,validation-test/Sema/type_checker_perf/fast/rdar23620262.swift,,stratified,SAMPLED,,10-30
+Swift,swiftlang-swift.git,630601701a99c44fa002ad4e43cdea8741ab0225,validation-test/Sema/type_checker_perf/fast/rdar23620262.swift,swift-swiftlang-swift-insert-delete-comment,stratified,PROMOTED,,10-30
 Swift,swiftlang-swift.git,7d3b2576241dda7586b9ebf4b59927a42137e232,stdlib/public/core/Integers.swift,,stratified,SAMPLED,,3000+
 Swift,swiftlang-swift.git,82875ff67b72c6c8f08a2cba74a2f961ab40b40e,stdlib/public/Concurrency/PartialAsyncTask.swift,,stratified,SAMPLED,,1000-3000
 Swift,swiftlang-swift.git,900f6906cd8e97f619566361f0d5c644c3fcbc3d,stdlib/public/Concurrency/Executor.swift,,stratified,SAMPLED,,1000-3000
-Swift,swiftlang-swift.git,a303829e6efdb46da00290a323e7d774739cbf80,test/Parse/ConditionalCompilation/arm64IOSTarget.swift,,stratified,SAMPLED,,10-30
+Swift,swiftlang-swift.git,a303829e6efdb46da00290a323e7d774739cbf80,test/Parse/ConditionalCompilation/arm64IOSTarget.swift,swift-swiftlang-swift-small-change-mostly-add,stratified,PROMOTED,,10-30
 Swift,swiftlang-swift.git,a684d6b74c988dd7a20fd1c879067b7c49a6c5ca,stdlib/public/Concurrency/PartialAsyncTask.swift,,stratified,SAMPLED,,1000-3000
 Swift,swiftlang-swift.git,ae1e3d086526ae15ef7c83fd6caa1bdea2f888d2,test/embedded/concurrency-deleted-method.swift,,stratified,SAMPLED,,30-100
 Swift,swiftlang-swift.git,ae1e3d086526ae15ef7c83fd6caa1bdea2f888d2,test/embedded/generic-specialization.swift,,stratified,SAMPLED,,10-30
@@ -1788,11 +1788,11 @@ XML,FasterXML-jackson-dataformat-xml,841eeb530b1149eb0a9afdedee15043f7d0a5c99,po
 XML,GPUOpen-Drivers-AMDVLK,f94ede75631645e311f1fc84e770daaa7a91e35f,build_with_tools.xml,xml-gpuopen-drivers-amdvlk-version-update,full,PROMOTED,,
 XML,Genymobile-scrcpy.git,5bf52a98ed701ca8bb9ce1b9e769acedf9fa3315,server/src/main/AndroidManifest.xml,xml-genymobile-scrcpy-remove-package-attribute,stratified,PROMOTED,,0-10
 XML,MegaGlest-megaglest-data,4511c2b2455d5e79d0a0ebbde4885086fd44df40,techs/megapack/factions/indian/units/main_teepee/main_teepee.xml,xml-megaglest-megaglest-data-update-url-path,full,PROMOTED,,
-XML,PaddlePaddle-PaddleOCR.git,24f06d1a1b018d90c3c16bf49e966f988f55d98d,deploy/android_demo/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml,,stratified,SAMPLED,,0-10
+XML,PaddlePaddle-PaddleOCR.git,24f06d1a1b018d90c3c16bf49e966f988f55d98d,deploy/android_demo/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml,xml-paddlepaddle-paddleocr-whitespace-only-2,stratified,PROMOTED,,0-10
 XML,PaddlePaddle-PaddleOCR.git,24f06d1a1b018d90c3c16bf49e966f988f55d98d,deploy/android_demo/app/src/main/res/xml/file_paths.xml,xml-paddlepaddle-paddleocr-whitespace-only-change,stratified,PROMOTED,,0-10
-XML,PaddlePaddle-PaddleOCR.git,24f06d1a1b018d90c3c16bf49e966f988f55d98d,deploy/fastdeploy/android/app/src/main/res/drawable-v24/realtime_start_btn.xml,,stratified,SAMPLED,,0-10
-XML,PaddlePaddle-PaddleOCR.git,24f06d1a1b018d90c3c16bf49e966f988f55d98d,deploy/fastdeploy/android/app/src/main/res/drawable-v24/realtime_stop_btn.xml,,stratified,SAMPLED,,0-10
-XML,PaddlePaddle-PaddleOCR.git,24f06d1a1b018d90c3c16bf49e966f988f55d98d,deploy/fastdeploy/android/app/src/main/res/drawable-v24/switch_side_btn.xml,,stratified,SAMPLED,,0-10
+XML,PaddlePaddle-PaddleOCR.git,24f06d1a1b018d90c3c16bf49e966f988f55d98d,deploy/fastdeploy/android/app/src/main/res/drawable-v24/realtime_start_btn.xml,xml-paddlepaddle-paddleocr-whitespace-only-3,stratified,PROMOTED,,0-10
+XML,PaddlePaddle-PaddleOCR.git,24f06d1a1b018d90c3c16bf49e966f988f55d98d,deploy/fastdeploy/android/app/src/main/res/drawable-v24/realtime_stop_btn.xml,xml-paddlepaddle-paddleocr-whitespace-only,stratified,PROMOTED,,0-10
+XML,PaddlePaddle-PaddleOCR.git,24f06d1a1b018d90c3c16bf49e966f988f55d98d,deploy/fastdeploy/android/app/src/main/res/drawable-v24/switch_side_btn.xml,xml-paddlepaddle-paddleocr-whitespace-only-4,stratified,PROMOTED,,0-10
 XML,antlr-antlr3,fc592963836ad55487bb45ff58cf72aa090129cb,antlr3-maven-archetype/pom.xml,xml-antlr-antlr3-comment-out-part-of-code-interesting-case,full,PROMOTED,,
 XML,eclipse-ee4j-jaxb-istack-commons,685bd782d32f9fa20670e0c5a9d7a2fc0b38845d,istack-commons/runtime/pom.xml,xml-eclipse-ee4j-jaxb-istack-commons-update-version-string,full,PROMOTED,,
 XML,gap-packages-toric,7f7aaf547ea83e856e9757795d36d6b920ff17db,doc/Toric.xml,xml-gap-packages-toric-remove-two-attributes,full,PROMOTED,,
@@ -1807,7 +1807,7 @@ XML,javacc-javacc,6374549940fd66003924b586474fea798875c5c0,pom.xml,xml-javacc-ja
 XML,jellyfin-jellyfin.git,0c46431cbb48850fae0e425e95692a1a9bbce427,tests/Jellyfin.LiveTv.Tests/Test Data/LiveTv/Listings/XmlTv/emptycategory.xml,xml-jellyfin-jellyfin-update-attribute-values,stratified,PROMOTED,,0-10
 XML,libreoffice,7d31c9e391cb8997a11ae7b97b7689e00f2427b9,extras/source/autotext/lang/zh-TW/standard/BlockList.xml,,stratified,SAMPLED,,10-30
 XML,libreoffice,7d31c9e391cb8997a11ae7b97b7689e00f2427b9,extras/source/autotext/lang/zh-TW/standard/JACL/content.xml,,stratified,SAMPLED,,10-30
-XML,libreoffice,7d31c9e391cb8997a11ae7b97b7689e00f2427b9,extras/source/autotext/lang/zh-TW/standard/Q/Q.xml,,stratified,SAMPLED,,0-10
+XML,libreoffice,7d31c9e391cb8997a11ae7b97b7689e00f2427b9,extras/source/autotext/lang/zh-TW/standard/Q/Q.xml,xml-libreoffice-unicode,stratified,PROMOTED,,0-10
 XML,libreoffice,9db6bc511b7bddcd844f3eb51b62e3fa89e9bc35,sc/uiconfig/scalc/menubar/menubar.xml,,stratified,SAMPLED,,300-1000
 XML,lincity-ng-lincity-ng,08f12f733b3afe3cf6bdfe212b0d9c7656588d1e,data/help/el/other-costs.xml,xml-lincity-ng-lincity-ng-whitespace-only-change,full,PROMOTED,,
 XML,microsoft-terminal.git,040f26175f6f2b200fe3d920d9354c05962c7a92,tools/tests.xml,,stratified,SAMPLED,,10-30
@@ -1862,7 +1862,7 @@ XML,odoo-odoo.git,531b28bca89942b61ecea32daf479b2b39a5cf1c,addons/point_of_sale/
 XML,odoo-odoo.git,531b28bca89942b61ecea32daf479b2b39a5cf1c,addons/pos_self_order/static/src/app/components/combo_stepper/combo_stepper.xml,,stratified,SAMPLED,,10-30
 XML,odoo-odoo.git,5ff8c241a2d8bbddd320b88411052adca6224e72,addons/l10n_cz/data/tax_report.xml,,stratified,SAMPLED,,300-1000
 XML,odoo-odoo.git,859930c9ad71c9ce997723994df5b298cfc40a15,addons/point_of_sale/views/pos_order_view.xml,xml-odoo-odoo-add-attribute,small,PROMOTED,,
-XML,odoo-odoo.git,97e8cc8d664e66ba62e8282a67f069805682ae41,addons/html_builder/static/src/plugins/cta_badge_option.xml,,stratified,SAMPLED,,0-10
+XML,odoo-odoo.git,97e8cc8d664e66ba62e8282a67f069805682ae41,addons/html_builder/static/src/plugins/cta_badge_option.xml,xml-odoo-odoo-insert-only,stratified,PROMOTED,,0-10
 XML,odoo-odoo.git,a5cb8668604c0a9d12464664892dad6b5d15e672,addons/account_edi_ubl_cii/data/cii_22_templates.xml,,stratified,SAMPLED,,300-1000
 XML,odoo-odoo.git,b5511e5ebb919c2c506131bf9e2a4196dac25f79,addons/account/views/account_move_views.xml,,stratified,SAMPLED,,1000-3000
 XML,odoo-odoo.git,b6df114735c044a0620bc3146964d5a9568c128b,addons/l10n_es_edi_facturae/tests/data/expected_out_invoice_round_glob.xml,,stratified,SAMPLED,,300-1000

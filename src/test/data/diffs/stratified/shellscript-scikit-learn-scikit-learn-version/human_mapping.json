@@ -1,0 +1,29 @@
+{
+  "entries": [],
+  "text_mappings": [
+    {
+      "name": "Only one solution",
+      "entries": [
+        {
+          "operation": "Match",
+          "before": [
+            {
+              "start_row": 8,
+              "start_column": 14,
+              "end_row": 8,
+              "end_column": 15
+            }
+          ],
+          "after": [
+            {
+              "start_row": 8,
+              "start_column": 14,
+              "end_row": 8,
+              "end_column": 15
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

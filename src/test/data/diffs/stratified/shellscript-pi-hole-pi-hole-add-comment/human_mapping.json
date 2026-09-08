@@ -1,0 +1,718 @@
+{
+  "entries": [
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [],
+      "after_path": []
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "comment:1"
+      ],
+      "after_path": [
+        "comment:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "comment:2"
+      ],
+      "after_path": [
+        "comment:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "variable_assignment:1"
+      ],
+      "after_path": [
+        "variable_assignment:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "variable_assignment:1",
+        "variable_name:1"
+      ],
+      "after_path": [
+        "variable_assignment:1",
+        "variable_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "variable_assignment:1",
+        "=:1"
+      ],
+      "after_path": [
+        "variable_assignment:1",
+        "=:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "variable_assignment:1",
+        "raw_string:1"
+      ],
+      "after_path": [
+        "variable_assignment:1",
+        "raw_string:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "variable_assignment:2"
+      ],
+      "after_path": [
+        "variable_assignment:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "variable_assignment:2",
+        "variable_name:1"
+      ],
+      "after_path": [
+        "variable_assignment:2",
+        "variable_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "variable_assignment:2",
+        "=:1"
+      ],
+      "after_path": [
+        "variable_assignment:2",
+        "=:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "variable_assignment:2",
+        "string:1",
+        "\":1"
+      ],
+      "after_path": [
+        "variable_assignment:2",
+        "string:1",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "variable_assignment:2",
+        "string:1",
+        "expansion:1",
+        "${:1"
+      ],
+      "after_path": [
+        "variable_assignment:2",
+        "string:1",
+        "expansion:1",
+        "${:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "variable_assignment:2",
+        "string:1",
+        "expansion:1",
+        "variable_name:1"
+      ],
+      "after_path": [
+        "variable_assignment:2",
+        "string:1",
+        "expansion:1",
+        "variable_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "variable_assignment:2",
+        "string:1",
+        "expansion:1",
+        "}:1"
+      ],
+      "after_path": [
+        "variable_assignment:2",
+        "string:1",
+        "expansion:1",
+        "}:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "variable_assignment:2",
+        "string:1",
+        "expansion:1"
+      ],
+      "after_path": [
+        "variable_assignment:2",
+        "string:1",
+        "expansion:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "variable_assignment:2",
+        "string:1",
+        "string_content:1"
+      ],
+      "after_path": [
+        "variable_assignment:2",
+        "string:1",
+        "string_content:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "variable_assignment:2",
+        "string:1",
+        "\":2"
+      ],
+      "after_path": [
+        "variable_assignment:2",
+        "string:1",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "variable_assignment:2",
+        "string:1"
+      ],
+      "after_path": [
+        "variable_assignment:2",
+        "string:1"
+      ]
+    },
+    {
+      "operation": "insert_with_children",
+      "after_path": [
+        "comment:3"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "command:1"
+      ],
+      "after_path": [
+        "command:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "command:1",
+        "command_name:1",
+        "word:1"
+      ],
+      "after_path": [
+        "command:1",
+        "command_name:1",
+        "word:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "command:1",
+        "command_name:1"
+      ],
+      "after_path": [
+        "command:1",
+        "command_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "command:1",
+        "string:1",
+        "\":1"
+      ],
+      "after_path": [
+        "command:1",
+        "string:1",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "command:1",
+        "string:1",
+        "expansion:1",
+        "${:1"
+      ],
+      "after_path": [
+        "command:1",
+        "string:1",
+        "expansion:1",
+        "${:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "command:1",
+        "string:1",
+        "expansion:1",
+        "variable_name:1"
+      ],
+      "after_path": [
+        "command:1",
+        "string:1",
+        "expansion:1",
+        "variable_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "command:1",
+        "string:1",
+        "expansion:1",
+        "}:1"
+      ],
+      "after_path": [
+        "command:1",
+        "string:1",
+        "expansion:1",
+        "}:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "command:1",
+        "string:1",
+        "expansion:1"
+      ],
+      "after_path": [
+        "command:1",
+        "string:1",
+        "expansion:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "command:1",
+        "string:1",
+        "\":2"
+      ],
+      "after_path": [
+        "command:1",
+        "string:1",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "command:1",
+        "string:1"
+      ],
+      "after_path": [
+        "command:1",
+        "string:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "comment:3"
+      ],
+      "after_path": [
+        "comment:4"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "variable_assignment:3"
+      ],
+      "after_path": [
+        "variable_assignment:3"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "variable_assignment:3",
+        "variable_name:1"
+      ],
+      "after_path": [
+        "variable_assignment:3",
+        "variable_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "variable_assignment:3",
+        "=:1"
+      ],
+      "after_path": [
+        "variable_assignment:3",
+        "=:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "variable_assignment:3",
+        "string:1",
+        "\":1"
+      ],
+      "after_path": [
+        "variable_assignment:3",
+        "string:1",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "variable_assignment:3",
+        "string:1",
+        "command_substitution:1",
+        "$(:1"
+      ],
+      "after_path": [
+        "variable_assignment:3",
+        "string:1",
+        "command_substitution:1",
+        "$(:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "variable_assignment:3",
+        "string:1",
+        "command_substitution:1",
+        "command:1",
+        "command_name:1",
+        "word:1"
+      ],
+      "after_path": [
+        "variable_assignment:3",
+        "string:1",
+        "command_substitution:1",
+        "command:1",
+        "command_name:1",
+        "word:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "variable_assignment:3",
+        "string:1",
+        "command_substitution:1",
+        "command:1",
+        "command_name:1"
+      ],
+      "after_path": [
+        "variable_assignment:3",
+        "string:1",
+        "command_substitution:1",
+        "command:1",
+        "command_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "variable_assignment:3",
+        "string:1",
+        "command_substitution:1",
+        "command:1",
+        "word:1"
+      ],
+      "after_path": [
+        "variable_assignment:3",
+        "string:1",
+        "command_substitution:1",
+        "command:1",
+        "word:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "variable_assignment:3",
+        "string:1",
+        "command_substitution:1",
+        "command:1"
+      ],
+      "after_path": [
+        "variable_assignment:3",
+        "string:1",
+        "command_substitution:1",
+        "command:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "variable_assignment:3",
+        "string:1",
+        "command_substitution:1",
+        "):1"
+      ],
+      "after_path": [
+        "variable_assignment:3",
+        "string:1",
+        "command_substitution:1",
+        "):1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "variable_assignment:3",
+        "string:1",
+        "command_substitution:1"
+      ],
+      "after_path": [
+        "variable_assignment:3",
+        "string:1",
+        "command_substitution:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "variable_assignment:3",
+        "string:1",
+        "\":2"
+      ],
+      "after_path": [
+        "variable_assignment:3",
+        "string:1",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "variable_assignment:3",
+        "string:1"
+      ],
+      "after_path": [
+        "variable_assignment:3",
+        "string:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "comment:4"
+      ],
+      "after_path": [
+        "comment:5"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "command:2"
+      ],
+      "after_path": [
+        "command:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "command:2",
+        "command_name:1",
+        "word:1"
+      ],
+      "after_path": [
+        "command:2",
+        "command_name:1",
+        "word:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "command:2",
+        "command_name:1"
+      ],
+      "after_path": [
+        "command:2",
+        "command_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "command:2",
+        "word:1"
+      ],
+      "after_path": [
+        "command:2",
+        "word:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "command:2",
+        "word:2"
+      ],
+      "after_path": [
+        "command:2",
+        "word:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "command:2",
+        "word:3"
+      ],
+      "after_path": [
+        "command:2",
+        "word:3"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "command:2",
+        "string:1",
+        "\":1"
+      ],
+      "after_path": [
+        "command:2",
+        "string:1",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "command:2",
+        "string:1",
+        "expansion:1",
+        "${:1"
+      ],
+      "after_path": [
+        "command:2",
+        "string:1",
+        "expansion:1",
+        "${:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "command:2",
+        "string:1",
+        "expansion:1",
+        "variable_name:1"
+      ],
+      "after_path": [
+        "command:2",
+        "string:1",
+        "expansion:1",
+        "variable_name:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "command:2",
+        "string:1",
+        "expansion:1",
+        "}:1"
+      ],
+      "after_path": [
+        "command:2",
+        "string:1",
+        "expansion:1",
+        "}:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "command:2",
+        "string:1",
+        "expansion:1"
+      ],
+      "after_path": [
+        "command:2",
+        "string:1",
+        "expansion:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "command:2",
+        "string:1",
+        "\":2"
+      ],
+      "after_path": [
+        "command:2",
+        "string:1",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "command:2",
+        "string:1"
+      ],
+      "after_path": [
+        "command:2",
+        "string:1"
+      ]
+    }
+  ],
+  "text_mappings": [
+    {
+      "name": "Only one solution",
+      "entries": [
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 5,
+              "start_column": 0,
+              "end_row": 6,
+              "end_column": 0
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
