@@ -54,8 +54,17 @@ pub(crate) fn node_label(node: Node, src: &[u8]) -> String {
 /// directly onto `line.char_indices()`, and every `HumanTextSpan` is stored in exactly those
 /// coordinates, so widening a tab would silently paint the wrong bytes. The product TUI's
 /// `display_safe` makes the same 1:1 trade for the same reason.
+///
+/// Not only `\t`: `\r` reaches this on every row of a Windows CRLF file, and a terminal receiving
+/// one returns its cursor to column 0 of the line it is drawing - so the row gets overwritten from
+/// its start, a louder version of the tab desync described above. `render_paint_side` walks a row
+/// from `split('\n')`, which keeps the `\r`, so this is where it has to be caught. Every C0
+/// `is_ascii_control`, not `is_control`: the C1 block (U+0080-U+009F) is two UTF-8 bytes per code
+/// point, and trading one of those for a one-byte space would break the byte-offset-for-screen-
+/// column correspondence this function exists to preserve. (`\n` cannot reach here: it is what the
+/// rows were split on.)
 pub(crate) fn display_safe_char(ch: char) -> char {
-    if ch == '\t' { ' ' } else { ch }
+    if ch.is_ascii_control() { ' ' } else { ch }
 }
 
 /// [`display_safe_char`] over a whole string, for the views that render a prebuilt line rather

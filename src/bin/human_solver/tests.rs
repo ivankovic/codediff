@@ -6466,6 +6466,42 @@ fn display_safe_str_replaces_every_tab_and_leaves_everything_else() {
     assert_eq!(display_safe_str("no tabs here"), "no tabs here");
 }
 
+/// A `\r` is worse in a terminal than the `\t` the rule above was written for: it returns the
+/// cursor to column 0 of the row being drawn, so the row is overwritten from its start instead of
+/// merely shifted. `render_paint_side` walks each row from `split('\n')`, which keeps the `\r`
+/// that ends every line of a Windows CRLF file, so this is the last place it can be caught.
+#[test]
+fn the_text_view_never_puts_a_carriage_return_in_the_buffer() {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("src/test/data/diffs/small/typescript-microsoft-typescript-add-target-comment");
+    let source = std::fs::read_to_string(dir.join("before.ts.test")).unwrap();
+    assert!(
+        source.contains('\r'),
+        "this test is pointless unless the fixture is CRLF"
+    );
+
+    let state = TextPaintState::default();
+    let lines = render_paint_side(&source, &[], &state, 0, 100, 10_000);
+    assert!(!lines.is_empty());
+
+    for line in &lines {
+        let rendered: String = line.spans.iter().map(|s| s.content.as_ref()).collect();
+        assert!(
+            !rendered.chars().any(|c| c.is_ascii_control()),
+            "a raw control character reached the buffer: {rendered:?}"
+        );
+    }
+}
+
+/// The substitution has to stay one byte for one byte, which `is_control` would not be: a C1 code
+/// point (U+0080-U+009F) is two UTF-8 bytes, and every `HumanTextSpan` is stored in byte columns
+/// of the untouched source.
+#[test]
+fn display_safe_leaves_multi_byte_control_code_points_alone() {
+    assert_eq!(display_safe_char('\u{9c}'), '\u{9c}');
+    assert_eq!(display_safe_char('\r'), ' ');
+}
+
 /// Promoting or rejecting one sample rewrites the whole sample.csv, so any column the reader drops
 /// is erased for every other row at the same time. `size_bucket` was exactly that column between
 /// the stratified draw landing and this test.

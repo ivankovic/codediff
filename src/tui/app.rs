@@ -1285,8 +1285,22 @@ fn assemble_diff_session_data(
 /// byte, so this is a strict length-preserving substitution - every `RangeMatch`/`TextRange`
 /// offset computed against the original tab-containing text upstream of this function stays
 /// exactly as valid against the space-substituted text it returns.
+///
+/// **Every ASCII control character, not just `\t`.** The one that actually reaches this in the wild
+/// is `\r`: a Windows CRLF file carries one at the end of every row, and it is worse than a tab -
+/// a terminal receiving `\r` returns its cursor to column 0 of the current line, so the row is
+/// overwritten from its start rather than merely shifted. `render_side` (headless) prints these
+/// rows verbatim and a real CRLF fixture emitted a literal `^M` on every line; the TUI's
+/// `code_viewer` puts them in a `Buffer` cell that `ratatui` believes is one column wide.
+///
+/// `is_ascii_control`, not `is_control`: the latter also covers the C1 block (U+0080-U+009F),
+/// whose code points are *two* UTF-8 bytes, and swapping one of those for a one-byte space would
+/// break the offset-preservation this function's whole contract rests on.
+///
+/// `\n` is deliberately exempt: this runs over whole file contents, and every caller downstream
+/// splits them into rows on it.
 fn display_safe(text: &str) -> String {
-    text.replace('\t', " ")
+    text.replace(|c: char| c.is_ascii_control() && c != '\n', " ")
 }
 
 /// `assemble_diff_session_data`'s counterpart for the plain-text fallback (see
@@ -2509,5 +2523,58 @@ mod tests {
             "after_contents still has a raw tab byte"
         );
         Ok(())
+    }
+
+    /// The same corruption, one control character over and louder: a Windows CRLF file carries a
+    /// `\r` at the end of every row, and a terminal receiving one returns its cursor to column 0
+    /// of the line being drawn rather than merely shifting it. Headless mode printed a literal
+    /// `^M` on every line of this fixture before `display_safe` covered the whole ASCII control
+    /// range.
+    ///
+    /// Row and column offsets must survive it: `\r` and `' '` are both one byte, and the row
+    /// count must not change, which is why `\n` is exempt.
+    #[test]
+    fn compute_diff_never_puts_a_raw_carriage_return_into_diff_session_data_contents() -> Result<()>
+    {
+        let before = Path::new(
+            "src/test/data/diffs/small/typescript-microsoft-typescript-add-target-comment/before.ts.test",
+        );
+        let after = Path::new(
+            "src/test/data/diffs/small/typescript-microsoft-typescript-add-target-comment/after.ts.test",
+        );
+        let before_source = std::fs::read_to_string(before)?;
+        // The fixture must actually be CRLF for this test to mean anything.
+        assert!(before_source.contains('\r'));
+
+        let (data, _large_residual) = compute_diff(before, after)?;
+
+        assert!(
+            !data.before_contents.contains('\r'),
+            "before_contents still has a raw carriage return"
+        );
+        assert!(
+            !data.after_contents.contains('\r'),
+            "after_contents still has a raw carriage return"
+        );
+        assert_eq!(
+            (
+                data.before_contents.len(),
+                data.before_contents.split('\n').count()
+            ),
+            (before_source.len(), before_source.split('\n').count()),
+            "the substitution must preserve every byte offset and every row boundary"
+        );
+        Ok(())
+    }
+
+    /// `is_ascii_control`, not `is_control`: a C1 code point is two UTF-8 bytes, so replacing one
+    /// with a one-byte space would shift every offset after it on its row - the exact failure the
+    /// tab substitution was designed never to cause.
+    #[test]
+    fn display_safe_leaves_multi_byte_control_code_points_alone() {
+        let text = "a\u{9c}b\r\n";
+        let safe = display_safe(text);
+        assert_eq!(safe, "a\u{9c}b \n");
+        assert_eq!(safe.len(), text.len());
     }
 }
