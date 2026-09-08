@@ -1096,6 +1096,13 @@ fn rows_covered(range: &TextRange) -> usize {
     end_row.saturating_sub(range.start_row).max(1)
 }
 
+/// True if `inner` lies wholly inside `outer`, comparing `(row, column)` positions. See
+/// `reconcile_moves`.
+fn range_contains(outer: &TextRange, inner: &TextRange) -> bool {
+    (outer.start_row, outer.start_column) <= (inner.start_row, inner.start_column)
+        && (inner.end_row, inner.end_column) <= (outer.end_row, outer.end_column)
+}
+
 /// Makes the two sides agree on *which* matched pair relocated, by believing whichever side
 /// blames fewer rows.
 ///
@@ -1117,14 +1124,23 @@ fn rows_covered(range: &TextRange) -> usize {
 /// rewriting the other side to match it. Agreed pairs are never touched, so a file whose walks
 /// already agree comes out byte-identical.
 ///
+/// **What counts as a disagreement is not an exact-extent question.** The two walks routinely
+/// decompose the same subtree differently, so a relocation both of them saw can be named over
+/// extents a few columns apart; reading that as a conflict is worse than doing nothing, because
+/// the tie-break then withdraws one side's correct claim and its own counterpart lookup finds
+/// nothing to promote in its place. So a pair is agreed when the other side has *any* `Move`
+/// nested either way with this one's destination, and only an unmatched extent is a real
+/// disagreement. Measured 2026-09-08: whole-corpus painting disagreement 0.7417% -> 0.6404%.
+///
 /// Two limits worth stating rather than discovering later. The comparison is **per file, not per
 /// reorder**: a file containing two independent reorders that disagree in opposite directions gets
 /// one global verdict, and the minority one is decided wrongly. Grouping disagreements into
 /// clusters needs a notion of which reorder a pair belongs to that nothing here has. And promoting
-/// the winner's counterpart needs to *find* it - an exact extent lookup into the other side's
-/// range list, which is not quite total (measured at 99.2% for the analogous lookup in
+/// the winner's counterpart still needs to *find* it - an exact extent lookup into the other
+/// side's range list, which is not quite total (measured at 99.2% for the analogous lookup in
 /// `generate_mapping_site`), so a counterpart that isn't found stays unpainted rather than being
-/// invented.
+/// invented. Promoting by containment instead was measured the same day and moved **nothing**
+/// once the agreement test above was in place; it is not there.
 fn reconcile_moves(before: &mut [RangeMatch], after: &mut [RangeMatch]) {
     use std::collections::HashMap;
 
@@ -1156,6 +1172,25 @@ fn reconcile_moves(before: &mut [RangeMatch], after: &mut [RangeMatch]) {
             .filter_map(|(index, range_match)| {
                 match other_index.get(&key(&range_match.destination)).copied() {
                     Some(other_index) if other[other_index].operation == TextOperation::Move => {
+                        None
+                    }
+                    // Exact extents are how the two sides *usually* name the same pair, but they
+                    // are not how the two sides usually decompose a subtree. When the other walk
+                    // already calls a containing or contained span `Move`, the two agree about
+                    // what relocated and differ only about where its edges are - and calling that
+                    // a disagreement is worse than useless, because the tie-break then withdraws
+                    // one side's correct claim and cannot promote a counterpart it did not find.
+                    // `rust-next-font-imports-generator` is the whole corpus's largest painting
+                    // disagreement for exactly this reason: sixty-one rows of a de-indented `if
+                    // let` chain, called `Move` by both walks over extents four columns apart,
+                    // rendered `Move` on the before side and blank on the after side.
+                    _ if other.iter().any(|other| {
+                        other.operation == TextOperation::Move
+                            && !other.source.is_empty()
+                            && (range_contains(&range_match.destination, &other.source)
+                                || range_contains(&other.source, &range_match.destination))
+                    }) =>
+                    {
                         None
                     }
                     counterpart => Some((index, counterpart)),

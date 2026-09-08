@@ -44,9 +44,14 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-01: minimal 6.537%, full 22.212% (measured, unexamined) - minimal dropped
-    // from 37.788% after paint_reindent_only_moves shipped (see solve_nested_condition_collapse)
-    assert_matches_human_painting_within_limit("rust-next-font-imports-generator", 22.24)
+    // re-measured 2026-09-08: minimal 3.247%, full 6.897%. `FULL` fell from 21.399% when
+    // `reconcile_moves` stopped calling two overlapping accounts of the same relocation a
+    // disagreement: both walks called this file's de-indented `if let` chain a `Move`, over
+    // extents four columns apart, and the exact-extent lookup read that as a conflict - so the
+    // after side was blanked over sixty-one rows. This fixture alone was a quarter of the whole
+    // corpus's painting disagreement. The 2026-09-01 comment's 6.537%/22.212% and its note about
+    // `paint_reindent_only_moves` describe the state before that.
+    assert_matches_human_painting_within_limit("rust-next-font-imports-generator", 6.91)
 }
 
 #[test]

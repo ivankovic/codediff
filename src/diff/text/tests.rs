@@ -249,6 +249,46 @@ fn paint_displaced_moves_gates_a_multi_row_node_edited_on_its_first_row() {
     );
 }
 
+/// `reconcile_moves` used to ask whether the *other* walk had a range with this pair's
+/// destination extent **exactly**, and treated anything else as the two walks disagreeing about
+/// which pair relocated. The two walks routinely decompose the same subtree differently, so a
+/// relocation both of them saw could be read as a conflict - and the tie-break then withdrew one
+/// side's correct claim while its own counterpart lookup found nothing to promote, leaving the
+/// relocation painted on one side and blank on the other. That is what blanked sixty-one rows of
+/// `rust-next-font-imports-generator`'s after side.
+///
+/// Here the two sides name the same relocation over extents a column or two apart, so neither
+/// side's exact-extent lookup finds the other. Neither claim may be withdrawn.
+#[test]
+fn reconcile_moves_keeps_two_overlapping_accounts_of_one_relocation() {
+    let range_match = |source: TextRange, destination: TextRange, operation| RangeMatch {
+        source,
+        destination,
+        operation,
+    };
+    // The before walk calls rows 3..9 moved; the after walk names the same relocation from one
+    // column further in, which no exact-extent lookup can match.
+    let mut before = [range_match(
+        TextRange::new(3, 4, 9, 0),
+        TextRange::new(3, 3, 9, 0),
+        TextOperation::Move,
+    )];
+    let mut after = [range_match(
+        TextRange::new(3, 2, 9, 0),
+        TextRange::new(3, 5, 9, 0),
+        TextOperation::Move,
+    )];
+
+    reconcile_moves(&mut before, &mut after);
+
+    assert_eq!(
+        (before[0].operation.clone(), after[0].operation.clone()),
+        (TextOperation::Move, TextOperation::Move),
+        "an overlapping account of the same relocation is agreement, not a disagreement to \
+         resolve by withdrawing one side"
+    );
+}
+
 /// The exact tokens the painted corpus showed `Full` adding over `Minimal` - eight `(`, five
 /// `)`, two `):` and one `;` across ten fixtures. If `Minimal` does not drop these, it is not
 /// modelling the style it is named after.
