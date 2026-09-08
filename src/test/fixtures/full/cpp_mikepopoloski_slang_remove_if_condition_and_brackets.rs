@@ -28,10 +28,12 @@ fn mapping() -> Result<()> {
     // identical `)` tokens inside the same `condition_clause` claims the human's chosen partner -
     // both pairings are byte-for-byte equivalent closes of a parenthesized expression, so this is
     // a same-shape sibling-choice tie, not a real structural miss.
-    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
+    // Re-measured 2026-09-08: the residual is gone. The delimiter fix in 974cc062
+    // (`reclaim_slot_level_twins`, "Give a delimiter back to the construct it closes") settled the
+    // sibling-choice tie above, so this is exact now and asserts so with the exact call shape
+    // rather than a limit of zero.
+    test::helper::human_mapping::assert_matches_human_mapping(
         "cpp-mikepopoloski-slang-remove-if-condition-and-brackets",
-        2,
-        2,
     )
 }
 

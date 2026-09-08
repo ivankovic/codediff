@@ -38,10 +38,15 @@ fn mapping() -> Result<()> {
     // allowance: it had outlived the change that closed the gap, and `quality_baseline.csv` was the
     // only thing still holding this fixture to its real number. Any counts above describe the
     // older, larger residual.
+    // Re-measured 2026-09-08 and tightened 362,251 -> 360,249: the delimiter fix in 974cc062
+    // (`reclaim_slot_level_twins`, "Give a delimiter back to the construct it closes") removed 2
+    // of them. A limit above the measured number is a test that cannot fail, which is what
+    // `the_quality_baseline_accuracy_columns_are_a_projection_of_the_stub_limits` exists to catch
+    // - the baseline records the measurement, so the stub has to record it too.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "java-pdftk-java-pdftk-real-change-all-across-the-file",
-        362,
-        251,
+        360,
+        249,
     )
 }
 

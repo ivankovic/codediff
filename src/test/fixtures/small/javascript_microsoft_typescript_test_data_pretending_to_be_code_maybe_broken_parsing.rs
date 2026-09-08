@@ -25,10 +25,12 @@ fn mapping() -> Result<()> {
     // this is TypeScript compiler test fixture data, not real code, and doesn't parse cleanly -
     // ERROR nodes dominate the tree, and node correspondence through them is essentially
     // undefined.
-    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
+    // Re-measured 2026-09-08: the residual is gone. The delimiter fix in 974cc062
+    // (`reclaim_slot_level_twins`, "Give a delimiter back to the construct it closes") settled the
+    // sibling-choice tie above, so this is exact now and asserts so with the exact call shape
+    // rather than a limit of zero.
+    test::helper::human_mapping::assert_matches_human_mapping(
         "javascript-microsoft-typescript-test-data-pretending-to-be-code-maybe-broken-parsing",
-        2,
-        2,
     )
 }
 

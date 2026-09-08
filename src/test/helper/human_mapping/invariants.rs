@@ -292,24 +292,43 @@ fn rows_of(contents: &str) -> impl Iterator<Item = (usize, usize, &str)> {
     })
 }
 
-/// **Candidate invariant 4.** If a `Full` painting calls the first visible character on a line
-/// inserted or deleted, it must call that line's own indentation inserted or deleted too.
+/// **Candidate invariant 4.** If a `Full` painting calls *every* visible character on a line
+/// inserted, or every one of them deleted, the whole line - its whitespace included - carries that
+/// verdict.
 ///
-/// A whole line entering or leaving the file takes its indentation with it - the indentation is
-/// not a survivor sitting on an inserted line, it is part of what was inserted. Painting the code
-/// but not the whitespace in front of it draws the highlight starting in the middle of the line,
-/// which reads as "this line was edited here" rather than "this line is new". This is the same
-/// closure `RenderOptions::leading_whitespace` already applies on the rendering side under `FULL`
-/// (see that field's doc comment, and `extend_leading_whitespace`); this is the data side of it.
+/// A line all of whose content is entering or leaving the file is entering or leaving *whole*. Its
+/// indentation is not a survivor sitting on an inserted line and the spaces between its tokens are
+/// not untouched ground; they are part of what was inserted. Painting the code but not the
+/// whitespace draws a highlight broken into pieces, which reads as several edits to a surviving
+/// line rather than one line arriving or departing. This is the data-side counterpart of the
+/// closure `RenderOptions::leading_whitespace` already applies when rendering under `FULL` (see
+/// that field's doc comment, and `extend_leading_whitespace`).
 ///
-/// Scoped to `Insert`/`Delete` deliberately. A `Move` or an `Update` is a *surviving* line whose
-/// indentation genuinely may not have changed - `Full` widening a `Move` over a reindented block
-/// is exactly the case `paint_reindent_only_moves` exists for, and it has no business claiming
-/// the old indentation as part of the move.
+/// **The condition is "all of them", not "the first one".** An earlier draft asked only whether
+/// the first visible character was `Insert`/`Delete` and required the indentation to match; that
+/// is a different and wrong claim, because a *surviving* line can begin with an inserted token and
+/// keep every space after it untouched, which no rule should forbid. Requiring the whole line to
+/// be one verdict before saying anything about its whitespace is what makes the conclusion follow:
+/// there is nothing on the line that survived, so there is nothing for the unpainted whitespace to
+/// belong to.
 ///
-/// A line with no visible character at all is skipped: there is no first character to test, and
-/// an all-whitespace line's own painting is what invariant 1 already declines to judge.
-fn full_paints_leading_whitespace_of_a_changed_line(
+/// Scoped to `Insert`/`Delete` deliberately. A line entirely `Move`d or `Update`d is still a
+/// surviving line whose whitespace genuinely may not have changed - `Full` widening a `Move` over
+/// a reindented block is exactly the case `paint_reindent_only_moves` exists for, and it has no
+/// business claiming the old indentation as part of the move.
+///
+/// **What the whitespace has to be is *accounted for*, not identically labelled.** A deleted line
+/// and the inserted line that replaces it can share their indentation, and a painter may say so by
+/// pairing the two runs in one `Match` entry - which resolves to `Move`, a different label from
+/// the `Insert`/`Delete` around it. That is a stronger claim than painting it `Insert`, not a
+/// weaker one: it names the surviving bytes and their counterpart on the other side.
+/// `go-lazygit-switch-to-strings` row 22 is the corpus's example, `\t\t\tindentation += "  "`
+/// against `\t\t\tcount++`. So only an **unpainted** byte is reported; any verdict at all passes.
+///
+/// A line with no visible character at all is skipped: "every visible character is `Insert`" is
+/// vacuously true there, and an all-whitespace line's own painting is what invariant 1 already
+/// declines to judge.
+fn full_paints_a_wholly_changed_line_whole(
     painting: &str,
     labels: &[Vec<Option<TextLabel>>; 2],
     before: &Code,
@@ -318,29 +337,48 @@ fn full_paints_leading_whitespace_of_a_changed_line(
     let mut violations = Vec::new();
     for (side, contents) in [(0usize, &before.contents), (1usize, &after.contents)] {
         for (row, start, line) in rows_of(contents) {
-            let Some(first) = line.find(|c: char| !c.is_whitespace()) else {
-                continue;
-            };
-            if first == 0 {
+            let visible: Vec<usize> = line
+                .char_indices()
+                .filter(|(_, c)| !c.is_whitespace())
+                .map(|(i, _)| i)
+                .collect();
+            if visible.is_empty() {
                 continue;
             }
-            let Some(label) = labels[side][start + first] else {
+            let Some(label) = labels[side][start + visible[0]] else {
                 continue;
             };
             if !matches!(label, TextLabel::Insert | TextLabel::Delete) {
                 continue;
             }
-            let unpainted: Vec<usize> = (0..first)
-                .filter(|&i| labels[side][start + i] != Some(label))
+            if !visible
+                .iter()
+                .all(|&i| labels[side][start + i] == Some(label))
+            {
+                continue;
+            }
+            // Up to and including the last visible character, never past it. Invariant 1 forbids
+            // a painted run *ending* on whitespace, so "the whole line" cannot mean the trailing
+            // whitespace too without the two rules contradicting each other - and they would, on
+            // real data: measured 2026-09-08, 16 of this check's 18 hits were a lone trailing
+            // `\r` on a CRLF file or one trailing space, i.e. bytes invariant 1 exists to keep
+            // unpainted. The line's *content* is what enters or leaves whole; what follows it is
+            // the stripe of colour hanging off the end that invariant 1 already refuses.
+            let end = visible.last().copied().unwrap_or(0)
+                + line[visible.last().copied().unwrap_or(0)..]
+                    .chars()
+                    .next()
+                    .map_or(1, char::len_utf8);
+            let unpainted: Vec<usize> = (0..end)
+                .filter(|&i| labels[side][start + i].is_none())
                 .collect();
             // The exact columns, not just how many: this list is read by a human repairing the
-            // painting by hand, and "12 of 16" does not say *which* twelve - the four already
-            // painted in `rust-next-font-imports-generator` are a deliberate-looking dedent.
+            // painting by hand, and "12 of 16" does not say *which* twelve.
             if let (Some(&low), Some(&high)) = (unpainted.first(), unpainted.last()) {
                 violations.push(format!(
-                    "painting '{painting}' {} row {} paints its first visible character \
-                     {label:?} but leaves columns {low}..{} of its 0..{first} indentation \
-                     unpainted ({} byte(s)): {line:?}",
+                    "painting '{painting}' {} row {} paints every visible character {label:?} but \
+                     leaves columns {low}..{} unpainted ({} byte(s) of whitespace inside the \
+                     line's own content): {line:?}",
                     side_name(side),
                     row + 1,
                     high + 1,
@@ -414,7 +452,7 @@ pub fn full_painting_whitespace_violations(
     let mut leading = Vec::new();
     let mut interior = Vec::new();
     for (painting, labels) in full_paintings_with_labels(mapping, before, after)? {
-        leading.extend(full_paints_leading_whitespace_of_a_changed_line(
+        leading.extend(full_paints_a_wholly_changed_line_whole(
             painting, &labels, before, after,
         ));
         interior.extend(no_unpainted_whitespace_between_painted_regions(

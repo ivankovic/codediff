@@ -25,10 +25,15 @@ fn mapping() -> Result<()> {
     // `MultiMapGroup`. The 27 that remain are an N:M correspondence the format cannot express.
     // This was an exact fixture only because the file was almost entirely ungraded; the 9
     // mismatches below are newly-graded nodes, not a regression.
+    // Re-measured 2026-09-08 and tightened 9,9 -> 7,7: the delimiter fix in 974cc062
+    // (`reclaim_slot_level_twins`, "Give a delimiter back to the construct it closes") removed 2
+    // of them. A limit above the measured number is a test that cannot fail, which is what
+    // `the_quality_baseline_accuracy_columns_are_a_projection_of_the_stub_limits` exists to catch
+    // - the baseline records the measurement, so the stub has to record it too.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "lua-neovim-neovim-logic-change-with-some-code-re-use",
-        9,
-        9,
+        7,
+        7,
     )
 }
 

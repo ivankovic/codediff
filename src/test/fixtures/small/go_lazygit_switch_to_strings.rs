@@ -32,7 +32,12 @@ fn mapping() -> Result<()> {
 #[test]
 fn painting() -> Result<()> {
     // measured 2026-09-05: minimal 2.564%, full 3.812%
-    assert_matches_human_painting_within_limit("go-lazygit-switch-to-strings", 3.83)
+    // re-measured 2026-09-08 after the Full painting was repaired against the two new whitespace
+    // invariants: minimal unchanged at 2.564%, full 3.812% -> 4.089%. The repair added an Insert over
+    // the leading tab of the inserted `"strings"` import and a Match pairing the `\t\t\t` of the
+    // deleted `indentation += "  "` row with the inserted `count++` row - the shared-indentation case
+    // invariant 4 explicitly allows. Ground truth moved, not the algorithm.
+    assert_matches_human_painting_within_limit("go-lazygit-switch-to-strings", 4.10)
 }
 
 #[test]

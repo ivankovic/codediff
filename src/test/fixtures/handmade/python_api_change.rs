@@ -33,7 +33,14 @@ fn painting() -> Result<()> {
     // an insert or a re-indent: minimal 1.047%, full 4.188% -> 3.141%. The 25.0 it replaces was
     // recorded against the 2026-08-26 renderer and its own comment (26.505%/27.945%) had been
     // impossible for some time.
-    assert_matches_human_painting_within_limit("python-api-change", 3.16)
+    // re-measured 2026-09-08 after the Full painting was repaired against the two new whitespace
+    // invariants (`full_paints_a_wholly_changed_line_whole`,
+    // `no_unpainted_whitespace_between_painted_regions`): minimal unchanged at 1.047%, full 3.141% ->
+    // 10.079%. The ground truth moved, not the algorithm - `Full` now claims the inserted line's own
+    // eight-space indentation, both `(user_id` parameter lists and both URL literals as Move, and
+    // codediff paints none of them. Every one of the 154 bytes is `theirs=Some(...) ours=None` or a
+    // narrowing disagreement, i.e. paint codediff does not produce, not paint it produces wrongly.
+    assert_matches_human_painting_within_limit("python-api-change", 10.09)
 }
 
 #[test]

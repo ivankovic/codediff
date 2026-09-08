@@ -24,10 +24,15 @@ fn mapping() -> Result<()> {
     // Known, unreviewed gap against the human-authored mapping - not yet root-caused. Clamped at
     // the observed count rather than requiring an exact match. Lower (or drop back to
     // `assert_matches_human_mapping`) once a fix lands.
+    // Re-measured 2026-09-08 and tightened 5,5 -> 4,4: the delimiter fix in 974cc062
+    // (`reclaim_slot_level_twins`, "Give a delimiter back to the construct it closes") removed 1
+    // of them. A limit above the measured number is a test that cannot fail, which is what
+    // `the_quality_baseline_accuracy_columns_are_a_projection_of_the_stub_limits` exists to catch
+    // - the baseline records the measurement, so the stub has to record it too.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "csharp-icsharpcode-avaloniailspy-a-few-formatting-changes-and-use-a-struct-instead-of-tuples",
-        5,
-        5,
+        4,
+        4,
     )
 }
 

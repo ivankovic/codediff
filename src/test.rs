@@ -44,7 +44,6 @@ mod tests {
         "json-excalidraw-excalidraw-change-translations-mostly-add",
         "json-kiwix-kiwix-desktop-add-a-few-change-a-few",
         "kotlin-jetbrains-kotlin-remove-one-comment-line",
-        "kotlin-nextcloud-a-few-small-removals",
         "php-zetacomponents-consoletools-file-with-parse-errors-and-a-few-deletions",
         "python-ansible-ansible-ridiculously-long-yaml-in-string-constant-and-actual-code-changes",
         "python-portagefilelist-client-remove-one-import-and-update-one-const-string",
