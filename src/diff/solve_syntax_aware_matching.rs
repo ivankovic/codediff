@@ -62,6 +62,7 @@ pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
     solve_large_flat_subtrees::solve(ctx, diff);
     solve_qualified_name_groups(before, after, diff);
     solve_import_list_overlap(before, after, diff);
+    solve_import_path_similarity(before, after, diff);
     solve_greedy_anchor_blocks::solve(ctx, diff);
 }
 
@@ -418,6 +419,227 @@ fn solve_import_list_overlap(before: &Code, after: &Code, diff: &mut ASTDiff) {
 /// `scoped_use_list` (i.e. the `use foo::{a, b, ...}` form, not a bare `use foo::bar;`) - a
 /// single-symbol import has nothing for Jaccard scoring to compare against, and already-hash-
 /// matches or doesn't via phase 1 with nothing this pass could add.
+/// Jaccard floor for a candidate pair of import statements, below which
+/// [`solve_import_path_similarity`] never pairs however the token budget works out.
+const IMPORT_PATH_SIMILARITY_THRESHOLD: f64 = 0.5;
+
+/// Fewest shared path tokens a candidate pair needs. Two imports agreeing on one token agree on
+/// nothing - `<string>` and `<sstream>` share `s`-nothing, but `a/b.h` and `a/c.h` share `a`, and
+/// a common top-level directory is the weakest possible evidence in a tree of hundreds of files.
+const IMPORT_PATH_MIN_SHARED_TOKENS: usize = 2;
+
+/// How many tokens two import paths may differ by before they are different modules, as
+/// `1 + union / IMPORT_PATH_TOKEN_BUDGET_DIVISOR`.
+///
+/// **This is the length term, and it exists because a ratio is the wrong instrument for short
+/// paths.** Jaccard says `{aoa, hid, h}` -> `{usb, aoa, hid, h}` (a file that moved into a
+/// subdirectory, and the same module either way) scores 0.75, while `{org, mockito, Mockito}` vs
+/// `{io, mockk, every}` scores 0.0 - so far so good - but it also says `{foo, bar, h}` vs
+/// `{foo, baz, h}` scores 0.5, and those are two different headers that happen to sit in one
+/// directory. The ratio cannot separate them because on a three-token path *every* difference is
+/// a third of the path. What separates them is the absolute count: one token changed is a path
+/// edit, two is a different file.
+///
+/// The budget then has to grow with length or the rule inverts on long paths: a Java
+/// `com.example.service.internal.ChatServiceError` is eight tokens, and demanding that a rename
+/// change at most one of them would reject a genuine two-segment relocation that no reader would
+/// call a different module. One extra token allowed per six of path is the corpus's own scale.
+///
+/// Measured 2026-09-08 over the 748-fixture corpus. The length term is doing real work - it is
+/// what stops `kotlin-nextcloud-android-move-from-one-mocking-library-to-other` pairing
+/// `org.mockito.*` with `io.mockk.*` (a plain 0.5 ratio pairs them, +36 mismatches) - but it is
+/// not sufficient on its own, which is what [`import_paths_have_no_rival`] is for.
+const IMPORT_PATH_TOKEN_BUDGET_DIVISOR: usize = 6;
+
+/**
+* Pairs leftover import statements by how much of their **path text** they share, in every
+* language [`nodes::is_import_kind`] knows.
+*
+* [`solve_import_list_overlap`] above is Rust-only and only handles multi-symbol
+* `use foo::{a, b, c}` statements, keyed on the base path with the imported *symbol set* as the
+* score. Nothing generalises: a `#include "aoa_hid.h"`, a Go `import "fmt"`, a Kotlin
+* `import com.unciv.logic.civilization.Civilization` have no symbol set to overlap - the whole of
+* their identity is the one path string.
+*
+* The score is Jaccard over the statement's own alphanumeric tokens (minus the language keyword,
+* see [`IMPORT_KEYWORD_TOKENS`]), reusing [`nodes::flow_control_similarity_of_sets`] - the same
+* helper `solve_import_list_overlap` scores its symbol sets with. **Acceptance is not the score
+* alone**: a pair must also clear [`IMPORT_PATH_MIN_SHARED_TOKENS`] and a differing-token budget
+* that scales with path length ([`IMPORT_PATH_TOKEN_BUDGET_DIVISOR`]). A pair that fails either
+* is priced out of the matcher rather than merely ranked low.
+*
+* **Only unmapped statements, and only against unmapped statements.** Byte-identical imports are
+* paired by phase 1, so what reaches here is the residue an edit actually touched. Bucketed by
+* node kind so a C++ `using_declaration` never competes with a `preproc_include`.
+*
+* **Deliberately statement-level, never member-level.** Phase-4 expansion candidate #1 (matching an
+* individual imported symbol) was tried and reverted for fragmenting the parent list's own comma
+* assignment - see [`solve_import_list_overlap`]'s doc comment.
+*/
+fn solve_import_path_similarity(before: &Code, after: &Code, diff: &mut ASTDiff) {
+    let before_metadata = metadata_of(before);
+    let after_metadata = metadata_of(after);
+    let language = before_metadata.language;
+    if language != after_metadata.language {
+        return;
+    }
+
+    let Some(before_root) = before.ast.as_ref().map(|ast| ast.root_node()) else {
+        return;
+    };
+    let Some(after_root) = after.ast.as_ref().map(|ast| ast.root_node()) else {
+        return;
+    };
+
+    let before_items =
+        collect_unmapped_imports(before_root, before, &diff.before_node_map, &language);
+    let after_items = collect_unmapped_imports(after_root, after, &diff.after_node_map, &language);
+    if before_items.is_empty() || after_items.is_empty() {
+        return;
+    }
+
+    let candidates =
+        |items: &[(usize, &'static str, HashSet<&str>)]| -> Vec<(usize, &'static str)> {
+            items.iter().map(|(id, kind, _)| (*id, *kind)).collect()
+        };
+    let before_candidates = candidates(&before_items);
+    let after_candidates = candidates(&after_items);
+    let before_tokens: HashMap<usize, &HashSet<&str>> = before_items
+        .iter()
+        .map(|(id, _, tokens)| (*id, tokens))
+        .collect();
+    let after_tokens: HashMap<usize, &HashSet<&str>> = after_items
+        .iter()
+        .map(|(id, _, tokens)| (*id, tokens))
+        .collect();
+
+    grouped_greedy_matcher::solve(
+        diff,
+        &before_candidates,
+        &after_candidates,
+        |before_id, after_id| {
+            let (before_set, after_set) = (before_tokens[&before_id], after_tokens[&after_id]);
+            if !import_paths_are_the_same_module(before_set, after_set)
+                || !import_paths_have_no_rival(before_set, after_set, &before_items, &after_items)
+            {
+                // Above any threshold the matcher can be given, so the pair is never accepted -
+                // `grouped_greedy_matcher` has one `max_cost` for every pair and both rules are
+                // per-pair.
+                return f64::INFINITY;
+            }
+            1.0 - flow_control_similarity_of_sets(before_set, after_set)
+        },
+        Some(1.0 - IMPORT_PATH_SIMILARITY_THRESHOLD),
+        |before_id, after_id, diff| {
+            apted::for_nodes(
+                &before_metadata,
+                &after_metadata,
+                vec![before_id],
+                vec![after_id],
+                Algorithm::Apted,
+                "import_path_similarity",
+                diff,
+            );
+        },
+    );
+}
+
+/// Whether two token sets name the same module: enough shared tokens to mean anything, and few
+/// enough differing ones for the difference to read as a path edit rather than a different file.
+/// See [`IMPORT_PATH_TOKEN_BUDGET_DIVISOR`] for why the budget is absolute-with-a-length-term
+/// rather than a ratio.
+fn import_paths_are_the_same_module(before: &HashSet<&str>, after: &HashSet<&str>) -> bool {
+    let shared = before.intersection(after).count();
+    let union = before.union(after).count();
+    let differing = union - shared;
+    shared >= IMPORT_PATH_MIN_SHARED_TOKENS
+        && differing <= 1 + union / IMPORT_PATH_TOKEN_BUDGET_DIVISOR
+}
+
+/// Whether this pair is the *only* acceptable reading on both sides.
+///
+/// **The remaining failure after the length term is ambiguity, not looseness.** An import block is
+/// routinely edited N:1 or 1:N - one `import a.b.{c, d}` split into two statements, or eight
+/// `com.unciv.logic.civilization.X` collapsed into one `com.unciv.logic.civilization.*`. Every
+/// member of such a group clears the token budget against the single statement on the other side,
+/// because they genuinely are the same module; a greedy 1:1 matcher then picks one of them and
+/// orphans the rest, and the ground truth reads the whole group together. Measured 2026-09-08:
+/// with the length term but without this check, the corpus's only remaining regressions were
+/// exactly those three shapes (`scala-com-lihaoyi-mill-split-import` 1 -> 17,
+/// `-split-import-2` 8 -> 14, `kotlin-yairm210-unciv-another-vector2-removal` 18 -> 22).
+///
+/// So a pair is accepted only when neither side has a second candidate it would also accept. What
+/// this pass can say with confidence is "this one module moved"; a group edit is left to APTED and
+/// the later phases, which see the whole block at once.
+fn import_paths_have_no_rival(
+    before: &HashSet<&str>,
+    after: &HashSet<&str>,
+    before_items: &[(usize, &'static str, HashSet<&str>)],
+    after_items: &[(usize, &'static str, HashSet<&str>)],
+) -> bool {
+    let rivals_for = |set: &HashSet<&str>, items: &[(usize, &'static str, HashSet<&str>)]| {
+        items
+            .iter()
+            .filter(|(_, _, other)| import_paths_are_the_same_module(set, other))
+            .count()
+    };
+    rivals_for(before, after_items) == 1 && rivals_for(after, before_items) == 1
+}
+
+/// Tokens every import in some language carries regardless of which module it names, dropped
+/// before scoring so the comparison is between the two *paths* and nothing else.
+///
+/// With these included a Kotlin `import a.b.C` shares one of its five tokens with every other
+/// import in the file for free, which lifts every pair by a fixed amount. Matched
+/// case-insensitively against whole tokens only, so a module named `Import` is unaffected.
+const IMPORT_KEYWORD_TOKENS: &[&str] = &[
+    "import", "include", "use", "using", "from", "require", "package",
+];
+
+/// Every not-yet-mapped import statement, as `(node id, node kind, its alphanumeric tokens)`.
+///
+/// The kind is `grouped_greedy_matcher`'s exact bucket key, so two different import forms in one
+/// language (C++'s `preproc_include` and `using_declaration`) are never scored against each other.
+fn collect_unmapped_imports<'a>(
+    root: Node<'a>,
+    code: &'a Code,
+    mapped: &rustc_hash::FxHashMap<usize, usize>,
+    language: &Language,
+) -> Vec<(usize, &'static str, HashSet<&'a str>)> {
+    let bytes = code.contents.as_bytes();
+    let mut out = Vec::new();
+    let mut stack = vec![root];
+    while let Some(node) = stack.pop() {
+        if nodes::is_import_kind(node.kind(), language) {
+            if !mapped.contains_key(&node.id())
+                && let Ok(text) = node.utf8_text(bytes)
+            {
+                let tokens: HashSet<&str> = text
+                    .split(|c: char| !c.is_alphanumeric())
+                    .filter(|token| {
+                        !token.is_empty()
+                            && !IMPORT_KEYWORD_TOKENS
+                                .iter()
+                                .any(|keyword| token.eq_ignore_ascii_case(keyword))
+                    })
+                    .collect();
+                if !tokens.is_empty() {
+                    // `Node::kind` returns `&'static str` - it borrows the grammar's own static
+                    // name table, not the tree - so bucketing on it costs no allocation.
+                    out.push((node.id(), node.kind(), tokens));
+                }
+            }
+            // An import statement holds no nested import statements.
+            continue;
+        }
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            stack.push(child);
+        }
+    }
+    out
+}
+
 fn collect_rust_grouped_use_declarations<'a>(
     root: Node<'a>,
     code: &'a Code,

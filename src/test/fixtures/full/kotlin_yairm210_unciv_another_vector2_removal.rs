@@ -24,10 +24,17 @@ fn mapping() -> Result<()> {
     // Known, unreviewed gap against the human-authored mapping - not yet root-caused. Clamped at
     // the observed count rather than requiring an exact match. Lower (or drop back to
     // `assert_matches_human_mapping`) once a fix lands.
+    //
+    // 18,14 -> 12,9 on 2026-09-08 with `solve_import_path_similarity`. This file collapses eight
+    // `import com.unciv.logic.civilization.X` lines into one `com.unciv.logic.civilization.*`; the
+    // eight are unmapped when phase 4 runs and the new pass now pairs the one of them the token
+    // budget accepts without a rival, instead of `APTED("fast_fallback")` aligning the whole block
+    // positionally. The remaining twelve are the rest of that collapse, which no 1:1 matcher can
+    // express.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "kotlin-yairm210-unciv-another-vector2-removal",
-        18,
-        14,
+        12,
+        9,
     )
 }
 
