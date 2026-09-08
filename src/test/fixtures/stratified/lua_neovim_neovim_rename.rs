@@ -28,9 +28,8 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test, read the rate it
-    // reports for both modes, and record that instead.
-    assert_matches_human_painting_within_limit("lua-neovim-neovim-rename", 100.0)
+    // measured 2026-09-09: minimal 0.657%, full 1.315% (measured, unexamined)
+    assert_matches_human_painting_within_limit("lua-neovim-neovim-rename", 1.33)
 }
 
 #[test]

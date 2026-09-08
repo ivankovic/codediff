@@ -19,7 +19,7 @@ use anyhow::Result;
 
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants_with_known_violations;
 
 #[test]
 fn mapping() -> Result<()> {
@@ -30,12 +30,20 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test, read the rate it
-    // reports for both modes, and record that instead.
-    assert_matches_human_painting_within_limit("php-nextcloud-server-real-small-change", 100.0)
+    // measured 2026-09-09: minimal 4.824%, full 0.981% (measured, unexamined)
+    assert_matches_human_painting_within_limit("php-nextcloud-server-real-small-change", 4.84)
 }
 
 #[test]
 fn invariants() -> Result<()> {
-    assert_ground_truth_invariants("php-nextcloud-server-real-small-change")
+    // Two `Full` rows - the `@var IClientService` docblock line and the `private $clientService;`
+    // beside it - have every visible character painted `Delete` but leave their one leading tab
+    // unpainted, which invariant 4 reads as a line changed in whole but painted in part. A hand-
+    // painting slip rather than a reading of the edit: nothing distinguishes those two rows from
+    // the deleted lines around them, whose indentation *is* painted. Recorded exactly rather than
+    // repaired, because what the indent of a deleted line means is the author's call.
+    assert_ground_truth_invariants_with_known_violations(
+        "php-nextcloud-server-real-small-change",
+        2,
+    )
 }

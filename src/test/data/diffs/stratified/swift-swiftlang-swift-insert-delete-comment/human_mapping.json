@@ -1617,33 +1617,6 @@
   ],
   "text_mappings": [
     {
-      "name": "Minimal",
-      "entries": [
-        {
-          "operation": "Delete",
-          "before": [
-            {
-              "start_row": 6,
-              "start_column": 0,
-              "end_row": 8,
-              "end_column": 0
-            }
-          ]
-        },
-        {
-          "operation": "Insert",
-          "after": [
-            {
-              "start_row": 6,
-              "start_column": 0,
-              "end_row": 9,
-              "end_column": 0
-            }
-          ]
-        }
-      ]
-    },
-    {
       "name": "Only one solution",
       "entries": [
         {

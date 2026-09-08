@@ -542,9 +542,21 @@ fn label_bytes(contents: &str, spans: &[(HumanTextSpan, TextLabel)]) -> Vec<Opti
             *slot = Some(label);
         }
     }
-    for (byte, label) in contents.bytes().zip(labels.iter_mut()) {
-        if byte == b'\n' {
-            *label = None;
+    // A line terminator is never painted, whichever one the file uses. A span written as ending at
+    // column 0 of the next row swallows the break - 28 of them in the corpus, an artifact of how
+    // `from_treesitter_range` normalises a range that ends at end of row - and nothing downstream
+    // paints it. On a CRLF file that break is **two** bytes: dropping only the `\n` left the `\r`
+    // painted, so the very span shape that is unremarkable on a Unix file reported as painted
+    // trailing whitespace on a Windows one (`javascript-microsoft-typescript-small-change-2`,
+    // invariant 1). Applies to codediff's ranges and the human's spans alike, since both arrive
+    // here.
+    let bytes = contents.as_bytes();
+    for index in 0..labels.len() {
+        if bytes[index] == b'\n' {
+            labels[index] = None;
+            if index > 0 && bytes[index - 1] == b'\r' {
+                labels[index - 1] = None;
+            }
         }
     }
     labels

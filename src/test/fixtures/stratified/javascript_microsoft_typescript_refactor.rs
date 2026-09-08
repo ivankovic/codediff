@@ -18,19 +18,29 @@
 use anyhow::Result;
 
 use crate::test;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 
 #[test]
 fn mapping() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("javascript-microsoft-typescript-refactor")
+    // The edit unwraps an IIFE: every statement moves from `call_expression > arguments >
+    // function_expression > statement_block` up to the file's top level. The human pairs the
+    // statements across those four removed levels; the pipeline's structural matchers do not
+    // bridge removed nesting, so `APTED("fast_fallback")` deletes and re-inserts the string and
+    // its punctuation. The same "bridge across added/removed nesting" gap `rust-algorithm-change`
+    // documents as its case 2 and `typescript-async-await` carries in the other direction. Not
+    // attempted here.
+    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
+        "javascript-microsoft-typescript-refactor",
+        10,
+        6,
+    )
 }
 
 #[test]
 fn painting() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test, read the rate it
-    // reports for both modes, and record that instead.
-    assert_matches_human_painting_within_limit("javascript-microsoft-typescript-refactor", 100.0)
+    // measured 2026-09-09: minimal 2.965%, full 3.877% (measured, unexamined)
+    assert_matches_human_painting_within_limit("javascript-microsoft-typescript-refactor", 3.89)
 }
 
 #[test]

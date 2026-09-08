@@ -30,11 +30,10 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test, read the rate it
-    // reports for both modes, and record that instead.
+    // measured 2026-09-09: minimal 1.563%, full 1.563% (measured, unexamined)
     assert_matches_human_painting_within_limit(
         "html-ladybirdbrowser-ladybird-update-two-pixel-numbers",
-        100.0,
+        1.58,
     )
 }
 
