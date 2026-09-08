@@ -23,7 +23,9 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 #[test]
 fn mapping() -> Result<()> {
     // Whitespace only
-    test::helper::human_mapping::assert_matches_human_mapping("java-paddlepaddle-paddleocr-whitespace-only")
+    test::helper::human_mapping::assert_matches_human_mapping(
+        "java-paddlepaddle-paddleocr-whitespace-only",
+    )
 }
 
 #[test]

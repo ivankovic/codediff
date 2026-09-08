@@ -18,19 +18,24 @@
 use anyhow::Result;
 
 use crate::test;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 
 #[test]
 fn mapping() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("xml-genymobile-scrcpy-remove-package-attribute")
+    test::helper::human_mapping::assert_matches_human_mapping(
+        "xml-genymobile-scrcpy-remove-package-attribute",
+    )
 }
 
 #[test]
 fn painting() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test, read the rate it
-    // reports for both modes, and record that instead.
-    assert_matches_human_painting_within_limit("xml-genymobile-scrcpy-remove-package-attribute", 100.0)
+    // measured 2026-09-08: minimal 10.145% (21/207 bytes), full 10.145% (21/207) (measured,
+    // unexamined)
+    assert_matches_human_painting_within_limit(
+        "xml-genymobile-scrcpy-remove-package-attribute",
+        10.16,
+    )
 }
 
 #[test]

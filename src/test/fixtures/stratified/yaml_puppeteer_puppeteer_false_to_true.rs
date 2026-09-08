@@ -18,19 +18,20 @@
 use anyhow::Result;
 
 use crate::test;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 
 #[test]
 fn mapping() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("yaml-puppeteer-puppeteer-false-to-true")
+    test::helper::human_mapping::assert_matches_human_mapping(
+        "yaml-puppeteer-puppeteer-false-to-true",
+    )
 }
 
 #[test]
 fn painting() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test, read the rate it
-    // reports for both modes, and record that instead.
-    assert_matches_human_painting_within_limit("yaml-puppeteer-puppeteer-false-to-true", 100.0)
+    // measured 2026-09-08: minimal 0.335% (2/597 bytes), full 0.335% (2/597) (measured, unexamined)
+    assert_matches_human_painting_within_limit("yaml-puppeteer-puppeteer-false-to-true", 0.35)
 }
 
 #[test]

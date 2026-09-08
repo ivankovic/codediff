@@ -339,9 +339,9 @@
           "before": [
             {
               "start_row": 0,
-              "start_column": 13,
+              "start_column": 12,
               "end_row": 0,
-              "end_column": 18
+              "end_column": 17
             }
           ]
         }

@@ -18,19 +18,23 @@
 use anyhow::Result;
 
 use crate::test;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 
 #[test]
 fn mapping() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("go-prometheus-prometheus-remove-copyright-year")
+    test::helper::human_mapping::assert_matches_human_mapping(
+        "go-prometheus-prometheus-remove-copyright-year",
+    )
 }
 
 #[test]
 fn painting() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test, read the rate it
-    // reports for both modes, and record that instead.
-    assert_matches_human_painting_within_limit("go-prometheus-prometheus-remove-copyright-year", 100.0)
+    // measured 2026-09-08: minimal 0.000% (0/2011 bytes), full 0.050% (1/2011) (measured, unexamined)
+    assert_matches_human_painting_within_limit(
+        "go-prometheus-prometheus-remove-copyright-year",
+        0.06,
+    )
 }
 
 #[test]
