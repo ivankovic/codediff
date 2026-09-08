@@ -18,22 +18,28 @@
 use anyhow::Result;
 
 use crate::test;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 
 #[test]
 fn mapping() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("php-wordpress-wordpress-one-line-file-with-real-insert-and-update")
+    test::helper::human_mapping::assert_matches_human_mapping(
+        "php-wordpress-wordpress-one-line-file-with-real-insert-and-update",
+    )
 }
 
 #[test]
 fn painting() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test, read the rate it
-    // reports for both modes, and record that instead.
-    assert_matches_human_painting_within_limit("php-wordpress-wordpress-one-line-file-with-real-insert-and-update", 100.0)
+    // measured 2026-09-08: minimal 47.966%, full 37.473% (measured, unexamined)
+    assert_matches_human_painting_within_limit(
+        "php-wordpress-wordpress-one-line-file-with-real-insert-and-update",
+        47.98,
+    )
 }
 
 #[test]
 fn invariants() -> Result<()> {
-    assert_ground_truth_invariants("php-wordpress-wordpress-one-line-file-with-real-insert-and-update")
+    assert_ground_truth_invariants(
+        "php-wordpress-wordpress-one-line-file-with-real-insert-and-update",
+    )
 }

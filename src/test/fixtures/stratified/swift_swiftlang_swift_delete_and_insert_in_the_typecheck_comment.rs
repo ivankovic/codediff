@@ -18,22 +18,28 @@
 use anyhow::Result;
 
 use crate::test;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 
 #[test]
 fn mapping() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("swift-swiftlang-swift-delete-and-insert-in-the-typecheck-comment")
+    test::helper::human_mapping::assert_matches_human_mapping(
+        "swift-swiftlang-swift-delete-and-insert-in-the-typecheck-comment",
+    )
 }
 
 #[test]
 fn painting() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test, read the rate it
-    // reports for both modes, and record that instead.
-    assert_matches_human_painting_within_limit("swift-swiftlang-swift-delete-and-insert-in-the-typecheck-comment", 100.0)
+    // measured 2026-09-08: minimal 66.150%, full 66.432% (measured, unexamined)
+    assert_matches_human_painting_within_limit(
+        "swift-swiftlang-swift-delete-and-insert-in-the-typecheck-comment",
+        66.45,
+    )
 }
 
 #[test]
 fn invariants() -> Result<()> {
-    assert_ground_truth_invariants("swift-swiftlang-swift-delete-and-insert-in-the-typecheck-comment")
+    assert_ground_truth_invariants(
+        "swift-swiftlang-swift-delete-and-insert-in-the-typecheck-comment",
+    )
 }

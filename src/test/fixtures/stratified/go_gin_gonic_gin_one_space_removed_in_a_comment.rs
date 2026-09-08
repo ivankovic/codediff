@@ -18,22 +18,34 @@
 use anyhow::Result;
 
 use crate::test;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants_with_known_violations;
 
 #[test]
 fn mapping() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("go-gin-gonic-gin-one-space-removed-in-a-comment")
+    test::helper::human_mapping::assert_matches_human_mapping(
+        "go-gin-gonic-gin-one-space-removed-in-a-comment",
+    )
 }
 
 #[test]
 fn painting() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test, read the rate it
-    // reports for both modes, and record that instead.
-    assert_matches_human_painting_within_limit("go-gin-gonic-gin-one-space-removed-in-a-comment", 100.0)
+    // measured 2026-09-08: minimal 0.214%, full 0.214%
+    assert_matches_human_painting_within_limit(
+        "go-gin-gonic-gin-one-space-removed-in-a-comment",
+        0.23,
+    )
 }
 
 #[test]
 fn invariants() -> Result<()> {
-    assert_ground_truth_invariants("go-gin-gonic-gin-one-space-removed-in-a-comment")
+    // measured 2026-09-08: 1 painted run ends on a space rather than a visible character, and
+    // permanently will. The whole change is the removal of one of the two spaces after
+    // "Gin Core Team." on row 1, so the only correct painting is that single space - the
+    // no-trailing-whitespace invariant has nothing visible to end on here. Not a repairable
+    // annotation defect.
+    assert_ground_truth_invariants_with_known_violations(
+        "go-gin-gonic-gin-one-space-removed-in-a-comment",
+        1,
+    )
 }

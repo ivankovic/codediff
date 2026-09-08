@@ -18,19 +18,23 @@
 use anyhow::Result;
 
 use crate::test;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 
 #[test]
 fn mapping() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("shellscript-paddlepaddle-paddleocr-insert-inside-a-string")
+    test::helper::human_mapping::assert_matches_human_mapping(
+        "shellscript-paddlepaddle-paddleocr-insert-inside-a-string",
+    )
 }
 
 #[test]
 fn painting() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test, read the rate it
-    // reports for both modes, and record that instead.
-    assert_matches_human_painting_within_limit("shellscript-paddlepaddle-paddleocr-insert-inside-a-string", 100.0)
+    // measured 2026-09-08: minimal 2.007%, full 2.007% (measured, unexamined)
+    assert_matches_human_painting_within_limit(
+        "shellscript-paddlepaddle-paddleocr-insert-inside-a-string",
+        2.02,
+    )
 }
 
 #[test]
