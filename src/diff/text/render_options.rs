@@ -250,6 +250,15 @@ pub struct RenderOptions {
     /// construct that contains it. Measured 2026-09-08 with
     /// `painting_disagreement_detail_batch` over every painted fixture, both presets.
     ///
+    /// **Two call sites, one shape.** `shifted_by_an_edit_beside_it` reads a *single-row* node;
+    /// `displaced_beside_an_edit_on_its_first_row` reads the multi-row one, where the node's
+    /// first row carries the edit and its remaining rows are untouched. That second half landed
+    /// the same day, for the same reason: `shifted_within_its_own_line` was also written against
+    /// row *indices* and so missed every node that had additionally been pushed down the file.
+    /// Whole-corpus painting disagreement 0.8341% -> 0.7417% (22599 -> 20094 bytes over 292
+    /// painted fixtures), 8 fixtures improved and one - `rust-algorithm-change` - two bytes
+    /// worse.
+    ///
     /// **Construction-time, like [`Self::paint_reindent_only_moves`].** It decides
     /// `TextOperation::Move` vs. `Identical` while `ranges` builds its list, so
     /// `ranges_for_options` cannot apply it as a post-filter and the `M` panel triggers a full

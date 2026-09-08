@@ -53,8 +53,14 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-01: minimal 25.823%, full 28.807% (measured, unexamined)
-    assert_matches_human_painting_within_limit("rust-algorithm-change", 28.83)
+    // re-measured 2026-09-08: minimal 17.078%, full 27.984% (the 2026-09-01 comment's 25.823% /
+    // 28.807% predate unrelated rendering and ground-truth fixes and were never re-measured).
+    // `MINIMAL` is two bytes worse than it was the moment before, and this is the corpus's only
+    // fixture that `displaced_beside_an_edit_on_its_first_row` cost anything: it stops calling a
+    // multi-row node `Move` for a sideways shift on its own first row, and here two bytes of that
+    // span are ones the human does paint. Kept - the same rule is worth 2505 bytes across the
+    // corpus. `FULL` is untouched and still sets the limit. Residual unexamined beyond that.
+    assert_matches_human_painting_within_limit("rust-algorithm-change", 28.0)
 }
 
 #[test]

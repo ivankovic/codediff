@@ -683,7 +683,36 @@ impl RangeWalk<'_> {
         // * a multi-row node that *also* changed rows keeps it too - that is a real relocation,
         //   and excluding it regressed `rust-add-if` (a block genuinely moved into a new `if`)
         //   from 0.7% to 56.5% disagreement with its painting.
-        let shifted_within_its_own_line = s.start_row == d.start_row && s.end_row > s.start_row;
+        //
+        // "Its own starting row" is about the row's *content*, not its index. A multi-row node
+        // can be pushed sideways by an edit on its first row *and* down the file by an insertion
+        // above it, and then `s.start_row == d.start_row` never holds even though nothing about
+        // the node moved relative to its own line: in
+        // `rust-adding-a-variable-and-test-with-comments` a `row_len` -> `paint_row_len` rename
+        // on the node's first row shifts a multi-row closure six columns while seven lines
+        // inserted above it shift every one of its rows by seven, and codediff painted the whole
+        // closure `Move`. The extra disjunct below reads that shape directly: the node's rows all
+        // shift by the same amount (so nothing was inserted *inside* it), its end column is
+        // unchanged, and the tail of its first row - the node's own text on that row - is
+        // byte-identical, so the row's one edit is beside it. Gated on `paint_displaced_moves`
+        // exactly like `shifted_by_an_edit_beside_it` below, because the two presets disagree
+        // about displaced moves.
+        //
+        // The `rust-add-if` regression the bullet above records does not come back: that block's
+        // geometry is the same, but under `MINIMAL` `known_pure_reindent` already renders it
+        // `Identical` by `WrapGrowth`, and under `FULL` this disjunct is switched off. Measured -
+        // it is not among the fixtures whose painting changed.
+        let displaced_beside_an_edit_on_its_first_row = !self.options.paint_displaced_moves
+            && d.end_row as i64 - s.end_row as i64 == d.start_row as i64 - s.start_row as i64
+            && s.end_column == d.end_column
+            && node_first_row_tail_untouched(
+                &self.source.contents,
+                &self.destination.contents,
+                &s,
+                &d,
+            );
+        let shifted_within_its_own_line = s.end_row > s.start_row
+            && (s.start_row == d.start_row || displaced_beside_an_edit_on_its_first_row);
         // A single-row node pushed sideways by an edit *elsewhere on its own row* is not a Move
         // either: `void process(int x)` -> `void process(const int x)` shifts `int x` by six
         // columns, and the human paints only the inserted `const`. The test is that the node lies
@@ -962,6 +991,31 @@ fn node_untouched_on_its_row(
     let in_suffix = s.start_column + suffix >= source_row.len()
         && d.start_column + suffix >= destination_row.len();
     in_prefix || in_suffix
+}
+
+/// True if the node's own text on its first row is unchanged - the row's tail from the node's
+/// start column to the end of the line is byte-identical on both sides, so whatever edit the row
+/// carries sits before the node. The multi-row counterpart of `node_untouched_on_its_row`'s
+/// suffix case, which cannot be used directly because a multi-row node's `end_column` is on a
+/// different row. See the `displaced_beside_an_edit_on_its_first_row` call site in
+/// `identical_or_move`.
+fn node_first_row_tail_untouched(
+    source: &str,
+    destination: &str,
+    s: &TextRange,
+    d: &TextRange,
+) -> bool {
+    let tail = |text: &str, row: usize, column: usize| -> Option<Vec<char>> {
+        let line: Vec<char> = text.split('\n').nth(row)?.chars().collect();
+        (column <= line.len()).then(|| line[column..].to_vec())
+    };
+    match (
+        tail(source, s.start_row, s.start_column),
+        tail(destination, d.start_row, d.start_column),
+    ) {
+        (Some(source_tail), Some(destination_tail)) => source_tail == destination_tail,
+        _ => false,
+    }
 }
 
 /// Build the `RangeMatch` for a non-Identical, non-Move node: advances `last_non_move_range` to

@@ -200,6 +200,55 @@ fn paint_displaced_moves_gates_a_node_pushed_down_by_an_insertion_above_it() {
     );
 }
 
+/// The multi-row half of the same gate (`rust-adding-a-variable-and-test-with-comments`): a
+/// closure spanning three rows whose *first* row carries the one edit - `row_len` renamed to
+/// `paint_row_len` beside it - and which a line inserted above pushes down the file. Its
+/// remaining rows are byte-identical at the same columns, so nothing about it was relocated.
+///
+/// `shifted_within_its_own_line` was written against row *indices* (`s.start_row ==
+/// d.start_row`) and so could not fire here, exactly as `shifted_by_an_edit_beside_it` could
+/// not; `displaced_beside_an_edit_on_its_first_row` reads the geometry and the row content
+/// instead. Pinned as a preset split, not a blanket suppression - `FULL` still paints it.
+#[test]
+fn paint_displaced_moves_gates_a_multi_row_node_edited_on_its_first_row() {
+    let before = Code::from_string(
+        "fn main() {\n    let x = values.filter(row_len).map(|value| {\n        println!(\"{value}\");\n    });\n}\n",
+        &crate::code::Language::Rust,
+    );
+    let after = Code::from_string(
+        "fn main() {\n    setup();\n    let x = values.filter(paint_row_len).map(|value| {\n        println!(\"{value}\");\n    });\n}\n",
+        &crate::code::Language::Rust,
+    );
+    let ast = crate::diff::diff_code(&before, &after);
+    let node_cache = crate::diff::NodeCache::build(&before, &after);
+
+    let multi_row_move_on_the_closure_row = |options| {
+        TextDiff::from_with_options(
+            &before,
+            &after,
+            ast.ast.as_ref().unwrap(),
+            &node_cache,
+            options,
+        )
+        .all(0)
+        .iter()
+        .any(|r| {
+            r.operation == TextOperation::Move
+                && r.source.start_row == 1
+                && r.source.end_row > r.source.start_row
+        })
+    };
+
+    assert!(
+        multi_row_move_on_the_closure_row(RenderOptions::FULL),
+        "paint_displaced_moves: true must keep painting the displaced closure Move"
+    );
+    assert!(
+        !multi_row_move_on_the_closure_row(RenderOptions::MINIMAL),
+        "paint_displaced_moves: false must leave the displaced closure unpainted"
+    );
+}
+
 /// The exact tokens the painted corpus showed `Full` adding over `Minimal` - eight `(`, five
 /// `)`, two `):` and one `;` across ten fixtures. If `Minimal` does not drop these, it is not
 /// modelling the style it is named after.

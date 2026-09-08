@@ -39,10 +39,12 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-08-26: minimal 0.635%, full 0.525%
+    // measured 2026-09-08: minimal 0.043%, full 0.055%. The minimal side fell from 0.279% when
+    // `displaced_beside_an_edit_on_its_first_row` stopped calling a multi-row node `Move` for a
+    // sideways shift on its own first row that an insertion above it had also pushed down the file.
     assert_matches_human_painting_within_limit(
         "rust-small-addition-with-reuse-of-binary-expressions",
-        0.65,
+        0.07,
     )
 }
 
