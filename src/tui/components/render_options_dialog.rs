@@ -139,6 +139,7 @@ mod tests {
                 whole_pair_updates: false,
                 paint_reindent_only_moves: false,
                 paint_displaced_moves: false,
+                paint_resized_moves: false,
             }))
         );
     }
@@ -158,6 +159,7 @@ mod tests {
                 whole_pair_updates: false,
                 paint_reindent_only_moves: false,
                 paint_displaced_moves: false,
+                paint_resized_moves: false,
             }))
         );
     }

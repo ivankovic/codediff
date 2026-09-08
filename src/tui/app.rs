@@ -1683,6 +1683,7 @@ mod tests {
             whole_pair_updates: false,
             paint_reindent_only_moves: true,
             paint_displaced_moves: true,
+            paint_resized_moves: true,
         })?;
 
         let queued: Vec<_> = std::iter::from_fn(|| app.action_rx.try_recv().ok()).collect();
@@ -1887,6 +1888,7 @@ mod tests {
             whole_pair_updates: false,
             paint_reindent_only_moves: true,
             paint_displaced_moves: true,
+            paint_resized_moves: true,
         });
 
         let backend = ratatui::backend::TestBackend::new(120, 24);

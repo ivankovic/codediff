@@ -270,6 +270,29 @@ pub struct RenderOptions {
     /// `Move`), not `bool::default()`'s `false`.
     #[serde(default = "paint_displaced_moves_default")]
     pub paint_displaced_moves: bool,
+    /// Whether a relocation the two sides describe over *different extents* paints on both sides.
+    ///
+    /// `TextDiff` builds each panel by walking that panel's own tree, so the two walks can call
+    /// the same subtree relocated and still disagree about where its edges are - the ordinary
+    /// outcome of a reindent, where one walk starts the span at the old column and the other at
+    /// the new one. `reconcile_moves` reads such a pair as agreement and keeps both claims; with
+    /// this off it goes back to treating them as a conflict and keeping only the more economical
+    /// account, leaving the other side unpainted.
+    ///
+    /// **`MINIMAL` false, `FULL` true, and the split is measured.** Kept on both presets, the
+    /// whole corpus goes 0.7417% -> 0.6404% and three fixtures paint more than their ground truth
+    /// wants; gated to `FULL` it goes to **0.6314%** with `MINIMAL` byte-identical to before -
+    /// mirroring a relocation onto the second panel doubles the bytes it paints, which is exactly
+    /// what `MINIMAL` is specified not to do ("paints as few bytes as possible, greatly preferring
+    /// not to paint pure identical moves"). `FULL` wants the opposite: a `Move` a reader can
+    /// follow to a highlighted node rather than to an unmarked one. Measured 2026-09-08 with
+    /// `painting_disagreement_report` over all 292 painted fixtures.
+    ///
+    /// **Construction-time**, like [`Self::paint_reindent_only_moves`] and
+    /// [`Self::paint_displaced_moves`]: it decides which ranges survive reconciliation while
+    /// `TextDiff` is being built, so `ranges_for_options` cannot apply it afterwards.
+    #[serde(default = "paint_resized_moves_default")]
+    pub paint_resized_moves: bool,
 }
 
 /// [`RenderOptions::paint_reindent_only_moves`]'s serde default - see that field's own doc
@@ -280,6 +303,11 @@ pub(crate) fn paint_reindent_only_moves_default() -> bool {
 
 /// [`RenderOptions::paint_displaced_moves`]'s serde default - see that field's own doc comment.
 pub(crate) fn paint_displaced_moves_default() -> bool {
+    true
+}
+
+/// [`RenderOptions::paint_resized_moves`]'s serde default - see that field's own doc comment.
+pub(crate) fn paint_resized_moves_default() -> bool {
     true
 }
 
@@ -295,6 +323,7 @@ impl RenderOptions {
         whole_pair_updates: false,
         paint_reindent_only_moves: false,
         paint_displaced_moves: false,
+        paint_resized_moves: false,
     };
     /// Every option on: the fullest reading of a diff, short of trailing whitespace, which no
     /// combination of options ever paints. `whole_pair_updates` stays off even here - see that
@@ -305,6 +334,7 @@ impl RenderOptions {
         whole_pair_updates: false,
         paint_reindent_only_moves: true,
         paint_displaced_moves: true,
+        paint_resized_moves: true,
     };
 
     /// Every option, paired with its label and current value, in the order a settings UI should
@@ -316,7 +346,7 @@ impl RenderOptions {
     /// whether a settings UI can offer it. The `M` panel toggling this one now goes through a
     /// diff reload rather than `DiffViewer::set_render_options`'s plain re-filter (see
     /// `tui::app`'s `Action::RenderOptionsChanged` handler) precisely so it's safe to list here.
-    pub fn options(&self) -> [(&'static str, bool); 5] {
+    pub fn options(&self) -> [(&'static str, bool); 6] {
         [
             ("Leading whitespace", self.leading_whitespace),
             (
@@ -326,6 +356,10 @@ impl RenderOptions {
             ("Whole-pair updates", self.whole_pair_updates),
             ("Paint reindent-only moves", self.paint_reindent_only_moves),
             ("Paint displaced moves", self.paint_displaced_moves),
+            (
+                "Paint moves the two sides size differently",
+                self.paint_resized_moves,
+            ),
         ]
     }
 
@@ -339,6 +373,7 @@ impl RenderOptions {
             2 => self.whole_pair_updates = !self.whole_pair_updates,
             3 => self.paint_reindent_only_moves = !self.paint_reindent_only_moves,
             4 => self.paint_displaced_moves = !self.paint_displaced_moves,
+            5 => self.paint_resized_moves = !self.paint_resized_moves,
             _ => {}
         }
     }

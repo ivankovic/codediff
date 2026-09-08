@@ -1130,7 +1130,12 @@ fn range_contains(outer: &TextRange, inner: &TextRange) -> bool {
 /// the tie-break then withdraws one side's correct claim and its own counterpart lookup finds
 /// nothing to promote in its place. So a pair is agreed when the other side has *any* `Move`
 /// nested either way with this one's destination, and only an unmatched extent is a real
-/// disagreement. Measured 2026-09-08: whole-corpus painting disagreement 0.7417% -> 0.6404%.
+/// disagreement - under [`RenderOptions::paint_resized_moves`], which is a preset split rather
+/// than a blanket relaxation. Measured 2026-09-08: whole-corpus painting disagreement 0.7417% ->
+/// 0.6314% gated to `FULL`, against 0.6404% ungated. Requiring the *pair* to correspond as well
+/// (the other side's destination nested with this one's source, not just its source with this
+/// one's destination) was measured the same day at 0.6410%: a stronger guarantee that the two
+/// extents name one pair, worth 16 bytes the wrong way, so it is not here.
 ///
 /// Two limits worth stating rather than discovering later. The comparison is **per file, not per
 /// reorder**: a file containing two independent reorders that disagree in opposite directions gets
@@ -1141,7 +1146,7 @@ fn range_contains(outer: &TextRange, inner: &TextRange) -> bool {
 /// `generate_mapping_site`), so a counterpart that isn't found stays unpainted rather than being
 /// invented. Promoting by containment instead was measured the same day and moved **nothing**
 /// once the agreement test above was in place; it is not there.
-fn reconcile_moves(before: &mut [RangeMatch], after: &mut [RangeMatch]) {
+fn reconcile_moves(before: &mut [RangeMatch], after: &mut [RangeMatch], options: RenderOptions) {
     use std::collections::HashMap;
 
     let key = |r: &TextRange| (r.start_row, r.start_column, r.end_row, r.end_column);
@@ -1184,12 +1189,19 @@ fn reconcile_moves(before: &mut [RangeMatch], after: &mut [RangeMatch]) {
                     // disagreement for exactly this reason: sixty-one rows of a de-indented `if
                     // let` chain, called `Move` by both walks over extents four columns apart,
                     // rendered `Move` on the before side and blank on the after side.
-                    _ if other.iter().any(|other| {
-                        other.operation == TextOperation::Move
-                            && !other.source.is_empty()
-                            && (range_contains(&range_match.destination, &other.source)
-                                || range_contains(&other.source, &range_match.destination))
-                    }) =>
+                    //
+                    // `None if`, not `_ if`: when the other side *does* hold a range at this exact
+                    // destination extent and it is `Identical`, that range is the counterpart this
+                    // pair needs promoted, and declaring the pair agreed because some other nested
+                    // `Move` exists would leave it unpainted - the one thing this function exists
+                    // to prevent.
+                    None if options.paint_resized_moves
+                        && other.iter().any(|other| {
+                            other.operation == TextOperation::Move
+                                && !other.source.is_empty()
+                                && (range_contains(&range_match.destination, &other.source)
+                                    || range_contains(&other.source, &range_match.destination))
+                        }) =>
                     {
                         None
                     }
@@ -1272,7 +1284,7 @@ impl TextDiff {
 
         // Each `ranges` call above decided `Move` from its own walk order, so the two can name
         // different pairs for the same reorder - see `reconcile_moves`.
-        reconcile_moves(&mut before_ranges_plain, &mut after_ranges_plain);
+        reconcile_moves(&mut before_ranges_plain, &mut after_ranges_plain, options);
 
         let before_ranges = merge_ranges(&before_ranges_plain, &after_ranges_plain);
         let after_ranges = merge_ranges(&after_ranges_plain, &before_ranges_plain);

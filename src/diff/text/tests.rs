@@ -279,7 +279,9 @@ fn reconcile_moves_keeps_two_overlapping_accounts_of_one_relocation() {
         TextOperation::Move,
     )];
 
-    reconcile_moves(&mut before, &mut after);
+    let mut minimal = (before.clone(), after.clone());
+    reconcile_moves(&mut minimal.0, &mut minimal.1, RenderOptions::MINIMAL);
+    reconcile_moves(&mut before, &mut after, RenderOptions::FULL);
 
     assert_eq!(
         (before[0].operation.clone(), after[0].operation.clone()),
@@ -287,6 +289,22 @@ fn reconcile_moves_keeps_two_overlapping_accounts_of_one_relocation() {
         "an overlapping account of the same relocation is agreement, not a disagreement to \
          resolve by withdrawing one side"
     );
+    assert_eq!(
+        (
+            minimal.0[0].operation.clone(),
+            minimal.1[0].operation.clone()
+        ),
+        (TextOperation::Move, TextOperation::Identical),
+        "MINIMAL keeps the more economical single account - mirroring the relocation onto the \
+         second panel doubles the bytes it paints"
+    );
+}
+
+/// `paint_resized_moves` is the third axis the two presets disagree on.
+#[test]
+fn minimal_and_full_disagree_on_paint_resized_moves() {
+    const { assert!(!RenderOptions::MINIMAL.paint_resized_moves) };
+    const { assert!(RenderOptions::FULL.paint_resized_moves) };
 }
 
 /// The exact tokens the painted corpus showed `Full` adding over `Minimal` - eight `(`, five
@@ -560,6 +578,7 @@ fn structural_punctuation_off_alone_still_keeps_leading_whitespace() {
         whole_pair_updates: false,
         paint_reindent_only_moves: true,
         paint_displaced_moves: true,
+        paint_resized_moves: true,
     };
     let result = ranges_for_options(&ranges, source, options);
 
@@ -582,6 +601,7 @@ fn leading_whitespace_off_alone_still_keeps_a_range_containing_punctuation() {
         whole_pair_updates: false,
         paint_reindent_only_moves: true,
         paint_displaced_moves: true,
+        paint_resized_moves: true,
     };
     let result = ranges_for_options(&ranges, source, options);
 

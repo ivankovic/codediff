@@ -30,10 +30,10 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // re-measured 2026-09-08: minimal 39.332%, full 39.589%, up from 17.224%/17.481% the same
-    // day. Nothing new is wrong here - codediff already called the one command line a `Move` on
-    // the before side, and `reconcile_moves`' containment fix now paints the same claim on the
-    // after side too, doubling a residual instead of creating one. The underlying false `Move` is
+    // re-measured 2026-09-08: minimal 17.224% (unchanged), full 39.589%, up from 17.481% the
+    // same day. Nothing new is wrong here - codediff already called the one command line a `Move`
+    // on the before side, and `RenderOptions::paint_resized_moves` now paints the same claim on
+    // the after side under `FULL`, doubling a residual instead of creating one. The underlying false `Move` is
     // the documented one-row-two-edits gap in `node_untouched_on_its_row`: the before file
     // indents every line by one space and the after file does not, *and* the command gains a
     // `--strategy=...` argument at the end, so the row's single common-prefix/common-suffix pair

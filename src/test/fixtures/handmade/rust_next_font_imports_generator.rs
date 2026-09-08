@@ -44,7 +44,7 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // re-measured 2026-09-08: minimal 3.247%, full 6.897%. `FULL` fell from 21.399% when
+    // re-measured 2026-09-08: minimal 2.605%, full 6.897%. `FULL` fell from 21.399% when
     // `reconcile_moves` stopped calling two overlapping accounts of the same relocation a
     // disagreement: both walks called this file's de-indented `if let` chain a `Move`, over
     // extents four columns apart, and the exact-extent lookup read that as a conflict - so the
