@@ -1,0 +1,21 @@
+{
+  "entries": [],
+  "text_mappings": [
+    {
+      "name": "Only one solution",
+      "entries": [
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 0,
+              "start_column": 3,
+              "end_row": 0,
+              "end_column": 21
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

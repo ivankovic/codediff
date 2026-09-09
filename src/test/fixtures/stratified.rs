@@ -97,6 +97,8 @@ mod cpp_microsoft_terminal_add_only;
 #[cfg(test)]
 mod cpp_microsoft_terminal_delete_only;
 #[cfg(test)]
+mod cpp_microsoft_terminal_insert_only;
+#[cfg(test)]
 mod cpp_mozilla_firefox_firefox_update_file_comment;
 #[cfg(test)]
 mod cpp_mozilla_firefox_firefox_update_file_comment_2;
@@ -159,7 +161,11 @@ mod csharp_sonarr_sonarr_delete_func;
 #[cfg(test)]
 mod csharp_sonarr_sonarr_use_a_different_class;
 #[cfg(test)]
+mod css_nextcloud_server_update_import;
+#[cfg(test)]
 mod css_wordpress_wordpress_go_to_one_line;
+#[cfg(test)]
+mod css_wordpress_wordpress_one_line_to_multiline;
 #[cfg(test)]
 mod css_wordpress_wordpress_re_format_in_one_line;
 #[cfg(test)]
@@ -272,6 +278,8 @@ mod java_protocolbuffers_protobuf_update_comment;
 mod java_protocolbuffers_protobuf_update_comment_2;
 #[cfg(test)]
 mod javascript_axios_axios_real_small_change;
+#[cfg(test)]
+mod javascript_d3_d3_nice_small_change;
 #[cfg(test)]
 mod javascript_facebook_react_update_comment_only;
 #[cfg(test)]
@@ -561,6 +569,8 @@ mod shellscript_vercel_next_change_command_params;
 #[cfg(test)]
 mod swift_nextcloud_ios_different_func;
 #[cfg(test)]
+mod swift_swiftlang_swift_add_target_comment;
+#[cfg(test)]
 mod swift_swiftlang_swift_add_to_typecheck_comment;
 #[cfg(test)]
 mod swift_swiftlang_swift_add_to_typecheck_comment_1;
@@ -575,11 +585,23 @@ mod swift_swiftlang_swift_add_to_typecheck_comment_6;
 #[cfg(test)]
 mod swift_swiftlang_swift_add_to_typecheck_comment_7;
 #[cfg(test)]
+mod swift_swiftlang_swift_constraint_comment;
+#[cfg(test)]
 mod swift_swiftlang_swift_delete_and_insert_in_the_typecheck_comment;
 #[cfg(test)]
 mod swift_swiftlang_swift_insert_delete_comment;
 #[cfg(test)]
+mod swift_swiftlang_swift_insert_only;
+#[cfg(test)]
+mod swift_swiftlang_swift_signature_next_comment;
+#[cfg(test)]
+mod swift_swiftlang_swift_signature_next_comment_2;
+#[cfg(test)]
 mod swift_swiftlang_swift_small_change_mostly_add;
+#[cfg(test)]
+mod swift_swiftlang_swift_target_comment;
+#[cfg(test)]
+mod swift_swiftlang_swift_target_comment_2;
 #[cfg(test)]
 mod swift_swiftlang_swift_update_leading_comment;
 #[cfg(test)]
@@ -589,13 +611,25 @@ mod tsx_excalidraw_excalidraw_add_type_to_import;
 #[cfg(test)]
 mod tsx_langflow_ai_langflow_add_type_to_import;
 #[cfg(test)]
+mod tsx_langflow_ai_langflow_insert_only;
+#[cfg(test)]
 mod tsx_langflow_ai_langflow_split_import;
 #[cfg(test)]
 mod tsx_langflow_ai_langflow_split_import_2;
 #[cfg(test)]
 mod tsx_langflow_ai_langflow_split_import_3;
 #[cfg(test)]
+mod tsx_microsoft_typescript_delete_only;
+#[cfg(test)]
+mod tsx_microsoft_typescript_libpath_to_lib;
+#[cfg(test)]
+mod tsx_mui_material_ui_add_attribute;
+#[cfg(test)]
 mod tsx_mui_material_ui_add_to_empty_block;
+#[cfg(test)]
+mod tsx_mui_material_ui_delete_only;
+#[cfg(test)]
+mod tsx_mui_material_ui_move_import;
 #[cfg(test)]
 mod tsx_mui_material_ui_remove_import;
 #[cfg(test)]
@@ -604,6 +638,8 @@ mod tsx_mui_material_ui_remove_import_2;
 mod tsx_mui_material_ui_remove_import_3;
 #[cfg(test)]
 mod tsx_mui_material_ui_remove_import_4;
+#[cfg(test)]
+mod tsx_shadcn_ui_ui_order_of_class_names;
 #[cfg(test)]
 mod typescript_microsoft_typescript_add_es_target;
 #[cfg(test)]
@@ -619,11 +655,47 @@ mod typescript_microsoft_typescript_add_es_target_6;
 #[cfg(test)]
 mod typescript_microsoft_typescript_add_eslint;
 #[cfg(test)]
+mod typescript_microsoft_typescript_add_lib_comment;
+#[cfg(test)]
+mod typescript_microsoft_typescript_add_module_and_target_comment;
+#[cfg(test)]
 mod typescript_microsoft_typescript_add_strict;
 #[cfg(test)]
 mod typescript_microsoft_typescript_add_strict_2;
 #[cfg(test)]
 mod typescript_microsoft_typescript_add_strict_false;
+#[cfg(test)]
+mod typescript_microsoft_typescript_add_target;
+#[cfg(test)]
+mod typescript_microsoft_typescript_add_target_2;
+#[cfg(test)]
+mod typescript_microsoft_typescript_add_target_3;
+#[cfg(test)]
+mod typescript_microsoft_typescript_add_target_comment_2;
+#[cfg(test)]
+mod typescript_microsoft_typescript_expand_target;
+#[cfg(test)]
+mod typescript_microsoft_typescript_expand_target_2;
+#[cfg(test)]
+mod typescript_microsoft_typescript_expand_target_3;
+#[cfg(test)]
+mod typescript_microsoft_typescript_extend_target_comment;
+#[cfg(test)]
+mod vimscript_neovim_neovim_comment_only_insert;
+#[cfg(test)]
+mod vimscript_neovim_neovim_date_update_plus_bugfix;
+#[cfg(test)]
+mod vimscript_neovim_neovim_expand_author_comment;
+#[cfg(test)]
+mod vimscript_neovim_neovim_insert_only;
+#[cfg(test)]
+mod vimscript_neovim_neovim_insert_only_3;
+#[cfg(test)]
+mod vimscript_neovim_neovim_only_delete;
+#[cfg(test)]
+mod vimscript_neovim_neovim_small_change;
+#[cfg(test)]
+mod vimscript_neovim_neovim_small_change_2;
 #[cfg(test)]
 mod xml_genymobile_scrcpy_remove_package_attribute;
 #[cfg(test)]

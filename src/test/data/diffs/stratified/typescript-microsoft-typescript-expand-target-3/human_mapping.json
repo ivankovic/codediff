@@ -1,0 +1,539 @@
+{
+  "entries": [
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [],
+      "after_path": []
+    },
+    {
+      "operation": "update",
+      "before_path": [
+        "comment:1"
+      ],
+      "after_path": [
+        "comment:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "comment:2"
+      ],
+      "after_path": [
+        "comment:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "comment:3"
+      ],
+      "after_path": [
+        "comment:3"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "comment:4"
+      ],
+      "after_path": [
+        "comment:4"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "comment:5"
+      ],
+      "after_path": [
+        "comment:5"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "comment:6"
+      ],
+      "after_path": [
+        "comment:6"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "comment:7"
+      ],
+      "after_path": [
+        "comment:7"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "export_statement:1"
+      ],
+      "after_path": [
+        "export_statement:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "export_statement:1",
+        "export:1"
+      ],
+      "after_path": [
+        "export_statement:1",
+        "export:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "export_statement:1",
+        "class_declaration:1"
+      ],
+      "after_path": [
+        "export_statement:1",
+        "class_declaration:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "export_statement:1",
+        "class_declaration:1",
+        "class:1"
+      ],
+      "after_path": [
+        "export_statement:1",
+        "class_declaration:1",
+        "class:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "export_statement:1",
+        "class_declaration:1",
+        "type_identifier:1"
+      ],
+      "after_path": [
+        "export_statement:1",
+        "class_declaration:1",
+        "type_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "export_statement:1",
+        "class_declaration:1",
+        "class_body:1"
+      ],
+      "after_path": [
+        "export_statement:1",
+        "class_declaration:1",
+        "class_body:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "export_statement:1",
+        "class_declaration:1",
+        "class_body:1",
+        "{:1"
+      ],
+      "after_path": [
+        "export_statement:1",
+        "class_declaration:1",
+        "class_body:1",
+        "{:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "export_statement:1",
+        "class_declaration:1",
+        "class_body:1",
+        "}:1"
+      ],
+      "after_path": [
+        "export_statement:1",
+        "class_declaration:1",
+        "class_body:1",
+        "}:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "comment:8"
+      ],
+      "after_path": [
+        "comment:8"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_statement:1"
+      ],
+      "after_path": [
+        "import_statement:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_statement:1",
+        "import:1"
+      ],
+      "after_path": [
+        "import_statement:1",
+        "import:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_statement:1",
+        "import_clause:1"
+      ],
+      "after_path": [
+        "import_statement:1",
+        "import_clause:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_statement:1",
+        "import_clause:1",
+        "named_imports:1"
+      ],
+      "after_path": [
+        "import_statement:1",
+        "import_clause:1",
+        "named_imports:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_statement:1",
+        "import_clause:1",
+        "named_imports:1",
+        "{:1"
+      ],
+      "after_path": [
+        "import_statement:1",
+        "import_clause:1",
+        "named_imports:1",
+        "{:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_statement:1",
+        "import_clause:1",
+        "named_imports:1",
+        "import_specifier:1"
+      ],
+      "after_path": [
+        "import_statement:1",
+        "import_clause:1",
+        "named_imports:1",
+        "import_specifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_statement:1",
+        "import_clause:1",
+        "named_imports:1",
+        "import_specifier:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "import_statement:1",
+        "import_clause:1",
+        "named_imports:1",
+        "import_specifier:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_statement:1",
+        "import_clause:1",
+        "named_imports:1",
+        "}:1"
+      ],
+      "after_path": [
+        "import_statement:1",
+        "import_clause:1",
+        "named_imports:1",
+        "}:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_statement:1",
+        "from:1"
+      ],
+      "after_path": [
+        "import_statement:1",
+        "from:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_statement:1",
+        "string:1"
+      ],
+      "after_path": [
+        "import_statement:1",
+        "string:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_statement:1",
+        "string:1",
+        "\":1"
+      ],
+      "after_path": [
+        "import_statement:1",
+        "string:1",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_statement:1",
+        "string:1",
+        "string_fragment:1"
+      ],
+      "after_path": [
+        "import_statement:1",
+        "string:1",
+        "string_fragment:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_statement:1",
+        "string:1",
+        "\":2"
+      ],
+      "after_path": [
+        "import_statement:1",
+        "string:1",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_statement:1",
+        ";:1"
+      ],
+      "after_path": [
+        "import_statement:1",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "export_statement:2"
+      ],
+      "after_path": [
+        "export_statement:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "export_statement:2",
+        "export:1"
+      ],
+      "after_path": [
+        "export_statement:2",
+        "export:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "export_statement:2",
+        "class_declaration:1"
+      ],
+      "after_path": [
+        "export_statement:2",
+        "class_declaration:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "export_statement:2",
+        "class_declaration:1",
+        "class:1"
+      ],
+      "after_path": [
+        "export_statement:2",
+        "class_declaration:1",
+        "class:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "export_statement:2",
+        "class_declaration:1",
+        "type_identifier:1"
+      ],
+      "after_path": [
+        "export_statement:2",
+        "class_declaration:1",
+        "type_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "export_statement:2",
+        "class_declaration:1",
+        "class_heritage:1"
+      ],
+      "after_path": [
+        "export_statement:2",
+        "class_declaration:1",
+        "class_heritage:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "export_statement:2",
+        "class_declaration:1",
+        "class_heritage:1",
+        "extends_clause:1"
+      ],
+      "after_path": [
+        "export_statement:2",
+        "class_declaration:1",
+        "class_heritage:1",
+        "extends_clause:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "export_statement:2",
+        "class_declaration:1",
+        "class_heritage:1",
+        "extends_clause:1",
+        "extends:1"
+      ],
+      "after_path": [
+        "export_statement:2",
+        "class_declaration:1",
+        "class_heritage:1",
+        "extends_clause:1",
+        "extends:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "export_statement:2",
+        "class_declaration:1",
+        "class_heritage:1",
+        "extends_clause:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "export_statement:2",
+        "class_declaration:1",
+        "class_heritage:1",
+        "extends_clause:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "export_statement:2",
+        "class_declaration:1",
+        "class_body:1"
+      ],
+      "after_path": [
+        "export_statement:2",
+        "class_declaration:1",
+        "class_body:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "export_statement:2",
+        "class_declaration:1",
+        "class_body:1",
+        "{:1"
+      ],
+      "after_path": [
+        "export_statement:2",
+        "class_declaration:1",
+        "class_body:1",
+        "{:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "export_statement:2",
+        "class_declaration:1",
+        "class_body:1",
+        "}:1"
+      ],
+      "after_path": [
+        "export_statement:2",
+        "class_declaration:1",
+        "class_body:1",
+        "}:1"
+      ]
+    }
+  ],
+  "text_mappings": [
+    {
+      "name": "Only one solution",
+      "entries": [
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 0,
+              "start_column": 15,
+              "end_row": 0,
+              "end_column": 23
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,874 @@
+{
+  "entries": [
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [],
+      "after_path": []
+    },
+    {
+      "operation": "update",
+      "before_path": [
+        "comment:1"
+      ],
+      "after_path": [
+        "comment:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "comment:2"
+      ],
+      "after_path": [
+        "comment:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "comment:3"
+      ],
+      "after_path": [
+        "comment:3"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ambient_declaration:1"
+      ],
+      "after_path": [
+        "ambient_declaration:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ambient_declaration:1",
+        "declare:1"
+      ],
+      "after_path": [
+        "ambient_declaration:1",
+        "declare:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ambient_declaration:1",
+        "module:1"
+      ],
+      "after_path": [
+        "ambient_declaration:1",
+        "module:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "module:1"
+      ],
+      "after_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "module:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "string:1"
+      ],
+      "after_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "string:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "string:1",
+        "\":1"
+      ],
+      "after_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "string:1",
+        "\":1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "string:1",
+        "string_fragment:1"
+      ],
+      "after_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "string:1",
+        "string_fragment:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "string:1",
+        "\":2"
+      ],
+      "after_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "string:1",
+        "\":2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "statement_block:1"
+      ],
+      "after_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "statement_block:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "statement_block:1",
+        "{:1"
+      ],
+      "after_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "statement_block:1",
+        "{:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "statement_block:1",
+        "variable_declaration:1"
+      ],
+      "after_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "statement_block:1",
+        "variable_declaration:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "statement_block:1",
+        "variable_declaration:1",
+        "var:1"
+      ],
+      "after_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "statement_block:1",
+        "variable_declaration:1",
+        "var:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "statement_block:1",
+        "variable_declaration:1",
+        "variable_declarator:1"
+      ],
+      "after_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "statement_block:1",
+        "variable_declaration:1",
+        "variable_declarator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "statement_block:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "statement_block:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "statement_block:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "type_annotation:1"
+      ],
+      "after_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "statement_block:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "type_annotation:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "statement_block:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "::1"
+      ],
+      "after_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "statement_block:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "statement_block:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "type_query:1"
+      ],
+      "after_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "statement_block:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "type_query:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "statement_block:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "type_query:1",
+        "typeof:1"
+      ],
+      "after_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "statement_block:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "type_query:1",
+        "typeof:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "statement_block:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "type_query:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "statement_block:1",
+        "variable_declaration:1",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "type_query:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "statement_block:1",
+        "variable_declaration:1",
+        ";:1"
+      ],
+      "after_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "statement_block:1",
+        "variable_declaration:1",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "statement_block:1",
+        "export_statement:1"
+      ],
+      "after_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "statement_block:1",
+        "export_statement:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "export:1"
+      ],
+      "after_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "export:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "default:1"
+      ],
+      "after_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "default:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "function_signature:1"
+      ],
+      "after_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "function_signature:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "function_signature:1",
+        "function:1"
+      ],
+      "after_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "function_signature:1",
+        "function:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "function_signature:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "function_signature:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "function_signature:1",
+        "formal_parameters:1"
+      ],
+      "after_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "function_signature:1",
+        "formal_parameters:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "function_signature:1",
+        "formal_parameters:1",
+        "(:1"
+      ],
+      "after_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "function_signature:1",
+        "formal_parameters:1",
+        "(:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "function_signature:1",
+        "formal_parameters:1",
+        "):1"
+      ],
+      "after_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "function_signature:1",
+        "formal_parameters:1",
+        "):1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "function_signature:1",
+        "type_annotation:1"
+      ],
+      "after_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "function_signature:1",
+        "type_annotation:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "function_signature:1",
+        "type_annotation:1",
+        "::1"
+      ],
+      "after_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "function_signature:1",
+        "type_annotation:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "function_signature:1",
+        "type_annotation:1",
+        "type_query:1"
+      ],
+      "after_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "function_signature:1",
+        "type_annotation:1",
+        "type_query:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "function_signature:1",
+        "type_annotation:1",
+        "type_query:1",
+        "typeof:1"
+      ],
+      "after_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "function_signature:1",
+        "type_annotation:1",
+        "type_query:1",
+        "typeof:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "function_signature:1",
+        "type_annotation:1",
+        "type_query:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "function_signature:1",
+        "type_annotation:1",
+        "type_query:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "function_signature:1",
+        ";:1"
+      ],
+      "after_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "statement_block:1",
+        "export_statement:1",
+        "function_signature:1",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "statement_block:1",
+        "variable_declaration:2"
+      ],
+      "after_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "statement_block:1",
+        "variable_declaration:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "statement_block:1",
+        "variable_declaration:2",
+        "var:1"
+      ],
+      "after_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "statement_block:1",
+        "variable_declaration:2",
+        "var:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "statement_block:1",
+        "variable_declaration:2",
+        "variable_declarator:1"
+      ],
+      "after_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "statement_block:1",
+        "variable_declaration:2",
+        "variable_declarator:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "statement_block:1",
+        "variable_declaration:2",
+        "variable_declarator:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "statement_block:1",
+        "variable_declaration:2",
+        "variable_declarator:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "statement_block:1",
+        "variable_declaration:2",
+        "variable_declarator:1",
+        "type_annotation:1"
+      ],
+      "after_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "statement_block:1",
+        "variable_declaration:2",
+        "variable_declarator:1",
+        "type_annotation:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "statement_block:1",
+        "variable_declaration:2",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "::1"
+      ],
+      "after_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "statement_block:1",
+        "variable_declaration:2",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "statement_block:1",
+        "variable_declaration:2",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "type_query:1"
+      ],
+      "after_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "statement_block:1",
+        "variable_declaration:2",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "type_query:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "statement_block:1",
+        "variable_declaration:2",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "type_query:1",
+        "typeof:1"
+      ],
+      "after_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "statement_block:1",
+        "variable_declaration:2",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "type_query:1",
+        "typeof:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "statement_block:1",
+        "variable_declaration:2",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "type_query:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "statement_block:1",
+        "variable_declaration:2",
+        "variable_declarator:1",
+        "type_annotation:1",
+        "type_query:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "statement_block:1",
+        "variable_declaration:2",
+        ";:1"
+      ],
+      "after_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "statement_block:1",
+        "variable_declaration:2",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "statement_block:1",
+        "}:1"
+      ],
+      "after_path": [
+        "ambient_declaration:1",
+        "module:1",
+        "statement_block:1",
+        "}:1"
+      ]
+    }
+  ],
+  "text_mappings": [
+    {
+      "name": "Only one solution",
+      "entries": [
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 0,
+              "start_column": 15,
+              "end_row": 0,
+              "end_column": 23
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
