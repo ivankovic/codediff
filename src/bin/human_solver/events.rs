@@ -30,8 +30,17 @@ use crate::*;
 /// handful of whole-tree passes); see `run_event_loop`'s `needs_redraw` for why it only happens
 /// once per keystroke rather than on every idle poll timeout.
 pub(crate) struct FrameState<'a> {
-    pub(crate) before_root: Node<'a>,
-    pub(crate) after_root: Node<'a>,
+    /// `None` for a file pair whose language tree-sitter has no grammar for - the *text-only*
+    /// mode a case opens in when `Code::ast` is missing on either side (a `BUILD` file, say).
+    /// There is no tree to flatten, so `before_flat`/`after_flat` are empty and `caches` is
+    /// `Caches::default()`; the panels draw a single "not supported" row (`draw_ui`) and every
+    /// key that reads a tree is routed away from `handle_key` (`run_case_session`). Painting is
+    /// unaffected: it works on the raw text, which is present either way.
+    ///
+    /// Both sides are `Some` or both are `None` - `compute_frame_state` never mixes them, so a
+    /// consumer can take them as a pair (`FrameState::roots`).
+    pub(crate) before_root: Option<Node<'a>>,
+    pub(crate) after_root: Option<Node<'a>>,
     pub(crate) before_src: &'a [u8],
     pub(crate) after_src: &'a [u8],
     pub(crate) caches: Caches,
@@ -62,18 +71,27 @@ pub(crate) fn compute_frame_state<'a>(
     after: &'a Code,
     app: &App,
 ) -> Result<FrameState<'a>> {
-    let before_root = before
-        .ast
-        .as_ref()
-        .context("Before code has no AST")?
-        .root_node();
-    let after_root = after
-        .ast
-        .as_ref()
-        .context("After code has no AST")?
-        .root_node();
     let before_src = before.contents.as_bytes();
     let after_src = after.contents.as_bytes();
+
+    // No grammar for this pair's language: there is nothing to flatten, nothing to resolve the
+    // mapping's paths against, and nothing to count as unmarked - but the file pair is still
+    // real, and its *text* is all a painting needs. See `FrameState::before_root`.
+    let (Some(before_tree), Some(after_tree)) = (before.ast.as_ref(), after.ast.as_ref()) else {
+        return Ok(FrameState {
+            before_root: None,
+            after_root: None,
+            before_src,
+            after_src,
+            caches: Caches::default(),
+            before_flat: FlatIndex::new(Vec::new()),
+            after_flat: FlatIndex::new(Vec::new()),
+            before_unmarked: 0,
+            after_unmarked: 0,
+        });
+    };
+    let before_root = before_tree.root_node();
+    let after_root = after_tree.root_node();
 
     let caches = rebuild_caches_for_mapping(&app.mapping, before_root, after_root);
 
@@ -101,8 +119,8 @@ pub(crate) fn compute_frame_state<'a>(
     let after_unmarked = count_unmarked(&after_flat, &caches, status_after);
 
     Ok(FrameState {
-        before_root,
-        after_root,
+        before_root: Some(before_root),
+        after_root: Some(after_root),
         before_src,
         after_src,
         caches,
@@ -111,6 +129,15 @@ pub(crate) fn compute_frame_state<'a>(
         before_unmarked,
         after_unmarked,
     })
+}
+
+impl<'a> FrameState<'a> {
+    /// Both trees, or `None` in text-only mode - see [`FrameState::before_root`]. The one place
+    /// the two `Option`s are turned back into the pair every tree-reading consumer wants, so no
+    /// caller has to decide what a half-present pair would mean.
+    pub(crate) fn roots(&self) -> Option<(Node<'a>, Node<'a>)> {
+        self.before_root.zip(self.after_root)
+    }
 }
 
 /// What a case session (`run_case_session`) ended on: either the user quit, or a modal asked to
@@ -136,8 +163,8 @@ pub(crate) fn run_event_loop(
             SessionEnd::Quit => break,
             SessionEnd::Open(OpenTarget::Diffs(name)) => match load_case(&name) {
                 Ok((new_before, new_after)) => {
-                    let before_root_id = new_before.ast.as_ref().unwrap().root_node().id();
-                    let after_root_id = new_after.ast.as_ref().unwrap().root_node().id();
+                    let before_root_id = starting_cursor_id(&new_before);
+                    let after_root_id = starting_cursor_id(&new_after);
                     before = new_before;
                     after = new_after;
                     app.mapping = human_mapping::load(&name).unwrap_or_default();
@@ -165,8 +192,8 @@ pub(crate) fn run_event_loop(
             },
             SessionEnd::Open(OpenTarget::Sample(name)) => match load_sample(&name) {
                 Ok((new_before, new_after, source)) => {
-                    let before_root_id = new_before.ast.as_ref().unwrap().root_node().id();
-                    let after_root_id = new_after.ast.as_ref().unwrap().root_node().id();
+                    let before_root_id = starting_cursor_id(&new_before);
+                    let after_root_id = starting_cursor_id(&new_after);
                     before = new_before;
                     after = new_after;
                     app.mapping = HumanMapping::default();
@@ -201,8 +228,8 @@ pub(crate) fn run_event_loop(
                 path,
             }) => match load_git_commit_file(&hash, &path) {
                 Ok((new_before, new_after)) => {
-                    let before_root_id = new_before.ast.as_ref().unwrap().root_node().id();
-                    let after_root_id = new_after.ast.as_ref().unwrap().root_node().id();
+                    let before_root_id = starting_cursor_id(&new_before);
+                    let after_root_id = starting_cursor_id(&new_after);
                     before = new_before;
                     after = new_after;
                     app.mapping = HumanMapping::default();
@@ -381,6 +408,7 @@ pub(crate) fn run_case_session(
                     frame_state.before_unmarked,
                     frame_state.after_unmarked,
                     &current_name,
+                    frame_state.roots().is_none(),
                 )
             })?;
             needs_redraw = false;
@@ -400,22 +428,6 @@ pub(crate) fn run_case_session(
             continue;
         }
 
-        // `load_case` runs `ensure_parsed` on both sides, so full-content hashes are always
-        // available here; used by `m`/`M` to decide Identical vs MatchButNotIdentical for nodes
-        // with children without asking (see `subtree_match_operation`).
-        let before_hash = &before
-            .metadata
-            .ast_metadata
-            .as_ref()
-            .context("Before code has no AST metadata")?
-            .node_to_full_hash;
-        let after_hash = &after
-            .metadata
-            .ast_metadata
-            .as_ref()
-            .context("After code has no AST metadata")?
-            .node_to_full_hash;
-
         let state_preserving = is_state_preserving_key(app.modal.as_ref(), key.code);
 
         let mut open_request: Option<OpenTarget> = None;
@@ -434,14 +446,31 @@ pub(crate) fn run_case_session(
                 before,
                 after,
             );
-        } else {
+        } else if let Some((before_root, after_root)) = frame_state.roots() {
+            // `load_case` runs `ensure_parsed` on both sides whenever there is a tree to parse,
+            // so full-content hashes are always available on this branch; used by `m`/`M` to
+            // decide Identical vs MatchButNotIdentical for nodes with children without asking
+            // (see `subtree_match_operation`).
+            let before_hash = &before
+                .metadata
+                .ast_metadata
+                .as_ref()
+                .context("Before code has no AST metadata")?
+                .node_to_full_hash;
+            let after_hash = &after
+                .metadata
+                .ast_metadata
+                .as_ref()
+                .context("After code has no AST metadata")?
+                .node_to_full_hash;
+
             handle_key(
                 app,
                 key.code,
                 &frame_state.before_flat,
                 &frame_state.after_flat,
-                frame_state.before_root,
-                frame_state.after_root,
+                before_root,
+                after_root,
                 &frame_state.caches,
                 frame_state.before_src,
                 frame_state.after_src,
@@ -449,6 +478,19 @@ pub(crate) fn run_case_session(
                 after_hash,
                 before,
                 after,
+            );
+        } else {
+            // Text-only mode (see `FrameState::before_root`): no trees to hand `handle_key`, and
+            // no `ast_metadata` to read either, so the keys that need neither are dispatched
+            // directly.
+            handle_tree_independent_key(
+                app,
+                key.code,
+                frame_state.before_src,
+                frame_state.after_src,
+                before,
+                after,
+                false,
             );
         }
 
@@ -486,29 +528,6 @@ pub(crate) fn handle_key(
     let focus = app.focus;
 
     let result: Option<Result<String>> = match code {
-        KeyCode::Char('q') | KeyCode::Esc => {
-            app.should_quit = true;
-            None
-        }
-        // Shift-1 rather than a letter: every letter near the ones this view uses is a keystroke
-        // away from something harmless, and this is the one action in the tool that cannot be
-        // undone.
-        KeyCode::Char('!') => {
-            app.modal = Some(Modal::ConfirmResetCase {
-                entries: app.mapping.entries.len(),
-                groups: app.mapping.groups.len(),
-                paintings: app.mapping.text_mappings.len(),
-            });
-            None
-        }
-        KeyCode::Char('?') => {
-            app.modal = Some(Modal::Help { scroll: 0 });
-            None
-        }
-        KeyCode::Tab => {
-            app.focus = focus.toggle();
-            None
-        }
         KeyCode::Up | KeyCode::Char('k') => {
             let (panel, flat) = match focus {
                 Focus::Before => (&mut app.before, before_flat),
@@ -771,22 +790,6 @@ pub(crate) fn handle_key(
             app.status = Some("Cleared multi-map selection".to_string());
             None
         }
-        KeyCode::Char('p') => {
-            let diff = diff_code(before, after);
-            app.status = Some(match diff.ast {
-                Some(ast_diff) => {
-                    let msg = format!(
-                        "Ran codediff: {} before-node(s), {} after-node(s) mapped",
-                        ast_diff.before_node_map.len(),
-                        ast_diff.after_node_map.len()
-                    );
-                    app.algo_diff = Some(ast_diff);
-                    msg
-                }
-                None => "codediff produced no AST diff".to_string(),
-            });
-            None
-        }
         KeyCode::Char('n') => Some(action_next_mismatch(
             app,
             focus,
@@ -809,19 +812,6 @@ pub(crate) fn handle_key(
             });
             None
         }
-        KeyCode::Char('t') => {
-            app.modal = Some(Modal::TextView {
-                state: TextPaintState::default(),
-            });
-            None
-        }
-        KeyCode::Char('T') => {
-            match run_unix_diff(before_src, after_src) {
-                Ok(output) => app.modal = Some(Modal::UnixDiffView { output, scroll: 0 }),
-                Err(err) => app.status = Some(format!("Error running diff: {:#}", err)),
-            }
-            None
-        }
         KeyCode::Char('H') => {
             app.hide_solved = !app.hide_solved;
             app.status = Some(if app.hide_solved {
@@ -840,9 +830,101 @@ pub(crate) fn handle_key(
             });
             None
         }
+        // Every key left is one the trees play no part in - quitting, the modals, the text
+        // views, saving. `handle_tree_independent_key` owns those, because text-only mode
+        // (`FrameState::before_root`) has no trees to hand this function and reaches them
+        // directly.
+        _ => {
+            handle_tree_independent_key(app, code, before_src, after_src, before, after, true);
+            return;
+        }
+    };
+
+    apply_key_result(app, result);
+}
+
+/// The keys that read no tree: quit, the help/reset modals, `Tab`, `p`, the `t`/`T` text views,
+/// save/reject/comment, and the three pickers.
+///
+/// Split out of [`handle_key`] rather than duplicated, because a case whose language tree-sitter
+/// has no grammar for still gets all of them - see [`FrameState::before_root`]. `handle_key`
+/// falls through to this for anything its own tree-reading arms don't claim, so a key only ever
+/// has one implementation and the two modes cannot drift.
+///
+/// `tree_available` is false exactly in text-only mode, and only changes what an *unhandled* key
+/// does: there it says why the tree keys do nothing, rather than leaving a keypress looking like
+/// a hang.
+pub(crate) fn handle_tree_independent_key(
+    app: &mut App,
+    code: KeyCode,
+    before_src: &[u8],
+    after_src: &[u8],
+    before: &Code,
+    after: &Code,
+    tree_available: bool,
+) {
+    let result: Option<Result<String>> = match code {
+        KeyCode::Char('q') | KeyCode::Esc => {
+            app.should_quit = true;
+            None
+        }
+        // Shift-1 rather than a letter: every letter near the ones this view uses is a keystroke
+        // away from something harmless, and this is the one action in the tool that cannot be
+        // undone.
+        KeyCode::Char('!') => {
+            app.modal = Some(Modal::ConfirmResetCase {
+                entries: app.mapping.entries.len(),
+                groups: app.mapping.groups.len(),
+                paintings: app.mapping.text_mappings.len(),
+            });
+            None
+        }
+        KeyCode::Char('?') => {
+            app.modal = Some(Modal::Help { scroll: 0 });
+            None
+        }
+        KeyCode::Tab => {
+            app.focus = app.focus.toggle();
+            None
+        }
+        KeyCode::Char('p') => {
+            let diff = diff_code(before, after);
+            app.status = Some(match diff.ast {
+                Some(ast_diff) => {
+                    let msg = format!(
+                        "Ran codediff: {} before-node(s), {} after-node(s) mapped",
+                        ast_diff.before_node_map.len(),
+                        ast_diff.after_node_map.len()
+                    );
+                    app.algo_diff = Some(ast_diff);
+                    msg
+                }
+                None => "codediff produced no AST diff".to_string(),
+            });
+            None
+        }
+        KeyCode::Char('t') => {
+            app.modal = Some(Modal::TextView {
+                state: TextPaintState::default(),
+            });
+            None
+        }
+        KeyCode::Char('T') => {
+            match run_unix_diff(before_src, after_src) {
+                Ok(output) => app.modal = Some(Modal::UnixDiffView { output, scroll: 0 }),
+                Err(err) => app.status = Some(format!("Error running diff: {:#}", err)),
+            }
+            None
+        }
         KeyCode::Char('s') => match &app.origin {
             CaseOrigin::Diffs => {
-                let result = action_save(&mut app.mapping, &mut app.dirty, &app.name, None);
+                let result = action_save(
+                    &mut app.mapping,
+                    &mut app.dirty,
+                    &app.name,
+                    None,
+                    is_text_only(before, after),
+                );
                 if result.is_ok() {
                     refresh_diff_unmarked(app, &app.name.clone());
                     refresh_diff_text_painted(app, &app.name.clone());
@@ -987,9 +1069,21 @@ pub(crate) fn handle_key(
             }
             None
         }
+        _ if !tree_available => Some(Ok(
+            "No tree-sitter grammar for this file: the tree keys do nothing here, but t (paint) \
+             and T (unix diff) work"
+                .to_string(),
+        )),
         _ => None,
     };
 
+    apply_key_result(app, result);
+}
+
+/// Reports what a key handler returned in the status line: the message on success, the error
+/// chain on failure. Shared by [`handle_key`] and [`handle_tree_independent_key`] so a key's
+/// outcome is reported the same way whichever of the two claimed it.
+fn apply_key_result(app: &mut App, result: Option<Result<String>>) {
     if let Some(res) = result {
         app.status = Some(match res {
             Ok(msg) => msg,
@@ -997,6 +1091,12 @@ pub(crate) fn handle_key(
         });
     }
 }
+
+/// What the two tree-committing modals say if they are somehow reached with no tree. Neither can
+/// be raised in text-only mode - both come from `handle_key`'s `m`/`M`, which that mode never
+/// reaches - so this is the answer to "what if the impossible happened", written down instead of
+/// unwrapped.
+const NO_TREE_TO_MAP: &str = "No tree-sitter grammar for this file: there is no tree to map";
 
 /// Routes a keypress while `app.modal` is `Some`. Returns `Some(name)` when the human just
 /// confirmed switching to a different test case (via the open picker, possibly after a save/
@@ -1009,8 +1109,12 @@ pub(crate) fn handle_modal_key(
     code: KeyCode,
     before_flat: &FlatIndex,
     after_flat: &FlatIndex,
-    before_root: Node,
-    after_root: Node,
+    // `None` in text-only mode (see `FrameState::before_root`). Only the two confirmation modals
+    // that commit a *tree* mapping read these, and neither can be raised without a tree to raise
+    // it from - every other modal here (the text views, the pickers, the prompts, the help) is
+    // reachable in both modes and needs no tree at all.
+    before_root: Option<Node>,
+    after_root: Option<Node>,
     caches: &Caches,
     before_src: &[u8],
     after_src: &[u8],
@@ -1020,6 +1124,10 @@ pub(crate) fn handle_modal_key(
     after: &Code,
 ) -> Option<OpenTarget> {
     let modal = app.modal.take()?;
+
+    // The one place the two `Option`s above are opened, so the arms that need a tree read the
+    // same "both or neither" fact `FrameState::roots` states.
+    let roots = before_root.zip(after_root);
 
     match modal {
         Modal::ConfirmResetCase { .. } => match code {
@@ -1041,6 +1149,10 @@ pub(crate) fn handle_modal_key(
             recursive,
         } => match code {
             KeyCode::Char('y') | KeyCode::Char('Y') => {
+                let Some((before_root, after_root)) = roots else {
+                    app.status = Some(NO_TREE_TO_MAP.to_string());
+                    return None;
+                };
                 app.dirty = true;
                 app.status = Some(apply_modal_choice(
                     &mut app.mapping,
@@ -1091,6 +1203,10 @@ pub(crate) fn handle_modal_key(
                     before_ids.iter().copied().collect();
                 let after_set: std::collections::BTreeSet<usize> =
                     after_ids.iter().copied().collect();
+                let Some((before_root, after_root)) = roots else {
+                    app.status = Some(NO_TREE_TO_MAP.to_string());
+                    return None;
+                };
                 app.status = Some(
                     match commit_multi_map_group(
                         &mut app.mapping,
@@ -1253,7 +1369,13 @@ pub(crate) fn handle_modal_key(
         },
         Modal::ConfirmDiscardUnsaved { target, can_save } => match code {
             KeyCode::Char('s') | KeyCode::Char('S') if can_save => {
-                match action_save(&mut app.mapping, &mut app.dirty, &app.name, None) {
+                match action_save(
+                    &mut app.mapping,
+                    &mut app.dirty,
+                    &app.name,
+                    None,
+                    is_text_only(before, after),
+                ) {
                     Ok(_) => {
                         refresh_diff_unmarked(app, &app.name.clone());
                         refresh_diff_text_painted(app, &app.name.clone());
@@ -1496,6 +1618,10 @@ pub(crate) fn handle_modal_key(
     None
 }
 
+/// `text_only` says this fixture's language has no tree-sitter grammar, which changes only what
+/// the *generated stub* asserts - see `ensure_stub_test`. Everything else here is the same: the
+/// mapping file is written, and the painting and invariants stubs are added on the same terms.
+///
 /// `comment` is only ever `Some` from `action_promote` (a sample's recorded `Modal::PromptComment`
 /// text, if any) - the plain save path (`s` on an already-real `CaseOrigin::Diffs` case) always
 /// passes `None`, since only samples have a comment to carry forward. Only takes effect when
@@ -1506,9 +1632,10 @@ pub(crate) fn action_save(
     dirty: &mut bool,
     name: &str,
     comment: Option<&str>,
+    text_only: bool,
 ) -> Result<String> {
     human_mapping::save(name, mapping)?;
-    let created = ensure_stub_test(name, comment)?;
+    let created = ensure_stub_test(name, comment, text_only)?;
     // Only once there is something to score: an unpainted fixture has no painting for the test to
     // compare against, and a stub for it would fail rather than report a distance.
     if !mapping.text_mappings.is_empty() {
@@ -1658,6 +1785,10 @@ pub(crate) fn action_promote(
         &mut app.dirty,
         new_name,
         comment.as_deref(),
+        // Always false: `load_sample`/`load_git_commit_file` still require a parseable language on
+        // both sides, so nothing that reaches promotion can be text-only. Only a fixture already
+        // sitting under `diffs/` (which `load_case` opens either way) can be.
+        false,
     )?;
 
     // ...and into the fixture's own `description.md`, which is where `diff_inventory` reads a note

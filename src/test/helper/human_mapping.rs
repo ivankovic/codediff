@@ -863,30 +863,100 @@ pub fn compare_painting(
     options: crate::diff::text::RenderOptions,
 ) -> Result<PaintingComparison> {
     let (before, after) = &*super::handmade_test_code_pair(name)?;
-    let diff = codediff_diff_for_painting(name, before, after)?;
+    let diff = codediff_diff_for_painting(before, after)?;
     compare_painting_with_diff(name, options, before, after, &diff)
 }
 
 /// codediff's side of a painting comparison: a real diff, so that every preset is projected from
 /// the same mapping. Built once per fixture and handed to [`compare_painting_with_diff`] for each
 /// preset, since the diff is the expensive half and does not depend on the preset.
-pub struct PaintingDiff {
-    ast: crate::diff::ASTDiff,
-    node_cache: crate::diff::NodeCache,
+pub enum PaintingDiff {
+    /// The ordinary case: a tree mapping, projected to text by [`crate::diff::text::TextDiff`].
+    Ast {
+        ast: crate::diff::ASTDiff,
+        node_cache: crate::diff::NodeCache,
+    },
+    /// A fixture whose language tree-sitter has no grammar for, so there is no tree to project
+    /// from. **This is not a degraded comparison - it is the right one.** The product itself
+    /// renders such a pair with [`crate::diff::text::plain_text_line_diff`] (see
+    /// `app::compute_diff`), so what the human paints against, and what a reader sees, is that
+    /// fallback; grading the painting against anything else would be grading a rendering the
+    /// product never produces. This used to error out (`codediff produced no AST diff for ...`),
+    /// which left such a fixture unable to carry a painting at all.
+    ///
+    /// The two range lists go through exactly the same `ranges_for_options` filtering the AST
+    /// side does, so the `Minimal`/`Full` presets still mean what they mean everywhere else -
+    /// with the one difference that the fallback never emits `Move`, so the options that only
+    /// govern moves have nothing to act on here and the two presets can legitimately coincide.
+    PlainText {
+        before: Vec<crate::diff::text::RangeMatch>,
+        after: Vec<crate::diff::text::RangeMatch>,
+    },
 }
 
 /// See [`PaintingDiff`].
 pub fn codediff_diff_for_painting(
-    name: &str,
     before: &crate::code::Code,
     after: &crate::code::Code,
 ) -> Result<PaintingDiff> {
+    // Keyed on the *code*, not on `diff_code`'s result, because that is what the product keys on
+    // (`app::compute_diff_with_options`) - and because `diff_code` hands back a `Some(ASTDiff)`
+    // for a pair with no trees at all rather than `None`, so testing the diff would silently
+    // grade this fixture against an empty tree mapping instead of the fallback a reader sees.
+    if before.ast.is_none() || after.ast.is_none() {
+        let (before_ranges, after_ranges) =
+            crate::diff::text::plain_text_line_diff(&before.contents, &after.contents);
+        return Ok(PaintingDiff::PlainText {
+            before: before_ranges,
+            after: after_ranges,
+        });
+    }
     let diff = crate::diff::diff_code(before, after);
     let ast = diff
         .ast
-        .with_context(|| format!("codediff produced no AST diff for '{name}'"))?;
+        .context("codediff produced no AST diff for a pair that has both trees")?;
     let node_cache = crate::diff::NodeCache::build(before, after);
-    Ok(PaintingDiff { ast, node_cache })
+    Ok(PaintingDiff::Ast { ast, node_cache })
+}
+
+/// codediff's own side of a painting comparison, as per-byte labels, `[before, after]`.
+///
+/// Goes through exactly the pipeline the TUI renders: a real diff, projected to text ranges, then
+/// filtered by `options`. Not a re-derivation - what is compared is what a reader would actually
+/// see. For a fixture tree-sitter has no grammar for, that projection is the product's own
+/// plain-text fallback, for the same reason (see [`PaintingDiff::PlainText`]); both variants meet
+/// again at `ranges_for_options`, so the presets mean the same thing on either.
+///
+/// Not `TextDiff::from` (which builds under `FULL`): `paint_reindent_only_moves` genuinely differs
+/// between `MINIMAL`/`FULL`, so this must build under `options` itself.
+pub fn codediff_painting_labels(
+    diff: &PaintingDiff,
+    before: &crate::code::Code,
+    after: &crate::code::Code,
+    options: crate::diff::text::RenderOptions,
+) -> [Vec<Option<TextLabel>>; 2] {
+    let sides: [Vec<crate::diff::text::RangeMatch>; 2] = match diff {
+        PaintingDiff::Ast { ast, node_cache } => {
+            let text_diff = crate::diff::text::TextDiff::from_with_options(
+                before, after, ast, node_cache, options,
+            );
+            [text_diff.all(0), text_diff.all(1)]
+        }
+        PaintingDiff::PlainText {
+            before: before_ranges,
+            after: after_ranges,
+        } => [before_ranges.clone(), after_ranges.clone()],
+    };
+
+    [0usize, 1usize].map(|side| {
+        let contents = if side == 0 {
+            &before.contents
+        } else {
+            &after.contents
+        };
+        let ranges = crate::diff::text::ranges_for_options(&sides[side], contents, options);
+        label_bytes_from_ranges(contents, &ranges)
+    })
 }
 
 /// [`compare_painting`] over an already computed diff - see [`PaintingDiff`] for why the two are
@@ -901,31 +971,9 @@ pub fn compare_painting_with_diff(
     let mapping = load(name)?;
     let candidates = paintings_for_mode(&mapping, options)?;
 
-    // codediff's side, through exactly the pipeline the TUI renders: a real diff, projected by
-    // `TextDiff`, then filtered by the options. Not a re-derivation - what is compared is what a
-    // reader would actually see.
-    //
-    // Not `TextDiff::from` (which builds under `FULL`): `paint_reindent_only_moves` genuinely
-    // differs between `MINIMAL`/`FULL`, so this must build under `options` itself.
-    let text_diff = crate::diff::text::TextDiff::from_with_options(
-        before,
-        after,
-        &diff.ast,
-        &diff.node_cache,
-        options,
-    );
-
     // codediff's side does not depend on which candidate painting is being compared, so it is
     // labelled once and reused.
-    let ours: [Vec<Option<TextLabel>>; 2] = [0usize, 1usize].map(|side| {
-        let contents = if side == 0 {
-            &before.contents
-        } else {
-            &after.contents
-        };
-        let ranges = crate::diff::text::ranges_for_options(&text_diff.all(side), contents, options);
-        label_bytes_from_ranges(contents, &ranges)
-    });
+    let ours = codediff_painting_labels(diff, before, after, options);
     let total_bytes = before.contents.len() + after.contents.len();
 
     // The best of the preset's candidates. Several paintings under one preset are *alternative*
@@ -987,7 +1035,7 @@ pub fn assert_matches_human_painting_within_limit(name: &str, max_percent: f64) 
     // One diff for both presets: they are two renderings of one mapping, and the diff is the
     // expensive half of each comparison.
     let (before, after) = &*super::handmade_test_code_pair(name)?;
-    let diff = codediff_diff_for_painting(name, before, after)?;
+    let diff = codediff_diff_for_painting(before, after)?;
     let mut failures = Vec::new();
     for options in [RenderOptions::MINIMAL, RenderOptions::FULL] {
         let comparison = compare_painting_with_diff(name, options, before, after, &diff)?;
@@ -4853,6 +4901,69 @@ mod tests {
             count < extents.len(),
             "a one-line span must not touch every node in the file"
         );
+    }
+
+    /// A pair with no tree-sitter grammar is graded against the product's own plain-text
+    /// fallback, not rejected.
+    ///
+    /// The fixture this exists for is a Bazel `BUILD` file a user reported; `diff_code` returns no
+    /// `ASTDiff` for it, which used to make `codediff_diff_for_painting` bail and left the fixture
+    /// unable to carry a painting at all. What codediff *renders* for such a pair is
+    /// `plain_text_line_diff` (`app::compute_diff`), so that is what its painting is answerable
+    /// to - checked here by comparing against that function directly rather than against a
+    /// recorded range list, so the two cannot drift.
+    #[test]
+    fn a_pair_with_no_grammar_paints_from_the_plain_text_fallback() -> Result<()> {
+        let before_text = "cc_library(\n    name = \"a\",\n    srcs = [\"a.cc\"],\n)\n";
+        let after_text = "cc_library(\n    name = \"a\",\n    srcs = [\"b.cc\"],\n)\n";
+        let before = crate::code::Code::from_string(before_text, &Language::Unknown);
+        let after = crate::code::Code::from_string(after_text, &Language::Unknown);
+        assert!(
+            before.ast.is_none() && after.ast.is_none(),
+            "the premise of this test is a pair tree-sitter cannot parse"
+        );
+
+        let diff = codediff_diff_for_painting(&before, &after)?;
+        let PaintingDiff::PlainText {
+            before: before_ranges,
+            after: after_ranges,
+        } = &diff
+        else {
+            panic!("a pair with no AST must fall back to the plain-text diff");
+        };
+        let (expected_before, expected_after) =
+            crate::diff::text::plain_text_line_diff(before_text, after_text);
+        assert_eq!(before_ranges.len(), expected_before.len());
+        assert_eq!(after_ranges.len(), expected_after.len());
+
+        // And the fallback actually reaches the scorer: the one changed character is labelled on
+        // both sides, which is what makes a painting for this fixture gradeable rather than
+        // compared against nothing. `plain_text_line_diff` narrows a rewritten line to its
+        // changed part (`intra_line_ranges`), so this is a single byte, not the whole row.
+        //
+        // Both presets give the same answer here, which is correct rather than a missing
+        // distinction: every `RenderOptions` field that could differ governs how a *move* is
+        // painted, and the fallback never emits one.
+        for options in [
+            crate::diff::text::RenderOptions::MINIMAL,
+            crate::diff::text::RenderOptions::FULL,
+        ] {
+            let labels = codediff_painting_labels(&diff, &before, &after, options);
+            for (side, contents) in [(0usize, before_text), (1usize, after_text)] {
+                let painted: String = contents
+                    .char_indices()
+                    .filter(|(index, _)| labels[side][*index].is_some())
+                    .map(|(_, character)| character)
+                    .collect();
+                assert_eq!(
+                    painted,
+                    if side == 0 { "a" } else { "b" },
+                    "side {side} under {options:?} should paint exactly the one changed \
+                     character, and nothing else in the file"
+                );
+            }
+        }
+        Ok(())
     }
 
     mod exploratory;

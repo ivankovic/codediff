@@ -231,6 +231,7 @@ yaml-draios-sysdig-string-url-change-4,src/test/data/diffs/full/yaml-draios-sysd
 yaml-kbudde-rabbitmq_exporter-string-url-change,src/test/data/diffs/full/yaml-kbudde-rabbitmq_exporter-string-url-change,full,YAML,kbudde-rabbitmq_exporter,b23551326c66f0d3c2aa0998391991905eb066d2,.github/workflows/release.yml,,58,390,58,390,0,0,0.000,none,
 yaml-manugarg-pacparser-string-url-change,src/test/data/diffs/full/yaml-manugarg-pacparser-string-url-change,full,YAML,manugarg-pacparser,26a14170bacd97ef208b511d6e7e2e0c56ebedac,.github/workflows/sonar.yml,,29,211,29,211,0,0,0.000,none,
 yaml-python-xmp-toolkit-python-xmp-toolkit-insert-two-values-to-a-slice,src/test/data/diffs/full/yaml-python-xmp-toolkit-python-xmp-toolkit-insert-two-values-to-a-slice,full,YAML,python-xmp-toolkit-python-xmp-toolkit,041d6a8c3b703e236132758de0dd1f4d684bdc6f,.github/workflows/python-package.yml,,60,335,60,345,0,0,0.000,none,
+bazel-not-actually-supported-by-treesitter,src/test/data/diffs/handmade/bazel-not-actually-supported-by-treesitter,handmade,Unknown,pytorch-xla.git,,BUILD,,67,0,41,0,0,0,,minimal+full,Full|Minimal
 cpp-add-const-correctness,src/test/data/diffs/handmade/cpp-add-const-correctness,handmade,CPP,,,,,16,116,16,122,0,0,0.000,minimal+full,Full|Minimal
 cpp-add-memory-management,src/test/data/diffs/handmade/cpp-add-memory-management,handmade,CPP,,,,,14,89,15,107,0,0,0.000,minimal+full,Full|Minimal
 cpp-add-templates,src/test/data/diffs/handmade/cpp-add-templates,handmade,CPP,,,,,15,105,16,119,0,0,0.000,minimal+full,Full|Minimal

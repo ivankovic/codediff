@@ -319,21 +319,53 @@ impl TextOverlay {
     }
 }
 
+/// Whether this pair has to be handled without a tree: tree-sitter has no grammar for its
+/// language (or the language was not recognised at all), so `Code::ast` is missing on at least one
+/// side.
+///
+/// One predicate rather than an `is_none()` check at each site, because "text-only" is a mode the
+/// whole tool agrees on - the panels draw a placeholder (`draw_ui`), `handle_key` is bypassed
+/// (`run_case_session`), the generated stub asserts a painting rather than a mapping
+/// (`stub_test_contents`), and codediff's own side comes from `plain_text_line_diff`
+/// ([`codediff_text_spans`]) - not a condition each of those gets to interpret for itself.
+pub(crate) fn is_text_only(before: &Code, after: &Code) -> bool {
+    before.ast.is_none() || after.ast.is_none()
+}
+
 /// codediff's own text ranges for this case, as painting spans - one list per side.
 ///
 /// Goes through `TextDiff::from`, the same projection the real TUI renders and the mapping site
 /// draws, so what shows here is what codediff actually produces rather than a second
 /// interpretation of its node mapping that could drift from it.
+///
+/// With no AST on either side, that projection is `plain_text_line_diff` instead - not nothing.
+/// A file pair tree-sitter has no grammar for is exactly what the product's own text fallback
+/// exists for (`app::compute_diff`), and it is what the painting for such a fixture is graded
+/// against (`compare_painting_with_diff`), so the `p` overlay and `P`'s seed have to show it.
+/// Returning two empty lists here - what this used to do - left a human painting a case with no
+/// visible answer to compare against, and seeding one with nothing at all.
 pub(crate) fn codediff_text_spans(
     before: &Code,
     after: &Code,
 ) -> [Vec<(HumanTextSpan, HumanTextVerdict)>; 2] {
-    let diff = diff_code(before, after);
-    let Some(ast_diff) = diff.ast.as_ref() else {
-        return [Vec::new(), Vec::new()];
+    // Keyed on `is_text_only` (the code), not on `diff_code`'s result: that is what the product
+    // keys on, and `diff_code` returns a `Some(ASTDiff)` even for a pair with no trees at all, so
+    // testing the diff would show an empty tree projection where the fallback belongs.
+    let sides = if is_text_only(before, after) {
+        let (before_ranges, after_ranges) =
+            codediff::diff::text::plain_text_line_diff(&before.contents, &after.contents);
+        [before_ranges, after_ranges]
+    } else {
+        let diff = diff_code(before, after);
+        match diff.ast.as_ref() {
+            Some(ast_diff) => {
+                let node_cache = NodeCache::build(before, after);
+                let text_diff = TextDiff::from(before, after, ast_diff, &node_cache);
+                [text_diff.all(0), text_diff.all(1)]
+            }
+            None => [Vec::new(), Vec::new()],
+        }
     };
-    let node_cache = NodeCache::build(before, after);
-    let text_diff = TextDiff::from(before, after, ast_diff, &node_cache);
 
     let convert = |ranges: Vec<codediff::diff::text::RangeMatch>| {
         ranges
@@ -360,7 +392,8 @@ pub(crate) fn codediff_text_spans(
             })
             .collect()
     };
-    [convert(text_diff.all(0)), convert(text_diff.all(1))]
+    let [before_ranges, after_ranges] = sides;
+    [convert(before_ranges), convert(after_ranges)]
 }
 
 /// codediff's own rendering of this pair as human painting *entries* - what `P` copies into an

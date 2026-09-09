@@ -82,7 +82,11 @@ pub(crate) fn fixtures_mod_file(dataset: &str) -> PathBuf {
 /// block right before the `assert_matches_human_mapping` call - only when the file is actually
 /// being created here for the first time; an already-existing stub is never rewritten, so a
 /// comment added or edited after promotion has no effect.
-pub(crate) fn ensure_stub_test(name: &str, comment: Option<&str>) -> Result<bool> {
+///
+/// `text_only` is for a fixture whose language tree-sitter has no grammar for: it has no tree
+/// mapping, so the file written here carries no `mapping()` test to assert one. See
+/// [`stub_test_contents`].
+pub(crate) fn ensure_stub_test(name: &str, comment: Option<&str>, text_only: bool) -> Result<bool> {
     let dataset = case_dataset(name).unwrap_or_else(legacy_dataset);
     let module = module_name(name);
     let dir = fixtures_dir(&dataset);
@@ -96,7 +100,7 @@ pub(crate) fn ensure_stub_test(name: &str, comment: Option<&str>) -> Result<bool
         // future dataset) needed it fresh on first promotion - real gap, not defensive
         // programming against something that can't happen.
         fs::create_dir_all(&dir).with_context(|| format!("creating {:?}", dir))?;
-        fs::write(&stub_path, stub_test_contents(name, comment))
+        fs::write(&stub_path, stub_test_contents(name, comment, text_only))
             .with_context(|| format!("writing stub test to {:?}", stub_path))?;
         true
     };
@@ -109,7 +113,40 @@ pub(crate) fn ensure_stub_test(name: &str, comment: Option<&str>) -> Result<bool
 /// Builds the full contents of a freshly-created `fixtures/<dataset>/<name>.rs` stub -
 /// split out from `ensure_stub_test` as a pure string-building function (no filesystem access) so
 /// it's directly unit-testable without writing into the real repo's `src/test/fixtures/`.
-pub(crate) fn stub_test_contents(name: &str, comment: Option<&str>) -> String {
+pub(crate) fn stub_test_contents(name: &str, comment: Option<&str>, text_only: bool) -> String {
+    if text_only {
+        // No `mapping()` test, deliberately: `assert_matches_human_mapping` grades a tree mapping,
+        // and this fixture has no tree to have one. Writing the usual stub here would create a
+        // test that can only ever fail, for a fixture whose ground truth is entirely its painting.
+        //
+        // No `painting()` either, on the same terms `action_save` already applies to every other
+        // fixture: a stub for a painting nobody has painted yet fails rather than reporting a
+        // distance. `ensure_painting_stub_test` adds one on the first save that carries a
+        // painting, and `ensure_invariants_stub_test` adds the `invariants()` test - which does
+        // hold for a paint-only fixture, since it reads the paintings and the raw text and never
+        // the trees - unconditionally, right after this.
+        let comment_block = match comment.map(str::trim) {
+            Some(c) if !c.is_empty() => {
+                format!("//!\n{}", wrap_comment_lines_with_prefix(c, "//! "))
+            }
+            _ => String::new(),
+        };
+        // Assembled line by line rather than as one `\n\`-continued literal: rustfmt collapses
+        // those back into a single line and keeps the source indentation inside the string, which
+        // silently wrote a stub with thirteen spaces in front of every `//!`.
+        //
+        // The fixture's name is deliberately not interpolated into it: the file is named after the
+        // fixture already, and a long name would push the first line past this codebase's comment
+        // width - which `cargo fmt` does not police, so nothing would catch it.
+        let module_doc = [
+            "//! This fixture's language has no tree-sitter grammar, so there is no tree to map",
+            "//! and no `mapping()` test here. codediff renders the pair with its plain-text",
+            "//! fallback diff (`plain_text_line_diff`), and that is what the `painting()` test",
+            "//! below is graded against - see `PaintingDiff::PlainText`.",
+        ]
+        .join("\n");
+        return format!("{LICENSE_HEADER}{module_doc}\n{comment_block}\nuse anyhow::Result;\n");
+    }
     let comment_block = match comment.map(str::trim) {
         Some(c) if !c.is_empty() => wrap_comment_lines(c),
         _ => String::new(),
@@ -125,9 +162,14 @@ pub(crate) fn stub_test_contents(name: &str, comment: Option<&str>) -> String {
 /// codebase's own prose-comment convention (~96 columns including the prefix). `comment` is
 /// assumed already trimmed and non-empty - see `ensure_stub_test`'s only caller.
 pub(crate) fn wrap_comment_lines(comment: &str) -> String {
+    wrap_comment_lines_with_prefix(comment, "    // ")
+}
+
+/// [`wrap_comment_lines`] with the line prefix chosen by the caller - `//! ` for the module-level
+/// note a text-only stub carries, since it has no `#[test]` body to sit inside.
+pub(crate) fn wrap_comment_lines_with_prefix(comment: &str, prefix: &str) -> String {
     const WIDTH: usize = 96;
-    const PREFIX: &str = "    // ";
-    let max_content = WIDTH.saturating_sub(PREFIX.len());
+    let max_content = WIDTH.saturating_sub(prefix.len());
 
     let mut lines = Vec::new();
     let mut current = String::new();
@@ -151,7 +193,7 @@ pub(crate) fn wrap_comment_lines(comment: &str) -> String {
 
     lines
         .into_iter()
-        .map(|line| format!("{PREFIX}{line}\n"))
+        .map(|line| format!("{prefix}{line}\n"))
         .collect()
 }
 
@@ -182,21 +224,34 @@ pub(crate) fn ensure_painting_stub_test(name: &str) -> Result<bool> {
     // file, so rustfmt has nothing to move on the next run.
     const USE_LINE: &str =
         "use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;\n";
-    let anchor = "use crate::test;\n";
-    let mut updated = if existing.contains(USE_LINE) {
-        existing.clone()
-    } else if let Some(at) = existing.find(anchor) {
-        let cut = at + anchor.len();
-        format!("{}{USE_LINE}{}", &existing[..cut], &existing[cut..])
-    } else {
-        format!("{existing}{USE_LINE}")
-    };
+    let mut updated = insert_use_line(&existing, USE_LINE);
     if !updated.ends_with('\n') {
         updated.push('\n');
     }
     updated.push_str(&painting_test_block(name));
     fs::write(&path, updated).with_context(|| format!("writing {:?}", path))?;
     Ok(true)
+}
+
+/// Puts `use_line` next to the imports a fixture's stub already has rather than at the end of the
+/// file, so rustfmt has nothing to move on the next run - and returns `existing` untouched if the
+/// line is already there.
+///
+/// Two anchors, tried in order: the `use crate::test;` an ordinary stub opens with, and the
+/// `use anyhow::Result;` above it. The second exists for a text-only fixture, whose stub carries
+/// no `mapping()` test and therefore no `use crate::test;` to sit beside - without it the import
+/// landed *after* the tests, which compiles but reads as an accident.
+pub(crate) fn insert_use_line(existing: &str, use_line: &str) -> String {
+    if existing.contains(use_line) {
+        return existing.to_string();
+    }
+    for anchor in ["use crate::test;\n", "use anyhow::Result;\n"] {
+        if let Some(at) = existing.find(anchor) {
+            let cut = at + anchor.len();
+            return format!("{}{use_line}{}", &existing[..cut], &existing[cut..]);
+        }
+    }
+    format!("{existing}{use_line}")
 }
 
 /// The `painting()` test appended by [`ensure_painting_stub_test`] - pure string building, no
@@ -239,15 +294,7 @@ pub(crate) fn ensure_invariants_stub_test(name: &str) -> Result<bool> {
 
     const USE_LINE: &str =
         "use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;\n";
-    let anchor = "use crate::test;\n";
-    let mut updated = if existing.contains(USE_LINE) {
-        existing.clone()
-    } else if let Some(at) = existing.find(anchor) {
-        let cut = at + anchor.len();
-        format!("{}{USE_LINE}{}", &existing[..cut], &existing[cut..])
-    } else {
-        format!("{existing}{USE_LINE}")
-    };
+    let mut updated = insert_use_line(&existing, USE_LINE);
     if !updated.ends_with('\n') {
         updated.push('\n');
     }

@@ -61,7 +61,7 @@ fn validate_new_case_name_rejects_rust_keywords() {
 
 #[test]
 fn stub_test_contents_has_no_comment_block_when_none_given() {
-    let contents = stub_test_contents("rust-add-if", None);
+    let contents = stub_test_contents("rust-add-if", None, false);
     assert!(!contents.contains("//\n") && !contents.contains("    // "));
     assert!(contents.contains(
         "fn mapping() -> Result<()> {\n    test::helper::human_mapping::assert_matches_human_mapping(\"rust-add-if\")\n}\n"
@@ -71,18 +71,18 @@ fn stub_test_contents_has_no_comment_block_when_none_given() {
 #[test]
 fn stub_test_contents_has_no_comment_block_when_comment_is_empty_or_whitespace() {
     assert_eq!(
-        stub_test_contents("rust-add-if", Some("")),
-        stub_test_contents("rust-add-if", None)
+        stub_test_contents("rust-add-if", Some(""), false),
+        stub_test_contents("rust-add-if", None, false)
     );
     assert_eq!(
-        stub_test_contents("rust-add-if", Some("   \n  ")),
-        stub_test_contents("rust-add-if", None)
+        stub_test_contents("rust-add-if", Some("   \n  "), false),
+        stub_test_contents("rust-add-if", None, false)
     );
 }
 
 #[test]
 fn stub_test_contents_includes_a_wrapped_comment_block_right_before_the_assert() {
-    let contents = stub_test_contents("rust-add-if", Some("A short note."));
+    let contents = stub_test_contents("rust-add-if", Some("A short note."), false);
     assert!(contents.contains(
         "fn mapping() -> Result<()> {\n    // A short note.\n    test::helper::human_mapping::assert_matches_human_mapping(\"rust-add-if\")\n}\n"
     ));
@@ -647,8 +647,8 @@ fn handle_modal_key_prompt_search_enter_finds_a_match_and_remembers_the_query() 
         KeyCode::Enter,
         &flat,
         &flat,
-        root,
-        root,
+        Some(root),
+        Some(root),
         &caches,
         source.as_bytes(),
         source.as_bytes(),
@@ -689,8 +689,8 @@ fn handle_modal_key_prompt_search_enter_on_empty_input_cancels_without_touching_
         KeyCode::Enter,
         &flat,
         &flat,
-        root,
-        root,
+        Some(root),
+        Some(root),
         &caches,
         source.as_bytes(),
         source.as_bytes(),
@@ -730,8 +730,8 @@ fn handle_modal_key_prompt_search_esc_cancels_without_searching() {
         KeyCode::Esc,
         &flat,
         &flat,
-        root,
-        root,
+        Some(root),
+        Some(root),
         &caches,
         source.as_bytes(),
         source.as_bytes(),
@@ -767,8 +767,8 @@ fn handle_modal_key_prompt_search_backspace_and_char_edit_the_input_and_keep_the
         KeyCode::Backspace,
         &flat,
         &flat,
-        root,
-        root,
+        Some(root),
+        Some(root),
         &caches,
         source.as_bytes(),
         source.as_bytes(),
@@ -785,8 +785,8 @@ fn handle_modal_key_prompt_search_backspace_and_char_edit_the_input_and_keep_the
         KeyCode::Char('x'),
         &flat,
         &flat,
-        root,
-        root,
+        Some(root),
+        Some(root),
         &caches,
         source.as_bytes(),
         source.as_bytes(),
@@ -1347,8 +1347,8 @@ fn press_in_solution_picker_editing(
             code,
             &flat,
             &flat,
-            root,
-            root,
+            Some(root),
+            Some(root),
             &caches,
             source.as_bytes(),
             source.as_bytes(),
@@ -1992,8 +1992,8 @@ fn x_in_the_text_view_banks_the_live_selection() {
         KeyCode::Char('x'),
         &flat,
         &flat,
-        root,
-        root,
+        Some(root),
+        Some(root),
         &caches,
         source.as_bytes(),
         source.as_bytes(),
@@ -2047,8 +2047,8 @@ fn c_in_the_text_view_clears_both_sides_banks() {
         KeyCode::Char('c'),
         &flat,
         &flat,
-        root,
-        root,
+        Some(root),
+        Some(root),
         &caches,
         source.as_bytes(),
         source.as_bytes(),
@@ -2121,8 +2121,8 @@ fn colon_jumps_to_a_line_in_the_text_view() {
             key,
             &flat,
             &flat,
-            root,
-            root,
+            Some(root),
+            Some(root),
             &caches,
             source.as_bytes(),
             source.as_bytes(),
@@ -3164,8 +3164,8 @@ fn open_sample_picker_enter_opens_the_visible_entry_not_the_raw_index() {
         KeyCode::Enter,
         &flat,
         &flat,
-        root,
-        root,
+        Some(root),
+        Some(root),
         &caches,
         source.as_bytes(),
         source.as_bytes(),
@@ -3215,8 +3215,8 @@ fn open_sample_picker_s_sorts_by_the_cursor_column_and_keeps_the_selected_row() 
         KeyCode::Char('s'),
         &flat,
         &flat,
-        root,
-        root,
+        Some(root),
+        Some(root),
         &caches,
         source.as_bytes(),
         source.as_bytes(),
@@ -3281,8 +3281,8 @@ fn open_sample_picker_f_persists_the_column_filter_on_app() {
         KeyCode::Char('f'),
         &flat,
         &flat,
-        root,
-        root,
+        Some(root),
+        Some(root),
         &caches,
         source.as_bytes(),
         source.as_bytes(),
@@ -3324,8 +3324,8 @@ fn open_commit_picker_j_k_move_selection_clamped_to_bounds() {
         KeyCode::Char('k'),
         &flat,
         &flat,
-        root,
-        root,
+        Some(root),
+        Some(root),
         &caches,
         source.as_bytes(),
         source.as_bytes(),
@@ -3344,8 +3344,8 @@ fn open_commit_picker_j_k_move_selection_clamped_to_bounds() {
             KeyCode::Char('j'),
             &flat,
             &flat,
-            root,
-            root,
+            Some(root),
+            Some(root),
             &caches,
             source.as_bytes(),
             source.as_bytes(),
@@ -3383,8 +3383,8 @@ fn open_commit_picker_esc_cancels() {
         KeyCode::Esc,
         &flat,
         &flat,
-        root,
-        root,
+        Some(root),
+        Some(root),
         &caches,
         source.as_bytes(),
         source.as_bytes(),
@@ -3423,8 +3423,8 @@ fn open_commit_picker_enter_on_an_unresolvable_commit_reports_an_error_without_c
         KeyCode::Enter,
         &flat,
         &flat,
-        root,
-        root,
+        Some(root),
+        Some(root),
         &caches,
         source.as_bytes(),
         source.as_bytes(),
@@ -3474,8 +3474,8 @@ fn open_commit_file_picker_enter_opens_the_selected_file_as_an_open_target() {
         KeyCode::Enter,
         &flat,
         &flat,
-        root,
-        root,
+        Some(root),
+        Some(root),
         &caches,
         source.as_bytes(),
         source.as_bytes(),
@@ -3529,8 +3529,8 @@ fn open_commit_file_picker_enter_from_a_dirty_git_commit_file_case_cannot_save_d
         KeyCode::Enter,
         &flat,
         &flat,
-        root,
-        root,
+        Some(root),
+        Some(root),
         &caches,
         source.as_bytes(),
         source.as_bytes(),
@@ -3583,8 +3583,8 @@ fn open_commit_file_picker_esc_cancels() {
         KeyCode::Esc,
         &flat,
         &flat,
-        root,
-        root,
+        Some(root),
+        Some(root),
         &caches,
         source.as_bytes(),
         source.as_bytes(),
@@ -3839,8 +3839,8 @@ fn press_in_diff_picker(
             *key,
             &flat,
             &flat,
-            root,
-            root,
+            Some(root),
+            Some(root),
             &caches,
             source.as_bytes(),
             source.as_bytes(),
@@ -4094,6 +4094,7 @@ fn draw_ui_shows_only_the_focused_panel_below_the_single_panel_width_threshold()
                 before_unmarked,
                 after_unmarked,
                 "test",
+                false,
             )
         })
         .unwrap();
@@ -4123,6 +4124,7 @@ fn draw_ui_shows_only_the_focused_panel_below_the_single_panel_width_threshold()
                 before_unmarked,
                 after_unmarked,
                 "test",
+                false,
             )
         })
         .unwrap();
@@ -4430,8 +4432,8 @@ fn open_diff_picker_f_on_cmpl_uses_the_cached_unmarked_map_without_recomputing_i
         KeyCode::Char('f'),
         &flat,
         &flat,
-        root,
-        root,
+        Some(root),
+        Some(root),
         &caches,
         source.as_bytes(),
         source.as_bytes(),
@@ -4501,8 +4503,8 @@ fn open_diff_picker_f_computes_the_unmarked_map_lazily_when_not_yet_cached() {
         KeyCode::Char('s'),
         &flat,
         &flat,
-        root,
-        root,
+        Some(root),
+        Some(root),
         &caches,
         source.as_bytes(),
         source.as_bytes(),
@@ -7088,8 +7090,8 @@ fn resetting_a_case_needs_the_explicit_key_and_enter_will_not_do() {
             key,
             &flat,
             &flat,
-            root,
-            root,
+            Some(root),
+            Some(root),
             &caches,
             source.as_bytes(),
             source.as_bytes(),
@@ -7103,5 +7105,228 @@ fn resetting_a_case_needs_the_explicit_key_and_enter_will_not_do() {
             "{key:?} should {} the mapping",
             if should_clear { "clear" } else { "leave" }
         );
+    }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Text-only mode: a fixture tree-sitter has no grammar for
+// ---------------------------------------------------------------------------------------------
+
+/// A Bazel `BUILD`-shaped pair, in a language tree-sitter has no grammar for - the shape a user
+/// reported, which the solver used to refuse to open at all ("Before code for '...' has no AST").
+fn unparseable_pair() -> (Code, Code) {
+    let before = "cc_library(\n    name = \"a\",\n    srcs = [\"a.cc\"],\n)\n";
+    let after = "cc_library(\n    name = \"a\",\n    srcs = [\"b.cc\"],\n)\n";
+    (
+        Code::from_string(before, &Language::Unknown),
+        Code::from_string(after, &Language::Unknown),
+    )
+}
+
+#[test]
+fn compute_frame_state_has_no_roots_for_a_pair_with_no_grammar() -> Result<()> {
+    let (before, after) = unparseable_pair();
+    assert!(
+        is_text_only(&before, &after),
+        "the premise of these tests is a pair tree-sitter cannot parse"
+    );
+
+    let app = test_app();
+    let state = compute_frame_state(&before, &after, &app)?;
+
+    assert!(state.roots().is_none(), "there is no tree to hand out");
+    assert!(state.before_flat.is_empty() && state.after_flat.is_empty());
+    assert_eq!((state.before_unmarked, state.after_unmarked), (0, 0));
+    // The text is present either way, which is the whole point: it is what a painting is made of.
+    assert_eq!(state.before_src, before.contents.as_bytes());
+    assert_eq!(state.after_src, after.contents.as_bytes());
+    Ok(())
+}
+
+/// The panels say why they are empty rather than just being empty, which would read as a bug.
+#[test]
+fn draw_ui_names_the_missing_grammar_instead_of_drawing_an_empty_tree() {
+    let (before, after) = unparseable_pair();
+    let mut app = test_app();
+    let flat = FlatIndex::new(Vec::new());
+    let caches = Caches::default();
+
+    let backend = ratatui::backend::TestBackend::new(SINGLE_PANEL_WIDTH_THRESHOLD, 24);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal
+        .draw(|f| {
+            draw_ui(
+                f,
+                &mut app,
+                &flat,
+                &flat,
+                &caches,
+                before.contents.as_bytes(),
+                after.contents.as_bytes(),
+                0,
+                0,
+                "bazel-not-actually-supported-by-treesitter",
+                true,
+            )
+        })
+        .unwrap();
+
+    let text = rendered_text(&terminal);
+    assert!(
+        text.contains("<Language not supported by TreeSitter>"),
+        "the panels should say the language is unsupported: {text}"
+    );
+}
+
+/// Painting is reachable with no tree: `t` opens the paint view exactly as it does anywhere else.
+/// This is the key the whole mode exists to keep working.
+#[test]
+fn the_paint_view_opens_without_a_tree() {
+    let (before, after) = unparseable_pair();
+    let mut app = test_app();
+
+    handle_tree_independent_key(
+        &mut app,
+        KeyCode::Char('t'),
+        before.contents.as_bytes(),
+        after.contents.as_bytes(),
+        &before,
+        &after,
+        false,
+    );
+
+    assert!(
+        matches!(app.modal, Some(Modal::TextView { .. })),
+        "t should open the painting view, got {:?}",
+        app.modal.is_some()
+    );
+}
+
+/// A tree key is answered rather than silently swallowed - a dead keypress reads as a hang.
+#[test]
+fn a_tree_key_explains_itself_in_text_only_mode() {
+    let (before, after) = unparseable_pair();
+    let mut app = test_app();
+
+    handle_tree_independent_key(
+        &mut app,
+        KeyCode::Char('m'),
+        before.contents.as_bytes(),
+        after.contents.as_bytes(),
+        &before,
+        &after,
+        false,
+    );
+
+    let status = app.status.clone().unwrap_or_default();
+    assert!(
+        status.contains("No tree-sitter grammar"),
+        "an unhandled tree key should say why it did nothing, got {status:?}"
+    );
+    assert!(app.mapping.entries.is_empty(), "and must not map anything");
+}
+
+/// The same key with a tree present stays silent, exactly as it was before this mode existed:
+/// `handle_key` claims `m` itself and never reaches the fallthrough, so the explanation must not
+/// fire there and overwrite whatever `m` had to say.
+#[test]
+fn the_same_key_is_not_explained_away_when_there_is_a_tree() {
+    let (before, after) = unparseable_pair();
+    let mut app = test_app();
+    let before_status = app.status.clone();
+
+    handle_tree_independent_key(
+        &mut app,
+        KeyCode::Char('m'),
+        before.contents.as_bytes(),
+        after.contents.as_bytes(),
+        &before,
+        &after,
+        true,
+    );
+
+    assert_eq!(app.status, before_status);
+}
+
+/// codediff's own answer for a pair with no grammar is its plain-text fallback, not nothing - so
+/// the `p` overlay has something to draw and `P` has something to seed from.
+#[test]
+fn codediff_text_spans_falls_back_to_the_plain_text_diff() {
+    let (before, after) = unparseable_pair();
+    let [before_spans, after_spans] = codediff_text_spans(&before, &after);
+
+    assert!(
+        !before_spans.is_empty() && !after_spans.is_empty(),
+        "an empty overlay leaves a human painting with nothing to compare against"
+    );
+}
+
+/// A text-only fixture's generated stub asserts a painting, never a tree mapping: there is no
+/// tree to map, so `assert_matches_human_mapping` could only ever fail there.
+#[test]
+fn a_text_only_stub_has_no_mapping_test() {
+    let contents = stub_test_contents("bazel-not-actually-supported-by-treesitter", None, true);
+
+    assert!(
+        !contents.contains("assert_matches_human_mapping"),
+        "a fixture with no tree must not carry a mapping assertion: {contents}"
+    );
+    assert!(
+        !contents.contains("fn mapping()"),
+        "and no mapping test at all: {contents}"
+    );
+    assert!(
+        contents.contains(
+            "//! This fixture's language has no tree-sitter grammar, so there is no tree to map\n"
+        ),
+        "the file should say why it is shaped differently, on its own line with no stray \
+         indentation: {contents}"
+    );
+    assert!(
+        contents.lines().all(|line| line.len() <= 100),
+        "no line should run past this codebase's comment width: {contents}"
+    );
+    // `ensure_painting_stub_test`/`ensure_invariants_stub_test` append theirs onto this, and both
+    // find their anchor here even though there is no `use crate::test;` line to sit beside.
+    assert!(contents.contains("use anyhow::Result;\n"));
+}
+
+/// The finished file a text-only fixture ends up with, assembled by the three writers in the
+/// order `action_save` calls them: a painting test, the ground-truth invariants, and no mapping
+/// test at all.
+///
+/// The imports land next to the one already there rather than after the tests - `insert_use_line`
+/// has no `use crate::test;` to anchor to here, which is the case that motivated its second
+/// anchor. rustfmt reorders that import group on the next run, exactly as it does for an ordinary
+/// stub; what matters is that the file is valid, complete Rust the moment it is written.
+#[test]
+fn a_text_only_fixture_file_carries_a_painting_and_invariants_but_no_mapping() {
+    let name = "bazel-not-actually-supported-by-treesitter";
+    let mut file = stub_test_contents(name, None, true);
+    file = insert_use_line(
+        &file,
+        "use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;\n",
+    );
+    file.push_str(&painting_test_block(name));
+    file = insert_use_line(
+        &file,
+        "use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;\n",
+    );
+    file.push_str(&invariants_test_block(name));
+
+    assert!(file.contains("\nfn painting() -> Result<()> {\n"), "{file}");
+    assert!(
+        file.contains("\nfn invariants() -> Result<()> {\n"),
+        "{file}"
+    );
+    assert!(!file.contains("fn mapping()"), "{file}");
+    // Both imports sit in the import block, above the first test - not appended past the end of
+    // the file, which is where they landed before `insert_use_line` learned its second anchor.
+    let first_test = file.find("#[test]").unwrap();
+    for import in [
+        "assert_matches_human_painting_within_limit;",
+        "assert_ground_truth_invariants;",
+    ] {
+        assert!(file.find(import).unwrap() < first_test, "{import}: {file}");
     }
 }

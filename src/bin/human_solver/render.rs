@@ -241,6 +241,65 @@ pub(crate) fn render_panel(
 pub(crate) const SINGLE_PANEL_WIDTH_THRESHOLD: u16 =
     codediff::tui::components::diff_viewer::SINGLE_PANEL_THRESHOLD;
 
+/// What the Before/After panels show for a pair tree-sitter has no grammar for: the same bordered
+/// blocks, holding one row saying why they are empty.
+///
+/// Deliberately drawn where the node list would be rather than as a status message, because the
+/// node list is exactly what is missing - a reader looking at two empty panels has no way to tell
+/// "nothing parsed" from "nothing matched". Everything else on screen (the footer, the `t`
+/// painting view, `T`'s unix diff) is unchanged and still works: the painting reads the raw text,
+/// which is present whether or not a grammar is.
+fn render_unsupported_language_panels(
+    frame: &mut Frame,
+    area: Rect,
+    single_panel: bool,
+    focus: Focus,
+) {
+    let message = Paragraph::new(NO_GRAMMAR_MESSAGE).wrap(Wrap { trim: false });
+    let panel = |title: &str, focused: bool| {
+        Block::default()
+            .borders(Borders::ALL)
+            .title(format!("{title} — no tree-sitter grammar"))
+            .border_style(if focused {
+                Style::default().fg(Color::Yellow)
+            } else {
+                Style::default()
+            })
+    };
+
+    if single_panel {
+        // Only the focused panel is on screen at this width, so it is the focused one by
+        // definition - `Tab` swaps which side that is, exactly as it does with a tree.
+        let title = match focus {
+            Focus::Before => "Before",
+            Focus::After => "After",
+        };
+        frame.render_widget(message.block(panel(title, true)), area);
+        return;
+    }
+
+    let panels = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+        .split(area);
+    frame.render_widget(
+        message
+            .clone()
+            .block(panel("Before", focus == Focus::Before)),
+        panels[0],
+    );
+    frame.render_widget(
+        message.block(panel("After", focus == Focus::After)),
+        panels[1],
+    );
+}
+
+/// The text [`render_unsupported_language_panels`] puts where the node list would be.
+pub(crate) const NO_GRAMMAR_MESSAGE: &str = "<Language not supported by TreeSitter>\n\nThere is \
+    no AST for this file pair, so there is no tree mapping to record. Press t to paint the text \
+    (which is graded against codediff's own plain-text fallback diff), T for a unix diff, s to \
+    save, o to open another case.";
+
 // Each parameter is genuinely distinct rendering context (the frame, app state, both sides'
 // flattened node lists, the caches, both raw sources, both unmarked counts) - a params struct
 // here would just relocate the same fields, not reduce them.
@@ -256,6 +315,10 @@ pub(crate) fn draw_ui(
     before_unmarked: usize,
     after_unmarked: usize,
     name: &str,
+    // True when this pair's language has no tree-sitter grammar, so there are no nodes to list -
+    // see `FrameState::before_root`. The panels say so instead of drawing an empty list, which on
+    // its own would read as a bug rather than as a fact about the file.
+    text_only: bool,
 ) {
     let size = frame.size();
     let chunks = Layout::default()
@@ -283,7 +346,9 @@ pub(crate) fn draw_ui(
     // toggles `app.focus`) becomes the way to see the other side.
     let single_panel = size.width < SINGLE_PANEL_WIDTH_THRESHOLD;
 
-    if single_panel {
+    if text_only {
+        render_unsupported_language_panels(frame, chunks[1], single_panel, app.focus);
+    } else if single_panel {
         let panel_area = chunks[1];
         let (title, flat, panel, side, src, total_unmarked, multi_selected) = match app.focus {
             Focus::Before => (

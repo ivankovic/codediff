@@ -384,6 +384,19 @@ C              open a commit from this repo's own git log, then a file it
 q / Esc        quit
 ";
 
+/// Where a freshly-opened panel puts its cursor: `code`'s root node id.
+///
+/// `usize::MAX` for a case with no tree at all (text-only mode - see `FrameState::before_root`).
+/// A real `Node::id` is an address inside the parsed tree, so the sentinel cannot collide with
+/// one, and nothing ever looks it up: the flat node list is empty in that mode, so `index_of`
+/// misses and the cursor simply sits nowhere - which is the truth about a case with no nodes.
+pub(crate) fn starting_cursor_id(code: &Code) -> usize {
+    code.ast
+        .as_ref()
+        .map(|tree| tree.root_node().id())
+        .unwrap_or(usize::MAX)
+}
+
 /// Loads and parses the before/after code for a test case, by name. Parses only this one case's
 /// directory (rather than every directory under src/test/data/diffs/, as a naive
 /// `handmade_test_code_pairs`-style lookup would) since this runs on every `o`-picker open, not
@@ -412,27 +425,28 @@ fn load_case(name: &str) -> Result<(Code, Code)> {
             )
         })?;
 
-    if before.ast.is_none() {
-        bail!(
-            "Before code for '{}' has no AST (unsupported or undetected language)",
-            name
-        );
+    // A fixture whose language tree-sitter has no grammar for (a Bazel `BUILD` file, say) opens
+    // anyway, in *text-only* mode: no tree to map, but the text views and the painting - which
+    // read the raw source and nothing else - work exactly as they do anywhere else, and the
+    // painting is what such a fixture exists to record. This used to bail, which left a case a
+    // user had reported impossible to even look at. See `FrameState::before_root` for what the
+    // rest of the tool does with the missing tree, and `codediff_text_spans` for the plain-text
+    // diff codediff itself falls back to on this pair.
+    //
+    // `ensure_parsed` only when there is something to compute metadata *for*: it errors on a
+    // language with no `to_treesitter` mapping rather than returning an empty result.
+    if before.ast.is_some() {
+        // Populates node_to_full_hash (among other things), which `m`/`M` use to auto-classify
+        // matches on nodes with children instead of asking.
+        before
+            .ensure_parsed()
+            .context("Failed to compute AST metadata for before code")?;
     }
-    if after.ast.is_none() {
-        bail!(
-            "After code for '{}' has no AST (unsupported or undetected language)",
-            name
-        );
+    if after.ast.is_some() {
+        after
+            .ensure_parsed()
+            .context("Failed to compute AST metadata for after code")?;
     }
-
-    // Populates node_to_full_hash (among other things), which `m`/`M` use to auto-classify
-    // matches on nodes with children instead of asking.
-    before
-        .ensure_parsed()
-        .context("Failed to compute AST metadata for before code")?;
-    after
-        .ensure_parsed()
-        .context("Failed to compute AST metadata for after code")?;
 
     Ok((before, after))
 }
@@ -836,9 +850,19 @@ fn diff_case_unmarked_count(name: &str) -> Option<usize> {
     // Tree only: the count walks nodes and never diffs, and the metadata `code_pair_from_dir`
     // adds is three quarters of the load (see that function's doc comment).
     let (before, after) = code_pair_from_dir_without_metadata(&dir).ok().flatten()?;
-    let mapping = human_mapping::load(name).ok()?;
-    let before_root = before.ast.as_ref()?.root_node();
-    let after_root = after.ast.as_ref()?.root_node();
+    // A fixture with no `human_mapping.json` yet is an ordinary state - it reads as every node
+    // unmarked, which is exactly true, and is the same reading `diff_inventory::row_for` takes.
+    // `.ok()?` reported it as *unreadable* instead, so the picker's Unmarked column was blank for
+    // precisely the fixtures with the most work left in them.
+    let mapping = human_mapping::load(name).unwrap_or_default();
+    // A pair tree-sitter has no grammar for has no nodes at all, so it has zero unmarked ones.
+    // `None` here means "could not be read", and reporting a perfectly real fixture that way made
+    // the picker's Unmarked column claim it was unreadable rather than complete.
+    let (Some(before_tree), Some(after_tree)) = (before.ast.as_ref(), after.ast.as_ref()) else {
+        return Some(0);
+    };
+    let before_root = before_tree.root_node();
+    let after_root = after_tree.root_node();
     let caches = rebuild_caches_for_mapping(&mapping, before_root, after_root);
     Some(
         count_unmarked_nodes_in_tree(before_root, &caches, status_before)
@@ -2008,8 +2032,13 @@ fn git_show(rev_path: &str) -> Result<String> {
 /// Loads the before/after content for `path` as changed by commit `hash`, read straight out of
 /// git (`git_show`) rather than from any on-disk fixture - before is `path` at `hash^`, after is
 /// `path` at `hash` itself. Mirrors `load_sample`'s AST checks: bails with a clear message if
-/// either side's language has no AST (unsupported or undetected), same as a sample or real case
-/// would.
+/// either side's language has no AST (unsupported or undetected).
+///
+/// Unlike `load_case`, which opens such a pair in text-only mode (see `FrameState::before_root`):
+/// a case under `diffs/` is one somebody deliberately added to the corpus and wants to paint,
+/// while these two are *browsing* paths - picking an arbitrary commit or sample only to find it
+/// has no tree is a mis-pick to report, not a mode to enter. Relaxing them is a small change if
+/// that turns out to be wrong; nothing below assumes the tree is there.
 fn load_git_commit_file(hash: &str, path: &str) -> Result<(Code, Code)> {
     let language = language_for_path(Path::new(path)).unwrap_or(Language::Unknown);
 
@@ -2080,9 +2109,10 @@ fn main() -> Result<()> {
     theme::set_custom_palette(theme::load_custom_palette());
     let _ = OVERLAY_THEME.set(theme::load_overlay_theme());
 
-    // Loading a case requires an initial, valid AST pair, so when no name is given on the
-    // command line, fall back to the first available case rather than restructuring the rest of
-    // the app to tolerate no case being loaded at all - press `o` to open a different one.
+    // A case always has to be loaded (the app is not built to sit there with none), so when no
+    // name is given on the command line, fall back to the first available one - press `o` to open
+    // a different one. Any case will do: one whose language has no grammar opens in text-only
+    // mode rather than failing (see `load_case`).
     let name = match args.name {
         Some(name) => name,
         None => list_available_cases()?
@@ -2093,8 +2123,8 @@ fn main() -> Result<()> {
     };
 
     let (before, after) = load_case(&name)?;
-    let before_root_id = before.ast.as_ref().unwrap().root_node().id();
-    let after_root_id = after.ast.as_ref().unwrap().root_node().id();
+    let before_root_id = starting_cursor_id(&before);
+    let after_root_id = starting_cursor_id(&after);
 
     let mapping = human_mapping::load(&name).unwrap_or_default();
 
