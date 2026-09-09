@@ -92,27 +92,28 @@ SAMPLE_PER_LANGUAGE = 10
 # Ground-truth corpus size and AST-node accuracy.
 # source: cargo run --release --features test-fixtures --bin benchmark_optimal_solutions -- --csv
 #         (research/data/quality/optimal_solutions_benchmark.csv), totalled over solved fixtures.
-# Measured 2026-09-08. The corpus directory holds 701 fixtures; 700 of them carry a
-# human_mapping.json and are what every accuracy number in the paper is scored against. The 701st
+# Measured 2026-09-09. The corpus directory holds 836 fixtures; 835 of them carry a
+# human_mapping.json and are what every accuracy number in the paper is scored against. The 836th
 # (rust-completely-unrelated-main-files) is deliberately ground-truth-free - it exists as a
 # pathological-latency case, not an accuracy case - and reports `human_unsolved` in the CSV.
 #
-# NumFixtures is therefore the ground-truth-bearing count, 700, which is the denominator of every
+# NumFixtures is therefore the ground-truth-bearing count, 835, which is the denominator of every
 # per-tool row, the ablation study, and the node accuracy below.
 #
-# Refreshed together, from one corpus state, on 2026-09-08 (previously 2026-09-07 / 650 and, the
-# same day, 627 and 615; before that 2026-09-05 / 597, 2026-09-02 / 512 and 2026-08-20 / 468). These four move as a set and must be
+# Refreshed together, from one corpus state, on 2026-09-09 (previously 2026-09-08 / 700,
+# 2026-09-07 / 650 and, the same day, 627 and 615; before that 2026-09-05 / 597, 2026-09-02 / 512
+# and 2026-08-20 / 468). These four move as a set and must be
 # refreshed as a set: re-run the benchmark with --csv, re-run `analyze_human_mappings --csv` so the
 # scope artifact agrees with it, then recompute here. Order matters in one direction: human_mapping_analysis.csv carries a
 # `current_mismatches` column read back from optimal_solutions_benchmark.csv, so the benchmark runs
 # first. The check at the bottom of this file compares NumFixtures against the corpus on disk
 # precisely because the previous values silently outlived the corpus they described.
 CORPUS = {
-    "NumFixtures": 700,
-    "NodesMatched": 5_748_993,
-    "NodesTotal": 5_756_456,
+    "NumFixtures": 835,
+    "NodesMatched": 5_778_717,
+    "NodesTotal": 5_786_145,
     # Distinct languages across the fixture corpus, from `analyze_human_mappings`' own "By
-    # language" census (24 as of 2026-09-08, unchanged since 2026-09-02 - the 188 fixtures added
+    # language" census (24 as of 2026-09-09, unchanged since 2026-09-02 - the 323 fixtures added
     # since fall in languages the corpus already covered). Not the same number as the empirical
     # study's \NumLanguages, which counts languages in the 100-repository measure-file-stats corpus.
     "NumFixtureLanguages": 24,
@@ -123,8 +124,8 @@ CORPUS = {
 # alongside the all-node figure because the all-node denominator includes every ancestor of every
 # change up to the root, so it partly measures how deep a grammar's tree is.
 CORPUS_VISIBLE = {
-    "VisibleNodesMatched": 3_928_458,
-    "VisibleNodesTotal": 3_933_559,
+    "VisibleNodesMatched": 3_948_001,
+    "VisibleNodesTotal": 3_953_084,
 }
 
 # Leave-one-out ablation deltas, in mismatches, against an all-enabled baseline. A positive number
