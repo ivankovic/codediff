@@ -75,7 +75,7 @@ import os
 import re
 import sys
 
-from _common import latex_number
+from _common import PAPER_DATASETS, fixture_datasets, in_paper_scope, latex_number
 
 PLACEHOLDER = r"\textbf{??}"
 
@@ -92,12 +92,18 @@ SAMPLE_PER_LANGUAGE = 10
 # Ground-truth corpus size and AST-node accuracy.
 # source: cargo run --release --features test-fixtures --bin benchmark_optimal_solutions -- --csv
 #         (research/data/quality/optimal_solutions_benchmark.csv), totalled over solved fixtures.
-# Measured 2026-09-09. The corpus directory holds 836 fixtures; 835 of them carry a
-# human_mapping.json and are what every accuracy number in the paper is scored against. The 836th
+# Measured 2026-09-09, over `_common.PAPER_DATASETS` - the `small`, `full` and `stratified`
+# fixtures, i.e. changes sampled from real commits. The corpus directory also holds 61 `handmade`
+# fixtures, hand-written minimal examples of one change pattern each; the product benchmark scores
+# them and this paper does not, because no rate over cases written to exercise the matcher
+# estimates anything about real changes. That exclusion arrived on 2026-09-09 and took the paper's
+# handmade-versus-sampled comparison with it.
+#
+# In scope: 776 fixture directories, 775 of them carrying a human_mapping.json. The 776th
 # (rust-completely-unrelated-main-files) is deliberately ground-truth-free - it exists as a
 # pathological-latency case, not an accuracy case - and reports `human_unsolved` in the CSV.
 #
-# NumFixtures is therefore the ground-truth-bearing count, 835, which is the denominator of every
+# NumFixtures is therefore the ground-truth-bearing count, 775, which is the denominator of every
 # per-tool row, the ablation study, and the node accuracy below.
 #
 # Refreshed together, from one corpus state, on 2026-09-09 (previously 2026-09-08 / 700,
@@ -109,12 +115,12 @@ SAMPLE_PER_LANGUAGE = 10
 # first. The check at the bottom of this file compares NumFixtures against the corpus on disk
 # precisely because the previous values silently outlived the corpus they described.
 CORPUS = {
-    "NumFixtures": 835,
-    "NodesMatched": 5_778_717,
-    "NodesTotal": 5_786_145,
+    "NumFixtures": 775,
+    "NodesMatched": 5_475_305,
+    "NodesTotal": 5_482_317,
     # Distinct languages across the fixture corpus, from `analyze_human_mappings`' own "By
-    # language" census (24 as of 2026-09-09, unchanged since 2026-09-02 - the 323 fixtures added
-    # since fall in languages the corpus already covered). Not the same number as the empirical
+    # language" census (24 as of 2026-09-09, and 24 over the sampled datasets alone - dropping the
+    # 61 handmade fixtures cost the paper no language). Not the same number as the empirical
     # study's \NumLanguages, which counts languages in the 100-repository measure-file-stats corpus.
     "NumFixtureLanguages": 24,
 }
@@ -124,8 +130,8 @@ CORPUS = {
 # alongside the all-node figure because the all-node denominator includes every ancestor of every
 # change up to the root, so it partly measures how deep a grammar's tree is.
 CORPUS_VISIBLE = {
-    "VisibleNodesMatched": 3_948_001,
-    "VisibleNodesTotal": 3_953_084,
+    "VisibleNodesMatched": 3_736_081,
+    "VisibleNodesTotal": 3_740_894,
 }
 
 # Leave-one-out ablation deltas, in mismatches, against an all-enabled baseline. A positive number
@@ -393,13 +399,6 @@ RENDERING_MACROS = [
     "PaintingSinglePct",
     "PaintingDual",
     "PaintingDualPct",
-    "PaintingHandmadePainted",
-    "PaintingHandmadeDual",
-    "PaintingHandmadeDualPct",
-    "PaintingSampledPainted",
-    "PaintingSampledDual",
-    "PaintingSampledDualPct",
-    "PaintingHandmadeTotal",
     "PaintingLanguages",
     "PaintingLocMedian",
     "PaintingLocMax",
@@ -575,8 +574,16 @@ def cost_preference(research_dir):
     path = os.path.join(research_dir, "data", "quality", "optimal_solutions_benchmark.csv")
     if not os.path.exists(path):
         return {}
+    # The benchmark scores the whole fixture corpus, `handmade` included; the paper reports the
+    # sampled datasets alone (see `_common.PAPER_DATASETS`), and this CSV carries no dataset
+    # column, so the scoping happens on the way in.
+    datasets = fixture_datasets()
     with open(path, newline="") as f:
-        rows = [r for r in csv.DictReader(f) if r["human_unsolved"] == "false"]
+        rows = [
+            r
+            for r in csv.DictReader(f)
+            if r["human_unsolved"] == "false" and in_paper_scope(r["solution"], datasets)
+        ]
 
     def cost(r, key):
         return float(r[key])
@@ -975,10 +982,18 @@ def main():
     # A warning, not an error: a paper is legitimately written against a frozen corpus state, and
     # the measured blocks (NodesMatched, NodesTotal and friends) come from one run that must be
     # refreshed together or not at all. What must not happen is nobody noticing.
-    ground_truth_fixtures = len(
-        glob.glob(
-            os.path.join(repo_root, "src", "test", "data", "diffs", "*", "*", "human_mapping.json")
+    #
+    # Scoped to `PAPER_DATASETS`, like every number here: the corpus on disk also holds the
+    # hand-written `handmade` fixtures, which the product benchmark scores and the paper does not.
+    ground_truth_fixtures = sum(
+        len(
+            glob.glob(
+                os.path.join(
+                    repo_root, "src", "test", "data", "diffs", dataset, "*", "human_mapping.json"
+                )
+            )
         )
+        for dataset in PAPER_DATASETS
     )
     if ground_truth_fixtures and ground_truth_fixtures != CORPUS["NumFixtures"]:
         print(

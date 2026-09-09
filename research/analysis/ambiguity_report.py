@@ -68,7 +68,7 @@ import subprocess
 from collections import Counter
 from pathlib import Path
 
-from _common import REPO_ROOT
+from _common import PAPER_DATASETS, REPO_ROOT
 
 # Path prefix every fixture directory lives under, relative to the repository root.
 DIFFS_ROOT = "src/test/data/diffs"
@@ -77,7 +77,11 @@ DIFFS_ROOT = "src/test/data/diffs"
 def fixture_names_in_scope(csv_path: Path) -> set[str]:
     """The fixture set Section 5 is measured against - see this script's "Corpus state" note."""
     with open(csv_path, newline="") as f:
-        return {r["name"] for r in csv.DictReader(f) if r["has_mapping"] == "true"}
+        return {
+            r["name"]
+            for r in csv.DictReader(f)
+            if r["has_mapping"] == "true" and r["category"] in PAPER_DATASETS
+        }
 
 
 def read_groups(root: Path, names: set[str]) -> dict[str, list[dict]]:
@@ -124,12 +128,13 @@ def paired_decisions(csv_path: Path, names: set[str]) -> int:
 
 
 def datasets_for(root: Path, names: set[str]) -> dict[str, str]:
-    """Fixture name -> the dataset directory it lives in (`handmade`, `small`, `full`, ...).
+    """Fixture name -> the dataset directory it lives in (`small`, `full`, `stratified`).
 
     Section 4 discusses the Curated and Full repository lists separately, which are the `small` and
-    `full` directories here (see src/test/helper.rs's DIFF_DATASETS)."""
+    `full` directories here (see src/test/helper.rs's DIFF_DATASETS). `handmade` cannot appear:
+    `names` is already scoped by [`_common.PAPER_DATASETS`]."""
     out = {}
-    for dataset in ("handmade", "small", "full", "stratified"):
+    for dataset in PAPER_DATASETS:
         base = root / DIFFS_ROOT / dataset
         if not base.is_dir():
             continue

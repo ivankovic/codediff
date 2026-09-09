@@ -33,6 +33,51 @@ RESEARCH_DIR = Path(__file__).resolve().parents[1]
 REPO_ROOT = RESEARCH_DIR.parent
 
 
+# The fixture datasets every number in the paper is scored over.
+#
+# `handmade` is deliberately absent. Those 61 fixtures are minimal hand-written examples of one
+# change pattern each, written to exercise the matcher; they are not draws from anything, so no
+# rate over them estimates a population, and mixing them into a corpus sampled from real commits
+# makes every such rate a mixture with an annotation-order artifact for a mixing proportion. The
+# paper reports what real changes look like, so it reports the sampled datasets alone.
+#
+# **The product benchmark still scores them**, and should: `benchmark_optimal_solutions`,
+# `quality_baseline.csv` and each fixture's own `#[test]` are regression coverage, where a
+# hand-built minimal case is worth more than a sampled one, not less. This constant scopes the
+# research reports, nothing else - which is why the two corpus sizes differ on purpose and every
+# report that reads `optimal_solutions_benchmark.csv` has to filter it here rather than assume
+# the producer did.
+PAPER_DATASETS = ("small", "full", "stratified")
+
+_DIFFS_ROOT = REPO_ROOT / "src" / "test" / "data" / "diffs"
+
+
+def fixture_datasets() -> dict[str, str]:
+    """Fixture name -> the dataset directory it lives in (`handmade`, `small`, `full`,
+    `stratified`), read from the corpus on disk.
+
+    Mirrors `test::helper::DIFF_DATASETS` in src/test/helper.rs. Not to be confused with Section
+    4's Curated and Full *repository* lists, which are the `small` and `full` directories here."""
+    out: dict[str, str] = {}
+    for dataset in ("handmade", *PAPER_DATASETS):
+        base = _DIFFS_ROOT / dataset
+        if not base.is_dir():
+            continue
+        for entry in base.iterdir():
+            if entry.is_dir():
+                out[entry.name] = dataset
+    return out
+
+
+def in_paper_scope(name: str, datasets: dict[str, str] | None = None) -> bool:
+    """Whether fixture `name` is one the paper reports on - see [`PAPER_DATASETS`].
+
+    A name no dataset directory holds is *out* of scope rather than in it: it cannot be placed,
+    and silently counting it would be the drift this scoping exists to prevent."""
+    datasets = fixture_datasets() if datasets is None else datasets
+    return datasets.get(name) in PAPER_DATASETS
+
+
 def read_rows(csv_path: Path | str) -> list[dict]:
     """Every row of `csv_path` as a dict keyed by the header, all values as strings."""
     with open(csv_path, newline="") as f:

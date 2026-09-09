@@ -56,7 +56,16 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
-from _common import GRIDLINE, INK_MUTED, INK_PRIMARY, INK_SECONDARY, SURFACE, read_rows_with_fields
+from _common import (
+    GRIDLINE,
+    INK_MUTED,
+    INK_PRIMARY,
+    INK_SECONDARY,
+    SURFACE,
+    fixture_datasets,
+    in_paper_scope,
+    read_rows_with_fields,
+)
 from matplotlib import ticker
 
 # Chart chrome, from the dataviz skill's reference palette (light mode).
@@ -296,6 +305,12 @@ if __name__ == "__main__":
         raise SystemExit(1)
 
     fieldnames, rows = read_rows_with_fields(csv_path)
+    # `optimal_solutions_benchmark.csv` carries the whole fixture corpus, `handmade` included,
+    # because the product benchmark that writes it scores all of it. Every paper number is over
+    # the sampled datasets alone - see `_common.PAPER_DATASETS` - and this file has no dataset
+    # column, so the scoping has to happen here rather than upstream.
+    datasets = fixture_datasets()
+    rows = [r for r in rows if in_paper_scope(r["solution"], datasets)]
     print(f"Loaded {csv_path}: {len(rows)} fixtures")
 
     columns = category_columns(fieldnames)

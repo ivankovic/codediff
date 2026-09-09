@@ -61,7 +61,15 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
-from _common import GRIDLINE, INK_MUTED, INK_PRIMARY, INK_SECONDARY, SURFACE, read_rows
+from _common import (
+    GRIDLINE,
+    INK_MUTED,
+    INK_PRIMARY,
+    INK_SECONDARY,
+    PAPER_DATASETS,
+    SURFACE,
+    read_rows,
+)
 from matplotlib import ticker
 
 # Same chart-chrome tokens as benchmark_other_report.py / apted_only_report.py.
@@ -86,7 +94,11 @@ ALL_OPS = ["node_op_identical"] + [k for k, _, _ in OPERATIONS]
 
 def mapped_rows(csv_path: Path) -> list[dict]:
     """Only the fixtures that have a `human_mapping.json`."""
-    return [r for r in read_rows(csv_path) if r["has_mapping"] == "true"]
+    return [
+        r
+        for r in read_rows(csv_path)
+        if r["has_mapping"] == "true" and r["category"] in PAPER_DATASETS
+    ]
 
 
 def _int(row: dict, key: str) -> int:

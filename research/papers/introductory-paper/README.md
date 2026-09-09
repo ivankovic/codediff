@@ -156,20 +156,25 @@ by accident:
   `analysis/rendering_report.py` (`make rendering-report`). They are the reason Section 4 exists as
   a separate methodology section: the painted text ground truth needed describing before either
   could be stated. Two properties of that script matter. It scopes itself to
-  `human_mapping_analysis.csv` exactly as `ambiguity_report.py` does, so its denominators match the
-  rest of the paper. And **the painted subset is not a random sample** - painting is manual, so it
-  started on the `handmade` fixtures. Do not quote `\PaintingDualPct{}` as a corpus-wide rate.
+  `human_mapping_analysis.csv` **and** to `_common.PAPER_DATASETS` exactly as `ambiguity_report.py`
+  does, so its denominators match the rest of the paper. And **the painted subset is still not a
+  random sample** - painting is manual, and which changes have been painted is an artifact of the
+  order the annotators worked in. `\PaintingDualPct{}` is a rate over the painted set, not over
+  the corpus.
 
-  **Changed 2026-09-05, and it reverses what Section 5 used to argue.** The painted set is no
-  longer handmade-only: 149 fixtures now, 57 hand-written and 92 sampled from real commits, and the
-  two populations disagree sharply - 86.0% of the hand-written ones carry two paintings against
-  27.2% of the sampled ones. `\PaintingDualPct{}` fell 82.5% -> 49.7% purely from that mixture
-  shifting, not from any painting changing. Section 5 previously said the handmade weighting ran
-  *conservative* and that the rate should rise on larger real-world changes; measured, it falls by
-  a factor of three. The split is now emitted as `\PaintingHandmadeDualPct{}` /
-  `\PaintingSampledDualPct{}` and Section 5 quotes both, because the aggregate's value is set by
-  annotation order rather than by the corpus. Quote the sampled figure when the claim is about
-  real-world code.
+  **Changed 2026-09-09: the `handmade` fixtures left the paper entirely.** They are hand-written
+  minimal examples of one change pattern each, written to exercise the matcher, so no rate over
+  them estimates anything about real changes - and mixing them in made every rendering rate a
+  mixture whose proportions were set by annotation order. The paper now reports the `small`, `full`
+  and `stratified` datasets alone: 775 scored fixtures, 317 of them painted. The
+  `\PaintingHandmade*` / `\PaintingSampled*` macros and the handmade-versus-sampled comparison
+  Section 5 used to draw are gone with them, and `\PaintingDualPct{}` is now simply the rate over
+  changes taken from real commits (the figure that block used to call the sampled one).
+
+  **The product benchmark still scores `handmade`**, and should: `benchmark_optimal_solutions`,
+  `quality_baseline.csv` and each fixture's own `#[test]` are regression coverage, where a
+  hand-built minimal case is worth more than a sampled one. The two corpus sizes differ on purpose;
+  every report reading `optimal_solutions_benchmark.csv` filters it itself.
 
 One property of `ambiguity_report.py` is load-bearing and easy to break: it scopes itself to the
 fixture set in `data/quality/human_mapping_analysis.csv`, so Section 5 keeps describing one corpus
