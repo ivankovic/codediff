@@ -316,6 +316,7 @@ class Accumulator:
         out = {
             "EditsRepositories": repositories,
             "EditsCommits": latex_number(len(commit_totals)),
+            "EditsAllFileEdits": latex_number(self.total_edits),
             "EditsFileEdits": latex_number(len(per_file)),
             "EditsCodeFileEdits": latex_number(self.code_edits),
             "EditsModifiedSharePct": (

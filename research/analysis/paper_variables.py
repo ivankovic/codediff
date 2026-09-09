@@ -89,6 +89,12 @@ PLACEHOLDER = r"\textbf{??}"
 # measurement - `sampling_provenance` reports how many languages had to be drawn again beyond it.
 SAMPLE_PER_LANGUAGE = 10
 
+# The stratified draw's target, which `sample_test_diffs --count` tracks per (language, size
+# bucket) rather than per language - see that binary's `CapacityKey`. A separate decision from
+# SAMPLE_PER_LANGUAGE that currently happens to carry the same value: keep the two apart so that
+# changing one cannot silently rewrite the other's sentence in the paper.
+STRATIFIED_PER_CELL = 10
+
 # Ground-truth corpus size and AST-node accuracy.
 # source: cargo run --release --features test-fixtures --bin benchmark_optimal_solutions -- --csv
 #         (research/data/quality/optimal_solutions_benchmark.csv), totalled over solved fixtures.
@@ -334,7 +340,7 @@ COMPARISON_MACROS = (
     [
         f"{tool}{suffix}"
         for tool in ("CodeDiff", "UnixDiff", "GumTree", "Difftastic", "Diffsitter")
-        for suffix in ("Fixtures", "LineMismatches", "LineRate")
+        for suffix in ("Fixtures", "LineMismatches", "LineRate", "PerfectPct")
     ]
     + ["CommonFixtures"]
     + [
@@ -363,6 +369,9 @@ AMBIGUITY_MACROS = [
     "AmbiguityScored",
     "AmbiguityAnyFixtures",
     "AmbiguityAnyPct",
+    "AmbiguityListScored",
+    "AmbiguityListWith",
+    "AmbiguityListPct",
     "AmbiguityCuratedTotal",
     "AmbiguityCuratedWith",
     "AmbiguityCuratedPct",
@@ -440,6 +449,7 @@ SHAPE_MACROS = (
 EDIT_SHAPE_MACROS = [
     "EditsRepositories",
     "EditsCommits",
+    "EditsAllFileEdits",
     "EditsFileEdits",
     "EditsCodeFileEdits",
     "EditsModifiedSharePct",
@@ -547,6 +557,7 @@ def sampling_provenance(repo_root):
     out["SampleRejectedR"] = by_language.get("R", 0)
     out["SampleRejectedTypeScript"] = by_language.get("TypeScript", 0)
     out["SampleDiffsPerLanguage"] = SAMPLE_PER_LANGUAGE
+    out["SampleStratifiedPerCell"] = STRATIFIED_PER_CELL
     return out
 
 

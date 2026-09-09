@@ -165,6 +165,19 @@ def summarize(
             "with": len([n for n in members if groups_by_fixture[n]]),
         }
 
+    # The `stratified` dataset carries no multi-map group at all: 0 of 323 fixtures, against
+    # 11.4% and 11.6% for `small` and `full`. At the pooled rate of the two reviewed lists we
+    # would expect ~37 of them, and P(0) under that rate is about 7e-18 - so this is a gap in the
+    # annotation, not a property of those changes. Their mappings are solved; the ambiguity pass
+    # over them has not been done. Pooling all three would therefore dilute a measured 11.5% to
+    # 6.7% by counting un-reviewed fixtures as unambiguous - the "an empty annotation scores as a
+    # perfect one" trap. `reviewed_*` below is the rate over the lists that have been reviewed,
+    # and is what the paper quotes; `any_pct` over every scored fixture is kept beside it so the
+    # dilution is visible rather than silent. Fold `stratified` in here once it is annotated.
+    REVIEWED_LISTS = ("small", "full")
+    reviewed = [n for n in names if (datasets or {}).get(n) in REVIEWED_LISTS]
+    reviewed_with = [n for n in reviewed if groups_by_fixture[n]]
+
     all_groups = [g for n in with_groups for g in groups_by_fixture[n]]
     sizes = [max(len(g["before_paths"]), len(g["after_paths"])) for g in all_groups]
     shapes = Counter((len(g["before_paths"]), len(g["after_paths"])) for g in all_groups)
@@ -184,6 +197,9 @@ def summarize(
         "scored": len(names),
         "any_fixtures": len(with_groups),
         "any_pct": pct(len(with_groups), len(names)),
+        "reviewed_scored": len(reviewed),
+        "reviewed_with": len(reviewed_with),
+        "reviewed_pct": pct(len(reviewed_with), len(reviewed)),
         "per_list": per_list,
         "groups": len(all_groups),
         "with_children": sum(1 for g in all_groups if g.get("with_children")),
@@ -215,6 +231,10 @@ def write_paper_fragment(s: dict, output_path: Path) -> None:
         "AmbiguityScored": s["scored"],
         "AmbiguityAnyFixtures": s["any_fixtures"],
         "AmbiguityAnyPct": f"{s['any_pct']:.1f}",
+        # Over the reviewed lists only - see REVIEWED_LISTS in `summarize`.
+        "AmbiguityListScored": s["reviewed_scored"],
+        "AmbiguityListWith": s["reviewed_with"],
+        "AmbiguityListPct": f"{s['reviewed_pct']:.1f}",
         # What the ambiguous cases look like.
         "AmbiguityGroups": s["groups"],
         "AmbiguityGroupsWithChildren": s["with_children"],

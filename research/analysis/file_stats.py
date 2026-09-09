@@ -317,15 +317,44 @@ def compute_full_dataset_stats(df):
     print("Type counts:")
     print(tip_counts)
 
-    plt.figure(figsize=(10, 5))
-    plt.pie(
-        tip_counts["count"],
-        labels=tip_counts["category"],
-        autopct="%1.1f%%",
-    )
-    plt.title("File Types")
-    plt.savefig("plots/tips.png", bbox_inches="tight")
-    plt.close()
+    # A horizontal bar chart, not a pie. The pie this replaced (2026-09-09) failed three ways at
+    # the size the paper prints it: the two smallest categories' labels and their percentages
+    # overprinted into an illegible smear, the five wedges were separated by hue alone and so said
+    # nothing in a greyscale print, and a reader cannot rank five wedges by eye anyway. Bars are
+    # sorted, individually labelled, and readable in black and white.
+    categories = list(tip_counts["category"])
+    counts = [int(c) for c in tip_counts["count"]]
+    total = sum(counts) or 1
+    # Sized for a single ACM column: the figure is scaled to about 3.3in wide in the paper, so a
+    # 7in-wide canvas shrinks 10pt labels to under 5pt. Drawing it near its final width instead
+    # keeps every label legible after shrinking.
+    fig, ax = plt.subplots(figsize=(4.2, 2.4))
+    positions = range(len(categories))
+    ax.barh(list(positions), counts, color="0.55", edgecolor="0.15", linewidth=0.6, zorder=3)
+    for y, count in zip(positions, counts):
+        ax.text(
+            count + total * 0.01,
+            y,
+            f"{count / total * 100:.1f}%",
+            va="center",
+            fontsize=8,
+        )
+    ax.set_yticks(list(positions))
+    ax.set_yticklabels(categories, fontsize=8)
+    ax.invert_yaxis()
+    ax.set_xlim(0, max(counts) * 1.16 if counts else 1)
+    ax.set_xlabel("Files in the corpus", fontsize=8)
+    # No title: papers/introductory-paper/main.tex captions this figure, and a title repeating the
+    # caption both wastes vertical space and goes stale independently of the caption.
+    ax.tick_params(labelsize=8)
+    ax.grid(axis="x", color="0.85", zorder=0)
+    for spine in ("top", "right", "left"):
+        ax.spines[spine].set_visible(False)
+    fig.tight_layout()
+    # Vector as well as bitmap: at 100 dpi the PNG was visibly soft once scaled into an ACM column.
+    fig.savefig("plots/tips.png", bbox_inches="tight", dpi=300)
+    fig.savefig("plots/tips.pdf", bbox_inches="tight")
+    plt.close(fig)
 
     undefined_tip = df.filter(pl.col("category") == "Unknown")
     undefined_tip_extensions = (

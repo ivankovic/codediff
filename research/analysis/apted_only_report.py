@@ -17,6 +17,11 @@
 """RQ1 report: "What percentage of real-world source-code changes can a single, whole-tree
 tree-edit-distance computation complete within a one-second budget?"
 
+The paper renumbered this question to **RQ2** in the 2026-09-02 restructure. "RQ1" survives here
+in the script name, the `RqOne*` macro stems and these comments, deliberately: renaming the macros
+would touch every paper that already cites them. Nothing user-visible may say "RQ1" - a stale
+"RQ1" in a chart title shipped in the PDF for a week before it was caught (2026-09-09).
+
 Reads apted_only_benchmark's per-pair CSV output(s) (language, size_bucket, repository, commit,
 path, loc_before, loc_after, loc_combined, bytes_before, bytes_after, ast_nodes_before,
 ast_nodes_after, status, elapsed_ms), buckets every pair by this project's shared LOC buckets
@@ -359,6 +364,10 @@ def plot_by_category(results: dict, output_path: Path, total_n: int) -> None:
 
     cats = [c for c in CATEGORY_ORDER if c in results]
     colors = {CODE: BAR_COLOR, SCRIPTING: "#e08a3c", CONFIG_DATA: "#6d8a5a"}
+    # Colour alone does not survive a greyscale print, and this paper's figures are read on paper
+    # as often as on screen. Every series therefore carries a hatch as well as a hue, and the two
+    # encode the same distinction rather than two different ones.
+    hatches = {CODE: "", SCRIPTING: "///", CONFIG_DATA: "xxx"}
     labels = [label for label, _, _, _ in results[cats[0]]["buckets"]]
     x = np.arange(len(labels))
     width = 0.8 / len(cats)
@@ -372,8 +381,9 @@ def plot_by_category(results: dict, output_path: Path, total_n: int) -> None:
             heights,
             width=width * 0.92,
             color=colors[cat],
-            edgecolor=SURFACE,
-            linewidth=0.8,
+            edgecolor=INK_PRIMARY,
+            hatch=hatches[cat],
+            linewidth=0.5,
             zorder=3,
             label=f"{cat} (n={results[cat]['n']:,})",
         )
@@ -397,13 +407,9 @@ def plot_by_category(results: dict, output_path: Path, total_n: int) -> None:
     ax.yaxis.set_major_formatter(ticker.FuncFormatter(lambda v, _: f"{v:.0f}%"))
     ax.set_ylabel("Pairs processed within 1s", fontsize=10.5, color=INK_PRIMARY)
     ax.set_xlabel("Lines of code (larger of before / after)", fontsize=10.5, color=INK_PRIMARY)
-    ax.set_title(
-        "RQ1: whole-tree tree-edit distance vs. a 1-second budget, by artifact category\n"
-        f"({total_n:,} real-world file changes, size-stratified per language - bars are "
-        "within-bucket rates; small numbers are per-cell n)",
-        fontsize=10.5,
-        color=INK_PRIMARY,
-    )
+    # No in-image title: papers/introductory-paper/main.tex captions this figure, and a title
+    # repeating the caption wastes the figure's vertical space. It also stops the title going
+    # stale - it named "RQ1" for a week after the 2026-09-02 restructure renumbered it to RQ2.
     ax.legend(frameon=False, fontsize=9, loc="upper right")
     ax.grid(axis="y", color=GRIDLINE, zorder=0)
     for spine in ("top", "right"):
@@ -413,6 +419,11 @@ def plot_by_category(results: dict, output_path: Path, total_n: int) -> None:
 
     fig.savefig(output_path, dpi=150, bbox_inches="tight", facecolor=SURFACE)
     print(f"Wrote {output_path}")
+    # A paper figure should be vector: the PNG is 150 dpi and visibly soft once ACM scales it into
+    # a two-column layout. Both are written so nothing that already references the PNG breaks.
+    vector_path = output_path.with_suffix(".pdf")
+    fig.savefig(vector_path, bbox_inches="tight", facecolor=SURFACE)
+    print(f"Wrote {vector_path}")
 
 
 def main() -> None:
@@ -535,7 +546,7 @@ def main() -> None:
     ax.set_ylabel("Pairs processed within 1s", fontsize=10.5, color=INK_PRIMARY)
     ax.set_xlabel("Lines of code (larger of before / after)", fontsize=10.5, color=INK_PRIMARY)
     ax.set_title(
-        "RQ1: whole-tree tree-edit distance vs. a 1-second budget\n"
+        "RQ2: whole-tree tree-edit distance vs. a 1-second budget\n"
         f"({len(attempted):,} real-world file changes, size-stratified per language - "
         "bars are within-bucket rates, not population-weighted)",
         fontsize=10.5,

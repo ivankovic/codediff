@@ -2,7 +2,7 @@
 %%% Do NOT edit. File created by BibTeX with style
 %%% ACM-Reference-Format-Journals [18-Jan-2012].
 
-\begin{thebibliography}{10}
+\begin{thebibliography}{12}
 
 %%% ====================================================================
 %%% NOTE TO THE USER: you can override these defaults by providing
@@ -149,6 +149,33 @@
 \newblock
 \urldef\tempurl%
 \url{https://doi.org/10.1007/BF01840446}
+\showDOI{\tempurl}
+
+
+\bibitem[Nielsen(1993)]%
+        {nielsen-usability}
+\bibfield{author}{\bibinfo{person}{Jakob Nielsen}.}
+  \bibinfo{year}{1993}\natexlab{}.
+\newblock \bibinfo{booktitle}{\emph{Usability Engineering}}.
+\newblock \bibinfo{publisher}{Morgan Kaufmann}, \bibinfo{address}{San
+  Francisco, CA}.
+\newblock
+\showISBNx{9780125184069}
+
+
+\bibitem[Nugroho et~al\mbox{.}(2020)]%
+        {nugroho-histogram}
+\bibfield{author}{\bibinfo{person}{Yusuf~Sulistyo Nugroho},
+  \bibinfo{person}{Hideaki Hata}, {and} \bibinfo{person}{Kenichi Matsumoto}.}
+  \bibinfo{year}{2020}\natexlab{}.
+\newblock \showarticletitle{How different are different diff algorithms in
+  {Git}? Use \texttt{--histogram} for code changes}.
+\newblock \bibinfo{journal}{\emph{Empirical Software Engineering}}
+  \bibinfo{volume}{25}, \bibinfo{number}{1} (\bibinfo{year}{2020}),
+  \bibinfo{pages}{790--823}.
+\newblock
+\urldef\tempurl%
+\url{https://doi.org/10.1007/s10664-019-09772-z}
 \showDOI{\tempurl}
 
 

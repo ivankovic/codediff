@@ -143,6 +143,37 @@ DISPLAY_NAMES = {
     "difftastic": "difftastic",
 }
 DISPLAY_ORDER = list(DISPLAY_NAMES)
+
+# The same series, spelled as papers/introductory-paper/main.tex spells them. [`DISPLAY_NAMES`]
+# feeds matplotlib, which cannot render LaTeX markup, so the two maps cannot be one: chart labels
+# stay plain and table cells carry \texttt{} on the things that are literally command names.
+# Before this split (2026-09-09) the paper showed the same ten series under three different naming
+# schemes across four tables - "UNIX diff (baseline)" here against "Unix \texttt{diff}" in the
+# authored tables, "GumTree (binary)" against "GumTree", "BDiff (per process)" against "BDiff
+# (cold, per-invocation)". Keep any new series in step with main.tex, not with DISPLAY_NAMES.
+LATEX_NAMES = {
+    "treesitter_parse": r"tree-sitter parse (lower bound)",
+    "unix_diff": r"Unix \texttt{diff}",
+    "git_myers": r"\texttt{git} (Myers)",
+    "git_minimal": r"\texttt{git} (minimal)",
+    "git_patience": r"\texttt{git} (patience)",
+    "git_histogram": r"\texttt{git} (histogram)",
+    "bdiff": r"BDiff (cold, per-invocation)",
+    "nvim_diff": r"\texttt{nvim -d}",
+    "bdiff_warm": r"BDiff (warm interpreter)",
+    "codediff": r"\textsc{CodeDiff}",
+    "gumtree": r"GumTree (cold, per-invocation)",
+    "gumtree_warm": r"GumTree (warm JVM)",
+    "diffsitter": r"diffsitter",
+    "difftastic": r"difftastic",
+}
+
+
+def latex_name(tool: str) -> str:
+    """The LaTeX spelling of a series, falling back to the chart spelling then the raw id."""
+    return LATEX_NAMES.get(tool, DISPLAY_NAMES.get(tool, tool))
+
+
 COLORS = {
     "treesitter_parse": INK_PRIMARY,
     "unix_diff": INK_MUTED,
@@ -160,7 +191,7 @@ COLORS = {
     "diffsitter": "#1a9e96",
 }
 
-# Which family each comparable tool belongs to. The accuracy chart is split on this: nine series in
+# Which family each comparable tool belongs to. The accuracy chart is split on this: ten series in
 # one grouped histogram is unreadable, and text-vs-AST is the split the comparison is actually
 # about, not an arbitrary halving to fit the page.
 TEXT_TOOLS = [
@@ -450,7 +481,7 @@ def write_bucket_table(accuracy_rows, output_path, include_codediff):
             cells = " & ".join(
                 f"{count} ({100.0 * count / scored:.0f}" + backslash + "%)" for count in counts
             )
-            name = DISPLAY_NAMES.get(tool, tool).replace("&", backslash + "&")
+            name = latex_name(tool).replace("&", backslash + "&")
             lines.append(f"    {name} & {scored} & {cells} {row_end}")
         lines.append(r"    \addlinespace")
     lines = lines[:-1]
@@ -503,7 +534,7 @@ def write_node_bucket_table(accuracy_rows, output_path):
         cells = " & ".join(
             f"{count} ({100.0 * count / scored:.0f}" + backslash + "%)" for count in counts
         )
-        name = DISPLAY_NAMES.get(tool, tool).replace("&", backslash + "&")
+        name = latex_name(tool).replace("&", backslash + "&")
         lines.append(f"    {name} & {scored} & {cells} {row_end}")
     lines += [r"    \bottomrule", r"  \end{tabular}", r"\end{table*}"]
     output_path.write_text("\n".join(lines) + "\n")
@@ -602,6 +633,10 @@ def plot_summary(rows, tools, output_path):
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(output_path, dpi=150, bbox_inches="tight", facecolor=SURFACE)
+    # Vector alongside the bitmap: 150 dpi is visibly soft once ACM scales a figure into its
+    # layout, and a paper figure should be resolution-independent. The PNG stays so that nothing
+    # already pointing at it breaks.
+    fig.savefig(output_path.with_suffix(".pdf"), bbox_inches="tight", facecolor=SURFACE)
     plt.close(fig)
     print(f"Plot saved to {output_path}")
 
@@ -655,11 +690,21 @@ def plot_runtime(rows: list[dict], tools: list[str], output_path: Path) -> None:
     fixture count is what determines each violin's real independence (3 repeats of the same
     fixture are correlated with each other, not 3 independent fixtures), so it stays the honest
     number to report as "n"."""
-    ids = ordered(
-        ["treesitter_parse", "codediff"]
-        + tools
-        + [w for w in ("gumtree_warm", "bdiff_warm") if has_warm(rows, w)]
-    )
+    # The parse-only reference violin and three of the four git algorithms are dropped from this
+    # figure (2026-09-09, author review). They were the two things making the chart hard to read:
+    # the reference violin is not a competing tool yet invites comparison as though it were, and
+    # the four git series are indistinguishable by construction - this paper's own result is that
+    # the choice of line-diff algorithm does not move any metric here, so plotting all four spends
+    # four slots saying one thing. `git_myers` is the default and stands for them. All four remain
+    # in every table and in the CSV; this is a presentation choice, not a change of scope.
+    FIGURE_OMITS = {"treesitter_parse", "git_minimal", "git_patience", "git_histogram"}
+    ids = [
+        i
+        for i in ordered(
+            ["codediff"] + tools + [w for w in ("gumtree_warm", "bdiff_warm") if has_warm(rows, w)]
+        )
+        if i not in FIGURE_OMITS
+    ]
     labels = [DISPLAY_NAMES[i] for i in ids]
     colors = [COLORS[i] for i in ids]
     scoped_rows = [rows_for(i, rows) for i in ids]
@@ -752,6 +797,10 @@ def plot_runtime(rows: list[dict], tools: list[str], output_path: Path) -> None:
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(output_path, dpi=150, bbox_inches="tight", facecolor=SURFACE)
+    # Vector alongside the bitmap: 150 dpi is visibly soft once ACM scales a figure into its
+    # layout, and a paper figure should be resolution-independent. The PNG stays so that nothing
+    # already pointing at it breaks.
+    fig.savefig(output_path.with_suffix(".pdf"), bbox_inches="tight", facecolor=SURFACE)
     plt.close(fig)
     print(f"Plot saved to {output_path}")
 
@@ -777,9 +826,12 @@ def coefficients_of_variation(rows: list[dict], column: str) -> np.ndarray:
 
 
 def _escape_tex(text: str) -> str:
-    """Minimal LaTeX escaping for `DISPLAY_NAMES` values embedded in a generated `.tex` table - none
-    of the current names need this (parentheses have no special meaning in LaTeX), but a future
-    tool name with `_`/`%`/`&`/`#` would otherwise silently break the build."""
+    """Minimal LaTeX escaping for a *plain* series name embedded in a generated `.tex` table.
+
+    Not applied to [`LATEX_NAMES`] values, which are LaTeX by construction: escaping
+    `\\texttt{git}` would yield `\\texttt\\{git\\}` and print the markup. Kept for the fallback
+    path, where a series with no `LATEX_NAMES` entry and a `_`/`%`/`&`/`#` in its id would
+    otherwise break the build silently."""
     for char in "&%$#_{}":
         text = text.replace(char, f"\\{char}")
     return text
@@ -807,7 +859,7 @@ def variance_table_rows(rows: list[dict], tools: list[str]) -> list[tuple[str, i
             continue
         out.append(
             (
-                DISPLAY_NAMES[id_],
+                latex_name(id_),
                 len(series),
                 float(np.median(series)),
                 float(np.percentile(series, 90)),
@@ -835,7 +887,8 @@ def write_variance_table(rows: list[dict], tools: list[str], output_path: Path) 
         r"    \midrule",
     ]
     for name, n, median, p90 in table_rows:
-        lines.append(f"    {_escape_tex(name)} & {n} & {median:.1f}\\% & {p90:.1f}\\% \\\\")
+        cell = name if name in LATEX_NAMES.values() else _escape_tex(name)
+        lines.append(f"    {cell} & {n} & {median:.1f}\\% & {p90:.1f}\\% \\\\")
     lines += [
         r"    \bottomrule",
         r"  \end{tabular}",
@@ -999,6 +1052,17 @@ def write_paper_fragment(
                 f"\\newcommand{{\\{stem}LineMismatches}}{{{mismatches:,}}}".replace(",", "{,}")
             )
             lines.append(f"\\newcommand{{\\{stem}LineRate}}{{{100.0 * mismatches / total:.3f}}}")
+            # The per-fixture "Perfect" share (zero mismatched lines), which is the reading the
+            # paper leads RA4.1 with since 2026-09-09 - the pooled line rate it used to quote is
+            # decided by a handful of very long fixtures, while this weights every change equally.
+            # Same source as Table~\\ref{tab:agreement-buckets}'s first column, so the two cannot
+            # drift apart.
+            buckets = bucket_counts(accuracy_rows, id_)
+            if buckets is not None:
+                scored, counts = buckets
+                lines.append(
+                    f"\\newcommand{{\\{stem}PerfectPct}}{{{100.0 * counts[0] / scored:.0f}}}"
+                )
 
         shared = common_subset(accuracy_rows, list(PAPER_MACRO_STEMS))
         lines.append(f"% Common subset: the {len(shared)} fixtures every tool scored.")

@@ -52,36 +52,47 @@
 \newcommand{\UnixDiffFixtures}{775}
 \newcommand{\UnixDiffLineMismatches}{6{,}575}
 \newcommand{\UnixDiffLineRate}{1.006}
+\newcommand{\UnixDiffPerfectPct}{49}
 \newcommand{\GitMyersFixtures}{775}
 \newcommand{\GitMyersLineMismatches}{6{,}497}
 \newcommand{\GitMyersLineRate}{0.994}
+\newcommand{\GitMyersPerfectPct}{49}
 \newcommand{\GitMinimalFixtures}{775}
 \newcommand{\GitMinimalLineMismatches}{6{,}497}
 \newcommand{\GitMinimalLineRate}{0.994}
+\newcommand{\GitMinimalPerfectPct}{49}
 \newcommand{\GitPatienceFixtures}{775}
 \newcommand{\GitPatienceLineMismatches}{6{,}555}
 \newcommand{\GitPatienceLineRate}{1.003}
+\newcommand{\GitPatiencePerfectPct}{49}
 \newcommand{\GitHistogramFixtures}{775}
 \newcommand{\GitHistogramLineMismatches}{6{,}557}
 \newcommand{\GitHistogramLineRate}{1.003}
+\newcommand{\GitHistogramPerfectPct}{49}
 \newcommand{\BDiffFixtures}{775}
 \newcommand{\BDiffLineMismatches}{6{,}882}
 \newcommand{\BDiffLineRate}{1.053}
+\newcommand{\BDiffPerfectPct}{48}
 \newcommand{\NvimDiffFixtures}{775}
 \newcommand{\NvimDiffLineMismatches}{6{,}445}
 \newcommand{\NvimDiffLineRate}{0.986}
+\newcommand{\NvimDiffPerfectPct}{50}
 \newcommand{\CodeDiffFixtures}{775}
 \newcommand{\CodeDiffLineMismatches}{2{,}917}
 \newcommand{\CodeDiffLineRate}{0.446}
+\newcommand{\CodeDiffPerfectPct}{89}
 \newcommand{\GumTreeFixtures}{592}
 \newcommand{\GumTreeLineMismatches}{10{,}235}
 \newcommand{\GumTreeLineRate}{2.570}
+\newcommand{\GumTreePerfectPct}{60}
 \newcommand{\DiffsitterFixtures}{504}
 \newcommand{\DiffsitterLineMismatches}{5{,}934}
 \newcommand{\DiffsitterLineRate}{1.210}
+\newcommand{\DiffsitterPerfectPct}{53}
 \newcommand{\DifftasticFixtures}{752}
 \newcommand{\DifftasticLineMismatches}{9{,}667}
 \newcommand{\DifftasticLineRate}{1.581}
+\newcommand{\DifftasticPerfectPct}{58}
 \newcommand{\CommonFixtures}{432}
 \newcommand{\CommonUnixDiffLineRate}{0.761}
 \newcommand{\CommonGitMyersLineRate}{0.741}
@@ -141,6 +152,9 @@
 \newcommand{\AmbiguityScored}{775}
 \newcommand{\AmbiguityAnyFixtures}{52}
 \newcommand{\AmbiguityAnyPct}{6.7}
+\newcommand{\AmbiguityListScored}{452}
+\newcommand{\AmbiguityListWith}{52}
+\newcommand{\AmbiguityListPct}{11.5}
 \newcommand{\AmbiguityGroups}{218}
 \newcommand{\AmbiguityGroupsWithChildren}{0}
 \newcommand{\AmbiguityIdenticalGroups}{92}
@@ -178,7 +192,7 @@
 \newcommand{\PaintingDualPct}{31.5}
 \newcommand{\PaintingLanguages}{22}
 \newcommand{\PaintingLocMedian}{9}
-\newcommand{\PaintingLocMax}{4146}
+\newcommand{\PaintingLocMax}{4{,}146}
 \newcommand{\PaintingUnpaintedLocMedian}{216}
 \newcommand{\PaintingEntries}{1368}
 \newcommand{\PaintingMatchEntries}{346}
@@ -188,7 +202,7 @@
 \newcommand{\PaintingFullEntries}{656}
 \newcommand{\PaintingFullExtraSpans}{568}
 \newcommand{\PaintingFullExtraPunctuation}{67}
-\newcommand{\PaintingFullExtraPunctuationPct}{12}
+\newcommand{\PaintingFullExtraPunctuationPct}{11.8}
 
 % --- Change-shape census: how often each shape RQ3 asks about occurs in the ground-truth
 % corpus, and how often CodeDiff maps a fixture containing it with zero mismatches.
@@ -246,6 +260,7 @@
 \newcommand{\EditsChurnPNinetyPct}{33.3}
 \newcommand{\EditsChurnUnderFivePct}{59.9}
 \newcommand{\EditsChurnUnderTwentyPct}{84.4}
+\newcommand{\EditsAllFileEdits}{\textbf{??}}
 
 % --- Ground-truth corpus and AST-node accuracy (AUTHORED - see script's CORPUS block).
 \newcommand{\NumFixtures}{775}
@@ -320,6 +335,7 @@
 \newcommand{\SampleRejectedR}{11}
 \newcommand{\SampleRejectedTotal}{25}
 \newcommand{\SampleRejectedTypeScript}{7}
+\newcommand{\SampleStratifiedPerCell}{10}
 
 % --- Cost comparison: how often the human mapping is costlier than a mapping the harness's
 % own matcher found, and how often the two tie at different mappings (DERIVED from

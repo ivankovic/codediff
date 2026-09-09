@@ -9,18 +9,18 @@
     Tool & $n$ & Perfect & $\ge$99\% & 95--99\% & $<$95\% \\
     \midrule
     \multicolumn{6}{l}{\emph{Line granularity only}} \\
-    UNIX diff (baseline) & 775 & 379 (49\%) & 169 (22\%) & 127 (16\%) & 100 (13\%) \\
-    git (Myers) & 775 & 381 (49\%) & 170 (22\%) & 127 (16\%) & 97 (13\%) \\
-    git (minimal) & 775 & 381 (49\%) & 170 (22\%) & 127 (16\%) & 97 (13\%) \\
-    git (patience) & 775 & 380 (49\%) & 169 (22\%) & 128 (17\%) & 98 (13\%) \\
-    git (histogram) & 775 & 380 (49\%) & 169 (22\%) & 129 (17\%) & 97 (13\%) \\
+    Unix \texttt{diff} & 775 & 379 (49\%) & 169 (22\%) & 127 (16\%) & 100 (13\%) \\
+    \texttt{git} (Myers) & 775 & 381 (49\%) & 170 (22\%) & 127 (16\%) & 97 (13\%) \\
+    \texttt{git} (minimal) & 775 & 381 (49\%) & 170 (22\%) & 127 (16\%) & 97 (13\%) \\
+    \texttt{git} (patience) & 775 & 380 (49\%) & 169 (22\%) & 128 (17\%) & 98 (13\%) \\
+    \texttt{git} (histogram) & 775 & 380 (49\%) & 169 (22\%) & 129 (17\%) & 97 (13\%) \\
     \addlinespace
     \multicolumn{6}{l}{\emph{Reports sub-line detail (not exercised here -- see Table~\ref{tab:agreement-buckets-node})}} \\
-    BDiff (per process) & 775 & 371 (48\%) & 165 (21\%) & 139 (18\%) & 100 (13\%) \\
-    nvim -d & 775 & 391 (50\%) & 170 (22\%) & 125 (16\%) & 89 (11\%) \\
+    BDiff (cold, per-invocation) & 775 & 371 (48\%) & 165 (21\%) & 139 (18\%) & 100 (13\%) \\
+    \texttt{nvim -d} & 775 & 391 (50\%) & 170 (22\%) & 125 (16\%) & 89 (11\%) \\
     diffsitter & 504 & 266 (53\%) & 86 (17\%) & 67 (13\%) & 85 (17\%) \\
     difftastic & 752 & 435 (58\%) & 118 (16\%) & 106 (14\%) & 93 (12\%) \\
-    GumTree (binary) & 592 & 356 (60\%) & 78 (13\%) & 79 (13\%) & 79 (13\%) \\
+    GumTree (cold, per-invocation) & 592 & 356 (60\%) & 78 (13\%) & 79 (13\%) & 79 (13\%) \\
     \bottomrule
   \end{tabular}
 \end{table*}

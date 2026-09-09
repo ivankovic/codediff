@@ -6,8 +6,9 @@ and easy to erode. Restructured on 2026-09-02 around four research question *gro
 introduction and each answered in its own section, in order; the tool comes last. Structure:
 
 1. **Introduction** (the four RQ groups, sub-numbered RQ1.1, RQ1.2, RQ2, RQ3.1-RQ3.3, RQ4.1,
-   RQ4.2), 2. **Background** (the algorithms and tools the field is built on - now including
-   Unix diff, git's four algorithms, BDiff and Neovim's diff mode)
+   RQ4.2, plus the page-1 motivating figure added 2026-09-09), 2. **Background** (the algorithms
+   and tools the field is built on - now including Unix diff, git's four algorithms, BDiff and
+   Neovim's diff mode)
 3. **Empirical Dataset** - the repository lists, file/edit shape, how the fixture corpus was
    sampled and solved, and how the human mapping (multi-map groups included) and the human painting
    were authored. Methodology only; no RQ is answered here. Its "Shape of real-world file edits"
@@ -21,7 +22,24 @@ introduction and each answered in its own section, in order; the tool comes last
    truth. CodeDiff is absent by construction.
 8. **CodeDiff** - the tool contribution: the pipeline, then its own node-level accuracy, its
    line-level rate on the same basis as Section 7's tools, speed and robustness.
-9. **Related Work**, 10. **Conclusion**.
+9. **Discussion**, 10. **Threats to Validity**, 11. **Related Work**, 12. **Conclusions**.
+
+**Sections 9, 10 and 12 changed shape on 2026-09-09.** The paper had no Threats to Validity
+section at all - its caveats were scattered as inline asides - and no Discussion, so the
+Conclusion carried the implications, the six recommendations and a summary at once. The
+recommendations and the "the answer is less well defined than the metrics assume" argument moved
+into Discussion; the caveats were collected into Threats to Validity, grouped
+construct/internal/external, with the annotator-bias risk stated for the first time; and
+Conclusions (plural, per convention) now answers "so what" in one paragraph. Section 7 was renamed
+**State of the Art** the same day: it was called "Implementation" while measuring other people's
+tools, immediately before the section that is the implementation.
+
+**The comparison is seven tools in ten configurations, not "nine tools".** The paper said "nine"
+in twelve places against tables with ten rows, and its own breakdown sentence said "Four report
+sub-line detail" over a list of five. Unix diff + git x4 = five line-granularity configurations;
+BDiff, nvim -d, GumTree, difftastic, diffsitter = five reporting sub-line detail. If a series is
+ever added, the count appears in prose, two authored table captions and `benchmark_other_report.py`
+- fix all four.
 
 The tool comparison is written to be read as generous, not competitive: difftastic and diffsitter
 optimize for human readability rather than ground-truth mapping fidelity, and GumTree's own
@@ -230,9 +248,14 @@ against ~2.5 ms medians. Quote percentiles, not means; the paper's speed table a
 
 ### The measure-edit-shape census (Section 3.2, Table 2)
 
-`analysis/edit_shape_stats.py` (`make measure-edit-shape MODE=small`) walks the most recent
+`analysis/edit_shape_stats.py` (`make measure-edit-shape MODE=<mode>`) walks the most recent
 `EDIT_SHAPE_COMMITS` (50, matching `\CorpusCloneDepth`) non-merge commits of each cloned
-repository and reports how big a real-world edit is. It replaced a "TODO: Add our own metrics
+repository and reports how big a real-world edit is.
+
+**The committed fragment is a full-corpus run, not `MODE=small`** - `\EditsRepositories` is 7,444
+and `\EditsCommits` 114,817, which 100 repositories at a 50-commit cap cannot produce. This README
+said `MODE=small` until 2026-09-09, and the paper had copied that error into Section 3.2 as "In the
+Curated dataset". Both are fixed; check `\EditsRepositories` before describing the scope again. It replaced a "TODO: Add our own metrics
 here" that had stood in Section 3.2 next to the Arafat and Riehle citation.
 
 Four decisions in it are load-bearing, each made after measuring the alternative:
@@ -260,16 +283,45 @@ so Section 3.2 labels its line-level fraction as a proxy and Section 8's phase 1
 one. The artifact in `data/corpus_stats/edit_shape.csv` is per-language rows only; the per-edit
 population is far too large to commit.
 
+### Generated tables name the series exactly as main.tex does
+
+Added 2026-09-09. `benchmark_other_report.py` now carries two name maps: `DISPLAY_NAMES` feeds
+matplotlib (which cannot render LaTeX) and `LATEX_NAMES` feeds the three generated `.tex` tables.
+Before the split the paper showed the same ten series under three naming schemes across four
+tables - "UNIX diff (baseline)" against "Unix \texttt{diff}", "GumTree (binary)" against
+"GumTree", "BDiff (per process)" against "BDiff (cold, per-invocation)". Keep any new series in
+step with `main.tex`, not with `DISPLAY_NAMES`. `_escape_tex` is deliberately **not** applied to
+`LATEX_NAMES` values: escaping `\texttt{git}` would print the markup.
+
+### Figures are vector and greyscale-safe
+
+Added 2026-09-09. Every plot script now writes a `.pdf` beside its `.png`, and `main.tex` includes
+figures without an extension so LaTeX takes the vector copy - with one exception, `figures/tips.png`,
+which keeps its extension because `plots/tips.pdf` does not exist yet (see below). Drop the
+extension and add the `figures/tips.pdf` symlink once a `measure-file-stats` run has produced it. `apted_only_report.py`'s bars carry
+hatching as well as hue, because colour alone says nothing in a printed paper. Both in-image chart
+titles were removed: they duplicated the LaTeX caption and went stale independently of it - one
+still read "RQ1" a week after the 2026-09-02 restructure renumbered that question to RQ2.
+
+**`plots/tips.png` is the one figure still stale.** `file_stats.py`'s pie chart was replaced with a
+horizontal bar chart (the pie's two smallest labels overprinted into an illegible smear, and five
+wedges separated by hue alone are unreadable in greyscale), but regenerating the image needs
+`stats.sqlite`, which is not committed. Run `make measure-file-stats MODE=small` then
+`make introductory-paper-empirical MODE=small`.
+
 ### Known-stale numbers
 
-**The empirical-study numbers (Section 3, Table 1, corpus size) currently reflect the 100-repository
-`small` sample, not the paper's eventual full 7,423-repository corpus.** This is deliberate, not a
-bug: computing the full corpus's numbers for real means running `file_stats` (tree-sitter parsing
-+ AST-node counting) over ~7,445 already-cloned repositories, which a timing probe against the
-100-repo sample put at roughly 24-25 hours and ~400GB of database (measured 2026-07-31: 100 repos
-took 19m50s, 1.35M files, 1,133 files/sec). Swapping in the real full-corpus numbers, once that run
-finishes, is `make measure-file-stats MODE=full` (slow, run once) followed by `make
-introductory-paper-empirical MODE=full` (fast, re-renders and rebuilds) - no hand-editing required.
+**The empirical-study numbers (Section 3, Table 1, corpus size) are the full
+\NumRepos{}-repository measurement**, run on the server on 2026-09-07 and landed in commit
+`1d0102d`; `research/data/corpus_stats/PROVENANCE.md` records the run in full (7,444 repositories
+cloned and measured, 7,045,754 `files` rows, 27 GB database, 2h38m to fetch). The superseded
+Curated-100 values are kept beside them under a `_curated` suffix.
+
+This block said the opposite until 2026-09-09 - that the numbers "currently reflect the
+100-repository `small` sample, not the paper's eventual full 7,423-repository corpus" - which was
+already false when the full run landed two days earlier, and which `main.tex` had copied into its
+own header comment and into Section 3.2's "In the Curated dataset". All three are fixed. Check
+`\NumRepos` in `plots/variables_empirical.tex` before describing the scope again.
 
 **The ground-truth corpus block was refreshed on 2026-09-05** to 597 fixtures (598 directories, 597
 of them carrying a `human_mapping.json`), moving `NumFixtures`, the node-accuracy totals, and the
