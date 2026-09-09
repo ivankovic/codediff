@@ -83,7 +83,16 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
-from _common import GRIDLINE, INK_MUTED, INK_PRIMARY, INK_SECONDARY, SURFACE, read_rows_with_fields
+from _common import (
+    GRIDLINE,
+    INK_MUTED,
+    INK_PRIMARY,
+    INK_SECONDARY,
+    SURFACE,
+    fixture_datasets,
+    in_paper_scope,
+    read_rows_with_fields,
+)
 from matplotlib import ticker
 
 # Chart chrome, from the dataviz skill's reference palette (light mode) - same tokens
@@ -878,11 +887,18 @@ PAPER_SPEED_STEMS = PAPER_MACRO_STEMS | {
 
 def read_accuracy_rows(csv_path: Path) -> list[dict] | None:
     """`benchmark_accuracy.csv`'s rows, or None if it isn't on disk. Optional by design - see this
-    module's doc comment for why the speed half must not depend on the accuracy file existing."""
+    module's doc comment for why the speed half must not depend on the accuracy file existing.
+
+    Scoped to [`_common.PAPER_DATASETS`], like every other report: `benchmark_other` writes the
+    whole fixture corpus (PROVENANCE.md's "refresh the whole file, never append" is about the
+    producer, and stays true), and the paper reports the sampled datasets alone. Each tool keeps
+    its own denominator through the per-tool `*Fixtures` macros, so a tool's coverage gaps survive
+    this filter rather than being averaged away by it."""
     if not csv_path.exists():
         return None
+    datasets = fixture_datasets()
     with csv_path.open() as f:
-        return list(csv.DictReader(f))
+        return [r for r in csv.DictReader(f) if in_paper_scope(r["solution"], datasets)]
 
 
 def accuracy_totals(rows: list[dict], tool: str) -> tuple[int, int, int] | None:
@@ -1040,7 +1056,11 @@ if __name__ == "__main__":
         raise SystemExit(1)
 
     fieldnames, rows = read_rows_with_fields(csv_path)
-    print(f"Loaded {csv_path}: {len(rows)} fixtures")
+    # Same scoping as `read_accuracy_rows`, for the same reason: the timing CSV is corpus-wide and
+    # the paper's speed table has to describe the same population as its accuracy table.
+    datasets = fixture_datasets()
+    rows = [r for r in rows if in_paper_scope(r["solution"], datasets)]
+    print(f"Loaded {csv_path}: {len(rows)} fixtures in the paper's scope")
 
     tools = tool_names(fieldnames)
     print(f"External tools found: {', '.join(tools)}")

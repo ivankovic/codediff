@@ -75,9 +75,16 @@ Same corpus and the same external-tool binaries, but accuracy only - no timing, 
 `benchmark_other.csv` this file is machine-independent and unaffected by load. Produced by
 `cd research && make measure-tools-accuracy` (`benchmark_other --accuracy-csv`).
 
-One row per fixture that has a `human_mapping.json`. Columns: `sample.csv` provenance
+One row per fixture that has a `human_mapping.json` - the **whole** corpus, `handmade` included,
+because the producer is corpus-wide by design ("refresh the whole file, never append", above).
+Since 2026-09-09 the paper reports the sampled datasets alone, so the *readers*
+(`benchmark_other_report.read_accuracy_rows`, `paper_variables.common_subset_concentration`) filter
+by `_common.PAPER_DATASETS` - do not push that scoping into the producer, or the file stops being
+the corpus-wide record the product side wants.
+
+Columns: `sample.csv` provenance
 (`language`, `repository`, `commit`, `path` - blank for the handmade fixtures that were never
-promoted from a sample, 60 of 432 as of 2026-08-19), the denominators `total_lines`,
+promoted from a sample, 60 of 835 as of 2026-09-09), the denominators `total_lines`,
 `total_nodes`, `total_leaf_nodes`, `total_visible_nodes`, and per tool a `_line_mismatches`,
 `_node_mismatches`, `_leaf_node_mismatches`, `_visible_node_mismatches` and `_status` column.
 Join to `src/test/data/sample.csv` on `solution == sample.csv:promoted_to`.
@@ -150,9 +157,27 @@ never a 0, which would read as a perfect score); `error` = the tool was expected
 language and failed; `line_only` = the node columns of a tool with no sub-line output at all (Unix
 diff and the four git algorithms - *not* BDiff or `nvim -d`, see above).
 
-**Tool versions are not recorded per row - record them here on every refresh.** The GumTree build
-in use is **4.0.0-beta8**, at `/var/tmp/tools/gumtree-4.0.0-beta8`, which is what the
-paper's comparison section claims. Re-verified 2026-08-24 by running `gumtree list GENERATORS`
+**Tool versions are not recorded per row - record them here on every refresh.**
+
+Refreshed **2026-09-09**, both CSVs, over 835 fixtures (775 of them in the paper's scope). Every
+binary verified by running it, not by reading a path:
+
+| tool | version | path |
+| --- | --- | --- |
+| GumTree | 4.0.0-beta8 | `/var/tmp/tools/gumtree-4.0.0-beta8/bin/gumtree` (`GUMTREE_BIN`) |
+| difftastic | 0.70.0 | `/var/tmp/tools/bin/difft` (`DIFFT_BIN`) |
+| diffsitter | 0.9.0 | `/var/tmp/tools/bin/diffsitter` (`DIFFSITTER_BIN`) |
+| Neovim | 0.10.2 | `/var/tmp/tools/nvim-linux64/bin/nvim` (`NVIM_BIN`) |
+| BDiff | 0.1.0 | `/var/tmp/bdiff-install/venv/bin/python` (`BDIFF_PYTHON`) |
+
+`NVIM_BIN` is the fifth variable and was undocumented here until 2026-09-09. **Set all five before
+either run.** A tool whose variable is unset is skipped with a note and exit 0, so a refresh done
+without them produces a clean-looking CSV missing most of the nine tools, and `timing-report` will
+regenerate the paper's macros from it. Smoke-test first with `--fixtures a,b` on a language
+GumTree supports and check every `_status` reads `ok` or `line_only`.
+
+The GumTree build in use is **4.0.0-beta8**, at `/var/tmp/tools/gumtree-4.0.0-beta8`, which is what
+the paper's comparison section claims. Re-verified 2026-08-24 by running `gumtree list GENERATORS`
 against that path: `cpp-treesitter-ng` and `tsx-treesitter-ng` present, no JSON generator. This resolves the version question that stood open here: the
 beta4 tree under `/var/tmp/tools/` that earlier measurements ran against **is back on disk** at
 `/var/tmp/tools/gumtree-4.0.0-beta4` (re-checked 2026-08-24; an earlier revision of this file said

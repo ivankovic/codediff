@@ -421,15 +421,19 @@ paper-variables:
 
 # Rebuilds the paper PDF from the figures and macros already in plots/.
 #
-# Deliberately does NOT depend on timing-report: that step regenerates the comparison
-# charts and variance table from whatever data/comparison/benchmark_other.csv currently holds,
-# and that CSV (156 fixtures) has grown past the corpus every AUTHORED number in the paper was
-# measured on (98 fixtures - see paper_variables.py's COMPARISON block and the TODO in main.tex).
-# A routine PDF rebuild must not silently swap 156-fixture charts into a paper whose prose says
-# 98 - exactly that happened live on 2026-08-19, caught only because the regenerated variance
-# table's n column changed. When the evaluation is deliberately refreshed, run
-# `make measure-tools-timing` (or timing-report), update the authored blocks in
-# paper_variables.py to match, and re-render - together, never piecemeal.
+# Deliberately does NOT depend on timing-report: that step regenerates the comparison charts,
+# the variance table and `plots/variables_comparison.tex` from whatever
+# data/comparison/benchmark_other.csv and benchmark_accuracy.csv currently hold. A routine PDF
+# rebuild must not silently swap in charts measured on a different corpus than the prose was
+# written against - exactly that happened live on 2026-08-19, caught only because the regenerated
+# variance table's n column changed.
+#
+# The per-tool numbers stopped being hand-transcribed on 2026-08-20 (they are generated now), so
+# a refresh is `make measure-tools-accuracy` and then `make measure-tools-timing` - **in that
+# order**, because the second ends with `timing-report`, which reads both CSVs. What still has to
+# be re-read by a human afterwards is the *prose*: it makes ordering claims ("no AST-aware tool
+# beats plain diff", "fastest of the three at the median") that the macros cannot check. The
+# 2026-09-09 refresh reversed three of them. Together, never piecemeal.
 #
 # Also does not regenerate plots/tips.png, which needs the full repository-fetch pipeline
 # (`make full`). Needs a LaTeX toolchain with the acmart class and cm-super (see

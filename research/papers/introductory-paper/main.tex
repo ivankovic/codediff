@@ -96,7 +96,7 @@ decisions no reader can see; and where the rendering was painted by hand, \Paint
 of changes admit two equally correct renderings of one settled mapping. \emph{Implementation.}
 Against the same ground truth, nine established tools---Unix \texttt{diff}, four \texttt{git}
 algorithms, BDiff, Neovim, GumTree, difftastic and diffsitter---show line-level mismatch rates
-from \GitMyersLineRate{}\% to \GumTreeLineRate{}\%, with no AST-aware tool among them beating
+from \NvimDiffLineRate{}\% to \GumTreeLineRate{}\%, with no AST-aware tool among them beating
 plain line-based \texttt{diff}.
 
 Finally, as a tool contribution, we present \textsc{CodeDiff}, a tree-sitter-based diffing tool
@@ -686,7 +686,7 @@ languages every tool supports.
 
 \begin{resultbox}{RA4.1 (Tool accuracy)}
 Across the nine tools (Table~\ref{tab:accuracy-vs-others}), line-level mismatch rates against the
-human mapping range from \GitMyersLineRate{}\% (\texttt{git diff}, Myers) to
+human mapping range from \NvimDiffLineRate{}\% (\texttt{nvim -d}) to
 \GumTreeLineRate{}\% (GumTree). Every tool agrees with the human mapping on the great majority of
 lines, so what separates them is the small, structurally interesting remainder---and on that
 remainder no AST-aware tool beats plain line-based \texttt{diff}, on either basis. The choice of
@@ -922,16 +922,17 @@ the headline figure is not being flattered by nodes no reviewer ever sees.
 Scored on the same line-level basis as the nine tools of Table~\ref{tab:accuracy-vs-others},
 \textsc{CodeDiff} marks \CodeDiffLineMismatches{} lines differently from the human mapping over
 the same \CodeDiffFixtures{} fixtures, a rate of \CodeDiffLineRate{}\%, below every tool in that
-table on its own applicable subset. On the \CommonFixtures{}-fixture subset every tool scored, its
-rate is \CommonCodeDiffLineRate{}\%, which places it above the line-based tools
-(\CommonGitMyersLineRate{}\% for \texttt{git}) and below difftastic and GumTree. We report both
-rather than choose, and the reason they disagree is worth stating, because it is a property of the
-metric rather than of the subset's language mix. A pooled line rate weights a fixture by its
-length, and on this subset \textsc{CodeDiff}'s errors are extremely concentrated:
-\CommonTopK{} fixtures hold \CommonTopKMismatches{} of its \CommonCodeDiffMismatches{} mismatched
-lines, \CommonTopKSharePct{}\% of them on \CommonTopKLinesPct{}\% of the lines. Set those aside and
-the remaining \CommonExTopKFixtures{} fixtures give \CommonExTopKCodeDiffRate{}\% against
-\texttt{git}'s \CommonExTopKGitMyersRate{}\%. The per-fixture reading does not reorder at all:
+table on its own applicable subset. Holding the fixture set fixed does not change that: on the
+\CommonFixtures{}-fixture subset every tool scored, its rate is \CommonCodeDiffLineRate{}\%,
+against \CommonGitMyersLineRate{}\% for the best of the line-based tools and
+\CommonDifftasticLineRate{}\% and \CommonGumTreeLineRate{}\% for difftastic and GumTree. The
+pooled and per-fixture readings agree, which is worth checking rather than assuming: a pooled line
+rate weights a fixture by its length, so a handful of long fixtures can decide it, and
+\textsc{CodeDiff}'s errors are extremely concentrated. \CommonTopK{} fixtures
+hold \CommonTopKMismatches{} of its \CommonCodeDiffMismatches{} mismatched lines,
+\CommonTopKSharePct{}\% of them on \CommonTopKLinesPct{}\% of the lines. Set those aside and the
+remaining \CommonExTopKFixtures{} fixtures give \CommonExTopKCodeDiffRate{}\% against
+\texttt{git}'s \CommonExTopKGitMyersRate{}\%. Weighting every change equally instead:
 on the same subset \textsc{CodeDiff} matches the human mapping on every line in
 \CommonCodeDiffPerfect{} fixtures against \texttt{git}'s \CommonGitMyersPerfect{}, and is closer
 than \texttt{git} on \CommonCodeDiffBetter{} fixtures against \CommonCodeDiffWorse{} the other
@@ -946,20 +947,24 @@ functions, the RA1.2 pattern in its purest form. The other two are open, un-root
 this paragraph exactly as to the others: it is a line-level projection of a node mapping, scored
 against one of possibly several correct answers.
 
-\textbf{Speed.} Against the tools of Table~\ref{tab:speed-vs-others}, \textsc{CodeDiff} sits
-between the two other tree-sitter-based tools at the median, \SpeedCodeDiffPFifty{}\,ms against
-diffsitter's \SpeedDiffsitterPFifty{}\,ms and difftastic's \SpeedDifftasticPFifty{}\,ms. Its figure
+\textbf{Speed.} Against the tools of Table~\ref{tab:speed-vs-others}, \textsc{CodeDiff} is the
+fastest of the three tree-sitter-based tools at the median, \SpeedCodeDiffPFifty{}\,ms against
+diffsitter's \SpeedDiffsitterPFifty{}\,ms and difftastic's \SpeedDifftasticPFifty{}\,ms---and
+ahead of the line-based tools at that percentile too, though the asymmetry stated below is large
+enough at this scale that we do not read the latter as a result. Its figure
 includes parsing, so that it measures the same span as the external tools, each of which is timed
 as a whole process---temporary file, process start, its own parse and diff, and reading its output
 back. One asymmetry remains in \textsc{CodeDiff}'s favour and we state it rather than carry it
 silently: measured in-process, it pays no process-startup cost, which every external tool here
-pays in full. That ordering does not hold across the distribution either. diffsitter, whose
+pays in full. That ordering does not hold across the distribution. diffsitter, whose
 narrower hand-picked grammar set does markedly less work, overtakes it at the 90th percentile
-(\SpeedDiffsitterPNinety{}\,ms against \SpeedCodeDiffPNinety{}\,ms) and is an order of magnitude
-ahead at the 99th (\SpeedDiffsitterPNinetyNine{}\,ms against \SpeedCodeDiffPNinetyNine{}\,ms);
-difftastic's tail is heavier still in aggregate cost and essentially ties \textsc{CodeDiff} at the
-99th percentile. The line-based tools remain fastest at every percentile, since they never parse
-or compare tree structure. \textsc{CodeDiff}'s tail is heavy, and the design above explains why:
+(\SpeedDiffsitterPNinety{}\,ms against \SpeedCodeDiffPNinety{}\,ms) and stays roughly twice as
+fast at the 99th (\SpeedDiffsitterPNinetyNine{}\,ms against \SpeedCodeDiffPNinetyNine{}\,ms);
+difftastic, slower at every percentile below, is the one whose tail
+\textsc{CodeDiff} now clears (\SpeedDifftasticPNinetyNine{}\,ms against
+\SpeedCodeDiffPNinetyNine{}\,ms). The line-based tools are fastest from the 90th percentile
+upward, since they never parse or compare tree structure.
+\textsc{CodeDiff}'s tail is heavy, and the design above explains why:
 the phases that resolve the common case cheaply do nothing for a large, genuinely dissimilar
 residual, which is exactly what the slowest fixtures in this corpus are.
 

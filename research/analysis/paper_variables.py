@@ -659,8 +659,12 @@ def common_subset_concentration(research_dir):
     path = os.path.join(research_dir, "data", "comparison", "benchmark_accuracy.csv")
     if not os.path.exists(path):
         return {}
+    # Scoped to `PAPER_DATASETS` like `cost_preference` above and like
+    # `benchmark_other_report.read_accuracy_rows`, which derives the COMPARISON block from this
+    # same file: the common subset these macros explain has to be the one the paper's table shows.
+    datasets = fixture_datasets()
     with open(path, newline="") as f:
-        rows = list(csv.DictReader(f))
+        rows = [r for r in csv.DictReader(f) if in_paper_scope(r["solution"], datasets)]
     # "line_only" is a scored status, not a failure - see benchmark_other_report.py::common_subset.
     scored = ("ok", "line_only")
     common = [r for r in rows if all(r[f"{t}_status"] in scored for t in COMMON_SUBSET_TOOLS)]
