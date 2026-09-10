@@ -48,6 +48,24 @@
 //! split `headless.rs` renders as two separate blocks, just serialized instead of printed. Rows
 //! and columns are 0-indexed, matching `diff::text_range::TextRange`'s own convention.
 //!
+//! **Columns are byte offsets within their row, not character or code-unit offsets.** That is
+//! `SourceColumn`'s documented meaning throughout this crate (see `diff::text_range`) and it is
+//! what tree-sitter's own `Point::column` reports, so it is the right thing to serialize - but it
+//! is the single most likely thing for an integration to get wrong, because it is invisible until
+//! a line contains a non-ASCII character and then every range on that line lands in the wrong
+//! place. Editors differ on what they want:
+//!
+//! * **Neovim** takes byte columns directly (`nvim_buf_add_highlight`, extmarks). No conversion.
+//! * **VS Code / LSP** want UTF-16 code units in `Position.character`. Convert per line, e.g.
+//!   `Buffer.from(line).subarray(0, byteColumn).toString('utf8').length` for UTF-16-safe JS
+//!   string indices.
+//! * **Anything using character offsets** (Python `str`, Go runes) must decode the row's bytes up
+//!   to the column and count from there.
+//!
+//! Deliberately not offered as a flag: emitting a second coordinate space would mean this file
+//! could disagree with itself, and every consumer already has the line's text (see the note on
+//! not embedding file contents, below) so the conversion is local and cheap.
+//!
 //! `summary` is the diff's overall shape (see `JsonDiffSummary`/`diff::text::DiffSummary`) -
 //! `no_changes`, `new_file`, `deleted_file`, `whitespace_only`, `comment_only`, or
 //! `refactor_moved_only` - omitted entirely for the ordinary case of a genuine mix of edits that

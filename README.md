@@ -23,7 +23,31 @@ The first `cargo install` takes a few minutes, because of this and the `lto = "f
 profile.
 
 Pre-built binaries for Linux, macOS (Intel and Apple Silicon), and Windows are attached to every
-[GitHub release](https://github.com/ivankovic/codediff/releases/latest).
+[GitHub release](https://github.com/ivankovic/codediff/releases/latest), along with an unofficial
+`.deb` for Debian and Ubuntu, a `codediff-completions-and-man.tar.gz` holding the man page and
+shell completions, and a `SHA256SUMS.txt` covering all of them.
+
+On NixOS, or anywhere with Nix installed, no installation step is needed at all:
+
+```
+nix run github:ivankovic/codediff
+```
+
+Recipes for Arch (AUR), Gentoo, Debian and Nix live in [`packaging/`](packaging/), together with
+what a VS Code extension would take. None of them are submitted to their respective repositories
+yet.
+
+## Shell completions and the man page
+
+```
+codediff util completions bash   # also: zsh, fish, powershell, elvish
+codediff util man
+```
+
+Both print to stdout, generated from the same definition as `--help`, so they cannot drift from the
+real flag list. Every package under `packaging/` installs them for you; if you installed a
+pre-built binary by hand, redirect them wherever your shell expects — or `source <(codediff util
+completions bash)` for the current session.
 
 The git-history analysis tools in `src/bin/` sit behind an off-by-default `stats` feature.
 `cargo install` does not install these tools. They matter only if you build from a checkout. The
@@ -34,6 +58,17 @@ dependencies. The diffing tool itself does not need these dependencies. Build th
 ## Editor integration
 
 For Neovim, see [codediff.nvim](https://github.com/ivankovic/codediff.nvim).
+
+Editors integrate through `codediff --mode json BEFORE AFTER`, which prints one JSON object
+describing each side's changed ranges, their operation (insert/delete/update/move), a move's real
+counterpart range in the other file, and the nearest enclosing declaration - enough to place
+highlights on buffers the editor already has open, with no ANSI parsing. The schema is documented
+at the top of `src/tui/json_output.rs`. **Its columns are byte offsets**, which is what tree-sitter
+reports and what Neovim consumes directly; an editor using UTF-16 (VS Code) or character offsets
+must convert per line.
+
+There is no VS Code extension yet. [`packaging/vscode.md`](packaging/vscode.md) writes up what one
+would need.
 
 # Using CodeDiff
 

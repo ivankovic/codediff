@@ -105,6 +105,12 @@ jobs:
           args: format --check
           src: research scripts assets
 
+      # The Gentoo ebuild names all ~293 dependency crates, generated from Cargo.lock. A lock
+      # change that does not reach the ebuild produces a package that fails to build for users
+      # while looking perfectly fine in review, so it is checked rather than remembered.
+      - name: Gentoo CRATES list is in sync with Cargo.lock
+        run: python3 scripts/generate_gentoo_crates.py --check
+
       # The Python unit tests, in research/'s uv environment (pytest is a dev dependency there).
       - uses: astral-sh/setup-uv@v6
 

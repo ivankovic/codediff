@@ -299,6 +299,19 @@ CRATES="
 	zmij@1.0.23
 "
 
+RUST_MIN_VER="1.85.0"
+
+# bash-completion-r1 for `newbashcomp` in src_install; without it that call is an unbound command
+# and the install phase dies.
+inherit bash-completion-r1 cargo
+
+DESCRIPTION="Fast, robust, syntax-aware code diffing using tree-sitter ASTs"
+HOMEPAGE="https://github.com/ivankovic/codediff"
+SRC_URI="
+	https://github.com/ivankovic/codediff/archive/refs/tags/v${PV}.tar.gz -> ${P}.tar.gz
+	${CARGO_CRATE_URIS}
+"
+
 # The ebuild's own license is AGPL-3+; the trailing list covers the ~294 vendored crates, whose
 # licenses cargo.eclass expects to be enumerated here. Regenerate with `pycargoebuild` if the
 # dependency set changes - the list below was read off the crates in Cargo.lock and is the usual
@@ -334,7 +347,10 @@ src_install() {
 	# Generated from the same clap definition as --help, by the binary that was just built. Native
 	# build only; if this package ever grows a cross-compile path, these have to move to a
 	# host-built artifact instead.
-	local codediff="${S}/target/$(usex debug debug release)/codediff"
+	# Hardcoded rather than $(usex debug ...): that idiom needs a `debug` USE flag in IUSE, and
+	# this package deliberately offers no debug build - the release profile's lto/codegen-units
+	# settings are the point of it (see Cargo.toml).
+	local codediff="${S}/target/release/codediff"
 	"${codediff}" util man > "${T}/${PN}.1" || die "failed to generate man page"
 	doman "${T}/${PN}.1"
 

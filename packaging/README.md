@@ -11,6 +11,7 @@ all live outside this repository.
 | Gentoo | `gentoo/dev-util/codediff/` | ready for an overlay; needs a `Manifest` |
 | Debian/Ubuntu | `[package.metadata.deb]` in `../Cargo.toml` | built by CI, attached to each release |
 | Nix / NixOS | `nix/package.nix`, `../flake.nix` | works today via `nix run` |
+| VS Code | [`vscode.md`](vscode.md) | requirements written up; extension not built |
 
 ## The one thing you cannot skip: checksums
 
@@ -61,8 +62,8 @@ release profile sets `lto = "fat"` with `codegen-units = 1`. Minutes, not second
 `CRATES=` lists all 293 dependency crates and is **generated, not edited**:
 
 ```sh
-python3 packaging/gentoo/generate-crates.py            # rewrite the block
-python3 packaging/gentoo/generate-crates.py --check    # fail if stale (for CI)
+python3 scripts/generate_gentoo_crates.py            # rewrite the block
+python3 scripts/generate_gentoo_crates.py --check    # fail if stale (for CI)
 ```
 
 Run this after any `Cargo.lock` change. A stale list produces a package that fails to build for
@@ -108,7 +109,7 @@ and `cargoLock.lockFile` for a `cargoHash`, since nixpkgs does not carry the loc
 ## Release checklist
 
 1. Bump `version` in `Cargo.toml`.
-2. `python3 packaging/gentoo/generate-crates.py` and rename the ebuild to match the new version.
+2. `python3 scripts/generate_gentoo_crates.py` and rename the ebuild to match the new version.
 3. Update `pkgver` in `aur/PKGBUILD` and the fallback `version` in `nix/package.nix`.
 4. `make deploy` — publishes to crates.io, tags, and triggers the release workflow.
 5. Read the new `SHA256SUMS.txt` off the release and fill in `sha256sums` / the Gentoo `Manifest`.
