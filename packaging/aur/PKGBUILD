@@ -13,9 +13,12 @@ makedepends=('cargo')
 # tests/, src/bin/ and the fixture corpus (see Cargo.toml's `exclude`), so `check()` would have
 # nothing to run. The tradeoff is that this download also carries research/ and the test corpus.
 source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
-# Placeholder. Fill in with `updpkgsums` in this directory, or read the value out of the
-# GitHub release's SHA256SUMS.txt asset. Do not guess it.
-sha256sums=('SKIP')
+# sha256 of the v0.0.13 tag tarball, computed from the downloaded artifact on 2026-09-10 and
+# confirmed identical across two independent fetches. Re-run `updpkgsums` in this directory on
+# every version bump; do not guess it, and do not read it from the release's SHA256SUMS.txt -
+# that asset covers the *release assets* (the prebuilt binaries, the .deb, the completions
+# tarball), and GitHub's auto-generated source tarball is not one of them.
+sha256sums=('b1fbed505e1e3acb604f6483d81ebe3cc5ce26312cd145f3962b9710135801d8')
 
 prepare() {
 	cd "$pkgname-$pkgver"

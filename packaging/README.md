@@ -7,31 +7,44 @@ all live outside this repository.
 
 | Target | Files | Status |
 | --- | --- | --- |
-| Arch (AUR) | `aur/PKGBUILD` | ready to submit; needs `sha256sums` |
-| Gentoo | `gentoo/dev-util/codediff/` | ready for an overlay; needs a `Manifest` |
+| Arch (AUR) | `aur/PKGBUILD` | ready to submit |
+| Gentoo | `gentoo/dev-util/codediff/` | ready for an overlay |
 | Debian/Ubuntu | `[package.metadata.deb]` in `../Cargo.toml` | built by CI, attached to each release |
 | Nix / NixOS | `nix/package.nix`, `../flake.nix` | works today via `nix run` |
 | VS Code | [`vscode.md`](vscode.md) | requirements written up; extension not built |
 
 ## The one thing you cannot skip: checksums
 
-Three of the four recipes need a hash of the release tarball, and **none of the placeholders in
-this directory are real**:
+Real for v0.0.13, and **every one of them has to be regenerated on the next version bump**:
 
-* `aur/PKGBUILD` ships `sha256sums=('SKIP')`
-* the Gentoo package has no `Manifest` at all
-* Nix needs a `hash =` only if you switch `package.nix` to `fetchFromGitHub`
+* `aur/PKGBUILD` carries the sha256 of the v0.0.13 tag tarball
+* `gentoo/dev-util/codediff/Manifest` carries 294 `DIST` lines - the tag tarball plus all 293
+  vendored crates, each with its size, BLAKE2B and SHA512
+* Nix needs a `hash =` only if you switch `package.nix` to `fetchFromGitHub`; as long as `src` is
+  a parameter and `cargoLock.lockFile` points at the in-tree lock, there is nothing to hash
 
-Every release publishes a `SHA256SUMS.txt` asset covering all of its artifacts (see the `checksums`
-job in `.github/workflows/release.yml`). Read the values from there, or regenerate locally:
+Regenerate with the real tools where you have them:
 
 ```sh
 cd packaging/aur && updpkgsums                      # rewrites sha256sums=() in place
-ebuild gentoo/dev-util/codediff/codediff-0.0.13.ebuild manifest
-nix-prefetch-url --unpack https://github.com/ivankovic/codediff/archive/refs/tags/v0.0.13.tar.gz
+ebuild gentoo/dev-util/codediff/codediff-<version>.ebuild manifest
+nix-prefetch-url --unpack https://github.com/ivankovic/codediff/archive/refs/tags/v<version>.tar.gz
 ```
 
+**Not from `SHA256SUMS.txt`.** That asset hashes the *release assets* - the prebuilt binaries, the
+`.deb`, the completions tarball - and GitHub's auto-generated source tarball is not one of them
+(see the `checksums` job in `.github/workflows/release.yml`, which hashes exactly what
+`gh release download` returns). The recipes here all build from the source tarball, so its hash
+has to come from the tarball itself.
+
 Do not hand-write a checksum. A wrong one looks correct until the moment somebody's build fails.
+
+Computing one from the downloaded artifact is not hand-writing it, and is what those tools do
+anyway - but check your work. The v0.0.13 values were produced without `updpkgsums`/`ebuild`
+available, so: the tarball was fetched twice and both fetches hashed identically, every crate file
+was verified against the sha256 `Cargo.lock` already records for it before being hashed, the
+ebuild's `CRATES` list was diffed against `Cargo.lock` (293 = 293, no drift), and the generated
+BLAKE2B/SHA512 digests were cross-checked against `b2sum` and `sha512sum`.
 
 ## Decisions that apply to every recipe
 
