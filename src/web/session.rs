@@ -238,6 +238,11 @@ impl Session {
         }
         let workspace = self.review_workspace.as_ref().expect("created just above");
         let (before, after) = workspace.materialize(root, target)?;
+        // Named by its repository path: the workspace path says nothing the reader can act on,
+        // and the diff engine's own "stream did not contain valid UTF-8" says even less.
+        if crate::code::is_binary_file(&before)? || crate::code::is_binary_file(&after)? {
+            anyhow::bail!("Binary file {} - nothing to show as text", target.file.path);
+        }
         Ok(self.begin_diff(before, after))
     }
 
@@ -744,6 +749,13 @@ mod tests {
             session.state().after.as_deref(),
             Some(job.after.to_str().unwrap())
         );
+
+        std::fs::write(root.join("a.rs"), [0xff, 0xfe, 0x00]).unwrap();
+        let err = session
+            .open_review_target(&review.root, &target)
+            .unwrap_err()
+            .to_string();
+        assert_eq!(err, "Binary file a.rs - nothing to show as text");
     }
 
     #[test]

@@ -582,14 +582,34 @@ impl App {
             self.review_workspace = Some(review::Workspace::new()?);
         }
         let workspace = self.review_workspace.as_ref().expect("created just above");
+        // The position is remembered even when the file cannot be shown: `]`/`[` must still be
+        // able to step past a binary to the next file of the set.
+        self.review_position = Some(position);
         match workspace.materialize(&root, &target) {
             Ok((before, after)) => {
+                // Named by its repository path, not the workspace's: that is the file the reader
+                // picked, and the temp path says nothing they can act on.
+                if Self::unshowable(&before)
+                    .or_else(|| Self::unshowable(&after))
+                    .is_some()
+                {
+                    self.last_error = Some(format!(
+                        "Binary file {} - nothing to show as text",
+                        target.file.path
+                    ));
+                    return Ok(());
+                }
+                let loaded = self
+                    .diff_viewer
+                    .set_before_file(before.clone())
+                    .and_then(|_| self.diff_viewer.set_after_file(after.clone()));
+                if let Err(err) = loaded {
+                    self.last_error = Some(format!("{err:#}"));
+                    return Ok(());
+                }
                 self.last_error = None;
                 self.before_path = Some(before.clone());
                 self.after_path = Some(after.clone());
-                self.diff_viewer.set_before_file(before.clone())?;
-                self.diff_viewer.set_after_file(after.clone())?;
-                self.review_position = Some(position);
                 self.action_tx.send(Action::StartDiff(before, after))?;
             }
             Err(err) => self.last_error = Some(format!("{err:#}")),
@@ -909,18 +929,42 @@ impl App {
     }
 
     /// Load `path` into `panel`, remember it, and kick off the diff once both panels have a file.
+    /// Why a file cannot be shown, in the words `codediff a.pdf b.pdf` uses on stdout, or
+    /// `None` when it can. Checked *before* loading a panel: `CodeViewer::load_file` reads with
+    /// `read_to_string`, and letting its UTF-8 error propagate took the whole TUI down - "Failed
+    /// to read file ... stream did not contain valid UTF-8" - on the first PDF picked, whether
+    /// through `o` or the review picker.
+    fn unshowable(path: &Path) -> Option<String> {
+        match crate::code::is_binary_file(path) {
+            Ok(true) => Some(format!(
+                "Binary file {} - nothing to show as text",
+                path.display()
+            )),
+            Ok(false) => None,
+            Err(err) => Some(format!("{err:#}")),
+        }
+    }
+
     fn select_file_for_panel(&mut self, panel: Panel, path: PathBuf) -> Result<()> {
         // Anything opened by hand is no longer "file N of the staged set".
         self.review_position = None;
+        if let Some(problem) = Self::unshowable(&path) {
+            self.last_error = Some(problem);
+            return Ok(());
+        }
+        let loaded = match panel {
+            Panel::Before => self.diff_viewer.set_before_file(path.clone()),
+            Panel::After => self.diff_viewer.set_after_file(path.clone()),
+        };
+        // A read that fails for any other reason (permissions, a file that vanished between the
+        // listing and the pick) is a banner too, not an exit.
+        if let Err(err) = loaded {
+            self.last_error = Some(format!("{err:#}"));
+            return Ok(());
+        }
         match panel {
-            Panel::Before => {
-                self.before_path = Some(path.clone());
-                self.diff_viewer.set_before_file(path)?;
-            }
-            Panel::After => {
-                self.after_path = Some(path.clone());
-                self.diff_viewer.set_after_file(path)?;
-            }
+            Panel::Before => self.before_path = Some(path),
+            Panel::After => self.after_path = Some(path),
         }
 
         if let (Some(before), Some(after)) = (self.before_path.clone(), self.after_path.clone()) {
@@ -1939,6 +1983,82 @@ mod tests {
         assert!(
             app.review_position.is_none(),
             "a file opened by hand leaves review mode"
+        );
+        Ok(())
+    }
+
+    /// The report that started this: `codediff`, `G`, Enter on a modified PDF, and the TUI was
+    /// gone with "Failed to read file ... stream did not contain valid UTF-8".
+    #[test]
+    fn a_binary_reviewed_file_is_a_banner_not_a_crash_and_stepping_moves_past_it() -> Result<()> {
+        let dir = enter_sample_repository();
+        std::fs::write(dir.path().join("a.rs"), [0xff, 0xfe, 0x00, 0x41]).unwrap();
+        let mut app = App::new(4.0, 60.0)?;
+        app.open_review();
+        let review = app.review_dialog.as_ref().unwrap().review().clone();
+        assert_eq!(review.working_tree[0].path, "a.rs");
+        let target = ReviewTarget {
+            set: ChangeSet::WorkingTree,
+            file: review.working_tree[0].clone(),
+        };
+        app.handle_review_file_selected(target, 0)?;
+        assert_eq!(app.screen, AppScreen::Viewer);
+        assert_eq!(
+            app.last_error.as_deref(),
+            Some("Binary file a.rs - nothing to show as text")
+        );
+        assert!(
+            app.before_path.is_none(),
+            "nothing was loaded into the panels"
+        );
+        assert!(app.action_rx.try_recv().is_err(), "no diff was started");
+        assert_eq!(
+            app.review_position.as_ref().unwrap().index,
+            0,
+            "but the position is kept"
+        );
+
+        app.step_review_file(1)?;
+        assert_eq!(app.review_position.as_ref().unwrap().index, 1);
+        assert_eq!(
+            app.last_error, None,
+            "the next file opens normally and clears the banner"
+        );
+        assert!(app.after_path.as_ref().unwrap().ends_with("b.rs"));
+        assert!(matches!(
+            app.action_rx.try_recv(),
+            Ok(Action::StartDiff(_, _))
+        ));
+        Ok(())
+    }
+
+    /// The same crash through `o`: the file dialog never checked what it was handing over.
+    #[test]
+    fn picking_a_binary_file_by_hand_is_a_banner_not_a_crash() -> Result<()> {
+        let mut app = App::new(4.0, 60.0)?;
+        let mut binary = tempfile::Builder::new().suffix(".pdf").tempfile()?;
+        std::io::Write::write_all(&mut binary, &[0x25, 0x50, 0x44, 0x46, 0xff, 0xfe])?;
+        app.select_file_for_panel(Panel::Before, binary.path().to_path_buf())?;
+        assert!(
+            app.last_error
+                .as_deref()
+                .unwrap()
+                .starts_with("Binary file ")
+        );
+        assert!(app.before_path.is_none());
+
+        let missing = std::env::temp_dir().join("codediff-no-such-file-ever.rs");
+        app.select_file_for_panel(Panel::After, missing)?;
+        assert!(
+            app.last_error
+                .as_deref()
+                .unwrap()
+                .contains("Failed to read file")
+        );
+        assert!(app.after_path.is_none());
+        assert!(
+            app.action_rx.try_recv().is_err(),
+            "no diff was started for either"
         );
         Ok(())
     }
