@@ -19,6 +19,12 @@ jobs:
         include:
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
+          # The only target here that needs a cross toolchain installed: the macOS pair cross-
+          # compiles too, but Xcode ships both slices. Added so the VS Code extension can bundle a
+          # binary for linux-arm64 rather than leaving those users to install one by hand.
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-latest
+            cross: aarch64-linux-gnu
           - target: x86_64-apple-darwin
             os: macos-latest
           - target: aarch64-apple-darwin
@@ -36,10 +42,32 @@ jobs:
         with:
           key: release-${{ matrix.target }}
 
+      # Both variables are needed, and for different consumers: cargo uses the LINKER to link the
+      # Rust code, while the `cc` crate uses CC to compile the 24 bundled tree-sitter grammars,
+      # which are C. Setting only the linker produces host-architecture objects and a link failure
+      # that reads as if the toolchain were missing.
+      - name: Install cross toolchain
+        if: matrix.cross
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-${{ matrix.cross }}
+          echo "CARGO_TARGET_$(echo ${{ matrix.target }} | tr 'a-z-' 'A-Z_')_LINKER=${{ matrix.cross }}-gcc" >> "$GITHUB_ENV"
+          echo "CC_$(echo ${{ matrix.target }} | tr '-' '_')=${{ matrix.cross }}-gcc" >> "$GITHUB_ENV"
+
       # Default features (`tui`) only - this is the `codediff` product binary, not the
       # test-fixtures/stats-gated dev tools in src/bin/.
       - name: Build
         run: cargo build --release --target ${{ matrix.target }} --bin codediff
+
+      # A cross-compiled binary cannot be run here to check it, so check what it *is*. A silent
+      # fallback to the host compiler would otherwise ship an x86-64 binary under an arm64 name,
+      # and the first sign would be an exec-format error on a user's machine.
+      - name: Verify architecture
+        if: matrix.cross
+        run: |
+          file target/${{ matrix.target }}/release/codediff
+          file target/${{ matrix.target }}/release/codediff | grep -q 'ARM aarch64' \
+            || { echo "::error::built binary is not aarch64"; exit 1; }
 
       # Deliberately not generated per-target here: `codediff util man`/`util completions` need to
       # *run* the binary, and one of these four targets is always cross-compiled (macos-latest is
