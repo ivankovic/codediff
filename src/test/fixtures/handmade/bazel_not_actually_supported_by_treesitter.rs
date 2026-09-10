@@ -20,9 +20,9 @@
 //! fallback diff (`plain_text_line_diff`), and that is what the `painting()` test
 //! below is graded against - see `PaintingDiff::PlainText`.
 
-use anyhow::Result;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
+use anyhow::Result;
 
 #[test]
 fn painting() -> Result<()> {

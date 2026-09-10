@@ -42,6 +42,17 @@ codegen-units = 1
 [dependencies]
 anyhow = "1.0.100"
 clap = { version = "4.5.51", features = ["derive"] }
+# Both generate packaging artifacts (shell completions, a man page) for `codediff util
+# completions`/`codediff util man`, and are used only by src/main.rs - so they ride the `tui`
+# feature alongside the rest of the product binary's deps rather than being unconditional, keeping
+# a `default-features = false` library consumer free of them.
+clap_complete = { version = "4.6.9", optional = true }
+# 0.2.x, not 0.3.x, deliberately. clap_mangen 0.3 requires clap >= 4.6.6; depending on it would
+# raise this crate's *effective* clap floor from the declared 4.5.51 to 4.6.6 without the manifest
+# ever saying so (cargo just unifies the two requirements silently). 0.2.33 accepts clap 4.0+, so
+# it imposes no floor of its own - a man-page generator is not a reason to constrain the CLI
+# framework every consumer of this crate resolves against.
+clap_mangen = { version = "0.2.33", optional = true }
 # TUI-only, but also used directly by src/bin/human_solver/'s own small debug UI - gated by the
 # `tui` feature (see [features] below), not unconditional: a pure library consumer of
 # `codediff::diff`/`codediff::code` has no use for it.
@@ -142,6 +153,8 @@ default = ["tui"]
 # uses tokio for concurrent I/O) - simpler to have every dev-tool feature imply `tui` than to track
 # exactly which of these 6 deps each individual bin happens to need.
 tui = [
+    "dep:clap_complete",
+    "dep:clap_mangen",
     "dep:ratatui",
     "dep:crossterm",
     "dep:tokio",

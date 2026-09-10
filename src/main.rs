@@ -45,6 +45,35 @@ enum Command {
         #[command(subcommand)]
         action: JjAction,
     },
+    /// Generate packaging artifacts (shell completions, man page).
+    ///
+    /// Nested under `util` rather than sitting at the top level as `completions`/`man` for the
+    /// reason `Command`'s own doc comment gives: every top-level subcommand name becomes a
+    /// reserved word for the first positional path. One new reserved word (`util`, not a
+    /// plausible name for a file someone diffs) costs less than two, and `man` in particular is
+    /// short enough to be a real filename. Same shape as `jj util completion`.
+    Util {
+        #[command(subcommand)]
+        action: UtilAction,
+    },
+}
+
+#[derive(Subcommand)]
+enum UtilAction {
+    /// Print a shell completion script for SHELL on stdout.
+    ///
+    /// Written to stdout rather than installed anywhere: the four packaging recipes under
+    /// `packaging/` each redirect it to whatever path their distribution expects, and a user
+    /// without a package manager can `source <(codediff util completions bash)`.
+    Completions {
+        /// The shell to generate for.
+        shell: clap_complete::Shell,
+    },
+    /// Print a roff-formatted man page (section 1) on stdout.
+    ///
+    /// Generated from the same clap `Args` definition the `--help` output comes from, so it
+    /// cannot drift from the real flag list the way a hand-written `codediff.1` would.
+    Man,
 }
 
 #[derive(Subcommand)]
@@ -72,6 +101,20 @@ enum ColorChoice {
 
 #[derive(Parser)]
 #[command(
+    // Explicit, not derived from a doc comment on `Args`. `Args` has none, and clap's derive then
+    // reaches for the nearest preceding doc comment - which is `Command`'s long internal note
+    // about `git` becoming a reserved positional. That note was silently the entire NAME and
+    // DESCRIPTION of both `--help` and (once `util man` existed to reveal it) the man page.
+    about = "Fast, robust, syntax-aware code diffing using tree-sitter ASTs",
+    long_about = "Fast, robust, syntax-aware code diffing.\n\n\
+        With no arguments, opens an interactive two-panel terminal UI. With BEFORE and AFTER \
+        file paths, diffs them directly - as the TUI, as plain text (--headless), or as a single \
+        JSON object (--mode json) for editor integrations. Also serves as a `git difftool` \
+        backend and a `jj` diff formatter; see `codediff git configure` and `codediff jj \
+        configure`.",
+    // Packagers and bug reports both need this, and it did not exist before: `codediff --version`
+    // failed with "unexpected argument". Sourced from CARGO_PKG_VERSION by clap's derive.
+    version,
     after_help = "Exit codes: 0 on success, 2 on error. Pass --exit-code to additionally get \
     1 when the files differ (the diff(1) convention), which is off by default for the same \
     reason `git diff` defaults to 0: when a VCS drives codediff as a display tool, a non-zero \
@@ -393,6 +436,29 @@ fn run_binary(args: &Args, before: &std::path::Path, after: &std::path::Path) ->
     ))
 }
 
+/// Writes a shell completion script or a man page to stdout - see `UtilAction`.
+///
+/// Both are derived from the same `Args`/`Command` clap definition `--help` is, so neither can
+/// drift from the real flag list. Output goes to stdout so the caller decides the destination:
+/// the recipes under `packaging/` each redirect it to their distribution's own path.
+fn run_util(action: &UtilAction) -> Result<()> {
+    use clap::CommandFactory;
+
+    let mut command = Args::command();
+    match action {
+        UtilAction::Completions { shell } => {
+            // `bin_name` matters: clap otherwise names the script after the *crate*, which here
+            // happens to match, but would silently generate completions for the wrong word the
+            // moment the package and the binary stop sharing a name.
+            clap_complete::generate(*shell, &mut command, "codediff", &mut std::io::stdout());
+        }
+        UtilAction::Man => {
+            clap_mangen::Man::new(command).render(&mut std::io::stdout())?;
+        }
+    }
+    Ok(())
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let args = Args::parse();
@@ -409,6 +475,12 @@ async fn main() -> Result<()> {
     }) = &args.command
     {
         return jj_configure::run();
+    }
+
+    // Before `resolve_before_after` below, like the two configure wizards above: these generate
+    // packaging artifacts and take no BEFORE/AFTER pair at all.
+    if let Some(Command::Util { action }) = &args.command {
+        return run_util(action);
     }
 
     let before_after = resolve_before_after(&args.paths)?;
@@ -791,6 +863,47 @@ mod tests {
         assert_eq!(
             args.paths,
             vec![PathBuf::from("a.rs"), PathBuf::from("b.rs")]
+        );
+    }
+
+    /// The packaging recipes under `packaging/` all shell out to these two, so a rename or a
+    /// re-nesting here silently breaks every distribution package rather than failing a build.
+    #[test]
+    fn util_generates_completions_and_a_man_page() {
+        let args = Args::try_parse_from(["codediff", "util", "completions", "bash"]).unwrap();
+        assert!(matches!(
+            args.command,
+            Some(Command::Util {
+                action: UtilAction::Completions {
+                    shell: clap_complete::Shell::Bash
+                }
+            })
+        ));
+
+        let args = Args::try_parse_from(["codediff", "util", "man"]).unwrap();
+        assert!(matches!(
+            args.command,
+            Some(Command::Util {
+                action: UtilAction::Man
+            })
+        ));
+    }
+
+    /// `about`/`long_about`/`version` are set explicitly on `Args` because clap otherwise reaches
+    /// for `Command`'s doc comment - an internal note about reserved positionals - and puts it in
+    /// `--help`, `--version` and the generated man page's NAME line. Guards that regression.
+    #[test]
+    fn the_help_text_describes_codediff_rather_than_a_doc_comment() {
+        use clap::CommandFactory;
+
+        let about = Args::command().get_about().unwrap().to_string();
+        assert!(
+            about.starts_with("Fast, robust, syntax-aware code diffing"),
+            "{about}"
+        );
+        assert_eq!(
+            Args::command().get_version(),
+            Some(env!("CARGO_PKG_VERSION"))
         );
     }
 
