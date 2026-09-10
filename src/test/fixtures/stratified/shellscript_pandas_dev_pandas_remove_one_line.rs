@@ -18,19 +18,44 @@
 use anyhow::Result;
 
 use crate::test;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 
 #[test]
 fn mapping() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("shellscript-pandas-dev-pandas-remove-one-line")
+    // First baseline (2026-09-10), not a regression: this fixture was promoted with its human
+    // mapping already written, so the stub's generated 0/0 never reflected a measurement.
+    //
+    // One `-i "..." \` line removed from a long run of them. The file does not parse as shell, so
+    // every `-i` hangs flat off one `ERROR`/`command` as a byte-identical `word`, and only
+    // position says which one went. The human deletes `word:13`, the `-i` on the removed line,
+    // and maps `word:14` onto after `word:13` - keeping each surviving `-i` with the string it
+    // introduces. `APTED("large_flat_subtree")` deletes `word:14` instead and leaves `word:13`
+    // paired at its own index, so the deletion and one identical pair swap places. Both nodes are
+    // visible. The same off-by-one within a run of same-kind siblings as
+    // `xml-libreoffice-add-one-menu-item`. Lower both numbers when a fix lands.
+    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
+        "shellscript-pandas-dev-pandas-remove-one-line",
+        2,
+        2,
+    )
 }
 
 #[test]
 fn painting() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test, read the rate it
-    // reports for both modes, and record that instead.
-    assert_matches_human_painting_within_limit("shellscript-pandas-dev-pandas-remove-one-line", 100.0)
+    // measured 2026-09-10: minimal 35.043%, full 35.043%
+    // A third of the file, for a one-line change - distinct from the two mapping mismatches
+    // above, and much larger, because this part lives entirely in `diff::text`. The enclosing
+    // container's children are separated by `\` line continuations, which are *not* whitespace,
+    // so `own_content` sees the container's own gap text change and `classify_node` returns
+    // `OwnContentChanged` instead of `Descend`. The container has a gap between every pair of
+    // children, so `own_content_span` returns `None` (it only localizes a single contiguous gap)
+    // and `own_content_update_ranges` falls back to painting the whole container `Update`.
+    // Recorded 2026-09-10 as a measured gap, not accepted as correct - see TODO.md.
+    assert_matches_human_painting_within_limit(
+        "shellscript-pandas-dev-pandas-remove-one-line",
+        35.06,
+    )
 }
 
 #[test]

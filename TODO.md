@@ -1,3 +1,41 @@
+# Whole-container `Update` painting when children are separated by `\` line continuations - found 2026-09-10, not fixed
+
+Found while clamping the 40 stratified fixtures added in `c67ef2e6`. Four of them paint far more
+than they should, with an **exact** AST mapping in three of the four - so the gap is entirely in
+`diff::text`, not in the solver:
+
+| fixture | minimal | full | mapping mismatches |
+| --- | --- | --- | --- |
+| `vimscript-neovim-neovim-add-one-line-to-dict` | 48.305% | 48.305% | 0 |
+| `vimscript-neovim-neovim-add-one-dict-entry` | 47.820% | 47.820% | 0 |
+| `vimscript-neovim-neovim-add-one-dict-item` | 47.800% | 47.800% | 0 |
+| `shellscript-pandas-dev-pandas-remove-one-line` | 35.043% | 35.043% | 2 |
+
+All four are one added or removed line in a long `\`-continued list. `codediff --mode json` on
+`vimscript-neovim-neovim-add-one-dict-entry` reports a single `update` hunk spanning rows 86-1006
+of a 3347-line file for a one-line insertion, so this is user-visible in the product, not only in
+the grader.
+
+**Mechanism**, in `src/diff/text.rs`:
+
+1. The container (`dictionnary` in vim, `command` in the shell script) maps
+   `MatchButNotIdentical`, and its direct children are separated by `\` line continuations.
+2. `own_content` concatenates *every* gap between direct children. The `\` characters are not
+   whitespace, so adding one child changes that concatenation beyond whitespace, and
+   `classify_node` returns `OwnContentChanged` rather than `Descend`. Its doc comment states the
+   assumption this breaks: "containers rarely have real content outside their named children".
+3. `own_content_update_ranges` then asks `own_content_span` where to paint - but that function
+   returns `None` for any node whose own content is split across more than one gap, which every
+   multi-child container is. The `_` arm paints the whole container `Update`.
+
+So the container is selected for painting on the strength of *all* its gaps and then painted
+whole because there is more than one of them. The obvious candidate fix is to return
+`NodeChange::Descend` when `own_content_span` is `None`, letting the existing descent find the
+small real change - but that changes rendering corpus-wide, so it needs a full
+`painting_disagreement_report` before and after, and any fixture whose clamped limit rises is a
+regression. Not attempted here; the four limits above are clamped at today's measurements so the
+tests hold the line rather than block on a fix that does not exist yet.
+
 # Major pipeline rework (SHIPPED, 2026-07-17/18 - old pipeline fully retired)
 
 ## Locality tie-break in `solve_moved_subtrees` - tried 2026-07-22, reverted, zero effect; plus a cost-comparison analysis of the 800-mismatch corpus
