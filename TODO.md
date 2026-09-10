@@ -1,3 +1,33 @@
+# Paper review follow-ups, opened 2026-09-10 by the annotated PDF
+
+Two of the review's margin notes ask for measurement work, not text edits. Both are recorded here
+rather than answered in the paper, and the paper currently reflects that.
+
+## Time \textsc{CodeDiff} as a whole process, not in-process
+
+Written against Section 10's *Internal validity* paragraph, which admits the asymmetry and then
+declines to correct for it: \textsc{CodeDiff} is timed in-process while every external tool pays
+for a temporary file, process start, its own parse and diff, and reading its output back. Every
+speed comparison in Sections 7 and 8 inherits that gap, and it runs in \textsc{CodeDiff}'s favour.
+
+The fix is a harness path that invokes the shipped `codediff` binary per fixture the way
+`benchmark_other` invokes GumTree and difftastic, and a second set of percentiles reported beside
+the in-process ones - not a replacement for them, since the in-process figure is the one that
+answers "how fast is the matching itself".
+
+## Re-do the robustness evaluation
+
+The Robustness paragraph in Section 8 was deleted on review, with the note that the measure needs
+drastically improving. What it claimed: 925 sampled (repository, commit, file) pairs from Rust
+repositories, of which 377 were unavailable and 142 exceeded the node cap, leaving 406 completed
+with zero panics and zero timeouts. Fewer than half the sampled pairs were actually exercised, the
+sample was one language, and the pairs above the node cap - the ones the Robust target is about -
+were excluded from the evidence.
+
+Until this is redone, **Section 8 states a Robust design target and reports nothing against it.**
+Section 8's own summary sentence was narrowed to promise only the Fast target, so the paper is not
+claiming evidence it no longer has, but the asymmetry is visible and a reviewer will ask.
+
 # Whole-container `Update` painting for multi-gap containers - SHIPPED 2026-09-10
 
 Found while clamping the 40 stratified fixtures added in `c67ef2e6`, fixed the same day. A

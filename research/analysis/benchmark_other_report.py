@@ -466,8 +466,7 @@ def write_bucket_table(accuracy_rows, output_path, include_codediff):
     ]
     group_titles = {
         "line": r"    \multicolumn{6}{l}{\emph{Line granularity only}} " + row_end,
-        "subline": r"    \multicolumn{6}{l}{\emph{Reports sub-line detail (not exercised here --"
-        r" see Table~\ref{tab:agreement-buckets-node})}} " + row_end,
+        "subline": r"    \multicolumn{6}{l}{\emph{Reports sub-line detail}} " + row_end,
     }
     for group, members in GRANULARITY.items():
         lines.append(group_titles[group])
@@ -491,18 +490,24 @@ def write_bucket_table(accuracy_rows, output_path, include_codediff):
 
 
 def write_node_bucket_table(accuracy_rows, output_path):
-    r"""The same buckets as [`write_bucket_table`], but scored per *node* instead of per line.
+    r"""The node-granularity half of the combined table, kept as a separate file for reuse.
 
     Only the tools whose output carries sub-line structure appear: Unix diff and the four git
     algorithms report whole lines and nothing finer, so `benchmark_other.rs` records them as
-    `line_only` and they have no node column to bucket. That is exactly what makes this table worth
-    having next to the line one - it is the only place BDiff's `str_diff` character offsets and
-    Neovim's `DiffText` column runs are actually exercised, and both were scored `line_only` here
-    until 2026-08-24 despite emitting them all along.
+    `line_only` and they have no node column to bucket. That is exactly what makes the node
+    reading worth having beside the line one - it is the only place BDiff's `str_diff` character
+    offsets and Neovim's `DiffText` column runs are actually exercised, and both were scored
+    `line_only` here until 2026-08-24 despite emitting them all along.
 
     The node metric is a "did the tool consider this node's text changed" projection, one
     granularity below the line columns - *not* node-to-node mapping fidelity, which cannot be asked
     of a tool that parses its own tree. See `benchmark_other.rs`'s `--accuracy-csv` doc comment.
+
+    **The paper no longer \input{}s this file.** Since 2026-09-10 the line and node readings are
+    one table (see [`write_combined_bucket_table`]), because two floats with identical column
+    headers, one immediately after the other, read as a single table split by a page break rather
+    than as two measurements. This is still written so the node numbers stay available on their own
+    to anything that wants them without the line rows attached.
     """
     backslash = "\\"
     row_end = backslash * 2
@@ -526,8 +531,21 @@ def write_node_bucket_table(accuracy_rows, output_path):
         f"    Tool & $n$ & {header_labels} {row_end}",
         r"    \midrule",
     ]
-    for tool in GRANULARITY["subline"]:
-        result = bucket_counts(accuracy_rows, tool, metric="node")
+    lines += _bucket_rows(accuracy_rows, GRANULARITY["subline"], "node", include_codediff=True)
+    lines += [r"    \bottomrule", r"  \end{tabular}", r"\end{table*}"]
+    output_path.write_text("\n".join(lines) + "\n")
+    print(f"Table written to {output_path}")
+
+
+def _bucket_rows(accuracy_rows, tools, metric, include_codediff):
+    """The `Tool & n & <bucket cells>` body rows for one granularity, as LaTeX source lines."""
+    backslash = "\\"
+    row_end = backslash * 2
+    rows = []
+    for tool in tools:
+        if tool == "codediff" and not include_codediff:
+            continue
+        result = bucket_counts(accuracy_rows, tool, metric=metric)
         if result is None:
             continue
         scored, counts = result
@@ -535,7 +553,67 @@ def write_node_bucket_table(accuracy_rows, output_path):
             f"{count} ({100.0 * count / scored:.0f}" + backslash + "%)" for count in counts
         )
         name = latex_name(tool).replace("&", backslash + "&")
-        lines.append(f"    {name} & {scored} & {cells} {row_end}")
+        rows.append(f"    {name} & {scored} & {cells} {row_end}")
+    return rows
+
+
+def write_combined_bucket_table(accuracy_rows, output_path, include_codediff):
+    r"""The line and node readings as **one** table, which is what the paper \input{}s.
+
+    Merged 2026-09-10, on review. The two were separate floats with byte-identical column headers
+    (``Tool``, ``n``, and the four buckets) placed one after the other, and LaTeX floated them onto
+    the same page - so a reader met the same header twice and read the second table as a
+    continuation of the first rather than as a different granularity. Nothing about the numbers
+    changed here: the rows, subsets and buckets are exactly those the two tables carried, only
+    gathered under one caption with the granularity stated as a row group rather than in two
+    captions a reader has to hold side by side.
+
+    The asymmetry between the halves is deliberate and predates this merge. The line half omits
+    \textsc{CodeDiff} (`include_codediff`), because Section 7 answers RQ4 over other people's
+    tools and the paper's own tool is reported in its own section; the node half includes it,
+    because the node reading is where a reader asking "and where does CodeDiff land" is actually
+    looking. Passing `include_codediff=True` puts it in both.
+    """
+    backslash = "\\"
+    row_end = backslash * 2
+    header_labels = " & ".join(label for label, _ in BUCKETS)
+    lines = [
+        "% Auto-generated by research/analysis/benchmark_other_report.py. Do not edit by hand -",
+        "% regenerate: make timing-report (from research/).",
+        # `table*`, not `table`: six columns of "244 (50%)" cells overflow a single ACM
+        # column and collide with the neighbouring table (observed 2026-08-23).
+        r"\begin{table*}",
+        (
+            r"  \caption{Per-fixture agreement with the human mapping, bucketed, at both"
+            r" granularities. The upper block is \emph{line-level} agreement for all ten"
+            r" configurations. The lower block is \emph{node-level} agreement, which only tools"
+            r" whose output carries sub-line structure can be scored on: a purely line-based tool"
+            r" has no finer signal to project onto the AST. The node metric is a per-node ``did you"
+            r" consider this changed'' projection, not mapping fidelity. ``Perfect'' means zero"
+            r" mismatches, not a rounded 100\%. Each tool is scored on its own applicable subset"
+            r" ($n$), so percentages, not counts, are comparable across rows.}"
+        ),
+        r"  \label{tab:agreement-buckets}",
+        r"  \small",
+        r"  \begin{tabular}{lrrrrr}",
+        r"    \toprule",
+        f"    Tool & $n$ & {header_labels} {row_end}",
+        r"    \midrule",
+        r"    \multicolumn{6}{l}{\emph{Line granularity: line-only tools}} " + row_end,
+    ]
+    lines += _bucket_rows(accuracy_rows, GRANULARITY["line"], "line", include_codediff)
+    lines.append(r"    \addlinespace")
+    lines.append(
+        r"    \multicolumn{6}{l}{\emph{Line granularity: tools reporting sub-line detail}} "
+        + row_end
+    )
+    lines += _bucket_rows(accuracy_rows, GRANULARITY["subline"], "line", include_codediff)
+    lines.append(r"    \midrule")
+    lines.append(
+        r"    \multicolumn{6}{l}{\emph{Node granularity: tools reporting sub-line detail}} "
+        + row_end
+    )
+    lines += _bucket_rows(accuracy_rows, GRANULARITY["subline"], "node", include_codediff=True)
     lines += [r"    \bottomrule", r"  \end{tabular}", r"\end{table*}"]
     output_path.write_text("\n".join(lines) + "\n")
     print(f"Table written to {output_path}")
@@ -1150,6 +1228,12 @@ if __name__ == "__main__":
             include_codediff=True,
         )
         write_node_bucket_table(accuracy_rows, plots_dir / "benchmark_other_buckets_node.tex")
+        # What the paper actually \input{}s since 2026-09-10 - see write_combined_bucket_table.
+        write_combined_bucket_table(
+            accuracy_rows,
+            plots_dir / "benchmark_other_buckets_combined.tex",
+            include_codediff=False,
+        )
         print_bucket_table(accuracy_rows)
 
     write_paper_fragment(

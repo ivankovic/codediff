@@ -21,18 +21,31 @@ introduction and each answered in its own section, in order; the tool comes last
 7. **Implementation** (RA4.1 accuracy, RA4.2 cost) - nine established tools against that ground
    truth. CodeDiff is absent by construction.
 8. **CodeDiff** - the tool contribution: the pipeline, then its own node-level accuracy, its
-   line-level rate on the same basis as Section 7's tools, speed and robustness.
-9. **Discussion**, 10. **Threats to Validity**, 11. **Related Work**, 12. **Conclusions**.
+   line-level rate on the same basis as Section 7's tools, and speed.
+9. **Threats to Validity**, 10. **Related Work**, 11. **Conclusions**.
 
-**Sections 9, 10 and 12 changed shape on 2026-09-09.** The paper had no Threats to Validity
-section at all - its caveats were scattered as inline asides - and no Discussion, so the
-Conclusion carried the implications, the six recommendations and a summary at once. The
-recommendations and the "the answer is less well defined than the metrics assume" argument moved
-into Discussion; the caveats were collected into Threats to Validity, grouped
-construct/internal/external, with the annotator-bias risk stated for the first time; and
-Conclusions (plural, per convention) now answers "so what" in one paragraph. Section 7 was renamed
-**State of the Art** the same day: it was called "Implementation" while measuring other people's
-tools, immediately before the section that is the implementation.
+**Discussion was deleted on 2026-09-10**, on the annotated review, along with the six
+recommendations and the "the answer is less well defined than the metrics assume" argument it
+carried. Those had moved *into* Discussion from the Conclusion the day before, so the paper has now
+dropped them rather than relocated them - if they are wanted back, they are in git history at
+`d481ce5e:research/papers/introductory-paper/main.tex`. **Section 8's Robustness paragraph went in
+the same pass**, with the note that the measure needs drastically improving; the Robust design
+target therefore still stands in Section 8 with no evidence reported against it, and Section 8 now
+promises only the Fast target.
+
+**Sections 10 and 11 changed shape on 2026-09-09.** The paper had no Threats to Validity
+section at all - its caveats were scattered as inline asides - so the Conclusion carried the
+implications, the recommendations and a summary at once. The caveats were collected into Threats
+to Validity, grouped construct/internal/external, with the annotator-bias risk stated for the first
+time; and Conclusions (plural, per convention) now answers "so what" in one paragraph. Section 7
+was renamed **State of the Art** the same day: it was called "Implementation" while measuring other
+people's tools, immediately before the section that is the implementation.
+
+**The two agreement tables became one on 2026-09-10.** Line-level and node-level agreement were
+separate `table*` floats with byte-identical column headers, landing on the same page, so the
+second read as a continuation of the first. They are now one table with the granularity as a row
+group - see `write_combined_bucket_table` in `research/analysis/benchmark_other_report.py`, which
+is what generates it. No number changed.
 
 **The comparison is seven tools in ten configurations, not "nine tools".** The paper said "nine"
 in twelve places against tables with ten rows, and its own breakdown sentence said "Four report
