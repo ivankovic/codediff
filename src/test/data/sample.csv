@@ -850,7 +850,7 @@ Kotlin,nextcloud-android.git,9318cd6a8da0ae57715d5b9e21259d42a6571da5,app/src/ma
 Kotlin,nextcloud-android.git,9c4222272baf2cd1f13de0d6a7407673861b8114,app/src/main/java/com/nextcloud/client/jobs/autoUpload/AutoUploadWorker.kt,,stratified,SAMPLED,,300-1000
 Kotlin,nextcloud-android.git,adc3c92b339d6988976f812f43942fbb443c8719,app/src/main/java/com/owncloud/android/ui/adapter/OCFileListDelegate.kt,,stratified,SAMPLED,,300-1000
 Kotlin,nextcloud-android.git,ae3e759e615367e0a78472eb83fc7c94634fca30,app/src/main/java/com/nextcloud/client/jobs/upload/FileUploadHelper.kt,kotlin-nextcloud-android-add-a-feature,small,PROMOTED,,
-Kotlin,nextcloud-android.git,af0e67a309d8fee5e8bdd57661c526e2318960dd,app/src/main/java/com/nextcloud/client/etm/EtmActivity.kt,,stratified,SAMPLED,,30-100
+Kotlin,nextcloud-android.git,af0e67a309d8fee5e8bdd57661c526e2318960dd,app/src/main/java/com/nextcloud/client/etm/EtmActivity.kt,kotlin-nextcloud-android-whitespace-only,stratified,PROMOTED,,30-100
 Kotlin,nextcloud-android.git,af0e67a309d8fee5e8bdd57661c526e2318960dd,app/src/main/java/com/nextcloud/client/etm/pages/EtmPreferencesFragment.kt,kotlin-nextcloud-whitespace-only-change,small,PROMOTED,,
 Kotlin,nextcloud-android.git,af0e67a309d8fee5e8bdd57661c526e2318960dd,app/src/main/java/com/nextcloud/client/media/AudioFocusManager.kt,,stratified,SAMPLED,,30-100
 Kotlin,nextcloud-android.git,af0e67a309d8fee5e8bdd57661c526e2318960dd,app/src/main/java/com/owncloud/android/ui/fragment/util/GalleryFastScrollViewHelper.kt,,stratified,SAMPLED,,100-300
@@ -863,9 +863,9 @@ Kotlin,nextcloud-android.git,d43b0bdb9b81848793f19b83b9b101e375fb1b00,app/src/ma
 Kotlin,nextcloud-android.git,d5223059a628ae3dca7279f0625ecc62d2ab2bd2,app/src/main/java/com/owncloud/android/ui/adapter/GalleryRowHolder.kt,kotlin-nextcloud-android-extract-argument-into-variable,small,PROMOTED,,
 Kotlin,nextcloud-android.git,dab2c20ed707511de817b7848486d0b67440d0b2,app/src/main/java/com/nextcloud/client/assistant/AssistantViewModel.kt,,stratified,SAMPLED,,300-1000
 Kotlin,nextcloud-android.git,e02d63f791e8d11a0ccc0c43c24cac848e269333,app/src/main/java/com/owncloud/android/ui/activity/FileDisplayActivity.kt,,stratified,SAMPLED,,3000+
-Kotlin,nextcloud-android.git,e73ce9f91d3ef81de599a0dc1fcb07489e8aed97,app/src/main/java/com/owncloud/android/ui/activity/FileDisplayActivity.kt,,stratified,SAMPLED,,3000+
-Kotlin,nextcloud-android.git,e9fee56c0dc04676b827ab08c7ee24f6ae9d640d,app/src/main/java/com/nextcloud/ui/fileactions/FileActionsBottomSheet.kt,,stratified,SAMPLED,,300-1000
-Kotlin,nextcloud-android.git,e9fee56c0dc04676b827ab08c7ee24f6ae9d640d,app/src/main/java/com/owncloud/android/ui/adapter/UnifiedSearchCurrentDirItemViewHolder.kt,,stratified,SAMPLED,,30-100
+Kotlin,nextcloud-android.git,e73ce9f91d3ef81de599a0dc1fcb07489e8aed97,app/src/main/java/com/owncloud/android/ui/activity/FileDisplayActivity.kt,kotlin-nextcloud-android-add-one-annotation,stratified,PROMOTED,,3000+
+Kotlin,nextcloud-android.git,e9fee56c0dc04676b827ab08c7ee24f6ae9d640d,app/src/main/java/com/nextcloud/ui/fileactions/FileActionsBottomSheet.kt,kotlin-nextcloud-android-remove-one-argument,stratified,PROMOTED,,300-1000
+Kotlin,nextcloud-android.git,e9fee56c0dc04676b827ab08c7ee24f6ae9d640d,app/src/main/java/com/owncloud/android/ui/adapter/UnifiedSearchCurrentDirItemViewHolder.kt,kotlin-nextcloud-android-remove-one-argument-2,stratified,PROMOTED,,30-100
 Kotlin,nextcloud-android.git,f2817680ead4e76b9b838cc0a080195b7da6e959,app/src/main/java/com/nextcloud/client/jobs/upload/FileUploadBroadcastManager.kt,,stratified,SAMPLED,,100-300
 Kotlin,nextcloud-android.git,f48f2bebba014e3c2bcf6d29c7606577608e9c35,app/src/main/java/com/owncloud/android/datamodel/e2e/v2/decrypted/DecryptedFolderMetadataFile.kt,kotlin-nextcloud-android-different-function,stratified,PROMOTED,,10-30
 Kotlin,nextcloud-android.git,f9969ef0b4b53a4ec021ff8fb24d0b66f7619bb0,app/src/main/java/com/owncloud/android/ui/activity/CommunityActivity.kt,,stratified,SAMPLED,,100-300
@@ -887,16 +887,16 @@ LUA,awesomeWM-awesome.git,1a2037758b8ce47dabc475dd73c05f73ee4c4bba,tests/example
 LUA,awesomeWM-awesome.git,2eab55e53681418eba6a87cd72f9198ea4f9bb9f,lib/wibox/container/border.lua,,stratified,SAMPLED,,1000-3000
 LUA,awesomeWM-awesome.git,4bd90f0f35d0f93235f0bcf207ca16baa174f8a1,lib/awful/mouse/resize.lua,lua-awesomewm-awesome-comment-changes-and-additions,small,PROMOTED,,
 LUA,awesomeWM-awesome.git,4bd90f0f35d0f93235f0bcf207ca16baa174f8a1,lib/gears/sort/init.lua,lua-awesomewm-awesome-update-comment,stratified,PROMOTED,,0-10
-LUA,awesomeWM-awesome.git,4bd90f0f35d0f93235f0bcf207ca16baa174f8a1,lib/naughty/layout/legacy.lua,,stratified,SAMPLED,,300-1000
+LUA,awesomeWM-awesome.git,4bd90f0f35d0f93235f0bcf207ca16baa174f8a1,lib/naughty/layout/legacy.lua,lua-awesomewm-awesome-add-deprecation-notice-to-comment,stratified,PROMOTED,,300-1000
 LUA,awesomeWM-awesome.git,4fa957b75dfabe63d3eb4636b5e409038318b461,lib/wibox/widget/systray.lua,,stratified,SAMPLED,,100-300
-LUA,awesomeWM-awesome.git,54a5a7dce580da39152175f2668463c7751d904c,lib/awful/_compat.lua,,stratified,SAMPLED,,100-300
+LUA,awesomeWM-awesome.git,54a5a7dce580da39152175f2668463c7751d904c,lib/awful/_compat.lua,lua-awesomewm-awesome-fix-one-byte-typo-in-comment,stratified,PROMOTED,,100-300
 LUA,awesomeWM-awesome.git,5fb6109439434df3db7e133a33132af334fad181,spec/wibox/widget/slider_spec.lua,,stratified,SAMPLED,,30-100
 LUA,awesomeWM-awesome.git,63def3d38d988c937e5b619e86854d85e41299c4,lib/ruled/client.lua,lua-awesome-only-comment-change,small,PROMOTED,,
 LUA,awesomeWM-awesome.git,6ad693eff00861c30a729970ac3d3f646777735f,tests/examples/screen/template.lua,,stratified,SAMPLED,,300-1000
 LUA,awesomeWM-awesome.git,75019c3f6f6693eecdb08e010957f9e1c3f136bc,lib/awful/menu.lua,,stratified,SAMPLED,,300-1000
 LUA,awesomeWM-awesome.git,75ab36676920cf6a7a17af836f6bd9fff52f834d,lib/awful/mouse/resize.lua,,stratified,SAMPLED,,100-300
 LUA,awesomeWM-awesome.git,869e63fcdc5ea836f22e935b1eb52fffefb759b3,lib/wibox/widget/textbox.lua,lua-awesomewm-awesome-change-doccomments,small,PROMOTED,,
-LUA,awesomeWM-awesome.git,86d1b1c22ca584640043fc50187ff59a76e488a1,lib/wibox/container/mirror.lua,,stratified,SAMPLED,,100-300
+LUA,awesomeWM-awesome.git,86d1b1c22ca584640043fc50187ff59a76e488a1,lib/wibox/container/mirror.lua,lua-awesomewm-awesome-add-noreturn-comment,stratified,PROMOTED,,100-300
 LUA,awesomeWM-awesome.git,86d1b1c22ca584640043fc50187ff59a76e488a1,tests/examples/awful/placement/maximize_horizontally.lua,lua-awesomewm-awesome-add-comment,stratified,PROMOTED,,10-30
 LUA,awesomeWM-awesome.git,88c65a71ddd9ef5b6c18cef576580a4bf7c691dd,spec/wibox/widget/textbox_spec.lua,,stratified,SAMPLED,,100-300
 LUA,awesomeWM-awesome.git,88c65a71ddd9ef5b6c18cef576580a4bf7c691dd,tests/examples/awful/wallpaper/remove_screen1.lua,,stratified,SAMPLED,,30-100
@@ -941,7 +941,7 @@ LUA,neovim-neovim.git,7c3df3e2ea1390731e5fac5411e3ad7e1de4a3d0,runtime/lua/vim/l
 LUA,neovim-neovim.git,7ea148a1dc1518bc8a6835c0329894a590135937,runtime/lua/vim/lsp/linked_editing_range.lua,,stratified,SAMPLED,,300-1000
 LUA,neovim-neovim.git,844caca881f85fa4e143fbfa982fba48590e8a60,test/functional/ui/cmdline2_spec.lua,lua-neovim-neovim-constant-changes,small,PROMOTED,,
 LUA,neovim-neovim.git,8a901a52e1f0c0e5c877dd27a9d1be73b8082598,runtime/lua/vim/health/health.lua,,stratified,SAMPLED,,300-1000
-LUA,neovim-neovim.git,9204b7541d27910c713aea4e9dd40d967941be21,src/gen/gen_char_blob.lua,,stratified,SAMPLED,,30-100
+LUA,neovim-neovim.git,9204b7541d27910c713aea4e9dd40d967941be21,src/gen/gen_char_blob.lua,lua-neovim-neovim-add-leading-comment,stratified,PROMOTED,,30-100
 LUA,neovim-neovim.git,92b2a267723922a60f0716a31d06d7d36115e103,src/gen/gen_eval.lua,,stratified,SAMPLED,,100-300
 LUA,neovim-neovim.git,92b2a267723922a60f0716a31d06d7d36115e103,src/gen/gen_keycodes.lua,,stratified,SAMPLED,,30-100
 LUA,neovim-neovim.git,96e6ce661965a2ad6da2b4d06eb275c438125e96,src/nvim/options.lua,,stratified,SAMPLED,,3000+
@@ -980,7 +980,7 @@ PHP,WordPress-WordPress.git,72d3fb0034dbbfcd0a753b3b2cb2e5a9268060aa,wp-includes
 PHP,WordPress-WordPress.git,7e9ef6641a7eb33843d78aa2530562896f67598d,wp-includes/version.php,,stratified,SAMPLED,,30-100
 PHP,WordPress-WordPress.git,83559dd0369af87044c1d19b257ba2ea34eb1bf5,wp-includes/version.php,,stratified,SAMPLED,,30-100
 PHP,WordPress-WordPress.git,87c17b8deb936527f63ecf2158d62799bc299240,wp-admin/includes/misc.php,php-wordpress-wordpress-add-rtc-check,small,PROMOTED,,
-PHP,WordPress-WordPress.git,8dc4b2a20783eecb2d2ffb7dfd92ac6de889a581,wp-includes/functions.php,,stratified,SAMPLED,,3000+
+PHP,WordPress-WordPress.git,8dc4b2a20783eecb2d2ffb7dfd92ac6de889a581,wp-includes/functions.php,php-wordpress-wordpress-not-sure-if-this-parses-correctly,stratified,PROMOTED,,3000+
 PHP,WordPress-WordPress.git,8f1afebf29e6f667159fc02d2b28d1801e7b5f96,wp-includes/assets/script-loader-packages.php,php-wordpress-wordpress-version-4,stratified,PROMOTED,,0-10
 PHP,WordPress-WordPress.git,964bcaf172201a43de7915aff140b4104bd5c1a0,wp-includes/class-wp-plugin-dependencies.php,,stratified,SAMPLED,,300-1000
 PHP,WordPress-WordPress.git,964bcaf172201a43de7915aff140b4104bd5c1a0,wp-includes/class-wp-query.php,,stratified,SAMPLED,,3000+
@@ -1000,14 +1000,14 @@ PHP,WordPress-WordPress.git,c56c3603cfe9b08871a747f1403722e9bef3d5ab,wp-includes
 PHP,WordPress-WordPress.git,cc4246cd13523eec5718fdf8b7ea0b2779ef31c7,wp-includes/rest-api/class-wp-rest-server.php,,stratified,SAMPLED,,1000-3000
 PHP,WordPress-WordPress.git,d77b57a227e03f8494289ed90dd8d9dbe7074778,wp-includes/version.php,php-wordpress-wordpress-version-update-3,small,PROMOTED,,
 PHP,WordPress-WordPress.git,d88ac61c9adf63291f7f3f6578b151b24a13d14d,wp-admin/includes/screen.php,,stratified,SAMPLED,,100-300
-PHP,WordPress-WordPress.git,d9547eadf7d9d47053a0047cbc786d45a21d1f60,wp-settings.php,,stratified,SAMPLED,,300-1000
+PHP,WordPress-WordPress.git,d9547eadf7d9d47053a0047cbc786d45a21d1f60,wp-settings.php,php-wordpress-wordpress-add-one-require-statement,stratified,PROMOTED,,300-1000
 PHP,WordPress-WordPress.git,dc0b4ceef5086699170d5608cff3443d48e52a8f,wp-includes/version.php,,stratified,SAMPLED,,30-100
 PHP,WordPress-WordPress.git,e3a446c81eb1e9bef97144975bd6058fedb7aa67,wp-includes/version.php,php-wordpress-wordpress-version-update-2,small,PROMOTED,,
 PHP,WordPress-WordPress.git,e7d8965d681540b3120bc4b3d18bacffaa4ba741,wp-includes/ID3/module.audio.ogg.php,,stratified,SAMPLED,,300-1000
 PHP,WordPress-WordPress.git,ec445010208a60af54853c3bfba3675ca43f1c78,wp-includes/js/dist/core-commands.min.asset.php,php-wordpress-wordpress-version-7,stratified,PROMOTED,,0-10
 PHP,WordPress-WordPress.git,ec445010208a60af54853c3bfba3675ca43f1c78,wp-includes/js/dist/private-apis.min.asset.php,php-wordpress-wordpress-version-8,stratified,PROMOTED,,0-10
 PHP,WordPress-WordPress.git,ed9ef8618b7040d436a8964ba140e33567032cdb,wp-includes/html-api/class-wp-html-tag-processor.php,,stratified,SAMPLED,,3000+
-PHP,WordPress-WordPress.git,ee3b03497cbb8386d5a575772503e5f51db3bff3,wp-admin/includes/nav-menu.php,,stratified,SAMPLED,,1000-3000
+PHP,WordPress-WordPress.git,ee3b03497cbb8386d5a575772503e5f51db3bff3,wp-admin/includes/nav-menu.php,php-wordpress-wordpress-remove-one-todo-comment,stratified,PROMOTED,,1000-3000
 PHP,WordPress-WordPress.git,f124de962f9bcc016b9256a4c8b392799fdd7798,wp-includes/post.php,,stratified,SAMPLED,,3000+
 PHP,WordPress-WordPress.git,f3ed2d5b09f5e7bba45873646be07460de9a0e1b,wp-includes/version.php,,stratified,SAMPLED,,30-100
 PHP,WordPress-WordPress.git,f441dd1965774760f09ac9bb0fb37cdd302eb3e9,wp-content/themes/twentytwenty/template-parts/featured-image.php,,stratified,SAMPLED,,30-100
@@ -1036,7 +1036,7 @@ PHP,nextcloud-server.git,f12cecb68470ad970eed430b019a1baaac6bf28a,lib/private/Fo
 PHP,nextcloud-server.git,f12cecb68470ad970eed430b019a1baaac6bf28a,lib/private/Preview/MSOffice2003.php,php-nextcloud-server-add-declare-6,stratified,PROMOTED,,10-30
 PHP,nextcloud-server.git,f3778bc9c7c93add71c69ad98ff5e3d1554cb686,lib/private/DB/QueryBuilder/QueryBuilder.php,,stratified,SAMPLED,,1000-3000
 PHP,nextcloud-server.git,f3ceded7540541ebb17d5fb99eb50e80dcf0c2ce,config/config.sample.php,,stratified,SAMPLED,,1000-3000
-PHP,nextcloud-server.git,f81475445d6d4a41c105b8bad4e80ed7b205c003,lib/composer/composer/autoload_static.php,,stratified,SAMPLED,,1000-3000
+PHP,nextcloud-server.git,f81475445d6d4a41c105b8bad4e80ed7b205c003,lib/composer/composer/autoload_static.php,php-nextcloud-server-add-one-element-to-array-init,stratified,PROMOTED,,1000-3000
 PHP,nextcloud-server.git,fb3f9fe2defec9beb158c4e6ed0a6e6f8cbcab49,lib/private/Repair/AddCleanupUpdaterBackupsJob.php,php-nextcloud-server-add-a-few-types,stratified,PROMOTED,,10-30
 PHP,nextcloud-server.git,fb3f9fe2defec9beb158c4e6ed0a6e6f8cbcab49,lib/private/Repair/NC24/AddTokenCleanupJob.php,php-nextcloud-server-add-readonly,stratified,PROMOTED,,10-30
 PHP,nextcloud-server.git,fe9e43c165e6efc1f5a7b1707e81ad3c67527b94,lib/private/Preview/Db/PreviewMapper.php,,stratified,SAMPLED,,100-300
@@ -1169,7 +1169,7 @@ Ruby,Homebrew-brew.git,67022bc84b5d8adcc6e9a64702d014aa2f2ce00d,Library/Homebrew
 Ruby,Homebrew-brew.git,6bab83ccc9c152b94abfeedf6ee5ae4e63260613,Library/Homebrew/test_bot/junit.rb,,stratified,SAMPLED,,30-100
 Ruby,Homebrew-brew.git,78f9b2572421c20a4cf2e3ac15a20acccd1c5b54,Library/Homebrew/test/support/fixtures/cask/Casks/nested-app.rb,ruby-homebrew-brew-version,stratified,PROMOTED,,10-30
 Ruby,Homebrew-brew.git,7f333c6b51a8f1c5f955c80e20a8057edc92c067,Library/Homebrew/cmd/reinstall.rb,ruby-homebrew-brew-enclose-block-in-rescue,small,PROMOTED,,
-Ruby,Homebrew-brew.git,81a86384cf2209b3d3bc039bdb430168fb32aa51,Library/Homebrew/rubocops/urls.rb,,stratified,SAMPLED,,100-300
+Ruby,Homebrew-brew.git,81a86384cf2209b3d3bc039bdb430168fb32aa51,Library/Homebrew/rubocops/urls.rb,ruby-homebrew-brew-add-extends,stratified,PROMOTED,,100-300
 Ruby,Homebrew-brew.git,81fb763c82240163eaf0dafa176ac6cfac355613,Library/Homebrew/formula.rb,,stratified,SAMPLED,,3000+
 Ruby,Homebrew-brew.git,834fc41045011945891d8d313d682e8aa0a77df0,Library/Homebrew/test/download_strategies/curl_spec.rb,,stratified,SAMPLED,,300-1000
 Ruby,Homebrew-brew.git,b5cdf13b2b1b5bfb24ae22a7fef2de8027549b3c,Library/Homebrew/livecheck/strategy/cpan.rb,,stratified,SAMPLED,,100-300
@@ -1182,7 +1182,7 @@ Ruby,intridea-multi_json,edb28ceab21b915aff6354cf9b05a08905d71d35,lib/multi_json
 Ruby,jekyll-jekyll.git,052f1bd412ef0b032eed1d73e2869bed92db6795,test/source/_plugins/dummy.rb,ruby-jekyll-jekyll-whitespace-only,stratified,PROMOTED,,0-10
 Ruby,jekyll-jekyll.git,0a48b23695831e95a70a96954740e9ae4c2c40d0,lib/jekyll/version.rb,ruby-jekyll-jekyll-version,stratified,PROMOTED,,0-10
 Ruby,jekyll-jekyll.git,11dd8934166d0947055bc01017426bad01277bc1,lib/jekyll/readers/collection_reader.rb,ruby-jekyll-jekyll-whitespace-only-3,stratified,PROMOTED,,10-30
-Ruby,jekyll-jekyll.git,11dd8934166d0947055bc01017426bad01277bc1,lib/jekyll/readers/layout_reader.rb,,stratified,SAMPLED,,30-100
+Ruby,jekyll-jekyll.git,11dd8934166d0947055bc01017426bad01277bc1,lib/jekyll/readers/layout_reader.rb,ruby-jekyll-jekyll-whitespace-only-4,stratified,PROMOTED,,30-100
 Ruby,jekyll-jekyll.git,32074ef9442966bb39081cc6862256a9a0e4604b,test/test_theme_drop.rb,,stratified,SAMPLED,,30-100
 Ruby,jekyll-jekyll.git,390b1f006bebdfa7e46c83831879a17a51cded52,lib/jekyll/version.rb,ruby-jekyll-jekyll-version-2,stratified,PROMOTED,,0-10
 Ruby,jekyll-jekyll.git,556febb436c93a476365a9235403c82d3f9e74be,lib/jekyll/version.rb,ruby-jekyll-jekyll-version-3,stratified,PROMOTED,,0-10
@@ -1218,7 +1218,7 @@ Ruby,mastodon-mastodon.git,08da9d8fc58180401c6d57b75af262733a4bfc7f,app/serializ
 Ruby,mastodon-mastodon.git,1ae6b52c471d82d3682a732680549fd849c91957,app/controllers/oauth/authorizations_controller.rb,,stratified,SAMPLED,,30-100
 Ruby,mastodon-mastodon.git,1e67567d8fc07d7830ad1464fd359730106a1357,app/controllers/concerns/signature_verification.rb,,stratified,SAMPLED,,100-300
 Ruby,mastodon-mastodon.git,23148dc536bd25b2aea6324e89f6fc85afa569ee,db/post_migrate/20190519130537_remove_boosts_widening_audience.rb,ruby-mastodon-mastodon-one-operator,stratified,PROMOTED,,10-30
-Ruby,mastodon-mastodon.git,48fe679728d39ca224b3cb1e7d1c32fdccd00e64,db/schema.rb,,stratified,SAMPLED,,1000-3000
+Ruby,mastodon-mastodon.git,48fe679728d39ca224b3cb1e7d1c32fdccd00e64,db/schema.rb,ruby-mastodon-mastodon-add-one-call,stratified,PROMOTED,,1000-3000
 Ruby,mastodon-mastodon.git,5d849571176b2e7ec6ae55370bee89cbf0c1c57f,app/serializers/rest/annual_report_serializer.rb,ruby-mastodon-mastodon-add-method,stratified,PROMOTED,,0-10
 Ruby,mastodon-mastodon.git,5e8b8f9c23c43763a8a3e673adc44bca1a88a458,spec/services/activitypub/process_status_update_service_spec.rb,,stratified,SAMPLED,,1000-3000
 Ruby,mastodon-mastodon.git,607449336da198ea9fe9c014220a5374a0ca1ae4,app/controllers/activitypub/shares_controller.rb,,stratified,SAMPLED,,30-100
@@ -1254,7 +1254,7 @@ Rust,GyulyVGC-sniffnet.git,f59964ac99350c47722369dfc0d281071c5ad52d,src/chart/ty
 Rust,GyulyVGC-sniffnet.git,fcc5d5c6d2ef61aee753e7093b32055a42df7023,src/gui/styles/toggler.rs,,stratified,SAMPLED,,30-100
 Rust,ReFirmLabs-binwalk,e460bddb37d668907ca894181062f4209327d3c5,src/binwalk.rs,rust-refirmlabs-binwalk-whitespace-only,full,PROMOTED,,
 Rust,fornwall-rust-script,4e128f4a864625f7959700af8ba9cbc88c9d3ec9,src/manifest.rs,rust-fornwall-rust-script-add-lifecycle-management,full,PROMOTED,,
-Rust,protocolbuffers-protobuf.git,2293d51b42bba6de461e84eb89eb25f2090fdb4e,rust/upb/sys/wire/wire.rs,,stratified,SAMPLED,,30-100
+Rust,protocolbuffers-protobuf.git,2293d51b42bba6de461e84eb89eb25f2090fdb4e,rust/upb/sys/wire/wire.rs,rust-protocolbuffers-protobuf-add-enum-variant,stratified,PROMOTED,,30-100
 Rust,protocolbuffers-protobuf.git,665c1a34451da77ea64d40ac759e04b103f07b8b,rust/upb/sys/wire/wire.rs,,stratified,SAMPLED,,30-100
 Rust,protocolbuffers-protobuf.git,b0366de6cde221359f61d9ccf42bc6fe07c628b1,rust/cpp.rs,,stratified,SAMPLED,,1000-3000
 Rust,protocolbuffers-protobuf.git,fabd38def4192a317974023d186562d711c7d5f4,rust/codegen_traits.rs,,stratified,SAMPLED,,300-1000
@@ -1275,14 +1275,14 @@ Rust,rust-lang-rust.git,8d072616a5d0c484e9761b0958ece68e8d235fe3,src/tools/unico
 Rust,rust-lang-rust.git,a3e469ea1f03936e2156b7d683aa7fc83d56a252,src/tools/miri/tests/pass/packed-struct-dyn-trait.rs,rust-rust-lang-rust-remove-starting-comment,stratified,PROMOTED,,10-30
 Rust,rust-lang-rust.git,c12ab08c14b1f607c4799893bcb2752c6fed34b4,compiler/rustc_mir_build/src/builder/expr/stmt.rs,,stratified,SAMPLED,,100-300
 Rust,rust-lang-rust.git,cfcbcb715c5120e481b2d1303b590a5eb2417e55,compiler/rustc_query_impl/src/execution.rs,rust-rust-lang-rust-add-key-to-function-arguments-and-call-sites,small,PROMOTED,,
-Rust,rust-lang-rust.git,e09936e820524a32544a3681e259d8127d02b596,src/tools/tidy/src/main.rs,,stratified,SAMPLED,,100-300
+Rust,rust-lang-rust.git,e09936e820524a32544a3681e259d8127d02b596,src/tools/tidy/src/main.rs,rust-rust-lang-rust-add-one-check,stratified,PROMOTED,,100-300
 Rust,rustdesk-rustdesk.git,296c6df462b1a8abdc31775200cdcfa8d59909a8,src/lang/th.rs,rust-rustdesk-rustdesk-add-two-values-to-slice,small,PROMOTED,,
 Rust,rustdesk-rustdesk.git,5faf0ad3cfef1b7237e6cbca53038d76ffdc281d,src/client/io_loop.rs,rust-rustdesk-rustdesk-actual-logic-change-in-io-loop-medium-sized-file,small,PROMOTED,,
 Rust,rustdesk-rustdesk.git,5faf0ad3cfef1b7237e6cbca53038d76ffdc281d,src/server/connection.rs,rust-rustdesk-rustdesk-large-file-40k-normal-feature-work,small,PROMOTED,,
 Rust,rustdesk-rustdesk.git,626a091f55d1c6de9d8c50ed343eaf9e48fa9b50,src/lang/ar.rs,,stratified,SAMPLED,,300-1000
 Rust,rustdesk-rustdesk.git,98362eaca036588039d10d2c1e9a9260de7a310d,src/lang/kz.rs,rust-rustdesk-add-one-slice-element,small,PROMOTED,,
 Rust,rustdesk-rustdesk.git,a32d36a97be9fab7001382e5f0992f373b0d61f5,src/platform/linux.rs,,stratified,SAMPLED,,1000-3000
-Rust,rustdesk-rustdesk.git,b99c540210a98df39b96ec65f2ec40fd703c7506,src/lang/ru.rs,,stratified,SAMPLED,,300-1000
+Rust,rustdesk-rustdesk.git,b99c540210a98df39b96ec65f2ec40fd703c7506,src/lang/ru.rs,rust-rustdesk-rustdesk-add-one-token,stratified,PROMOTED,,300-1000
 Rust,rustdesk-rustdesk.git,b99c540210a98df39b96ec65f2ec40fd703c7506,src/lang/sq.rs,rust-rustdesk-add-item,small,PROMOTED,,
 Rust,rustdesk-rustdesk.git,ffddf60184731bb2c8842ef3134550390f73e43b,src/lang/it.rs,rust-rustdesk-rustdesk-string-constant-change,small,PROMOTED,,
 Rust,skim-rs-skim,cbd176588196b48433dac61962526231663a9823,skim/src/matcher.rs,rust-skim-rs-skim-format-string,full,PROMOTED,,
@@ -1404,7 +1404,7 @@ ShellScript,nvm-sh-nvm.git,1bf567bd0b12be189f595f5cd781258260cf37b5,nvm.sh,,stra
 ShellScript,nvm-sh-nvm.git,31e58d1827f4c2569723efc8e51dbd6c1087373c,nvm.sh,,stratified,SAMPLED,,1000-3000
 ShellScript,nvm-sh-nvm.git,3417e9d9a350f805ea51784c63fc9063e1ae0187,install.sh,,stratified,SAMPLED,,300-1000
 ShellScript,nvm-sh-nvm.git,3fea5493a431ac64470d4230d4b51438cf213bd1,nvm.sh,,stratified,SAMPLED,,3000+
-ShellScript,nvm-sh-nvm.git,430860a8bec7a59837929db37374b1bc71262e9c,update_test_mocks.sh,,stratified,SAMPLED,,30-100
+ShellScript,nvm-sh-nvm.git,430860a8bec7a59837929db37374b1bc71262e9c,update_test_mocks.sh,shellscript-nvm-sh-nvm-add-one-line,stratified,PROMOTED,,30-100
 ShellScript,nvm-sh-nvm.git,4b4e71f05c7ad3a8159d5b5ee22a5ec55d7cf2db,nvm.sh,,stratified,SAMPLED,,3000+
 ShellScript,nvm-sh-nvm.git,552db40622bb7a82d9c6d67d2d6bcf3694b47e30,nvm.sh,shellscript-nvm-sh-nvm-upgrade-version-string,small,PROMOTED,,
 ShellScript,nvm-sh-nvm.git,5c117e6ab329cb1c5dc1c6fa932e7a590919a26f,nvm.sh,,stratified,SAMPLED,,3000+
@@ -1418,7 +1418,7 @@ ShellScript,nvm-sh-nvm.git,dca022027589da11f62d8160098d0d66ebb38f56,nvm.sh,,stra
 ShellScript,nzbgetcom-nzbget.git,8df6a512e86edb94d5b23a50f16e3a395536e404,osx/build-nzbget.sh,,stratified,SAMPLED,,100-300
 ShellScript,openssl-openssl.git,c7215806539ea0a312c42a5893b1f5f9eb9ae5ae,test/recipes/95-test_external_pkcs11_provider_data/pkcs11-provider.sh,,stratified,SAMPLED,,30-100
 ShellScript,pandas-dev-pandas.git,2c9c742c137ecc9b87deeae329b5ed97afe3f335,ci/code_checks.sh,,stratified,SAMPLED,,100-300
-ShellScript,pandas-dev-pandas.git,6a6950da14b08d1b616f7683a25037754590c102,ci/code_checks.sh,,stratified,SAMPLED,,100-300
+ShellScript,pandas-dev-pandas.git,6a6950da14b08d1b616f7683a25037754590c102,ci/code_checks.sh,shellscript-pandas-dev-pandas-remove-one-line,stratified,PROMOTED,,100-300
 ShellScript,pandas-dev-pandas.git,9349a425475d08d510537c32b284e81b2e8dadfc,ci/code_checks.sh,,stratified,SAMPLED,,100-300
 ShellScript,pi-hole-pi-hole.git,0187087da0624e5e1dbbe8805b7802a4304a9ea0,advanced/Scripts/api.sh,,stratified,SAMPLED,,300-1000
 ShellScript,pi-hole-pi-hole.git,1bea6db50adb3a07ba58808791c7c013bc12a671,advanced/Scripts/api.sh,,stratified,SAMPLED,,300-1000
@@ -1457,7 +1457,7 @@ Swift,nextcloud-desktop.git,5c286d30c48bbb9150a57db080a6c32f7fb986e9,Sources/Nex
 Swift,nextcloud-desktop.git,e545f06f3c70192acfa687892ac856405a3f1d21,Sources/NextcloudFileProviderKit/Utilities/IgnoredFilesMatcher.swift,,stratified,SAMPLED,,30-100
 Swift,nextcloud-desktop.git,ee149aed45a1dab9bdcf9b83270ad850111bcfcc,Sources/NextcloudFileProviderKit/Item/Item+KeepDownloaded.swift,,stratified,SAMPLED,,30-100
 Swift,nextcloud-ios.git,03a4d5c5dc912d03c191018e5111c52dd9fa0f51,iOSClient/Activity/NCActivityNavigationController.swift,swift-nextcloud-ios-different-func,stratified,PROMOTED,,10-30
-Swift,nextcloud-ios.git,1e91b55889f7d63fe1fe31bdf568b5d77bd5e934,iOSClient/Networking/NCNetworking+Download.swift,,stratified,SAMPLED,,300-1000
+Swift,nextcloud-ios.git,1e91b55889f7d63fe1fe31bdf568b5d77bd5e934,iOSClient/Networking/NCNetworking+Download.swift,swift-nextcloud-ios-add-one-log-line,stratified,PROMOTED,,300-1000
 Swift,nextcloud-ios.git,2ebaa5c696990129a9888f9caa76a0fc43b98159,iOSClient/Menu/NCMainNavigationControllerMenu.swift,,stratified,SAMPLED,,100-300
 Swift,nextcloud-ios.git,32ed733e1dfce03a799571b4b7406a74355b3dcf,iOSClient/Share/NCShareNetworking.swift,,stratified,SAMPLED,,100-300
 Swift,nextcloud-ios.git,33c52794edb8b37ab92b5dc68abe944004f4329d,iOSClient/Networking/NCNetworking+Download.swift,swift-nextcloud-ios-actual-control-flow-change,small,PROMOTED,,
@@ -1592,7 +1592,7 @@ TSX,mitmproxy-mitmproxy,26074879818ed547d3ca44b02880fb78ee62bbb3,web/src/js/comp
 TSX,mui-material-ui.git,29f37dc2b9f644bb8a0f3ca3c7898a1c0e2acc5a,packages/mui-joy/src/CssBaseline/CssBaseline.test.tsx,tsx-mui-material-ui-add-to-empty-block,stratified,PROMOTED,,0-10
 TSX,mui-material-ui.git,3896cb13c31aa74b69076130e6efadf0ae935c33,docs/data/material/components/transitions/SlideFromContainer.tsx,,stratified,SAMPLED,,30-100
 TSX,mui-material-ui.git,48e7bd80d280088591576a12bf8f681aed25015e,docs/data/material/components/tooltips/ArrowTooltips.tsx,tsx-mui-material-ui-add-attribute,stratified,PROMOTED,,10-30
-TSX,mui-material-ui.git,6c9e82f975fe9b59815e435094408d8195bbd723,docs/data/joy/components/card/LicenseCard.tsx,,stratified,SAMPLED,,30-100
+TSX,mui-material-ui.git,6c9e82f975fe9b59815e435094408d8195bbd723,docs/data/joy/components/card/LicenseCard.tsx,tsx-mui-material-ui-remove-one-import,stratified,PROMOTED,,30-100
 TSX,mui-material-ui.git,6c9e82f975fe9b59815e435094408d8195bbd723,docs/data/joy/components/input/BasicInput.tsx,tsx-mui-material-ui-remove-import-2,stratified,PROMOTED,,0-10
 TSX,mui-material-ui.git,6c9e82f975fe9b59815e435094408d8195bbd723,docs/data/material/components/progress/CircularUnderLoad.tsx,tsx-mui-material-ui-remove-import-3,stratified,PROMOTED,,0-10
 TSX,mui-material-ui.git,6c9e82f975fe9b59815e435094408d8195bbd723,docs/data/material/components/tooltips/BasicTooltip.tsx,tsx-mui-material-ui-delete-only,stratified,PROMOTED,,10-30
@@ -1633,12 +1633,12 @@ TypeScript,langflow-ai-langflow.git,315f1ab0b642830db6419f02dd7c29ca6862b33d,src
 TypeScript,lxqt-lxqt-openssh-askpass,10aead709b0cca17ff6df901d6735905a8a4299f,translations/lxqt-openssh-askpass_arn.ts,typescript-lxqt-lxqt-openssh-askpass-change-url,full,PROMOTED,,
 TypeScript,lxqt-lxqt-panel,2a6192e7af78aac56c66b951ba302ff3b87cfcd4,panel/translations/lxqt-panel.ts,,full,REJECTED,Not actually TypeScript,
 TypeScript,lxqt-lxqt-powermanagement,e48e2559128c7e086e81d8d11ed905f050e99513,config/translations/lxqt-config-powermanagement_hu.ts,,full,REJECTED,"Not actually typescript, it's XML",
-TypeScript,microsoft-TypeScript.git,09caaf60aa4101813bedc41f21ad84318aadd29a,tests/baselines/reference/api/typescript.d.ts,,stratified,SAMPLED,,3000+
+TypeScript,microsoft-TypeScript.git,09caaf60aa4101813bedc41f21ad84318aadd29a,tests/baselines/reference/api/typescript.d.ts,typescript-microsoft-typescript-add-one-line,stratified,PROMOTED,,3000+
 TypeScript,microsoft-TypeScript.git,16beff101ae1dae0600820ebf22632ac8a40cfc8,src/compiler/transformers/es2015.ts,,stratified,SAMPLED,,3000+
 TypeScript,microsoft-TypeScript.git,16beff101ae1dae0600820ebf22632ac8a40cfc8,src/testRunner/transpileRunner.ts,typescript-microsoft-typescript-add-dot-js-to-import-paths,small,PROMOTED,,
 TypeScript,microsoft-TypeScript.git,2fed59084b847e6c155382122859c8d638009676,tests/cases/fourslash/completionAfterGlobalThis.ts,typescript-microsoft-typescript-add-lib-comment,stratified,PROMOTED,,10-30
 TypeScript,microsoft-TypeScript.git,34d1ea68f6ef83689909ab77a625c177887d09b1,src/compiler/types.ts,,stratified,SAMPLED,,3000+
-TypeScript,microsoft-TypeScript.git,3a68348fcbb5916228a722c433017cc5af75a0fe,src/compiler/commandLineParser.ts,,stratified,SAMPLED,,3000+
+TypeScript,microsoft-TypeScript.git,3a68348fcbb5916228a722c433017cc5af75a0fe,src/compiler/commandLineParser.ts,typescript-microsoft-typescript-add-one-item,stratified,PROMOTED,,3000+
 TypeScript,microsoft-TypeScript.git,3dd0a35032ca78d8b220177362398b03457fb2d8,src/compiler/utilities.ts,,stratified,SAMPLED,,3000+
 TypeScript,microsoft-TypeScript.git,3fc1f264de2aacae0c008eb4295e66833ade36d9,tests/cases/compiler/assignmentCompatability37.ts,typescript-typescript-add-target-comment,small,PROMOTED,,
 TypeScript,microsoft-TypeScript.git,3fc1f264de2aacae0c008eb4295e66833ade36d9,tests/cases/compiler/assignmentNestedInLiterals.ts,typescript-typescript-add-target-comment-2,small,PROMOTED,,
@@ -1662,7 +1662,7 @@ TypeScript,microsoft-TypeScript.git,3fc1f264de2aacae0c008eb4295e66833ade36d9,tes
 TypeScript,microsoft-TypeScript.git,3fc1f264de2aacae0c008eb4295e66833ade36d9,tests/cases/conformance/parser/ecmascript5/RegressionTests/parser642331_1.ts,typescript-microsoft-typescript-add-es-target-4,stratified,PROMOTED,,0-10
 TypeScript,microsoft-TypeScript.git,3fc1f264de2aacae0c008eb4295e66833ade36d9,tests/cases/conformance/types/any/anyAsFunctionCall.ts,typescript-microsoft-typescript-add-eslint,stratified,PROMOTED,,0-10
 TypeScript,microsoft-TypeScript.git,3fc1f264de2aacae0c008eb4295e66833ade36d9,tests/cases/conformance/types/objectTypeLiteral/methodSignatures/objectTypesWithOptionalProperties2.ts,typescript-microsoft-typescript-add-target,stratified,PROMOTED,,10-30
-TypeScript,microsoft-TypeScript.git,3fc1f264de2aacae0c008eb4295e66833ade36d9,tests/cases/conformance/types/typeRelationships/subtypesAndSuperTypes/subtypingWithConstructSignaturesWithSpecializedSignatures.ts,,stratified,SAMPLED,,30-100
+TypeScript,microsoft-TypeScript.git,3fc1f264de2aacae0c008eb4295e66833ade36d9,tests/cases/conformance/types/typeRelationships/subtypesAndSuperTypes/subtypingWithConstructSignaturesWithSpecializedSignatures.ts,typescript-microsoft-typescript-add-target-4,stratified,PROMOTED,,30-100
 TypeScript,microsoft-TypeScript.git,48575468659c4a464ff0246ad402a2ad8cd7b4c7,tests/baselines/reference/api/typescript.d.ts,,stratified,SAMPLED,,3000+
 TypeScript,microsoft-TypeScript.git,4cedfe40b0d2a81b132b6ae2fcca77f0b036c274,src/testRunner/unittests/tsc/redirect.ts,,stratified,SAMPLED,,30-100
 TypeScript,microsoft-TypeScript.git,7956c00166df552a1d6da6c2f996b558e5dd94ff,tests/cases/fourslash/completionsImport_umdModules2_moduleExports.ts,,stratified,SAMPLED,,30-100
@@ -1702,7 +1702,7 @@ TypeScript,radioacoustick-Coil64,4cd06a16bafe66e4925cfd40dfa7e6218f6e31cf,lang/C
 TypeScript,th-ch-youtube-music,4fba3ffd92ca4d12962d4bdac22b8d497aefed39,src/plugins/downloader/main/index.ts,typescript-th-ch-youtube-music-add-a-function-and-some-small-changes,full,PROMOTED,,
 TypeScript,vercel-next.js.git,02af7ed3a4f67d0f6d3d07ee6ac1754c754d145f,test/e2e/app-dir-export/test/utils.ts,,stratified,SAMPLED,,300-1000
 TypeScript,vercel-next.js.git,4385ed36f66dfe0d9ae6a955135be7c1461fd35f,turbopack/crates/turbopack-ecmascript-runtime/js/src/browser/runtime/base/runtime-base.ts,,stratified,SAMPLED,,300-1000
-TypeScript,vercel-next.js.git,a65c3c86e762623278d1d9aca317c0afbc90bce0,packages/next/src/client/components/router-reducer/ppr-navigations.ts,,stratified,SAMPLED,,1000-3000
+TypeScript,vercel-next.js.git,a65c3c86e762623278d1d9aca317c0afbc90bce0,packages/next/src/client/components/router-reducer/ppr-navigations.ts,typescript-vercel-next-whitespace-only,stratified,PROMOTED,,1000-3000
 TypeScript,vercel-next.js.git,ea3cad2848539d9a6273b42b09011d52b8a99b6a,packages/next/src/server/request/headers.ts,,stratified,SAMPLED,,300-1000
 Vimscript,chikamichi-mediawiki.vim,03ed9538a8a623c3fe626d07d5085d040a2cfc65,ftdetect/mediawiki.vim,vimscript-chikamichi-mediawiki-add-one-autocmd,full,PROMOTED,,
 Vimscript,chikamichi-mediawiki.vim,cd89be566e89e2d32444660a261af8e877323a2c,autoload/mediawiki.vim,vimscript-chikamichi-mediawiki-remove-3-lines,full,PROMOTED,,
@@ -1717,7 +1717,7 @@ Vimscript,junegunn-fzf.git,8cb59e6fcac3dce8dfa44b678fdc94cf81efa11b,plugin/fzf.v
 Vimscript,m-pilia-vim-mediawiki,43bcb013f50438b5c5d07bbe6e72639b8c0764e2,test/utils.vim,vimscript-m-pilia-vim-mediawiki-add-a-new-functon,full,PROMOTED,,
 Vimscript,neovim-neovim.git,0082cd313485aa60811b1bdbe3c765f107ba1ba9,test/old/testdir/test_perl.vim,,stratified,SAMPLED,,300-1000
 Vimscript,neovim-neovim.git,0566767d7dbe5b2abce8d37aab85d328629b2cc7,runtime/syntax/vim.vim,,stratified,SAMPLED,,1000-3000
-Vimscript,neovim-neovim.git,0655a359ae73348e7bba457ca4a1fae0450dcb98,test/old/testdir/test_filetype.vim,,stratified,SAMPLED,,3000+
+Vimscript,neovim-neovim.git,0655a359ae73348e7bba457ca4a1fae0450dcb98,test/old/testdir/test_filetype.vim,vimscript-neovim-neovim-add-one-dict-item,stratified,PROMOTED,,3000+
 Vimscript,neovim-neovim.git,069a5ef8e02e1d0c9b12828fc1ff57cd0feac6d3,runtime/ftplugin/haskell.vim,,stratified,SAMPLED,,30-100
 Vimscript,neovim-neovim.git,08b8fe5ab36ee3df3ce593942565d4cd318373c4,test/old/testdir/test_ins_complete.vim,vimscript-neovim-neovim-add-test-case-plus-edit-existing-one,small,PROMOTED,,
 Vimscript,neovim-neovim.git,0dfac68928778f3ed6297c5ad46a79eb9a8dc69d,test/old/testdir/test_cd.vim,vimscript-neovim-neovim-improved-asserts,small,PROMOTED,,
@@ -1726,7 +1726,7 @@ Vimscript,neovim-neovim.git,17555de2674fb7aa79815d815395aebfc01ea8ec,runtime/col
 Vimscript,neovim-neovim.git,17555de2674fb7aa79815d815395aebfc01ea8ec,runtime/colors/peachpuff.vim,,stratified,SAMPLED,,300-1000
 Vimscript,neovim-neovim.git,17555de2674fb7aa79815d815395aebfc01ea8ec,runtime/colors/retrobox.vim,,stratified,SAMPLED,,300-1000
 Vimscript,neovim-neovim.git,17555de2674fb7aa79815d815395aebfc01ea8ec,runtime/colors/zellner.vim,vimscript-neovim-neovim-awful-test-case-bunch-of-hex-colours-more-data-than-code,small,PROMOTED,,
-Vimscript,neovim-neovim.git,1de1c08210076edbdc23fba86d9ffff25b54cbd8,test/old/testdir/test_filetype.vim,,stratified,SAMPLED,,3000+
+Vimscript,neovim-neovim.git,1de1c08210076edbdc23fba86d9ffff25b54cbd8,test/old/testdir/test_filetype.vim,vimscript-neovim-neovim-add-one-dict-entry,stratified,PROMOTED,,3000+
 Vimscript,neovim-neovim.git,20a7e744441983906b3ff1c8562e05e32af50c32,test/old/testdir/test_crash.vim,vimscript-neovim-neovim-add-a-few-lines-one-after-the-other,small,PROMOTED,,
 Vimscript,neovim-neovim.git,289eb2edd9c83870bc59d0f17fff25df8c738437,runtime/compiler/pyright.vim,vimscript-neovim-neovim-date-update-plus-bugfix,stratified,PROMOTED,,10-30
 Vimscript,neovim-neovim.git,30bcb25341b73882ed0ee839002fdf6c2847ebae,test/old/testdir/test_autocmd.vim,,stratified,SAMPLED,,3000+
@@ -1746,7 +1746,7 @@ Vimscript,neovim-neovim.git,6ad73421cbfc42d63e8e2d3522ef1e6b9ed48855,runtime/syn
 Vimscript,neovim-neovim.git,6dfcb2b78463949ba066851a949bae15e869b33c,test/old/testdir/test_filetype.vim,,stratified,SAMPLED,,3000+
 Vimscript,neovim-neovim.git,6e3883adb82b64acd04da7936abb4addba886284,runtime/ftplugin/zsh.vim,,stratified,SAMPLED,,30-100
 Vimscript,neovim-neovim.git,73f2286f08caa52537523515c27a3070218fc164,test/old/testdir/test_conceal.vim,,stratified,SAMPLED,,300-1000
-Vimscript,neovim-neovim.git,73f2286f08caa52537523515c27a3070218fc164,test/old/testdir/test_tabpage.vim,,stratified,SAMPLED,,1000-3000
+Vimscript,neovim-neovim.git,73f2286f08caa52537523515c27a3070218fc164,test/old/testdir/test_tabpage.vim,vimscript-neovim-neovim-add-one-line-to-test,stratified,PROMOTED,,1000-3000
 Vimscript,neovim-neovim.git,7b7e8cc724584d9d40cfa84516c8294f4b60d2b9,test/old/testdir/gen_opt_test.vim,vimscript-neovim-neovim-i-have-no-idea-what-this-diff-does,small,PROMOTED,,
 Vimscript,neovim-neovim.git,80788dc9db8d092437fe98a01274bb7114f365aa,runtime/syntax/make.vim,,stratified,SAMPLED,,100-300
 Vimscript,neovim-neovim.git,8754118213d79d316f740e739201b34639b4c8f6,test/old/testdir/test_tagjump.vim,vimscript-neovim-neovim-add-line-comment,small,PROMOTED,,
@@ -1759,7 +1759,7 @@ Vimscript,neovim-neovim.git,957eb1fde04496b4a2c07fd8427a8d78844d1bf7,runtime/ftp
 Vimscript,neovim-neovim.git,9ca69488cf08d78609ad4baef50bbcbbc937a9b7,runtime/pack/dist/opt/matchit/autoload/matchit.vim,vimscript-neovim-neovim-add-two-functions-and-modify-a-few-lines,small,PROMOTED,,
 Vimscript,neovim-neovim.git,a4ee34a165ef5b190378740d2c4ce15410f0f477,runtime/ftplugin/rst.vim,vimscript-neovim-neovim-add-a-few-lines,small,PROMOTED,,
 Vimscript,neovim-neovim.git,a60d5f863e060ff35a38e0d5a829dfe5b8aaecac,runtime/syntax/tera.vim,,stratified,SAMPLED,,100-300
-Vimscript,neovim-neovim.git,a84bf386d241b459708588291174a928799379d5,test/old/testdir/test_filetype.vim,,stratified,SAMPLED,,3000+
+Vimscript,neovim-neovim.git,a84bf386d241b459708588291174a928799379d5,test/old/testdir/test_filetype.vim,vimscript-neovim-neovim-add-one-line-to-dict,stratified,PROMOTED,,3000+
 Vimscript,neovim-neovim.git,aed1f8c37730103a38f7248f22826892cd6f556e,test/old/testdir/test_quickfix.vim,,stratified,SAMPLED,,3000+
 Vimscript,neovim-neovim.git,b4e602dde544d2b18bc7813415565fbe6ab1041b,test/old/testdir/test_exit.vim,,stratified,SAMPLED,,100-300
 Vimscript,neovim-neovim.git,b59eba3ada13ee3ceb0f8decebd261e55b2baa2d,test/old/testdir/test_cindent.vim,,stratified,SAMPLED,,3000+
@@ -1798,7 +1798,7 @@ XML,eclipse-ee4j-jaxb-istack-commons,685bd782d32f9fa20670e0c5a9d7a2fc0b38845d,is
 XML,gap-packages-toric,7f7aaf547ea83e856e9757795d36d6b920ff17db,doc/Toric.xml,xml-gap-packages-toric-remove-two-attributes,full,PROMOTED,,
 XML,godotengine-godot.git,0d52a6c94ca17c6a923ebfb8a83d8706029cdaed,doc/classes/CameraAttributesPractical.xml,,stratified,SAMPLED,,30-100
 XML,godotengine-godot.git,1a5d818ea97c40023e0b403a0390f5e24ea379a8,doc/classes/AnimationNode.xml,,stratified,SAMPLED,,100-300
-XML,godotengine-godot.git,33530407660306e804bb0edadfda3dc4ccb1b592,doc/classes/Input.xml,,stratified,SAMPLED,,300-1000
+XML,godotengine-godot.git,33530407660306e804bb0edadfda3dc4ccb1b592,doc/classes/Input.xml,xml-godotengine-godot-update-element-value,stratified,PROMOTED,,300-1000
 XML,godotengine-godot.git,cdcb208eb9d4e8cc5aef8a6977d2ecb6ebbd5f24,doc/classes/PopupMenu.xml,,stratified,SAMPLED,,300-1000
 XML,godotengine-godot.git,d7418f8ff2ad18b332bccb9664e765b594a29be6,doc/classes/TabBar.xml,,stratified,SAMPLED,,300-1000
 XML,godotengine-godot.git,e2e1c89723dbea93ac81f0903644575acf3be6f8,doc/classes/EditorSettings.xml,,stratified,SAMPLED,,1000-3000
@@ -1808,9 +1808,9 @@ XML,jellyfin-jellyfin.git,0c46431cbb48850fae0e425e95692a1a9bbce427,tests/Jellyfi
 XML,libreoffice,7d31c9e391cb8997a11ae7b97b7689e00f2427b9,extras/source/autotext/lang/zh-TW/standard/BlockList.xml,,stratified,SAMPLED,,10-30
 XML,libreoffice,7d31c9e391cb8997a11ae7b97b7689e00f2427b9,extras/source/autotext/lang/zh-TW/standard/JACL/content.xml,,stratified,SAMPLED,,10-30
 XML,libreoffice,7d31c9e391cb8997a11ae7b97b7689e00f2427b9,extras/source/autotext/lang/zh-TW/standard/Q/Q.xml,xml-libreoffice-unicode,stratified,PROMOTED,,0-10
-XML,libreoffice,9db6bc511b7bddcd844f3eb51b62e3fa89e9bc35,sc/uiconfig/scalc/menubar/menubar.xml,,stratified,SAMPLED,,300-1000
+XML,libreoffice,9db6bc511b7bddcd844f3eb51b62e3fa89e9bc35,sc/uiconfig/scalc/menubar/menubar.xml,xml-libreoffice-add-one-menu-item,stratified,PROMOTED,,300-1000
 XML,lincity-ng-lincity-ng,08f12f733b3afe3cf6bdfe212b0d9c7656588d1e,data/help/el/other-costs.xml,xml-lincity-ng-lincity-ng-whitespace-only-change,full,PROMOTED,,
-XML,microsoft-terminal.git,040f26175f6f2b200fe3d920d9354c05962c7a92,tools/tests.xml,,stratified,SAMPLED,,10-30
+XML,microsoft-terminal.git,040f26175f6f2b200fe3d920d9354c05962c7a92,tools/tests.xml,xml-microsoft-terminal-add-one-element,stratified,PROMOTED,,10-30
 XML,microsoft-terminal.git,1283c0f5b99a2961673249fa77c6b986efb5086c,build/StoreSubmission/Stable/PDPs/pt-BR/PDP.xml,xml-microsoft-terminal-multiline-string-constant-change,small,PROMOTED,,
 XML,microsoft-terminal.git,30dbd3b55416cceaff2b4db51e72a398fb05df9f,tools/tests.xml,,stratified,SAMPLED,,10-30
 XML,microsoft-terminal.git,37e2bc0caa6db564d9b7b4feb75e279ef0a400cd,build/StoreSubmission/Preview/PDPs/it-IT/PDP.xml,,stratified,SAMPLED,,100-300
@@ -1831,14 +1831,14 @@ XML,mozilla-firefox-firefox.git,82342cb1e84d7b43763f62a26b55b657fe526b52,mobile/
 XML,mozilla-firefox-firefox.git,aa31a3f99832180e304dce44b8a59c83f1632dae,mobile/android/fenix/app/src/main/res/raw/keep.xml,xml-mozilla-firefox-firefox-update-value,stratified,PROMOTED,,0-10
 XML,mozilla-firefox-firefox.git,dd7944feed7688a5a769f244b1abef732ecb2dd9,browser/components/preferences/experimental.inc.xhtml,,stratified,SAMPLED,,30-100
 XML,nextcloud-android.git,275220d89e07a10816eb4aca5e23c4ff7419ebc2,app/src/main/res/values-is/strings.xml,xml-nextcloud-android-delete-element,small,PROMOTED,,
-XML,nextcloud-android.git,4146a715b7e951655b69c322ed735ec0fa7e9f02,app/src/main/res/values-eu/strings.xml,,stratified,SAMPLED,,1000-3000
+XML,nextcloud-android.git,4146a715b7e951655b69c322ed735ec0fa7e9f02,app/src/main/res/values-eu/strings.xml,xml-nextcloud-android-add-one-element,stratified,PROMOTED,,1000-3000
 XML,nextcloud-android.git,43f3f125746da1949864f46b94a65811058a0990,app/src/main/res/values-hr/strings.xml,,stratified,SAMPLED,,1000-3000
 XML,nextcloud-android.git,486ce60b7c58946cd6abf7093ea71870fc6e72b2,app/src/main/res/values-nl/strings.xml,,stratified,SAMPLED,,1000-3000
-XML,nextcloud-android.git,5f3323b975bf3460d893cac0c6912c60996d8463,app/src/main/res/values-et-rEE/strings.xml,,stratified,SAMPLED,,1000-3000
+XML,nextcloud-android.git,5f3323b975bf3460d893cac0c6912c60996d8463,app/src/main/res/values-et-rEE/strings.xml,xml-nextcloud-android-add-translation,stratified,PROMOTED,,1000-3000
 XML,nextcloud-android.git,703b42d5e69c75fce770adbe7d338dbc8bd5947e,app/src/main/res/layout/quick_sharing_permissions_bottom_sheet_fragment.xml,,stratified,SAMPLED,,10-30
 XML,nextcloud-android.git,905d4cf21f56c7e5329bd24bc7e95c34d6b303fb,app/src/main/res/values-zh-rTW/strings.xml,,stratified,SAMPLED,,1000-3000
 XML,nextcloud-android.git,a28b3fdd3d24f159e0bd3212a3ceb9abbebea960,app/src/main/res/values-it/strings.xml,xml-nextcloud-android-delete-element-2,small,PROMOTED,,
-XML,nextcloud-android.git,a5426a8559163112e53c09bea4822797f115a506,app/src/main/res/values-sv/strings.xml,,stratified,SAMPLED,,1000-3000
+XML,nextcloud-android.git,a5426a8559163112e53c09bea4822797f115a506,app/src/main/res/values-sv/strings.xml,xml-nextcloud-android-add-translation-2,stratified,PROMOTED,,1000-3000
 XML,nextcloud-android.git,c54c32008bb748e7151399a889691f9ecfb5809d,app/src/main/res/values-ca/strings.xml,,stratified,SAMPLED,,1000-3000
 XML,nextcloud-android.git,e2c3bd1120a82d301e13367fab0aaf5b0083daf6,app/src/main/res/values-pl/strings.xml,,stratified,SAMPLED,,1000-3000
 XML,nextcloud-android.git,e3204931c6efe32c39239dfc93d3c88b153f45d1,app/src/main/res/values-hr/strings.xml,xml-nextcloud-android-add-few-translations,small,PROMOTED,,
@@ -1868,7 +1868,7 @@ XML,odoo-odoo.git,b5511e5ebb919c2c506131bf9e2a4196dac25f79,addons/account/views/
 XML,odoo-odoo.git,b6df114735c044a0620bc3146964d5a9568c128b,addons/l10n_es_edi_facturae/tests/data/expected_out_invoice_round_glob.xml,,stratified,SAMPLED,,300-1000
 XML,odoo-odoo.git,c8678db04dfa35b023cba7e3784ddb38348c116f,addons/l10n_ar/demo/respinsc_demo.xml,,stratified,SAMPLED,,30-100
 XML,odoo-odoo.git,cb7c0506e65d8c41653406192baadb84cf79ff0d,addons/pos_self_order/static/src/app/pages/product_page/product_page.xml,,stratified,SAMPLED,,30-100
-XML,odoo-odoo.git,d461b886b58a519a51151b8fcbb89e87b8a28c6d,addons/web/static/src/core/autocomplete/autocomplete.xml,,stratified,SAMPLED,,30-100
+XML,odoo-odoo.git,d461b886b58a519a51151b8fcbb89e87b8a28c6d,addons/web/static/src/core/autocomplete/autocomplete.xml,xml-odoo-odoo-add-attribute-2,stratified,PROMOTED,,30-100
 XML,protocolbuffers-protobuf.git,40fe103a798b52dc0c3072d249e766063db241ac,editions/golden/compare_cpp_codegen_failure.xml,,stratified,SAMPLED,,10-30
 XML,protocolbuffers-protobuf.git,8227cf163009ca55bce92a569483d1e622ce58db,java/kotlin/pom.xml,,stratified,SAMPLED,,100-300
 XML,protocolbuffers-protobuf.git,a688b3d40cf73bbcbf2299bb38dc316a763a0fb5,editions/golden/compare_cpp_codegen_failure.xml,,stratified,SAMPLED,,10-30
@@ -1914,9 +1914,9 @@ YAML,mastodon-mastodon.git,015d88b4c66e154f3b21db9f745c24c8c1247b67,config/local
 YAML,mastodon-mastodon.git,04f7638224e723fc24ed39daf3e4ac1a3e14e6ed,config/locales/zh-CN.yml,,stratified,SAMPLED,,1000-3000
 YAML,mastodon-mastodon.git,6bd4d7980283c67adb58d2fd858fdc1ea839d1c4,config/locales/doorkeeper.fr.yml,yaml-mastodon-mastodon-add-block-pair-translation,small,PROMOTED,,
 YAML,mastodon-mastodon.git,6e8df21233d9fe62267b30c7e3be17df256c924f,config/locales/fr.yml,,stratified,SAMPLED,,1000-3000
-YAML,mastodon-mastodon.git,6e8df21233d9fe62267b30c7e3be17df256c924f,config/locales/simple_form.hu.yml,,stratified,SAMPLED,,300-1000
-YAML,mastodon-mastodon.git,6e8df21233d9fe62267b30c7e3be17df256c924f,config/locales/simple_form.sl.yml,,stratified,SAMPLED,,300-1000
-YAML,mastodon-mastodon.git,7eb4b907eb7a6d431f9d20539554e50cd66ec682,config/locales/io.yml,,stratified,SAMPLED,,1000-3000
+YAML,mastodon-mastodon.git,6e8df21233d9fe62267b30c7e3be17df256c924f,config/locales/simple_form.hu.yml,yaml-mastodon-mastodon-delete-one-pair,stratified,PROMOTED,,300-1000
+YAML,mastodon-mastodon.git,6e8df21233d9fe62267b30c7e3be17df256c924f,config/locales/simple_form.sl.yml,yaml-mastodon-mastodon-remove-one-translation,stratified,PROMOTED,,300-1000
+YAML,mastodon-mastodon.git,7eb4b907eb7a6d431f9d20539554e50cd66ec682,config/locales/io.yml,yaml-mastodon-mastodon-remove-translation,stratified,PROMOTED,,1000-3000
 YAML,mastodon-mastodon.git,cc75188a76f738981ae39277d74a3fdd8e44ad7e,config/locales/ko.yml,,stratified,SAMPLED,,1000-3000
 YAML,mastodon-mastodon.git,e2aecd040c84cc5d57337d1c092577f5870ccab5,config/locales/cs.yml,,stratified,SAMPLED,,1000-3000
 YAML,mermaid-js-mermaid.git,9cd687a7a820a8038601a58e5ad3f0faa6816a9d,packages/mermaid/src/schemas/config.schema.yaml,,stratified,SAMPLED,,1000-3000

@@ -403,6 +403,8 @@ mod kotlin_mozilla_firefox_firefox_add_one_line_2;
 #[cfg(test)]
 mod kotlin_mozilla_firefox_firefox_rename;
 #[cfg(test)]
+mod kotlin_nextcloud_android_add_one_annotation;
+#[cfg(test)]
 mod kotlin_nextcloud_android_add_param;
 #[cfg(test)]
 mod kotlin_nextcloud_android_add_param_to_class;
@@ -413,6 +415,10 @@ mod kotlin_nextcloud_android_real_small_change;
 #[cfg(test)]
 mod kotlin_nextcloud_android_remove_function;
 #[cfg(test)]
+mod kotlin_nextcloud_android_remove_one_argument;
+#[cfg(test)]
+mod kotlin_nextcloud_android_remove_one_argument_2;
+#[cfg(test)]
 mod kotlin_nextcloud_android_remove_one_import;
 #[cfg(test)]
 mod kotlin_nextcloud_android_rename;
@@ -421,9 +427,13 @@ mod kotlin_nextcloud_android_rename_field;
 #[cfg(test)]
 mod kotlin_nextcloud_android_small_change;
 #[cfg(test)]
+mod kotlin_nextcloud_android_whitespace_only;
+#[cfg(test)]
 mod kotlin_rustdesk_rustdesk_add_func;
 #[cfg(test)]
 mod lua_awesomewm_awesome_add_comment;
+#[cfg(test)]
+mod lua_awesomewm_awesome_add_deprecation_notice_to_comment;
 #[cfg(test)]
 mod lua_awesomewm_awesome_add_func;
 #[cfg(test)]
@@ -431,11 +441,15 @@ mod lua_awesomewm_awesome_add_func_call;
 #[cfg(test)]
 mod lua_awesomewm_awesome_add_h_to_align;
 #[cfg(test)]
+mod lua_awesomewm_awesome_add_noreturn_comment;
+#[cfg(test)]
 mod lua_awesomewm_awesome_add_to_table_constructor;
 #[cfg(test)]
 mod lua_awesomewm_awesome_comment_only;
 #[cfg(test)]
 mod lua_awesomewm_awesome_comment_only_2;
+#[cfg(test)]
+mod lua_awesomewm_awesome_fix_one_byte_typo_in_comment;
 #[cfg(test)]
 mod lua_awesomewm_awesome_halign;
 #[cfg(test)]
@@ -444,6 +458,8 @@ mod lua_awesomewm_awesome_insert;
 mod lua_awesomewm_awesome_insert_only;
 #[cfg(test)]
 mod lua_awesomewm_awesome_update_comment;
+#[cfg(test)]
+mod lua_neovim_neovim_add_leading_comment;
 #[cfg(test)]
 mod lua_neovim_neovim_rename;
 #[cfg(test)]
@@ -463,13 +479,21 @@ mod php_nextcloud_server_add_declare_6;
 #[cfg(test)]
 mod php_nextcloud_server_add_declare_7;
 #[cfg(test)]
+mod php_nextcloud_server_add_one_element_to_array_init;
+#[cfg(test)]
 mod php_nextcloud_server_add_readonly;
 #[cfg(test)]
 mod php_nextcloud_server_real_small_change;
 #[cfg(test)]
+mod php_wordpress_wordpress_add_one_require_statement;
+#[cfg(test)]
+mod php_wordpress_wordpress_not_sure_if_this_parses_correctly;
+#[cfg(test)]
 mod php_wordpress_wordpress_one_line_file_insert_and_update;
 #[cfg(test)]
 mod php_wordpress_wordpress_one_line_file_with_real_insert_and_update;
+#[cfg(test)]
+mod php_wordpress_wordpress_remove_one_todo_comment;
 #[cfg(test)]
 mod php_wordpress_wordpress_version;
 #[cfg(test)]
@@ -527,6 +551,8 @@ mod python_ytdl_org_youtube_dl_version_update;
 #[cfg(test)]
 mod python_ytdl_org_youtube_dl_version_update_2;
 #[cfg(test)]
+mod ruby_homebrew_brew_add_extends;
+#[cfg(test)]
 mod ruby_homebrew_brew_version;
 #[cfg(test)]
 mod ruby_jekyll_jekyll_version;
@@ -549,9 +575,13 @@ mod ruby_jekyll_jekyll_whitespace_only_2;
 #[cfg(test)]
 mod ruby_jekyll_jekyll_whitespace_only_3;
 #[cfg(test)]
+mod ruby_jekyll_jekyll_whitespace_only_4;
+#[cfg(test)]
 mod ruby_mastodon_mastodon_add_func_and_attribute;
 #[cfg(test)]
 mod ruby_mastodon_mastodon_add_method;
+#[cfg(test)]
+mod ruby_mastodon_mastodon_add_one_call;
 #[cfg(test)]
 mod ruby_mastodon_mastodon_add_one_line;
 #[cfg(test)]
@@ -575,7 +605,11 @@ mod rust_gyulyvgc_sniffnet_add_mod_3;
 #[cfg(test)]
 mod rust_gyulyvgc_sniffnet_remoev_attribute;
 #[cfg(test)]
+mod rust_protocolbuffers_protobuf_add_enum_variant;
+#[cfg(test)]
 mod rust_rust_lang_rust_add_note_comment;
+#[cfg(test)]
+mod rust_rust_lang_rust_add_one_check;
 #[cfg(test)]
 mod rust_rust_lang_rust_change_use;
 #[cfg(test)]
@@ -592,6 +626,8 @@ mod rust_rust_lang_rust_remove_warn_comment_3;
 mod rust_rust_lang_rust_remove_warn_comments;
 #[cfg(test)]
 mod rust_rust_lang_rust_update_comment;
+#[cfg(test)]
+mod rust_rustdesk_rustdesk_add_one_token;
 #[cfg(test)]
 mod rust_tauri_apps_tauri_add_use_and_function;
 #[cfg(test)]
@@ -629,9 +665,13 @@ mod shellscript_microsoft_playwright_version;
 #[cfg(test)]
 mod shellscript_mongodb_mongo_small_change;
 #[cfg(test)]
+mod shellscript_nvm_sh_nvm_add_one_line;
+#[cfg(test)]
 mod shellscript_openhands_openhands_update_string_value;
 #[cfg(test)]
 mod shellscript_paddlepaddle_paddleocr_insert_inside_a_string;
+#[cfg(test)]
+mod shellscript_pandas_dev_pandas_remove_one_line;
 #[cfg(test)]
 mod shellscript_pi_hole_pi_hole_add_comment;
 #[cfg(test)]
@@ -642,6 +682,8 @@ mod shellscript_stgpetrovic_stacuist_pure_add;
 mod shellscript_stgpetrovic_stacuist_pure_add_2;
 #[cfg(test)]
 mod shellscript_vercel_next_change_command_params;
+#[cfg(test)]
+mod swift_nextcloud_ios_add_one_log_line;
 #[cfg(test)]
 mod swift_nextcloud_ios_different_func;
 #[cfg(test)]
@@ -715,6 +757,8 @@ mod tsx_mui_material_ui_remove_import_3;
 #[cfg(test)]
 mod tsx_mui_material_ui_remove_import_4;
 #[cfg(test)]
+mod tsx_mui_material_ui_remove_one_import;
+#[cfg(test)]
 mod tsx_shadcn_ui_ui_order_of_class_names;
 #[cfg(test)]
 mod typescript_microsoft_typescript_add_es_target;
@@ -735,6 +779,10 @@ mod typescript_microsoft_typescript_add_lib_comment;
 #[cfg(test)]
 mod typescript_microsoft_typescript_add_module_and_target_comment;
 #[cfg(test)]
+mod typescript_microsoft_typescript_add_one_item;
+#[cfg(test)]
+mod typescript_microsoft_typescript_add_one_line;
+#[cfg(test)]
 mod typescript_microsoft_typescript_add_strict;
 #[cfg(test)]
 mod typescript_microsoft_typescript_add_strict_2;
@@ -747,6 +795,8 @@ mod typescript_microsoft_typescript_add_target_2;
 #[cfg(test)]
 mod typescript_microsoft_typescript_add_target_3;
 #[cfg(test)]
+mod typescript_microsoft_typescript_add_target_4;
+#[cfg(test)]
 mod typescript_microsoft_typescript_add_target_comment_2;
 #[cfg(test)]
 mod typescript_microsoft_typescript_expand_target;
@@ -756,6 +806,16 @@ mod typescript_microsoft_typescript_expand_target_2;
 mod typescript_microsoft_typescript_expand_target_3;
 #[cfg(test)]
 mod typescript_microsoft_typescript_extend_target_comment;
+#[cfg(test)]
+mod typescript_vercel_next_whitespace_only;
+#[cfg(test)]
+mod vimscript_neovim_neovim_add_one_dict_entry;
+#[cfg(test)]
+mod vimscript_neovim_neovim_add_one_dict_item;
+#[cfg(test)]
+mod vimscript_neovim_neovim_add_one_line_to_dict;
+#[cfg(test)]
+mod vimscript_neovim_neovim_add_one_line_to_test;
 #[cfg(test)]
 mod vimscript_neovim_neovim_comment_only_insert;
 #[cfg(test)]
@@ -775,11 +835,25 @@ mod vimscript_neovim_neovim_small_change_2;
 #[cfg(test)]
 mod xml_genymobile_scrcpy_remove_package_attribute;
 #[cfg(test)]
+mod xml_godotengine_godot_update_element_value;
+#[cfg(test)]
 mod xml_jellyfin_jellyfin_update_attribute_values;
+#[cfg(test)]
+mod xml_libreoffice_add_one_menu_item;
 #[cfg(test)]
 mod xml_libreoffice_unicode;
 #[cfg(test)]
+mod xml_microsoft_terminal_add_one_element;
+#[cfg(test)]
 mod xml_mozilla_firefox_firefox_update_value;
+#[cfg(test)]
+mod xml_nextcloud_android_add_one_element;
+#[cfg(test)]
+mod xml_nextcloud_android_add_translation;
+#[cfg(test)]
+mod xml_nextcloud_android_add_translation_2;
+#[cfg(test)]
+mod xml_odoo_odoo_add_attribute_2;
 #[cfg(test)]
 mod xml_odoo_odoo_insert_only;
 #[cfg(test)]
@@ -810,5 +884,11 @@ mod yaml_ansible_ansible_version;
 mod yaml_gyulyvgc_sniffnet_version;
 #[cfg(test)]
 mod yaml_jekyll_jekyll_true_to_false;
+#[cfg(test)]
+mod yaml_mastodon_mastodon_delete_one_pair;
+#[cfg(test)]
+mod yaml_mastodon_mastodon_remove_one_translation;
+#[cfg(test)]
+mod yaml_mastodon_mastodon_remove_translation;
 #[cfg(test)]
 mod yaml_puppeteer_puppeteer_false_to_true;
