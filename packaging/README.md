@@ -27,8 +27,8 @@ job in `.github/workflows/release.yml`). Read the values from there, or regenera
 
 ```sh
 cd packaging/aur && updpkgsums                      # rewrites sha256sums=() in place
-ebuild gentoo/dev-util/codediff/codediff-0.0.12.ebuild manifest
-nix-prefetch-url --unpack https://github.com/ivankovic/codediff/archive/refs/tags/v0.0.12.tar.gz
+ebuild gentoo/dev-util/codediff/codediff-0.0.13.ebuild manifest
+nix-prefetch-url --unpack https://github.com/ivankovic/codediff/archive/refs/tags/v0.0.13.tar.gz
 ```
 
 Do not hand-write a checksum. A wrong one looks correct until the moment somebody's build fails.
