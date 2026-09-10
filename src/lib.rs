@@ -23,6 +23,8 @@ pub mod diff;
 pub mod stats;
 #[cfg(feature = "tui")]
 pub mod tui;
+#[cfg(feature = "web")]
+pub mod web;
 
 // `test` also (not just `feature = "test-fixtures"`) whenever compiling under `cfg(test)`:
 // dozens of ordinary `#[cfg(test)] mod tests` blocks throughout the crate (diff/, code/, tui/)

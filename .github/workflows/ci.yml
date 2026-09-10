@@ -30,7 +30,7 @@ jobs:
         # Same reasoning as build-and-test's matrix below: each feature config is its own
         # compilation unit (see Cargo.toml's [features]), so each needs its own clippy pass, not
         # just a single default-feature run.
-        features: ["", "test-fixtures", "stats"]
+        features: ["", "test-fixtures", "stats", "web"]
     steps:
       - uses: actions/checkout@v7
 
@@ -68,7 +68,7 @@ jobs:
       - run: cargo audit --ignore RUSTSEC-2026-0195 --ignore RUSTSEC-2026-0194
 
   mapping-site-js:
-    name: human_mapping site JS tests
+    name: JS tests (human_mapping site, web viewer)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -81,6 +81,9 @@ jobs:
       # pre-push hook run, and the three must not drift apart (see the target's own comment for
       # what the tests do and do not cover).
       - run: make test-mapping-site-js
+
+      # The browser viewer's model (assets/web/), same arrangement - see the target's comment.
+      - run: make test-web-js
 
   # The analysis scripts under research/ compute the numbers that go into the papers, and until
   # 2026-08-27 nothing checked them at all while the Rust half had clippy -D warnings across three
@@ -142,10 +145,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # "" = default features (tui only). test-fixtures and stats are each their own
+        # "" = default features (tui only). test-fixtures, stats and web are each their own
         # compilation unit - see Cargo.toml's [features] - so each needs its own build+test pass,
         # not just a single default-feature run.
-        features: ["", "test-fixtures", "stats"]
+        features: ["", "test-fixtures", "stats", "web"]
     steps:
       - uses: actions/checkout@v7
 

@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>codediff</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body data-token="__CODEDIFF_TOKEN__">
+<span id="measure" aria-hidden="true">MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM</span>
+<div id="app">
+  <div id="status" hidden></div>
+  <div id="panels">
+    <section class="panel" id="panel-0">
+      <div class="title"><span class="label"> Before </span><span class="file"></span></div>
+      <div class="body"><div class="code"><div class="rows"></div></div><canvas class="minimap" width="8"></canvas></div>
+    </section>
+    <section class="panel" id="panel-1">
+      <div class="title"><span class="label"> After </span><span class="file"></span></div>
+      <div class="body"><div class="code"><div class="rows"></div></div><canvas class="minimap" width="8"></canvas></div>
+    </section>
+  </div>
+  <div id="error" hidden></div>
+  <footer><span id="footer-left"></span><span id="footer-right"></span></footer>
+</div>
+<div id="recent" class="popup" hidden></div>
+<div id="toast" class="popup" hidden></div>
+<div id="overlay" hidden></div>
+<div id="diffing" class="screen" hidden></div>
+<div id="editing" class="screen" hidden>Editing in the terminal codediff-web was started from… waiting for the editor to exit</div>
+<div id="quit" class="screen" hidden>codediff-web has stopped. You can close this tab.</div>
+<script src="/model.js"></script>
+<script src="/app.js"></script>
+</body>
+</html>

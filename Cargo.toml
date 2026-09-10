@@ -237,6 +237,15 @@ stats = [
     "dep:walkdir",
     "test-fixtures",
 ]
+# The browser front end: `codediff-web` (src/web_main.rs, src/web/) serves the same diff the TUI
+# draws, to a page in a local browser. Implies `tui` because it reuses that module's diff-session
+# assembly (`tui::app::compute_diff_with_options`), config persistence (`tui::theme`) and syntect
+# highlighting (`tui::widgets::code_viewer`) rather than duplicating them. It adds no dependency
+# of its own: the HTTP/1.1 subset a single-page app on localhost needs is small enough to sit on
+# the tokio `tui` already pulls in (src/web/http.rs says why that beats a server crate here), so
+# Cargo.lock - and with it packaging/gentoo's generated CRATES= block - is unchanged by it.
+# Off by default: `cargo install codediff` keeps producing exactly the one binary it always has.
+web = ["tui"]
 
 # The one integration test in this project: `benchmark_other`'s harness end to end, driven through
 # a stand-in tool (`fake_diff_tool`) whose answers are known in advance. It has to live in tests/
@@ -253,6 +262,11 @@ required-features = ["test-fixtures"]
 name = "codediff"
 path = "src/main.rs"
 required-features = ["tui"]
+
+[[bin]]
+name = "codediff-web"
+path = "src/web_main.rs"
+required-features = ["web"]
 
 [[bin]]
 name = "ascii_visualizer"

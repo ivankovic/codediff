@@ -1,0 +1,271 @@
+/* The viewer's chrome. Colours that carry meaning come from the palette (inline styles set by
+   app.js) or from the syntect theme (--page-bg/--page-fg); this file only lays things out. */
+:root {
+  --page-bg: #1e1e1e;
+  --page-fg: #d4d4d4;
+  --chrome: #7f7f7f;
+  --accent: #00cdcd;
+  --row-height: 18px;
+}
+
+/* The rules below give several elements an explicit display, which would otherwise beat the
+   user agent's own `[hidden]` rule; app.js toggles visibility through the attribute. */
+[hidden] {
+  display: none !important;
+}
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--page-bg);
+  color: var(--page-fg);
+  font: 13px/var(--row-height) ui-monospace, "JetBrains Mono", "Fira Code", Menlo, Consolas, monospace;
+  overflow: hidden;
+}
+
+#measure {
+  position: absolute;
+  visibility: hidden;
+  white-space: pre;
+  line-height: var(--row-height);
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+#status {
+  text-align: center;
+  font-weight: bold;
+  height: var(--row-height);
+}
+
+#panels {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  gap: 1ch;
+}
+
+.panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.title {
+  height: var(--row-height);
+  white-space: pre;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: bold;
+}
+
+.title .filename {
+  color: var(--accent);
+}
+
+.title .language {
+  font-weight: normal;
+  color: var(--chrome);
+}
+
+.body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+.code {
+  flex: 1;
+  overflow: auto;
+  position: relative;
+  outline: none;
+  min-width: 0;
+}
+
+.rows {
+  position: relative;
+  white-space: pre;
+}
+
+/* Sized to the text, not the viewport, so the sticky gutter's containing block spans the whole
+   scrollable width and the line numbers stay put however far right the panel is scrolled. */
+.row {
+  position: absolute;
+  left: 0;
+  min-width: 100%;
+  width: max-content;
+  height: var(--row-height);
+  display: flex;
+}
+
+.gutter {
+  position: sticky;
+  left: 0;
+  flex: none;
+  color: var(--chrome);
+  background: var(--page-bg);
+  z-index: 1;
+}
+
+.text {
+  flex: none;
+}
+
+.cursor {
+  background: var(--page-fg);
+  color: var(--page-bg);
+  outline: 1px solid var(--page-fg);
+}
+
+.minimap {
+  flex: none;
+  width: 8px;
+  height: 100%;
+}
+
+#error {
+  color: #cd0000;
+  height: var(--row-height);
+  white-space: pre;
+  overflow: hidden;
+}
+
+footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 2ch;
+  color: var(--chrome);
+  height: var(--row-height);
+  white-space: pre;
+  overflow: hidden;
+}
+
+/* Overlays. */
+.popup, .dialog {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--page-bg);
+  color: var(--page-fg);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  padding: 0.5em 1ch;
+  white-space: pre;
+  z-index: 10;
+}
+
+#toast {
+  font-weight: bold;
+  text-align: center;
+  padding: 0.5em 2ch;
+}
+
+.screen {
+  position: fixed;
+  inset: 0;
+  background: var(--page-bg);
+  color: var(--page-fg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  z-index: 20;
+  white-space: pre-wrap;
+}
+
+#overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 15;
+}
+
+body.file-dialog #overlay {
+  background: var(--page-bg);
+}
+
+body.file-dialog .dialog {
+  width: calc(100% - 4ch);
+  height: calc(100% - 2em);
+}
+
+.dialog {
+  display: flex;
+  flex-direction: column;
+  max-width: calc(100% - 4ch);
+  max-height: calc(100% - 2em);
+  min-width: 52ch;
+  padding: 0;
+}
+
+.dialog-title {
+  color: var(--accent);
+  font-weight: bold;
+  padding: 0.25em 1ch;
+  border-bottom: 1px solid var(--accent);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dialog-body {
+  flex: 1;
+  overflow: auto;
+  padding: 0.25em 1ch;
+  min-height: 0;
+}
+
+.dialog-hint {
+  color: var(--chrome);
+  padding: 0.25em 1ch;
+  border-top: 1px solid var(--accent);
+}
+
+.dialog.help {
+  width: 90%;
+  height: 90%;
+}
+
+.dialog.help pre {
+  margin: 0;
+  font: inherit;
+}
+
+.list-row {
+  padding: 0 1ch;
+}
+
+.list-row.selected {
+  background: #0000ee;
+  color: #fff;
+  font-weight: bold;
+}
+
+.theme-row {
+  display: flex;
+}
+
+.theme-label {
+  display: inline-block;
+  width: 20ch;
+}
+
+.dropdown {
+  color: var(--accent);
+}
+
+.swatch {
+  display: inline-block;
+  width: 3ch;
+  height: 1em;
+  vertical-align: middle;
+}
+
+.prompt {
+  padding: 0.25em 1ch;
+}

@@ -1177,7 +1177,7 @@ impl App {
 
 /// The footer's compact key-hint reference - deliberately just the handful of most-used keys, not
 /// a full reference (that's `?`/`help_modal.rs`'s job).
-const FOOTER_HINTS: &str =
+pub(crate) const FOOTER_HINTS: &str =
     "?:help  o:open  r:reload  n/p:next/prev  /:search  M:options  Tab:switch  q:quit";
 
 /// Formats a `ChangeCounts` as a compact `+12 -4 ~2` summary for the footer - omits any category

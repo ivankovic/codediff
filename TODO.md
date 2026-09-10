@@ -854,6 +854,36 @@ work that was already done. What is written below is what the code actually says
 *  DONE 2026-09-10: the magenta diff color. Note the entry was wrong about which one: `Update` is
    yellow, and the magenta was `Move` in **headless** output only - every TUI preset had already
    moved to grey ("grey at the purple's own weight"). Headless now matches.
+*  Found 2026-09-10 while porting the viewer to the browser (src/web/SPECS.md lists them; the
+   port keeps each so the two front ends agree, so fixing one means fixing both):
+   - `q` quits from *every* screen, including the search modal and the file dialog's filter -
+     `App::handle_events` matches `Char('q')` before any screen check, so typing a `q` into a
+     search ends the session. The web viewer deliberately does not copy this one.
+   - `DiffViewer::merged_change_count_and_index` counts stops ordered by `(panel, position)`, not
+     in the order `n` walks them (before-file order with panel as the tiebreak), so `change N/M`
+     does not climb monotonically across a panel switch, contrary to its own doc comment.
+   - `draw_footer`'s `[... off]` badge names "Whole-pair updates" whenever anything else is off,
+     because that option is off in `RenderOptions::FULL` itself; the badge should compare against
+     the preset, not against "everything on".
+
+# Web front end follow-ups
+
+`codediff-web` (feature `web`, 2026-09-10) reached parity with the TUI's key list; see
+src/web/SPECS.md. What it does not yet have:
+
+*  Release artifacts. `.github/workflows/release.yml` builds and attaches `codediff` only; the web
+   binary is checkout-only until a job builds it with `--features web` (and the packaging recipes
+   under packaging/ decide whether to ship it - they currently install one binary).
+*  A browser-side test of app.js. model.js is covered under Node (`make test-web-js`); the DOM
+   wiring - measuring cells, virtualised rows, the click-to-column mapping, dialogs - has only
+   been exercised by hand. A headless-browser check (Firefox's `--screenshot` was tried but the
+   snap build refuses to start beside a running instance) would close that gap.
+*  Stopping with the tab. `q` stops the server, like quitting the TUI; closing the tab does not,
+   because a reload must not end the session. A heartbeat with a grace period would let a
+   `git difftool` invocation finish when the user simply closes the tab.
+*  Wide characters. Columns are UTF-16 code units and the cursor steps over surrogate pairs, but
+   a double-width (CJK) character occupies one cell in the model and two on screen; the TUI has
+   `text_range::ScreenColumn` for this and the page does not use it.
 
 # Possible code health improvements
 

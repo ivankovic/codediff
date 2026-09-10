@@ -70,7 +70,7 @@ coverage:
 	@echo "Browsable report: target/llvm-cov/html/index.html"
 	@echo "README badge: commit research/data/coverage/badge.json to publish this number"
 
-test: test-mapping-site-js test-python
+test: test-mapping-site-js test-web-js test-python
 	cargo nextest run --release
 
 # The pure functions under research/analysis/ and scripts/ (CSV readers, LaTeX number format, LOC
@@ -91,6 +91,13 @@ test-python:
 test-mapping-site-js:
 	node assets/mapping_site/index.test.js
 	node assets/mapping_site/viewer.test.js
+
+# The same for the browser viewer's own logic (assets/web/model.js - cursor, change navigation,
+# search, overlay painting, ported from the TUI's widgets and pinned to them test by test). Embedded
+# via include_str! into src/web/server.rs and never executed by anything Rust runs, so this is its
+# only coverage; app.js (DOM wiring) has none, like the mapping site's.
+test-web-js:
+	node assets/web/model.test.js
 
 # $(FEATURES) defaults to `stats` because every research target that depends on this one
 # (measure-file-stats, measure-commit-stats, sample-pairs, measure-pairs, and the language-specific

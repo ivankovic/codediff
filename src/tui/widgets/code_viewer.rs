@@ -42,12 +42,12 @@ static THEME_SET: OnceLock<ThemeSet> = OnceLock::new();
 /// plain text before this. `two-face` bundles the much larger syntax set `bat` ships with, which
 /// covers all of those - confirmed against every `language_to_syntect` name below. Bazel/Starlark
 /// still has no definition in either set and remains an unhighlighted gap.
-fn syntax_set() -> &'static SyntaxSet {
+pub(crate) fn syntax_set() -> &'static SyntaxSet {
     SYNTAX_SET.get_or_init(two_face::syntax::extra_newlines)
 }
 
 /// Get or initialize the theme set
-fn theme_set() -> &'static ThemeSet {
+pub(crate) fn theme_set() -> &'static ThemeSet {
     THEME_SET.get_or_init(ThemeSet::load_defaults)
 }
 
@@ -62,7 +62,7 @@ pub fn syntax_theme_names() -> Vec<String> {
 }
 
 /// Map our internal Language enum to syntect syntax name
-fn language_to_syntect(lang: &crate::code::Language) -> Option<&'static str> {
+pub(crate) fn language_to_syntect(lang: &crate::code::Language) -> Option<&'static str> {
     use crate::code::Language::*;
 
     match lang {

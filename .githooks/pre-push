@@ -47,7 +47,7 @@ cargo fmt --check
 # Mirrors build-and-test's feature matrix (see ci.yml's own comment on why each of these three is
 # its own compilation unit) and CI's own (undocumented until now, see clippy job's own comment)
 # per-feature-config `cargo clippy -D warnings` gate.
-for features in "" "test-fixtures" "stats"; do
+for features in "" "test-fixtures" "stats" "web"; do
     label="${features:-default}"
     echo "pre-push: cargo clippy --tests --features \"$features\" -- -D warnings ($label)"
     cargo clippy --tests --features "$features" -- -D warnings
@@ -69,6 +69,8 @@ if command -v node >/dev/null 2>&1; then
     # one edit and not three - this hook, CI's mapping-site-js job, and `make test` all have to
     # agree, and viewer.test.js was already missed by this line once.
     make test-mapping-site-js
+    echo "pre-push: web viewer JS tests"
+    make test-web-js
 else
     echo "pre-push: node not found, skipping human_mapping site JS tests (CI still runs these)"
 fi

@@ -38,7 +38,9 @@ use crate::tui::theme::OverlayTheme;
 /// static text: the actual colors are theme-dependent, so `draw` renders it from the live
 /// `OverlayTheme` palette instead (see `legend_lines`) - a fixed "Green means inserted"
 /// description would be wrong for most non-default themes.
-const HELP_TEXT: &str = "\
+/// The keybinding reference, one source for both front ends: the TUI draws it in this modal and
+/// `web` serves it verbatim to the browser's `?` overlay, so the two cannot list different keys.
+pub const HELP_TEXT: &str = "\
 Navigation
   Tab              Switch the active panel (Before/After)
   h/j/k/l          Move the cursor left/down/up/right

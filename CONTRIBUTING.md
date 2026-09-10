@@ -154,8 +154,15 @@ Some directories in the list below do not exist yet. Create them if the need ari
         |- tui/         <- The TUI itself: app.rs (controller), ui.rs (terminal rendering),
         |                  components/, widgets/
         |   |- SPECS.md <- TUI specs
+        |- web_main.rs  <- Entry point of `codediff-web` (feature `web`): the viewer in a browser
+        |- web.rs       <- Declares the web front end's submodules
+        |- web/         <- The local HTTP server and JSON API behind codediff-web: session.rs
+        |                  (controller), payload.rs (wire format), server.rs, http.rs
+        |   |- SPECS.md <- Web front end specs
         |- test/        <- Shared test helpers, plus slower fixture-driven tests (see "Testing")
         |- bin/         <- Standalone developer tools: benchmarking, dataset sampling, and more
+    |- /assets/web      <- The page codediff-web serves (embedded at build time): model.js is the
+    |                      TUI's viewer logic ported to the browser, app.js the DOM wiring
     |- /benches         <- Benchmarks
     |- /research        <- Datasets and analysis scripts used to guide design decisions
     |- README.md        <- High-level project summary. Must be readable to humans.
@@ -184,8 +191,9 @@ documented there.
 
 ### Build, test, quality
 
-* `test` - `cargo nextest run --release`, plus `test-mapping-site-js` (a plain-Node test of the
-  human-mapping site's vanilla JS, which cargo's suite cannot cover - see the root Makefile).
+* `test` - `cargo nextest run --release`, plus `test-mapping-site-js` and `test-web-js` (plain-Node
+  tests of the human-mapping site's and the web viewer's vanilla JS, which cargo's suite cannot
+  cover - see the root Makefile).
   Requires `cargo-nextest` (`cargo install cargo-nextest`, one-time). Unlike `cargo test`, nextest
   runs each test in its own process rather than as a thread inside one long-lived binary, so the
   `src/test/helper.rs` fixture caches (never-evicting, process-lifetime) get reclaimed by the OS
