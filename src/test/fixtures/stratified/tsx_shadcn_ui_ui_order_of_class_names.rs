@@ -30,9 +30,10 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test, read the rate it
-    // reports for both modes, and record that instead.
-    assert_matches_human_painting_within_limit("tsx-shadcn-ui-ui-order-of-class-names", 100.0)
+    // measured 2026-09-10: minimal 3.226%, full 3.226%
+    // Two `ours=Update, theirs=Move` - a class-attribute reorder that codediff reads as a
+    // rewrite. Move-vs-Update, the second-largest painting family.
+    assert_matches_human_painting_within_limit("tsx-shadcn-ui-ui-order-of-class-names", 3.24)
 }
 
 #[test]

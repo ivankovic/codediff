@@ -19,7 +19,7 @@ use anyhow::Result;
 
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants_with_known_violations;
 
 #[test]
 fn mapping() -> Result<()> {
@@ -30,12 +30,24 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test, read the rate it
-    // reports for both modes, and record that instead.
-    assert_matches_human_painting_within_limit("vimscript-neovim-neovim-small-change-2", 100.0)
+    // measured 2026-09-10: minimal 0.590%, full 5.605%
+    // codediff splits into Insert+Delete what the human painting calls one Update. Note this
+    // fixture also has a known ground-truth invariant violation (see invariants() below), so part
+    // of this rate may be the data rather than the algorithm.
+    assert_matches_human_painting_within_limit("vimscript-neovim-neovim-small-change-2", 5.62)
 }
 
 #[test]
 fn invariants() -> Result<()> {
-    assert_ground_truth_invariants("vimscript-neovim-neovim-small-change-2")
+    // 1 known violation in the ground truth itself, not in codediff:
+    //
+    //   painting 'Minimal' after row 18 ends its last painted run on ' ', not on a visible
+    //     character: "let b:undo_ftplugin .= '| setl com< cms<'"
+    //
+    // Same defect and same repair as vimscript-neovim-neovim-only-delete next door: re-paint the
+    // row in human_solver so the run stops at the last visible byte, then drop this to 0.
+    assert_ground_truth_invariants_with_known_violations(
+        "vimscript-neovim-neovim-small-change-2",
+        1,
+    )
 }

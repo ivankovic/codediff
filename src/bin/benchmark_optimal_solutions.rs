@@ -313,6 +313,17 @@ struct Row {
     /// the denominator for the visible-mismatch percentage - same `(count, denominator)` shape as
     /// `mismatches`, and `None` under the same "unsolved" convention.
     visible_mismatches: Option<(usize, usize)>,
+    /// Whether this fixture's pair has no tree-sitter AST at all - an unsupported language, where
+    /// codediff falls back to `plain_text_line_diff` (see `PaintingDiff::PlainText`). Such a
+    /// fixture has a `human_mapping.json` and is fully solved; there is simply no tree to map, so
+    /// it carries no mapping score.
+    ///
+    /// A separate field rather than another `None`, because "unsolved" is counted in two places
+    /// from `mismatches.is_none()` (the print loop's `_` arm and `compare_to_baseline`) and means
+    /// one specific thing: no `human_mapping.json` yet. Folding a text-only fixture into that
+    /// makes the census lie - it sends the next reader looking for a missing file that is not
+    /// missing.
+    text_only: bool,
     /// How many node slots this fixture's human mapping actually grades, in the same unit as
     /// `mismatches`' denominator - see `human_mapping::graded_node_count`. `None` for an unsolved
     /// fixture, same convention as the fields above.
@@ -455,6 +466,26 @@ fn main() -> Result<()> {
         let algorithm_cost = algorithm_cost_for(before, after, &config);
         let elapsed_ms = elapsed_ms_for(before, after, &config);
 
+        // Before the mapping-path check, and keyed off `Code::ast` rather than `diff.ast`:
+        // `diff_code` returns `Some(ASTDiff)` even when neither side parsed, so the diff is the
+        // wrong thing to ask. Without this branch the human-mapping calls below bail with "Before
+        // code has no AST" and take the whole gate down with them - which is what they did the
+        // moment the first such fixture was added.
+        if before.ast.is_none() || after.ast.is_none() {
+            rows.push(Row {
+                name: name.clone(),
+                mismatches: None,
+                reason_counts,
+                algorithm_cost,
+                human_cost: None,
+                elapsed_ms,
+                visible_mismatches: None,
+                graded_nodes: None,
+                text_only: true,
+            });
+            continue;
+        }
+
         if !human_mapping::mapping_path(name).exists() {
             rows.push(Row {
                 name: name.clone(),
@@ -465,6 +496,7 @@ fn main() -> Result<()> {
                 elapsed_ms,
                 visible_mismatches: None,
                 graded_nodes: None,
+                text_only: false,
             });
             continue;
         }
@@ -487,6 +519,7 @@ fn main() -> Result<()> {
                 visible.before_visible_node_count + visible.after_visible_node_count,
             )),
             graded_nodes: Some(graded_nodes),
+            text_only: false,
         });
     }
 
@@ -708,7 +741,12 @@ fn print_table(rows: &[Row]) {
                 );
             }
             _ => {
-                total_unsolved += 1;
+                // A text-only fixture is solved - it just has no tree to score. Counting it here
+                // would overstate how much of the corpus still needs a human mapping.
+                if !row.text_only {
+                    total_unsolved += 1;
+                }
+                let unsolved_cell = if row.text_only { "text-only" } else { "yes" };
                 println!(
                     "{:<name_width$}  {:>10}  {:>7}  {:>9}  {:>7}  {:>13}  {:>9}  {:>9}  {:>9}  {:>12.1}",
                     row.name,
@@ -716,7 +754,7 @@ fn print_table(rows: &[Row]) {
                     "-",
                     "-",
                     "-",
-                    "yes",
+                    unsolved_cell,
                     row.algorithm_cost,
                     "-",
                     "-",
@@ -1017,7 +1055,13 @@ fn write_baseline(rows: &[Row], path: &std::path::Path) -> Result<()> {
 fn compare_to_baseline(rows: &[Row], baseline: &BTreeMap<String, BaselineEntry>) -> GateReport {
     let current = baseline_from_rows(rows);
     let mut report = GateReport {
-        unsolved: rows.len() - current.len(),
+        // Not `rows.len() - current.len()`: text-only fixtures are absent from `current` too
+        // (no mapping score to put there), and they are not unsolved. Counted explicitly so the
+        // two categories cannot drift back together.
+        unsolved: rows
+            .iter()
+            .filter(|row| row.mismatches.is_none() && !row.text_only)
+            .count(),
         ..Default::default()
     };
 
@@ -1299,7 +1343,14 @@ fn write_csv(rows: &[Row], path: &std::path::Path) -> Result<()> {
                     "-".to_string(),
                     "-".to_string(),
                     "-".to_string(),
-                    "true".to_string(),
+                    // Three states, not two: `true` here has always meant "no human_mapping.json".
+                    // A text-only fixture has one and is solved, so writing `true` for it would
+                    // make the baseline artifact disagree with the printed table beside it.
+                    if row.text_only {
+                        "text-only".to_string()
+                    } else {
+                        "true".to_string()
+                    },
                     row.algorithm_cost.to_string(),
                     "-".to_string(),
                     "-".to_string(),
@@ -1383,6 +1434,7 @@ mod tests {
             algorithm_cost: 0,
             human_cost: Some(0),
             elapsed_ms: 0.0,
+            text_only: false,
         }
     }
 
@@ -1398,6 +1450,7 @@ mod tests {
             algorithm_cost: 0,
             human_cost: None,
             elapsed_ms: 0.0,
+            text_only: false,
         }
     }
 
@@ -1538,6 +1591,36 @@ mod tests {
 
         assert!(!report.failed());
         assert_eq!(report.removed, vec!["gone".to_string()]);
+    }
+
+    /// A fixture whose language has no tree-sitter grammar: codediff diffs it with
+    /// `plain_text_line_diff`, so there is no tree to score, but it *is* solved - it has a
+    /// `human_mapping.json` and a painting test that grades it.
+    fn text_only(name: &str) -> Row {
+        Row {
+            text_only: true,
+            ..unsolved(name)
+        }
+    }
+
+    /// The distinction `text_only` exists for. Both kinds of row stay out of the baseline for the
+    /// same reason - no mapping score to record - but only one of them means "still needs a human
+    /// mapping", and conflating them sends a reader looking for a file that is not missing.
+    #[test]
+    fn a_text_only_fixture_stays_out_of_the_baseline_without_counting_as_unsolved() {
+        let rows = [row("a", 3, 1), text_only("bazel-no-grammar")];
+
+        assert_eq!(
+            baseline_from_rows(&rows).keys().collect::<Vec<_>>(),
+            vec!["a"],
+            "a fixture with no AST has no mapping score to record"
+        );
+        let report = compare_to_baseline(&rows, &baseline(&[("a", 3, 1)]));
+        assert_eq!(
+            report.unsolved, 0,
+            "text-only is solved; only a missing human_mapping.json is unsolved"
+        );
+        assert!(report.added.is_empty() && !report.failed());
     }
 
     #[test]

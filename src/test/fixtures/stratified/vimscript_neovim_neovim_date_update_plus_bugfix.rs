@@ -30,11 +30,10 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test, read the rate it
-    // reports for both modes, and record that instead.
+    // measured 2026-09-10: minimal 0.078%, full 0.078%
     assert_matches_human_painting_within_limit(
         "vimscript-neovim-neovim-date-update-plus-bugfix",
-        100.0,
+        0.09,
     )
 }
 

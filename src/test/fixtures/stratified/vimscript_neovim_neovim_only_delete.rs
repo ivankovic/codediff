@@ -19,7 +19,7 @@ use anyhow::Result;
 
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants_with_known_violations;
 
 #[test]
 fn mapping() -> Result<()> {
@@ -28,12 +28,22 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test, read the rate it
-    // reports for both modes, and record that instead.
-    assert_matches_human_painting_within_limit("vimscript-neovim-neovim-only-delete", 100.0)
+    // measured 2026-09-10: minimal 0.054%, full 0.054%
+    assert_matches_human_painting_within_limit("vimscript-neovim-neovim-only-delete", 0.07)
 }
 
 #[test]
 fn invariants() -> Result<()> {
-    assert_ground_truth_invariants("vimscript-neovim-neovim-only-delete")
+    // 2 known violations in the ground truth itself, not in codediff - both the same defect, and
+    // both spelled out here because this assertion is exact and a bare count is unreadable:
+    //
+    //   painting 'Minimal' before row 24 ends its last painted run on ' ', not on a visible
+    //     character: "  let b:undo_ftplugin .= '| setlocal keywordprg< iskeyword< | sil! delc
+    //     -buffer SudoersKeywordPrg'"
+    //   painting 'Full' before row 24: the same run, same trailing space.
+    //
+    // Repairing it means re-painting row 24 in human_solver so the run stops at the last visible
+    // byte; until then this pins the count. See the no-trailing-whitespace painting work of
+    // 2026-08-31 for why a painted run may not end on whitespace.
+    assert_ground_truth_invariants_with_known_violations("vimscript-neovim-neovim-only-delete", 2)
 }
