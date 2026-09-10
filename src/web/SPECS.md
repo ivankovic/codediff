@@ -105,6 +105,17 @@ re-diffs when it exits, keeping the cursor.
 tab closes: a reload would kill the session, and a `git difftool` driving this binary wants it to
 outlive one page load.
 
+## Git review
+
+`G` and `--review` open the same picker the TUI has (`src/tui/SPECS.md`, "Git review"), from the
+same `src/review.rs`. The listing is one request (`/api/review`) made when the dialog opens, and the
+page keeps it for the dialog's lifetime - folding a commit is a re-render, not a round trip. Opening
+a file is `/api/review/open` with the repository root and the target; the server materializes the
+two sides into the session's workspace and runs the same diff every other open runs, so the answer
+is an ordinary diff payload. The page then holds the reviewed position (set, files, index) the way
+`App::review_position` does: `]`/`[` step through it, the footer shows `file N/M (set)`, `r`
+re-materializes, and opening a file by hand clears it.
+
 ## Not carried over
 
 * Ctrl-Z. A browser tab has no job control to suspend into.

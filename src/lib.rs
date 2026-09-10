@@ -21,6 +21,11 @@ pub mod code;
 pub mod diff;
 #[cfg(feature = "stats")]
 pub mod stats;
+// Git-backed review needs no TUI dependency of its own, but both of its consumers (the TUI
+// picker and the web session) are behind `tui` (`web` implies it), so it rides the same gate
+// rather than widening a `default-features = false` library consumer's surface.
+#[cfg(feature = "tui")]
+pub mod review;
 #[cfg(feature = "tui")]
 pub mod tui;
 #[cfg(feature = "web")]

@@ -201,6 +201,17 @@ struct EditRequest {
     line: usize,
 }
 
+#[derive(Deserialize)]
+struct ReviewRequest {
+    limit: Option<usize>,
+}
+
+#[derive(Deserialize)]
+struct ReviewOpenRequest {
+    root: String,
+    target: crate::review::ReviewTarget,
+}
+
 fn body<T: for<'de> Deserialize<'de>>(request: &Request) -> Result<T, Response> {
     serde_json::from_slice(&request.body)
         .map_err(|err| Response::error(400, format!("bad request body: {err}")))
@@ -305,6 +316,29 @@ async fn api(context: &Context, request: &Request) -> (Response, bool) {
                         }
                     }
                     None => Response::error(400, "no file is open in that panel"),
+                }
+            }
+            Err(response) => response,
+        },
+        "/api/review" => match body::<ReviewRequest>(request) {
+            Ok(req) => {
+                let limit = req.limit.unwrap_or(crate::review::DEFAULT_COMMIT_LIMIT);
+                let loaded = tokio::task::spawn_blocking(move || Session::load_review(limit)).await;
+                match loaded {
+                    Ok(Ok(review)) => Response::json(200, &review),
+                    Ok(Err(err)) => Response::error(400, format!("{err:#}")),
+                    Err(err) => Response::error(500, err.to_string()),
+                }
+            }
+            Err(response) => response,
+        },
+        "/api/review/open" => match body::<ReviewOpenRequest>(request) {
+            Ok(req) => {
+                let root = std::path::PathBuf::from(req.root);
+                let job = lock(context).open_review_target(&root, &req.target);
+                match job {
+                    Ok(job) => compute(context, job).await,
+                    Err(err) => Response::error(400, format!("{err:#}")),
                 }
             }
             Err(response) => response,

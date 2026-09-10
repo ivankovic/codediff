@@ -18,6 +18,7 @@
 use std::path::PathBuf;
 
 use crate::diff::text::{RangeMatch, RenderOptions};
+use crate::review::ReviewTarget;
 use crate::tui::theme::OverlayTheme;
 
 /// One entry in a directory listing shown by the file dialog.
@@ -85,6 +86,13 @@ pub enum Action {
     FileSelected(PathBuf),
     /// The user cancelled the file dialog.
     DialogCancelled,
+    /// The user picked a file in the git review picker (the `G` key): materialize its two sides
+    /// and open them. `index` is the file's position within its change set, so `]`/`[` know
+    /// where to step from.
+    ReviewFileSelected {
+        target: ReviewTarget,
+        index: usize,
+    },
     /// Both before/after files are known; kick off the (background) diff computation.
     StartDiff(PathBuf, PathBuf),
     /// A background diff computation returned - success or failure - tagged with the generation

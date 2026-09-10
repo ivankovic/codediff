@@ -63,6 +63,11 @@ Files and diffing
   o                Open a file selector for the active panel
   r                Reload both files from disk and re-diff (keeps the cursor position)
   e                Open the focused panel's file in $VISUAL/$EDITOR at the cursor line
+  G                Review git changes: a picker of the repository's unstaged files, staged
+                   files, and recent commits (Enter unfolds a commit into its files).
+                   Enter on a file opens its diff - index vs working tree, HEAD vs index,
+                   or parent vs commit. `codediff --review` starts here.
+  ]/[              Next/previous file of the set the reviewed file came from
   Esc              While a diff is computing: cancel it and keep the previous result
 
 Appearance

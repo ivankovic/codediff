@@ -219,6 +219,12 @@ struct Args {
     #[arg(long, value_name = "N", default_value_t = tui::headless::CONTEXT_LINES)]
     context: usize,
 
+    /// Open on the git review picker - the repository around the current directory's unstaged
+    /// files, staged files and recent commits - instead of an empty viewer (the `G` key, at
+    /// startup). TUI only; takes no BEFORE/AFTER pair.
+    #[arg(long, conflicts_with = "headless")]
+    review: bool,
+
     /// Tick rate
     #[arg(long, value_name = "FLOAT", default_value_t = 4.0)]
     tui_tick_rate: f64,
@@ -234,6 +240,9 @@ async fn tui_main(args: &Args, before_after: Option<(PathBuf, PathBuf)>) -> Resu
     let mut app = tui::app::App::new(args.tui_tick_rate, args.tui_frame_rate)?;
     if let Some((before, after)) = before_after {
         app.open_files(before, after)?;
+    }
+    if args.review {
+        app.start_in_review();
     }
     app.run().await?;
 
@@ -624,6 +633,7 @@ mod tests {
             color: ColorChoice::Auto,
             exit_code: false,
             context: tui::headless::CONTEXT_LINES,
+            review: false,
             tui_tick_rate: 4.0,
             tui_frame_rate: 60.0,
         }

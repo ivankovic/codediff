@@ -429,4 +429,52 @@ function pairModel() {
   assert.deepStrictEqual([model.activePanel, model.focusedCursorPosition()], [1, [3, 6]]);
 }
 
+// The git review picker's rows and navigation mirror ReviewDialog's tests
+{
+  const file = (status, path, old_path) => ({ status, path, ...(old_path ? { old_path } : {}) });
+  const review = {
+    root: "/repo",
+    working_tree: [file("modified", "a.rs")],
+    staged: [],
+    commits: [
+      { hash: "aaaa", short: "aaaa", author: "Ada", date: "2026-09-10", subject: "newest", files: [file("added", "n.rs"), file("deleted", "o.rs")] },
+      { hash: "bbbb", short: "bbbb", author: "Bob", date: "2026-09-09", subject: "older", files: [file("renamed", "new.rs", "old.rs")] },
+    ],
+  };
+  const rows = M.reviewRows(review, [true, false]);
+  assert.deepStrictEqual(
+    rows.map((row) => row.label),
+    [
+      "Working tree (1)",
+      "    M a.rs",
+      "Staged (0)",
+      "  (nothing staged)",
+      "Recent commits (2)",
+      "  \u25be aaaa 2026-09-10 newest (Ada)",
+      "    A n.rs",
+      "    D o.rs",
+      "  \u25b8 bbbb 2026-09-09 older (Bob)",
+    ]
+  );
+  assert.deepStrictEqual(rows[7].target, { set: { kind: "commit", hash: "aaaa" }, file: file("deleted", "o.rs") });
+  assert.strictEqual(rows[7].index, 1);
+  assert.strictEqual(M.nextReviewSelection(rows, 1, -1), 1, "nothing selectable above the first file");
+  assert.strictEqual(M.nextReviewSelection(rows, 1, 1), 5, "straight over the empty Staged section");
+  assert.strictEqual(M.nextReviewSelection(rows, 8, 1), 8, "stays at the end");
+  assert.strictEqual(M.reviewRows(review, [false, true]).length, 8);
+  assert.strictEqual(M.reviewRows(review, [false, true])[7].label, "    R old.rs -> new.rs");
+  assert.strictEqual(M.reviewFilesOf(review, { kind: "commit", hash: "bbbb" }).length, 1);
+  assert.strictEqual(M.reviewFilesOf(review, { kind: "commit", hash: "nope" }).length, 0);
+  assert.strictEqual(M.reviewFilesOf(review, { kind: "working_tree" }).length, 1);
+  assert.strictEqual(M.changeSetLabel({ kind: "commit", hash: "0123456789" }), "0123456");
+  assert.strictEqual(M.changeSetLabel({ kind: "staged" }), "staged");
+  const empty = M.reviewRows({ working_tree: [], staged: [], commits: [] }, []);
+  assert.deepStrictEqual(empty.map((row) => row.kind), ["header", "note", "header", "note", "header", "note"]);
+  assert.strictEqual(M.nextReviewSelection(empty, 0, 1), 0);
+  assert.strictEqual(
+    M.footerLeft({ review: { set: { kind: "working_tree" }, files: [1, 2], index: 1 } }),
+    "file 2/2 (working tree)"
+  );
+}
+
 console.log("model.test.js: all assertions passed");

@@ -74,6 +74,12 @@ struct Args {
     /// Print the URL but do not open a browser.
     #[arg(long)]
     no_open: bool,
+
+    /// Open on the git review picker - the repository around the current directory's unstaged
+    /// files, staged files and recent commits - instead of an empty viewer (the page's `G` key,
+    /// at startup).
+    #[arg(long)]
+    review: bool,
 }
 
 /// The initial render options: a preset when asked for one, otherwise whatever the `M` panel
@@ -158,6 +164,9 @@ async fn main() -> Result<()> {
     let mut session = Session::from_config(initial_render_options(&args));
     if let Some((before, after)) = pair {
         session.set_pair(before, after);
+    }
+    if args.review {
+        session.set_review_on_start();
     }
     let server = Server::bind(&args.host, args.port, session).await?;
     let url = server.url();

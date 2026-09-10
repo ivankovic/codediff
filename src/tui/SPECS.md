@@ -245,6 +245,37 @@ omitted entirely rather than `null` for the ordinary case) instead of a printed 
 reason it has a `fallback_used` field instead of `headless::run`'s stderr note: JSON mode is for a
 script to parse, not a person to read.
 
+## Git review (`G`, `--review`)
+
+A second way to open a pair: pick a change out of the repository around the current directory
+instead of two files out of the filesystem. `ReviewDialog` (`components/review_dialog.rs`) lists
+the working tree's unstaged modifications and untracked files, the staged changes, and the last
+twenty commits, each commit folding open to its files (the newest starts unfolded, since "what did
+the last commit touch" is the usual question). Enter on a file materializes its two sides and opens
+them exactly as `o` would - the same `StartDiff`, the same `Diffing` screen, the same viewer.
+
+The data comes from `src/review.rs`, shared with the web front end, which shells out to the `git`
+binary rather than linking `git2` - `git2` is a `stats`-only dependency on purpose (its
+OpenSSL/libssh2 build chain), and anyone using this feature has `git` on `PATH` already. One
+parser (`git diff --name-status -z`) serves all three lists; a root commit is diffed against the
+empty tree, a merge against its first parent.
+
+Which two revisions a file is diffed between follows from the list it came from: index vs working
+tree for an unstaged change, HEAD vs index for a staged one, parent vs commit for a committed one.
+A blob is written to a temp workspace under its repository-relative path - the basename picks the
+tree-sitter grammar, and the directory keeps two same-named files (`mod.rs`, `index.ts`) at one
+revision apart - while the working tree's own file is diffed in place, so `e` edits the real file.
+An absent side (an added or deleted file) is an empty file at the same path, which parses as a
+whole-file insert or delete in the right language; `/dev/null` does not exist everywhere. The
+workspace lives under the system temp directory, which `theme::record_recent_pair` treats as
+throwaway, so a reviewed pair never lands in the recent-pairs list to dangle after the workspace
+is removed on exit.
+
+`App::review_position` remembers the set the open file came from and its index in it: `]`/`[` step
+to the neighbouring file (stopping at the ends), the footer says `file 2/7 (staged)`, and `r`
+re-materializes rather than re-reads, since the index and HEAD blobs are snapshots and the point of
+`r` is to see what changed since. Opening a file by any other route clears the position.
+
 ## Performance note
 
 CPU usage should be judged from a `--release` build, not a debug build: idle CPU usage for an

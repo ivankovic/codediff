@@ -59,6 +59,7 @@
     diffing: null, // { controller, startedAt, timer }
     restoreAfterReload: null,
     recentPairs: [],
+    review: null, // { root, set, files, index } while a reviewed pair is open
     cellWidth: 8,
     rowHeight: 18,
     syncingScroll: false,
@@ -275,6 +276,7 @@
       searchProgress: model.focusedSearchMatchCountAndIndex(),
       changeProgress: model.mergedChangeCountAndIndex(),
       plainText: state.plainText,
+      review: state.review,
       layout: model.layoutOverride,
       options: state.renderOptions,
       rows: state.info.render_option_rows,
@@ -408,9 +410,60 @@
   }
 
   function reload() {
+    if (state.review) {
+      // Re-materialized, not re-read: the index and HEAD blobs are snapshots.
+      rememberCursorForRestore();
+      openReviewPosition(state.review);
+      return;
+    }
     if (!state.before || !state.after) return;
     rememberCursorForRestore();
     startDiff(state.before, state.after);
+  }
+
+  // ----- git review --------------------------------------------------------------------------
+
+  // `App::open_review_position`: diff file `index` of the reviewed set, through the server's
+  // workspace.
+  async function openReviewPosition(position) {
+    const file = position.files[position.index];
+    if (!file) return;
+    cancelInFlight();
+    const controller = new AbortController();
+    state.review = position;
+    state.diffing = { controller, startedAt: Date.now(), timer: setInterval(renderOverlays, 100) };
+    state.screen = "diffing";
+    state.summary = null;
+    state.counts = null;
+    state.plainText = false;
+    render();
+    try {
+      const payload = await api(
+        "/api/review/open",
+        { root: position.root, target: { set: position.set, file } },
+        controller.signal
+      );
+      applyDiff(payload);
+    } catch (error) {
+      if (error.name === "AbortError") return;
+      setError(error.message);
+      state.restoreAfterReload = null;
+    } finally {
+      if (state.diffing && state.diffing.controller === controller) {
+        clearInterval(state.diffing.timer);
+        state.diffing = null;
+        if (state.screen === "diffing") state.screen = "viewer";
+      }
+      render();
+    }
+  }
+
+  // `]`/`[`: the next or previous file of the reviewed set, stopping at the ends.
+  function stepReviewFile(direction) {
+    if (!state.review) return;
+    const next = state.review.index + (direction < 0 ? -1 : 1);
+    if (next < 0 || next >= state.review.files.length) return;
+    openReviewPosition({ ...state.review, index: next });
   }
 
   async function applyRenderOptions(options) {
@@ -584,11 +637,75 @@
   }
 
   function selectFileForPanel(panelIndex, path) {
+    // Anything opened by hand is no longer "file N of the staged set".
+    state.review = null;
     if (panelIndex === 0) state.before = path;
     else state.after = path;
     state.lastError = null;
     if (state.before && state.after) startDiff(state.before, state.after);
     else render();
+  }
+
+  // `G`: ReviewDialog. The listing is fetched when the dialog opens; the newest commit starts
+  // unfolded, as in the TUI.
+  function reviewDialog() {
+    const dialog = {
+      review: null,
+      expanded: [],
+      selected: 0,
+      rows() {
+        return this.review ? M.reviewRows(this.review, this.expanded) : [];
+      },
+      async load() {
+        try {
+          const review = await api("/api/review", { limit: 20 });
+          if (state.dialog !== this) return;
+          this.review = review;
+          this.expanded = review.commits.map((_, i) => i === 0);
+          const rows = this.rows();
+          const first = rows.findIndex(M.reviewSelectable);
+          this.selected = first < 0 ? 0 : first;
+        } catch (error) {
+          setError(error.message);
+          state.dialog = null;
+        }
+        render();
+      },
+      key(e) {
+        if (e.key === "Escape" || e.key === "G") {
+          closeDialog();
+          return;
+        }
+        if (!this.review) return;
+        const rows = this.rows();
+        const row = rows[this.selected];
+        if (e.key === "ArrowUp" || e.key === "k") this.selected = M.nextReviewSelection(rows, this.selected, -1);
+        else if (e.key === "ArrowDown" || e.key === "j") this.selected = M.nextReviewSelection(rows, this.selected, 1);
+        else if ((e.key === "Enter" || e.key === " ") && row && row.kind === "file") {
+          const files = M.reviewFilesOf(this.review, row.target.set);
+          state.dialog = null;
+          openReviewPosition({ root: this.review.root, set: row.target.set, files, index: row.index });
+          return;
+        } else if ((e.key === "Enter" || e.key === " ") && row && row.kind === "commit") {
+          this.expanded[row.commit] = !this.expanded[row.commit];
+        } else if ((e.key === "ArrowRight" || e.key === "ArrowLeft") && row && row.kind === "commit") {
+          this.expanded[row.commit] = e.key === "ArrowRight";
+        }
+        render();
+      },
+      render(container) {
+        const title = this.review ? `Git review - ${this.review.root}` : "Git review - loading…";
+        const { dialog, body } = box(
+          container,
+          title,
+          "↑/↓ or j/k: move | Enter: open file / fold commit | ←/→: fold/unfold | Esc or G: close"
+        );
+        dialog.classList.add("help");
+        listRows(body, this.rows().map((row) => row.label), this.selected);
+      },
+    };
+    dialog.load();
+    return dialog;
   }
 
   // `c`: ThemeDialog.
@@ -935,6 +1052,15 @@
       case "o":
         state.dialog = fileDialog(model.activePanel);
         break;
+      case "G":
+        state.dialog = reviewDialog();
+        break;
+      case "]":
+        stepReviewFile(1);
+        return true;
+      case "[":
+        stepReviewFile(-1);
+        return true;
       case "c":
         state.dialog = themeDialog();
         break;
@@ -1101,6 +1227,10 @@
     });
     render();
     if (state.before && state.after) startDiff(state.before, state.after);
+    else if (state.info.review_on_start) {
+      state.dialog = reviewDialog();
+      render();
+    }
   }
 
   init();

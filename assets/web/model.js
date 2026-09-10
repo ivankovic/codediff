@@ -13,7 +13,7 @@
 const CodeDiffModel = (() => {
   // src/tui/app.rs FOOTER_HINTS, verbatim - pinned by a Rust test so the two cannot drift.
   const FOOTER_HINTS =
-    "?:help  o:open  r:reload  n/p:next/prev  /:search  M:options  Tab:switch  q:quit";
+    "?:help  o:open  G:git  r:reload  n/p:next/prev  /:search  M:options  Tab:switch  q:quit";
 
   const UNCHANGED = new Set(["identical", "unset"]);
 
@@ -367,6 +367,81 @@ const CodeDiffModel = (() => {
   const LAYOUT_CYCLE = { Auto: "Dual", Dual: "Single", Single: "Auto" };
   const LAYOUT_LABEL = { Auto: "auto", Dual: "dual", Single: "single" };
 
+  // `ChangeSet::label`: `working tree`, `staged`, or the abbreviated hash.
+  function changeSetLabel(set) {
+    if (set.kind === "working_tree") return "working tree";
+    if (set.kind === "staged") return "staged";
+    return String(set.hash).slice(0, 7);
+  }
+
+  // `ChangedFile::label` / `Commit::label`.
+  function fileLabel(file) {
+    const letters = {
+      added: "A",
+      modified: "M",
+      deleted: "D",
+      renamed: "R",
+      copied: "C",
+      type_changed: "T",
+      unmerged: "U",
+      untracked: "?",
+    };
+    const letter = letters[file.status] || "X";
+    return file.old_path ? `${letter} ${file.old_path} -> ${file.path}` : `${letter} ${file.path}`;
+  }
+
+  function commitLabel(commit) {
+    return `${commit.short} ${commit.date} ${commit.subject} (${commit.author})`;
+  }
+
+  // `ReviewDialog::rows`: the three sections as one list, commits folding open to their files.
+  // `expanded` is one boolean per commit. Only `file` and `commit` rows are selectable.
+  function reviewRows(review, expanded) {
+    const rows = [];
+    const fileRows = (set, files) => {
+      files.forEach((file, index) => {
+        rows.push({ kind: "file", label: `    ${fileLabel(file)}`, target: { set, file }, index });
+      });
+    };
+    rows.push({ kind: "header", label: `Working tree (${review.working_tree.length})` });
+    if (review.working_tree.length === 0) rows.push({ kind: "note", label: "  (clean)" });
+    fileRows({ kind: "working_tree" }, review.working_tree);
+    rows.push({ kind: "header", label: `Staged (${review.staged.length})` });
+    if (review.staged.length === 0) rows.push({ kind: "note", label: "  (nothing staged)" });
+    fileRows({ kind: "staged" }, review.staged);
+    rows.push({ kind: "header", label: `Recent commits (${review.commits.length})` });
+    if (review.commits.length === 0) rows.push({ kind: "note", label: "  (no commits yet)" });
+    review.commits.forEach((commit, index) => {
+      const marker = expanded[index] ? "\u25be" : "\u25b8";
+      rows.push({ kind: "commit", label: `  ${marker} ${commitLabel(commit)}`, commit: index });
+      if (expanded[index]) fileRows({ kind: "commit", hash: commit.hash }, commit.files);
+    });
+    return rows;
+  }
+
+  function reviewSelectable(row) {
+    return row.kind === "file" || row.kind === "commit";
+  }
+
+  // `ReviewDialog::move_selection`: the next selectable row in `direction`, or `selected` itself
+  // at the ends.
+  function nextReviewSelection(rows, selected, direction) {
+    let index = selected;
+    for (;;) {
+      index += direction < 0 ? -1 : 1;
+      if (index < 0 || index >= rows.length) return selected;
+      if (reviewSelectable(rows[index])) return index;
+    }
+  }
+
+  // The files `]`/`[` step through for a target's set.
+  function reviewFilesOf(review, set) {
+    if (set.kind === "working_tree") return review.working_tree;
+    if (set.kind === "staged") return review.staged;
+    const commit = review.commits.find((c) => c.hash === set.hash);
+    return commit ? commit.files : [];
+  }
+
   // `App::draw_footer`'s left half.
   function footerLeft(info) {
     const parts = [];
@@ -377,6 +452,9 @@ const CodeDiffModel = (() => {
     }
     if (info.searchProgress) parts.push(`match ${info.searchProgress[0]}/${info.searchProgress[1]}`);
     else if (info.changeProgress) parts.push(`change ${info.changeProgress[0]}/${info.changeProgress[1]}`);
+    if (info.review) {
+      parts.push(`file ${info.review.index + 1}/${info.review.files.length} (${changeSetLabel(info.review.set)})`);
+    }
     if (info.plainText) parts.push("[plain text]");
     if (info.layout && info.layout !== "Auto") parts.push(`[layout: ${LAYOUT_LABEL[info.layout]}]`);
     if (info.options && info.rows && info.presets) {
@@ -869,6 +947,13 @@ const CodeDiffModel = (() => {
     backgroundFor,
     buildRangeOrder,
     changeBands,
+    changeSetLabel,
+    commitLabel,
+    fileLabel,
+    nextReviewSelection,
+    reviewFilesOf,
+    reviewRows,
+    reviewSelectable,
     changePositions,
     changeStops,
     clampToNonWhitespace,

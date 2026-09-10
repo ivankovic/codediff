@@ -866,6 +866,23 @@ work that was already done. What is written below is what the code actually says
      because that option is off in `RenderOptions::FULL` itself; the badge should compare against
      the preset, not against "everything on".
 
+# Git review follow-ups
+
+`G`/`--review` in both front ends (2026-09-10): unstaged, staged and the last 20 commits, each
+commit's files, opened as index-vs-worktree / HEAD-vs-index / parent-vs-commit. Not yet:
+
+*  Stage, unstage and commit from the picker. Reading only, by design for the first cut; a
+   review tool that can act (`git add -p`-style hunk staging is the obvious next step) needs its
+   own confirmation model.
+*  Arbitrary revisions: the picker lists the last 20 commits from HEAD. A prompt for a ref or a
+   range (`main..feature`), and a longer list on demand, are both small additions to
+   `review::load`.
+*  Whole-commit navigation: `]`/`[` stop at the ends of one commit's files rather than rolling
+   into the next commit.
+*  The picker lists the repository around the *current directory* of the process - not the one
+   containing an already-open file. Fine for `cd repo && codediff --review`; surprising when
+   codediff was started elsewhere.
+
 # Web front end follow-ups
 
 `codediff-web` (feature `web`, 2026-09-10) reached parity with the TUI's key list; see

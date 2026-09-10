@@ -30,6 +30,7 @@ use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 
 use crate::diff::text::RenderOptions;
+use crate::review::{self, Review, ReviewTarget};
 use crate::tui::actions::DiffSessionData;
 use crate::tui::components::diff_viewer::SINGLE_PANEL_THRESHOLD;
 use crate::tui::components::help_modal::HELP_TEXT;
@@ -126,6 +127,8 @@ pub struct StatePayload {
     /// `DiffViewer`'s dual/single cut-over, in character cells, so the page's auto layout flips
     /// at the same width the terminal's does.
     pub single_panel_threshold: u16,
+    /// `--review`: the page opens the git review picker as soon as it loads.
+    pub review_on_start: bool,
 }
 
 /// A settings change from the page. Every field optional: the page sends the one that changed.
@@ -181,6 +184,10 @@ pub struct Session {
     loaded: Option<Loaded>,
     generation: u64,
     config_error: Option<String>,
+    review_on_start: bool,
+    /// Materialized blobs of reviewed changes, created on the first review open, removed when
+    /// the session (and so the server) goes away.
+    review_workspace: Option<review::Workspace>,
 }
 
 impl Session {
@@ -203,7 +210,35 @@ impl Session {
             config_error: theme::config_error().map(|problem| {
                 format!("config not loaded, using defaults and leaving the file alone - {problem}")
             }),
+            review_on_start: false,
+            review_workspace: None,
         }
+    }
+
+    /// `--review`: remembered for the state payload; the page does the opening.
+    pub fn set_review_on_start(&mut self) {
+        self.review_on_start = true;
+    }
+
+    /// The repository around the server's working directory - what the page's `G` lists.
+    pub fn load_review(commit_limit: usize) -> anyhow::Result<Review> {
+        let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+        review::load(&cwd, commit_limit)
+    }
+
+    /// Materializes `target`'s two sides under this session's workspace and starts their diff,
+    /// exactly as `App::open_review_position` does for the TUI.
+    pub fn open_review_target(
+        &mut self,
+        root: &Path,
+        target: &ReviewTarget,
+    ) -> anyhow::Result<DiffJob> {
+        if self.review_workspace.is_none() {
+            self.review_workspace = Some(review::Workspace::new()?);
+        }
+        let workspace = self.review_workspace.as_ref().expect("created just above");
+        let (before, after) = workspace.materialize(root, target)?;
+        Ok(self.begin_diff(before, after))
     }
 
     /// The pair the command line named. Only remembered: the page asks for the diff itself once
@@ -262,6 +297,7 @@ impl Session {
             help_text: HELP_TEXT,
             config_error: self.config_error.clone(),
             single_panel_threshold: SINGLE_PANEL_THRESHOLD,
+            review_on_start: self.review_on_start,
         }
     }
 
@@ -664,6 +700,50 @@ mod tests {
         let listing = list_directory(Path::new("/definitely/not/a/dir"));
         assert_eq!(listing.entries.len(), 1);
         assert_eq!(listing.entries[0].name, "..");
+    }
+
+    #[test]
+    fn a_reviewed_file_is_materialized_and_diffed_like_any_pair() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        let git = |args: &[&str]| {
+            let status = std::process::Command::new("git")
+                .arg("-C")
+                .arg(root)
+                .args([
+                    "-c",
+                    "user.name=T",
+                    "-c",
+                    "user.email=t@example.com",
+                    "-c",
+                    "commit.gpgsign=false",
+                ])
+                .args(args)
+                .status()
+                .unwrap();
+            assert!(status.success());
+        };
+        git(&["init", "-q"]);
+        std::fs::write(root.join("a.rs"), "fn a() {}\n").unwrap();
+        git(&["add", "."]);
+        git(&["commit", "-q", "-m", "first"]);
+        std::fs::write(root.join("a.rs"), "fn a() { 1 }\n").unwrap();
+        let review = review::load(root, 5).unwrap();
+        let target = ReviewTarget {
+            set: review::ChangeSet::WorkingTree,
+            file: review.working_tree[0].clone(),
+        };
+        let mut session = session();
+        assert!(!session.state().review_on_start);
+        session.set_review_on_start();
+        assert!(session.state().review_on_start);
+        let job = session.open_review_target(&review.root, &target).unwrap();
+        assert!(job.before.starts_with(std::env::temp_dir()));
+        assert!(job.after.ends_with("a.rs"));
+        assert_eq!(
+            session.state().after.as_deref(),
+            Some(job.after.to_str().unwrap())
+        );
     }
 
     #[test]

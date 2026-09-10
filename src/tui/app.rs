@@ -35,6 +35,7 @@ use crate::diff::{
         plain_text_line_diff, summarize_diff_with_comment_check,
     },
 };
+use crate::review::{self, ChangeSet, ChangedFile, ReviewTarget};
 use crate::tui::actions::{Action, DiffOutcome, DiffSessionData};
 use crate::tui::components::{
     Component,
@@ -43,6 +44,7 @@ use crate::tui::components::{
     help_modal::HelpModal,
     line_prompt::LinePrompt,
     render_options_dialog::RenderOptionsDialog,
+    review_dialog::ReviewDialog,
     search_modal::SearchModal,
     theme_dialog::ThemeDialog,
 };
@@ -70,6 +72,18 @@ pub enum AppScreen {
     Search,
     /// The `g` jump-to-line prompt is open, drawn over the (still-visible) viewer.
     JumpToLine,
+    /// The `G` git review picker is open, drawn over the (still-visible) viewer.
+    Review,
+}
+
+/// Where in a reviewed change set the open pair sits, so `]`/`[` can step and the footer can
+/// say `file 2/7 (staged)`. Set by `Action::ReviewFileSelected`, cleared when a file is opened
+/// any other way.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ReviewPosition {
+    set: ChangeSet,
+    files: Vec<ChangedFile>,
+    index: usize,
 }
 
 /// Whether pressing Esc on `screen` should quit the app, rather than being handled by that
@@ -94,7 +108,8 @@ fn esc_should_quit(screen: AppScreen) -> bool {
         | AppScreen::RenderOptions
         | AppScreen::Help
         | AppScreen::Search
-        | AppScreen::JumpToLine => false,
+        | AppScreen::JumpToLine
+        | AppScreen::Review => false,
     }
 }
 
@@ -110,6 +125,11 @@ pub struct App {
     help_modal: Option<HelpModal>,
     search_modal: Option<SearchModal>,
     line_prompt: Option<LinePrompt>,
+    review_dialog: Option<ReviewDialog>,
+    /// Materialized blobs of reviewed changes; one per app, removed on drop. Created on the first
+    /// `ReviewFileSelected`.
+    review_workspace: Option<review::Workspace>,
+    review_position: Option<ReviewPosition>,
 
     action_tx: mpsc::UnboundedSender<Action>,
     action_rx: mpsc::UnboundedReceiver<Action>,
@@ -215,6 +235,9 @@ impl App {
             render_options_dialog: None,
             help_modal: None,
             search_modal: None,
+            review_dialog: None,
+            review_workspace: None,
+            review_position: None,
             summary_toast_ticks: 0,
             diff_started_at: None,
             line_prompt: None,
@@ -349,7 +372,13 @@ impl App {
                 // Re-diff the current pair from disk - the edit-in-another-terminal loop. Keeps
                 // the cursor where it is (clamped) instead of resetting to the first change.
                 KeyCode::Char('r') if self.screen == AppScreen::Viewer => {
-                    if let (Some(before), Some(after)) =
+                    if let Some(position) = self.review_position.clone() {
+                        // A reviewed pair is re-materialized rather than re-read: the index
+                        // and HEAD blobs are snapshots, and the point of `r` is to see what
+                        // changed since.
+                        self.remember_cursor_for_restore();
+                        self.open_review_position(position)?;
+                    } else if let (Some(before), Some(after)) =
                         (self.before_path.clone(), self.after_path.clone())
                     {
                         self.remember_cursor_for_restore();
@@ -424,6 +453,21 @@ impl App {
                     action_tx.send(Action::Render)?;
                     globally_handled = true;
                 }
+                KeyCode::Char('G') if self.screen == AppScreen::Viewer => {
+                    self.open_review();
+                    action_tx.send(Action::Render)?;
+                    globally_handled = true;
+                }
+                KeyCode::Char(']') if self.screen == AppScreen::Viewer => {
+                    self.step_review_file(1)?;
+                    action_tx.send(Action::Render)?;
+                    globally_handled = true;
+                }
+                KeyCode::Char('[') if self.screen == AppScreen::Viewer => {
+                    self.step_review_file(-1)?;
+                    action_tx.send(Action::Render)?;
+                    globally_handled = true;
+                }
                 KeyCode::Char('?') if self.screen == AppScreen::Viewer => {
                     self.help_modal = Some(HelpModal::new(self.current_theme));
                     self.screen = AppScreen::Help;
@@ -492,7 +536,114 @@ impl App {
                 Some(modal) => modal.handle_events(Some(event)),
                 None => Ok(None),
             },
+            AppScreen::Review => match self.review_dialog.as_mut() {
+                Some(dialog) => dialog.handle_events(Some(event)),
+                None => Ok(None),
+            },
         }
+    }
+
+    /// `G`: list the repository around the current directory. Failure (not a repository, no
+    /// `git`) goes to the banner rather than a dialog, since there is nothing to pick from.
+    fn open_review(&mut self) {
+        let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+        match review::load(&cwd, review::DEFAULT_COMMIT_LIMIT) {
+            Ok(review) => {
+                self.review_dialog = Some(ReviewDialog::new(review));
+                self.screen = AppScreen::Review;
+            }
+            Err(err) => self.last_error = Some(format!("{err:#}")),
+        }
+    }
+
+    /// `--review`: start on the picker instead of the empty viewer.
+    pub fn start_in_review(&mut self) {
+        self.open_review();
+    }
+
+    /// Materializes `position`'s current file and opens the pair. Kept separate from
+    /// `select_file_for_panel` so that `before_path`/`after_path` and the viewer are set in one
+    /// step and the diff starts once, not once per side.
+    fn open_review_position(&mut self, position: ReviewPosition) -> Result<()> {
+        let Some(file) = position.files.get(position.index).cloned() else {
+            return Ok(());
+        };
+        let target = ReviewTarget {
+            set: position.set.clone(),
+            file,
+        };
+        let root = match self.review_dialog.as_ref() {
+            Some(dialog) => dialog.review().root.clone(),
+            None => review::repository_root(
+                &std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
+            )?,
+        };
+        if self.review_workspace.is_none() {
+            self.review_workspace = Some(review::Workspace::new()?);
+        }
+        let workspace = self.review_workspace.as_ref().expect("created just above");
+        match workspace.materialize(&root, &target) {
+            Ok((before, after)) => {
+                self.last_error = None;
+                self.before_path = Some(before.clone());
+                self.after_path = Some(after.clone());
+                self.diff_viewer.set_before_file(before.clone())?;
+                self.diff_viewer.set_after_file(after.clone())?;
+                self.review_position = Some(position);
+                self.action_tx.send(Action::StartDiff(before, after))?;
+            }
+            Err(err) => self.last_error = Some(format!("{err:#}")),
+        }
+        Ok(())
+    }
+
+    /// `Action::ReviewFileSelected`: close the picker and open the file, remembering its set so
+    /// `]`/`[` can walk the rest.
+    fn handle_review_file_selected(&mut self, target: ReviewTarget, index: usize) -> Result<()> {
+        let files = self
+            .review_dialog
+            .as_ref()
+            .map(|dialog| dialog.review().files_of(&target.set).to_vec())
+            .unwrap_or_else(|| vec![target.file.clone()]);
+        let position = ReviewPosition {
+            set: target.set,
+            files,
+            index,
+        };
+        self.open_review_position(position)?;
+        self.review_dialog = None;
+        self.screen = AppScreen::Viewer;
+        Ok(())
+    }
+
+    /// `]`/`[`: the next or previous file of the reviewed set, stopping at the ends. A no-op
+    /// when the open pair did not come from the picker.
+    fn step_review_file(&mut self, direction: i32) -> Result<()> {
+        let Some(mut position) = self.review_position.clone() else {
+            return Ok(());
+        };
+        let next = if direction < 0 {
+            position.index.checked_sub(1)
+        } else {
+            Some(position.index + 1).filter(|&i| i < position.files.len())
+        };
+        let Some(next) = next else {
+            return Ok(());
+        };
+        position.index = next;
+        self.open_review_position(position)
+    }
+
+    /// `file 2/7 (staged)` for the footer, when a reviewed pair is open.
+    fn review_progress(&self) -> Option<String> {
+        self.review_position.as_ref().map(|position| {
+            format!(
+                "file {}/{} ({})",
+                position.index + 1,
+                position.files.len(),
+                position.set.label()
+            )
+        })
     }
 
     /// Create, register and initialize a fresh file dialog, replacing any previous one.
@@ -517,6 +668,9 @@ impl App {
                 Action::Resize(w, h) => self.handle_resize(ui, *w, *h)?,
                 Action::Render => self.render(ui)?,
                 Action::FileSelected(path) => self.handle_file_selected(path.clone())?,
+                Action::ReviewFileSelected { target, index } => {
+                    self.handle_review_file_selected(target.clone(), *index)?
+                }
                 Action::DialogCancelled => self.handle_dialog_cancelled()?,
                 Action::StartDiff(before, after) => {
                     self.screen = AppScreen::Diffing;
@@ -756,6 +910,8 @@ impl App {
 
     /// Load `path` into `panel`, remember it, and kick off the diff once both panels have a file.
     fn select_file_for_panel(&mut self, panel: Panel, path: PathBuf) -> Result<()> {
+        // Anything opened by hand is no longer "file N of the staged set".
+        self.review_position = None;
         match panel {
             Panel::Before => {
                 self.before_path = Some(path.clone());
@@ -800,6 +956,7 @@ impl App {
         self.help_modal = None;
         self.search_modal = None;
         self.line_prompt = None;
+        self.review_dialog = None;
         self.dialog_target = None;
         self.screen = AppScreen::Viewer;
         Ok(())
@@ -905,6 +1062,7 @@ impl App {
                 AppScreen::Help => self.draw_help_modal(frame, area),
                 AppScreen::Search => self.draw_search_modal(frame, area),
                 AppScreen::JumpToLine => self.draw_line_prompt(frame, area),
+                AppScreen::Review => self.draw_review_dialog(frame, area),
             };
             if let Err(err) = result {
                 let _ = self
@@ -1013,6 +1171,9 @@ impl App {
             left_parts.push(format!("match {index}/{total}"));
         } else if let Some((index, total)) = self.diff_viewer.merged_change_count_and_index() {
             left_parts.push(format!("change {index}/{total}"));
+        }
+        if let Some(progress) = self.review_progress() {
+            left_parts.push(progress);
         }
         // `[plain text]` flags that no AST algorithm ran at all (unrecognized language on one
         // side).
@@ -1161,6 +1322,16 @@ impl App {
     /// Draw the `/` search input as a popup over the (still-visible) viewer behind it, with a real
     /// blinking terminal cursor at the end of the typed query - same convention as the focused
     /// code panel's own cursor (`CodeViewer::cursor_screen_position`).
+    fn draw_review_dialog(&mut self, frame: &mut ratatui::Frame, area: Rect) -> Result<()> {
+        self.draw_viewer(frame, area)?;
+        let Some(dialog) = self.review_dialog.as_mut() else {
+            return Ok(());
+        };
+        let popup = dialog.popup_area(area);
+        frame.render_widget(Clear, popup);
+        dialog.draw(frame, popup)
+    }
+
     fn draw_search_modal(&mut self, frame: &mut ratatui::Frame, area: Rect) -> Result<()> {
         self.draw_viewer(frame, area)?;
         let Some(modal) = self.search_modal.as_mut() else {
@@ -1178,7 +1349,7 @@ impl App {
 /// The footer's compact key-hint reference - deliberately just the handful of most-used keys, not
 /// a full reference (that's `?`/`help_modal.rs`'s job).
 pub(crate) const FOOTER_HINTS: &str =
-    "?:help  o:open  r:reload  n/p:next/prev  /:search  M:options  Tab:switch  q:quit";
+    "?:help  o:open  G:git  r:reload  n/p:next/prev  /:search  M:options  Tab:switch  q:quit";
 
 /// Formats a `ChangeCounts` as a compact `+12 -4 ~2` summary for the footer - omits any category
 /// that's zero, and returns an empty string if every category is (e.g. a `NoChanges` diff, already
@@ -1678,6 +1849,116 @@ mod tests {
     /// Regression test: Esc used to quit the whole app instead of closing the theme picker,
     /// because `SelectTheme` was missing from a hand-maintained exclusion list (twice-extended,
     /// missed both times). Every screen with its own dialog must resolve Esc itself, not quit.
+    /// A repository with two unstaged modifications, and the process moved into it - nextest
+    /// runs every test in its own process, so `set_current_dir` cannot leak into another test.
+    fn enter_sample_repository() -> tempfile::TempDir {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        let git = |args: &[&str]| {
+            let status = std::process::Command::new("git")
+                .arg("-C")
+                .arg(root)
+                .args([
+                    "-c",
+                    "user.name=T",
+                    "-c",
+                    "user.email=t@example.com",
+                    "-c",
+                    "commit.gpgsign=false",
+                ])
+                .args(args)
+                .status()
+                .unwrap();
+            assert!(status.success(), "git {args:?}");
+        };
+        git(&["init", "-q"]);
+        std::fs::write(root.join("a.rs"), "fn a() {}\n").unwrap();
+        std::fs::write(root.join("b.rs"), "fn b() {}\n").unwrap();
+        git(&["add", "."]);
+        git(&["commit", "-q", "-m", "first"]);
+        std::fs::write(root.join("a.rs"), "fn a() { 1 }\n").unwrap();
+        std::fs::write(root.join("b.rs"), "fn b() { 2 }\n").unwrap();
+        std::env::set_current_dir(root).unwrap();
+        dir
+    }
+
+    #[test]
+    fn opening_a_reviewed_file_sets_the_position_and_stepping_walks_its_set() -> Result<()> {
+        let dir = enter_sample_repository();
+        let mut app = App::new(4.0, 60.0)?;
+        app.open_review();
+        assert_eq!(app.screen, AppScreen::Review);
+        let review = app.review_dialog.as_ref().unwrap().review().clone();
+        assert_eq!(review.working_tree.len(), 2);
+
+        let target = ReviewTarget {
+            set: ChangeSet::WorkingTree,
+            file: review.working_tree[0].clone(),
+        };
+        app.handle_review_file_selected(target, 0)?;
+        assert_eq!(app.screen, AppScreen::Viewer);
+        assert!(app.review_dialog.is_none());
+        let position = app
+            .review_position
+            .clone()
+            .expect("a reviewed pair is open");
+        assert_eq!((position.index, position.files.len()), (0, 2));
+        assert!(
+            app.before_path
+                .as_ref()
+                .unwrap()
+                .starts_with(std::env::temp_dir()),
+            "the index blob is materialized"
+        );
+        assert_eq!(
+            app.after_path.as_deref(),
+            Some(dir.path().canonicalize()?.join("a.rs").as_path()),
+            "the working tree side is the real file"
+        );
+        assert!(matches!(
+            app.action_rx.try_recv(),
+            Ok(Action::StartDiff(_, _))
+        ));
+
+        app.step_review_file(1)?;
+        assert_eq!(app.review_position.as_ref().unwrap().index, 1);
+        assert!(app.after_path.as_ref().unwrap().ends_with("b.rs"));
+        app.step_review_file(1)?;
+        assert_eq!(
+            app.review_position.as_ref().unwrap().index,
+            1,
+            "stops at the end"
+        );
+        app.step_review_file(-1)?;
+        assert_eq!(app.review_position.as_ref().unwrap().index, 0);
+
+        let terminal = draw_viewer_once(&mut app)?;
+        assert!(rendered_text(&terminal).contains("file 1/2 (working tree)"));
+
+        app.select_file_for_panel(Panel::Before, dir.path().join("a.rs"))?;
+        assert!(
+            app.review_position.is_none(),
+            "a file opened by hand leaves review mode"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn opening_the_review_outside_a_repository_goes_to_the_banner() -> Result<()> {
+        let dir = tempfile::tempdir()?;
+        std::env::set_current_dir(dir.path())?;
+        let mut app = App::new(4.0, 60.0)?;
+        app.open_review();
+        assert_eq!(app.screen, AppScreen::Viewer);
+        assert!(
+            app.last_error
+                .as_deref()
+                .unwrap_or("")
+                .contains("not inside a git repository")
+        );
+        Ok(())
+    }
+
     #[test]
     fn esc_should_quit_is_false_for_every_screen_with_its_own_dialog() {
         assert!(!esc_should_quit(AppScreen::SelectFile));
@@ -1685,6 +1966,7 @@ mod tests {
         assert!(!esc_should_quit(AppScreen::Help));
         assert!(!esc_should_quit(AppScreen::Search));
         assert!(!esc_should_quit(AppScreen::JumpToLine));
+        assert!(!esc_should_quit(AppScreen::Review));
     }
 
     #[test]
