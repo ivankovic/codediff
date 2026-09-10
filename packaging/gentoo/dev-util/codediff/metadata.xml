@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE pkgmetadata SYSTEM "https://www.gentoo.org/dtd/metadata.dtd">
+<pkgmetadata>
+	<maintainer type="person">
+		<email>marko@ivankovic.me</email>
+		<name>Marko Ivankovic</name>
+	</maintainer>
+	<longdescription lang="en">
+		CodeDiff is a syntax-aware diff tool. Instead of aligning two files line by line, it
+		parses both sides with tree-sitter and matches their syntax trees, so a change is
+		reported as what it structurally is - an insertion, a deletion, an update, or a move -
+		rather than as whichever lines happened to line up.
+
+		It runs as an interactive terminal UI, as a plain-text batch formatter, or as a JSON
+		emitter for editor integrations, and it works as a git difftool backend and a
+		Jujutsu (jj) diff formatter.
+	</longdescription>
+	<upstream>
+		<bugs-to>https://github.com/ivankovic/codediff/issues</bugs-to>
+		<remote-id type="github">ivankovic/codediff</remote-id>
+		<remote-id type="cratesio">codediff</remote-id>
+	</upstream>
+</pkgmetadata>

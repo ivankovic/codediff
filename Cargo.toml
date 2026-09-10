@@ -26,6 +26,11 @@ exclude = [
     # target that cannot compile - `cargo package` keeps tests/ and the manifest stanza by default
     # even when the binaries the test names are gone (confirmed by unpacking the .crate).
     "tests/**",
+    # Distribution recipes, not crate content: the ebuild alone is ~300 lines of dependency names.
+    # Both are excluded together on purpose - flake.nix imports packaging/nix/package.nix, so
+    # shipping one without the other would leave a flake that cannot evaluate.
+    "packaging/**",
+    "flake.nix",
 ]
 
 # No [profile.release] section existed before this (2026-07-25, speed-goal investigation) - Cargo's
@@ -38,6 +43,43 @@ exclude = [
 [profile.release]
 lto = "fat"
 codegen-units = 1
+
+# Debian packaging, driven by `cargo deb` (cargo-deb), not by the Debian archive's own toolchain.
+# That distinction is deliberate and worth stating: a package in Debian proper would need every one
+# of this crate's ~293 dependencies packaged as `librust-*-dev` first, including 24 tree-sitter
+# grammar crates, almost none of which are in Debian. That path is not reachable. What this
+# produces is an unofficial .deb, built by the release workflow and attached to the GitHub release,
+# which installs the same files the Arch/Gentoo/Nix recipes under packaging/ do.
+#
+# `cargo deb` is not vendored here; install it with `cargo install cargo-deb`. See packaging/README.md.
+[package.metadata.deb]
+maintainer = "Marko Ivankovic <marko@ivankovic.me>"
+copyright = "2026 Marko Ivankovic"
+license-file = ["LICENSE", "0"]
+extended-description = """
+CodeDiff parses both sides of a diff with tree-sitter and matches their syntax \
+trees, so a change is reported as what it structurally is - an insertion, \
+deletion, update, or move - rather than as whichever lines happened to align. \
+It runs as an interactive terminal UI, a plain-text batch formatter, or a JSON \
+emitter for editor integrations, and works as a git difftool backend and a \
+Jujutsu (jj) diff formatter."""
+section = "devel"
+priority = "optional"
+# `$auto` lets cargo-deb read the built binary's actual ELF dependencies (libc, libgcc) rather than
+# guessing. Every tree-sitter grammar is compiled in statically, so there is nothing else to name.
+depends = "$auto"
+assets = [
+    ["target/release/codediff", "usr/bin/", "755"],
+    ["README.md", "usr/share/doc/codediff/README.md", "644"],
+    # Generated before packaging by `codediff util man` / `codediff util completions` - see the
+    # `deb` job in .github/workflows/release.yml and packaging/README.md. cargo-deb copies files
+    # from disk and cannot run the binary itself, so these must already exist or the build fails
+    # loudly (which is the intent: a silently man-page-less .deb is worse).
+    ["target/dist/codediff.1", "usr/share/man/man1/", "644"],
+    ["target/dist/codediff.bash", "usr/share/bash-completion/completions/codediff", "644"],
+    ["target/dist/_codediff", "usr/share/zsh/vendor-completions/", "644"],
+    ["target/dist/codediff.fish", "usr/share/fish/vendor_completions.d/", "644"],
+]
 
 [dependencies]
 anyhow = "1.0.100"

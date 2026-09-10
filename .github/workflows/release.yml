@@ -41,6 +41,11 @@ jobs:
       - name: Build
         run: cargo build --release --target ${{ matrix.target }} --bin codediff
 
+      # Deliberately not generated per-target here: `codediff util man`/`util completions` need to
+      # *run* the binary, and one of these four targets is always cross-compiled (macos-latest is
+      # arm64, so x86_64-apple-darwin is the odd one out and would need Rosetta). The output is
+      # identical for every platform anyway - it is derived from the clap definition, not from the
+      # host - so the `assets` job below builds it once and ships it as its own artifact.
       - name: Package (Unix)
         if: runner.os != 'Windows'
         run: tar czf codediff-${{ matrix.target }}.tar.gz -C target/${{ matrix.target }}/release codediff
@@ -56,3 +61,111 @@ jobs:
           # Harmless to set on all 4 matrix jobs: same tag/commit range each time, so every job
           # generates identical notes - GitHub just uses whatever's already there past the first.
           generate_release_notes: true
+
+  # Shell completions and the man page, generated once on a native Linux runner. Every packaging
+  # recipe under packaging/ generates these itself from its own freshly built binary, so this
+  # artifact is for people installing a prebuilt binary by hand rather than through a package.
+  assets:
+    name: completions + man page
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: release-assets
+
+      - name: Build and generate
+        run: |
+          cargo build --release --bin codediff
+          mkdir -p dist/completions
+          ./target/release/codediff util man > dist/codediff.1
+          ./target/release/codediff util completions bash > dist/completions/codediff.bash
+          ./target/release/codediff util completions zsh > dist/completions/_codediff
+          ./target/release/codediff util completions fish > dist/completions/codediff.fish
+          ./target/release/codediff util completions powershell > dist/completions/codediff.ps1
+          ./target/release/codediff util completions elvish > dist/completions/codediff.elv
+          tar czf codediff-completions-and-man.tar.gz -C dist .
+
+      - name: Upload to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: codediff-completions-and-man.tar.gz
+
+  # An *unofficial* .deb, built with cargo-deb from the [package.metadata.deb] block in Cargo.toml.
+  # It is not, and cannot readily become, a package in the Debian archive: that would require all
+  # ~293 dependency crates (24 tree-sitter grammars among them) to exist as `librust-*-dev` first.
+  # See packaging/README.md.
+  deb:
+    name: deb (amd64)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: release-deb
+
+      - name: Install cargo-deb
+        run: cargo install cargo-deb --locked
+
+      # cargo-deb copies assets from disk and cannot run the binary itself, so the man page and
+      # completions Cargo.toml's `assets` list points at have to exist before it runs. Building
+      # here and passing --no-build below also stops cargo-deb from doing a second release build.
+      - name: Build and generate assets
+        run: |
+          cargo build --release --bin codediff
+          mkdir -p target/dist
+          ./target/release/codediff util man > target/dist/codediff.1
+          ./target/release/codediff util completions bash > target/dist/codediff.bash
+          ./target/release/codediff util completions zsh > target/dist/_codediff
+          ./target/release/codediff util completions fish > target/dist/codediff.fish
+
+      - name: Package
+        run: cargo deb --no-build --output codediff_amd64.deb
+
+      # Catches an asset path in Cargo.toml going stale: `cargo deb` would happily produce a
+      # package missing the man page, and nobody would notice until someone ran `man codediff`.
+      - name: Verify contents
+        run: |
+          dpkg-deb --contents codediff_amd64.deb
+          for path in usr/bin/codediff usr/share/man/man1/codediff.1 \
+                      usr/share/bash-completion/completions/codediff; do
+            dpkg-deb --contents codediff_amd64.deb | grep -q " ./$path" \
+              || { echo "::error::missing $path in .deb"; exit 1; }
+          done
+
+      - name: Upload to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: codediff_amd64.deb
+
+  # One SHA256SUMS.txt over every artifact. This is what makes the packaging recipes maintainable:
+  # a PKGBUILD's `sha256sums=()`, an ebuild's Manifest and a Nix `hash =` all need a checksum
+  # somebody has to produce, and reading it off the release beats each packager re-downloading and
+  # hashing by hand. Runs last, after every other job has uploaded.
+  checksums:
+    name: SHA256SUMS
+    runs-on: ubuntu-latest
+    needs: [build, assets, deb]
+    steps:
+      - name: Collect and hash every release asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # workflow_dispatch has no tag of its own; fall back to the latest release so a manual
+          # re-run still produces a usable file instead of failing on an empty ref.
+          TAG: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
+        run: |
+          set -euo pipefail
+          tag="${TAG:-$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName -q .tagName)}"
+          mkdir -p assets && cd assets
+          gh release download "$tag" --repo "$GITHUB_REPOSITORY" --clobber
+          # Sorted so the file's line order is stable between runs and a diff between two releases
+          # is readable.
+          sha256sum $(ls | sort) > ../SHA256SUMS.txt
+          cat ../SHA256SUMS.txt
+
+      - name: Upload to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: SHA256SUMS.txt
