@@ -834,7 +834,6 @@ assign -> real APTED" mechanism.
 
 *  Mouse support and bracketed paste handling in the TUI.
 *  Re-review TUI suspend/resume (Ctrl-Z) behavior, not touched since the async event loop rewrite.
-*  Headless mode (`--headless`) is still unimplemented.
 *  Revisit the `Update` diff color (currently magenta) once seen against more real diffs.
 
 # Possible code health improvements

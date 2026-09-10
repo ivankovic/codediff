@@ -428,10 +428,18 @@ impl PanelLayout {
 const MAX_RECENT_PAIRS: usize = 9;
 
 /// On-disk representation of the persisted settings. A dedicated struct (rather than
-/// persisting `OverlayTheme` directly) so the config file has named fields. Every field after
-/// `theme` carries `#[serde(default)]` so a config written by an older build still parses.
+/// persisting `OverlayTheme` directly) so the config file has named fields. Every field carries
+/// `#[serde(default)]` so a config written by an older build still parses.
 #[derive(Debug, Default, PartialEq, Serialize, Deserialize)]
 struct ThemeConfig {
+    /// Falls back to the default theme rather than failing the parse.
+    ///
+    /// `#[serde(default)]` alone is not enough and was the trap here: it covers a *missing* field,
+    /// while an unknown enum *value* - a config written by a newer codediff, or hand-edited with a
+    /// typo - is a hard error that fails the whole document. Every other setting in the file then
+    /// silently reverted. `theme_or_default` matches the name against the variants this build
+    /// actually has and shrugs at anything else.
+    #[serde(default, deserialize_with = "theme_or_default")]
     theme: OverlayTheme,
     #[serde(default)]
     layout: PanelLayout,
@@ -461,14 +469,192 @@ struct ThemeConfig {
     render_options: crate::diff::text::RenderOptions,
 }
 
-/// The config file's path: a dotfile in the current working directory, per the exploratory-
-/// testing request to store the choice "in a config file in the current working directory".
-/// `pub(crate)` only so `app.rs` tests can clean up the file a real `save_overlay_theme` call
-/// writes into the test process's actual cwd.
+/// Deserialize a theme name, falling back to the default for anything this build does not know.
+///
+/// Re-runs the enum's own `Deserialize` over the name rather than comparing against `Display`.
+/// The two disagree: serde writes the variant identifier (`SolarizedLight`), while strum's
+/// `Display` gives the picker label (`Solarized Light`, `Dracula (default)`). Matching on the
+/// label would reject every theme codediff has ever written to disk - which is exactly what the
+/// first version of this function did, caught by
+/// `a_pre_existing_render_options_table_without_whole_pair_updates_still_loads`.
+///
+/// A value that is not a string at all still fails, at which point the file is structurally wrong
+/// rather than merely naming something unfamiliar, and [`update_config`]'s refusal to overwrite an
+/// unparseable file is what protects the user's settings.
+fn theme_or_default<'de, D>(deserializer: D) -> Result<OverlayTheme, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::de::IntoDeserializer;
+    let name = String::deserialize(deserializer)?;
+    let as_value: serde::de::value::StrDeserializer<serde::de::value::Error> =
+        name.as_str().into_deserializer();
+    Ok(OverlayTheme::deserialize(as_value).unwrap_or_default())
+}
+
+/// The environment variable that overrides every other config layer.
+pub const CONFIG_ENV: &str = "CODEDIFF_CONFIG";
+
+/// The project-level config file's name, looked for at or above the current directory.
+const PROJECT_CONFIG: &str = ".codediff.toml";
+
+/// The config file to read and write, resolved in this order:
+///
+/// 1. `$CODEDIFF_CONFIG`, if set and non-empty. Authoritative: no walk-up, no fallback. This is
+///    the seam tests use, so they never touch a real user's settings.
+/// 2. The nearest `.codediff.toml` at or above the current directory, **if one already exists**.
+/// 3. `$XDG_CONFIG_HOME/codediff/config.toml`, else `$HOME/.config/codediff/config.toml`.
+///
+/// Layer 2 is only ever *used*, never *created*. Until 2026-09-10 the path was unconditionally
+/// `./.codediff.toml`, so codediff dropped a dotfile into whatever directory it happened to run
+/// in - including, memorably, a checkout of the VS Code extension, where its own integration test
+/// spawning codediff littered the repository.
+///
+/// The walk-up matters for `git difftool` and `GIT_EXTERNAL_DIFF`, which git runs with the working
+/// directory set to the repository root: without it, a project config would be found only when
+/// codediff was invoked from that exact directory and not from any subdirectory of it.
+///
+/// `pub(crate)` so `app.rs` tests can clean up after a setter that writes for real.
 pub(crate) fn config_path() -> PathBuf {
-    std::env::current_dir()
-        .unwrap_or_else(|_| PathBuf::from("."))
-        .join(".codediff.toml")
+    // Checked before the test redirect below, so a test that wants a specific file still wins.
+    if let Ok(explicit) = std::env::var(CONFIG_ENV)
+        && !explicit.is_empty()
+    {
+        return PathBuf::from(explicit);
+    }
+    #[cfg(test)]
+    {
+        test_config_path()
+    }
+    #[cfg(not(test))]
+    {
+        nearest_project_config().unwrap_or_else(user_config_path)
+    }
+}
+
+/// A throwaway config for the test build, so no test can write a developer's real settings.
+///
+/// Needed because the code that persists settings is ordinary production code that many tests
+/// reach incidentally - `handle_diff_ready` records a recent pair, `apply_render_options` and the
+/// panel-layout and node-highlight toggles each save - so isolating them one at a time misses the
+/// ones nobody thought of. On 2026-09-10 a full run rewrote this repository's own
+/// `.codediff.toml`, dropping a recent pair and flipping every render option, and only two of the
+/// responsible tests had been spotted by inspection.
+///
+/// Done here rather than in the test harness because `cargo-nextest` 0.9.143 ignores an `[env]`
+/// table in `.config/nextest.toml` ("unknown configuration key"), and a `Makefile`-level variable
+/// would not cover a bare `cargo test`. Keyed by process id so a threaded `cargo test` run does
+/// not have two tests fighting over one file.
+#[cfg(test)]
+fn test_config_path() -> PathBuf {
+    std::env::temp_dir().join(format!("codediff-test-config-{}.toml", std::process::id()))
+}
+
+/// The nearest existing `.codediff.toml`, walking up from the current directory to the root.
+///
+/// Unreachable in the test build, where `config_path` short-circuits to `test_config_path` - the
+/// walk itself is covered through `nearest_project_config_from`.
+#[cfg_attr(test, allow(dead_code))]
+fn nearest_project_config() -> Option<PathBuf> {
+    nearest_project_config_from(&std::env::current_dir().ok()?)
+}
+
+/// The walk itself, parameterized by starting directory so it is testable without changing the
+/// process's working directory out from under every other test.
+fn nearest_project_config_from(start: &Path) -> Option<PathBuf> {
+    start.ancestors().find_map(|directory| {
+        let candidate = directory.join(PROJECT_CONFIG);
+        candidate.is_file().then_some(candidate)
+    })
+}
+
+/// `$XDG_CONFIG_HOME/codediff/config.toml`, else `$HOME/.config/codediff/config.toml`.
+///
+/// Resolved from the environment rather than through the `dirs`/`directories` crate deliberately:
+/// a new dependency means regenerating the 293-crate `CRATES=` block every Gentoo ebuild bump
+/// reads, which is a real cost for two `std::env::var` calls. Falling back to `./.codediff.toml`
+/// when neither variable is set keeps the old behaviour on a system with no HOME at all, rather
+/// than writing to a path that resolves to the filesystem root.
+#[cfg_attr(test, allow(dead_code))]
+fn user_config_path() -> PathBuf {
+    user_config_path_from(
+        std::env::var("XDG_CONFIG_HOME").ok(),
+        std::env::var("HOME").ok(),
+    )
+}
+
+/// The resolution itself, taking the two variables as arguments so it is testable without mutating
+/// the process environment.
+fn user_config_path_from(xdg_config_home: Option<String>, home: Option<String>) -> PathBuf {
+    if let Some(xdg) = xdg_config_home.filter(|value| !value.is_empty()) {
+        return PathBuf::from(xdg).join("codediff").join("config.toml");
+    }
+    if let Some(home) = home.filter(|value| !value.is_empty()) {
+        return PathBuf::from(home)
+            .join(".config")
+            .join("codediff")
+            .join("config.toml");
+    }
+    PathBuf::from(PROJECT_CONFIG)
+}
+
+/// The last config parse failure, for the TUI to surface. `None` once a load succeeds.
+///
+/// A parse failure used to be entirely silent: `unwrap_or_default()` turned it into a fresh set of
+/// defaults, and the next setting the user changed wrote those defaults over the file. One bad
+/// line therefore cost every other setting in it, with nothing on screen to say so.
+static CONFIG_ERROR: std::sync::RwLock<Option<String>> = std::sync::RwLock::new(None);
+
+/// The current config parse error, if the last load hit one.
+pub fn config_error() -> Option<String> {
+    CONFIG_ERROR.read().ok().and_then(|held| held.clone())
+}
+
+/// The file exists but does not parse, so its contents must not be overwritten - see
+/// [`update_config`]. A unit error rather than a two-variant enum because the `Ok` side carries a
+/// `ThemeConfig`, and an enum pairing that with an empty variant is all payload and no tag.
+#[derive(Debug)]
+struct Unreadable;
+
+/// Read the config, distinguishing "absent" from "present but broken".
+///
+/// Absent is not an error: confy yields defaults for a file that is not there, and writing over
+/// nothing loses nothing. Present-but-unparseable is recorded in [`CONFIG_ERROR`] for the TUI to
+/// show and refuses to become a `ThemeConfig` anyone might write back.
+fn read_config(path: &Path) -> Result<ThemeConfig, Unreadable> {
+    match confy::load_path::<ThemeConfig>(path) {
+        Ok(config) => {
+            if let Ok(mut held) = CONFIG_ERROR.write() {
+                *held = None;
+            }
+            Ok(config)
+        }
+        Err(error) => {
+            if !path.exists() {
+                return Ok(ThemeConfig::default());
+            }
+            if let Ok(mut held) = CONFIG_ERROR.write() {
+                *held = Some(format!("{}: {error}", path.display()));
+            }
+            Err(Unreadable)
+        }
+    }
+}
+
+/// Read-modify-write one setting, resolving the config path exactly once.
+///
+/// Refuses to write when the existing file does not parse. Every setter used to be
+/// `load_from(config_path())` - which silently yielded defaults on a parse error - followed by
+/// `save_to(config_path(), ...)`, so changing any single setting overwrote every other one with a
+/// default. Resolving the path once also matters now that it is layered: two calls could
+/// otherwise read one layer and write another.
+fn update_config(mutate: impl FnOnce(&mut ThemeConfig)) {
+    let path = config_path();
+    let Ok(mut config) = read_config(&path) else {
+        return;
+    };
+    mutate(&mut config);
+    save_to(path, config);
 }
 
 /// Load the persisted theme choice, or `OverlayTheme::default()` if the config file doesn't
@@ -487,9 +673,7 @@ pub fn load_overlay_theme() -> OverlayTheme {
 /// directory) are non-fatal: the choice simply won't survive a restart. Load-modify-save so the
 /// other persisted settings in the same file survive the write.
 pub fn save_overlay_theme(theme: OverlayTheme) {
-    let mut config = load_from(config_path());
-    config.theme = theme;
-    save_to(config_path(), config);
+    update_config(|config| config.theme = theme);
 }
 
 /// Load the persisted panel-layout choice (the `v` key), or `PanelLayout::Auto` if the config
@@ -501,9 +685,7 @@ pub fn load_panel_layout() -> PanelLayout {
 /// Persist the panel-layout choice, preserving the other settings in the same file - same
 /// non-fatal failure semantics as `save_overlay_theme`.
 pub fn save_panel_layout(layout: PanelLayout) {
-    let mut config = load_from(config_path());
-    config.layout = layout;
-    save_to(config_path(), config);
+    update_config(|config| config.layout = layout);
 }
 
 /// The persisted custom palette, or Dracula's colors if none was ever saved.
@@ -515,9 +697,7 @@ pub fn load_custom_palette() -> CustomPalette {
 /// palette the running process isn't using.
 pub fn save_custom_palette(palette: CustomPalette) {
     set_custom_palette(palette.clone());
-    let mut config = load_from(config_path());
-    config.custom_palette = palette;
-    save_to(config_path(), config);
+    update_config(|config| config.custom_palette = palette);
 }
 
 /// The persisted render options (the `M` key), or `RenderOptions::FULL` if none was ever chosen.
@@ -528,9 +708,7 @@ pub fn load_render_options() -> crate::diff::text::RenderOptions {
 /// Persist the render options, preserving the other settings in the same file - same non-fatal
 /// failure semantics as `save_overlay_theme`.
 pub fn save_render_options(options: crate::diff::text::RenderOptions) {
-    let mut config = load_from(config_path());
-    config.render_options = options;
-    save_to(config_path(), config);
+    update_config(|config| config.render_options = options);
 }
 
 /// The persisted syntax-highlighting theme name, or `None` if the user never picked one.
@@ -541,9 +719,7 @@ pub fn load_syntax_theme() -> Option<String> {
 
 /// Persist the syntax-highlighting theme choice.
 pub fn save_syntax_theme(name: &str) {
-    let mut config = load_from(config_path());
-    config.syntax_theme = name.to_string();
-    save_to(config_path(), config);
+    update_config(|config| config.syntax_theme = name.to_string());
 }
 
 /// Whether the node highlight is enabled (the `H` key), defaulting to **off**.
@@ -560,33 +736,61 @@ pub fn load_node_highlight() -> bool {
 /// Persist the node-highlight toggle, preserving the other settings in the same file - same
 /// non-fatal failure semantics as `save_overlay_theme`.
 pub fn save_node_highlight(enabled: bool) {
-    let mut config = load_from(config_path());
-    config.node_highlight = enabled;
-    save_to(config_path(), config);
+    update_config(|config| config.node_highlight = enabled);
+}
+
+/// Whether a path is one of the throwaway files a VCS materializes to hand to a diff tool.
+///
+/// `git difftool` and `GIT_EXTERNAL_DIFF` write each side to something like
+/// `/tmp/git-blob-AbC123/file.rs` and delete it the moment the tool exits, so recording such a
+/// pair produces an entry that is dead before it is ever offered. jj does the same with its own
+/// temp directory.
+fn is_throwaway(path: &Path) -> bool {
+    path.starts_with(std::env::temp_dir())
 }
 
 /// The recently diffed file pairs, most recent first - offered on the empty-start screen as
 /// digit shortcuts (`tui::app::draw_viewer`).
+///
+/// Entries whose files have since disappeared are dropped rather than offered: a recents list is
+/// only useful if selecting an item works. This also cleans up the `/tmp/git-blob-*` pairs written
+/// by builds before `record_recent_pair` learned to refuse them.
+///
+/// Note that this list became **per-user** on 2026-09-10, along with the rest of the config; it
+/// was previously per-directory, because the config file itself was.
 pub fn load_recent_pairs() -> Vec<(PathBuf, PathBuf)> {
-    load_from(config_path()).recent_pairs
+    let mut pairs = load_from(config_path()).recent_pairs;
+    pairs.retain(|(before, after)| before.exists() && after.exists());
+    pairs
 }
 
 /// Record a successfully diffed pair at the front of the recent list (deduplicated, capped at
 /// [`MAX_RECENT_PAIRS`]), preserving the other settings in the same file. Same non-fatal failure
 /// semantics as the other save functions.
+///
+/// A pair with a throwaway side is not recorded at all - see [`is_throwaway`]. Filtering these out
+/// only on read would leave every `git difftool` invocation still writing one, and now into the
+/// user-level config rather than a directory-local file.
 pub fn record_recent_pair(before: &Path, after: &Path) {
-    let mut config = load_from(config_path());
+    if is_throwaway(before) || is_throwaway(after) {
+        return;
+    }
     let pair = (before.to_path_buf(), after.to_path_buf());
-    config.recent_pairs.retain(|existing| existing != &pair);
-    config.recent_pairs.insert(0, pair);
-    config.recent_pairs.truncate(MAX_RECENT_PAIRS);
-    save_to(config_path(), config);
+    update_config(|config| {
+        config.recent_pairs.retain(|existing| existing != &pair);
+        config.recent_pairs.insert(0, pair);
+        config.recent_pairs.truncate(MAX_RECENT_PAIRS);
+    });
 }
 
 /// `load_overlay_theme`/`save_overlay_theme`, parameterized by path so tests can exercise the
 /// round-trip against a temp file instead of mutating the process's actual working directory.
+///
+/// Getters use this and fall back to defaults, which is right for a *read*: showing default colors
+/// beats refusing to start. Writes go through [`update_config`] instead, which refuses to clobber
+/// a file it could not parse.
 fn load_from(path: PathBuf) -> ThemeConfig {
-    confy::load_path::<ThemeConfig>(path).unwrap_or_default()
+    read_config(&path).unwrap_or_default()
 }
 
 fn save_to(path: PathBuf, config: ThemeConfig) {
@@ -597,6 +801,203 @@ fn save_to(path: PathBuf, config: ThemeConfig) {
 mod tests {
     use super::*;
     use strum::IntoEnumIterator;
+
+    /// A config naming a theme this build does not know must not cost every other setting in the
+    /// file. Before `theme` gained `#[serde(default)]`, the unknown value failed the whole parse,
+    /// `unwrap_or_default()` produced a blank config, and the next setting the user touched wrote
+    /// that blank over their file.
+    #[test]
+    fn an_unknown_theme_name_does_not_discard_the_rest_of_the_config() {
+        let file = tempfile::NamedTempFile::new().expect("temp file");
+        std::fs::write(
+            file.path(),
+            "theme = \"NotATheme\"\nsyntax_theme = \"base16-ocean.dark\"\nnode_highlight = true\n",
+        )
+        .expect("write config");
+
+        let config = load_from(file.path().to_path_buf());
+
+        assert_eq!(config.theme, OverlayTheme::default());
+        assert_eq!(config.syntax_theme, "base16-ocean.dark");
+        assert!(config.node_highlight);
+    }
+
+    /// The load/save asymmetry that made one bad line destroy a whole config: every setter used to
+    /// read with `unwrap_or_default()` and then write the result back.
+    #[test]
+    fn a_file_that_does_not_parse_is_never_overwritten() {
+        let file = tempfile::NamedTempFile::new().expect("temp file");
+        let garbage = "this is not toml = = =\n";
+        std::fs::write(file.path(), garbage).expect("write config");
+
+        let path = file.path().to_path_buf();
+        assert!(read_config(&path).is_err());
+        assert!(config_error().is_some(), "the failure must be reportable");
+
+        // What a setter does now.
+        if let Ok(mut config) = read_config(&path) {
+            config.node_highlight = true;
+            save_to(path.clone(), config);
+        }
+
+        assert_eq!(
+            std::fs::read_to_string(file.path()).expect("read back"),
+            garbage,
+            "an unparseable config must be left exactly as the user wrote it"
+        );
+    }
+
+    /// `$CODEDIFF_CONFIG` is authoritative: no walk-up, no user-level fallback. Tests rely on this
+    /// to stay off a real user's settings.
+    #[test]
+    fn the_environment_override_wins_over_every_other_layer() {
+        let file = tempfile::NamedTempFile::new().expect("temp file");
+        unsafe { std::env::set_var(CONFIG_ENV, file.path()) };
+        assert_eq!(config_path(), file.path());
+        unsafe { std::env::remove_var(CONFIG_ENV) };
+    }
+
+    /// A pair whose files no longer exist is dead weight in a recents list - selecting it fails.
+    /// This is also the migration that clears the `/tmp/git-blob-*` entries written by builds
+    /// before `record_recent_pair` learned to refuse them.
+    #[test]
+    fn recent_pairs_drops_entries_whose_files_are_gone() {
+        let alive = tempfile::NamedTempFile::new().expect("temp file");
+        let file = tempfile::NamedTempFile::new().expect("temp config");
+        save_to(
+            file.path().to_path_buf(),
+            ThemeConfig {
+                recent_pairs: vec![
+                    (alive.path().to_path_buf(), alive.path().to_path_buf()),
+                    (
+                        PathBuf::from("/tmp/git-blob-deleted/before.rs"),
+                        PathBuf::from("/tmp/git-blob-deleted/after.rs"),
+                    ),
+                ],
+                ..Default::default()
+            },
+        );
+
+        unsafe { std::env::set_var(CONFIG_ENV, file.path()) };
+        let pairs = load_recent_pairs();
+        unsafe { std::env::remove_var(CONFIG_ENV) };
+
+        assert_eq!(pairs.len(), 1);
+        assert_eq!(pairs[0].0, alive.path());
+    }
+
+    /// The fix, as opposed to the migration above: a VCS temp file is never recorded in the first
+    /// place. Filtering only on read would leave every `git difftool` run still writing one.
+    #[test]
+    fn a_throwaway_vcs_path_is_recognised() {
+        let temp = std::env::temp_dir().join("git-blob-AbC123").join("main.rs");
+        assert!(is_throwaway(&temp));
+        assert!(!is_throwaway(Path::new(
+            "/home/someone/src/project/main.rs"
+        )));
+    }
+
+    /// The walk-up is what makes a project config work under `git difftool` and from any
+    /// subdirectory. git runs a difftool with the working directory set to the repository root,
+    /// but codediff is just as often invoked from somewhere below it.
+    #[test]
+    fn a_project_config_is_found_from_a_subdirectory() {
+        let root = tempfile::tempdir().expect("temp dir");
+        let nested = root.path().join("src").join("tui");
+        std::fs::create_dir_all(&nested).expect("create dirs");
+        let config = root.path().join(PROJECT_CONFIG);
+        std::fs::write(&config, "node_highlight = true\n").expect("write config");
+
+        assert_eq!(nearest_project_config_from(&nested), Some(config.clone()));
+        assert_eq!(nearest_project_config_from(root.path()), Some(config));
+    }
+
+    /// The nearest one wins, so a project can override a config further up the tree.
+    #[test]
+    fn the_nearest_project_config_wins() {
+        let root = tempfile::tempdir().expect("temp dir");
+        let inner = root.path().join("inner");
+        std::fs::create_dir_all(&inner).expect("create dirs");
+        std::fs::write(root.path().join(PROJECT_CONFIG), "").expect("outer");
+        std::fs::write(inner.join(PROJECT_CONFIG), "").expect("inner");
+
+        assert_eq!(
+            nearest_project_config_from(&inner),
+            Some(inner.join(PROJECT_CONFIG))
+        );
+    }
+
+    /// A directory with no config above it must not invent one - that is what dropped a
+    /// `.codediff.toml` into every directory codediff was ever run in, including a checkout of the
+    /// VS Code extension, where codediff's own integration test littered the repository.
+    #[test]
+    fn no_project_config_means_none_is_created() {
+        let root = tempfile::tempdir().expect("temp dir");
+        let nested = root.path().join("a").join("b");
+        std::fs::create_dir_all(&nested).expect("create dirs");
+
+        // `/tmp` itself could in principle hold one, so only assert about the temp tree.
+        let found = nearest_project_config_from(&nested);
+        assert!(
+            found.is_none_or(|path| !path.starts_with(root.path())),
+            "nothing under the temp root should have been found or created"
+        );
+        assert!(!nested.join(PROJECT_CONFIG).exists());
+    }
+
+    /// The user-level config lives two directories deep in a path that will not exist on a fresh
+    /// machine (`~/.config/codediff/config.toml`). If saving did not create those directories,
+    /// every setting would silently fail to persist for anyone without a project config - which is
+    /// now the default case, since a project config is never created implicitly.
+    #[test]
+    fn saving_creates_the_directories_the_user_config_lives_in() {
+        let home = tempfile::tempdir().expect("temp dir");
+        let path = home
+            .path()
+            .join(".config")
+            .join("codediff")
+            .join("config.toml");
+        assert!(!path.exists());
+
+        save_to(
+            path.clone(),
+            ThemeConfig {
+                node_highlight: true,
+                ..Default::default()
+            },
+        );
+
+        assert!(
+            path.is_file(),
+            "config was not written to {}",
+            path.display()
+        );
+        assert!(load_from(path).node_highlight);
+    }
+
+    #[test]
+    fn the_user_config_path_follows_xdg_then_home() {
+        assert_eq!(
+            user_config_path_from(Some("/x/config".into()), Some("/home/me".into())),
+            PathBuf::from("/x/config/codediff/config.toml"),
+            "XDG_CONFIG_HOME wins when it is set"
+        );
+        assert_eq!(
+            user_config_path_from(None, Some("/home/me".into())),
+            PathBuf::from("/home/me/.config/codediff/config.toml")
+        );
+        // An empty variable is not a choice; treating it as one would produce a path rooted at the
+        // filesystem root.
+        assert_eq!(
+            user_config_path_from(Some(String::new()), Some("/home/me".into())),
+            PathBuf::from("/home/me/.config/codediff/config.toml")
+        );
+        // No HOME at all: keep the pre-2026-09-10 behaviour rather than writing to `/`.
+        assert_eq!(
+            user_config_path_from(None, None),
+            PathBuf::from(PROJECT_CONFIG)
+        );
+    }
 
     #[test]
     fn save_then_load_round_trips_the_chosen_theme() {

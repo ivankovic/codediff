@@ -245,6 +245,15 @@ impl App {
             self.diff_viewer.set_syntax_theme(name);
         }
         self.recent_pairs = theme::load_recent_pairs();
+        // A config that does not parse is otherwise entirely invisible: the settings above all
+        // fall back to defaults, and nothing is written back over the file (see
+        // `theme::update_config`), so the user sees their preferences quietly ignored every run
+        // with no clue why. The banner says which file and what serde objected to.
+        if let Some(problem) = theme::config_error() {
+            self.last_error = Some(format!(
+                "config not loaded, using defaults and leaving the file alone - {problem}"
+            ));
+        }
 
         let mut ui = UI::new()?
             .tick_rate(self.tick_rate)
@@ -480,7 +489,7 @@ impl App {
                 Action::Resize(w, h) => self.handle_resize(ui, *w, *h)?,
                 Action::Render => self.render(ui)?,
                 Action::FileSelected(path) => self.handle_file_selected(path.clone())?,
-                Action::DialogCancelled => self.handle_dialog_cancelled(),
+                Action::DialogCancelled => self.handle_dialog_cancelled()?,
                 Action::StartDiff(before, after) => {
                     self.screen = AppScreen::Diffing;
                     self.diff_started_at = Some(std::time::Instant::now());
@@ -703,7 +712,7 @@ impl App {
         Ok(())
     }
 
-    fn handle_dialog_cancelled(&mut self) {
+    fn handle_dialog_cancelled(&mut self) -> Result<()> {
         // Cancelling the theme dialog must undo any live preview it applied (see
         // `Action::ThemePreviewed`); a no-op when no preview happened.
         if self.theme_dialog.is_some() {
@@ -717,16 +726,22 @@ impl App {
         }
         self.file_dialog = None;
         self.theme_dialog = None;
-        // Nothing to revert here, unlike the theme dialog above: every toggle in the
-        // render-options panel already applied and persisted itself (see
-        // `Action::RenderOptionsChanged`), so closing it is just discarding the dialog's own
-        // cursor state.
+        // Every toggle in the render-options panel applied and persisted itself the moment it was
+        // pressed (see `Action::RenderOptionsChanged`), so cancelling has to actively put back
+        // what the panel opened with - there is no uncommitted state to simply drop. Without this,
+        // a mis-keyed preset is already on disk and Esc offers no way back.
+        if let Some(dialog) = self.render_options_dialog
+            && dialog.initial() != self.diff_viewer.render_options()
+        {
+            self.apply_render_options(dialog.initial())?;
+        }
         self.render_options_dialog = None;
         self.help_modal = None;
         self.search_modal = None;
         self.line_prompt = None;
         self.dialog_target = None;
         self.screen = AppScreen::Viewer;
+        Ok(())
     }
 
     /// Apply a search query from the search modal: jump the focused panel's cursor to the nearest
@@ -1660,16 +1675,46 @@ mod tests {
     }
 
     #[test]
-    fn handle_dialog_cancelled_resets_dialog_state() {
+    fn handle_dialog_cancelled_resets_dialog_state() -> Result<()> {
         let mut app = App::new(4.0, 60.0).expect("construct App");
         app.screen = AppScreen::SelectFile;
         app.dialog_target = Some(Panel::Before);
 
-        app.handle_dialog_cancelled();
+        app.handle_dialog_cancelled()?;
 
         assert_eq!(app.screen, AppScreen::Viewer);
         assert_eq!(app.dialog_target, None);
         assert!(app.file_dialog.is_none());
+        Ok(())
+    }
+
+    /// The render-options panel persists every toggle the instant it is pressed, so `Esc` has to
+    /// actively restore - there is no uncommitted state to drop. This is the bug that emptied a
+    /// real user's config: `M` opened the panel, a stray `m` meant MINIMAL (every field off), and
+    /// the wipe was on disk before `Esc` was ever reached.
+    #[test]
+    fn cancelling_the_render_options_panel_restores_what_it_opened_with() -> Result<()> {
+        // `apply_render_options` persists, so redirect the write - see the note on
+        // `apply_theme_selection_updates_viewer_and_returns_to_the_viewer_screen`.
+        let config = tempfile::NamedTempFile::new().expect("temp config");
+        unsafe { std::env::set_var(theme::CONFIG_ENV, config.path()) };
+
+        let mut app = App::new(4.0, 60.0).expect("construct App");
+        app.diff_viewer.set_render_options(RenderOptions::FULL);
+        app.screen = AppScreen::RenderOptions;
+        app.render_options_dialog = Some(RenderOptionsDialog::new(RenderOptions::FULL));
+
+        // What the preset key does: applied and persisted immediately.
+        app.apply_render_options(RenderOptions::MINIMAL)?;
+        assert_eq!(app.diff_viewer.render_options(), RenderOptions::MINIMAL);
+
+        app.handle_dialog_cancelled()?;
+
+        assert_eq!(app.diff_viewer.render_options(), RenderOptions::FULL);
+        assert!(app.render_options_dialog.is_none());
+
+        unsafe { std::env::remove_var(theme::CONFIG_ENV) };
+        Ok(())
     }
 
     /// `whole_pair_updates` changes which ranges the diff itself has - a plain re-filter can't
@@ -1835,12 +1880,19 @@ mod tests {
         Ok(())
     }
 
-    /// `apply_theme_selection` is the only place that calls `theme::save_overlay_theme`, which
-    /// writes to the real process cwd (there's no per-test path injection for it, since the
-    /// production code intentionally always targets the cwd it's run from). Clean up the file
-    /// this test causes to be written so repeated runs don't see a stale leftover.
+    /// `apply_theme_selection` calls `theme::save_overlay_theme`, which writes for real. Since
+    /// 2026-09-10 the config is layered and an unredirected write would land in the developer's
+    /// own `~/.config/codediff/config.toml`, so this points `$CODEDIFF_CONFIG` at a temp file -
+    /// the override exists precisely for this.
+    ///
+    /// Safe under `cargo nextest`, which the repository uses and which runs every test in its own
+    /// process. Under a threaded `cargo test` this would be visible to a concurrent test; no other
+    /// test reads the variable.
     #[test]
     fn apply_theme_selection_updates_viewer_and_returns_to_the_viewer_screen() {
+        let config = tempfile::NamedTempFile::new().expect("temp config");
+        unsafe { std::env::set_var(theme::CONFIG_ENV, config.path()) };
+
         let mut app = App::new(4.0, 60.0).expect("construct App");
         app.screen = AppScreen::SelectTheme;
         app.theme_dialog = Some(ThemeDialog::new(app.current_theme));
@@ -1851,7 +1903,7 @@ mod tests {
         assert_eq!(app.screen, AppScreen::Viewer);
         assert!(app.theme_dialog.is_none());
 
-        let _ = std::fs::remove_file(theme::config_path());
+        unsafe { std::env::remove_var(theme::CONFIG_ENV) };
     }
 
     fn rendered_text(terminal: &ratatui::Terminal<ratatui::backend::TestBackend>) -> String {

@@ -25,17 +25,26 @@ use crate::tui::actions::Action;
 
 /// A hint line explaining every key this dialog answers to, drawn under the option list by
 /// `render_list_dialog` - the same scaffold `FileDialog` uses.
-const HINT: &str = "↑/↓ move  Enter/Space toggle  m: minimal  f: full  Esc: close";
+const HINT: &str = "↑/↓ move  Enter/Space toggle  1: minimal  2: full  Esc: cancel";
 
 /// The `M` key's settings panel: one checkbox row per [`RenderOptions`] field, plus two preset
 /// shortcuts.
 ///
 /// Every toggle applies and persists immediately (see [`Action::RenderOptionsChanged`]'s doc
-/// comment for why this doesn't need `ThemeDialog`'s preview/commit/revert-on-cancel machinery) -
-/// `Esc` simply closes the dialog, nothing to undo.
+/// comment for why this doesn't need `ThemeDialog`'s full preview/commit machinery), so `Esc`
+/// restores the options the panel was opened with rather than merely closing it - see
+/// [`Self::initial`]. Without that, there is no way back from a mistaken keystroke: the mistake is
+/// already on disk.
+///
+/// The presets are on `1`/`2` rather than `m`/`f` for the same reason. The panel is opened with
+/// `M`, and lowercase `m` used to mean [`RenderOptions::MINIMAL`] - every field off - so pressing
+/// the opening key twice silently wiped the whole setting and persisted the result. Digits cannot
+/// collide with the key that opens the panel.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RenderOptionsDialog {
     options: RenderOptions,
+    /// What `options` was when the panel opened, for `Esc` to restore.
+    initial: RenderOptions,
     selected: usize,
 }
 
@@ -43,8 +52,15 @@ impl RenderOptionsDialog {
     pub fn new(options: RenderOptions) -> Self {
         Self {
             options,
+            initial: options,
             selected: 0,
         }
+    }
+
+    /// The options this panel was opened with. `app.rs` restores these when the panel is
+    /// cancelled, since every change made inside it has already been applied and persisted.
+    pub fn initial(&self) -> RenderOptions {
+        self.initial
     }
 
     fn row_count(&self) -> usize {
@@ -79,11 +95,11 @@ impl Component for RenderOptionsDialog {
                 self.options.toggle(self.selected);
                 Ok(Some(Action::RenderOptionsChanged(self.options)))
             }
-            KeyCode::Char('m') => {
+            KeyCode::Char('1') => {
                 self.options = RenderOptions::MINIMAL;
                 Ok(Some(Action::RenderOptionsChanged(self.options)))
             }
-            KeyCode::Char('f') => {
+            KeyCode::Char('2') => {
                 self.options = RenderOptions::FULL;
                 Ok(Some(Action::RenderOptionsChanged(self.options)))
             }
@@ -165,20 +181,37 @@ mod tests {
     }
 
     #[test]
-    fn m_and_f_jump_straight_to_the_named_presets() {
+    fn digits_jump_straight_to_the_named_presets() {
         let mut dialog = RenderOptionsDialog::new(RenderOptions::FULL);
 
-        let to_minimal = dialog.handle_key_event(key(KeyCode::Char('m'))).unwrap();
+        let to_minimal = dialog.handle_key_event(key(KeyCode::Char('1'))).unwrap();
         assert_eq!(
             to_minimal,
             Some(Action::RenderOptionsChanged(RenderOptions::MINIMAL))
         );
 
-        let to_full = dialog.handle_key_event(key(KeyCode::Char('f'))).unwrap();
+        let to_full = dialog.handle_key_event(key(KeyCode::Char('2'))).unwrap();
         assert_eq!(
             to_full,
             Some(Action::RenderOptionsChanged(RenderOptions::FULL))
         );
+    }
+
+    /// The panel opens on `M`, so a stray lowercase `m` inside it used to mean MINIMAL - every
+    /// field off, applied and persisted before the user could react. It must now do nothing.
+    #[test]
+    fn the_key_that_opens_the_panel_is_inert_inside_it() {
+        let mut dialog = RenderOptionsDialog::new(RenderOptions::FULL);
+
+        assert_eq!(
+            dialog.handle_key_event(key(KeyCode::Char('m'))).unwrap(),
+            None
+        );
+        assert_eq!(
+            dialog.handle_key_event(key(KeyCode::Char('f'))).unwrap(),
+            None
+        );
+        assert_eq!(dialog.options, RenderOptions::FULL);
     }
 
     #[test]
@@ -189,6 +222,22 @@ mod tests {
 
         assert_eq!(action, Some(Action::DialogCancelled));
         assert_eq!(dialog.options, RenderOptions::FULL);
+    }
+
+    /// `Esc` after a change is the case that matters: the change is already on disk, so the panel
+    /// has to remember what it opened with for `app.rs` to put back. The test above passes
+    /// vacuously - nothing was changed before pressing Esc - so it cannot catch a lost `initial`.
+    #[test]
+    fn esc_after_a_change_still_reports_what_the_panel_opened_with() {
+        let mut dialog = RenderOptionsDialog::new(RenderOptions::FULL);
+
+        dialog.handle_key_event(key(KeyCode::Char('1'))).unwrap();
+        assert_eq!(dialog.options, RenderOptions::MINIMAL);
+
+        let action = dialog.handle_key_event(key(KeyCode::Esc)).unwrap();
+
+        assert_eq!(action, Some(Action::DialogCancelled));
+        assert_eq!(dialog.initial(), RenderOptions::FULL);
     }
 
     #[test]
