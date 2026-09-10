@@ -401,6 +401,23 @@ pub(crate) enum NodeChange<'c> {
 /// `mapping.operation` instead, which missed a statement moving one level deeper (still mapped
 /// `Identical` at the AST level - only its rendered `TextOperation` becomes `Move`, from the
 /// column shift) and wrongly treated the whole enclosing block as one giant `Update`.
+///
+/// **`OwnContentChanged` additionally requires both sides' own content to sit in a single
+/// contiguous gap**, because that is the only shape the branch can actually paint: it returns
+/// `descend = false`, so whatever it reports is the node's *whole* rendering, and
+/// `own_content_update_ranges` can only place a sub-node range when `own_content_span` gives it
+/// one - with multiple gaps it falls back to painting the entire node `Update`. Without this
+/// guard the two halves disagreed, and a container was selected for painting on the strength of
+/// *all* its gaps and then painted whole because there was more than one of them.
+///
+/// That is not hypothetical, and "containers rarely have real content outside their named
+/// children" is exactly the assumption it breaks: a `\`-continued vim `dictionnary` or shell
+/// `command` carries a continuation marker in every gap between its children, so gaining one
+/// child changes the concatenated `own_content` beyond whitespace. Measured on
+/// `vimscript-neovim-neovim-add-one-dict-entry`, where a one-line insertion into a 3347-line file
+/// rendered as a single `update` hunk over rows 86-1006 - with an exact AST mapping underneath it.
+/// Descending instead lets the walk find the one inserted child, which is what the mapping already
+/// knew.
 pub(crate) fn classify_node<'c>(
     node: Node,
     mapped_id: usize,
@@ -422,11 +439,16 @@ pub(crate) fn classify_node<'c>(
         }
         ASTMappingOperation::Update => NodeChange::Update(counterpart()),
         ASTMappingOperation::MatchButNotIdentical => match counterpart() {
+            // `own_content_span` first, and not only because it is the cheaper test: it is the
+            // one that decides whether this branch can keep its promise. See the doc comment
+            // above for the container shape that made this guard necessary.
             Some(other)
-                if !whitespace_stripped_equal(
-                    &own_content(node, own_bytes),
-                    &own_content(other, other_bytes),
-                ) =>
+                if own_content_span(node).is_some()
+                    && own_content_span(other).is_some()
+                    && !whitespace_stripped_equal(
+                        &own_content(node, own_bytes),
+                        &own_content(other, other_bytes),
+                    ) =>
             {
                 NodeChange::OwnContentChanged(other)
             }

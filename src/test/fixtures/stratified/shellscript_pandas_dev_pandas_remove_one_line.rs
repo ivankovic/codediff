@@ -43,18 +43,14 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-10: minimal 35.043%, full 35.043%
-    // A third of the file, for a one-line change - distinct from the two mapping mismatches
-    // above, and much larger, because this part lives entirely in `diff::text`. The enclosing
-    // container's children are separated by `\` line continuations, which are *not* whitespace,
-    // so `own_content` sees the container's own gap text change and `classify_node` returns
-    // `OwnContentChanged` instead of `Descend`. The container has a gap between every pair of
-    // children, so `own_content_span` returns `None` (it only localizes a single contiguous gap)
-    // and `own_content_update_ranges` falls back to painting the whole container `Update`.
-    // Recorded 2026-09-10 as a measured gap, not accepted as correct - see TODO.md.
+    // measured 2026-09-10: minimal 0.066%, full 0.142%
+    // Was 35.043% until the `own_content_span` guard in `classify_node` landed the same
+    // day: this fixture's container separates its children with `\` line continuations, so
+    // every gap held a non-whitespace character and the whole container was painted
+    // `Update` for a one-line change. See that guard's doc comment in `diff::text`.
     assert_matches_human_painting_within_limit(
         "shellscript-pandas-dev-pandas-remove-one-line",
-        35.06,
+        0.16,
     )
 }
 

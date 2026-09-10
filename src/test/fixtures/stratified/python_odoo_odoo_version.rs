@@ -28,8 +28,13 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-09: minimal 36.018%, full 36.018% (measured, unexamined)
-    assert_matches_human_painting_within_limit("python-odoo-odoo-version", 36.03)
+    // measured 2026-09-10: minimal 0.112%, full 0.112%
+    // Was 36.018% until the `own_content_span` guard in `classify_node` landed the same day. The
+    // whole change is one word inside a `\`-continued triple-quoted string, and those
+    // continuations split the string node's own content across several gaps - which is the shape
+    // the guard now sends down the descent path instead of painting whole. See that guard's doc
+    // comment in `diff::text`.
+    assert_matches_human_painting_within_limit("python-odoo-odoo-version", 0.13)
 }
 
 #[test]

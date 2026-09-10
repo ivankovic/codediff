@@ -1,40 +1,48 @@
-# Whole-container `Update` painting when children are separated by `\` line continuations - found 2026-09-10, not fixed
+# Whole-container `Update` painting for multi-gap containers - SHIPPED 2026-09-10
 
-Found while clamping the 40 stratified fixtures added in `c67ef2e6`. Four of them paint far more
-than they should, with an **exact** AST mapping in three of the four - so the gap is entirely in
-`diff::text`, not in the solver:
+Found while clamping the 40 stratified fixtures added in `c67ef2e6`, fixed the same day. A
+one-line change was painting up to half a file: `codediff --mode json` on
+`vimscript-neovim-neovim-add-one-dict-entry` reported a single `update` hunk spanning rows 86-1006
+of a 3347-line file for a one-line insertion, with an **exact** AST mapping underneath it - so the
+whole gap was in `diff::text`, not the solver.
 
-| fixture | minimal | full | mapping mismatches |
-| --- | --- | --- | --- |
-| `vimscript-neovim-neovim-add-one-line-to-dict` | 48.305% | 48.305% | 0 |
-| `vimscript-neovim-neovim-add-one-dict-entry` | 47.820% | 47.820% | 0 |
-| `vimscript-neovim-neovim-add-one-dict-item` | 47.800% | 47.800% | 0 |
-| `shellscript-pandas-dev-pandas-remove-one-line` | 35.043% | 35.043% | 2 |
+**Root cause.** `classify_node` and `own_content_update_ranges` disagreed about what
+`NodeChange::OwnContentChanged` means. `classify_node` selected a node for it by comparing
+`own_content`, which concatenates *every* gap between direct children; `own_content_update_ranges`
+can only place a precise range when `own_content_span` reports a *single* contiguous gap, and
+falls back to painting the whole node otherwise. `OwnContentChanged` also returns `descend = false`,
+so that whole-node paint was the node's entire rendering and the real inserted child was never
+visited. A container was therefore selected on the strength of all its gaps and then painted whole
+because there was more than one of them.
 
-All four are one added or removed line in a long `\`-continued list. `codediff --mode json` on
-`vimscript-neovim-neovim-add-one-dict-entry` reports a single `update` hunk spanning rows 86-1006
-of a 3347-line file for a one-line insertion, so this is user-visible in the product, not only in
-the grader.
+The assumption that broke is named in `classify_node`'s own doc comment - "containers rarely have
+real content outside their named children". A `\`-continued vim `dictionnary`, shell `command` or
+Python string carries a continuation marker in *every* gap, so gaining one child changes the
+concatenated `own_content` beyond whitespace.
 
-**Mechanism**, in `src/diff/text.rs`:
+**Fix.** `OwnContentChanged` now additionally requires `own_content_span` to be `Some` on both
+sides - the only shape the branch can actually paint - and everything else descends. The span
+check runs first, before `own_content`, so the large containers this fires on no longer allocate a
+concatenation of every gap.
 
-1. The container (`dictionnary` in vim, `command` in the shell script) maps
-   `MatchButNotIdentical`, and its direct children are separated by `\` line continuations.
-2. `own_content` concatenates *every* gap between direct children. The `\` characters are not
-   whitespace, so adding one child changes that concatenation beyond whitespace, and
-   `classify_node` returns `OwnContentChanged` rather than `Descend`. Its doc comment states the
-   assumption this breaks: "containers rarely have real content outside their named children".
-3. `own_content_update_ranges` then asks `own_content_span` where to paint - but that function
-   returns `None` for any node whose own content is split across more than one gap, which every
-   multi-child container is. The `_` arm paints the whole container `Update`.
+**Measured** with `painting_disagreement_report` over all 488 painted fixtures, both presets,
+before and after:
 
-So the container is selected for painting on the strength of *all* its gaps and then painted
-whole because there is more than one of them. The obvious candidate fix is to return
-`NodeChange::Descend` when `own_content_span` is `None`, letting the existing descent find the
-small real change - but that changes rendering corpus-wide, so it needs a full
-`painting_disagreement_report` before and after, and any fixture whose clamped limit rises is a
-regression. Not attempted here; the four limits above are clamped at today's measurements so the
-tests hold the line rather than block on a fix that does not exist yet.
+* whole corpus **3.4086% -> 0.1073%** (688795 -> 21681 mismatched bytes), clearing the < 1% goal
+* excluding parse errors 4.0895% -> 0.1180%
+* handmade only 0.4447% -> 0.4447% (untouched)
+* **0 fixtures worse in either preset**; 6 improved, and they were the corpus's six worst:
+
+| fixture | before | after |
+| --- | --- | --- |
+| `vimscript-neovim-neovim-add-one-line-to-dict` | 48.305% | 0.003% |
+| `vimscript-neovim-neovim-add-one-dict-entry` | 47.820% | 0.003% |
+| `vimscript-neovim-neovim-add-one-dict-item` | 47.800% | 0.003% |
+| `shellscript-genymobile-scrcpy-insert-only` | 39.664% | 0.336% |
+| `python-odoo-odoo-version` | 36.018% | 0.112% |
+| `shellscript-pandas-dev-pandas-remove-one-line` | 35.043% | 0.142% |
+
+All six limits are re-clamped at the new measurements.
 
 # Major pipeline rework (SHIPPED, 2026-07-17/18 - old pipeline fully retired)
 

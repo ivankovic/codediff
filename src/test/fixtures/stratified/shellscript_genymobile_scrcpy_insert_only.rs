@@ -30,8 +30,12 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-09: minimal 39.664%, full 39.664% (measured, unexamined)
-    assert_matches_human_painting_within_limit("shellscript-genymobile-scrcpy-insert-only", 39.68)
+    // measured 2026-09-10: minimal 0.336%, full 0.336%
+    // Was 39.664% until the `own_content_span` guard in `classify_node` landed the same day: one
+    // line added to a `\`-continued argument list, whose container therefore holds a
+    // non-whitespace character in every gap between its children. See that guard's doc comment in
+    // `diff::text`.
+    assert_matches_human_painting_within_limit("shellscript-genymobile-scrcpy-insert-only", 0.35)
 }
 
 #[test]
