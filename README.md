@@ -120,6 +120,31 @@ in every example below.
 * `q` or `Esc` — quit. If a dialog is open, `Esc` cancels the dialog instead; while a diff is
   computing, `Esc` cancels the computation.
 
+## The web UI
+
+`codediff-web` is the same viewer served to a browser tab. It is a second binary behind the
+off-by-default `web` feature:
+
+```
+cargo install codediff --features web
+codediff-web BEFORE AFTER
+```
+
+It starts a local server, prints the URL, and opens your browser (`--no-open` to skip that,
+`--port` and `--host` to pick where it listens - the default is a random port on 127.0.0.1). With
+no arguments it starts empty, like the TUI, and it accepts git's `GIT_EXTERNAL_DIFF` argument list
+too. Every key from the list above works in the page, `?` included, and the two front ends share
+one config file: a theme, layout or render option chosen in one is what the other starts with.
+
+Three things differ because a browser is not a terminal. `e` opens `$VISUAL`/`$EDITOR` in the
+terminal `codediff-web` was started from (a GUI editor opens wherever it opens), and the page
+re-diffs when it exits. `q` stops the server, the way it quits the TUI; closing the tab does not,
+so a reload does not end the session. `Ctrl-Z` has no counterpart. Only the machine running
+`codediff-web` can use the page: it binds a loopback address, and every request has to carry a
+token the page got when it loaded, so no other site open in the same browser can read a diff or
+drive the session. Listening on anything but a loopback address exposes your files to whoever can
+reach it.
+
 ## Headless / batch mode
 
 `codediff --headless BEFORE AFTER`, or its synonym `--batch`, prints the diff as plain text, with
