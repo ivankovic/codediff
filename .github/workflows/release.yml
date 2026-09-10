@@ -94,7 +94,7 @@ jobs:
 
   # An *unofficial* .deb, built with cargo-deb from the [package.metadata.deb] block in Cargo.toml.
   # It is not, and cannot readily become, a package in the Debian archive: that would require all
-  # ~293 dependency crates (24 tree-sitter grammars among them) to exist as `librust-*-dev` first.
+  # 293 dependency crates (24 tree-sitter grammars among them) to exist as `librust-*-dev` first.
   # See packaging/README.md.
   deb:
     name: deb (amd64)
@@ -161,8 +161,10 @@ jobs:
           mkdir -p assets && cd assets
           gh release download "$tag" --repo "$GITHUB_REPOSITORY" --clobber
           # Sorted so the file's line order is stable between runs and a diff between two releases
-          # is readable.
-          sha256sum $(ls | sort) > ../SHA256SUMS.txt
+          # is readable. SHA256SUMS.txt itself is excluded: on a re-run `gh release download`
+          # fetches the previous run's copy along with everything else, and it would otherwise be
+          # hashed into its own successor.
+          sha256sum $(ls | grep -vFx SHA256SUMS.txt | sort) > ../SHA256SUMS.txt
           cat ../SHA256SUMS.txt
 
       - name: Upload to release

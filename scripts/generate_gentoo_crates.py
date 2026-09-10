@@ -60,6 +60,29 @@ def crates_from_lockfile(lockfile: Path) -> list[str]:
     return sorted(crates)
 
 
+# Everything outside the CRATES block that must survive a substitution. The regex above is
+# anchored and shape-restricted so it cannot overrun today, but a destroyed ebuild is perfectly
+# self-consistent - `--check` reported "up to date" on a headerless one - so nothing else in this
+# script can notice the damage. This can, and it costs one pass over a 374-line file.
+REQUIRED_AFTER_SUBSTITUTION = (
+    "inherit ",
+    "DESCRIPTION=",
+    "HOMEPAGE=",
+    "SRC_URI=",
+    "LICENSE=",
+    "src_install()",
+)
+
+
+def _assert_intact(ebuild: Path, updated: str) -> None:
+    missing = [token for token in REQUIRED_AFTER_SUBSTITUTION if token not in updated]
+    if missing:
+        raise SystemExit(
+            f"error: substituting CRATES into {ebuild.name} removed {', '.join(missing)} - "
+            f"refusing to write. The CRATES regex has overrun its block; fix it before rerunning."
+        )
+
+
 def main() -> int:
     check_only = "--check" in sys.argv[1:]
     crates = crates_from_lockfile(REPO_ROOT / "Cargo.lock")
@@ -75,6 +98,7 @@ def main() -> int:
         if not CRATES_BLOCK.search(text):
             raise SystemExit(f'error: {ebuild} has no CRATES="..." block to replace')
         updated = CRATES_BLOCK.sub(lambda _: block, text, count=1)
+        _assert_intact(ebuild, updated)
         if updated == text:
             continue
         if check_only:

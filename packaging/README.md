@@ -76,7 +76,7 @@ The `LICENSE` variable enumerates the vendored crates' licenses alongside the pa
 
 The `.deb` is built with [`cargo-deb`](https://github.com/kornelski/cargo-deb) and attached to each
 GitHub release. It is **unofficial**, and the distinction matters: a package in the Debian archive
-proper would require every one of the ~293 dependency crates — 24 tree-sitter grammars among them —
+proper would require every one of the 293 dependency crates — 24 tree-sitter grammars among them —
 to be packaged as `librust-*-dev` first. Almost none are. That path is not reachable, so this is a
 `cargo-deb` artifact, not a route into Debian.
 

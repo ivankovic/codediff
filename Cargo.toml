@@ -46,7 +46,7 @@ codegen-units = 1
 
 # Debian packaging, driven by `cargo deb` (cargo-deb), not by the Debian archive's own toolchain.
 # That distinction is deliberate and worth stating: a package in Debian proper would need every one
-# of this crate's ~293 dependencies packaged as `librust-*-dev` first, including 24 tree-sitter
+# of this crate's 293 dependencies packaged as `librust-*-dev` first, including 24 tree-sitter
 # grammar crates, almost none of which are in Debian. That path is not reachable. What this
 # produces is an unofficial .deb, built by the release workflow and attached to the GitHub release,
 # which installs the same files the Arch/Gentoo/Nix recipes under packaging/ do.
