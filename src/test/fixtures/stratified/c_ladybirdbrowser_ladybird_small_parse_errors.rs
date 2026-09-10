@@ -18,20 +18,33 @@
 use anyhow::Result;
 
 use crate::test;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 
 #[test]
 fn mapping() -> Result<()> {
     // Impossible to map because of parse errors. Painting is correct.
-    test::helper::human_mapping::assert_matches_human_mapping("c-ladybirdbrowser-ladybird-small-parse-errors")
+    //
+    // measured 2026-09-10: 1 total, 0 visible - and the one mismatch is exactly that parse error.
+    // Both sides carry a tree-sitter `ERROR` node (its parse-failure placeholder); the human
+    // mapping pairs them, codediff deletes before's instead, because after's sits one level
+    // deeper - under an added `expression_statement` - and APTED("qualified_name") does not
+    // follow it down. Nothing a reader can see is affected: `ERROR` is scaffolding, which is why
+    // the visible count is 0 while the total is 1.
+    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
+        "c-ladybirdbrowser-ladybird-small-parse-errors",
+        1,
+        0,
+    )
 }
 
 #[test]
 fn painting() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test, read the rate it
-    // reports for both modes, and record that instead.
-    assert_matches_human_painting_within_limit("c-ladybirdbrowser-ladybird-small-parse-errors", 100.0)
+    // measured 2026-09-10: minimal 0.013%, full 0.025%
+    assert_matches_human_painting_within_limit(
+        "c-ladybirdbrowser-ladybird-small-parse-errors",
+        0.04,
+    )
 }
 
 #[test]
