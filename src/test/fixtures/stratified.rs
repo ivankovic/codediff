@@ -35,6 +35,8 @@ mod c_genymobile_scrcpy_rename_and_add_a_define;
 #[cfg(test)]
 mod c_genymobile_scrcpy_rename_defines;
 #[cfg(test)]
+mod c_godotengine_godot_whitespace_only;
+#[cfg(test)]
 mod c_htop_dev_htop_add_comment;
 #[cfg(test)]
 mod c_htop_dev_htop_add_function;
@@ -44,6 +46,8 @@ mod c_htop_dev_htop_update_import;
 mod c_ladybirdbrowser_ladybird_change_to_a_different_class;
 #[cfg(test)]
 mod c_ladybirdbrowser_ladybird_move_to_a_different_class;
+#[cfg(test)]
+mod c_ladybirdbrowser_ladybird_small_parse_errors;
 #[cfg(test)]
 mod c_microsoft_terminal_add_two_includes;
 #[cfg(test)]
@@ -77,11 +81,27 @@ mod c_postgres_postgres_preprocessor_heavy_change;
 #[cfg(test)]
 mod c_postgres_postgres_update_copyright_year;
 #[cfg(test)]
+mod c_redis_redis_one_line_insert;
+#[cfg(test)]
 mod c_rust_lang_rust_add_two_consts;
+#[cfg(test)]
+mod c_tmux_tmux_delete_one_include;
 #[cfg(test)]
 mod cpp_electron_electron_add_imports;
 #[cfg(test)]
 mod cpp_godotengine_godot_add_include;
+#[cfg(test)]
+mod cpp_godotengine_godot_add_one_include;
+#[cfg(test)]
+mod cpp_godotengine_godot_add_one_include_2;
+#[cfg(test)]
+mod cpp_godotengine_godot_add_one_include_3;
+#[cfg(test)]
+mod cpp_godotengine_godot_add_one_include_4;
+#[cfg(test)]
+mod cpp_godotengine_godot_add_one_include_5;
+#[cfg(test)]
+mod cpp_godotengine_godot_insert_one_include;
 #[cfg(test)]
 mod cpp_ladybirdbrowser_ladybird_add_real_logic;
 #[cfg(test)]
@@ -98,6 +118,8 @@ mod cpp_microsoft_terminal_add_only;
 mod cpp_microsoft_terminal_delete_only;
 #[cfg(test)]
 mod cpp_microsoft_terminal_insert_only;
+#[cfg(test)]
+mod cpp_mozilla_firefox_firefox_delete_leading_comment;
 #[cfg(test)]
 mod cpp_mozilla_firefox_firefox_update_file_comment;
 #[cfg(test)]
@@ -129,6 +151,8 @@ mod cpp_paddlepaddle_paddleocr_add_namespace_closing_comment;
 #[cfg(test)]
 mod cpp_protocolbuffers_protobuf_add_preprocessor_commands;
 #[cfg(test)]
+mod cpp_protocolbuffers_protobuf_one_line_insert;
+#[cfg(test)]
 mod csharp_jellyfin_jellyfin_update_version_string;
 #[cfg(test)]
 mod csharp_lidarr_lidarr_add_enum_value;
@@ -144,6 +168,10 @@ mod csharp_lidarr_lidarr_add_method_to_class;
 mod csharp_radarr_radarr_add_base_class;
 #[cfg(test)]
 mod csharp_radarr_radarr_add_func;
+#[cfg(test)]
+mod csharp_radarr_radarr_add_one_using;
+#[cfg(test)]
+mod csharp_radarr_radarr_add_one_using_2;
 #[cfg(test)]
 mod csharp_radarr_radarr_remove_import_and_func;
 #[cfg(test)]
@@ -161,6 +189,10 @@ mod csharp_sonarr_sonarr_delete_func;
 #[cfg(test)]
 mod csharp_sonarr_sonarr_use_a_different_class;
 #[cfg(test)]
+mod css_gorhill_ublock_add_one_attribute;
+#[cfg(test)]
+mod css_microsoft_vscode_remove_one_line;
+#[cfg(test)]
 mod css_nextcloud_server_update_import;
 #[cfg(test)]
 mod css_wordpress_wordpress_go_to_one_line;
@@ -170,6 +202,8 @@ mod css_wordpress_wordpress_one_line_to_multiline;
 mod css_wordpress_wordpress_re_format_in_one_line;
 #[cfg(test)]
 mod css_wordpress_wordpress_reformat_and_fix_lint_errors;
+#[cfg(test)]
+mod css_wordpress_wordpress_remove_one_line;
 #[cfg(test)]
 mod css_wordpress_wordpress_remove_one_rule;
 #[cfg(test)]
@@ -201,6 +235,8 @@ mod go_gohugoio_hugo_update_and_add_some_values;
 #[cfg(test)]
 mod go_gohugoio_hugo_version;
 #[cfg(test)]
+mod go_golang_go_add_one_line;
+#[cfg(test)]
 mod go_golang_go_update_copyright_year;
 #[cfg(test)]
 mod go_grafana_grafana_real_small_change_with_a_move;
@@ -215,7 +251,11 @@ mod go_ollama_ollama_remove_go_build_comment;
 #[cfg(test)]
 mod go_prometheus_prometheus_remove_copyright_year;
 #[cfg(test)]
+mod html_apache_echarts_delete_one_script_tag;
+#[cfg(test)]
 mod html_axios_axios_add_script_element;
+#[cfg(test)]
+mod html_caddyserver_caddy_add_one_element;
 #[cfg(test)]
 mod html_fatedier_frp_update_hashes;
 #[cfg(test)]
@@ -233,7 +273,11 @@ mod html_gohugoio_hugo_template_not_pure_html_2;
 #[cfg(test)]
 mod html_gohugoio_hugo_update_href_template;
 #[cfg(test)]
+mod html_gorhill_ublock_add_one_meta_element;
+#[cfg(test)]
 mod html_ladybirdbrowser_ladybird_remove_meta_attribute;
+#[cfg(test)]
+mod html_ladybirdbrowser_ladybird_remove_one_line;
 #[cfg(test)]
 mod html_ladybirdbrowser_ladybird_update_pixel_value;
 #[cfg(test)]
@@ -255,6 +299,8 @@ mod html_prettier_prettier_not_pure_html_includes_yaml_as_well;
 #[cfg(test)]
 mod html_twbs_bootstrap_not_html_template_extract_two_vars;
 #[cfg(test)]
+mod html_twbs_bootstrap_remove_one_line_in_yaml_metadata_preamble;
+#[cfg(test)]
 mod java_genymobile_scrcpy_add_enum_value;
 #[cfg(test)]
 mod java_genymobile_scrcpy_add_func;
@@ -269,9 +315,15 @@ mod java_genymobile_scrcpy_only_insert;
 #[cfg(test)]
 mod java_genymobile_scrcpy_whitespace_only;
 #[cfg(test)]
+mod java_nextcloud_android_add_one_line;
+#[cfg(test)]
 mod java_paddlepaddle_paddleocr_whitespace_only;
 #[cfg(test)]
 mod java_paddlepaddle_paddleocr_whitespace_only_2;
+#[cfg(test)]
+mod java_protocolbuffers_protobuf_add_one_annotation;
+#[cfg(test)]
+mod java_protocolbuffers_protobuf_add_one_import;
 #[cfg(test)]
 mod java_protocolbuffers_protobuf_update_comment;
 #[cfg(test)]
@@ -280,6 +332,8 @@ mod java_protocolbuffers_protobuf_update_comment_2;
 mod javascript_axios_axios_real_small_change;
 #[cfg(test)]
 mod javascript_d3_d3_nice_small_change;
+#[cfg(test)]
+mod javascript_facebook_react_delete_one_line;
 #[cfg(test)]
 mod javascript_facebook_react_update_comment_only;
 #[cfg(test)]
@@ -290,6 +344,8 @@ mod javascript_microsoft_typescript_add_use_strict_2;
 mod javascript_microsoft_typescript_concat_to_template;
 #[cfg(test)]
 mod javascript_microsoft_typescript_refactor;
+#[cfg(test)]
+mod javascript_microsoft_typescript_remove_one_line;
 #[cfg(test)]
 mod javascript_microsoft_typescript_small_change;
 #[cfg(test)]
@@ -305,6 +361,14 @@ mod javascript_microsoft_typescript_use_strict_3;
 #[cfg(test)]
 mod javascript_microsoft_typescript_use_strict_4;
 #[cfg(test)]
+mod javascript_microsoft_typescript_use_strict_5;
+#[cfg(test)]
+mod javascript_microsoft_typescript_use_strict_6;
+#[cfg(test)]
+mod javascript_microsoft_typescript_use_strict_7;
+#[cfg(test)]
+mod javascript_microsoft_typescript_use_strict_8;
+#[cfg(test)]
 mod javascript_mozilla_firefox_firefox_remove_one_comment;
 #[cfg(test)]
 mod javascript_mui_material_ui_delete_one_import;
@@ -317,6 +381,8 @@ mod json_gorhill_ublock_version;
 #[cfg(test)]
 mod json_grafana_grafana_add_pair;
 #[cfg(test)]
+mod json_lidarr_lidarr_remove_one_line;
+#[cfg(test)]
 mod json_microsoft_playwright_version_update;
 #[cfg(test)]
 mod json_puppeteer_puppeteer_update_version;
@@ -325,7 +391,15 @@ mod json_puppeteer_puppeteer_version_update;
 #[cfg(test)]
 mod json_puppeteer_puppeteer_version_update_2;
 #[cfg(test)]
+mod json_shadcn_ui_ui_add_one_line;
+#[cfg(test)]
 mod json_vercel_next_version;
+#[cfg(test)]
+mod kotlin_mozilla_firefox_firefox_add_one_annotation;
+#[cfg(test)]
+mod kotlin_mozilla_firefox_firefox_add_one_line;
+#[cfg(test)]
+mod kotlin_mozilla_firefox_firefox_add_one_line_2;
 #[cfg(test)]
 mod kotlin_mozilla_firefox_firefox_rename;
 #[cfg(test)]
@@ -338,6 +412,8 @@ mod kotlin_nextcloud_android_different_function;
 mod kotlin_nextcloud_android_real_small_change;
 #[cfg(test)]
 mod kotlin_nextcloud_android_remove_function;
+#[cfg(test)]
+mod kotlin_nextcloud_android_remove_one_import;
 #[cfg(test)]
 mod kotlin_nextcloud_android_rename;
 #[cfg(test)]
