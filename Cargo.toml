@@ -177,6 +177,13 @@ strum = { version = "0.28.0", features = ["derive"] }
 syntect = { version = "5.2", features = ["default-fancy"], optional = true }
 two-face = { version = "0.5.2", default-features = false, features = ["syntect-fancy"], optional = true }
 
+# Unix only, and only for `libc::raise(SIGTSTP)` in `tui::app::suspend` - the Ctrl-Z half of
+# job control, which has no Windows equivalent. Already present in Cargo.lock as a transitive
+# dependency of tokio and crossterm, so naming it here does not add a crate to the tree (and so
+# leaves packaging/gentoo's generated CRATES= block untouched).
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
 [dev-dependencies]
 # The same two crates the `test-fixtures` feature enables, for the `#[cfg(test)]` builds that
 # compile src/test/ without that feature (see lib.rs's gate on `mod test`).

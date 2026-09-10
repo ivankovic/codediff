@@ -827,19 +827,39 @@ assign -> real APTED" mechanism.
 
 # Next features to implement
 
-*  Add "Diff script" generation that can take the ASTDiff and make a "insert, move, update, delete"
-   script out of it.
+*  PARKED 2026-09-10, "not worth it for now": "Diff script" generation - take the `ASTDiff` and emit
+   an ordered insert/move/update/delete script. Still the only item here that would add capability,
+   and the natural companion to `--mode json`, which reports *what* changed but not how to apply it.
+   The mapping already holds everything needed; the work is choosing the output contract (ordering
+   guarantees, how a move is expressed relative to insert/delete, whether positions are pre- or
+   post-application), and that contract is the hard part because it is what any consumer builds
+   against. Worth a short design note before any code.
 
 # TUI follow-ups
 
-*  Mouse support and bracketed paste handling in the TUI.
-*  Re-review TUI suspend/resume (Ctrl-Z) behavior, not touched since the async event loop rewrite.
-*  Revisit the `Update` diff color (currently magenta) once seen against more real diffs.
+This list was audited on 2026-09-10 and had drifted badly - three of its four entries described
+work that was already done. What is written below is what the code actually says.
+
+*  DONE, before 2026-09-10: mouse support. `DiffViewer::handle_mouse_event` handles wheel scroll,
+   left-click to place the cursor, and click-to-focus; `app.rs` sets `ui.mouse = true`. Drag,
+   button-up, horizontal scroll and right/middle click are still unhandled - file "click-drag to
+   select a range" separately if it is ever wanted.
+*  PARKED 2026-09-10, "not worth it for now": bracketed paste. The plumbing exists (`EnableBracketedPaste`,
+   event mapping) but `UI::paste` defaults to false and paste events are dropped on purpose - the
+   TUI's only text inputs are the search modal and the jump-to-line prompt, so there is little to
+   paste into.
+*  DONE 2026-09-10: Ctrl-Z suspend/resume. Raw mode turns off ISIG, so the terminal never produced
+   SIGTSTP and the keystroke was being swallowed; the TUI now releases the terminal, raises the
+   signal itself, and restores on SIGCONT.
+*  DONE 2026-09-10: the magenta diff color. Note the entry was wrong about which one: `Update` is
+   yellow, and the magenta was `Move` in **headless** output only - every TUI preset had already
+   moved to grey ("grey at the purple's own weight"). Headless now matches.
 
 # Possible code health improvements
 
-*  Make code.rs parse code in the from_string if possible, and then remove parsing from diff_code
-   diff.rs
+*  DONE, before 2026-09-10: "make code.rs parse in from_string, then remove parsing from diff_code".
+   Both halves landed with the 2026-07-26 `Code::clone`/`ensure_parsed` work - `from_string` parses,
+   and `src/diff.rs` no longer contains a single `parse` call.
 
 ## Code reuse / readability review (2026-07-12) - FIXED 2026-07-12
 

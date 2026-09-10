@@ -131,6 +131,8 @@ pub struct App {
     /// line)`, then re-enter and re-diff - serviced by the `run` loop between event batches,
     /// since only it holds the `UI` needed to release and re-acquire the terminal.
     pending_editor: Option<(PathBuf, usize)>,
+    /// Set by `Action::Suspend`, consumed by the run loop - see that action's doc comment.
+    pending_suspend: bool,
     /// Recently diffed pairs (most recent first), loaded from the config in `run` and offered on
     /// the empty-start screen as digit shortcuts - see `draw_recent_pairs`/the digit-key arm.
     recent_pairs: Vec<(PathBuf, PathBuf)>,
@@ -187,6 +189,18 @@ pub struct App {
     should_exit: bool,
 }
 
+/// Whether a key event is Ctrl-Z, the suspend request.
+///
+/// A free function so it can be tested without a `UI`, which needs a real terminal. The test must
+/// never reach `App::suspend` itself - that stops the process, which for a test process means the
+/// run hangs rather than fails.
+fn is_suspend_key(key: &crossterm::event::KeyEvent) -> bool {
+    key.code == KeyCode::Char('z')
+        && key
+            .modifiers
+            .contains(crossterm::event::KeyModifiers::CONTROL)
+}
+
 impl App {
     /// Construct the App.
     pub fn new(tick_rate: f64, frame_rate: f64) -> Result<Self> {
@@ -210,6 +224,7 @@ impl App {
             restore_after_reload: None,
             last_search_query: None,
             pending_editor: None,
+            pending_suspend: false,
             recent_pairs: Vec::new(),
             screen: AppScreen::default(),
             syntax_theme: None,
@@ -274,6 +289,9 @@ impl App {
             if let Some((path, line)) = self.pending_editor.take() {
                 self.run_editor(&mut ui, &path, line)?;
             }
+            if std::mem::take(&mut self.pending_suspend) {
+                self.suspend(&mut ui)?;
+            }
             if self.should_exit {
                 break;
             }
@@ -301,6 +319,15 @@ impl App {
         }
 
         if let Event::Key(key) = &event {
+            // Ctrl-Z before the `match` on `key.code`, because the code is a plain `Char('z')`
+            // and would otherwise have to be excluded from every arm that might want `z`. Raw
+            // mode is why this is needed at all: it turns off ISIG, so the terminal never turns
+            // Ctrl-Z into SIGTSTP and the keystroke arrives as an ordinary key that the TUI was
+            // simply swallowing.
+            if is_suspend_key(key) {
+                action_tx.send(Action::Suspend)?;
+                return Ok(());
+            }
             match key.code {
                 KeyCode::Char('q') => {
                     action_tx.send(Action::Quit)?;
@@ -485,6 +512,7 @@ impl App {
             match &action {
                 Action::Tick => self.tick_summary_toast(),
                 Action::Quit => self.should_exit = true,
+                Action::Suspend => self.pending_suspend = true,
                 Action::ClearScreen => ui.terminal.clear()?,
                 Action::Resize(w, h) => self.handle_resize(ui, *w, *h)?,
                 Action::Render => self.render(ui)?,
@@ -672,6 +700,39 @@ impl App {
             self.action_tx.send(Action::StartDiff(before, after))?;
         }
         self.action_tx.send(Action::Render)?;
+        Ok(())
+    }
+
+    /// Ctrl-Z: put the process in the background the way every other terminal program does.
+    ///
+    /// Same release/re-acquire shape as [`Self::run_editor`], and blocking the async loop is again
+    /// the point - there is no terminal to draw on while stopped. Safe to do inline here precisely
+    /// because input comes from an async `EventStream` rather than a background reader thread (see
+    /// `UI`'s doc comment): nothing else is touching the terminal to race with `exit`/`enter`.
+    ///
+    /// Raising the signal is what actually stops us. The default disposition of `SIGTSTP` stops
+    /// the process, and `raise` returns once the shell resumes it with `SIGCONT`, so the two lines
+    /// after it run on resume. Restoring the screen has to be unconditional: the shell will have
+    /// scribbled a prompt over it.
+    #[cfg(unix)]
+    fn suspend(&mut self, ui: &mut UI) -> Result<()> {
+        ui.exit()?;
+        // SAFETY: `raise` is an async-signal-safe libc call taking a signal number, with no
+        // pointers and no memory to invalidate. The terminal is already restored above, so if the
+        // process never comes back the user's shell is still usable.
+        unsafe {
+            libc::raise(libc::SIGTSTP);
+        }
+        ui.enter()?;
+        ui.terminal.clear()?;
+        self.action_tx.send(Action::Render)?;
+        Ok(())
+    }
+
+    /// Windows has no `SIGTSTP` and no job control to suspend into, so Ctrl-Z does nothing there
+    /// rather than pretending.
+    #[cfg(not(unix))]
+    fn suspend(&mut self, _ui: &mut UI) -> Result<()> {
         Ok(())
     }
 
@@ -1672,6 +1733,32 @@ mod tests {
         );
         assert!(app.last_error.is_none());
         Ok(())
+    }
+
+    /// Raw mode turns off ISIG, so the terminal never converts Ctrl-Z into SIGTSTP and the TUI
+    /// used to swallow the keystroke entirely. Only the recognition is tested: calling the
+    /// suspend path itself would stop the test process, hanging the run instead of failing it.
+    #[test]
+    fn ctrl_z_is_recognised_as_suspend_and_a_bare_z_is_not() {
+        use crossterm::event::{KeyEvent, KeyModifiers};
+
+        assert!(is_suspend_key(&KeyEvent::new(
+            KeyCode::Char('z'),
+            KeyModifiers::CONTROL
+        )));
+        // `z` is an ordinary key the viewer and the file dialog both use; it must stay ordinary.
+        assert!(!is_suspend_key(&KeyEvent::new(
+            KeyCode::Char('z'),
+            KeyModifiers::NONE
+        )));
+        assert!(!is_suspend_key(&KeyEvent::new(
+            KeyCode::Char('c'),
+            KeyModifiers::CONTROL
+        )));
+        assert!(!is_suspend_key(&KeyEvent::new(
+            KeyCode::Char('z'),
+            KeyModifiers::SHIFT
+        )));
     }
 
     #[test]

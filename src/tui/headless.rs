@@ -35,15 +35,30 @@ use crate::diff::text::{
 use crate::tui::actions::DiffSessionData;
 use crate::tui::app::compute_diff_with_options;
 
+/// SGR grey, for everything that is chrome rather than content: the line-number gutter and the
+/// box drawn around a moved chunk.
+///
+/// `90` (bright black) rather than `37` (white) because it is the one neutral that stays legible
+/// on a light *and* a dark terminal - `37` washes out on white. Sharing it with the gutter is
+/// deliberate: both are furniture around the diff, and neither should compete with the four
+/// operation colors.
+const CHROME_COLOR: &str = "90";
+
 /// ANSI SGR color for each `TextOperation`, matching the TUI's own canonical palette
-/// (`tui::theme::OverlayTheme`): insert green, delete red, move magenta, update yellow.
+/// (`tui::theme::OverlayTheme`): insert green, delete red, move grey, update yellow.
+///
+/// Move was magenta until 2026-09-10, which had stopped matching the TUI: every preset there moved
+/// to grey (`OverlayPalette::move_bg`, "grey at the purple's own weight", pinned by
+/// `every_preset_paints_moves_grey`) and headless was left behind, so the same diff came out
+/// magenta in a pipe and grey on screen.
+///
 /// `Identical` (and the `NotYetSet` sentinel, which never survives into a real diff) are left
 /// uncolored, same as the TUI's plain syntax-highlighted text.
 fn ansi_color(operation: &TextOperation) -> Option<&'static str> {
     match operation {
         TextOperation::Insert => Some("32"),
         TextOperation::Delete => Some("31"),
-        TextOperation::Move => Some("35"),
+        TextOperation::Move => Some(CHROME_COLOR),
         TextOperation::Update => Some("33"),
         TextOperation::Identical | TextOperation::NotYetSet => None,
     }
@@ -442,7 +457,7 @@ fn render_side(
                 None => format!("Moved {verb} elsewhere"),
             };
             if use_color {
-                out.push_str(&format!("\u{1b}[35m{header}\u{1b}[0m\n"));
+                out.push_str(&format!("\u{1b}[{CHROME_COLOR}m{header}\u{1b}[0m\n"));
             } else {
                 out.push_str(&header);
                 out.push('\n');
@@ -451,7 +466,7 @@ fn render_side(
 
         let number = format!("{:>number_width$} ", i + 1);
         if use_color {
-            out.push_str(&format!("\u{1b}[90m{number}\u{1b}[0m"));
+            out.push_str(&format!("\u{1b}[{CHROME_COLOR}m{number}\u{1b}[0m"));
         } else {
             out.push_str(&number);
         }
@@ -465,7 +480,7 @@ fn render_side(
         if ends_moved_chunk {
             let footer = "-".repeat(MOVED_CHUNK_FOOTER_WIDTH);
             if use_color {
-                out.push_str(&format!("\u{1b}[35m{footer}\u{1b}[0m\n"));
+                out.push_str(&format!("\u{1b}[{CHROME_COLOR}m{footer}\u{1b}[0m\n"));
             } else {
                 out.push_str(&footer);
                 out.push('\n');
@@ -831,21 +846,21 @@ mod tests {
             CONTEXT_LINES,
         );
         assert!(
-            colored.contains("\u{1b}[35mMoved from line 10\u{1b}[0m"),
-            "the header should be magenta: {colored}"
+            colored.contains("\u{1b}[90mMoved from line 10\u{1b}[0m"),
+            "the header should be grey: {colored}"
         );
         assert!(
-            colored.contains(&format!("\u{1b}[35m{footer}\u{1b}[0m")),
-            "the footer should be magenta: {colored}"
+            colored.contains(&format!("\u{1b}[90m{footer}\u{1b}[0m")),
+            "the footer should be grey: {colored}"
         );
         assert!(
-            colored.contains("\u{1b}[35m|\u{1b}[0m"),
-            "the box bar should be magenta: {colored}"
+            colored.contains("\u{1b}[90m|\u{1b}[0m"),
+            "the box bar should be grey: {colored}"
         );
         // A purely-moved line's own text must NOT be inline-colored - only Insert/Delete/Update
         // get that treatment; Move is conveyed purely by the box.
         assert!(
-            !colored.contains("\u{1b}[35mmoved_call();"),
+            !colored.contains("\u{1b}[90mmoved_call();"),
             "a purely-moved line's text should stay plain, not inline-colored: {colored}"
         );
     }

@@ -69,6 +69,12 @@ pub enum Action {
     Render,
     Resize(u16, u16),
     Quit,
+    /// Ctrl-Z: hand the terminal back to the shell and stop, as any other program would.
+    ///
+    /// Deferred rather than acted on where it is raised, because suspending has to release and
+    /// re-acquire the terminal and therefore needs `&mut UI` - the same reason `e` (open an
+    /// editor) goes through `App::pending_editor`.
+    Suspend,
     ClearScreen,
     /// A recoverable, non-fatal failure the user should be told about (e.g. a failed frame draw)
     /// - surfaced via `App::last_error`, the same one-line banner `Action::DiffFailed` uses.
