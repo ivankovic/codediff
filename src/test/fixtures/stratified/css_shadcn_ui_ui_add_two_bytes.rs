@@ -18,8 +18,8 @@
 use anyhow::Result;
 
 use crate::test;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 
 #[test]
 fn mapping() -> Result<()> {
@@ -28,9 +28,15 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test, read the rate it
-    // reports for both modes, and record that instead.
-    assert_matches_human_painting_within_limit("css-shadcn-ui-ui-add-two-bytes", 100.0)
+    // measured 2026-09-11: minimal 0.016%, full 0.016%
+    // The right-anchored alternative painting was removed on 2026-09-11: inside a node
+    // whose value we read character by character, ground truth anchors an ambiguous
+    // add/delete LEFT. `intra_node_update_ranges` takes the common prefix first and the
+    // suffix of the remainder, so it is right-anchored by construction and still emits the
+    // dropped spelling. This residual is that disagreement, and it is expected - it is the
+    // price of the rule, not a regression. See TODO.md for why the renderer was not
+    // flipped to match (it would fix 4 fixtures and break 12).
+    assert_matches_human_painting_within_limit("css-shadcn-ui-ui-add-two-bytes", 0.03)
 }
 
 #[test]

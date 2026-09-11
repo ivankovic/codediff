@@ -18,19 +18,23 @@
 use anyhow::Result;
 
 use crate::test;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 
 #[test]
 fn mapping() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("c-protocolbuffers-protobuf-add-to-preproc-define")
+    test::helper::human_mapping::assert_matches_human_mapping(
+        "c-protocolbuffers-protobuf-add-to-preproc-define",
+    )
 }
 
 #[test]
 fn painting() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test, read the rate it
-    // reports for both modes, and record that instead.
-    assert_matches_human_painting_within_limit("c-protocolbuffers-protobuf-add-to-preproc-define", 100.0)
+    // measured 2026-09-11: minimal 0.503%, full 0.510%
+    assert_matches_human_painting_within_limit(
+        "c-protocolbuffers-protobuf-add-to-preproc-define",
+        0.52,
+    )
 }
 
 #[test]

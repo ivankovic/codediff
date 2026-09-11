@@ -28,8 +28,16 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // remeasured 2026-09-06 after `Minimal (right)`'s Delete on row 17 was pulled back off a
-    // space: minimal 0.064% -> 0.000%, full unchanged at 4.499%
+    // measured 2026-09-11: minimal 0.193%, full 4.499%
+    // The right-anchored alternative painting was removed on 2026-09-11: inside a node
+    // whose value we read character by character, ground truth anchors an ambiguous
+    // add/delete LEFT. `intra_node_update_ranges` takes the common prefix first and the
+    // suffix of the remainder, so it is right-anchored by construction and still emits the
+    // dropped spelling. This residual is that disagreement, and it is expected - it is the
+    // price of the rule, not a regression. See TODO.md for why the renderer was not
+    // flipped to match (it would fix 4 fixtures and break 12).
+    // Superseded the 2026-09-06 remeasurement, which tracked a `Minimal (right)` Delete
+    // that no longer exists.
     assert_matches_human_painting_within_limit("rust-rust-lang-rust-update-comment", 4.51)
 }
 

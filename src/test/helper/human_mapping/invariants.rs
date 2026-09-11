@@ -102,7 +102,11 @@ pub fn ground_truth_invariant_violations_for(
 }
 
 /// One painting reduced to per-byte labels, `[before, after]`.
-fn painted_labels(named: &NamedTextMapping, before: &Code, after: &Code) -> Result<PaintedLabels> {
+pub(crate) fn painted_labels(
+    named: &NamedTextMapping,
+    before: &Code,
+    after: &Code,
+) -> Result<PaintedLabels> {
     let mut spans: [Vec<(HumanTextSpan, TextLabel)>; 2] = [Vec::new(), Vec::new()];
     for entry in &named.mapping.entries {
         let label = TextLabel::from_verdict(entry.verdict(&before.contents, &after.contents)?);

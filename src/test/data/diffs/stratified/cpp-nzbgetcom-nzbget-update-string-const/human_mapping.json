@@ -72191,33 +72191,6 @@
       ]
     },
     {
-      "name": "Full (right)",
-      "entries": [
-        {
-          "operation": "Insert",
-          "after": [
-            {
-              "start_row": 117,
-              "start_column": 61,
-              "end_row": 117,
-              "end_column": 64
-            }
-          ]
-        },
-        {
-          "operation": "Insert",
-          "after": [
-            {
-              "start_row": 117,
-              "start_column": 64,
-              "end_row": 117,
-              "end_column": 65
-            }
-          ]
-        }
-      ]
-    },
-    {
       "name": "Full (left)",
       "entries": [
         {

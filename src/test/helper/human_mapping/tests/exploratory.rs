@@ -920,3 +920,184 @@ fn measure_full_painting_whitespace_invariants() -> Result<()> {
     );
     Ok(())
 }
+
+/// EXPLORATORY: does every painted insert/delete run sit at its **leftmost** equivalent position?
+///
+/// The question behind it: when a change adds or removes characters *inside* a value a reader
+/// reads character by character - an identifier, a string, a comment - the run is often free to
+/// slide. `overscroll-none` -> `overscroll-y-none` can be painted as inserting `-y` after
+/// `overscroll` or `y-` after `overscroll-`, and both produce the same text. Five fixtures record
+/// that ambiguity explicitly, as a pair of paintings named `(left)`/`(right)`. The rule under test
+/// is that `left` is always the one to keep.
+///
+/// **Scoped to runs strictly inside one node**, which is the whole subtlety. A comma that follows
+/// a newly inserted argument can also slide - but it is a node of its own, the AST maps it, and
+/// `RULES_AND_PREFERENCES.md`'s delimiter rule already says it should follow the thing it
+/// delimits, which is a *right* preference. Applying "prefer left" there would contradict a rule
+/// this corpus is already annotated under. A run qualifies as intra-value only when the smallest
+/// node containing it contains it *strictly* and no child boundary falls inside it: that admits
+/// identifier and string leaves, and excludes both a whole-node delimiter and anything spanning
+/// two nodes.
+///
+/// `FIXTURES=a,b` narrows it; otherwise every painted fixture in the corpus.
+#[test]
+#[ignore]
+fn painting_left_anchor_census() -> Result<()> {
+    use crate::test::helper::human_mapping::invariants::painted_labels;
+
+    let only: Vec<String> = std::env::var("FIXTURES")
+        .unwrap_or_default()
+        .split(',')
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect();
+
+    let mut fixtures = 0usize;
+    let (mut runs_total, mut runs_intra) = (0usize, 0usize);
+    let (mut slidable_intra, mut slidable_structural) = (0usize, 0usize);
+    let (mut declared, mut counterexamples) = (0usize, 0usize);
+    let mut offenders: Vec<String> = Vec::new();
+
+    let diffs_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("src")
+        .join("test")
+        .join("data")
+        .join("diffs");
+    let mut names: Vec<String> = Vec::new();
+    for dataset in crate::test::helper::DIFF_DATASETS {
+        let dir = diffs_dir.join(dataset);
+        if !dir.is_dir() {
+            continue;
+        }
+        for entry in fs::read_dir(&dir)?.filter_map(|entry| entry.ok()) {
+            if entry.path().is_dir() {
+                names.push(entry.file_name().to_string_lossy().into_owned());
+            }
+        }
+    }
+    names.sort();
+
+    for name in names {
+        if !only.is_empty() && !only.contains(&name) {
+            continue;
+        }
+        let Ok(pair) = crate::test::helper::handmade_test_code_pair(&name) else {
+            continue;
+        };
+        let (before, after) = &*pair;
+        let Ok(mapping) = load(&name) else { continue };
+        if mapping.text_mappings.is_empty() {
+            continue;
+        }
+        fixtures += 1;
+        for named in &mapping.text_mappings {
+            let Ok(labels) = painted_labels(named, before, after) else {
+                continue;
+            };
+            for (side, code) in [(0usize, before), (1usize, after)] {
+                let contents = code.contents.as_bytes();
+                // The run a slide would move: Delete is only paintable on the before side and
+                // Insert only on the after side, so one label per side is the whole question.
+                let wanted = if side == 0 {
+                    TextLabel::Delete
+                } else {
+                    TextLabel::Insert
+                };
+                let mut i = 0usize;
+                while i < labels[side].len() {
+                    if labels[side][i] != Some(wanted) {
+                        i += 1;
+                        continue;
+                    }
+                    let start = i;
+                    while i < labels[side].len() && labels[side][i] == Some(wanted) {
+                        i += 1;
+                    }
+                    let end = i;
+                    runs_total += 1;
+                    // Sliding one byte left leaves the same text iff the byte before the run
+                    // equals the run's own last byte. A slide whose result reads *identically*
+                    // (a run inside a stretch of one repeated character - four spaces of
+                    // indentation, say) is excluded: there is no left and right to prefer
+                    // between two spellings a reader cannot tell apart.
+                    let slidable = start > 0
+                        && contents.get(start - 1) == contents.get(end - 1)
+                        && contents[start..end] != contents[start - 1..end - 1];
+                    let intra = intra_value_run(code, start, end);
+                    if intra {
+                        runs_intra += 1;
+                    }
+                    if !slidable {
+                        continue;
+                    }
+                    if intra {
+                        slidable_intra += 1;
+                        let text = String::from_utf8_lossy(&contents[start..end]).into_owned();
+                        let shifted =
+                            String::from_utf8_lossy(&contents[start - 1..end - 1]).into_owned();
+                        // A painting that *names itself* the right-hand reading is the ambiguity
+                        // being recorded on purpose, not a painter's slip - the two are worth
+                        // counting apart, because dropping the first is a data edit and
+                        // disagreeing with the second is a claim about what a human prefers.
+                        let declared_right = named.name.to_lowercase().contains("right");
+                        if declared_right {
+                            declared += 1;
+                        } else {
+                            counterexamples += 1;
+                        }
+                        offenders.push(format!(
+                            "  [{}] {name} painting '{}' {} bytes {start}..{end} {text:?} -> \
+                             left would be {shifted:?}",
+                            if declared_right {
+                                "declared-right"
+                            } else {
+                                "COUNTEREXAMPLE"
+                            },
+                            named.name,
+                            if side == 0 { "before" } else { "after" },
+                        ));
+                    } else {
+                        slidable_structural += 1;
+                    }
+                }
+            }
+        }
+    }
+
+    for line in &offenders {
+        eprintln!("{line}");
+    }
+    eprintln!(
+        "\nPAINTED FIXTURES            {fixtures}\n\
+         INSERT/DELETE RUNS          {runs_total} ({runs_intra} intra-value)\n\
+         NOT LEFTMOST, intra-value   {slidable_intra}\n\
+         ..of which declared 'right'  {declared}   (the recorded ambiguity - dropping these is the rule)\n\
+         ..of which counterexamples   {counterexamples}   (a human anchored right on purpose)\n\
+         NOT LEFTMOST, structural    {slidable_structural}   (delimiters etc., out of scope)"
+    );
+    Ok(())
+}
+
+/// Whether `[start, end)` sits strictly inside a single node with no child boundary inside it -
+/// see [`painting_left_anchor_census`] for why that is the line between "a value we read
+/// character by character" and "a token the AST already maps".
+///
+/// Strictly inside on **both** sides, so a run that already starts at its node's first byte is
+/// reported structural rather than intra-value. That is deliberate - such a run has no left to
+/// slide to without leaving the node - but it also means the census cannot see runs that are
+/// already at the leftmost legal position, and so undercounts how often the rule is satisfied.
+fn intra_value_run(code: &crate::code::Code, start: usize, end: usize) -> bool {
+    let Some(tree) = code.ast.as_ref() else {
+        return false;
+    };
+    let node = tree
+        .root_node()
+        .descendant_for_byte_range(start, end.saturating_sub(1));
+    let Some(node) = node else { return false };
+    if node.start_byte() >= start || node.end_byte() <= end {
+        return false;
+    }
+    let mut cursor = node.walk();
+    node.children(&mut cursor)
+        .all(|c| c.end_byte() <= start || c.start_byte() >= end)
+}

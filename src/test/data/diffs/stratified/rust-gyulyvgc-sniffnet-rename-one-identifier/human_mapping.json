@@ -506063,22 +506063,6 @@
   ],
   "text_mappings": [
     {
-      "name": "Minimal (Prefer right)",
-      "entries": [
-        {
-          "operation": "Insert",
-          "after": [
-            {
-              "start_row": 294,
-              "start_column": 42,
-              "end_row": 294,
-              "end_column": 51
-            }
-          ]
-        }
-      ]
-    },
-    {
       "name": "Minimal (Prefer left)",
       "entries": [
         {

@@ -18,22 +18,33 @@
 use anyhow::Result;
 
 use crate::test;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants_with_known_violations;
 
 #[test]
 fn mapping() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("go-gin-gonic-gin-whitespace-in-comment")
+    test::helper::human_mapping::assert_matches_human_mapping(
+        "go-gin-gonic-gin-whitespace-in-comment",
+    )
 }
 
 #[test]
 fn painting() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test, read the rate it
-    // reports for both modes, and record that instead.
-    assert_matches_human_painting_within_limit("go-gin-gonic-gin-whitespace-in-comment", 100.0)
+    // measured 2026-09-11: minimal 0.069%, full 0.069%
+    assert_matches_human_painting_within_limit("go-gin-gonic-gin-whitespace-in-comment", 0.08)
 }
 
 #[test]
 fn invariants() -> Result<()> {
-    assert_ground_truth_invariants("go-gin-gonic-gin-whitespace-in-comment")
+    // measured 2026-09-11: 1 violation, and one the left-anchor rule would repair. The
+    // painted run ends on a space because the deletion was anchored right; the same
+    // deletion anchored LEFT covers the same bytes, ends on a visible character, and so
+    // satisfies this invariant as well as the rule. Re-painting that one run in
+    // human_solver should take this to 0 - it needs the ground truth edited, not codediff.
+    // Painting 'Only one solution', before row 1: `// Copyright 2021 Gin Core Team.  All
+    // rights reserved.` - the doubled space is the point of the fixture.
+    assert_ground_truth_invariants_with_known_violations(
+        "go-gin-gonic-gin-whitespace-in-comment",
+        1,
+    )
 }

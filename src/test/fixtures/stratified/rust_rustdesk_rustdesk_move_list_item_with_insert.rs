@@ -18,19 +18,23 @@
 use anyhow::Result;
 
 use crate::test;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 
 #[test]
 fn mapping() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("rust-rustdesk-rustdesk-move-list-item-with-insert")
+    test::helper::human_mapping::assert_matches_human_mapping(
+        "rust-rustdesk-rustdesk-move-list-item-with-insert",
+    )
 }
 
 #[test]
 fn painting() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test, read the rate it
-    // reports for both modes, and record that instead.
-    assert_matches_human_painting_within_limit("rust-rustdesk-rustdesk-move-list-item-with-insert", 100.0)
+    // measured 2026-09-11: minimal 0.070%, full 0.074%
+    assert_matches_human_painting_within_limit(
+        "rust-rustdesk-rustdesk-move-list-item-with-insert",
+        0.09,
+    )
 }
 
 #[test]

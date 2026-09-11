@@ -73,6 +73,29 @@ In such cases, the realistic answer is that it is actually irrelevant to a human
 not care either way. So a consistent mapping is simply to map any irrelevant mappings in order of
 apperance. With this rule, the final "||" would be missing a match and would be considered added.
 
+### Anchoring an ambiguous edit inside a value
+
+Inside a node whose value we examine character by character - an identifier, a string constant, a
+comment - an added or deleted run can sometimes sit in more than one place and produce exactly the
+same text. Deleting the first `y-` or the second from `y-y-foo` leaves `y-foo` either way. In such
+cases the edit is anchored **left**: the leftmost run of bytes that produces the intended result is
+the one that gets painted.
+
+This applies only *inside* such a node. Ambiguity outside one - a comma that follows a newly added
+identifier, one of two identical `::` in a path - is structural, the AST maps it, and this rule has
+nothing to say about it.
+
+Two caveats, both learned from measuring the corpus (see TODO.md for the numbers):
+
+-   The rule is subordinate to token boundaries. Inserting `,"k":"v"` into JSON-inside-a-comment
+    can be slid one byte left to `","k":"v` - the same length, the same resulting text, and a
+    split string literal. A leftmost run that cuts a token in half is not the intended reading, and
+    a human will not pick it.
+-   CodeDiff does not currently implement the rule. `intra_node_update_ranges` takes the longest
+    common prefix first and then the suffix of what remains, which makes it right-anchored by
+    construction. Flipping it was measured and rejected: it would agree with 4 more fixtures in the
+    corpus and disagree with 12 more.
+
 ## Preferences
 
 These always present a choice between two or more equally correct ways to show the same diff. The

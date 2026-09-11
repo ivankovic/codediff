@@ -322223,33 +322223,6 @@
           ]
         }
       ]
-    },
-    {
-      "name": "Prefer right",
-      "entries": [
-        {
-          "operation": "Delete",
-          "before": [
-            {
-              "start_row": 1946,
-              "start_column": 39,
-              "end_row": 1946,
-              "end_column": 46
-            }
-          ]
-        },
-        {
-          "operation": "Delete",
-          "before": [
-            {
-              "start_row": 1577,
-              "start_column": 29,
-              "end_row": 1577,
-              "end_column": 36
-            }
-          ]
-        }
-      ]
     }
   ]
 }

@@ -2,6 +2,44 @@
 
 Two of the review's margin notes ask for measurement work, not text edits. Both are recorded here
 rather than answered in the paper, and the paper currently reflects that.
+## Left-anchor preference for intra-value edits (explored 2026-09-11, PARTLY ADOPTED)
+
+Rule as proposed: inside a node whose value we examine character by character (identifier,
+string constant, comment), an add/delete that could be anchored either left or right is
+anchored **left**. Outside such a node - a comma following a new identifier - the AST maps it
+and the rule does not apply.
+
+ADOPTED for the recorded-ambiguity cases. Five fixtures carried both spellings as separate
+named paintings; the right-hand one is gone and the left one is now the ground truth.
+
+NOT adopted as a sixth ground-truth invariant, and the renderer was NOT flipped. The census
+(`painting_left_anchor_census`, exploratory.rs) swept all 543 painted fixtures and found 24
+intra-value runs that are not leftmost. Five are the declared pairs above. Of the other 19 -
+single paintings, no alternative recorded - codediff **already reproduces 12 byte for byte**.
+`intra_node_update_ranges` takes the common prefix first and the suffix of the remainder, so
+it is right-anchored by construction, and that construction is currently agreeing with the
+corpus more often than a left-anchored one would: flipping it would fix 4 fixtures and break
+12. That measurement, not which spelling reads better, is why the renderer was left alone.
+
+Two of the 19 are repairable rather than counterexamples, and they are the best evidence the
+rule has: `go-gin-gonic-gin-whitespace-in-comment` and `csharp-sonarr-sonarr-fix-comment-typo`
+both end a painted run on a space, which breaks the existing no-painted-trailing-whitespace
+invariant. Sliding those runs left covers the same bytes, ends on a visible character, and
+satisfies the invariant and the rule at once - here the two agree. Both are clamped at 1 known
+violation with that repair written down; they want a pass in human_solver.
+
+The remaining 17 are 3 distinct phenomena, not 17 independent judgements - 14 are one clone family
+(swift `,"signatureNext":"X"` inserted into JSON-in-a-comment). That family is also the
+clearest argument against the rule: the leftmost spelling of the same byte count is
+`","signatureNext":"X`, which splits a JSON token in half. A human will not pick it.
+
+Caveat on what the census can conclude: `human_solver` seeds paintings from codediff's own
+ranges, so "the human painted rightmost" is partly evidence about the seed, not only about
+human preference. That cuts both ways - it is a reason not to treat the 19 as refuting the
+rule, and equally a reason not to silently repaint them to match it.
+
+Open, if the rule is ever to be enforced: it needs a tie-break that knows about token
+boundaries (do not split a quoted string or a delimiter pair), not a plain leftmost rule.
 
 ## Time \textsc{CodeDiff} as a whole process, not in-process
 

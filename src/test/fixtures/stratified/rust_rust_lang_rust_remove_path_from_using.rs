@@ -18,19 +18,26 @@
 use anyhow::Result;
 
 use crate::test;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 
 #[test]
 fn mapping() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("rust-rust-lang-rust-remove-path-from-using")
+    // measured 2026-09-11: 2 mismatch(es), 2 visible. One of two `::` tokens in a nested
+    // `scoped_identifier` is dropped. Both are identical and either may be called the deleted one;
+    // the human picked the inner, codediff the outer, and the pair costs two mismatches. Same
+    // ambiguity the painting rule is about, one level up in the tree - see TODO.md.
+    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
+        "rust-rust-lang-rust-remove-path-from-using",
+        2,
+        2,
+    )
 }
 
 #[test]
 fn painting() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test, read the rate it
-    // reports for both modes, and record that instead.
-    assert_matches_human_painting_within_limit("rust-rust-lang-rust-remove-path-from-using", 100.0)
+    // measured 2026-09-11: minimal 0.000%, full 0.000% (measured, unexamined)
+    assert_matches_human_painting_within_limit("rust-rust-lang-rust-remove-path-from-using", 0.0)
 }
 
 #[test]

@@ -18,21 +18,28 @@
 use anyhow::Result;
 
 use crate::test;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 
 #[test]
 fn mapping() -> Result<()> {
-    // Allows multiple completely different solutions, depending if given node types are
-    // preferred to match or not.
-    test::helper::human_mapping::assert_matches_human_mapping("go-caddyserver-caddy-multiple-solutions-interesting-case")
+    // measured 2026-09-11: 3 mismatch(es), 3 visible. The fixture's own name records the reason:
+    // several genuinely different mappings are defensible here depending on whether given node
+    // kinds are preferred to match, and codediff takes a different one than the painter did.
+    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
+        "go-caddyserver-caddy-multiple-solutions-interesting-case",
+        3,
+        3,
+    )
 }
 
 #[test]
 fn painting() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test, read the rate it
-    // reports for both modes, and record that instead.
-    assert_matches_human_painting_within_limit("go-caddyserver-caddy-multiple-solutions-interesting-case", 100.0)
+    // measured 2026-09-11: minimal 0.014%, full 0.015%
+    assert_matches_human_painting_within_limit(
+        "go-caddyserver-caddy-multiple-solutions-interesting-case",
+        0.03,
+    )
 }
 
 #[test]

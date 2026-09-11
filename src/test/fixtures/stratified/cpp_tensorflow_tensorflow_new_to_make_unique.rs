@@ -18,19 +18,28 @@
 use anyhow::Result;
 
 use crate::test;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 
 #[test]
 fn mapping() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("cpp-tensorflow-tensorflow-new-to-make-unique")
+    // measured 2026-09-11: 6 mismatch(es), 4 visible. `new Foo(a, b)` became
+    // `absl::make_unique<Foo>(a, b)`. The human maps the old `argument_list` and its parens to
+    // nothing - the call is a different call - while APTED pairs them with the new call's
+    // `argument_list` on qualified_name, because the arguments inside really are identical. 4 of
+    // the 6 are the two paren pairs; this is the flat delimiter-pairing family, not something
+    // specific to this fixture.
+    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
+        "cpp-tensorflow-tensorflow-new-to-make-unique",
+        6,
+        4,
+    )
 }
 
 #[test]
 fn painting() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test, read the rate it
-    // reports for both modes, and record that instead.
-    assert_matches_human_painting_within_limit("cpp-tensorflow-tensorflow-new-to-make-unique", 100.0)
+    // measured 2026-09-11: minimal 0.220%, full 0.220%
+    assert_matches_human_painting_within_limit("cpp-tensorflow-tensorflow-new-to-make-unique", 0.23)
 }
 
 #[test]

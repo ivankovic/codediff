@@ -47080,22 +47080,6 @@
           ]
         }
       ]
-    },
-    {
-      "name": "Right",
-      "entries": [
-        {
-          "operation": "Insert",
-          "after": [
-            {
-              "start_row": 152,
-              "start_column": 22,
-              "end_row": 152,
-              "end_column": 24
-            }
-          ]
-        }
-      ]
     }
   ]
 }
