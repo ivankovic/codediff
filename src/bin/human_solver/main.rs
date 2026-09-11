@@ -301,16 +301,23 @@ n / N          jump to next / previous mismatch (`*`) vs. codediff's verdict
 
 t              text view: read the source, and paint the human text-range ground
                  truth onto it (stored beside the tree mapping, not derived from
-                 it). Tab side, hjkl/0/$/g/G move, v select. By default a
-                 selection spanning several rows is vertical -- the same columns
-                 on each row, like a stack of squares, not every full line swept
-                 in between; V toggles that to a full-line sweep, for a single
-                 contiguous multi-line block. d/i paint the
+                 it). Tab side, hjkl/g/G move, 0/^/$ to a line's start/first
+                 code character/end, v select. By default a selection spanning
+                 several rows is vertical -- the same columns on each row, like
+                 a stack of squares, not every full line swept in between; V
+                 toggles that to a full-line sweep, for a single contiguous
+                 multi-line block. d/i paint the
                  Before/After selection deleted/inserted, m pairs BOTH sides'
                  selections as a match (move vs update derived from whether the
                  spans' text is identical), u removes the range under the cursor,
                  Z marks a nothing-to-paint fixture, : jumps to a line number,
                  Esc unselects or closes.
+                 In a painting named Minimal, d/i on a multi-row full-line (V)
+                 sweep is recorded as one range per row starting at that row's
+                 first code character, never through the indentation -- the rule
+                 invariant 6 states, kept for you instead of reported afterwards.
+                 A blank row in the sweep drops out; a vertical selection and a
+                 Full or free-named painting are left exactly as drawn.
                  A range that overlaps one already painted is refused at the
                  keystroke (u removes the old one first): the renderer resolves
                  an overlap by highest verdict and the scorer by list order, so
@@ -329,7 +336,12 @@ t              text view: read the source, and paint the human text-range ground
                  switches which one you edit; D twice in either list deletes the
                  highlighted painting, which is how a fixture painted Only one
                  solution becomes a Minimal + Full pair.
-                 p cycles what is drawn: your painting, codediff's own rendering
+                 n / p jump BOTH panels to the next / previous hunk of the plain
+                 line diff (wrapping, read off the focused side's own row), and a
+                 puts the other panel on the same line number as this one and
+                 scrolls it to the same place on screen -- the two ways to stop
+                 hand-scrolling two independently scrolled panels
+                 o cycles what is drawn: your painting, codediff's own rendering
                  of the same pair, or only the bytes where the two disagree
                  P copies codediff's rendering into the current painting as a
                  starting point, so a fixture is corrected rather than painted

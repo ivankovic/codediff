@@ -35,3 +35,7 @@ mod java_defects4j_chart_14_xyplot;
 mod java_defects4j_chart_15_pieplot;
 #[cfg(test)]
 mod java_defects4j_chart_1_abstractcategoryitemrenderer;
+#[cfg(test)]
+mod java_defects4j_cli_29_util;
+#[cfg(test)]
+mod java_defects4j_cli_5_util;

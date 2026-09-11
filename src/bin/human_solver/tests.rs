@@ -2062,6 +2062,737 @@ fn c_in_the_text_view_clears_both_sides_banks() {
     assert!(state.pending[0].is_empty() && state.pending[1].is_empty());
 }
 
+/// A 40-line pair whose two sides differ in three places: an inserted line near the top, a
+/// reworded line in the middle, and a deleted line near the bottom. Deliberately taller than the
+/// text view's 20-row viewport, so a jump has somewhere to scroll to.
+fn navigable_pair() -> (String, String) {
+    let mut before: Vec<String> = (0..40)
+        .map(|row| format!("let line_{row} = {row};"))
+        .collect();
+    let mut after = before.clone();
+    // Bottom-up, so each edit's row numbers are the ones written here.
+    before.remove(30);
+    after[20] = "let line_20 = 999;".to_string();
+    after.insert(10, "let inserted = 0;".to_string());
+    (
+        format!("{}\n", before.join("\n")),
+        format!("{}\n", after.join("\n")),
+    )
+}
+
+/// Drives one keystroke through `handle_modal_key` into an open text view over a before/after
+/// pair that actually differs, and hands back the app and the paint state it left behind.
+///
+/// Through the real key handler rather than the action directly, for the reason
+/// `x_in_the_text_view_banks_the_live_selection` gives: these tests are about keys being *wired*,
+/// and an action called directly passes even when nothing dispatches to it.
+fn press_in_text_view(
+    before_src: &str,
+    after_src: &str,
+    state: TextPaintState,
+    code: KeyCode,
+) -> (App, TextPaintState) {
+    press_in_text_view_painting("Minimal", before_src, after_src, state, code)
+}
+
+/// [`press_in_text_view_painting`] with a chance to put ranges into the painting first - what a
+/// rule about *existing* ranges (the overlap refusal) needs in order to be tested at all.
+fn press_in_text_view_seeded(
+    solution: &str,
+    source: &str,
+    state: TextPaintState,
+    code: KeyCode,
+    seed: impl Fn(&mut App),
+) -> (App, TextPaintState) {
+    let tree = parse_rust(source);
+    let root = tree.root_node();
+    let mut app = App::new(
+        "test".to_string(),
+        CaseOrigin::Diffs,
+        root.id(),
+        root.id(),
+        HumanMapping::default(),
+    );
+    let flat = FlatIndex::new(flatten_visible(root, &app.before.collapsed, None));
+    let caches = rebuild_caches(&app.mapping.entries, root, root);
+    app.text_solution = solution.to_string();
+    seed(&mut app);
+    app.modal = Some(Modal::TextView { state });
+
+    handle_modal_key(
+        &mut app,
+        code,
+        &flat,
+        &flat,
+        Some(root),
+        Some(root),
+        &caches,
+        source.as_bytes(),
+        source.as_bytes(),
+        &Code::from_string(source, &Language::Rust),
+        &Code::from_string(source, &Language::Rust),
+    );
+
+    let Some(Modal::TextView { state }) = &app.modal else {
+        panic!("the text view should still be open, got {:?}", app.modal);
+    };
+    let state = state.clone();
+    (app, state)
+}
+
+/// [`press_in_text_view`] with the painting being edited named explicitly - what the rules keyed
+/// on that name (`Minimal`'s leading-whitespace split) need in order to be tested against a
+/// painting they do *not* apply to.
+fn press_in_text_view_painting(
+    solution: &str,
+    before_src: &str,
+    after_src: &str,
+    state: TextPaintState,
+    code: KeyCode,
+) -> (App, TextPaintState) {
+    let tree = parse_rust(before_src);
+    let root = tree.root_node();
+    let mut app = App::new(
+        "test".to_string(),
+        CaseOrigin::Diffs,
+        root.id(),
+        root.id(),
+        HumanMapping::default(),
+    );
+    let flat = FlatIndex::new(flatten_visible(root, &app.before.collapsed, None));
+    let caches = rebuild_caches(&app.mapping.entries, root, root);
+    app.text_solution = solution.to_string();
+    app.modal = Some(Modal::TextView { state });
+
+    handle_modal_key(
+        &mut app,
+        code,
+        &flat,
+        &flat,
+        Some(root),
+        Some(root),
+        &caches,
+        before_src.as_bytes(),
+        after_src.as_bytes(),
+        &Code::from_string(before_src, &Language::Rust),
+        &Code::from_string(after_src, &Language::Rust),
+    );
+
+    let Some(Modal::TextView { state }) = &app.modal else {
+        panic!("the text view should still be open, got {:?}", app.modal);
+    };
+    let state = state.clone();
+    (app, state)
+}
+
+/// The hunk list `n`/`p` walk: one entry per differing region, holding the first unmatched row on
+/// each side. An unchanged pair has none, which is what makes "No differences" reportable rather
+/// than a silent no-op.
+#[test]
+fn text_diff_hunks_finds_one_entry_per_differing_region() {
+    assert_eq!(text_diff_hunks("a\nb\nc\n", "a\nb\nc\n"), Some(Vec::new()));
+    // A pure insertion: the before row is where the new line goes in front of.
+    assert_eq!(text_diff_hunks("a\nc\n", "a\nb\nc\n"), Some(vec![(1, 1)]));
+    assert_eq!(text_diff_hunks("a\nb\nc\n", "a\nc\n"), Some(vec![(1, 1)]));
+    // A reworded line is unmatched on both sides, so it is a hunk like any other - the property
+    // `plain_text_line_diff`'s `RangeMatch` lists would have made harder to read off.
+    assert_eq!(
+        text_diff_hunks("a\nOLD\nc\n", "a\nNEW\nc\n"),
+        Some(vec![(1, 1)])
+    );
+    // Two regions, each keeping its own side's row: the second hunk's after row is one ahead,
+    // since the first inserted a line.
+    assert_eq!(
+        text_diff_hunks("a\nb\nc\nd\n", "a\nX\nb\nc\nY\nd\n"),
+        Some(vec![(1, 1), (3, 4)])
+    );
+}
+
+/// `n` has to move *both* cursors and scroll *both* panels: the two sides scroll independently,
+/// so moving only the focused one leaves the other showing an unrelated part of the file, which
+/// is the hand-scrolling this key exists to remove.
+#[test]
+fn n_in_the_text_view_jumps_both_sides_to_the_next_hunk() {
+    let (before_src, after_src) = navigable_pair();
+    let (app, state) = press_in_text_view(
+        &before_src,
+        &after_src,
+        TextPaintState::default(),
+        KeyCode::Char('n'),
+    );
+
+    assert_eq!(state.cursor[0].0, 10, "the first hunk is the inserted line");
+    assert_eq!(state.cursor[1].0, 10);
+    assert!(
+        app.status.as_deref().unwrap_or("").starts_with("Diff 1/3"),
+        "got {:?}",
+        app.status
+    );
+
+    // The third hunk is past the viewport, so reaching it must scroll both panels, not just the
+    // focused one.
+    let (_, state) = press_in_text_view(&before_src, &after_src, state, KeyCode::Char('n'));
+    assert_eq!(state.cursor[0].0, 20, "the reworded line, before side");
+    assert_eq!(state.cursor[1].0, 21, "one lower after the insertion");
+    let (_, state) = press_in_text_view(&before_src, &after_src, state, KeyCode::Char('n'));
+    assert_eq!(state.cursor[0].0, 30, "the deleted line");
+    assert_eq!(state.cursor[1].0, 31);
+    assert!(
+        state.scroll[0] > 0,
+        "the before panel scrolled to its cursor"
+    );
+    assert!(state.scroll[1] > 0, "and so did the unfocused after panel");
+}
+
+/// `p` is the other half, and wraps at the top the way the tree view's own `n`/`N` wrap - holding
+/// it on a short file keeps cycling instead of stopping silently on the first hunk.
+#[test]
+fn p_in_the_text_view_walks_back_and_wraps_to_the_last_hunk() {
+    let (before_src, after_src) = navigable_pair();
+    let mut state = TextPaintState::default();
+    state.cursor[0] = (20, 0);
+
+    let (app, state) = press_in_text_view(&before_src, &after_src, state, KeyCode::Char('p'));
+    assert_eq!(state.cursor[0].0, 10, "back to the hunk above");
+    assert!(
+        app.status.as_deref().unwrap_or("").starts_with("Diff 1/3"),
+        "got {:?}",
+        app.status
+    );
+
+    let (app, state) = press_in_text_view(&before_src, &after_src, state, KeyCode::Char('p'));
+    assert_eq!(state.cursor[0].0, 30, "wrapped around to the last hunk");
+    assert!(
+        app.status.as_deref().unwrap_or("").starts_with("Diff 3/3"),
+        "got {:?}",
+        app.status
+    );
+}
+
+/// `n` from the After panel steps through *after*-side rows: the reader is looking at that side,
+/// so "the next difference" is the next one down the page they are reading.
+#[test]
+fn the_focused_side_decides_which_hunk_is_next() {
+    let (before_src, after_src) = navigable_pair();
+    let mut state = TextPaintState {
+        side: 1,
+        ..Default::default()
+    };
+    // Past the second hunk on the after side (row 21), but not past it on the before side (20).
+    state.cursor[1] = (21, 0);
+
+    let (app, state) = press_in_text_view(&before_src, &after_src, state, KeyCode::Char('n'));
+    assert_eq!(
+        state.cursor[1].0, 31,
+        "the third hunk, not the second again"
+    );
+    assert!(
+        app.status.as_deref().unwrap_or("").starts_with("Diff 3/3"),
+        "got {:?}",
+        app.status
+    );
+}
+
+/// An identical pair has no hunks at all; `n` must say so rather than look broken.
+#[test]
+fn n_on_an_unchanged_pair_reports_no_differences() {
+    let source = "let a = 1;\nlet b = 2;\n";
+    let (app, state) = press_in_text_view(
+        source,
+        source,
+        TextPaintState::default(),
+        KeyCode::Char('n'),
+    );
+    assert_eq!(state.cursor[0], (0, 0), "and moves nothing");
+    assert_eq!(
+        app.status.as_deref(),
+        Some("No differences between the two sides")
+    );
+}
+
+/// `a` lines the unfocused panel up with the focused one: same line number, same screen row.
+#[test]
+fn a_in_the_text_view_aligns_the_other_side_on_the_same_line() {
+    let (before_src, after_src) = navigable_pair();
+    let mut state = TextPaintState::default();
+    state.cursor[0] = (25, 0);
+    state.scroll[0] = 15;
+
+    state.cursor[1] = (0, 4);
+
+    let (app, state) = press_in_text_view(&before_src, &after_src, state, KeyCode::Char('a'));
+    assert_eq!(state.cursor[1].0, 25, "same line number on the other side");
+    assert_eq!(
+        state.cursor[1].1, 4,
+        "and its own column, not the focused side's - a is about the line"
+    );
+    assert_eq!(
+        state.scroll[1], 15,
+        "and the same top row, so the two panels show the same numbers"
+    );
+    assert_eq!(state.side, 0, "focus does not move");
+    assert!(
+        app.status.as_deref().unwrap_or("").contains("line 26"),
+        "1-based in the status, as the gutter shows it; got {:?}",
+        app.status
+    );
+}
+
+/// The other side can be shorter than the line asked for. Landing past its end would put the
+/// cursor on a row no span can be read from, so it clamps - and says it clamped.
+#[test]
+fn a_clamps_to_the_other_sides_last_line() {
+    let before_src = "let a = 1;\nlet b = 2;\nlet c = 3;\nlet d = 4;\n";
+    let after_src = "let a = 1;\n";
+    let mut state = TextPaintState::default();
+    state.cursor[0] = (3, 0);
+
+    let (app, state) = press_in_text_view(before_src, after_src, state, KeyCode::Char('a'));
+    assert_eq!(
+        state.cursor[1].0,
+        TextPaintState::row_count(after_src) - 1,
+        "clamped to the last row that side actually has"
+    );
+    assert!(
+        app.status.as_deref().unwrap_or("").contains("ends there"),
+        "got {:?}",
+        app.status
+    );
+}
+
+/// An indented block with a blank line in the middle of it - the shape a multi-line delete is
+/// painted over, and the one where "do not paint the indentation" has something to say on every
+/// row.
+fn indented_block() -> &'static str {
+    "fn main() {\n    let a = 1;\n\n        let b = 2;\n    println!();\n}\n"
+}
+
+/// Selects rows 1 to 4 of [`indented_block`] as one full-line (`V`) sweep on the Before side.
+fn sweep_over_the_block() -> TextPaintState {
+    let source = indented_block();
+    let last = TextPaintState::row_text(source, 4).len();
+    TextPaintState {
+        vertical: false,
+        anchor: [Some((1, 0)), None],
+        cursor: [(4, last), (0, 0)],
+        ..Default::default()
+    }
+}
+
+/// The painting under edit, as `(operation, before spans)`.
+fn painted_entries(app: &App) -> Vec<(HumanTextOperation, Vec<HumanTextSpan>)> {
+    solution_entries(&app.mapping, &app.text_solution)
+        .iter()
+        .map(|entry| (entry.operation, entry.before.clone()))
+        .collect()
+}
+
+/// The rule invariant 6 states, kept at the keystroke: a `Minimal` painting never claims a line's
+/// indentation, and a full-line sweep is the one selection shape that cannot say so itself - so
+/// `d` decomposes it into one range per row, each starting at that row's first code character.
+#[test]
+fn a_minimal_full_line_sweep_is_painted_without_any_indentation() {
+    let source = indented_block();
+    let (app, _) = press_in_text_view(source, source, sweep_over_the_block(), KeyCode::Char('d'));
+
+    let entries = painted_entries(&app);
+    assert_eq!(
+        entries.len(),
+        1,
+        "one decision, however many ranges it holds"
+    );
+    let (operation, spans) = &entries[0];
+    assert_eq!(*operation, HumanTextOperation::Delete);
+    assert_eq!(
+        spans,
+        &vec![
+            HumanTextSpan {
+                start_row: 1,
+                start_column: 4,
+                end_row: 1,
+                end_column: 14,
+            },
+            // Row 2 is blank and drops out: it has no code character to start at.
+            HumanTextSpan {
+                start_row: 3,
+                start_column: 8,
+                end_row: 3,
+                end_column: 18,
+            },
+            HumanTextSpan {
+                start_row: 4,
+                start_column: 4,
+                end_row: 4,
+                end_column: 15,
+            },
+        ],
+        "one range per row, each past its own indentation"
+    );
+
+    assert_eq!(
+        app.status.as_deref(),
+        Some("Painted 1 deletion(s) - indentation left unpainted (Minimal)"),
+        "the count is what the painter selected, not how many rows it became"
+    );
+}
+
+/// The point of the split is the ground-truth checker, so the checker is what pins it: the
+/// painting `d` records must draw no invariant-6 violation, and the same painting left whole must.
+#[test]
+fn the_split_painting_passes_invariant_6_and_the_unsplit_one_does_not() {
+    let source = indented_block();
+    let before = Code::from_string(source, &Language::Rust);
+    let after = Code::from_string(source, &Language::Rust);
+    let leading = |app: &App| -> Vec<String> {
+        human_mapping::invariants::ground_truth_invariant_violations_for(
+            &app.mapping,
+            &before,
+            &after,
+        )
+        .expect("the invariant checker should read this mapping")
+        .into_iter()
+        .filter(|violation| violation.contains("leading whitespace"))
+        .collect()
+    };
+
+    let (app, _) = press_in_text_view(source, source, sweep_over_the_block(), KeyCode::Char('d'));
+    assert!(leading(&app).is_empty(), "got {:?}", leading(&app));
+
+    // The negative control, which is what keeps the assertion above from passing vacuously: the
+    // same sweep painted under a name the split does not apply to, then renamed to `Minimal`, is
+    // exactly the painting a human used to have to repair by hand.
+    let (mut unsplit, _) = press_in_text_view_painting(
+        "Full",
+        source,
+        source,
+        sweep_over_the_block(),
+        KeyCode::Char('d'),
+    );
+    unsplit.mapping.text_mappings[0].name = "Minimal".to_string();
+    unsplit.text_solution = "Minimal".to_string();
+    let violations = leading(&unsplit);
+    assert_eq!(
+        violations.len(),
+        3,
+        "one per indented row of the sweep, got {violations:?}"
+    );
+}
+
+/// A `Full` painting is the generous reading, and invariant 4 wants a wholly-deleted line painted
+/// *whole*, indentation included. So the sweep it records is the one that was drawn.
+#[test]
+fn a_full_painting_keeps_the_sweep_exactly_as_drawn() {
+    let source = indented_block();
+    let (app, _) = press_in_text_view_painting(
+        "Full",
+        source,
+        source,
+        sweep_over_the_block(),
+        KeyCode::Char('d'),
+    );
+
+    let entries = painted_entries(&app);
+    assert_eq!(
+        entries[0].1,
+        vec![HumanTextSpan {
+            start_row: 1,
+            start_column: 0,
+            end_row: 4,
+            end_column: TextPaintState::row_text(source, 4).len(),
+        }],
+        "one multi-row range, indentation and all"
+    );
+    assert_eq!(
+        app.status.as_deref(),
+        Some("Painted 1 deletion(s)"),
+        "and no note about a split that did not happen"
+    );
+}
+
+/// A vertical selection already names its own columns on every row it touches, so there is nothing
+/// to infer and nothing to reshape - even in a `Minimal` painting.
+#[test]
+fn a_vertical_selection_is_never_reshaped() {
+    let source = indented_block();
+    // Columns 2..6 of rows 1 and 3 - inside both rows' indentation, which is exactly what a
+    // vertical selection is for and exactly what the sweep's split would have removed.
+    let state = TextPaintState {
+        anchor: [Some((1, 2)), None],
+        cursor: [(3, 6), (0, 0)],
+        ..Default::default()
+    };
+    let (app, _) = press_in_text_view(source, source, state, KeyCode::Char('d'));
+
+    let spans = painted_entries(&app).remove(0).1;
+    assert_eq!(
+        spans,
+        vec![
+            HumanTextSpan {
+                start_row: 1,
+                start_column: 2,
+                end_row: 1,
+                end_column: 7,
+            },
+            // Row 2 is empty, and a vertical selection skips a row with no character at those
+            // columns - its own rule, not the split's.
+            HumanTextSpan {
+                start_row: 3,
+                start_column: 2,
+                end_row: 3,
+                end_column: 7,
+            },
+        ],
+        "painted through the indentation, as drawn"
+    );
+    assert_eq!(app.status.as_deref(), Some("Painted 2 deletion(s)"));
+}
+
+/// The split runs *before* the overlap check, and that ordering is load-bearing: a sweep whose
+/// only collision with an existing range is in the indentation no longer collides at all, because
+/// the split removed the bytes that collided. Refusing it would be refusing over bytes a `Minimal`
+/// painting never claims. Pinned so the two steps are not reordered by accident.
+#[test]
+fn a_minimal_sweep_commits_over_a_range_that_only_overlapped_the_indentation() {
+    let source = indented_block();
+    let indentation = HumanTextSpan {
+        start_row: 1,
+        start_column: 0,
+        end_row: 1,
+        end_column: 4,
+    };
+    let seed = |app: &mut App| {
+        solution_entries_mut(&mut app.mapping, &app.text_solution.clone()).push(HumanTextEntry {
+            operation: HumanTextOperation::Delete,
+            before: vec![indentation],
+            after: Vec::new(),
+        });
+    };
+
+    let (app, _) = press_in_text_view_seeded(
+        "Minimal",
+        source,
+        sweep_over_the_block(),
+        KeyCode::Char('d'),
+        seed,
+    );
+    assert_eq!(
+        painted_entries(&app).len(),
+        2,
+        "the seeded range and the swept one, got status {:?}",
+        app.status
+    );
+    assert_eq!(
+        app.status.as_deref(),
+        Some("Painted 1 deletion(s) - indentation left unpainted (Minimal)")
+    );
+
+    // The same sweep in a painting the split does not apply to still runs into the seeded range,
+    // which is what makes the assertion above a statement about the split rather than about the
+    // overlap check having been removed.
+    let (app, _) = press_in_text_view_seeded(
+        "Full",
+        source,
+        sweep_over_the_block(),
+        KeyCode::Char('d'),
+        seed,
+    );
+    assert_eq!(painted_entries(&app).len(), 1, "only the seeded range");
+    assert!(
+        app.status
+            .as_deref()
+            .unwrap_or("")
+            .starts_with("Not painted:"),
+        "got {:?}",
+        app.status
+    );
+}
+
+/// A sweep over nothing but blank lines trims away to nothing. That is not the "nothing selected"
+/// case - the painter did select something - so it gets its own answer rather than advice to
+/// press `v`.
+#[test]
+fn a_minimal_sweep_over_blank_lines_only_paints_nothing_and_says_so() {
+    let source = "fn main() {\n\n   \n}\n";
+    let state = TextPaintState {
+        vertical: false,
+        anchor: [Some((1, 0)), None],
+        cursor: [(2, 3), (0, 0)],
+        ..Default::default()
+    };
+    let (app, _) = press_in_text_view(source, source, state, KeyCode::Char('d'));
+
+    assert!(
+        painted_entries(&app).is_empty(),
+        "nothing paintable was left after the indentation came out"
+    );
+    assert_eq!(
+        app.status.as_deref(),
+        Some("Only blank lines selected - Minimal claims no indentation, so nothing to paint")
+    );
+}
+
+/// The split's own coordinate arithmetic, away from the key handler: partial first and last rows,
+/// a blank row in the middle, and a row whose indentation swallows the whole span.
+#[test]
+fn skip_leading_whitespace_splits_a_sweep_row_by_row() {
+    let source = indented_block();
+    // The whole of rows 1..=4, as a full-line sweep writes it.
+    let swept = HumanTextSpan {
+        start_row: 1,
+        start_column: 0,
+        end_row: 4,
+        end_column: 15,
+    };
+    let rows: Vec<(usize, usize, usize)> = skip_leading_whitespace(swept, source)
+        .into_iter()
+        .map(|span| (span.start_row, span.start_column, span.end_column))
+        .collect();
+    assert_eq!(rows, vec![(1, 4, 14), (3, 8, 18), (4, 4, 15)]);
+
+    // A sweep starting past the indentation keeps its own, later start on that row.
+    let inside = HumanTextSpan {
+        start_row: 1,
+        start_column: 8,
+        end_row: 1,
+        end_column: 14,
+    };
+    assert_eq!(skip_leading_whitespace(inside, source), vec![inside]);
+
+    // A span that ends inside its row's indentation has nothing left once that comes out.
+    let indentation_only = HumanTextSpan {
+        start_row: 3,
+        start_column: 0,
+        end_row: 3,
+        end_column: 5,
+    };
+    assert!(skip_leading_whitespace(indentation_only, source).is_empty());
+}
+
+/// `^` sits between `0` and `$`: the first character that is actually code. On an indented line
+/// that is where a painted range wants to start - starting at `0` sweeps the indentation into the
+/// range, which then reads differently from the same code painted anywhere else.
+#[test]
+fn caret_moves_to_the_first_non_whitespace_character() {
+    let source = "    let a = 1;\n\tlet b = 2;\n   \nlet c = 3;\n";
+    let mut state = TextPaintState::default();
+    state.cursor[0] = (0, 12);
+
+    let (_, state) = press_in_text_view(source, source, state, KeyCode::Char('^'));
+    assert_eq!(state.cursor[0].1, 4, "past four spaces of indentation");
+
+    // A tab is one byte and one indent character, not one column of many.
+    let mut state = state;
+    state.cursor[0] = (1, 9);
+    let (_, state) = press_in_text_view(source, source, state, KeyCode::Char('^'));
+    assert_eq!(state.cursor[0].1, 1);
+
+    // A whitespace-only row has no code character; `^` ends up where `$` would, which is where
+    // code would begin, rather than back at `0`'s column.
+    let mut state = state;
+    state.cursor[0] = (2, 0);
+    let (_, state) = press_in_text_view(source, source, state, KeyCode::Char('^'));
+    assert_eq!(state.cursor[0].1, 3);
+
+    // An unindented row: `^` and `0` agree, as they do in vi.
+    let mut state = state;
+    state.cursor[0] = (3, 6);
+    let (_, state) = press_in_text_view(source, source, state, KeyCode::Char('^'));
+    assert_eq!(state.cursor[0].1, 0);
+}
+
+/// The column `^` lands on is a byte offset like every other column here, so an indent followed by
+/// a multi-byte character must not report the character's *index*.
+#[test]
+fn the_first_code_column_is_a_byte_offset() {
+    assert_eq!(
+        TextPaintState::first_code_column("  \u{e9}t\u{e9} = 1;", 0),
+        2
+    );
+    assert_eq!(TextPaintState::first_code_column("\u{e9} = 1;", 0), 0);
+    // Past the end of the file: no row, no code, column 0.
+    assert_eq!(TextPaintState::first_code_column("a\n", 9), 0);
+}
+
+/// A fixture with no tree-sitter grammar opens in text-only mode - no tree, `None` roots - and
+/// painting is the *only* thing there is to do in it. So the three navigation keys have to work
+/// with no roots at all, which the tests above (all of which parse a tree) would not catch.
+#[test]
+fn the_navigation_keys_work_in_text_only_mode() {
+    let (before_src, after_src) = navigable_pair();
+    let mut app = App::new(
+        "test".to_string(),
+        CaseOrigin::Diffs,
+        usize::MAX,
+        usize::MAX,
+        HumanMapping::default(),
+    );
+    let flat = FlatIndex::new(Vec::new());
+    let caches = Caches::default();
+    app.modal = Some(Modal::TextView {
+        state: TextPaintState::default(),
+    });
+
+    for code in [KeyCode::Char('n'), KeyCode::Char('a'), KeyCode::Char('p')] {
+        handle_modal_key(
+            &mut app,
+            code,
+            &flat,
+            &flat,
+            None,
+            None,
+            &caches,
+            before_src.as_bytes(),
+            after_src.as_bytes(),
+            &Code::from_string(&before_src, &Language::Rust),
+            &Code::from_string(&after_src, &Language::Rust),
+        );
+        assert!(
+            matches!(app.modal, Some(Modal::TextView { .. })),
+            "the text view should still be open after {code:?}, got {:?}",
+            app.modal
+        );
+    }
+
+    let Some(Modal::TextView { state }) = &app.modal else {
+        unreachable!("asserted above");
+    };
+    assert_eq!(
+        state.cursor[0].0, 30,
+        "n then p walked to the first hunk and wrapped back to the last"
+    );
+}
+
+/// `o` cycles the overlay `p` used to cycle, now that `n`/`p` navigate. Pinned as a pair: the
+/// rebinding is only half done if the old key still cycles too, and a reader following the help
+/// would then find two keys doing it.
+#[test]
+fn o_cycles_the_overlay_and_p_no_longer_does() {
+    let (before_src, after_src) = navigable_pair();
+    let (app, _) = press_in_text_view(
+        &before_src,
+        &after_src,
+        TextPaintState::default(),
+        KeyCode::Char('o'),
+    );
+    assert_eq!(app.text_overlay, TextOverlay::CodeDiff);
+
+    // Each press starts a fresh app, so `Human` here is the *default* rather than a value `p`
+    // restored - what actually rules out the old binding is the status line, which reports a jump
+    // instead of the overlay `p` would have switched to.
+    let (app, _) = press_in_text_view(
+        &before_src,
+        &after_src,
+        TextPaintState::default(),
+        KeyCode::Char('p'),
+    );
+    assert_eq!(app.text_overlay, TextOverlay::Human);
+    assert!(
+        app.status.as_deref().unwrap_or("").starts_with("Diff 3/3"),
+        "p navigates now, wrapping to the last hunk from the top; got {:?}",
+        app.status
+    );
+}
+
 /// `diff -u` reports positions only in its hunk headers; the gutter turns counting into
 /// reading. A deleted line has no after-side number and an inserted one has no before-side
 /// number - the blank half is the point, not an omission.

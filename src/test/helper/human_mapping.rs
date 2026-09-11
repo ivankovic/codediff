@@ -841,7 +841,7 @@ pub fn paintings_for_mode(
 /// passes on any of them; before this, the mode lookup wanted one exact name and a fixture
 /// painted that way failed with "no 'Minimal' painting" despite being painted more carefully than
 /// one that passed.
-fn designates_preset(name: &str, preset: &str) -> bool {
+pub(crate) fn designates_preset(name: &str, preset: &str) -> bool {
     name == preset
         || name
             .strip_prefix(preset)

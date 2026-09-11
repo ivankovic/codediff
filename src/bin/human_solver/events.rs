@@ -1119,8 +1119,9 @@ pub(crate) fn handle_modal_key(
     caches: &Caches,
     before_src: &[u8],
     after_src: &[u8],
-    // Needed only by the text view's `p` (running codediff to show its own rendering), but the
-    // modal handler is one function, so it takes the pair the same way `handle_key` does.
+    // Needed only by the text view's `o`/`P` (running codediff to show, or adopt, its own
+    // rendering), but the modal handler is one function, so it takes the pair the same way
+    // `handle_key` does.
     before: &Code,
     after: &Code,
 ) -> Option<OpenTarget> {
@@ -2341,6 +2342,13 @@ fn handle_text_view(
         KeyCode::PageUp => state.step_row(-(VIEWPORT_ROWS as isize), focused_source),
         KeyCode::PageDown => state.step_row(VIEWPORT_ROWS as isize, focused_source),
         KeyCode::Char('0') | KeyCode::Home => state.cursor[state.side].1 = 0,
+        // `^` between them, as in vi: the first character that is actually code, which on an
+        // indented line is where a painted range almost always wants to start - `0` lands in the
+        // indentation, and painting from there sweeps leading whitespace into the range.
+        KeyCode::Char('^') => {
+            let row = state.cursor[state.side].0;
+            state.cursor[state.side].1 = TextPaintState::first_code_column(focused_source, row);
+        }
         KeyCode::Char('$') | KeyCode::End => {
             let row = state.cursor[state.side].0;
             state.cursor[state.side].1 = TextPaintState::row_text(focused_source, row).len();
@@ -2417,10 +2425,34 @@ fn handle_text_view(
         ),
         KeyCode::Char('u') => action_paint_unmark(app, &state, before_text, after_text),
         KeyCode::Char('Z') => action_paint_mark_empty(app),
-        // Shift-`p`, next to the `p` that shows codediff's rendering: `p` looks at it, `P` adopts
-        // it as the draft to correct.
+        // `n`/`p` step through the plain line diff's hunks, `a` lines the other panel up with
+        // this one - the three keys that spare a painter the manual re-scrolling of two
+        // independently scrolled panels.
+        KeyCode::Char('n') => action_paint_next_diff(
+            app,
+            &mut state,
+            before_text,
+            after_text,
+            true,
+            VIEWPORT_ROWS,
+        ),
+        KeyCode::Char('p') => action_paint_next_diff(
+            app,
+            &mut state,
+            before_text,
+            after_text,
+            false,
+            VIEWPORT_ROWS,
+        ),
+        KeyCode::Char('a') => {
+            action_paint_align(app, &mut state, before_text, after_text, VIEWPORT_ROWS)
+        }
+        // Shift-`p`, next to the `p` that *used* to cycle overlays - now `o`, which `n`/`p`
+        // displaced. Kept on `P` anyway: it is the same idea one step further (`o` looks at
+        // codediff's rendering, `P` adopts it as the draft to correct), and rebinding a
+        // destructive-ish key to chase that pairing would cost more muscle memory than it buys.
         KeyCode::Char('P') => action_paint_seed_from_codediff(app, before, after),
-        KeyCode::Char('p') => {
+        KeyCode::Char('o') => {
             let next = app.text_overlay.next();
             // Computed on the first cycle away from `Human` and kept for the rest of the
             // case: running codediff is real work on a large fixture, and the default view

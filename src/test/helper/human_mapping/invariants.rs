@@ -349,20 +349,17 @@ pub(crate) fn paintings_with_labels<'a>(
 
 /// Whether a painting's name declares it the `Minimal` reading - exactly the name, or the name
 /// followed by a qualifier, matching `human_mapping::designates_preset`'s own rule.
-pub(crate) fn designates_minimal(name: &str) -> bool {
-    designates(name, "Minimal")
+///
+/// `pub` for `human_solver`, which asks the same question about the painting being edited: invariant
+/// 6 below is a rule it can keep for the painter rather than report afterwards (see
+/// `action_paint_one_sided`'s leading-whitespace split).
+pub fn designates_minimal(name: &str) -> bool {
+    super::designates_preset(name, "Minimal")
 }
 
 /// Whether a painting's name declares it the `Full` reading. See [`designates_minimal`].
 pub(crate) fn designates_full(name: &str) -> bool {
-    designates(name, "Full")
-}
-
-fn designates(name: &str, preset: &str) -> bool {
-    name == preset
-        || name
-            .strip_prefix(preset)
-            .is_some_and(|r| r.starts_with(' '))
+    super::designates_preset(name, "Full")
 }
 
 /// Rows of `contents` as `(row index, byte offset of the row, the row itself)`.

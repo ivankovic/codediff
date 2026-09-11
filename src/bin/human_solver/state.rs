@@ -893,16 +893,191 @@ impl TextPaintState {
         spans
     }
 
-    /// Keeps the cursor's row inside a `height`-row viewport.
+    /// Keeps the focused side's cursor row inside a `height`-row viewport.
     pub(crate) fn scroll_into_view(&mut self, height: usize) {
-        let row = self.cursor[self.side].0;
-        let top = &mut self.scroll[self.side];
+        self.scroll_side_into_view(self.side, height);
+    }
+
+    /// The same, for a side that is not the focused one - what `n`/`p`/`a` need, since they move
+    /// the *other* side's cursor too and a cursor scrolled off its own panel is invisible there.
+    pub(crate) fn scroll_side_into_view(&mut self, side: usize, height: usize) {
+        let row = self.cursor[side].0;
+        let top = &mut self.scroll[side];
         if row < *top {
             *top = row;
         } else if height > 0 && row >= *top + height {
             *top = row + 1 - height;
         }
     }
+
+    /// Where `^` lands: the byte column of the row's first non-whitespace character.
+    ///
+    /// A whitespace-only row has none, and then this is its end - the same column `$` gives, and
+    /// the column where code *would* start. Column 0 would be the other defensible answer, but it
+    /// is the one `0` already reaches.
+    ///
+    /// A char boundary by construction (`char_indices` only yields boundaries, and `len()` is
+    /// one), so no caller needs the clamp `place_cursor` applies to a reused column.
+    pub(crate) fn first_code_column(source: &str, row: usize) -> usize {
+        let line = Self::row_text(source, row);
+        line.char_indices()
+            .find(|(_, character)| !character.is_whitespace())
+            .map_or(line.len(), |(index, _)| index)
+    }
+
+    /// Puts `side`'s cursor on `row`, clamped to that side's own last row, keeping its column
+    /// where it was (clamped to the new row's length and to a character boundary, the same way
+    /// `step_row` does - columns are bytes, and a column valid on one row can land mid-character
+    /// on another).
+    ///
+    /// Returns the row actually landed on, which is the requested one unless that side is shorter.
+    pub(crate) fn place_cursor(&mut self, side: usize, row: usize, source: &str) -> usize {
+        let last = Self::row_count(source).saturating_sub(1);
+        let row = row.min(last);
+        let line = Self::row_text(source, row);
+        let column = self.cursor[side].1.min(line.len());
+        let column = (0..=column)
+            .rev()
+            .find(|&c| line.is_char_boundary(c))
+            .unwrap_or(0);
+        self.cursor[side] = (row, column);
+        row
+    }
+}
+
+/// The edit-distance cap `text_diff_hunks` gives the Myers search. Deliberately the same number as
+/// the library's own `PLAIN_TEXT_MAX_EDIT`, which is `pub(crate)` there and so unreachable from
+/// this binary: navigation should find hunks on exactly the file pairs whose plain-text rendering
+/// finds them, not on a wider or narrower set.
+const HUNK_MAX_EDIT: usize = 10_000;
+
+/// Where each differing region of the plain line diff starts, as `(before_row, after_row)` -
+/// what `n`/`p` step through.
+///
+/// Derived from `line_diff_core`'s matched pairs rather than from `plain_text_line_diff`'s
+/// `RangeMatch` lists: Myers pairs only *identical* lines, so every row it leaves unpaired -
+/// deleted, inserted, or merely reworded - falls into a gap between consecutive pairs, and the
+/// gaps are exactly the regions a reader thinks of as "the next difference". A hunk's two rows are
+/// the first unmatched row on each side; for a pure insertion the before row is the row the
+/// insertion sits in front of, which is where a painter wants the cursor anyway.
+///
+/// Both coordinates strictly increase from hunk to hunk (consecutive gaps are separated by at
+/// least one matched pair, which advances both), so either one orders the list for navigation.
+///
+/// `None` means the Myers search gave up past `HUNK_MAX_EDIT` - callers must report that rather
+/// than read it as "no differences".
+pub(crate) fn text_diff_hunks(before_src: &str, after_src: &str) -> Option<Vec<(usize, usize)>> {
+    let core = codediff::diff::text::line_diff_core(before_src, after_src, HUNK_MAX_EDIT)?;
+    let mut hunks = Vec::new();
+    let (mut next_before, mut next_after) = (0usize, 0usize);
+    for &(before_row, after_row) in &core.pairs {
+        if before_row > next_before || after_row > next_after {
+            hunks.push((next_before, next_after));
+        }
+        next_before = before_row + 1;
+        next_after = after_row + 1;
+    }
+    if next_before < core.before_line_count || next_after < core.after_line_count {
+        hunks.push((next_before, next_after));
+    }
+    Some(hunks)
+}
+
+/// `n` / `p`: moves *both* sides' cursors to the next/previous differing region of the plain line
+/// diff, wrapping around like the tree view's own `n`/`N`.
+///
+/// Both sides, deliberately: the two panels scroll independently (painting a move means looking at
+/// two places that are nowhere near each other), so a jump that moved only the focused side would
+/// leave the other panel showing an unrelated part of the file - exactly the manual re-scrolling
+/// this exists to remove.
+///
+/// Which hunk is "next" is read off the focused side's own row, so `n` from the After panel steps
+/// through after-side positions. A live selection is left alone, as `g`/`G` and `:` leave it.
+pub(crate) fn action_paint_next_diff(
+    app: &mut App,
+    state: &mut TextPaintState,
+    before_src: &str,
+    after_src: &str,
+    forward: bool,
+    viewport_rows: usize,
+) {
+    let Some(hunks) = text_diff_hunks(before_src, after_src) else {
+        app.status = Some(
+            "This file pair is too different to navigate by hunk (the line diff gave up)"
+                .to_string(),
+        );
+        return;
+    };
+    if hunks.is_empty() {
+        app.status = Some("No differences between the two sides".to_string());
+        return;
+    }
+
+    let row = state.cursor[state.side].0;
+    let key = |hunk: &(usize, usize)| if state.side == 0 { hunk.0 } else { hunk.1 };
+    let index = if forward {
+        hunks.iter().position(|hunk| key(hunk) > row)
+    } else {
+        hunks.iter().rposition(|hunk| key(hunk) < row)
+    }
+    // Wrapping ends the list at the other end, so holding `n` on a short file keeps cycling
+    // rather than stopping silently on the last hunk.
+    .unwrap_or(if forward { 0 } else { hunks.len() - 1 });
+
+    let (before_row, after_row) = hunks[index];
+    let before_row = state.place_cursor(0, before_row, before_src);
+    let after_row = state.place_cursor(1, after_row, after_src);
+    state.scroll_side_into_view(0, viewport_rows);
+    state.scroll_side_into_view(1, viewport_rows);
+
+    app.status = Some(format!(
+        "Diff {}/{} - Before line {}, After line {}",
+        index + 1,
+        hunks.len(),
+        before_row + 1,
+        after_row + 1
+    ));
+}
+
+/// `a`: puts the unfocused side's cursor on the same line number as the focused one, and scrolls
+/// it to the same place on screen.
+///
+/// Line *number*, not the line the diff pairs it with: this is the cheap "show me the same place
+/// over there" that an unchanged region wants, where the two sides have not yet drifted apart.
+/// `n`/`p` are the diff-aware counterpart for regions where they have.
+pub(crate) fn action_paint_align(
+    app: &mut App,
+    state: &mut TextPaintState,
+    before_src: &str,
+    after_src: &str,
+    viewport_rows: usize,
+) {
+    let other = 1 - state.side;
+    let (source, name) = if other == 0 {
+        (before_src, "Before")
+    } else {
+        (after_src, "After")
+    };
+    let row = state.cursor[state.side].0;
+    let landed = state.place_cursor(other, row, source);
+    // Same top row, so the two panels show the same line numbers side by side rather than merely
+    // holding cursors on the same one; the clamp below re-fixes a short side.
+    state.scroll[other] = state.scroll[state.side];
+    state.scroll_side_into_view(other, viewport_rows);
+
+    let mut status = format!("Aligned the {name} side to line {}", landed + 1);
+    if landed != row {
+        status.push_str(&format!(
+            " - it has no line {}, that side ends there",
+            row + 1
+        ));
+    }
+    // Moving a cursor that has an anchor behind it grows that side's selection, and it is the side
+    // the reader is not looking at - so say so rather than let it happen quietly.
+    if state.anchor[other].is_some() {
+        status.push_str(" - its selection now reaches there too");
+    }
+    app.status = Some(status);
 }
 
 /// `m`: pairs everything selected on the before side with everything selected on the after side,
@@ -1048,6 +1223,13 @@ pub(crate) fn action_paint_match(
 /// Takes banked ranges too, so the same token removed in several places is one decision rather
 /// than one per occurrence - but unlike a match, these carry no identity constraint: with nothing
 /// to pair against, spans that read differently assert nothing unsound.
+///
+/// **In a painting named `Minimal`, a full-line sweep over several rows is committed without any
+/// line's indentation** - see [`skip_leading_whitespace`]. The rule it keeps (invariant 6) is one
+/// the painter would otherwise have to keep by hand on every multi-line delete, and the only way
+/// to keep it is a shape the selection cannot have: one range per row. Left alone are a `Full` or
+/// free-named painting, whose rules differ or are unstated, and a vertical selection, which names
+/// its own columns on every row it touches.
 pub(crate) fn action_paint_one_sided(
     app: &mut App,
     state: &mut TextPaintState,
@@ -1073,7 +1255,41 @@ pub(crate) fn action_paint_one_sided(
         return;
     }
 
+    // How many ranges the painter *selected*, taken before the split below can turn one full-line
+    // sweep into one range per row: the status line reports what they did, not how it is stored.
     let count = spans.len();
+    // Per span, on its own shape: a single-row range is painted exactly as it was drawn, even when
+    // it is committed alongside a multi-row one. Only a full-line sweep is reshaped, because only a
+    // sweep says "these whole lines" rather than "these columns" - and only in a painting named
+    // `Minimal`, whose rules alone forbid the indentation it would otherwise claim.
+    let minimal_mode =
+        human_mapping::invariants::designates_minimal(&app.text_solution) && !state.vertical;
+    let mut split_any = false;
+    let spans: Vec<HumanTextSpan> = if minimal_mode {
+        spans
+            .into_iter()
+            .flat_map(|span| {
+                if span.end_row > span.start_row {
+                    split_any = true;
+                    skip_leading_whitespace(span, source)
+                } else {
+                    vec![span]
+                }
+            })
+            .collect()
+    } else {
+        spans
+    };
+    // Only reachable through the split: every other path here started from a non-empty
+    // selection and kept it. A sweep over nothing but blank lines trims away to nothing, and
+    // saying so is not the "nothing selected" message above - the painter did select something.
+    if spans.is_empty() {
+        app.status = Some(
+            "Only blank lines selected - Minimal claims no indentation, so nothing to paint"
+                .to_string(),
+        );
+        return;
+    }
     let entry = if side == 0 {
         HumanTextEntry {
             operation,
@@ -1103,10 +1319,61 @@ pub(crate) fn action_paint_one_sided(
     app.dirty = true;
     state.anchor[side] = None;
     state.pending[side].clear();
+    let note = if split_any {
+        " - indentation left unpainted (Minimal)"
+    } else {
+        ""
+    };
     app.status = Some(match operation {
-        HumanTextOperation::Delete => format!("Painted {count} deletion(s)"),
-        _ => format!("Painted {count} insertion(s)"),
+        HumanTextOperation::Delete => format!("Painted {count} deletion(s){note}"),
+        _ => format!("Painted {count} insertion(s){note}"),
     });
+}
+
+/// One span per row `span` covers, each starting at that row's first code character - what a
+/// multi-row full-line sweep commits to in a painting named `Minimal`.
+///
+/// Invariant 6 of the ground truth says a `Minimal` painting never paints a line's leading
+/// whitespace: it is the tightest defensible reading of an edit, and nobody marking up a diff by
+/// hand draws the highlight through the indentation in front of the code they are pointing at.
+/// A full-line sweep is a single span running start to end, so under that rule it has to be
+/// decomposed - there is no one range that covers several lines' code and none of their
+/// indentation.
+///
+/// A row with nothing but whitespace on it drops out entirely. It has no code character to start
+/// at, and both invariant 1 and invariant 6 decline to judge such a row rather than licensing a
+/// painting of it.
+///
+/// Nothing is lost at the seams: `label_bytes` - the projection every scorer and every invariant
+/// reads a painting through - never labels a line terminator, whatever span covers it. So the
+/// newlines the single sweep swallowed were not painted before the split either, and the only
+/// bytes this drops are the indentation it is here to drop.
+pub(crate) fn skip_leading_whitespace(span: HumanTextSpan, source: &str) -> Vec<HumanTextSpan> {
+    (span.start_row..=span.end_row)
+        .filter_map(|row| {
+            // Against `row_text`, not a raw line: it drops a CRLF file's trailing `\r`, which is
+            // part of the terminator rather than of the row, and clamping to a length that still
+            // counted it would hand back the phantom last column that byte used to add.
+            let length = TextPaintState::row_text(source, row).len();
+            let start = if row == span.start_row {
+                span.start_column
+            } else {
+                0
+            }
+            .max(TextPaintState::first_code_column(source, row));
+            let end = if row == span.end_row {
+                span.end_column.min(length)
+            } else {
+                length
+            };
+            (start < end).then_some(HumanTextSpan {
+                start_row: row,
+                start_column: start,
+                end_row: row,
+                end_column: end,
+            })
+        })
+        .collect()
 }
 
 /// `u`: removes whichever painted entry covers the focused cursor.

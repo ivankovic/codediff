@@ -1117,7 +1117,7 @@ pub(crate) fn render_text_view_modal(
                 String::new()
             };
             format!(
-                "Before [{solution}] {painted} painted{banked} — showing {} (p cycles)",
+                "Before [{solution}] {painted} painted{banked} — showing {} (o cycles)",
                 overlay.label()
             )
         }),
@@ -1129,7 +1129,8 @@ pub(crate) fn render_text_view_modal(
                 _ if others > 0 => {
                     format!("After — s save-as, L load ({others} other) — u/Tab/Esc")
                 }
-                _ => "After — v sel/i ins/u unmark, s save-as, : jump, Tab, Esc".to_string(),
+                _ => "After — v sel/i ins/u unmark, n/p diff, a align, s save-as, : jump, Tab, Esc"
+                    .to_string(),
             },
         ),
     ] {

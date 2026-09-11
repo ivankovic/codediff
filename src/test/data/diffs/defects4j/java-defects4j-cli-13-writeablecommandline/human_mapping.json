@@ -1,0 +1,2654 @@
+{
+  "entries": [
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [],
+      "after_path": []
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "block_comment:1"
+      ],
+      "after_path": [
+        "block_comment:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "package_declaration:1"
+      ],
+      "after_path": [
+        "package_declaration:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "package_declaration:1",
+        "package:1"
+      ],
+      "after_path": [
+        "package_declaration:1",
+        "package:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "package_declaration:1",
+        "scoped_identifier:1",
+        "scoped_identifier:1",
+        "scoped_identifier:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "package_declaration:1",
+        "scoped_identifier:1",
+        "scoped_identifier:1",
+        "scoped_identifier:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "package_declaration:1",
+        "scoped_identifier:1",
+        "scoped_identifier:1",
+        "scoped_identifier:1",
+        ".:1"
+      ],
+      "after_path": [
+        "package_declaration:1",
+        "scoped_identifier:1",
+        "scoped_identifier:1",
+        "scoped_identifier:1",
+        ".:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "package_declaration:1",
+        "scoped_identifier:1",
+        "scoped_identifier:1",
+        "scoped_identifier:1",
+        "identifier:2"
+      ],
+      "after_path": [
+        "package_declaration:1",
+        "scoped_identifier:1",
+        "scoped_identifier:1",
+        "scoped_identifier:1",
+        "identifier:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "package_declaration:1",
+        "scoped_identifier:1",
+        "scoped_identifier:1",
+        "scoped_identifier:1"
+      ],
+      "after_path": [
+        "package_declaration:1",
+        "scoped_identifier:1",
+        "scoped_identifier:1",
+        "scoped_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "package_declaration:1",
+        "scoped_identifier:1",
+        "scoped_identifier:1",
+        ".:1"
+      ],
+      "after_path": [
+        "package_declaration:1",
+        "scoped_identifier:1",
+        "scoped_identifier:1",
+        ".:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "package_declaration:1",
+        "scoped_identifier:1",
+        "scoped_identifier:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "package_declaration:1",
+        "scoped_identifier:1",
+        "scoped_identifier:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "package_declaration:1",
+        "scoped_identifier:1",
+        "scoped_identifier:1"
+      ],
+      "after_path": [
+        "package_declaration:1",
+        "scoped_identifier:1",
+        "scoped_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "package_declaration:1",
+        "scoped_identifier:1",
+        ".:1"
+      ],
+      "after_path": [
+        "package_declaration:1",
+        "scoped_identifier:1",
+        ".:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "package_declaration:1",
+        "scoped_identifier:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "package_declaration:1",
+        "scoped_identifier:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "package_declaration:1",
+        "scoped_identifier:1"
+      ],
+      "after_path": [
+        "package_declaration:1",
+        "scoped_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "package_declaration:1",
+        ";:1"
+      ],
+      "after_path": [
+        "package_declaration:1",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_declaration:1"
+      ],
+      "after_path": [
+        "import_declaration:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_declaration:1",
+        "import:1"
+      ],
+      "after_path": [
+        "import_declaration:1",
+        "import:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_declaration:1",
+        "scoped_identifier:1"
+      ],
+      "after_path": [
+        "import_declaration:1",
+        "scoped_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_declaration:1",
+        "scoped_identifier:1",
+        "scoped_identifier:1"
+      ],
+      "after_path": [
+        "import_declaration:1",
+        "scoped_identifier:1",
+        "scoped_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_declaration:1",
+        "scoped_identifier:1",
+        "scoped_identifier:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "import_declaration:1",
+        "scoped_identifier:1",
+        "scoped_identifier:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_declaration:1",
+        "scoped_identifier:1",
+        "scoped_identifier:1",
+        ".:1"
+      ],
+      "after_path": [
+        "import_declaration:1",
+        "scoped_identifier:1",
+        "scoped_identifier:1",
+        ".:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_declaration:1",
+        "scoped_identifier:1",
+        "scoped_identifier:1",
+        "identifier:2"
+      ],
+      "after_path": [
+        "import_declaration:1",
+        "scoped_identifier:1",
+        "scoped_identifier:1",
+        "identifier:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_declaration:1",
+        "scoped_identifier:1",
+        ".:1"
+      ],
+      "after_path": [
+        "import_declaration:1",
+        "scoped_identifier:1",
+        ".:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_declaration:1",
+        "scoped_identifier:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "import_declaration:1",
+        "scoped_identifier:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_declaration:1",
+        ";:1"
+      ],
+      "after_path": [
+        "import_declaration:1",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "block_comment:2"
+      ],
+      "after_path": [
+        "block_comment:2"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "interface_declaration:1"
+      ],
+      "after_path": [
+        "interface_declaration:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "modifiers:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "modifiers:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "modifiers:1",
+        "public:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "modifiers:1",
+        "public:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "extends_interfaces:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "extends_interfaces:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "extends_interfaces:1",
+        "extends:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "extends_interfaces:1",
+        "extends:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "extends_interfaces:1",
+        "type_list:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "extends_interfaces:1",
+        "type_list:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "extends_interfaces:1",
+        "type_list:1",
+        "type_identifier:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "extends_interfaces:1",
+        "type_list:1",
+        "type_identifier:1"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "{:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "{:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "block_comment:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "block_comment:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:1",
+        "void_type:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:1",
+        "void_type:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:1",
+        "formal_parameters:1",
+        "(:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:1",
+        "formal_parameters:1",
+        "(:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:1",
+        "formal_parameters:1",
+        "formal_parameter:1",
+        "modifiers:1",
+        "final:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:1",
+        "formal_parameters:1",
+        "formal_parameter:1",
+        "modifiers:1",
+        "final:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:1",
+        "formal_parameters:1",
+        "formal_parameter:1",
+        "modifiers:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:1",
+        "formal_parameters:1",
+        "formal_parameter:1",
+        "modifiers:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:1",
+        "formal_parameters:1",
+        "formal_parameter:1",
+        "type_identifier:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:1",
+        "formal_parameters:1",
+        "formal_parameter:1",
+        "type_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:1",
+        "formal_parameters:1",
+        "formal_parameter:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:1",
+        "formal_parameters:1",
+        "formal_parameter:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:1",
+        "formal_parameters:1",
+        "formal_parameter:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:1",
+        "formal_parameters:1",
+        "formal_parameter:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:1",
+        "formal_parameters:1",
+        "):1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:1",
+        "formal_parameters:1",
+        "):1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:1",
+        "formal_parameters:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:1",
+        "formal_parameters:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:1",
+        ";:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:1",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "block_comment:2"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "block_comment:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:2"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:2",
+        "void_type:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:2",
+        "void_type:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:2",
+        "identifier:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:2",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:2",
+        "formal_parameters:1",
+        "(:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:2",
+        "formal_parameters:1",
+        "(:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:2",
+        "formal_parameters:1",
+        "formal_parameter:1",
+        "modifiers:1",
+        "final:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:2",
+        "formal_parameters:1",
+        "formal_parameter:1",
+        "modifiers:1",
+        "final:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:2",
+        "formal_parameters:1",
+        "formal_parameter:1",
+        "modifiers:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:2",
+        "formal_parameters:1",
+        "formal_parameter:1",
+        "modifiers:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:2",
+        "formal_parameters:1",
+        "formal_parameter:1",
+        "type_identifier:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:2",
+        "formal_parameters:1",
+        "formal_parameter:1",
+        "type_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:2",
+        "formal_parameters:1",
+        "formal_parameter:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:2",
+        "formal_parameters:1",
+        "formal_parameter:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:2",
+        "formal_parameters:1",
+        "formal_parameter:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:2",
+        "formal_parameters:1",
+        "formal_parameter:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:2",
+        "formal_parameters:1",
+        ",:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:2",
+        "formal_parameters:1",
+        ",:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:2",
+        "formal_parameters:1",
+        "formal_parameter:2",
+        "modifiers:1",
+        "final:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:2",
+        "formal_parameters:1",
+        "formal_parameter:2",
+        "modifiers:1",
+        "final:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:2",
+        "formal_parameters:1",
+        "formal_parameter:2",
+        "modifiers:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:2",
+        "formal_parameters:1",
+        "formal_parameter:2",
+        "modifiers:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:2",
+        "formal_parameters:1",
+        "formal_parameter:2",
+        "type_identifier:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:2",
+        "formal_parameters:1",
+        "formal_parameter:2",
+        "type_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:2",
+        "formal_parameters:1",
+        "formal_parameter:2",
+        "identifier:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:2",
+        "formal_parameters:1",
+        "formal_parameter:2",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:2",
+        "formal_parameters:1",
+        "formal_parameter:2"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:2",
+        "formal_parameters:1",
+        "formal_parameter:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:2",
+        "formal_parameters:1",
+        "):1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:2",
+        "formal_parameters:1",
+        "):1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:2",
+        "formal_parameters:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:2",
+        "formal_parameters:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:2",
+        ";:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:2",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "block_comment:3"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "block_comment:3"
+      ]
+    },
+    {
+      "operation": "insert_with_children",
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:3"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "block_comment:4"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "block_comment:4"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:3"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:4"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:3",
+        "void_type:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:4",
+        "void_type:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:3",
+        "identifier:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:4",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:3",
+        "formal_parameters:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:4",
+        "formal_parameters:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:3",
+        "formal_parameters:1",
+        "(:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:4",
+        "formal_parameters:1",
+        "(:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:3",
+        "formal_parameters:1",
+        "formal_parameter:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:4",
+        "formal_parameters:1",
+        "formal_parameter:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:3",
+        "formal_parameters:1",
+        "formal_parameter:1",
+        "modifiers:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:4",
+        "formal_parameters:1",
+        "formal_parameter:1",
+        "modifiers:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:3",
+        "formal_parameters:1",
+        "formal_parameter:1",
+        "modifiers:1",
+        "final:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:4",
+        "formal_parameters:1",
+        "formal_parameter:1",
+        "modifiers:1",
+        "final:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:3",
+        "formal_parameters:1",
+        "formal_parameter:1",
+        "type_identifier:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:4",
+        "formal_parameters:1",
+        "formal_parameter:1",
+        "type_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:3",
+        "formal_parameters:1",
+        "formal_parameter:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:4",
+        "formal_parameters:1",
+        "formal_parameter:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:3",
+        "formal_parameters:1",
+        ",:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:4",
+        "formal_parameters:1",
+        ",:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:3",
+        "formal_parameters:1",
+        "formal_parameter:2"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:4",
+        "formal_parameters:1",
+        "formal_parameter:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:3",
+        "formal_parameters:1",
+        "formal_parameter:2",
+        "modifiers:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:4",
+        "formal_parameters:1",
+        "formal_parameter:2",
+        "modifiers:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:3",
+        "formal_parameters:1",
+        "formal_parameter:2",
+        "modifiers:1",
+        "final:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:4",
+        "formal_parameters:1",
+        "formal_parameter:2",
+        "modifiers:1",
+        "final:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:3",
+        "formal_parameters:1",
+        "formal_parameter:2",
+        "type_identifier:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:4",
+        "formal_parameters:1",
+        "formal_parameter:2",
+        "type_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:3",
+        "formal_parameters:1",
+        "formal_parameter:2",
+        "identifier:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:4",
+        "formal_parameters:1",
+        "formal_parameter:2",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:3",
+        "formal_parameters:1",
+        "):1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:4",
+        "formal_parameters:1",
+        "):1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:3",
+        ";:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:4",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "block_comment:5"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "block_comment:5"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:4"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:5"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:4",
+        "void_type:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:5",
+        "void_type:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:4",
+        "identifier:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:5",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:4",
+        "formal_parameters:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:5",
+        "formal_parameters:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:4",
+        "formal_parameters:1",
+        "(:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:5",
+        "formal_parameters:1",
+        "(:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:4",
+        "formal_parameters:1",
+        "formal_parameter:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:5",
+        "formal_parameters:1",
+        "formal_parameter:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:4",
+        "formal_parameters:1",
+        "formal_parameter:1",
+        "modifiers:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:5",
+        "formal_parameters:1",
+        "formal_parameter:1",
+        "modifiers:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:4",
+        "formal_parameters:1",
+        "formal_parameter:1",
+        "modifiers:1",
+        "final:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:5",
+        "formal_parameters:1",
+        "formal_parameter:1",
+        "modifiers:1",
+        "final:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:4",
+        "formal_parameters:1",
+        "formal_parameter:1",
+        "type_identifier:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:5",
+        "formal_parameters:1",
+        "formal_parameter:1",
+        "type_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:4",
+        "formal_parameters:1",
+        "formal_parameter:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:5",
+        "formal_parameters:1",
+        "formal_parameter:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:4",
+        "formal_parameters:1",
+        ",:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:5",
+        "formal_parameters:1",
+        ",:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:4",
+        "formal_parameters:1",
+        "formal_parameter:2"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:5",
+        "formal_parameters:1",
+        "formal_parameter:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:4",
+        "formal_parameters:1",
+        "formal_parameter:2",
+        "modifiers:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:5",
+        "formal_parameters:1",
+        "formal_parameter:2",
+        "modifiers:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:4",
+        "formal_parameters:1",
+        "formal_parameter:2",
+        "modifiers:1",
+        "final:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:5",
+        "formal_parameters:1",
+        "formal_parameter:2",
+        "modifiers:1",
+        "final:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:4",
+        "formal_parameters:1",
+        "formal_parameter:2",
+        "boolean_type:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:5",
+        "formal_parameters:1",
+        "formal_parameter:2",
+        "boolean_type:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:4",
+        "formal_parameters:1",
+        "formal_parameter:2",
+        "identifier:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:5",
+        "formal_parameters:1",
+        "formal_parameter:2",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:4",
+        "formal_parameters:1",
+        "):1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:5",
+        "formal_parameters:1",
+        "):1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:4",
+        "throws:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:5",
+        "throws:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:4",
+        "throws:1",
+        "throws:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:5",
+        "throws:1",
+        "throws:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:4",
+        "throws:1",
+        "type_identifier:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:5",
+        "throws:1",
+        "type_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:4",
+        ";:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:5",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "block_comment:6"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "block_comment:6"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:5"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:6"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:5",
+        "void_type:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:6",
+        "void_type:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:5",
+        "identifier:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:6",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:5",
+        "formal_parameters:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:6",
+        "formal_parameters:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:5",
+        "formal_parameters:1",
+        "(:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:6",
+        "formal_parameters:1",
+        "(:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:5",
+        "formal_parameters:1",
+        "formal_parameter:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:6",
+        "formal_parameters:1",
+        "formal_parameter:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:5",
+        "formal_parameters:1",
+        "formal_parameter:1",
+        "modifiers:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:6",
+        "formal_parameters:1",
+        "formal_parameter:1",
+        "modifiers:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:5",
+        "formal_parameters:1",
+        "formal_parameter:1",
+        "modifiers:1",
+        "final:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:6",
+        "formal_parameters:1",
+        "formal_parameter:1",
+        "modifiers:1",
+        "final:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:5",
+        "formal_parameters:1",
+        "formal_parameter:1",
+        "type_identifier:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:6",
+        "formal_parameters:1",
+        "formal_parameter:1",
+        "type_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:5",
+        "formal_parameters:1",
+        "formal_parameter:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:6",
+        "formal_parameters:1",
+        "formal_parameter:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:5",
+        "formal_parameters:1",
+        ",:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:6",
+        "formal_parameters:1",
+        ",:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:5",
+        "formal_parameters:1",
+        "formal_parameter:2"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:6",
+        "formal_parameters:1",
+        "formal_parameter:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:5",
+        "formal_parameters:1",
+        "formal_parameter:2",
+        "modifiers:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:6",
+        "formal_parameters:1",
+        "formal_parameter:2",
+        "modifiers:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:5",
+        "formal_parameters:1",
+        "formal_parameter:2",
+        "modifiers:1",
+        "final:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:6",
+        "formal_parameters:1",
+        "formal_parameter:2",
+        "modifiers:1",
+        "final:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:5",
+        "formal_parameters:1",
+        "formal_parameter:2",
+        "type_identifier:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:6",
+        "formal_parameters:1",
+        "formal_parameter:2",
+        "type_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:5",
+        "formal_parameters:1",
+        "formal_parameter:2",
+        "identifier:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:6",
+        "formal_parameters:1",
+        "formal_parameter:2",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:5",
+        "formal_parameters:1",
+        "):1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:6",
+        "formal_parameters:1",
+        "):1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:5",
+        ";:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:6",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "block_comment:7"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "block_comment:7"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:6"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:7"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:6",
+        "void_type:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:7",
+        "void_type:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:6",
+        "identifier:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:7",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:6",
+        "formal_parameters:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:7",
+        "formal_parameters:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:6",
+        "formal_parameters:1",
+        "(:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:7",
+        "formal_parameters:1",
+        "(:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:6",
+        "formal_parameters:1",
+        "formal_parameter:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:7",
+        "formal_parameters:1",
+        "formal_parameter:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:6",
+        "formal_parameters:1",
+        "formal_parameter:1",
+        "modifiers:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:7",
+        "formal_parameters:1",
+        "formal_parameter:1",
+        "modifiers:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:6",
+        "formal_parameters:1",
+        "formal_parameter:1",
+        "modifiers:1",
+        "final:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:7",
+        "formal_parameters:1",
+        "formal_parameter:1",
+        "modifiers:1",
+        "final:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:6",
+        "formal_parameters:1",
+        "formal_parameter:1",
+        "type_identifier:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:7",
+        "formal_parameters:1",
+        "formal_parameter:1",
+        "type_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:6",
+        "formal_parameters:1",
+        "formal_parameter:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:7",
+        "formal_parameters:1",
+        "formal_parameter:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:6",
+        "formal_parameters:1",
+        ",:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:7",
+        "formal_parameters:1",
+        ",:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:6",
+        "formal_parameters:1",
+        "formal_parameter:2"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:7",
+        "formal_parameters:1",
+        "formal_parameter:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:6",
+        "formal_parameters:1",
+        "formal_parameter:2",
+        "modifiers:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:7",
+        "formal_parameters:1",
+        "formal_parameter:2",
+        "modifiers:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:6",
+        "formal_parameters:1",
+        "formal_parameter:2",
+        "modifiers:1",
+        "final:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:7",
+        "formal_parameters:1",
+        "formal_parameter:2",
+        "modifiers:1",
+        "final:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:6",
+        "formal_parameters:1",
+        "formal_parameter:2",
+        "type_identifier:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:7",
+        "formal_parameters:1",
+        "formal_parameter:2",
+        "type_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:6",
+        "formal_parameters:1",
+        "formal_parameter:2",
+        "identifier:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:7",
+        "formal_parameters:1",
+        "formal_parameter:2",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:6",
+        "formal_parameters:1",
+        "):1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:7",
+        "formal_parameters:1",
+        "):1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:6",
+        ";:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:7",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "block_comment:8"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "block_comment:8"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:7"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:8"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:7",
+        "boolean_type:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:8",
+        "boolean_type:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:7",
+        "identifier:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:8",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:7",
+        "formal_parameters:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:8",
+        "formal_parameters:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:7",
+        "formal_parameters:1",
+        "(:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:8",
+        "formal_parameters:1",
+        "(:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:7",
+        "formal_parameters:1",
+        "formal_parameter:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:8",
+        "formal_parameters:1",
+        "formal_parameter:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:7",
+        "formal_parameters:1",
+        "formal_parameter:1",
+        "modifiers:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:8",
+        "formal_parameters:1",
+        "formal_parameter:1",
+        "modifiers:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:7",
+        "formal_parameters:1",
+        "formal_parameter:1",
+        "modifiers:1",
+        "final:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:8",
+        "formal_parameters:1",
+        "formal_parameter:1",
+        "modifiers:1",
+        "final:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:7",
+        "formal_parameters:1",
+        "formal_parameter:1",
+        "type_identifier:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:8",
+        "formal_parameters:1",
+        "formal_parameter:1",
+        "type_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:7",
+        "formal_parameters:1",
+        "formal_parameter:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:8",
+        "formal_parameters:1",
+        "formal_parameter:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:7",
+        "formal_parameters:1",
+        "):1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:8",
+        "formal_parameters:1",
+        "):1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:7",
+        ";:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "method_declaration:8",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "}:1"
+      ],
+      "after_path": [
+        "interface_declaration:1",
+        "interface_body:1",
+        "}:1"
+      ]
+    }
+  ],
+  "text_mappings": [
+    {
+      "name": "Minimal",
+      "entries": [
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 46,
+              "start_column": 4,
+              "end_row": 46,
+              "end_column": 51
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Full",
+      "entries": [
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 46,
+              "start_column": 4,
+              "end_row": 46,
+              "end_column": 51
+            }
+          ]
+        },
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 46,
+              "start_column": 0,
+              "end_row": 46,
+              "end_column": 4
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
