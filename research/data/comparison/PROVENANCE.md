@@ -225,3 +225,70 @@ mapping-fidelity comparison *would* be defensible for the 1.00x languages, since
 emit a full node-to-node mapping (`textdiff -f JSON`'s `matches` array covers intermediate nodes,
 not just the edit script, with real byte offsets). difftastic and diffsitter emit no node
 correspondences at all at any granularity, so they could never be included in such a comparison.
+
+## astdiff_oracle_defects4j.csv (added 2026-09-11)
+
+The first accuracy number for codediff against ground truth this project did not write. Produced
+by `benchmark_astdiff_oracle` (`cd research && make measure-astdiff-oracle`) from two external
+inputs fetched by the scripts in `research/external/` (see its README for the datasets):
+
+* the Alikhanifard & Tsantalis AST node-mapping oracle, Defects4J half - RefactoringMiner
+  `9d8743c0f5de2966ce1ae4df5ba778630c97a129` (2026-09-10), `src/test/resources/astDiff/defects4j/`,
+  800 cases / 996 compilation units, 3,031,434 mapping records;
+* the source files those records index into, from Falleri & Martinez' ICSE 2024 replication
+  package (Zenodo 10474674), `dataset/defects4j/{before,after}/`.
+
+One row per compilation unit: how many oracle records it held, how many resolved to tree-sitter
+span pairs, and TP/FP/FN at the paper's two granularities (`all` = statement + sub-expression,
+Table 12; `statement` = Table 11), plus codediff's wall-clock. `problematic` carries the oracle's
+own `cases-problematic.json` flag (102 of the 800) so the two populations can be read apart.
+
+**How a JDT mapping and a tree-sitter mapping are compared is the whole measurement**, and it is
+documented at the top of `src/bin/benchmark_astdiff_oracle.rs`. In one paragraph: a JDT node and a
+tree-sitter node are the same node when their byte spans agree (after converting JDT's UTF-16
+offsets; 3 of the 1046 files are non-ASCII), with four span tolerances for systematic boundary
+differences (a JDT body declaration starts at its Javadoc; `;`/`:` on `for` initialisers and
+`case` labels; `METHOD_INVOCATION_ARGUMENTS` without its parentheses). Mappings under unchanged
+program elements are excluded on both sides, as in the paper. A codediff pair is judged only when
+the oracle maps one of its spans, or its node kind is one the oracle models one-to-one (a
+data-driven whitelist: 83 kinds at `all`, 20 at `statement`) *and* the node moved or changed.
+
+**Resolution: 78.02% of oracle records** resolve to a tree-sitter span pair. Of the 22% that do
+not, 336,000 (all but ~6,000) are inside Javadoc and comments, which JDT parses into `TagElement`/
+`TextElement` subtrees and tree-sitter leaves as one `block_comment`; excluding those, resolution
+is **87.78%**. The remaining unresolved kinds are `SingleVariableDeclaration` (1,959),
+`ArrayType`/`Dimension`/`VARARGS_TYPE` (~3,000 - JDT's type spans for `int[] x` and `String...`
+differ from tree-sitter's), `METHOD_INVOCATION_ARGUMENTS` (2,221 - empty argument lists, where the
+synthetic span is zero-width) and `SwitchCase` (349). Quote the resolution rate next to any
+precision/recall from this file.
+
+**Result (2026-09-11, codediff v0.0.13 at commit c091eea1 + this tool):**
+
+| population / granularity | cases | oracle pairs scored | precision | recall | perfect-diff rate |
+|---|---|---|---|---|---|
+| all 800 / statement + sub-expression | 800 | 242,749 | 99.42% | 98.86% | 54.1% |
+| all 800 / statement | 800 | 40,024 | 99.46% | 98.67% | 80.8% |
+| cases.json (698) / statement + sub-expression | 698 | 198,572 | 99.57% | 99.42% | 59.0% |
+| cases-problematic.json (102) / statement + sub-expression | 102 | 44,177 | 98.76% | 96.35% | 20.6% |
+
+Against the paper's Table 12/14 (Defects4J, statement + sub-expression): RefactoringMiner 3.0
+99.7 / 99.3, perfect 85.9%; GumTree 3.0 simple 98.4 / 97.8, perfect 63.3%; GumTree 3.0 greedy
+97.5 / 93.1, perfect 18.1%. At statement level (Table 11/13): RM 99.8 / 99.6, perfect 89.4%;
+GumTree simple 99.1 / 98.5, perfect 72.4%. So codediff's precision and recall sit between GumTree
+simple and RefactoringMiner at both granularities; its perfect-diff rate beats GumTree simple at
+statement level (80.8 against 72.4) and trails it at sub-expression level (54.1 against 63.3).
+
+**Read those comparisons with two caveats.** (1) The paper's numbers were computed on JDT trees,
+ours on tree-sitter trees through the span equality above; the 12% of non-comment oracle records
+we cannot resolve are excluded from our denominator and not from theirs. (2) Our judged set of
+codediff pairs is conservative by construction - a codediff pairing of a deleted node with an
+inserted one is only counted as a false positive when its kind is whitelisted, and `identifier`
+(ratio 0.916) and `binary_expression` (0.942, JDT's flat n-ary `InfixExpression` against
+tree-sitter's nested pairs) fall below the 0.95 threshold. Both caveats push our precision up and
+neither is easy to remove without a JDT parse.
+
+**Where the errors are.** 429 of 996 files are imperfect, 230 of them by 1-3 pairs. The top 15
+files carry 43% of all FP+FN and the top 50 carry 65%; the worst three (Closure-157
+`CodeGenerator`, 455 FN / 0 FP; Closure-148 `SourceMap`, 325 FN; Time-23 `DateTimeZone`, 140 FP /
+143 FN) are all in the oracle's own `problematic` list. Per project the FP+FN rate ranges from
+0.28% (Gson) to 6.42% (Time). Rows are only comparable within one run; refresh the whole file.

@@ -57,8 +57,9 @@ Two populations of numbers, deliberately kept visibly distinct in the output:
   comment for the slide-deck story). They live here, in one version-controlled place with their
   provenance attached, rather than scattered through `main.tex` with none - a real improvement,
   but not the same guarantee the generated blocks have. What remains authored is the corpus/
-  node-accuracy totals, the ablation deltas, the robustness run's status histogram, and the design
-  targets; the first three are each one command away from their artifact, recorded per block.
+  node-accuracy totals, the ablation deltas and the design targets; the first two are each one
+  command away from their artifact, recorded per block. (The robustness run's status histogram
+  was authored too until 2026-09-11; it is now DERIVED, see `robustness_fixtures`.)
 
 Every macro is emitted on every run, whether or not its source was available. A missing source
 emits a loud `\\textbf{??}` placeholder rather than omitting the macro: `main.tex` builds under
@@ -180,25 +181,11 @@ ABLATION_VISIBLE = {
 # blocks. That removes ~30 hand-transcribed numbers, which were the largest remaining AUTHORED
 # group and the one most likely to drift: they are the numbers a refresh touches every time.
 
-# Sampled robustness run over real Rust (repository, commit, file) pairs.
-# source: cargo run --release --bin benchmark_diff_pairs --csv data/samples/sampled_code_pairs_rust.csv
-#         --repo-root /var/tmp/research/small/repositories/ --output data/performance/robustness_rust.csv
-#         Measured 2026-08-20: ok=406, skipped_too_large=142, timed_out=0, panicked=0,
-#         failed_to_read=377, over the 925 pairs in sampled_code_pairs_rust.csv.
-#
-# Recomputing the split from disk: `skipped_too_large` and `ok` are the output CSV's own `status`
-# column, and RobustnessSampled is that input sample's row count. `failed_to_read` is the one
-# value NOT in the output - a pair whose blob cannot be read never gets a row - so it is the
-# difference between the two files' row counts (925 - 548 = 377), not a value to read directly.
-# Every one of those 377 is a `revspec ... not found`: these repositories' histories were rewritten
-# after the sample was drawn, which is a property of the corpus, not a CodeDiff failure.
-ROBUSTNESS = {
-    "RobustnessSampled": 925,
-    "RobustnessNodeCap": 16_000,
-    "RobustnessTimeoutSeconds": 120,
-    "RobustnessUnavailable": 377,
-    "RobustnessSkipped": 142,
-}
+# NOTE: the ROBUSTNESS block that used to live here (a 2026-08-20 run over 925 sampled Rust pairs,
+# capped at 16,000 combined nodes, 377 of whose clones had already been rewritten out of history)
+# was replaced on 2026-09-11 by `robustness_fixtures` below, DERIVED from
+# data/performance/robustness_fixtures.csv - the same fixture corpus every other number in the
+# paper is reported on, with no node cap.
 
 # Design targets and fixed descriptive facts. Chosen, not measured - a refresh means a decision,
 # not a re-run - except GumTreeVersion, which is whichever build benchmark_other was run against.
@@ -327,6 +314,7 @@ RQ_ONE_MACROS = [
     "RqOneConfigDataPairs",
     "RqOneConfigDataPct",
     "RqOneCodeTenToThirtyPct",
+    "RqOneCodeThirtyToHundredPct",
     "RqOneCodeHundredToThreeHundredPct",
 ]
 
@@ -561,6 +549,26 @@ def sampling_provenance(repo_root):
     return out
 
 
+def frozen_fixture_scope(research_dir):
+    """The fixture names the paper's per-fixture numbers are scored over: the `solution` column of
+    `data/comparison/benchmark_accuracy.csv` intersected with `_common.PAPER_DATASETS`.
+
+    Added 2026-09-11. The corpus on disk keeps growing between paper refreshes (942 fixtures with
+    a human_mapping.json against NumFixtures=775 that day), and `optimal_solutions_benchmark.csv`
+    is re-run by the product benchmark independently of the paper, so a block derived from it
+    with only the dataset filter silently followed the corpus while every other block stayed at
+    the freeze - the cost block reported 889 scored fixtures in a paper whose corpus is 775. The
+    comparison CSV is only written by the paper's own refresh, so its solution list is the freeze.
+    Returns None when that CSV is absent, in which case callers fall back to the dataset filter.
+    """
+    path = os.path.join(research_dir, "data", "comparison", "benchmark_accuracy.csv")
+    if not os.path.exists(path):
+        return None
+    datasets = fixture_datasets()
+    with open(path, newline="") as f:
+        return {r["solution"] for r in csv.DictReader(f) if in_paper_scope(r["solution"], datasets)}
+
+
 def cost_preference(research_dir):
     """RQ1.2's and RQ3.1's cost comparison, derived from
     `data/quality/optimal_solutions_benchmark.csv` - the same artifact the CORPUS block is
@@ -585,15 +593,21 @@ def cost_preference(research_dir):
     path = os.path.join(research_dir, "data", "quality", "optimal_solutions_benchmark.csv")
     if not os.path.exists(path):
         return {}
-    # The benchmark scores the whole fixture corpus, `handmade` included; the paper reports the
-    # sampled datasets alone (see `_common.PAPER_DATASETS`), and this CSV carries no dataset
-    # column, so the scoping happens on the way in.
+    # The benchmark scores the whole fixture corpus, `handmade` included and post-freeze fixtures
+    # too; the paper reports the frozen sampled corpus alone, and this CSV carries no dataset
+    # column, so the scoping happens on the way in - see `frozen_fixture_scope`.
+    frozen = frozen_fixture_scope(research_dir)
     datasets = fixture_datasets()
     with open(path, newline="") as f:
         rows = [
             r
             for r in csv.DictReader(f)
-            if r["human_unsolved"] == "false" and in_paper_scope(r["solution"], datasets)
+            if r["human_unsolved"] == "false"
+            and (
+                r["solution"] in frozen
+                if frozen is not None
+                else in_paper_scope(r["solution"], datasets)
+            )
         ]
 
     def cost(r, key):
@@ -722,6 +736,64 @@ def common_subset_concentration(research_dir):
     }
 
 
+def robustness_fixtures(research_dir):
+    """Section 8's Robust target, measured: every fixture in the paper's corpus pushed through
+    `diff_code` with no node cap, a per-fixture timeout, panic isolation and allocation counters.
+    DERIVED from `data/performance/robustness_fixtures.csv`.
+
+    source: `make measure-robustness-fixtures` from research/ (benchmark_diff_pairs --fixtures,
+            --max-combined-nodes 1000000000 --timeout-secs 120 --iterations 5). Measured
+            2026-09-11 on the MACHINE block's hardware.
+
+    Scoped to the paper's frozen corpus, not to everything the run measured: the run walks every
+    `small`/`full`/`stratified` fixture directory on disk, and fixtures solved after the 2026-09-09
+    freeze the CORPUS block describes were measured too but are out of scope here. The scope is
+    the `solution` column of `data/comparison/benchmark_accuracy.csv`, the artifact the rest of
+    the paper's per-fixture numbers are scored over, intersected with `_common.PAPER_DATASETS`,
+    so this block describes the same NumFixtures every other rate does. The CSV row's `repository`
+    column carries the dataset directory and `path` the fixture name - see the binary's
+    `--fixtures` doc comment.
+
+    `RobustnessTimeoutSeconds` is the run's own flag value, recorded here so the prose that quotes
+    the budget cannot drift from the run that enforced it.
+    """
+    path = os.path.join(research_dir, "data", "performance", "robustness_fixtures.csv")
+    in_scope = frozen_fixture_scope(research_dir)
+    if not os.path.exists(path) or in_scope is None:
+        return {}
+    with open(path, newline="") as f:
+        rows = [
+            r
+            for r in csv.DictReader(f)
+            if r["repository"] in PAPER_DATASETS and r["path"] in in_scope
+        ]
+    if not rows:
+        return {}
+
+    statuses = collections.Counter(r["status"] for r in rows)
+    completed = [r for r in rows if r["status"] == "ok"]
+    max_side = max(max(int(r["ast_nodes_before"]), int(r["ast_nodes_after"])) for r in rows)
+    max_combined = max(int(r["ast_nodes_before"]) + int(r["ast_nodes_after"]) for r in rows)
+    slowest_ms = max(float(r["elapsed_ms"]) for r in completed) if completed else 0.0
+    peak_bytes = (
+        max(int(r["peak_memory_bytes"]) for r in completed if r["peak_memory_bytes"])
+        if completed
+        else 0
+    )
+    return {
+        "RobustnessFixtures": latex_number(len(rows)),
+        "RobustnessCompleted": latex_number(statuses.get("ok", 0)),
+        "RobustnessTimedOut": latex_number(statuses.get("timed_out", 0)),
+        "RobustnessPanicked": latex_number(statuses.get("panicked", 0)),
+        "RobustnessLanguages": len({r["language"] for r in rows}),
+        "RobustnessMaxNodes": latex_number(max_side),
+        "RobustnessMaxCombinedNodes": latex_number(max_combined),
+        "RobustnessSlowestMs": f"{slowest_ms:.1f}",
+        "RobustnessPeakMemoryMb": f"{peak_bytes / 1e6:.1f}",
+        "RobustnessTimeoutSeconds": 120,
+    }
+
+
 def build(
     empirical_lines,
     rq1_lines,
@@ -733,6 +805,7 @@ def build(
     sampling,
     cost,
     concentration,
+    robustness,
 ):
     """Returns the complete variables.tex as a list of lines."""
     out = [
@@ -858,18 +931,13 @@ def build(
     out += [command(name, value) for name, value in ABLATION.items()]
     out += [command(name, value) for name, value in ABLATION_VISIBLE.items()]
 
-    # Completed = sampled - unavailable - skipped, derived for the same reason as NodeMismatches.
-    completed = (
-        ROBUSTNESS["RobustnessSampled"]
-        - ROBUSTNESS["RobustnessUnavailable"]
-        - ROBUSTNESS["RobustnessSkipped"]
-    )
     out += [
         "",
-        "% --- Sampled robustness run (AUTHORED - see script's ROBUSTNESS block).",
+        "% --- Robustness run over the fixture corpus: no node cap, per-fixture timeout, panic",
+        "% isolation (DERIVED from data/performance/robustness_fixtures.csv, scoped to the paper's",
+        "% corpus - see `robustness_fixtures`). Refresh with `make measure-robustness-fixtures`.",
     ]
-    out += [command(name, latex_number(value)) for name, value in ROBUSTNESS.items()]
-    out += [command("RobustnessCompleted", latex_number(completed))]
+    out += [command(name, value) for name, value in robustness.items()]
 
     out += [
         "",
@@ -1045,6 +1113,13 @@ def main():
                 f"drifted from that script's PAPER_MACRO_STEMS."
             )
 
+    robustness = robustness_fixtures(research_dir)
+    if not robustness:
+        print(
+            "WARNING: no robustness run found (data/performance/robustness_fixtures.csv) - the "
+            "Robustness* macros will be absent. Run `make measure-robustness-fixtures`."
+        )
+
     lines = build(
         empirical,
         rq1,
@@ -1056,6 +1131,7 @@ def main():
         sampling,
         cost,
         concentration,
+        robustness,
     )
 
     os.makedirs(os.path.dirname(output_path), exist_ok=True)

@@ -78,8 +78,10 @@
 //! codediff cannot currently do better, and a claim with no argument behind it is indistinguishable
 //! from a number nobody has revisited - which is exactly what 49 of these turned out to be.
 
-// Mirrors src/test/data/diffs/'s four-way split (see `test::helper::DIFF_DATASETS`): each of
+// Mirrors src/test/data/diffs/'s five-way split (see `test::helper::DIFF_DATASETS`): each of
 // these is its own mod-list file, one `#[cfg(test)] mod <name>;` per fixture in that dataset.
+#[cfg(test)]
+mod defects4j;
 #[cfg(test)]
 mod full;
 #[cfg(test)]

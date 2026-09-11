@@ -2,7 +2,7 @@
 %%% Do NOT edit. File created by BibTeX with style
 %%% ACM-Reference-Format-Journals [18-Jan-2012].
 
-\begin{thebibliography}{12}
+\begin{thebibliography}{13}
 
 %%% ====================================================================
 %%% NOTE TO THE USER: you can override these defaults by providing
@@ -108,6 +108,23 @@
 \newblock
 \newblock
 \shownote{Accessed 2026-07-31}.
+
+
+\bibitem[Just et~al\mbox{.}(2014)]%
+        {defects4j}
+\bibfield{author}{\bibinfo{person}{Ren{\'e} Just}, \bibinfo{person}{Darioush
+  Jalali}, {and} \bibinfo{person}{Michael~D. Ernst}.}
+  \bibinfo{year}{2014}\natexlab{}.
+\newblock \showarticletitle{{Defects4J}: A Database of Existing Faults to
+  Enable Controlled Testing Studies for {Java} Programs}. In
+  \bibinfo{booktitle}{\emph{Proceedings of the 2014 International Symposium on
+  Software Testing and Analysis (ISSTA 2014)}}. \bibinfo{publisher}{Association
+  for Computing Machinery}, \bibinfo{address}{New York, NY, USA},
+  \bibinfo{pages}{437--440}.
+\newblock
+\urldef\tempurl%
+\url{https://doi.org/10.1145/2610384.2628055}
+\showDOI{\tempurl}
 
 
 \bibitem[L{\"a}mmel et~al\mbox{.}(2011)]%

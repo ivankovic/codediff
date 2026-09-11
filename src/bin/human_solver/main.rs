@@ -500,7 +500,7 @@ fn list_dir_names(root: &Path) -> Result<Vec<String>> {
     Ok(names)
 }
 
-/// Every case name across all `DIFF_DATASETS` folders (`handmade`/`small`/`full`/`stratified`) -
+/// Every case name across all `DIFF_DATASETS` folders (`handmade`/`small`/`full`/`stratified`/`defects4j`) -
 /// the `o` picker doesn't distinguish between them (see the title bar's `[dataset]` tag, via
 /// `case_dataset`, for where a given case actually lives), since names are unique across all of
 /// them by construction (`action_promote`'s collision check spans all of them too).

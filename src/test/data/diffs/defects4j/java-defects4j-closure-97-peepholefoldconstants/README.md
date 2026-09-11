@@ -1,0 +1,22 @@
+# Sample provenance
+
+- **Repository:** https://github.com/google/closure-compiler.git (`google-closure-compiler.git`)
+- **Commit:** `ee749e286b477f8d6f53ff5960a38453baf50f31`
+- **File:** `src/com/google/javascript/jscomp/PeepholeFoldConstants.java`
+- **Research dataset:** defects4j
+
+This fixture is Defects4J bug **Closure-97** (https://github.com/rjust/defects4j): `before.java.test`
+is the buggy revision (`4cf197f69d8733ac68b02672b2e23d7939e5eb76`) and `after.java.test` the fixed revision
+(`ee749e286b477f8d6f53ff5960a38453baf50f31`) of the file above, byte for byte as shipped in the GumTree Simple
+replication package (Falleri & Martinez, ICSE 2024, https://doi.org/10.5281/zenodo.10474674),
+which is also the exact text the Alikhanifard & Tsantalis AST-diff oracle's offsets index into.
+The revision ids are Defects4J's own, from the repositories it bundles, and are not guaranteed
+to resolve in the upstream repository's history. Original bug report: https://storage.googleapis.com/google-code-archive/v2/code.google.com/closure-compiler/issues/issue-200.json
+
+This content is **not** part of codediff's own codebase and is **not** covered by codediff's own
+AGPL-3.0 license - it remains under the license of the project it came from.
+
+## License
+
+The upstream project's license, as it read at the revision above, in the repository listed at the
+top of this file.

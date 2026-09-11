@@ -342,10 +342,15 @@ def write_paper_fragment(
             f"\\newcommand{{\\RqOne{macro}Pairs}}{{{results[cat]['n']:,}}}".replace(",", "{,}")
         )
         lines.append(f"\\newcommand{{\\RqOne{macro}Pct}}{{{pct(results[cat]['pct'])}}}")
-    # The two code-category buckets the prose cites by name: the last bucket where whole-tree
-    # APTED still (nearly) always fits the budget, and the first where it collapses.
+    # The three code-category buckets the prose cites by name: the last bucket where whole-tree
+    # APTED still (nearly) always fits the budget, the one after it, and the first where it
+    # collapses.
     code_buckets = {label: p for label, n, _, p in results[CODE]["buckets"] if n > 0}
     lines.append(f"\\newcommand{{\\RqOneCodeTenToThirtyPct}}{{{pct(code_buckets['10-30'])}}}")
+    # The bucket between the two, added 2026-09-11 on review: RA2 used to jump from 11-30 straight
+    # to 101-300 while calling the latter "one bucket up", which it is not - 31-100 sits between
+    # them, and it is where the budget first starts to bite.
+    lines.append(f"\\newcommand{{\\RqOneCodeThirtyToHundredPct}}{{{pct(code_buckets['30-100'])}}}")
     lines.append(
         f"\\newcommand{{\\RqOneCodeHundredToThreeHundredPct}}{{{pct(code_buckets['100-300'])}}}"
     )

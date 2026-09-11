@@ -81,6 +81,27 @@ Compiles cleanly, 16 pages, builds with `latexmk -pdf -g main` (verified locally
 `texlive-publishers` installed). See the `TODO` comments in `main.tex` for the placeholder ACM
 conference/rights metadata and CCS concepts, still to fill in once a venue is chosen.
 
+### Review pass of 2026-09-11
+
+Resolved the author's handwritten review of the 2026-09-10 PDF. Prose: the abstract now opens with
+the introduction's first two sentences; GumTree moved from Algorithms to Tools in Section 2;
+the N:M paragraph moved from Section 3.3 to Section 4 under RQ1.1; Section 8 no longer compares
+CodeDiff to other tools except in its Summary sentence (absolute CodeDiff numbers only); the
+Conclusions were rewritten to the reviewer's one-sentence message (speed requirements are met,
+full quality requirements are not, RA1-RA3); Defects4J is cited under Empirical studies.
+
+Data: RA2 now names the 31-100 bucket (`\RqOneCodeThirtyToHundredPct`, new in
+`apted_only_report.py`) instead of calling 101-300 "one bucket up"; Table 3 dropped its
+node-granularity block; every accuracy result is also split by dataset
+(`figures/benchmark_other_buckets_by_dataset.pdf` for the ten configurations,
+`figures/benchmark_codediff_by_dataset.tex` for CodeDiff, both from `benchmark_other_report.py`);
+the robustness evaluation was re-run over the fixture corpus (`make measure-robustness-fixtures`,
+`benchmark_diff_pairs --fixtures`) and Section 8 gained a Robustness paragraph, with the 905k-node
+ceiling marked as unexercised in Threats. Table 2's rewrite-share p99 and max stay empty: the
+2026-09-07 run recorded only p50/p90 and the Full-list clones no longer exist on disk;
+`edit_shape_stats.py` now emits both so the next run fills them. The 255 Full-list sample is
+explained in the text (R and Scala re-drawn, `\SampleFullResampled`).
+
 ### Every number is a macro
 
 **`main.tex` contains no bare numeric literal that came from a measurement.** Every number in the
@@ -119,8 +140,9 @@ machine-independent) and `benchmark_other.csv` (timing).
 **Edit authored values in `paper_variables.py`, never in `figures/variables.tex`.** That file is
 generated output: `make introductory-paper` regenerates and overwrites it on every routine PDF
 rebuild, so a hand-edit there survives only until the next build. The authored numbers live in the
-`CORPUS` / `ABLATION` / `COMPARISON` / `SPEED` / `ROBUSTNESS` / `TARGETS` dicts near the top of the
-script.
+`CORPUS` / `ABLATION` / `COMPARISON` / `SPEED` / `TARGETS` dicts near the top of the script (the
+`ROBUSTNESS` dict was replaced on 2026-09-11 by a block derived from
+`data/performance/robustness_fixtures.csv`).
 
 **`figures/` contains symlinks, not copies.** Every entry in `figures/` points at
 `research/plots/`, which is the single source of truth for generated figures and for

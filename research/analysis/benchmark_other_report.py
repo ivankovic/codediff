@@ -573,6 +573,13 @@ def write_combined_bucket_table(accuracy_rows, output_path, include_codediff):
     tools and the paper's own tool is reported in its own section; the node half includes it,
     because the node reading is where a reader asking "and where does CodeDiff land" is actually
     looking. Passing `include_codediff=True` puts it in both.
+
+    **The node block was dropped on 2026-09-11, on review.** The reviewer asked what the
+    node-granularity rows were for, and the honest answer was "a second reading of the same tools
+    under a metric only half of them can be scored on". Line granularity is the single common
+    ground all ten configurations share, and it is the basis Section 8 scores \textsc{CodeDiff}
+    on too, so the table now carries the two line-level blocks only. The node numbers stay
+    available in `write_node_bucket_table`'s own file for anything that wants them.
     """
     backslash = "\\"
     row_end = backslash * 2
@@ -584,14 +591,12 @@ def write_combined_bucket_table(accuracy_rows, output_path, include_codediff):
         # column and collide with the neighbouring table (observed 2026-08-23).
         r"\begin{table*}",
         (
-            r"  \caption{Per-fixture agreement with the human mapping, bucketed, at both"
-            r" granularities. The upper block is \emph{line-level} agreement for all ten"
-            r" configurations. The lower block is \emph{node-level} agreement, which only tools"
-            r" whose output carries sub-line structure can be scored on: a purely line-based tool"
-            r" has no finer signal to project onto the AST. The node metric is a per-node ``did you"
-            r" consider this changed'' projection, not mapping fidelity. ``Perfect'' means zero"
-            r" mismatches, not a rounded 100\%. Each tool is scored on its own applicable subset"
-            r" ($n$), so percentages, not counts, are comparable across rows.}"
+            r"  \caption{Per-fixture line-level agreement with the human mapping, bucketed, for"
+            r" all ten configurations. The upper block holds the tools that report whole lines"
+            r" only; the lower block holds the tools whose output carries sub-line detail, scored"
+            r" on the same line-level basis so that the ten are comparable. ``Perfect'' means zero"
+            r" mismatched lines, not a rounded 100\%. Each tool is scored on its own applicable"
+            r" subset ($n$), so percentages, not counts, are comparable across rows.}"
         ),
         r"  \label{tab:agreement-buckets}",
         r"  \small",
@@ -608,13 +613,243 @@ def write_combined_bucket_table(accuracy_rows, output_path, include_codediff):
         + row_end
     )
     lines += _bucket_rows(accuracy_rows, GRANULARITY["subline"], "line", include_codediff)
-    lines.append(r"    \midrule")
-    lines.append(
-        r"    \multicolumn{6}{l}{\emph{Node granularity: tools reporting sub-line detail}} "
-        + row_end
-    )
-    lines += _bucket_rows(accuracy_rows, GRANULARITY["subline"], "node", include_codediff=True)
     lines += [r"    \bottomrule", r"  \end{tabular}", r"\end{table*}"]
+    output_path.write_text("\n".join(lines) + "\n")
+    print(f"Table written to {output_path}")
+
+
+# The paper's three sampled datasets, as the corpus directory names them and as the paper names
+# them (Section 3's Curated and Full repository lists, and the stratified-by-size sample). "All"
+# is their union, which is the population every pooled number in the paper is over.
+DATASET_LABELS = [("small", "Curated"), ("full", "Full"), ("stratified", "Stratified")]
+ALL_DATASETS = "All"
+
+
+def rows_in_dataset(accuracy_rows, datasets, dataset):
+    """The accuracy rows whose fixture lives in `dataset`, or every row for `ALL_DATASETS`."""
+    if dataset == ALL_DATASETS:
+        return list(accuracy_rows)
+    return [r for r in accuracy_rows if datasets.get(r["solution"]) == dataset]
+
+
+def dataset_bucket_shares(accuracy_rows, datasets, tool, metric="line"):
+    """`{dataset label: (n, [share per BUCKETS entry])}` for `tool`, one entry per dataset plus
+    `ALL_DATASETS`. A dataset the tool scored nothing in is omitted rather than drawn as zeros."""
+    out = {}
+    for key, label in DATASET_LABELS + [(ALL_DATASETS, ALL_DATASETS)]:
+        result = bucket_counts(rows_in_dataset(accuracy_rows, datasets, key), tool, metric=metric)
+        if result is None:
+            continue
+        scored, counts = result
+        out[label] = (scored, [100.0 * c / scored for c in counts])
+    return out
+
+
+# Hue and hatch per agreement bucket, most-accurate first, matching BUCKETS. Both encode the same
+# ordinal so the figure survives a greyscale print: the fill lightens and the hatch thins as
+# agreement falls, and the "<95%" segment is white so the eye reads it as "missing".
+BUCKET_FILLS = ["#2a78d6", "#9cc0ea", "#dfe8f3", SURFACE]
+BUCKET_HATCHES = ["", "////", "....", ""]
+PLAIN_BUCKET_LEGEND = ["Perfect (0 mismatched lines)", "\u226599%", "95\u201399%", "<95%"]
+
+
+# Accuracy does not depend on how a process was launched, so the cold/warm qualifiers the timing
+# series carry in DISPLAY_NAMES would only confuse an accuracy figure.
+FIGURE_NAMES = {"gumtree": "GumTree", "bdiff": "BDiff", "unix_diff": "Unix diff"}
+
+
+def plot_dataset_buckets(accuracy_rows, datasets, output_path):
+    r"""One panel per dataset (Curated, Full, Stratified, All), one horizontal 100%-stacked bar
+    per external configuration, segments in BUCKETS order - the per-dataset reading of the
+    line-level table, added 2026-09-11 on review: the corpus is three differently-drawn samples
+    (Section 3), and a pooled rate cannot show whether a tool's accuracy is a property of the tool
+    or of which sample dominates the pool. Tools are ordered by their Perfect share over the whole
+    corpus, so the four panels share one y axis and a row means the same tool everywhere.
+
+    \textsc{CodeDiff} is deliberately absent: Section 7 answers RQ4 over other people's tools and
+    the paper's own tool is reported in Section 8 (`write_codediff_dataset_table`)."""
+    tools = [t for t in GRANULARITY["line"] + GRANULARITY["subline"] if t != "codediff"]
+    overall = {t: dataset_bucket_shares(accuracy_rows, datasets, t) for t in tools}
+    tools = [t for t in tools if ALL_DATASETS in overall[t]]
+    # Best at the top: matplotlib draws y upward, so the sort is ascending by Perfect share.
+    tools.sort(key=lambda t: overall[t][ALL_DATASETS][1][0])
+
+    panels = [label for _, label in DATASET_LABELS] + [ALL_DATASETS]
+    fig, axes = plt.subplots(
+        1, len(panels), figsize=(11, 4.5), sharey=True, facecolor=SURFACE, constrained_layout=True
+    )
+    y = np.arange(len(tools))
+    height = 0.72
+    for ax, panel in zip(axes, panels, strict=True):
+        ax.set_facecolor(SURFACE)
+        left = np.zeros(len(tools))
+        for b, (fill, hatch) in enumerate(zip(BUCKET_FILLS, BUCKET_HATCHES, strict=True)):
+            widths = np.array(
+                [overall[t][panel][1][b] if panel in overall[t] else 0.0 for t in tools]
+            )
+            ax.barh(
+                y,
+                widths,
+                left=left,
+                height=height,
+                color=fill,
+                hatch=hatch,
+                edgecolor=INK_PRIMARY,
+                linewidth=0.6,
+                zorder=3,
+                label=PLAIN_BUCKET_LEGEND[b] if panel == panels[0] else None,
+            )
+            if b == 0:
+                # Inside the Perfect segment, white on blue: every bar here is wide enough
+                # (the lowest Perfect share is ~40%), and a label past the segment's end
+                # would sit on top of the hatched >=99% one.
+                for yi, w in zip(y, widths, strict=True):
+                    if w > 0:
+                        ax.text(
+                            w - 1.5,
+                            yi,
+                            f"{w:.0f}%",
+                            va="center",
+                            ha="right",
+                            fontsize=8,
+                            color=SURFACE,
+                            fontweight="bold",
+                            zorder=4,
+                        )
+            left += widths
+        ns = [overall[t][panel][0] if panel in overall[t] else 0 for t in tools]
+        n_total = len(rows_in_dataset(accuracy_rows, datasets, panel_key(panel)))
+        ax.set_title(f"{panel} ({n_total} fixtures)", fontsize=10.5, color=INK_PRIMARY)
+        ax.set_xlim(0, 100)
+        ax.set_xticks([0, 25, 50, 75, 100])
+        ax.xaxis.set_major_formatter(ticker.PercentFormatter(decimals=0))
+        ax.tick_params(colors=INK_MUTED, labelsize=8.5)
+        ax.grid(axis="x", color=GRIDLINE, linewidth=1, zorder=0)
+        for spine in ("top", "right", "left"):
+            ax.spines[spine].set_visible(False)
+        ax.spines["bottom"].set_color(BASELINE)
+        # A tool's own applicable subset differs per dataset (diffsitter and GumTree cover only
+        # the languages their grammars do), so each panel states its own n beside every bar.
+        for yi, n in zip(y, ns, strict=True):
+            ax.text(
+                101.5,
+                yi,
+                f"n={n}",
+                va="center",
+                ha="left",
+                fontsize=7,
+                color=INK_SECONDARY,
+                zorder=4,
+                clip_on=False,
+            )
+    axes[0].set_yticks(y)
+    axes[0].set_yticklabels(
+        [FIGURE_NAMES.get(t, DISPLAY_NAMES.get(t, t)) for t in tools],
+        fontsize=9,
+        color=INK_PRIMARY,
+    )
+    axes[0].tick_params(axis="y", colors=INK_PRIMARY)
+    fig.supxlabel("Share of fixtures, by line-level agreement with the human mapping", fontsize=10)
+    fig.legend(
+        loc="lower center",
+        bbox_to_anchor=(0.5, -0.06),
+        ncol=4,
+        frameon=False,
+        fontsize=9,
+        handlelength=2.2,
+    )
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(output_path, dpi=150, bbox_inches="tight", facecolor=SURFACE)
+    fig.savefig(output_path.with_suffix(".pdf"), bbox_inches="tight", facecolor=SURFACE)
+    plt.close(fig)
+    print(f"Plot saved to {output_path}")
+
+
+def panel_key(label):
+    """The dataset directory name behind a panel label (`ALL_DATASETS` maps to itself)."""
+    return next((key for key, lab in DATASET_LABELS if lab == label), ALL_DATASETS)
+
+
+def read_quality_rows(csv_path: Path) -> dict[str, dict] | None:
+    """`optimal_solutions_benchmark.csv` keyed by solution name, or None if it isn't on disk.
+
+    This is the source of the paper's node-accuracy figures (the CORPUS block in
+    paper_variables.py totals its `mismatches`/`total_nodes` and `visible_mismatches`/
+    `visible_nodes` columns), which is why the per-dataset CodeDiff table reads its node columns
+    from here rather than from benchmark_accuracy.csv: the latter's `codediff_node_mismatches` is
+    the per-node "did you consider this changed" projection every sub-line tool is scored on,
+    not mapping fidelity, and over the same 775 fixtures it totals 16,656 mismatches where the
+    mapping-fidelity figure is 7,012 (checked 2026-09-11). Two numbers both called "node
+    mismatches" in one paper would be exactly the drift paper_variables.py exists to prevent."""
+    if not csv_path.exists():
+        return None
+    with csv_path.open() as f:
+        return {r["solution"]: r for r in csv.DictReader(f)}
+
+
+def write_codediff_dataset_table(accuracy_rows, datasets, quality_rows, output_path):
+    r"""\textsc{CodeDiff}'s accuracy per dataset and overall, as a single-column LaTeX table for
+    Section 8 - the tool's own per-dataset reading, kept apart from `plot_dataset_buckets` because
+    Section 8 reports \textsc{CodeDiff} on its own rather than against the other tools.
+
+    Line columns come from benchmark_accuracy.csv (the same rows and basis as Table 3); node and
+    visible-node accuracy come from optimal_solutions_benchmark.csv, see `read_quality_rows`. If
+    the quality CSV is absent the node columns are omitted rather than substituted."""
+    backslash = "\\"
+    row_end = backslash * 2
+    with_nodes = quality_rows is not None
+    header = "Dataset & $n$ & Perfect & Lines & Nodes"
+    if with_nodes:
+        header += " & Visible"
+    lines = [
+        "% Auto-generated by research/analysis/benchmark_other_report.py. Do not edit by hand -",
+        "% regenerate: make timing-report (from research/).",
+        r"\begin{table}",
+        (
+            r"  \caption{\textsc{CodeDiff} against the human mapping, per dataset of"
+            r" Section~\ref{sec:dataset} and overall. \emph{Perfect} is the share of fixtures with"
+            r" zero mismatched lines; \emph{Lines} is the pooled line-level mismatch rate on the"
+            r" same basis as Table~\ref{tab:agreement-buckets}; \emph{Nodes} is the share of AST"
+            r" nodes mapped correctly"
+            + (
+                r", and \emph{Visible} the same share over the nodes RA3.3 finds visible."
+                if with_nodes
+                else "."
+            )
+            + "}"
+        ),
+        r"  \label{tab:codediff-by-dataset}",
+        r"  \small",
+        r"  \begin{tabular}{l" + "r" * (5 if with_nodes else 4) + "}",
+        r"    \toprule",
+        f"    {header} {row_end}",
+        r"    \midrule",
+    ]
+    for key, label in DATASET_LABELS + [(ALL_DATASETS, ALL_DATASETS)]:
+        rows = rows_in_dataset(accuracy_rows, datasets, key)
+        totals = accuracy_totals(rows, "codediff")
+        buckets = bucket_counts(rows, "codediff")
+        if totals is None or buckets is None:
+            continue
+        n, mismatches, total_lines = totals
+        scored, counts = buckets
+        cells = [
+            str(n),
+            f"{counts[0]} ({100.0 * counts[0] / scored:.0f}" + backslash + "%)",
+            f"{100.0 * mismatches / total_lines:.3f}" + backslash + "%",
+        ]
+        if with_nodes:
+            q = [quality_rows[r["solution"]] for r in rows if r["solution"] in quality_rows]
+            node_total = sum(int(r["total_nodes"]) for r in q)
+            node_miss = sum(int(r["mismatches"]) for r in q)
+            vis_total = sum(int(r["visible_nodes"]) for r in q)
+            vis_miss = sum(int(r["visible_mismatches"]) for r in q)
+            cells.append(f"{100.0 * (node_total - node_miss) / node_total:.2f}" + backslash + "%")
+            cells.append(f"{100.0 * (vis_total - vis_miss) / vis_total:.2f}" + backslash + "%")
+        name = r"\emph{All}" if key == ALL_DATASETS else label
+        lines.append(f"    {name} & " + " & ".join(cells) + f" {row_end}")
+    lines += [r"    \bottomrule", r"  \end{tabular}", r"\end{table}"]
     output_path.write_text("\n".join(lines) + "\n")
     print(f"Table written to {output_path}")
 
@@ -1142,6 +1377,29 @@ def write_paper_fragment(
                     f"\\newcommand{{\\{stem}PerfectPct}}{{{100.0 * counts[0] / scored:.0f}}}"
                 )
 
+        # Per-dataset readings (2026-09-11, on review): the Perfect share of every configuration
+        # and CodeDiff's pooled line rate, split by the three sampled datasets of Section 3. Same
+        # sources as `plot_dataset_buckets` and `write_codediff_dataset_table`.
+        datasets = fixture_datasets()
+        lines.append("% Per-dataset: Curated = small/, Full = full/, Stratified = stratified/.")
+        for id_ in ordered(list(PAPER_MACRO_STEMS)):
+            stem = PAPER_MACRO_STEMS[id_]
+            for key, label in DATASET_LABELS:
+                subset = rows_in_dataset(accuracy_rows, datasets, key)
+                buckets = bucket_counts(subset, id_)
+                if buckets is not None:
+                    scored, counts = buckets
+                    lines.append(
+                        f"\\newcommand{{\\{stem}PerfectPct{label}}}{{{100.0 * counts[0] / scored:.0f}}}"
+                    )
+                if id_ == "codediff":
+                    totals = accuracy_totals(subset, id_)
+                    if totals is not None:
+                        _, mismatches, total = totals
+                        lines.append(
+                            f"\\newcommand{{\\{stem}LineRate{label}}}{{{100.0 * mismatches / total:.3f}}}"
+                        )
+
         shared = common_subset(accuracy_rows, list(PAPER_MACRO_STEMS))
         lines.append(f"% Common subset: the {len(shared)} fixtures every tool scored.")
         lines.append(f"\\newcommand{{\\CommonFixtures}}{{{len(shared)}}}")
@@ -1185,6 +1443,12 @@ if __name__ == "__main__":
         "--accuracy-csv",
         default="data/comparison/benchmark_accuracy.csv",
         help="Path to the accuracy CSV (default: data/comparison/benchmark_accuracy.csv)",
+    )
+    parser.add_argument(
+        "--quality-csv",
+        default="data/quality/optimal_solutions_benchmark.csv",
+        help="Path to codediff's own quality benchmark CSV, the source of its node accuracy"
+        " (default: data/quality/optimal_solutions_benchmark.csv)",
     )
     parser.add_argument(
         "--plots-dir", default="plots", help="Directory for output PNGs (default: plots/)"
@@ -1233,6 +1497,17 @@ if __name__ == "__main__":
             accuracy_rows,
             plots_dir / "benchmark_other_buckets_combined.tex",
             include_codediff=False,
+        )
+        # Per-dataset readings, added 2026-09-11 on review - see plot_dataset_buckets.
+        datasets = fixture_datasets()
+        plot_dataset_buckets(
+            accuracy_rows, datasets, plots_dir / "benchmark_other_buckets_by_dataset.png"
+        )
+        write_codediff_dataset_table(
+            accuracy_rows,
+            datasets,
+            read_quality_rows(Path(args.quality_csv)),
+            plots_dir / "benchmark_codediff_by_dataset.tex",
         )
         print_bucket_table(accuracy_rows)
 

@@ -43,7 +43,8 @@ RESEARCH_DIR = /var/tmp/research/$(MODE)/
 	measure-code-pair-diffs pairs-diff-report measure-sampled matching-reasons-report \
 	shapes-report measure-edit-shape ambiguity-report rendering-report measure-tools-timing \
 	measure-tools-accuracy timing-report install-bdiff apted-budget-report measure-apted-budget \
-	paper-variables introductory-paper introductory-paper-empirical
+	paper-variables introductory-paper introductory-paper-empirical fetch-external \
+	measure-astdiff-oracle extract-defects4j-fixtures measure-robustness-fixtures
 
 # Delegates to the root Makefile so the cargo invocation (and its `--features stats` requirement)
 # lives in exactly one place.
@@ -210,6 +211,20 @@ measure-pairs: build
 		--output data/performance/benchmark_$(LANGUAGE).csv \
 		--max-combined-nodes $(PAIRS_NODE_LIMIT)
 
+# The paper's robustness run: every `small`/`full`/`stratified` fixture directory (the datasets the
+# paper reports on) pushed through diff_code with no node cap, a per-fixture timeout, panic
+# isolation and the allocation counters, into one CSV with the same schema as measure-pairs.
+# Replaces the 2026-08-20 Rust-only sample (data/performance/robustness_rust.csv), whose clones
+# had 377 of 925 pairs already rewritten out of history by the time it ran and which capped the
+# tree at 16,000 combined nodes - so it neither covered the corpus the rest of the paper is
+# measured on nor exercised the large files the Robust target is about. Fixtures are read from the
+# checked-in corpus, so this needs no checkouts and no MODE. A few minutes; feeds
+# analysis/paper_variables.py's ROBUSTNESS block.
+measure-robustness-fixtures: build
+	$(BIN_DIR)/benchmark_diff_pairs --fixtures \
+		--output data/performance/robustness_fixtures.csv \
+		--max-combined-nodes 1000000000 --timeout-secs 120 --iterations 5
+
 measure-code-pair-diffs:
 	uv run ./analysis/code_pair_diff_stats.py data/samples/sampled_code_pairs_$(LANGUAGE).csv \
 		--repo-root $(REPOSITORIES_DIR) \
@@ -372,6 +387,32 @@ install-bdiff:
 	$(BDIFF_PREFIX)/venv/bin/pip install -q $(BDIFF_PREFIX)/BDiff rapidfuzz
 	@$(BDIFF_PREFIX)/venv/bin/python -m bdiff --version
 	@echo "export BDIFF_PYTHON=$(BDIFF_PREFIX)/venv/bin/python"
+
+# ── External oracles: ground truth we did not write ─────────────────────────────────────────────
+
+# Third-party datasets, fetched into /var/tmp/research/external/ by the scripts in external/ (each
+# is idempotent and records what it fetched in a FETCHED file). See external/README.md for what
+# they are and why. Nothing here is vendored into the repository.
+fetch-external:
+	./external/fetch_astdiff_oracle.sh
+	./external/fetch_gumtree_simple_package.sh
+	./external/fetch_defects4j_metadata.sh
+
+# Promote the N compilation units codediff disagrees with the oracle on most into
+# src/test/data/diffs/defects4j/ as unsolved fixtures for human_solver (README + description, no
+# mapping). Never overwrites an existing fixture directory. `DEFECTS4J_TOP=20` by default.
+DEFECTS4J_TOP ?= 20
+extract-defects4j-fixtures:
+	uv run ./external/extract_defects4j_fixtures.py --top $(DEFECTS4J_TOP)
+
+# Score codediff's node mapping against the Alikhanifard & Tsantalis oracle (Defects4J half, 800
+# cases). Writes data/comparison/astdiff_oracle_defects4j.csv and prints precision/recall at the
+# paper's two granularities next to its published numbers. Reads ~2.2 GB of oracle JSON twice;
+# takes a few minutes. `--details` adds the unresolved-JDT-type census, the kind whitelist and
+# every FP/FN with source text; `--cases Time-20,Chart-1` scopes a run.
+measure-astdiff-oracle: fetch-external
+	cd .. && cargo run --release --features test-fixtures --bin benchmark_astdiff_oracle -- \
+		--csv research/data/comparison/astdiff_oracle_defects4j.csv $(ASTDIFF_ORACLE_ARGS)
 
 # ── RQ1: whole-tree APTED against a 1-second budget ─────────────────────────────────────────────
 

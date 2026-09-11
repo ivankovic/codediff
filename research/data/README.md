@@ -15,7 +15,7 @@ data/
   quality/        output  - diff accuracy against human-authored ground truth
   performance/    output  - diff speed/memory over the sampled pairs
     baselines/            - pinned point-in-time snapshots, kept for comparison
-  comparison/     output  - codediff against other diff tools
+  comparison/     output  - codediff against other diff tools, and against external oracles
   measure-apted-budget/            output  - whole-tree APTED against a 1-second budget (the paper's RQ1)
   ablation/       output  - leave-one-out heuristic study (gitignored: regenerable scratch)
 ```

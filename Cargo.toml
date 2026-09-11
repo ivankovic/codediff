@@ -297,6 +297,13 @@ path = "src/bin/generate_mapping_site.rs"
 required-features = ["test-fixtures"]
 
 [[bin]]
+# Research-only: scores codediff against the Alikhanifard & Tsantalis AST node-mapping oracle
+# (see research/external/README.md). Needs `csv`, hence the gate; touches nothing in the product.
+name = "benchmark_astdiff_oracle"
+path = "src/bin/benchmark_astdiff_oracle.rs"
+required-features = ["test-fixtures"]
+
+[[bin]]
 # Not a diff tool: a stand-in that answers predictably (nothing changed / everything changed /
 # a per-line hash / a crash) so `benchmark_other`'s harness can be scored against arithmetic
 # instead of against a real tool whose correct answer nobody knows. Speaks difftastic's JSON, so

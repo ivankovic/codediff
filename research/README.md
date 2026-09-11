@@ -17,11 +17,13 @@ plots/           every generated figure and variables.tex - single source of tru
 papers/          LaTeX papers; figures/ symlinks into plots/, never copies
 presentations/   conference decks (point-in-time artifacts)
 drivers/         vendored external-tool harnesses (GumTree batch driver)
+external/        fetch scripts for third-party ground truth we score against (never vendored)
 ```
 
-The flow is one-directional: `sampling` fills checkouts under `/var/tmp/research/<mode>/`,
-`measure/` and the Rust binaries in `src/bin/` turn those into `data/`, `analysis/` turns `data/`
-into `plots/`, and `papers/` builds from `plots/`. When something looks stale, walk upstream:
+The flow is one-directional: `sampling` fills checkouts under `/var/tmp/research/<mode>/`
+(and `external/` fills `/var/tmp/research/external/` with other people's oracles), `measure/` and
+the Rust binaries in `src/bin/` turn those into `data/`, `analysis/` turns `data/` into `plots/`,
+and `papers/` builds from `plots/`. When something looks stale, walk upstream:
 a wrong number in the paper is a `plots/` question, which is an `analysis/` question, which is a
 `data/` question.
 

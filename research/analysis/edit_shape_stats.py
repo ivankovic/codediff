@@ -345,6 +345,13 @@ class Accumulator:
                 "EditsChurnScored": latex_number(len(churn)),
                 "EditsChurnPFiftyPct": f"{percentile(churn, 50) * 100:.1f}",
                 "EditsChurnPNinetyPct": f"{percentile(churn, 90) * 100:.1f}",
+                # p99 and max were not recorded by the 2026-09-07 Full-list run (only the two
+                # percentiles above were), and that run's clones no longer exist on disk, so the
+                # paper's edit-size table leaves those two cells empty. Added 2026-09-11 on review
+                # so the next measurement fills them; churn is capped at 1.0 above, so the max can
+                # never exceed 100.
+                "EditsChurnPNinetyNinePct": f"{percentile(churn, 99) * 100:.1f}",
+                "EditsChurnMaxPct": f"{churn[-1] * 100:.1f}",
                 "EditsChurnUnderFivePct": share([c * 100 for c in churn], 5),
                 "EditsChurnUnderTwentyPct": share([c * 100 for c in churn], 20),
             }
