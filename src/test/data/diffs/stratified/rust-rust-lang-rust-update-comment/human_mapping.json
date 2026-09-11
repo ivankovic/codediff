@@ -4424,7 +4424,7 @@
   ],
   "text_mappings": [
     {
-      "name": "Minimal (left)",
+      "name": "Minimal",
       "entries": [
         {
           "operation": "Delete",

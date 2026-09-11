@@ -19,7 +19,7 @@ use anyhow::Result;
 
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants_with_known_violations;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 
 #[test]
 fn mapping() -> Result<()> {
@@ -36,11 +36,9 @@ fn painting() -> Result<()> {
 
 #[test]
 fn invariants() -> Result<()> {
-    // measured 2026-09-11: 1 violation, and one the left-anchor rule would repair. The
-    // painted run ends on a space because the deletion was anchored right; the same
-    // deletion anchored LEFT covers the same bytes, ends on a visible character, and so
-    // satisfies this invariant as well as the rule. Re-painting that one run in
-    // human_solver should take this to 0 - it needs the ground truth edited, not codediff.
-    // Painting 'Full', before row 234: a doubled `// ` in a comment, either copy deletable.
-    assert_ground_truth_invariants_with_known_violations("csharp-sonarr-sonarr-fix-comment-typo", 1)
+    // Repaired in the ground truth on 2026-09-11 and back to 0. `Full` used to delete the
+    // second of the two `// ` copies on row 234, ending its run on a space; it now deletes the
+    // first, which covers the same bytes, ends on `/`, and is the left-anchored spelling the
+    // rule in RULES_AND_PREFERENCES.md asks for. The invariant and the rule agreed here.
+    assert_ground_truth_invariants("csharp-sonarr-sonarr-fix-comment-typo")
 }

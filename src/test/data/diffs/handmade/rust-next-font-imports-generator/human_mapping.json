@@ -93031,17 +93031,6 @@
           "operation": "Delete",
           "before": [
             {
-              "start_row": 142,
-              "start_column": 12,
-              "end_row": 142,
-              "end_column": 13
-            }
-          ]
-        },
-        {
-          "operation": "Delete",
-          "before": [
-            {
               "start_row": 180,
               "start_column": 16,
               "end_row": 180,
@@ -93131,6 +93120,17 @@
               "start_column": 30,
               "end_row": 177,
               "end_column": 31
+            }
+          ]
+        },
+        {
+          "operation": "Delete",
+          "before": [
+            {
+              "start_row": 142,
+              "start_column": 12,
+              "end_row": 142,
+              "end_column": 13
             }
           ]
         }

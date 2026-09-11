@@ -1,11 +1,6 @@
 {
   "entries": [
     {
-      "operation": "match_but_not_identical",
-      "before_path": [],
-      "after_path": []
-    },
-    {
       "operation": "identical",
       "before_path": [
         "using_directive:1"
@@ -65425,6 +65420,11 @@
         "declaration_list:1",
         "}:1"
       ]
+    },
+    {
+      "after_path": [],
+      "before_path": [],
+      "operation": "match_but_not_identical"
     }
   ],
   "text_mappings": [
@@ -65463,9 +65463,9 @@
           "before": [
             {
               "start_row": 233,
-              "start_column": 29,
+              "start_column": 26,
               "end_row": 233,
-              "end_column": 30
+              "end_column": 27
             }
           ]
         }

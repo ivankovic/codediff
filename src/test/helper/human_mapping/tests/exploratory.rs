@@ -1020,8 +1020,19 @@ fn painting_left_anchor_census() -> Result<()> {
                     // (a run inside a stretch of one repeated character - four spaces of
                     // indentation, say) is excluded: there is no left and right to prefer
                     // between two spellings a reader cannot tell apart.
+                    //
+                    // The shared byte the run pivots on must also be a CONNECTOR. Any repeated
+                    // byte makes a slide *possible*, but only a few make the two spellings
+                    // equally readable, and the rest are token boundaries a slide would cut
+                    // through: pivoting on `"` turns the inserted JSON pair `,"k":"v"` into the
+                    // fragment `","k":"v`, and pivoting on `<` moves a vimscript ` iskeyword<`
+                    // onto `< iskeyword`. Neither is a reading a human would choose, so neither
+                    // is an ambiguity the left-anchor rule should be asked to settle. Limited to
+                    // space, `_` and `-` for now - see RULES_AND_PREFERENCES.md.
+                    let pivot = contents.get(end - 1).copied();
                     let slidable = start > 0
-                        && contents.get(start - 1) == contents.get(end - 1)
+                        && contents.get(start - 1) == pivot.as_ref()
+                        && matches!(pivot, Some(b' ' | b'_' | b'-'))
                         && contents[start..end] != contents[start - 1..end - 1];
                     let intra = intra_value_run(code, start, end);
                     if intra {

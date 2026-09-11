@@ -30,8 +30,11 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-10: minimal 0.103%, full 0.000%
-    assert_matches_human_painting_within_limit("vimscript-neovim-neovim-small-change", 0.12)
+    // remeasured 2026-09-11 after the single 'Only one solution' painting was split into
+    // 'Minimal' and 'Full': minimal 0.103% -> 0.000%, full unchanged at 0.000%. Minimal
+    // now leaves the leading space of ` iskeyword<` out of the inserted run, which is what
+    // codediff already rendered. (measured, unexamined)
+    assert_matches_human_painting_within_limit("vimscript-neovim-neovim-small-change", 0.0)
 }
 
 #[test]

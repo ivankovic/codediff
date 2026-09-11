@@ -85,12 +85,19 @@ This applies only *inside* such a node. Ambiguity outside one - a comma that fol
 identifier, one of two identical `::` in a path - is structural, the AST maps it, and this rule has
 nothing to say about it.
 
-Two caveats, both learned from measuring the corpus (see TODO.md for the numbers):
+The two spellings have to pivot on a **connector**. A slide is arithmetically possible whenever
+the byte before the run equals the run's own last byte, but only a few such bytes leave both
+spellings equally readable; the rest are token boundaries that a slide cuts through. For now the
+rule is limited to three: a space, an underscore `_`, and a dash `-`.
 
--   The rule is subordinate to token boundaries. Inserting `,"k":"v"` into JSON-inside-a-comment
-    can be slid one byte left to `","k":"v` - the same length, the same resulting text, and a
-    split string literal. A leftmost run that cuts a token in half is not the intended reading, and
-    a human will not pick it.
+Anything else is out of scope rather than a violation. Inserting `,"k":"v"` into
+JSON-inside-a-comment pivots on `"` and slides to `","k":"v` - the same length, the same resulting
+text, and a split string literal. A vimscript ` iskeyword<` pivots on `<` and slides to
+`< iskeyword`. Neither is a reading a human would choose, so neither is an ambiguity this rule is
+asked to settle.
+
+One caveat, learned from measuring the corpus (see TODO.md for the numbers):
+
 -   CodeDiff does not currently implement the rule. `intra_node_update_ranges` takes the longest
     common prefix first and then the suffix of what remains, which makes it right-anchored by
     construction. Flipping it was measured and rejected: it would agree with 4 more fixtures in the

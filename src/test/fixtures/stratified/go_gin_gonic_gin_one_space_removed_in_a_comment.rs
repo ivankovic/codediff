@@ -39,11 +39,14 @@ fn painting() -> Result<()> {
 
 #[test]
 fn invariants() -> Result<()> {
-    // measured 2026-09-08: 1 painted run ends on a space rather than a visible character, and
-    // permanently will. The whole change is the removal of one of the two spaces after
-    // "Gin Core Team." on row 1, so the only correct painting is that single space - the
-    // no-trailing-whitespace invariant has nothing visible to end on here. Not a repairable
-    // annotation defect.
+    // 1 painted run ends on a space rather than a visible character, and permanently
+    // will. One of the two spaces after "Gin Core Team." on row 1 is removed, so the
+    // only correct painting is that single space and the no-trailing-whitespace
+    // invariant has nothing visible to end on.
+    //
+    // The left-anchor rule does apply - either space may be called the deleted one - and
+    // the painting was moved to the first of the two on 2026-09-11 to match it. That is
+    // why this count did not change: both spellings are one space.
     assert_ground_truth_invariants_with_known_violations(
         "go-gin-gonic-gin-one-space-removed-in-a-comment",
         1,

@@ -929,6 +929,7 @@ pub(crate) fn handle_tree_independent_key(
                     refresh_diff_unmarked(app, &app.name.clone());
                     refresh_diff_text_painted(app, &app.name.clone());
                     refresh_diff_disagreement(app, &app.name.clone());
+                    refresh_diff_invariants(app, &app.name.clone());
                 }
                 Some(result)
             }
@@ -1380,6 +1381,7 @@ pub(crate) fn handle_modal_key(
                         refresh_diff_unmarked(app, &app.name.clone());
                         refresh_diff_text_painted(app, &app.name.clone());
                         refresh_diff_disagreement(app, &app.name.clone());
+                        refresh_diff_invariants(app, &app.name.clone());
                         return Some(target);
                     }
                     Err(err) => {
@@ -1802,6 +1804,7 @@ pub(crate) fn action_promote(
     refresh_diff_unmarked(app, new_name);
     refresh_diff_text_painted(app, new_name);
     refresh_diff_disagreement(app, new_name);
+    refresh_diff_invariants(app, new_name);
     refresh_diff_comment(app, new_name);
 
     let csv_note = match &sample_source {

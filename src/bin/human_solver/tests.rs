@@ -3875,7 +3875,7 @@ fn open_diff_picker_h_and_l_move_the_column_cursor_and_clamp_at_the_ends() {
         "the cursor column persists on App too, so the next o reopens on it"
     );
 
-    // Six presses from the far left overshoots the six-column table by one.
+    // Seven presses from the far left overshoots the seven-column table by one.
     let app = press_in_diff_picker(
         options.clone(),
         DiffPickerView::default(),
@@ -3886,11 +3886,12 @@ fn open_diff_picker_h_and_l_move_the_column_cursor_and_clamp_at_the_ends() {
             KeyCode::Char('l'),
             KeyCode::Char('l'),
             KeyCode::Char('l'),
+            KeyCode::Char('l'),
         ],
     );
     assert_eq!(
         picker_view(&app).column,
-        DiffColumn::Disagree,
+        DiffColumn::Invariant,
         "l must clamp at the last column, not wrap round to Name"
     );
 
@@ -3900,6 +3901,48 @@ fn open_diff_picker_h_and_l_move_the_column_cursor_and_clamp_at_the_ends() {
         DiffColumn::Name,
         "h must clamp at the first column"
     );
+}
+
+/// The `Invariant` column reads `App::diff_invariants`, and - like every other lazily-scanned
+/// column - shows `?` rather than a number until that scan has run. The distinction that matters
+/// is between a case the scan has not reached and one it found clean: the first must not sort or
+/// filter as if it were the second.
+#[test]
+fn diff_picker_invariant_column_separates_unscanned_from_clean() {
+    let mut app = App::new(
+        "test".to_string(),
+        CaseOrigin::Diffs,
+        0,
+        0,
+        HumanMapping::default(),
+    );
+
+    assert_eq!(
+        DiffPickerData::from_app(&app).invariants_of("alpha"),
+        None,
+        "before the scan runs, every case reads as unknown"
+    );
+
+    app.diff_invariants = Some(
+        [("alpha".to_string(), 0usize), ("beta".to_string(), 2usize)]
+            .into_iter()
+            .collect(),
+    );
+    let data = DiffPickerData::from_app(&app);
+    assert_eq!(data.invariants_of("alpha"), Some(0), "scanned and clean");
+    assert_eq!(data.invariants_of("beta"), Some(2), "scanned and broken");
+    assert_eq!(
+        data.invariants_of("gamma"),
+        None,
+        "a case the scan left out - no mapping to check - stays unknown, not clean"
+    );
+
+    // The filter has to fail open on the unknown row in both directions, or narrowing the picker
+    // would hide exactly the cases nobody has looked at yet.
+    assert!(FlagFilter::Yes.keeps(data.invariants_of("beta").map(|count| count > 0)));
+    assert!(!FlagFilter::Yes.keeps(data.invariants_of("alpha").map(|count| count > 0)));
+    assert!(FlagFilter::Yes.keeps(data.invariants_of("gamma").map(|count| count > 0)));
+    assert!(FlagFilter::No.keeps(data.invariants_of("gamma").map(|count| count > 0)));
 }
 
 /// `f` on `Dataset` is the old `d` key: it cycles the dataset filter, and - like every other
@@ -4045,13 +4088,15 @@ fn open_diff_picker_column_movement_does_not_trigger_a_corpus_scan() {
             KeyCode::Char('l'),
             KeyCode::Char('l'),
             KeyCode::Char('l'),
+            KeyCode::Char('l'),
         ],
     );
 
-    assert_eq!(picker_view(&app).column, DiffColumn::Disagree);
+    assert_eq!(picker_view(&app).column, DiffColumn::Invariant);
     assert!(app.diff_unmarked.is_none());
     assert!(app.diff_text_painted.is_none());
     assert!(app.diff_disagreement.is_none());
+    assert!(app.diff_invariants.is_none());
 }
 
 #[test]

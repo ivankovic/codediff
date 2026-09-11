@@ -506063,7 +506063,7 @@
   ],
   "text_mappings": [
     {
-      "name": "Minimal (Prefer left)",
+      "name": "Minimal",
       "entries": [
         {
           "operation": "Insert",

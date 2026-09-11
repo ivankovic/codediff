@@ -134,7 +134,8 @@
 *   o              open a different test case: a table of every directory under
 *                  src/test/data/diffs/{handmade,small,full,stratified}/, one row per case and one
 *                  column per thing worth triaging on - Name, Dataset, Cmpl, Unmarked, Paint,
-*                  Disagree (see `DiffColumn`). j/k move between rows, Enter opens, Esc cancels.
+*                  Disagree, Invariant (see `DiffColumn`). j/k move between rows, Enter opens,
+*                  Esc cancels.
 *                  h/l move a cursor between *columns* (the current one is highlighted in the
 *                  header), and the two keys that act on it are the same for every column:
 *                    `s`  sort by the cursor column; pressing it again on the column that already
@@ -145,15 +146,15 @@
 *                         empty clears, Esc cancels - while it is open every key is text, not a
 *                         command), the dataset cycle on Dataset (all -> handmade -> small -> full
 *                         -> stratified -> all, see DIFF_DATASETS), and an off -> yes -> no cycle
-*                         on each of the other four (e.g. Paint: all, painted only, unpainted
+*                         on each of the other five (e.g. Paint: all, painted only, unpainted
 *                         only). Filters on different columns combine as an AND: every active one
 *                         must match for a row to show. A row whose value for a column isn't known
 *                         - the scan behind it hasn't been run, or the case failed to load - stays
 *                         visible under either direction of that column's filter (see
 *                         `FlagFilter::keeps`).
-*                  Cmpl/Unmarked, Paint and Disagree each need a corpus-wide scan that only runs
-*                  when `s` or `f` is first pressed on them, and it blocks - roughly 12s for
-*                  Cmpl/Unmarked and 7s for Disagree over 513 fixtures on a 4-core machine (see
+*                  Cmpl/Unmarked, Paint, Disagree and Invariant each need a corpus-wide scan that
+*                  only runs when `s` or `f` is first pressed on them, and it blocks - roughly 12s
+*                  for Cmpl/Unmarked and 7s for Disagree over 513 fixtures on a 4-core machine (see
 *                  `scan_corpus`, which runs them across threads; h/l alone never triggers one),
 *                  so those columns read `?` until then. Cursor column, sort and
 *                  every filter persist across closing and reopening this picker (they live on
@@ -352,13 +353,15 @@ e              on a diff, enter/edit its description.md (written on Enter, empty
                  works regardless of status; carried into the generated test stub
                  if present when later promoted)
 o              open a different test case (src/test/data/diffs/) as a table:
-                 Name, Dataset, Cmpl, Unmarked, Paint, Disagree. j/k pick a row,
-                 h/l pick a column, s sorts by that column (again to reverse),
-                 f filters on it -- substring on Name, dataset cycle on Dataset,
-                 off/yes/no on the rest. Filters AND together across columns.
-                 The scans behind Cmpl/Unmarked, Paint and Disagree run on the
-                 first s or f on that column (Cmpl/Unmarked blocks for ~12s and
-                 Disagree ~7s on the full corpus); until then those
+                 Name, Dataset, Cmpl, Unmarked, Paint, Disagree, Invariant. j/k
+                 pick a row, h/l pick a column, s sorts by that column (again to
+                 reverse), f filters on it -- substring on Name, dataset cycle on
+                 Dataset, off/yes/no on the rest. Filters AND across columns.
+                 Invariant counts the ground-truth invariants this case's own
+                 mapping breaks, the number its invariants() test asserts on.
+                 The scans behind Cmpl/Unmarked, Paint, Disagree and Invariant
+                 run on the first s or f on that column (Cmpl/Unmarked blocks for
+                 ~12s and Disagree ~7s on the full corpus); until then those
                  columns read ?, and a ? row survives either filter direction.
                  Cursor, sort and filters persist across o
 O              open a sampled candidate (src/test/data/samples/) as a table:
@@ -568,6 +571,11 @@ fn visible_diff_options(
                 .disagree
                 .keeps(data.disagreement_of(name).map(|bytes| bytes > 0))
         })
+        .filter(|(name, _)| {
+            filters
+                .invariant
+                .keeps(data.invariants_of(name).map(|count| count > 0))
+        })
         .map(|(name, _)| name.as_str())
         .collect();
 
@@ -593,6 +601,9 @@ fn visible_diff_options(
             DiffColumn::Paint => bool_rank(data.painted_of(a)).cmp(&bool_rank(data.painted_of(b))),
             DiffColumn::Disagree => {
                 sort_rank(data.disagreement_of(a)).cmp(&sort_rank(data.disagreement_of(b)))
+            }
+            DiffColumn::Invariant => {
+                sort_rank(data.invariants_of(a)).cmp(&sort_rank(data.invariants_of(b)))
             }
         };
         let primary = if view.sort.descending {
@@ -802,6 +813,11 @@ fn ensure_diff_column_data(app: &mut App, column: DiffColumn) {
         DiffColumn::Disagree => {
             if app.diff_disagreement.is_none() {
                 app.diff_disagreement = Some(compute_diff_disagreement());
+            }
+        }
+        DiffColumn::Invariant => {
+            if app.diff_invariants.is_none() {
+                app.diff_invariants = Some(compute_diff_invariants());
             }
         }
         // Both are read straight off `list_available_cases`' own output - nothing to scan.
@@ -1025,6 +1041,47 @@ fn compute_diff_disagreement() -> std::collections::HashMap<String, usize> {
         return std::collections::HashMap::new();
     };
     scan_corpus(&names, diff_case_disagreement_bytes)
+}
+
+/// How many of its own ground-truth invariants `name`'s human mapping breaks - the number the
+/// per-fixture `invariants()` tests assert on, so a row reading above 0 here is a row whose test
+/// is either failing or pinned to a known violation.
+///
+/// `None`, not `Some(0)`, when there is no mapping to check: a case nobody has annotated has not
+/// *satisfied* these invariants, and reporting it as clean would put it at the bottom of the sort
+/// alongside the finished ones. Same presence-not-emptiness distinction
+/// `diff_case_disagreement_bytes` draws.
+fn diff_case_invariant_violations(name: &str) -> Option<usize> {
+    human_mapping::invariants::ground_truth_invariant_violations(name)
+        .ok()
+        .map(|violations| violations.len())
+}
+
+/// Builds `App::diff_invariants` for the whole corpus, for the `o` picker's `Invariant` column.
+///
+/// Cost sits between `Paint` and `Disagree`: this parses both sides and walks every painting, but
+/// unlike `compute_diff_disagreement` it never builds a synthetic `ASTDiff` or renders one.
+fn compute_diff_invariants() -> std::collections::HashMap<String, usize> {
+    let Ok(names) = list_available_case_names() else {
+        return std::collections::HashMap::new();
+    };
+    scan_corpus(&names, diff_case_invariant_violations)
+}
+
+/// Refreshes just `name`'s entry, for the same reason and at the same call sites as
+/// `refresh_diff_disagreement`: saving a mapping is the only thing that can repair or introduce a
+/// violation mid-session, and the row it was saved from should not keep reading the old count.
+fn refresh_diff_invariants(app: &mut App, name: &str) {
+    if let Some(map) = &mut app.diff_invariants {
+        match diff_case_invariant_violations(name) {
+            Some(count) => {
+                map.insert(name.to_string(), count);
+            }
+            None => {
+                map.remove(name);
+            }
+        }
+    }
 }
 
 /// Every case's note, keyed by case name, for the `o` picker. Cases without one are simply
@@ -1365,18 +1422,20 @@ enum DiffColumn {
     Unmarked,
     Paint,
     Disagree,
+    Invariant,
 }
 
 impl DiffColumn {
     /// Left-to-right order, shared by the header row, the cursor movement below, and the width
     /// list in `render_open_diff_picker` - so a column can only ever be added in one place.
-    const ALL: [DiffColumn; 6] = [
+    const ALL: [DiffColumn; 7] = [
         DiffColumn::Name,
         DiffColumn::Dataset,
         DiffColumn::Cmpl,
         DiffColumn::Unmarked,
         DiffColumn::Paint,
         DiffColumn::Disagree,
+        DiffColumn::Invariant,
     ];
 
     fn index(self) -> usize {
@@ -1404,6 +1463,7 @@ impl DiffColumn {
             DiffColumn::Unmarked => "Unmarked",
             DiffColumn::Paint => "Paint",
             DiffColumn::Disagree => "Disagree",
+            DiffColumn::Invariant => "Invariant",
         }
     }
 
@@ -1415,6 +1475,7 @@ impl DiffColumn {
             DiffColumn::Unmarked => Some(("has unmarked", "none unmarked")),
             DiffColumn::Paint => Some(("painted only", "unpainted only")),
             DiffColumn::Disagree => Some(("disagreements only", "agreeing only")),
+            DiffColumn::Invariant => Some(("breaks invariants", "invariants hold")),
             DiffColumn::Name | DiffColumn::Dataset => None,
         }
     }
@@ -1475,6 +1536,7 @@ struct DiffFilters {
     unmarked: FlagFilter,
     paint: FlagFilter,
     disagree: FlagFilter,
+    invariant: FlagFilter,
 }
 
 impl DiffFilters {
@@ -1484,6 +1546,7 @@ impl DiffFilters {
             DiffColumn::Unmarked => Some(&mut self.unmarked),
             DiffColumn::Paint => Some(&mut self.paint),
             DiffColumn::Disagree => Some(&mut self.disagree),
+            DiffColumn::Invariant => Some(&mut self.invariant),
             DiffColumn::Name | DiffColumn::Dataset => None,
         }
     }
@@ -1494,6 +1557,7 @@ impl DiffFilters {
             DiffColumn::Unmarked => self.unmarked,
             DiffColumn::Paint => self.paint,
             DiffColumn::Disagree => self.disagree,
+            DiffColumn::Invariant => self.invariant,
             DiffColumn::Name | DiffColumn::Dataset => FlagFilter::Off,
         }
     }
@@ -1599,6 +1663,7 @@ struct DiffPickerData<'a> {
     unmarked: Option<&'a HashMap<String, usize>>,
     text_painted: Option<&'a HashMap<String, bool>>,
     disagreement: Option<&'a HashMap<String, usize>>,
+    invariants: Option<&'a HashMap<String, usize>>,
 }
 
 impl<'a> DiffPickerData<'a> {
@@ -1607,6 +1672,7 @@ impl<'a> DiffPickerData<'a> {
             unmarked: app.diff_unmarked.as_ref(),
             text_painted: app.diff_text_painted.as_ref(),
             disagreement: app.diff_disagreement.as_ref(),
+            invariants: app.diff_invariants.as_ref(),
         }
     }
 
@@ -1623,6 +1689,13 @@ impl<'a> DiffPickerData<'a> {
     /// purposes, and `compute_diff_disagreement` already leaves the latter out of its map.
     fn disagreement_of(&self, name: &str) -> Option<usize> {
         self.disagreement.and_then(|map| map.get(name)).copied()
+    }
+
+    /// How many of its own ground-truth invariants `name`'s human mapping breaks - 0 for a
+    /// mapping that holds, `None` both before the scan has run and for a case with no mapping to
+    /// check, the same "not known" `disagreement_of` draws.
+    fn invariants_of(&self, name: &str) -> Option<usize> {
+        self.invariants.and_then(|map| map.get(name)).copied()
     }
 }
 

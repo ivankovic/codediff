@@ -19,7 +19,7 @@ use anyhow::Result;
 
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants_with_known_violations;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 
 #[test]
 fn mapping() -> Result<()> {
@@ -34,16 +34,9 @@ fn painting() -> Result<()> {
 
 #[test]
 fn invariants() -> Result<()> {
-    // 2 known violations in the ground truth itself, not in codediff - both the same defect, and
-    // both spelled out here because this assertion is exact and a bare count is unreadable:
-    //
-    //   painting 'Minimal' before row 24 ends its last painted run on ' ', not on a visible
-    //     character: "  let b:undo_ftplugin .= '| setlocal keywordprg< iskeyword< | sil! delc
-    //     -buffer SudoersKeywordPrg'"
-    //   painting 'Full' before row 24: the same run, same trailing space.
-    //
-    // Repairing it means re-painting row 24 in human_solver so the run stops at the last visible
-    // byte; until then this pins the count. See the no-trailing-whitespace painting work of
-    // 2026-08-31 for why a painted run may not end on whitespace.
-    assert_ground_truth_invariants_with_known_violations("vimscript-neovim-neovim-only-delete", 2)
+    // Repaired in the ground truth on 2026-09-11 and back to 0, from the 2 violations this
+    // pinned since 2026-08-31. Both presets deleted `iskeyword< ` on row 24 and ended the run on
+    // a space; `Full` now takes ` iskeyword<` (the left-anchored spelling) and `Minimal`
+    // `iskeyword<`. Both end on `<`, so the no-trailing-whitespace invariant holds.
+    assert_ground_truth_invariants("vimscript-neovim-neovim-only-delete")
 }

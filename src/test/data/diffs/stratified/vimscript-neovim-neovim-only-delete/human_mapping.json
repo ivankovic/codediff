@@ -1724,7 +1724,7 @@
               "start_row": 23,
               "start_column": 49,
               "end_row": 23,
-              "end_column": 60
+              "end_column": 59
             }
           ]
         }
@@ -1748,10 +1748,10 @@
           "operation": "Delete",
           "before": [
             {
-              "start_row": 23,
-              "start_column": 49,
-              "end_row": 23,
-              "end_column": 60
+              "start_row": 21,
+              "start_column": 0,
+              "end_row": 21,
+              "end_column": 2
             }
           ]
         },
@@ -1759,10 +1759,10 @@
           "operation": "Delete",
           "before": [
             {
-              "start_row": 21,
-              "start_column": 0,
-              "end_row": 21,
-              "end_column": 2
+              "start_row": 23,
+              "start_column": 48,
+              "end_row": 23,
+              "end_column": 59
             }
           ]
         }

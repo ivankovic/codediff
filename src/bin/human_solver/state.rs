@@ -1465,6 +1465,11 @@ pub(crate) struct App {
     /// column, the same lazy-once-per-session contract `diff_unmarked` has - and the most
     /// expensive of the three scans (see that function's own doc comment).
     pub(crate) diff_disagreement: Option<std::collections::HashMap<String, usize>>,
+    /// Cache of how many ground-truth invariants each case's human mapping breaks, for the `o`
+    /// picker's `Invariant` column. `None` until the first `s`/`f` on that column, the same
+    /// lazy-once-per-session contract the three caches above have; a case with no mapping to
+    /// check stays absent rather than reading as 0.
+    pub(crate) diff_invariants: Option<std::collections::HashMap<String, usize>>,
     /// Cache of, for every case `list_available_cases` lists, whether it already has a painted
     /// text mapping (see `diff_case_has_text_mapping`). `None` until the first `s`/`f` on the
     /// picker's `Paint` column, the same lazy-once-per-session contract `diff_unmarked` has -
@@ -1552,6 +1557,7 @@ impl App {
             sample_diff_sizes: std::collections::HashMap::new(),
             diff_view: DiffPickerView::default(),
             diff_disagreement: None,
+            diff_invariants: None,
             diff_text_painted: None,
             diff_comments: None,
             text_solution,

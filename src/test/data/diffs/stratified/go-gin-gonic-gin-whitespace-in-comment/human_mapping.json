@@ -4482,9 +4482,9 @@
           "before": [
             {
               "start_row": 0,
-              "start_column": 33,
+              "start_column": 32,
               "end_row": 0,
-              "end_column": 34
+              "end_column": 33
             }
           ]
         }

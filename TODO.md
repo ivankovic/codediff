@@ -12,6 +12,15 @@ and the rule does not apply.
 ADOPTED for the recorded-ambiguity cases. Five fixtures carried both spellings as separate
 named paintings; the right-hand one is gone and the left one is now the ground truth.
 
+REFINED on 2026-09-11: the two spellings must pivot on a **connector**. A slide is possible
+whenever the byte before the run equals the run's own last byte, but only some such bytes leave
+both readings natural; the rest are token boundaries a slide cuts through. Limited to space, `_`
+and `-` for now. This is what settles the swift clone family below - it pivots on `"` - and the
+vimscript ` iskeyword<`, which pivots on `<`. With that restriction the census finds **0**
+not-leftmost intra-value runs in the whole corpus, so the rule holds as stated everywhere it
+applies. Two things went into that 0 and they should not be confused: the connector restriction
+put 17 runs out of scope, and the remaining 2 were repainted by hand the same day.
+
 NOT adopted as a sixth ground-truth invariant, and the renderer was NOT flipped. The census
 (`painting_left_anchor_census`, exploratory.rs) swept all 543 painted fixtures and found 24
 intra-value runs that are not leftmost. Five are the declared pairs above. Of the other 19 -
@@ -21,12 +30,12 @@ it is right-anchored by construction, and that construction is currently agreein
 corpus more often than a left-anchored one would: flipping it would fix 4 fixtures and break
 12. That measurement, not which spelling reads better, is why the renderer was left alone.
 
-Two fixtures are repairable rather than counterexamples, and they are the best evidence the
+Two fixtures were repairable rather than counterexamples, and they are the best evidence the
 rule has: `csharp-sonarr-sonarr-fix-comment-typo` and `vimscript-neovim-neovim-only-delete`
-both end a painted run on a space, which breaks the existing no-painted-trailing-whitespace
+both ended a painted run on a space, which breaks the existing no-painted-trailing-whitespace
 invariant. Sliding those runs left covers the same bytes, ends on a visible character, and
-satisfies the invariant and the rule at once - here the two agree. They want a pass in
-human_solver; until then they stay clamped at their measured violation counts.
+satisfies the invariant and the rule at once - here the two agree. Both were repainted on
+2026-09-11 and both are back to 0 violations.
 
 The converse is worth recording because it was got wrong once: three other trailing-space
 violations (`go-gin-gonic-gin-whitespace-in-comment`,
