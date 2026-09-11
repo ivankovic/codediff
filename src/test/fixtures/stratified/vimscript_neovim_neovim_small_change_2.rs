@@ -44,8 +44,12 @@ fn invariants() -> Result<()> {
     //   painting 'Minimal' after row 18 ends its last painted run on ' ', not on a visible
     //     character: "let b:undo_ftplugin .= '| setl com< cms<'"
     //
-    // Same defect and same repair as vimscript-neovim-neovim-only-delete next door: re-paint the
-    // row in human_solver so the run stops at the last visible byte, then drop this to 0.
+    // Re-checked 2026-09-11: this is NOT the repairable defect its neighbour
+    // vimscript-neovim-neovim-only-delete has. The inserted run is `| ` and the text it is
+    // inserted into continues with `setl`, so sliding it one byte left would require the
+    // preceding `'` to equal the following space. It does not: the run genuinely ends in
+    // whitespace and no painting of this edit avoids that. Same permanent class as the two
+    // go-gin-gonic-gin comment fixtures, not a pending repair.
     assert_ground_truth_invariants_with_known_violations(
         "vimscript-neovim-neovim-small-change-2",
         1,

@@ -36,13 +36,13 @@ fn painting() -> Result<()> {
 
 #[test]
 fn invariants() -> Result<()> {
-    // measured 2026-09-11: 1 violation, and one the left-anchor rule would repair. The
-    // painted run ends on a space because the deletion was anchored right; the same
-    // deletion anchored LEFT covers the same bytes, ends on a visible character, and so
-    // satisfies this invariant as well as the rule. Re-painting that one run in
-    // human_solver should take this to 0 - it needs the ground truth edited, not codediff.
-    // Painting 'Only one solution', before row 1: `// Copyright 2021 Gin Core Team.  All
-    // rights reserved.` - the doubled space is the point of the fixture.
+    // measured 2026-09-11: 1 painted run ends on a space rather than a visible character, and
+    // permanently will - exactly the same shape as go-gin-gonic-gin-one-space-removed-in-a-
+    // comment next door. One of the two spaces after "Gin Core Team." on row 1 is removed, so
+    // the only correct painting is that single space and the no-trailing-whitespace invariant
+    // has nothing visible to end on. The left-anchor rule does apply here (either space may be
+    // called the deleted one) but cannot repair it: both spellings are one space. Not a
+    // repairable annotation defect.
     assert_ground_truth_invariants_with_known_violations(
         "go-gin-gonic-gin-whitespace-in-comment",
         1,

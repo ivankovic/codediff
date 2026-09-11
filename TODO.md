@@ -21,12 +21,20 @@ it is right-anchored by construction, and that construction is currently agreein
 corpus more often than a left-anchored one would: flipping it would fix 4 fixtures and break
 12. That measurement, not which spelling reads better, is why the renderer was left alone.
 
-Two of the 19 are repairable rather than counterexamples, and they are the best evidence the
-rule has: `go-gin-gonic-gin-whitespace-in-comment` and `csharp-sonarr-sonarr-fix-comment-typo`
+Two fixtures are repairable rather than counterexamples, and they are the best evidence the
+rule has: `csharp-sonarr-sonarr-fix-comment-typo` and `vimscript-neovim-neovim-only-delete`
 both end a painted run on a space, which breaks the existing no-painted-trailing-whitespace
 invariant. Sliding those runs left covers the same bytes, ends on a visible character, and
-satisfies the invariant and the rule at once - here the two agree. Both are clamped at 1 known
-violation with that repair written down; they want a pass in human_solver.
+satisfies the invariant and the rule at once - here the two agree. They want a pass in
+human_solver; until then they stay clamped at their measured violation counts.
+
+The converse is worth recording because it was got wrong once: three other trailing-space
+violations (`go-gin-gonic-gin-whitespace-in-comment`,
+`go-gin-gonic-gin-one-space-removed-in-a-comment`, `vimscript-neovim-neovim-small-change-2`)
+are NOT repairable. There the edited run is itself whitespace - one of two spaces in a comment,
+or an inserted `| ` - so every correct painting of it ends on a space and the invariant has
+nothing visible to end on. The left-anchor rule applies to the first two and still does not
+help, because both spellings are the same single space.
 
 The remaining 17 are 3 distinct phenomena, not 17 independent judgements - 14 are one clone family
 (swift `,"signatureNext":"X"` inserted into JSON-in-a-comment). That family is also the
