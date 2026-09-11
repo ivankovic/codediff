@@ -321,6 +321,8 @@ mod go_grafana_grafana_real_small_change_with_a_move;
 #[cfg(test)]
 mod go_jesseduffield_lazygit_add_a_func;
 #[cfg(test)]
+mod go_jesseduffield_lazygit_add_two_lines;
+#[cfg(test)]
 mod go_junegunn_fzf_real_small_change;
 #[cfg(test)]
 mod go_ollama_ollama_add_go_build_comment;
@@ -344,6 +346,8 @@ mod html_fatedier_frp_update_hashes_3;
 mod html_fatedier_frp_update_hashes_4;
 #[cfg(test)]
 mod html_fatedier_frp_version;
+#[cfg(test)]
+mod html_gohugoio_hugo_change_template_variable_path;
 #[cfg(test)]
 mod html_gohugoio_hugo_template_not_pure_html;
 #[cfg(test)]

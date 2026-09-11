@@ -411,7 +411,7 @@ Go,jesseduffield-lazygit.git,1b60c9d7c6f4121a5561022986a0ae4627668b1b,vendor/gol
 Go,jesseduffield-lazygit.git,376ca6580798b0ff7e765e3beac0658343cb907b,pkg/config/user_config.go,,stratified,SAMPLED,,1000-3000
 Go,jesseduffield-lazygit.git,4cf49ff44920f0b34dfc0ff4d4d4570acd2b2d38,vendor/github.com/stretchr/testify/assert/assertion_order.go,,stratified,SAMPLED,,30-100
 Go,jesseduffield-lazygit.git,5a630aeda1dd6eeac21f65a9d3d775e7693f5253,pkg/gui/global_handlers.go,,stratified,SAMPLED,,100-300
-Go,jesseduffield-lazygit.git,6cbc1e0aced8b216adce5735775e484f226f3539,pkg/integration/tests/interactive_rebase/shared.go,,stratified,SAMPLED,,30-100
+Go,jesseduffield-lazygit.git,6cbc1e0aced8b216adce5735775e484f226f3539,pkg/integration/tests/interactive_rebase/shared.go,go-jesseduffield-lazygit-add-two-lines,stratified,PROMOTED,,30-100
 Go,jesseduffield-lazygit.git,82e1caa16611fb16a1df943d4fc37cc3d704c74e,pkg/integration/tests/submodule/reset.go,,stratified,SAMPLED,,100-300
 Go,jesseduffield-lazygit.git,89a0542a978b525dab97607dca9c6ae51ea95caf,pkg/gui/presentation/submodules.go,go-lazygit-switch-to-strings,small,PROMOTED,,
 Go,jesseduffield-lazygit.git,945b023eb590cc123a813d4916f74324eb3aafb7,pkg/integration/tests/interactive_rebase/revert_during_rebase_when_stopped_on_edit.go,,stratified,SAMPLED,,30-100
@@ -484,7 +484,7 @@ HTML,fatedier-frp.git,341a5e3e3a8ffe05b2ef6a392b6e142e851d446c,assets/frps/stati
 HTML,fatedier-frp.git,9a849a29e94e969d99b41c8f3bb70c89ea46fdd3,assets/frps/static/index.html,html-fatedier-frp-update-hashes-2,stratified,PROMOTED,,0-10
 HTML,fatedier-frp.git,c7d4637382bef6756683e822e2fc651a00f20e5a,assets/frpc/static/index.html,html-fatedier-frp-update-hashes-3,stratified,PROMOTED,,0-10
 HTML,fatedier-frp.git,c7d4637382bef6756683e822e2fc651a00f20e5a,assets/frps/static/index.html,html-fatedier-frp-update-hashes-4,stratified,PROMOTED,,0-10
-HTML,gohugoio-hugo.git,0c2fa2460f485e0eca564dcccf36d34538374922,layouts/_partials/layouts/home/sponsors.html,,stratified,SAMPLED,,30-100
+HTML,gohugoio-hugo.git,0c2fa2460f485e0eca564dcccf36d34538374922,layouts/_partials/layouts/home/sponsors.html,html-gohugoio-hugo-change-template-variable-path,stratified,PROMOTED,,30-100
 HTML,gohugoio-hugo.git,1e00842489b05ae49bb3c8af8b4795f68b3be979,tpl/tplimpl/embedded/templates/_partials/pagination.html,,stratified,SAMPLED,,100-300
 HTML,gohugoio-hugo.git,29cf87444f97665a753732d1fa5efd2770f9ee43,create/skeletons/theme/layouts/home.html,html-gohugoio-hugo-template-not-pure-html,stratified,PROMOTED,,0-10
 HTML,gohugoio-hugo.git,5be51ac3db225d5df501ed1fa1499c41d97dbf65,layouts/shortcodes/code-toggle.html,,stratified,SAMPLED,,100-300

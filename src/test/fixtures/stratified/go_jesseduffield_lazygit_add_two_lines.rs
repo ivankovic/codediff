@@ -15,33 +15,25 @@
  *  You should have received a copy of the GNU Affero General Public License
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
-use crate::test;
-use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 use anyhow::Result;
+
+use crate::test;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
+use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
 
 #[test]
 fn mapping() -> Result<()> {
-    // Re-baselined 2026-09-07 from 11/5, and NOT an algorithm regression: this fixture's human
-    // mapping was re-paired by hand on 2026-09-06 (the crossed inner/outer braces its
-    // `invariants()` test used to record), so the limits now score codediff against a different,
-    // corrected ground truth. The residual is the nested `if` this commit did not touch - the
-    // container choice, not the delimiters.
-    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
-        "cpp-godot-small-bugfix",
-        13,
-        7,
-    )
-}
-
-#[test]
-fn invariants() -> Result<()> {
-    assert_ground_truth_invariants("cpp-godot-small-bugfix")
+    test::helper::human_mapping::assert_matches_human_mapping("go-jesseduffield-lazygit-add-two-lines")
 }
 
 #[test]
 fn painting() -> Result<()> {
     // Not measured yet: 100.0 passes unconditionally. Run this test, read the rate it
     // reports for both modes, and record that instead.
-    assert_matches_human_painting_within_limit("cpp-godot-small-bugfix", 100.0)
+    assert_matches_human_painting_within_limit("go-jesseduffield-lazygit-add-two-lines", 100.0)
+}
+
+#[test]
+fn invariants() -> Result<()> {
+    assert_ground_truth_invariants("go-jesseduffield-lazygit-add-two-lines")
 }
