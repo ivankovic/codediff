@@ -28,9 +28,8 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test, read the rate it
-    // reports for both modes, and record that instead.
-    assert_matches_human_painting_within_limit("java-defects4j-chart-20-valuemarker", 100.0)
+    // measured 2026-09-12: minimal 0.140%, full 0.201% (measured, unexamined)
+    assert_matches_human_painting_within_limit("java-defects4j-chart-20-valuemarker", 0.22)
 }
 
 #[test]

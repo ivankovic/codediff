@@ -19,7 +19,7 @@ use anyhow::Result;
 
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants_with_known_violations;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 
 #[test]
 fn mapping() -> Result<()> {
@@ -36,14 +36,10 @@ fn painting() -> Result<()> {
 
 #[test]
 fn invariants() -> Result<()> {
-    // Two `Full` rows - the `@var IClientService` docblock line and the `private $clientService;`
-    // beside it - have every visible character painted `Delete` but leave their one leading tab
-    // unpainted, which invariant 4 reads as a line changed in whole but painted in part. A hand-
-    // painting slip rather than a reading of the edit: nothing distinguishes those two rows from
-    // the deleted lines around them, whose indentation *is* painted. Recorded exactly rather than
-    // repaired, because what the indent of a deleted line means is the author's call.
-    assert_ground_truth_invariants_with_known_violations(
-        "php-nextcloud-server-real-small-change",
-        2,
-    )
+    // Was pinned at 2 until 2026-09-12: two `Full` rows - the `@var IClientService` docblock line
+    // and the `private $clientService;` beside it - painted every visible character `Delete` but
+    // left their one leading tab unpainted, which invariant 4 reads as a line changed in whole but
+    // painted in part. The note left the call to the author, and the author made it: both tabs are
+    // now painted, matching the deleted lines around them, so the fixture is at 0.
+    assert_ground_truth_invariants("php-nextcloud-server-real-small-change")
 }

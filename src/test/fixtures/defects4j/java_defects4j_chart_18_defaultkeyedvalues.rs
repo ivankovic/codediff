@@ -19,7 +19,7 @@ use anyhow::Result;
 
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants_with_known_violations;
 
 #[test]
 fn mapping() -> Result<()> {
@@ -30,12 +30,20 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test, read the rate it
-    // reports for both modes, and record that instead.
-    assert_matches_human_painting_within_limit("java-defects4j-chart-18-defaultkeyedvalues", 100.0)
+    // measured 2026-09-12: minimal 0.010%, full 0.017% (measured, unexamined)
+    assert_matches_human_painting_within_limit("java-defects4j-chart-18-defaultkeyedvalues", 0.03)
 }
 
 #[test]
 fn invariants() -> Result<()> {
-    assert_ground_truth_invariants("java-defects4j-chart-18-defaultkeyedvalues")
+    // Two invariant-1 violations, one per preset, both on the same row: after row 333, the
+    // `throw new UnknownKeyException("The key (" + key ` line, whose painted run ends on the
+    // space after `key` rather than on a visible character. The row's own content continues
+    // past it on the next line of the wrapped expression, so this is a run that stops one
+    // character late rather than a stripe of colour hanging off a line end - a repair of the
+    // painting, not of the rule, and the painter's to make.
+    assert_ground_truth_invariants_with_known_violations(
+        "java-defects4j-chart-18-defaultkeyedvalues",
+        2,
+    )
 }

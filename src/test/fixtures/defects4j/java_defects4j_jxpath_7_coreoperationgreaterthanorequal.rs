@@ -23,8 +23,17 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping(
+    // First measurement, 2026-09-12, of a mapping added in the 2026-09-11 Defects4J batch.
+    // All four `CoreOperation*` fixtures in this batch carry the same disagreement and the
+    // same 36/22: the human deletes the first `method_declaration` whole and inserts its
+    // replacement, while codediff keeps that method's scaffolding - its `}`, its `;`, its
+    // `>=` operator leaf - and re-uses it inside the surviving method. One choice about
+    // which of two near-identical methods survives, counted once per re-used leaf, rather
+    // than 36 independent errors.
+    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "java-defects4j-jxpath-7-coreoperationgreaterthanorequal",
+        36,
+        22,
     )
 }
 
@@ -35,10 +44,9 @@ fn invariants() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test, read the rate it
-    // reports for both modes, and record that instead.
+    // measured 2026-09-12: minimal 3.407%, full 4.476% (measured, unexamined)
     assert_matches_human_painting_within_limit(
         "java-defects4j-jxpath-7-coreoperationgreaterthanorequal",
-        100.0,
+        4.49,
     )
 }

@@ -34,8 +34,50 @@ mod java_defects4j_chart_14_xyplot;
 #[cfg(test)]
 mod java_defects4j_chart_15_pieplot;
 #[cfg(test)]
+mod java_defects4j_chart_16_defaultintervalcategorydataset;
+#[cfg(test)]
+mod java_defects4j_chart_17_timeseries;
+#[cfg(test)]
+mod java_defects4j_chart_18_defaultkeyedvalues;
+#[cfg(test)]
+mod java_defects4j_chart_18_defaultkeyedvalues2d;
+#[cfg(test)]
+mod java_defects4j_chart_19_categoryplot;
+#[cfg(test)]
 mod java_defects4j_chart_1_abstractcategoryitemrenderer;
+#[cfg(test)]
+mod java_defects4j_chart_20_valuemarker;
+#[cfg(test)]
+mod java_defects4j_chart_21_defaultboxandwhiskercategorydataset;
+#[cfg(test)]
+mod java_defects4j_chart_2_datasetutilities;
+#[cfg(test)]
+mod java_defects4j_cli_13_writeablecommandline;
+#[cfg(test)]
+mod java_defects4j_cli_21_writeablecommandline;
 #[cfg(test)]
 mod java_defects4j_cli_29_util;
 #[cfg(test)]
 mod java_defects4j_cli_5_util;
+#[cfg(test)]
+mod java_defects4j_compress_42_unixstat;
+#[cfg(test)]
+mod java_defects4j_jsoup_91_uncheckedioexception;
+#[cfg(test)]
+mod java_defects4j_jxpath_7_coreoperationgreaterthan;
+#[cfg(test)]
+mod java_defects4j_jxpath_7_coreoperationgreaterthanorequal;
+#[cfg(test)]
+mod java_defects4j_jxpath_7_coreoperationlessthan;
+#[cfg(test)]
+mod java_defects4j_jxpath_7_coreoperationlessthanorequal;
+#[cfg(test)]
+mod java_defects4j_mockito_12_genericmaster;
+#[cfg(test)]
+mod java_defects4j_mockito_19_mockcandidatefilter;
+#[cfg(test)]
+mod java_defects4j_mockito_19_typebasedcandidatefilter;
+#[cfg(test)]
+mod java_defects4j_mockito_2_timer;
+#[cfg(test)]
+mod java_defects4j_mockito_9_callsrealmethods;

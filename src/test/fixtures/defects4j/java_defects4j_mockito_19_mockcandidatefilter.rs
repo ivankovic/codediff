@@ -30,11 +30,10 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test, read the rate it
-    // reports for both modes, and record that instead.
+    // measured 2026-09-12: minimal 1.856%, full 1.856% (measured, unexamined)
     assert_matches_human_painting_within_limit(
         "java-defects4j-mockito-19-mockcandidatefilter",
-        100.0,
+        1.87,
     )
 }
 

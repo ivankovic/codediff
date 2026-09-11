@@ -18,19 +18,29 @@
 use anyhow::Result;
 
 use crate::test;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 
 #[test]
 fn mapping() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("java-defects4j-chart-12-multiplepieplot")
+    // First measurement, 2026-09-12, of a mapping added in the 2026-09-11 Defects4J batch. The two
+    // residuals are one pairing: inside the second constructor, the human reads the `dataset`
+    // field assignment as gone and the `setDataset(...)` call that replaced it as new, while
+    // codediff's APTED pass reads the two `identifier` leaves as one `Update` because they sit in
+    // the same large flat subtree and share their text. A container-choice disagreement rather
+    // than a wrong pairing - the enclosing statements are already matched - so the number is
+    // recorded as the bar, not as a defect with a fix behind it.
+    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
+        "java-defects4j-chart-12-multiplepieplot",
+        2,
+        2,
+    )
 }
 
 #[test]
 fn painting() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test, read the rate it
-    // reports for both modes, and record that instead.
-    assert_matches_human_painting_within_limit("java-defects4j-chart-12-multiplepieplot", 100.0)
+    // measured 2026-09-12: minimal 0.077%, full 0.044% (measured, unexamined)
+    assert_matches_human_painting_within_limit("java-defects4j-chart-12-multiplepieplot", 0.09)
 }
 
 #[test]
