@@ -19,7 +19,7 @@ use anyhow::Result;
 
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants_with_known_violations;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 
 #[test]
 fn mapping() -> Result<()> {
@@ -39,19 +39,9 @@ fn painting() -> Result<()> {
 
 #[test]
 fn invariants() -> Result<()> {
-    // 1 known violation in the ground truth itself, not in codediff:
-    //
-    //   painting 'Minimal' after row 18 ends its last painted run on ' ', not on a visible
-    //     character: "let b:undo_ftplugin .= '| setl com< cms<'"
-    //
-    // Re-checked 2026-09-11: this is NOT the repairable defect its neighbour
-    // vimscript-neovim-neovim-only-delete has. The inserted run is `| ` and the text it is
-    // inserted into continues with `setl`, so sliding it one byte left would require the
-    // preceding `'` to equal the following space. It does not: the run genuinely ends in
-    // whitespace and no painting of this edit avoids that. Same permanent class as the two
-    // go-gin-gonic-gin comment fixtures, not a pending repair.
-    assert_ground_truth_invariants_with_known_violations(
-        "vimscript-neovim-neovim-small-change-2",
-        1,
-    )
+    // Was pinned at 1: `Minimal` inserts `| ` on row 18 of the after side and the run ends on
+    // that space. It is mid-row - `setl com< cms<'` follows it - so this was the invariant
+    // over-firing, not a painting to repair. Back to 0 since `rows_end_on_visible_characters`
+    // was narrowed to genuinely trailing whitespace on 2026-09-11.
+    assert_ground_truth_invariants("vimscript-neovim-neovim-small-change-2")
 }

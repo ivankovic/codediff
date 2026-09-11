@@ -25,7 +25,8 @@
 //! invariants are that missing half: they can fail only because the hand-authored data disagrees
 //! with itself.
 //!
-//! * [`rows_end_on_visible_characters`] - no painted run on a row may end on whitespace.
+//! * [`rows_end_on_visible_characters`] - no painted run may end in a row's *trailing*
+//!   whitespace.
 //! * [`full_painting_covers_minimal`] - every byte painted under `Minimal` is painted under `Full`.
 //! * [`delimiter_pairs_agree`] - a bracket and its partner carry one verdict in the tree mapping.
 //! * [`full_paints_a_wholly_changed_line_whole`] - a `Full` line whose every visible character is
@@ -127,11 +128,21 @@ pub(crate) fn painted_labels(
 // Invariant 1: a painted row ends on a visible character
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 
-/// The last painted character on any row must be one a reader can see.
+/// No painted run may end in a row's **trailing** whitespace.
 ///
 /// Highlighted trailing whitespace is a stripe of colour hanging off the end of a line, pointing
 /// at nothing - it says "something happened here" about a region with no content to have happened
-/// to. The rendering side of this was fixed in the product on 2026-08-31 (`columns_on_row` bounds
+/// to.
+///
+/// Trailing is the operative word, and until 2026-09-11 this checked only whether the row's last
+/// painted byte was whitespace - which also condemned every run that stops on a space *in the
+/// middle* of a line. Those are the ordinary shape of an edit, not a stripe hanging off anything:
+/// deleting one of the two spaces in `Team.  All` paints a single mid-row space, and deleting
+/// `foo ` from `foo bar` paints a run ending on one. Both are now accepted, as is a run that is
+/// *entirely* whitespace - it has no visible character it could have ended on, so there is no
+/// spelling of it this rule would take.
+///
+/// The rendering side of this was fixed in the product on 2026-08-31 (`columns_on_row` bounds
 /// every painted row to that row's own content), so what remains is the data: a span whose
 /// `end_column` sits a few columns past the last real character still *claims* that whitespace,
 /// and every consumer that reads bytes rather than rendering them - the scorer included - honours
@@ -178,14 +189,45 @@ fn rows_end_on_visible_characters(
             let Some(character) = line[boundary..].chars().next() else {
                 continue;
             };
-            if character.is_whitespace() {
-                violations.push(format!(
-                    "painting '{painting}' {} row {} ends its last painted run on {character:?}, \
-                     not on a visible character: {line:?}",
-                    side_name(side),
-                    row + 1,
-                ));
+            if !character.is_whitespace() {
+                continue;
             }
+            // Whitespace only counts if it is *trailing* - nothing visible after it on the row.
+            // A painted run that stops on a space in the middle of a line is the ordinary shape
+            // of an edit, not a defect: deleting one of two spaces from `Team.  All` paints a
+            // single mid-row space, and deleting `foo ` from `foo bar` paints a run ending on
+            // one. Neither renders as a stripe hanging off the end of anything, which is the
+            // whole complaint this rule exists to make.
+            if line[boundary..].chars().any(|c| !c.is_whitespace()) {
+                continue;
+            }
+            // A run that is *all* whitespace has no visible character it could have ended on, so
+            // there is no painting of it this rule would accept. Same exemption, and the same
+            // reason, as the blank-row skip above: condemning every possible spelling of an edit
+            // is not a useful thing for an invariant to do. A commit that strips trailing spaces
+            // is exactly this shape.
+            // Both ends are snapped to character boundaries before slicing: `last` is a *byte*
+            // index and either end can land inside a multi-byte character (163 corpus files are
+            // not ASCII).
+            let run_start = (0..=last)
+                .rev()
+                .take_while(|&i| labels[side][start + i].is_some())
+                .last()
+                .unwrap_or(last);
+            let run_start = (0..=run_start)
+                .rev()
+                .find(|&i| line.is_char_boundary(i))
+                .unwrap_or(0);
+            let run_end = boundary + character.len_utf8();
+            if line[run_start..run_end].chars().all(char::is_whitespace) {
+                continue;
+            }
+            violations.push(format!(
+                "painting '{painting}' {} row {} ends its last painted run on {character:?}, \
+                 not on a visible character: {line:?}",
+                side_name(side),
+                row + 1,
+            ));
         }
     }
     violations
@@ -872,6 +914,41 @@ mod tests {
         let mapping = painted(vec![("Only one solution", vec![deleted(8, 2)])]);
 
         assert!(violations(&mapping, &before, &after).is_empty());
+    }
+
+    /// The rule is about a stripe hanging off the *end* of a line. A run that stops on a space
+    /// with visible text still to come on that row is the ordinary shape of an edit - this is
+    /// go-gin-gonic-gin-whitespace-in-comment, where one of two spaces mid-comment is deleted.
+    #[test]
+    fn a_painted_run_that_ends_on_a_mid_row_space_is_accepted() {
+        let before = rust("let x = 1;  // a  b\n");
+        let after = rust("\n");
+        // `a ` at columns 15..17 - the run ends on the space at 16, with `b` still to come on
+        // the row. Deliberately a run with a visible character in it: a run of only whitespace
+        // would be exempt under the other rule too, and this test would then pass without
+        // exercising the mid-row check it is named for.
+        let mapping = painted(vec![("Only one solution", vec![deleted(15, 2)])]);
+
+        assert!(
+            violations(&mapping, &before, &after).is_empty(),
+            "a mid-row space is not trailing whitespace"
+        );
+    }
+
+    /// A run with no visible character in it has no spelling this rule would accept, so it is
+    /// exempt for the same reason a blank row is - a commit that strips trailing spaces is
+    /// exactly this shape.
+    #[test]
+    fn a_painted_run_that_is_entirely_whitespace_is_exempt() {
+        let before = rust("let x = 1;  \n");
+        let after = rust("let x = 1;\n");
+        // Just the two trailing spaces: trailing, but with nothing visible inside the run.
+        let mapping = painted(vec![("Only one solution", vec![deleted(10, 2)])]);
+
+        assert!(
+            violations(&mapping, &before, &after).is_empty(),
+            "a run that is all whitespace has no visible character it could end on"
+        );
     }
 
     #[test]

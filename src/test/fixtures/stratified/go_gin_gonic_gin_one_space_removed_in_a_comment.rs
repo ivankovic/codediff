@@ -19,7 +19,7 @@ use anyhow::Result;
 
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants_with_known_violations;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 
 #[test]
 fn mapping() -> Result<()> {
@@ -39,16 +39,9 @@ fn painting() -> Result<()> {
 
 #[test]
 fn invariants() -> Result<()> {
-    // 1 painted run ends on a space rather than a visible character, and permanently
-    // will. One of the two spaces after "Gin Core Team." on row 1 is removed, so the
-    // only correct painting is that single space and the no-trailing-whitespace
-    // invariant has nothing visible to end on.
-    //
-    // The left-anchor rule does apply - either space may be called the deleted one - and
-    // the painting was moved to the first of the two on 2026-09-11 to match it. That is
-    // why this count did not change: both spellings are one space.
-    assert_ground_truth_invariants_with_known_violations(
-        "go-gin-gonic-gin-one-space-removed-in-a-comment",
-        1,
-    )
+    // Was pinned at 1 from 2026-09-08 to 2026-09-11, and for the same reason as its twin
+    // go-gin-gonic-gin-whitespace-in-comment: the deleted space is mid-comment, not trailing, so
+    // the no-trailing-whitespace invariant should never have fired on it. Back to 0 now that the
+    // invariant checks what its name says.
+    assert_ground_truth_invariants("go-gin-gonic-gin-one-space-removed-in-a-comment")
 }

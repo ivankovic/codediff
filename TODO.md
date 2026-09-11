@@ -37,26 +37,36 @@ invariant. Sliding those runs left covers the same bytes, ends on a visible char
 satisfies the invariant and the rule at once - here the two agree. Both were repainted on
 2026-09-11 and both are back to 0 violations.
 
-The converse is worth recording because it was got wrong once: three other trailing-space
-violations (`go-gin-gonic-gin-whitespace-in-comment`,
+Three other trailing-space violations (`go-gin-gonic-gin-whitespace-in-comment`,
 `go-gin-gonic-gin-one-space-removed-in-a-comment`, `vimscript-neovim-neovim-small-change-2`)
-are NOT repairable. There the edited run is itself whitespace - one of two spaces in a comment,
-or an inserted `| ` - so every correct painting of it ends on a space and the invariant has
-nothing visible to end on. The left-anchor rule applies to the first two and still does not
-help, because both spellings are the same single space.
+turned out to be the *invariant's* defect, not the paintings'. Each edits a run that is itself
+whitespace - one of two spaces in a comment, an inserted `| ` - so no painting of it ends on a
+visible character; but more to the point, every one of those runs sits **mid-row**, with visible
+text still to come on the line. Nothing about them is trailing.
+`rows_end_on_visible_characters` had been checking only whether the row's last painted byte was
+whitespace, which condemns any run that stops on a space in the middle of a line - the ordinary
+shape of deleting `foo ` from `foo bar`. Narrowed on 2026-09-11 to whitespace with nothing
+visible after it on the row, plus an exemption for a run that is entirely whitespace (a
+strip-trailing-spaces commit is exactly that shape). All three are back to 0, and the corpus
+went from 11 recorded violations to 8 - the remaining 8 are delimiter-pair mapping defects and
+one Full-indentation defect, none of them about trailing whitespace.
 
 The remaining 17 are 3 distinct phenomena, not 17 independent judgements - 14 are one clone family
-(swift `,"signatureNext":"X"` inserted into JSON-in-a-comment). That family is also the
-clearest argument against the rule: the leftmost spelling of the same byte count is
-`","signatureNext":"X`, which splits a JSON token in half. A human will not pick it.
+(swift `,"signatureNext":"X"` inserted into JSON-in-a-comment). That family is what showed the
+rule needed a boundary condition rather than an exception list: the leftmost spelling of the same
+byte count is `","signatureNext":"X`, which splits a JSON token in half. It pivots on `"`, so the
+connector restriction now puts all 14 out of scope by construction.
 
 Caveat on what the census can conclude: `human_solver` seeds paintings from codediff's own
 ranges, so "the human painted rightmost" is partly evidence about the seed, not only about
 human preference. That cuts both ways - it is a reason not to treat the 19 as refuting the
 rule, and equally a reason not to silently repaint them to match it.
 
-Open, if the rule is ever to be enforced: it needs a tie-break that knows about token
-boundaries (do not split a quoted string or a delimiter pair), not a plain leftmost rule.
+The token-boundary tie-break this needed is the connector restriction above; a plain leftmost
+rule was never going to work. What is still open is the renderer: `intra_node_update_ranges`
+remains right-anchored, so the five collapsed fixtures each carry a small expected residual. Any
+future attempt to flip it should re-measure against the *connector-restricted* rule, since the
+4-fix/12-break count that argued against flipping was taken before that restriction existed.
 
 ## Time \textsc{CodeDiff} as a whole process, not in-process
 
