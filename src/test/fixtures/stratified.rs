@@ -19,6 +19,10 @@
 // `sample_test_diffs --stratified`) - `human_solver`'s `insert_mod_declaration` adds entries here
 // the same way it does for `handmade.rs`/`small.rs`/`full.rs`.
 #[cfg(test)]
+mod c_ffmpeg_ffmpeg_rename_two_identifiers;
+#[cfg(test)]
+mod c_freeciv_freeciv_rename_identifier;
+#[cfg(test)]
 mod c_freeciv_freeciv_update_version;
 #[cfg(test)]
 mod c_genymobile_scrcpy_add_a_define;
@@ -34,6 +38,10 @@ mod c_genymobile_scrcpy_big_change;
 mod c_genymobile_scrcpy_rename_and_add_a_define;
 #[cfg(test)]
 mod c_genymobile_scrcpy_rename_defines;
+#[cfg(test)]
+mod c_godotengine_godot_add_two_enum_values;
+#[cfg(test)]
+mod c_godotengine_godot_pure_move;
 #[cfg(test)]
 mod c_godotengine_godot_whitespace_only;
 #[cfg(test)]
@@ -59,17 +67,29 @@ mod c_neovim_neovim_add_an_include;
 #[cfg(test)]
 mod c_neovim_neovim_small_change;
 #[cfg(test)]
+mod c_nginx_nginx_add_preproc_two_lines;
+#[cfg(test)]
 mod c_ollama_ollama_change_imports;
 #[cfg(test)]
 mod c_openssl_openssl_add_import;
 #[cfg(test)]
 mod c_openssl_openssl_add_two_clang_comments;
 #[cfg(test)]
+mod c_openssl_openssl_copyright;
+#[cfg(test)]
 mod c_openssl_openssl_format_only_change;
+#[cfg(test)]
+mod c_openssl_openssl_identifier_to_literal_zero;
 #[cfg(test)]
 mod c_openssl_openssl_whitepsace_only;
 #[cfg(test)]
 mod c_openssl_openssl_whitespace_only;
+#[cfg(test)]
+mod c_postgres_postgres_copyright;
+#[cfg(test)]
+mod c_postgres_postgres_copyright_2;
+#[cfg(test)]
+mod c_postgres_postgres_copyright_3;
 #[cfg(test)]
 mod c_postgres_postgres_copyright_year_update;
 #[cfg(test)]
@@ -77,13 +97,23 @@ mod c_postgres_postgres_copyright_year_update_2;
 #[cfg(test)]
 mod c_postgres_postgres_copyright_year_update_3;
 #[cfg(test)]
+mod c_postgres_postgres_fix_typo;
+#[cfg(test)]
 mod c_postgres_postgres_preprocessor_heavy_change;
 #[cfg(test)]
+mod c_postgres_postgres_tiny_but_interesting;
+#[cfg(test)]
 mod c_postgres_postgres_update_copyright_year;
+#[cfg(test)]
+mod c_protocolbuffers_protobuf_add_to_preproc_define;
+#[cfg(test)]
+mod c_protocolbuffers_protobuf_change_regex;
 #[cfg(test)]
 mod c_redis_redis_one_line_insert;
 #[cfg(test)]
 mod c_rust_lang_rust_add_two_consts;
+#[cfg(test)]
+mod c_sqlite_sqlite_fix_format_string_typo;
 #[cfg(test)]
 mod c_tmux_tmux_delete_one_include;
 #[cfg(test)]
@@ -103,6 +133,8 @@ mod cpp_godotengine_godot_add_one_include_5;
 #[cfg(test)]
 mod cpp_godotengine_godot_insert_one_include;
 #[cfg(test)]
+mod cpp_godotengine_godot_two_imports_added;
+#[cfg(test)]
 mod cpp_ladybirdbrowser_ladybird_add_real_logic;
 #[cfg(test)]
 mod cpp_ladybirdbrowser_ladybird_change_inherited_class_name;
@@ -113,11 +145,17 @@ mod cpp_libreoffice_add_imports_and_function_param;
 #[cfg(test)]
 mod cpp_libreoffice_delete_function;
 #[cfg(test)]
+mod cpp_libreoffice_remove_two_wrapping_functions;
+#[cfg(test)]
+mod cpp_libreoffice_warn_to_info;
+#[cfg(test)]
 mod cpp_microsoft_terminal_add_only;
 #[cfg(test)]
 mod cpp_microsoft_terminal_delete_only;
 #[cfg(test)]
 mod cpp_microsoft_terminal_insert_only;
+#[cfg(test)]
+mod cpp_microsoft_terminal_remove_unary_expression_from_binary;
 #[cfg(test)]
 mod cpp_mozilla_firefox_firefox_delete_leading_comment;
 #[cfg(test)]
@@ -126,6 +164,8 @@ mod cpp_mozilla_firefox_firefox_update_file_comment;
 mod cpp_mozilla_firefox_firefox_update_file_comment_2;
 #[cfg(test)]
 mod cpp_nzbgetcom_nzbget_add_include;
+#[cfg(test)]
+mod cpp_nzbgetcom_nzbget_update_string_const;
 #[cfg(test)]
 mod cpp_ollama_ollama_update_commit_hash;
 #[cfg(test)]
@@ -153,11 +193,21 @@ mod cpp_protocolbuffers_protobuf_add_preprocessor_commands;
 #[cfg(test)]
 mod cpp_protocolbuffers_protobuf_one_line_insert;
 #[cfg(test)]
+mod cpp_pytorch_pytorch_two_inserted_lines;
+#[cfg(test)]
+mod cpp_tensorflow_tensorflow_new_to_make_unique;
+#[cfg(test)]
+mod csharp_jellyfin_jellyfin_add_const_string;
+#[cfg(test)]
+mod csharp_jellyfin_jellyfin_add_line;
+#[cfg(test)]
 mod csharp_jellyfin_jellyfin_update_version_string;
 #[cfg(test)]
 mod csharp_lidarr_lidarr_add_enum_value;
 #[cfg(test)]
 mod csharp_lidarr_lidarr_add_function;
+#[cfg(test)]
+mod csharp_lidarr_lidarr_add_function_call_to_return;
 #[cfg(test)]
 mod csharp_lidarr_lidarr_add_function_signature_to_class;
 #[cfg(test)]
@@ -173,6 +223,10 @@ mod csharp_radarr_radarr_add_one_using;
 #[cfg(test)]
 mod csharp_radarr_radarr_add_one_using_2;
 #[cfg(test)]
+mod csharp_radarr_radarr_add_property;
+#[cfg(test)]
+mod csharp_radarr_radarr_add_to_end_of_regex;
+#[cfg(test)]
 mod csharp_radarr_radarr_remove_import_and_func;
 #[cfg(test)]
 mod csharp_sonarr_sonarr_add_attribute;
@@ -185,15 +239,33 @@ mod csharp_sonarr_sonarr_add_import_and_annotation;
 #[cfg(test)]
 mod csharp_sonarr_sonarr_add_list_item;
 #[cfg(test)]
+mod csharp_sonarr_sonarr_add_two_attributes;
+#[cfg(test)]
+mod csharp_sonarr_sonarr_add_two_items_to_list;
+#[cfg(test)]
 mod csharp_sonarr_sonarr_delete_func;
+#[cfg(test)]
+mod csharp_sonarr_sonarr_fix_comment_typo;
+#[cfg(test)]
+mod csharp_sonarr_sonarr_update_regex;
 #[cfg(test)]
 mod csharp_sonarr_sonarr_use_a_different_class;
 #[cfg(test)]
+mod css_facebook_react_add_two_selectors;
+#[cfg(test)]
 mod css_gorhill_ublock_add_one_attribute;
+#[cfg(test)]
+mod css_mastodon_mastodon_add_two_lines;
 #[cfg(test)]
 mod css_microsoft_vscode_remove_one_line;
 #[cfg(test)]
 mod css_nextcloud_server_update_import;
+#[cfg(test)]
+mod css_shadcn_ui_ui_add_two_bytes;
+#[cfg(test)]
+mod css_twbs_bootstrap_parse_errors;
+#[cfg(test)]
+mod css_wordpress_wordpress_change_comment;
 #[cfg(test)]
 mod css_wordpress_wordpress_go_to_one_line;
 #[cfg(test)]
@@ -208,6 +280,10 @@ mod css_wordpress_wordpress_remove_one_line;
 mod css_wordpress_wordpress_remove_one_rule;
 #[cfg(test)]
 mod css_wordpress_wordpress_remove_webkit_prefix;
+#[cfg(test)]
+mod css_wordpress_wordpress_rename_attribute;
+#[cfg(test)]
+mod go_caddyserver_caddy_multiple_solutions_interesting_case;
 #[cfg(test)]
 mod go_fatedier_frp_build_comment_insert_only;
 #[cfg(test)]
@@ -226,6 +302,8 @@ mod go_gin_gonic_gin_update_version_string_4;
 mod go_gin_gonic_gin_update_version_string_5;
 #[cfg(test)]
 mod go_gin_gonic_gin_update_version_string_6;
+#[cfg(test)]
+mod go_gin_gonic_gin_whitespace_in_comment;
 #[cfg(test)]
 mod go_gohugoio_hugo_add_and_upadate_list_items;
 #[cfg(test)]
@@ -605,15 +683,25 @@ mod rust_gyulyvgc_sniffnet_add_mod_3;
 #[cfg(test)]
 mod rust_gyulyvgc_sniffnet_remoev_attribute;
 #[cfg(test)]
+mod rust_gyulyvgc_sniffnet_rename_one_identifier;
+#[cfg(test)]
 mod rust_protocolbuffers_protobuf_add_enum_variant;
+#[cfg(test)]
+mod rust_protocolbuffers_protobuf_add_two_attributes;
 #[cfg(test)]
 mod rust_rust_lang_rust_add_note_comment;
 #[cfg(test)]
 mod rust_rust_lang_rust_add_one_check;
 #[cfg(test)]
+mod rust_rust_lang_rust_add_or_expression;
+#[cfg(test)]
 mod rust_rust_lang_rust_change_use;
 #[cfg(test)]
+mod rust_rust_lang_rust_one_comment_line_into_two;
+#[cfg(test)]
 mod rust_rust_lang_rust_remove_min_version_comment;
+#[cfg(test)]
+mod rust_rust_lang_rust_remove_path_from_using;
 #[cfg(test)]
 mod rust_rust_lang_rust_remove_starting_comment;
 #[cfg(test)]
@@ -629,13 +717,27 @@ mod rust_rust_lang_rust_update_comment;
 #[cfg(test)]
 mod rust_rustdesk_rustdesk_add_one_token;
 #[cfg(test)]
+mod rust_rustdesk_rustdesk_move_list_item_with_insert;
+#[cfg(test)]
+mod rust_tauri_apps_tauri_add_doccomment_empty_line;
+#[cfg(test)]
+mod rust_tauri_apps_tauri_add_path_to_const_string;
+#[cfg(test)]
+mod rust_tauri_apps_tauri_add_pub_to_mod;
+#[cfg(test)]
+mod rust_tauri_apps_tauri_add_to_list;
+#[cfg(test)]
 mod rust_tauri_apps_tauri_add_use_and_function;
+#[cfg(test)]
+mod rust_tauri_apps_tauri_fix_typo_in_string_constant;
 #[cfg(test)]
 mod rust_tauri_apps_tauri_rename_mod;
 #[cfg(test)]
 mod rust_vercel_next_add_mode;
 #[cfg(test)]
 mod rust_vercel_next_remove_mod;
+#[cfg(test)]
+mod rust_vercel_next_simple_identifier_change;
 #[cfg(test)]
 mod rust_zed_industries_zed_add_mod;
 #[cfg(test)]
