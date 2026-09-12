@@ -18,19 +18,26 @@
 use anyhow::Result;
 
 use crate::test;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 
 #[test]
 fn mapping() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("java-defects4j-jsoup-52-xmldeclaration")
+    // First measurement, 2026-09-12. The statement carrying the call moved from position 1 to
+    // position 3 of its block; the human keeps its receiver `.` paired across the move, while
+    // codediff's `qualified_name` pass reads that leaf as deleted. The statement itself is
+    // matched either way, so the residual is the one leaf inside it.
+    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
+        "java-defects4j-jsoup-52-xmldeclaration",
+        1,
+        1,
+    )
 }
 
 #[test]
 fn painting() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test, read the rate it
-    // reports for both modes, and record that instead.
-    assert_matches_human_painting_within_limit("java-defects4j-jsoup-52-xmldeclaration", 100.0)
+    // measured 2026-09-12: minimal 5.008%, full 7.753% (measured, unexamined)
+    assert_matches_human_painting_within_limit("java-defects4j-jsoup-52-xmldeclaration", 7.77)
 }
 
 #[test]

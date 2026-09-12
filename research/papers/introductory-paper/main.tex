@@ -386,6 +386,18 @@ more than 3000 lines of code. In each stratum, \SampleStratifiedPerCell{} diffs 
 sampled per language, and inspected as above. Drawing and solving that stratified sample
 is still in progress; every number in this paper is reported over the \NumFixtures{} changes solved so far.
 
+% TODO(references.bib): this paragraph needs two entries that the bibliography does not yet have -
+% Alikhanifard and Tsantalis' AST node-mapping oracle (TOSEM 2025), and Falleri and Martinez' ICSE
+% 2024 replication package, which supplies the file contents the oracle's offsets index into. Cite
+% both here once they are in the .bib; the oracle is named in prose in the meantime.
+A fourth list extends the corpus beyond our own sampling. The AST node-mapping oracle of
+Alikhanifard and Tsantalis records, for 800 bug-fixing changes of Defects4J~\cite{defects4j}, which
+node of the before file each node of the after file corresponds to, over 996 Java compilation
+units. We solve those same 996 compilation units by hand as well, so that our mappings can be read
+against an independently authored reference on a corpus that other AST-differencing evaluations
+already use. Annotating that list is in progress, and no result in
+this paper is reported over it.
+
 Each diff was then solved by hand by the authors, who have each at least 15 years of experience in
 software development, and have reviewed tens of thousands of real world code changes in industrial
 environments. Based on this experience, we did not even attempt to find a unique solution for each diff.
@@ -408,10 +420,15 @@ cannot be expressed using common AST diff operations (Insert, Delete, Update, Mo
 $N{:}M$ mapping: one or more nodes from one side map to one or more nodes from the
 other.\footnote{The most common cause of an $N{:}M$ mapping is a refactoring, where two or more
 similar blocks of code are moved into a common function. The correct solution is the one that maps
-all of them as moved.} That rate is over the \AmbiguityListScored{} changes reviewed for
-ambiguity, not the full \NumFixtures{}: the stratified fixtures are solved but have not yet had
-the ambiguity pass, and counting them as unambiguous would report a gap in the annotation as a
-property of the code.
+all of them as moved.} That rate is over the \AmbiguityListScored{} changes of the Curated and Full
+lists, not the full \NumFixtures{}. Both lists have had a complete ambiguity pass, in which we
+revisited every change in them and recorded an $N{:}M$ site wherever a second reading of the
+correspondence held, so the denominator is a finished pass over those two lists rather than
+whichever changes happened to be reviewed. The two lists agree closely, at \AmbiguityCuratedPct{}\%
+of \AmbiguityCuratedTotal{} changes on the Curated list and \AmbiguityFullPct{}\% of
+\AmbiguityFullTotal{} on the Full list, which is what licenses pooling them. The stratified sample
+stays out because its ambiguity pass is not done, and counting its changes as unambiguous would
+report a gap in the annotation as a property of the code.
 
 \begin{resultbox}{RA1.1 (Expressibility)}
   \AmbiguityListPct{}\% of changes (\AmbiguityListWith{} of \AmbiguityListScored{}) have optimal
@@ -836,7 +853,7 @@ rate of any tool measured on the full corpus, and a median well inside its inter
 \textbf{Construct validity.} Every rate this paper reports about ambiguity is a floor rather than
 an estimate. A multi-map group exists where an annotator noticed that two pairings were equally
 correct and recorded it; a change whose alternative mapping nobody saw is filed as unique. The
-same holds for the paintings. We report these as existence results and lower bounds throughout, and RA3.1's second reading---cost ties at differing mappings, which needs no annotation to detect---exists precisely because it does not depend on annotator attention. For the same reason RA1.1 and RA3.1 are scored over the \AmbiguityListScored{} changes that have had an ambiguity pass rather than all \NumFixtures{}; the stratified fixtures carry no multi-map group at all, which at the rate the reviewed lists show is an annotation gap rather than a finding about them.
+same holds for the paintings. We report these as existence results and lower bounds throughout, and RA3.1's second reading---cost ties at differing mappings, which needs no annotation to detect---exists precisely because it does not depend on annotator attention. For the same reason we score RA1.1 and RA3.1 over the \AmbiguityListScored{} changes whose ambiguity pass is complete rather than over all \NumFixtures{}. That pass covers the Curated and Full lists in full, so for those two lists the bound is one on annotator attention rather than one on coverage. The stratified fixtures carry no multi-map group at all, which at the rate the two finished lists show is an annotation gap rather than a finding about those changes.
 
 Because no whole-file exact computation is affordable at these sizes (RA2), RA1.2 compares the
 human mapping's cost to a heuristics-augmented computation's rather than to a proven optimum. Its

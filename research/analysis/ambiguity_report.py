@@ -165,15 +165,22 @@ def summarize(
             "with": len([n for n in members if groups_by_fixture[n]]),
         }
 
-    # The `stratified` dataset carries no multi-map group at all: 0 of 323 fixtures, against
-    # 11.4% and 11.6% for `small` and `full`. At the pooled rate of the two reviewed lists we
-    # would expect ~37 of them, and P(0) under that rate is about 7e-18 - so this is a gap in the
-    # annotation, not a property of those changes. Their mappings are solved; the ambiguity pass
-    # over them has not been done. Pooling all three would therefore dilute a measured 11.5% to
-    # 6.7% by counting un-reviewed fixtures as unambiguous - the "an empty annotation scores as a
-    # perfect one" trap. `reviewed_*` below is the rate over the lists that have been reviewed,
-    # and is what the paper quotes; `any_pct` over every scored fixture is kept beside it so the
-    # dilution is visible rather than silent. Fold `stratified` in here once it is annotated.
+    # The `stratified` dataset is still essentially un-annotated for ambiguity: 4 of 490 fixtures
+    # carry a multi-map group on disk as of 2026-09-12 (0 of 323 at the corpus state the paper
+    # reports), against 11.4% and 11.6% for `small` and `full`. At the pooled rate of the two
+    # finished lists we would expect ~56 of the 490, so this is a gap in the annotation, not a
+    # property of those changes. Their mappings are solved; the ambiguity pass over them has not
+    # been done. Pooling all three would therefore dilute a measured 11.5% by counting
+    # un-reviewed fixtures as unambiguous - the "an empty annotation scores as a perfect one"
+    # trap. `reviewed_*` below is the rate over the lists whose pass is complete, and is what the
+    # paper quotes; `any_pct` over every scored fixture is kept beside it so the dilution is
+    # visible rather than silent. Fold `stratified` in here once it is annotated.
+    #
+    # `small` and `full` are complete rather than merely touched: both were revisited fixture by
+    # fixture in September 2026 and back-filled wherever a second reading of the correspondence
+    # held, which is why the paper claims a finished pass over them rather than a reviewed subset.
+    # `handmade`, which the paper does not report on, came out of the same pass at 7 of 61 (11.5%)
+    # - a third independent estimate agreeing with both, and the reason the pooling is sound.
     REVIEWED_LISTS = ("small", "full")
     reviewed = [n for n in names if (datasets or {}).get(n) in REVIEWED_LISTS]
     reviewed_with = [n for n in reviewed if groups_by_fixture[n]]

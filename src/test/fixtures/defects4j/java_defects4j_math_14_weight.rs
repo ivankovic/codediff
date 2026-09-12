@@ -18,19 +18,28 @@
 use anyhow::Result;
 
 use crate::test;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 
 #[test]
 fn mapping() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("java-defects4j-math-14-weight")
+    // First measurement, 2026-09-12. A `method_invocation` is replaced by an
+    // `object_creation_expression`: the human deletes the call whole and inserts the
+    // constructor, while codediff re-uses the deleted call's leaves - its parentheses and its
+    // identifier, one of them against a `type_identifier` - inside the new expression. The same
+    // scaffolding-reuse family as the jxpath `CoreOperation*` fixtures, counted once per
+    // re-used leaf.
+    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
+        "java-defects4j-math-14-weight",
+        10,
+        8,
+    )
 }
 
 #[test]
 fn painting() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test, read the rate it
-    // reports for both modes, and record that instead.
-    assert_matches_human_painting_within_limit("java-defects4j-math-14-weight", 100.0)
+    // measured 2026-09-12: minimal 0.662%, full 0.662% (measured, unexamined)
+    assert_matches_human_painting_within_limit("java-defects4j-math-14-weight", 0.68)
 }
 
 #[test]

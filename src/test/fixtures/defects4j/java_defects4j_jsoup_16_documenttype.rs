@@ -18,19 +18,28 @@
 use anyhow::Result;
 
 use crate::test;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 
 #[test]
 fn mapping() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("java-defects4j-jsoup-16-documenttype")
+    // First measurement, 2026-09-12. The edit wraps an existing call in another one, so the
+    // after side has a `method_invocation` inside a `method_invocation` where the before side
+    // has one. The human reads the inner pair as the surviving call and the outer one as new;
+    // codediff's `qualified_name` pass pairs the receiver's `.` and `identifier` with the outer
+    // call instead, which makes the same four leaves disagree twice - once as a wrong pairing,
+    // once as an insert that was matched. One reading of one wrap, not four faults.
+    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
+        "java-defects4j-jsoup-16-documenttype",
+        4,
+        4,
+    )
 }
 
 #[test]
 fn painting() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test, read the rate it
-    // reports for both modes, and record that instead.
-    assert_matches_human_painting_within_limit("java-defects4j-jsoup-16-documenttype", 100.0)
+    // measured 2026-09-12: minimal 1.117%, full 4.276% (measured, unexamined)
+    assert_matches_human_painting_within_limit("java-defects4j-jsoup-16-documenttype", 4.29)
 }
 
 #[test]
