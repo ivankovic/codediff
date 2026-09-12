@@ -137,6 +137,78 @@ mod tests {
         Ok(())
     }
 
+    /// **Every fixture stub is declared in its dataset's module file.**
+    ///
+    /// A `fixtures/<dataset>/<name>.rs` with no `mod <name>;` beside it is not a failing test or a
+    /// compile error - it is not compiled at all. The file sits in the tree looking exactly like a
+    /// fixture that passes, and its `mapping()`, `painting()` and `invariants()` never run.
+    ///
+    /// Found on 2026-09-12 with **21 stubs and 63 tests in that state** for a day: `human_solver`
+    /// had written the declarations (`insert_mod_declaration`, which does its job), and a
+    /// `git checkout -- $(git diff --name-only | grep defects4j)` meant to undo `cargo fmt` churn
+    /// on `fixtures/defects4j/*.rs` reverted `fixtures/defects4j.rs` along with them. The stub
+    /// files survived because they were still untracked; the declarations did not because the
+    /// module file was not. Nothing noticed until `quality_baseline.csv` disagreed with a stub
+    /// whose tests had never run.
+    ///
+    /// Whoever drops a declaration next - a bad merge, a revert, a generator that errors after
+    /// writing the file - this is the check that says so on the next run.
+    #[test]
+    #[cfg(feature = "test-fixtures")]
+    fn every_fixture_stub_is_declared_in_its_dataset_module() -> Result<()> {
+        // Imported here rather than beside `Result` at the top of the module: every user of it is
+        // inside this one `test-fixtures`-gated test, so a module-level import is an unused one
+        // under the default feature set - which CI's `clippy (features=default)` job, running with
+        // `-D warnings`, turns into a build failure.
+        use anyhow::Context;
+
+        let fixtures = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("src")
+            .join("test")
+            .join("fixtures");
+        let mut orphaned = Vec::new();
+        let mut datasets_seen = 0usize;
+        for dataset in helper::DIFF_DATASETS {
+            let dir = fixtures.join(dataset);
+            if !dir.exists() {
+                continue;
+            }
+            // Read as text rather than trusting the module system: a declaration that is missing
+            // is exactly what this looks for, so it cannot ask the compiler what it declared.
+            let module_file = fixtures.join(format!("{dataset}.rs"));
+            let declarations = std::fs::read_to_string(&module_file)
+                .with_context(|| format!("reading {module_file:?}"))?;
+            datasets_seen += 1;
+            for entry in std::fs::read_dir(&dir)? {
+                let path = entry?.path();
+                if path.extension().and_then(|e| e.to_str()) != Some("rs") {
+                    continue;
+                }
+                let Some(stem) = path.file_stem().and_then(|s| s.to_str()) else {
+                    continue;
+                };
+                // With the `;`, so one stub cannot vouch for another whose name it is a prefix of
+                // (`..._defaultkeyedvalues` vs `..._defaultkeyedvalues2d`, both real).
+                if !declarations.contains(&format!("mod {stem};")) {
+                    orphaned.push(format!("{dataset}/{stem}.rs"));
+                }
+            }
+        }
+        assert!(
+            datasets_seen > 0,
+            "no fixture directories found - this check would pass vacuously"
+        );
+        orphaned.sort();
+        assert!(
+            orphaned.is_empty(),
+            "these fixture stubs are not declared in their dataset's module file, so none of \
+             their tests run. Add `#[cfg(test)] mod <name>;` to \
+             src/test/fixtures/<dataset>.rs:\n    {}",
+            orphaned.join("\n    ")
+        );
+        Ok(())
+    }
+
     /// Pins what `stub_mapping_limits` can and cannot read, so the projection above is checked
     /// against a parse that is itself checked - a regex that silently matched nothing would make
     /// that test vacuously pass.
