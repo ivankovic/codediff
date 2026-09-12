@@ -318,6 +318,13 @@ t              text view: read the source, and paint the human text-range ground
                  invariant 6 states, kept for you instead of reported afterwards.
                  A blank row in the sweep drops out; a vertical selection and a
                  Full or free-named painting are left exactly as drawn.
+                 Branching a Minimal painting to one named Full (s, Enter) does
+                 the opposite on the way across: every line whose every visible
+                 character is painted deleted, or every one inserted, is widened
+                 to start at column 0, which is what invariant 4 requires of a
+                 Full painting. Only those lines -- a partly changed line, a
+                 matched (move/update) line, and a branch to any other name are
+                 copied unchanged, and the Minimal painting itself never moves.
                  A range that overlaps one already painted is refused at the
                  keystroke (u removes the old one first): the renderer resolves
                  an overlap by highest verdict and the scorer by list order, so

@@ -172,7 +172,13 @@ pub(crate) fn solution_entries_mut<'a>(
 /// Choosing a name that already exists never writes: it just switches to it, exactly as `L` would.
 /// Merging would leave overlapping duplicates and replacing would silently discard a painting
 /// somebody made, and neither is recoverable here - there is no undo.
-pub(crate) fn action_save_solution_as(app: &mut App, target: &str, copy: bool) {
+pub(crate) fn action_save_solution_as(
+    app: &mut App,
+    target: &str,
+    copy: bool,
+    before_src: &str,
+    after_src: &str,
+) {
     let target = target.trim();
     if target.is_empty() {
         app.status = Some("A solution needs a name".to_string());
@@ -195,12 +201,26 @@ pub(crate) fn action_save_solution_as(app: &mut App, target: &str, copy: bool) {
         return;
     }
 
-    let entries = if copy {
+    let mut entries = if copy {
         solution_entries(&app.mapping, &app.text_solution).to_vec()
     } else {
         Vec::new()
     };
     let count = entries.len();
+    // The one transformation a branch applies to the ranges it copies. `Minimal` is forbidden the
+    // indentation of a wholly-changed line and `Full` is required to carry it, so the same spans
+    // cannot answer for both presets, and the difference is mechanical enough to do here rather
+    // than ask for it line by line - see `expand_leading_whitespace_for_full`. Keyed on both names:
+    // a branch to a free-form name states no preset, and the rule belongs to the preset, not to
+    // the act of branching.
+    let extended = if copy
+        && human_mapping::invariants::designates_minimal(&app.text_solution)
+        && human_mapping::invariants::designates_full(target)
+    {
+        expand_leading_whitespace_for_full(&mut entries, before_src, after_src)
+    } else {
+        0
+    };
     app.mapping.text_mappings.push(NamedTextMapping {
         name: target.to_string(),
         mapping: HumanTextMapping { entries },
@@ -208,8 +228,13 @@ pub(crate) fn action_save_solution_as(app: &mut App, target: &str, copy: bool) {
     app.text_solution = target.to_string();
     app.dirty = true;
     app.status = Some(if copy {
+        let widened = match extended {
+            0 => String::new(),
+            1 => ", 1 line widened to its indentation".to_string(),
+            rows => format!(", {rows} lines widened to their indentation"),
+        };
         format!(
-            "Started '{target}' as a copy of the previous painting ({count} range(s)) - {} now on file",
+            "Started '{target}' as a copy of the previous painting ({count} range(s)){widened} - {} now on file",
             app.mapping.text_mappings.len()
         )
     } else {
@@ -981,6 +1006,106 @@ pub(crate) fn text_diff_hunks(before_src: &str, after_src: &str) -> Option<Vec<(
         hunks.push((next_before, next_after));
     }
     Some(hunks)
+}
+
+/// Invariant 4, applied when a `Minimal` painting is branched to a `Full` one: a line whose every
+/// visible character is inserted, or whose every one is deleted, is painted whole under `Full`,
+/// its indentation included.
+///
+/// The mirror of [`skip_leading_whitespace`], and the reason both exist: the two presets disagree
+/// about exactly this whitespace, so the same ranges cannot serve both. A line all of whose content
+/// is entering or leaving the file is entering or leaving whole - its indentation is not a survivor
+/// sitting on an inserted line - and painting the code but not the space in front of it draws a
+/// highlight broken into pieces, which reads as an edit to a surviving line.
+///
+/// Four conditions, all of which the invariant itself states. The row must have a visible character
+/// to begin with. Every visible character on it must be painted, by entries that are all the same
+/// one-sided operation - a `Match` anywhere on the row means a `Move` or an `Update`, which is a
+/// surviving line whose old indentation the painting has no business claiming. The leading
+/// whitespace must be unpainted, so nothing here can create an overlap. And some span must start
+/// exactly at the first visible character, since that is the one with room to grow leftwards; a row
+/// reached by a multi-row span already carries its indentation and needs nothing.
+///
+/// Returns how many rows it extended.
+pub(crate) fn expand_leading_whitespace_for_full(
+    entries: &mut [HumanTextEntry],
+    before_src: &str,
+    after_src: &str,
+) -> usize {
+    let mut extended = 0;
+    for (side, source) in [(0usize, before_src), (1usize, after_src)] {
+        let wanted = if side == 0 {
+            HumanTextOperation::Delete
+        } else {
+            HumanTextOperation::Insert
+        };
+        // Every (entry, span) on this side, and every row any of them touches.
+        let spans_on_side = |entries: &[HumanTextEntry]| -> Vec<(usize, usize, HumanTextSpan)> {
+            entries
+                .iter()
+                .enumerate()
+                .flat_map(|(entry_index, entry)| {
+                    let spans = if side == 0 {
+                        &entry.before
+                    } else {
+                        &entry.after
+                    };
+                    spans
+                        .iter()
+                        .enumerate()
+                        .map(move |(span_index, span)| (entry_index, span_index, *span))
+                        .collect::<Vec<_>>()
+                })
+                .collect()
+        };
+        let placed = spans_on_side(entries);
+        let mut rows: Vec<usize> = placed
+            .iter()
+            .flat_map(|(_, _, span)| span.start_row..=span.end_row)
+            .collect();
+        rows.sort_unstable();
+        rows.dedup();
+
+        for row in rows {
+            let line = TextPaintState::row_text(source, row);
+            let Some(first_visible) = line.find(|c: char| !c.is_whitespace()) else {
+                continue;
+            };
+            let covering = |column: usize| -> Option<usize> {
+                placed
+                    .iter()
+                    .find(|(_, _, span)| span_covers(*span, row, column, line.len()))
+                    .map(|(entry_index, _, _)| *entry_index)
+            };
+            let every_visible_is_wanted = line[first_visible..]
+                .char_indices()
+                .filter(|(_, c)| !c.is_whitespace())
+                .all(|(offset, _)| {
+                    covering(first_visible + offset)
+                        .is_some_and(|entry_index| entries[entry_index].operation == wanted)
+                });
+            if !every_visible_is_wanted {
+                continue;
+            }
+            if (0..first_visible).any(|column| covering(column).is_some()) {
+                continue;
+            }
+            let Some((entry_index, span_index, _)) = placed
+                .iter()
+                .find(|(_, _, span)| span.start_row == row && span.start_column == first_visible)
+            else {
+                continue;
+            };
+            let spans = if side == 0 {
+                &mut entries[*entry_index].before
+            } else {
+                &mut entries[*entry_index].after
+            };
+            spans[*span_index].start_column = 0;
+            extended += 1;
+        }
+    }
+    extended
 }
 
 /// `n` / `p`: moves *both* sides' cursors to the next/previous differing region of the plain line

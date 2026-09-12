@@ -1559,6 +1559,8 @@ pub(crate) fn handle_modal_key(
                 new_name,
                 confirm_delete,
                 state,
+                before_src,
+                after_src,
             );
         }
         Modal::UnixDiffView { output, scroll } => match code {
@@ -2167,7 +2169,14 @@ fn handle_solution_picker(
     new_name: Option<String>,
     confirm_delete: Option<String>,
     state: TextPaintState,
+    // Only the save-as branch reads these, to widen a `Minimal` painting's ranges to the
+    // indentation `Full` requires (`expand_leading_whitespace_for_full`). Same fallback as
+    // `handle_text_view`: these are the bytes of a `String`, so the conversion cannot fail.
+    before_src: &[u8],
+    after_src: &[u8],
 ) -> Option<OpenTarget> {
+    let before_text = std::str::from_utf8(before_src).unwrap_or_default();
+    let after_text = std::str::from_utf8(after_src).unwrap_or_default();
     let reopen = |app: &mut App, names, selected, new_name, confirm_delete| {
         app.modal = Some(Modal::SolutionPicker {
             names,
@@ -2193,7 +2202,7 @@ fn handle_solution_picker(
         }
         (Some(typed), KeyCode::Enter) => {
             if saving {
-                action_save_solution_as(app, &typed, true);
+                action_save_solution_as(app, &typed, true, before_text, after_text);
             } else {
                 action_load_solution(app, typed.trim());
             }
@@ -2218,7 +2227,7 @@ fn handle_solution_picker(
             } else {
                 let chosen = names[selected].clone();
                 if saving {
-                    action_save_solution_as(app, &chosen, true);
+                    action_save_solution_as(app, &chosen, true, before_text, after_text);
                 } else {
                     action_load_solution(app, &chosen);
                 }
@@ -2229,7 +2238,7 @@ fn handle_solution_picker(
         // instead of from a copy of what is currently painted.
         (None, KeyCode::Char('e')) if saving && selected < free_form_index => {
             let chosen = names[selected].clone();
-            action_save_solution_as(app, &chosen, false);
+            action_save_solution_as(app, &chosen, false, before_text, after_text);
             app.modal = Some(Modal::TextView { state });
         }
         // `D` twice deletes the highlighted painting. Capital, and twice, because there

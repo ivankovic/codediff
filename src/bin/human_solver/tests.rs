@@ -1511,7 +1511,7 @@ fn branching_keeps_both_paintings_on_file() {
     );
     assert_eq!(app.text_solution, "Minimal");
 
-    action_save_solution_as(&mut app, "Full", true);
+    action_save_solution_as(&mut app, "Full", true, before_src, after_src);
 
     assert_eq!(
         app.text_solution, "Full",
@@ -1528,6 +1528,154 @@ fn branching_keeps_both_paintings_on_file() {
         solution_entries(&app.mapping, "Full").len(),
         1,
         "a copy starts from what was painted"
+    );
+}
+
+/// Branching `Minimal` to `Full` widens every wholly-changed line to its own indentation, which is
+/// what invariant 4 requires of a `Full` painting and invariant 6 forbids a `Minimal` one. The two
+/// presets disagree about exactly these bytes, so the branch is the point where the difference can
+/// be applied mechanically instead of line by line.
+#[test]
+fn branching_minimal_to_full_widens_a_wholly_changed_line_to_its_indentation() {
+    let source = indented_block();
+    let (mut app, _) =
+        press_in_text_view(source, source, sweep_over_the_block(), KeyCode::Char('d'));
+    let minimal = painted_entries(&app).remove(0).1;
+    assert_eq!(minimal[0].start_column, 4, "Minimal starts past the indent");
+
+    action_save_solution_as(&mut app, "Full", true, source, source);
+
+    let full = painted_entries(&app).remove(0).1;
+    assert_eq!(
+        full,
+        vec![
+            HumanTextSpan {
+                start_row: 1,
+                start_column: 0,
+                end_row: 1,
+                end_column: 14,
+            },
+            HumanTextSpan {
+                start_row: 3,
+                start_column: 0,
+                end_row: 3,
+                end_column: 18,
+            },
+            HumanTextSpan {
+                start_row: 4,
+                start_column: 0,
+                end_row: 4,
+                end_column: 15,
+            },
+        ],
+        "each row now starts at column 0"
+    );
+    assert_eq!(
+        solution_entries(&app.mapping, "Minimal")[0].before[0].start_column,
+        4,
+        "and the painting it was branched from is untouched"
+    );
+    assert!(
+        app.status
+            .as_deref()
+            .unwrap_or("")
+            .contains("3 lines widened"),
+        "got {:?}",
+        app.status
+    );
+}
+
+/// The checker is what this is for, so the checker is what pins it: one fixture carrying both
+/// paintings must satisfy invariant 6 on its `Minimal` and invariant 4 on its `Full` at once.
+#[test]
+fn the_two_branched_paintings_satisfy_their_own_preset_rules() {
+    let source = indented_block();
+    let (mut app, _) =
+        press_in_text_view(source, source, sweep_over_the_block(), KeyCode::Char('d'));
+    action_save_solution_as(&mut app, "Full", true, source, source);
+
+    let code = Code::from_string(source, &Language::Rust);
+    let violations = human_mapping::invariants::ground_truth_invariant_violations_for(
+        &app.mapping,
+        &code,
+        &code,
+    )
+    .expect("the invariant checker should read this mapping");
+    assert!(
+        violations.is_empty(),
+        "neither preset should contradict itself: {violations:?}"
+    );
+}
+
+/// A line the edit only partly touches keeps its indentation unpainted under both presets: the
+/// rest of the line survives, so the space in front of it is not part of what changed.
+#[test]
+fn branching_leaves_a_partly_changed_line_alone() {
+    let source = indented_block();
+    // Columns 8..13 of row 1 only - `a = 1` out of `    let a = 1;`.
+    let state = TextPaintState {
+        anchor: [Some((1, 8)), None],
+        cursor: [(1, 12), (0, 0)],
+        ..Default::default()
+    };
+    let (mut app, _) = press_in_text_view(source, source, state, KeyCode::Char('d'));
+
+    action_save_solution_as(&mut app, "Full", true, source, source);
+
+    assert_eq!(
+        painted_entries(&app).remove(0).1[0].start_column,
+        8,
+        "`let` and the indentation before it both survive, so nothing widens"
+    );
+}
+
+/// A `Match` entry resolves to a `Move` or an `Update`, which invariant 4 excludes by name: a
+/// surviving line's old indentation may genuinely be untouched, so the branch must not claim it.
+#[test]
+fn branching_leaves_a_matched_line_alone() {
+    let source = indented_block();
+    let mut app = test_app();
+    solution_entries_mut(&mut app.mapping, "Minimal").push(HumanTextEntry {
+        operation: HumanTextOperation::Match,
+        before: vec![HumanTextSpan {
+            start_row: 1,
+            start_column: 4,
+            end_row: 1,
+            end_column: 14,
+        }],
+        after: vec![HumanTextSpan {
+            start_row: 1,
+            start_column: 4,
+            end_row: 1,
+            end_column: 14,
+        }],
+    });
+
+    action_save_solution_as(&mut app, "Full", true, source, source);
+
+    let spans = painted_entries(&app).remove(0).1;
+    assert_eq!(spans[0].start_column, 4, "a move keeps its own columns");
+}
+
+/// Keyed on both names: a branch to a free-form name states no preset, and the rule belongs to the
+/// preset rather than to the act of branching.
+#[test]
+fn branching_to_a_free_form_name_widens_nothing() {
+    let source = indented_block();
+    let (mut app, _) =
+        press_in_text_view(source, source, sweep_over_the_block(), KeyCode::Char('d'));
+
+    action_save_solution_as(&mut app, "Only one solution", true, source, source);
+
+    assert_eq!(
+        painted_entries(&app).remove(0).1[0].start_column,
+        4,
+        "nothing was asked for, so nothing changed"
+    );
+    assert!(
+        !app.status.as_deref().unwrap_or("").contains("widened"),
+        "and the status must not claim otherwise: {:?}",
+        app.status
     );
 }
 
@@ -1548,7 +1696,7 @@ fn branching_empty_starts_the_new_painting_from_nothing() {
         after_src,
     );
 
-    action_save_solution_as(&mut app, "Full", false);
+    action_save_solution_as(&mut app, "Full", false, before_src, after_src);
 
     assert_eq!(app.mapping.text_mappings.len(), 2);
     assert_eq!(solution_entries(&app.mapping, "Minimal").len(), 1);
@@ -1582,7 +1730,7 @@ fn branching_to_an_existing_name_switches_without_overwriting_it() {
         },
     ];
 
-    action_save_solution_as(&mut app, "Full", true);
+    action_save_solution_as(&mut app, "Full", true, "gone\n", "\n");
 
     assert_eq!(app.text_solution, "Full");
     assert_eq!(app.mapping.text_mappings.len(), 2);

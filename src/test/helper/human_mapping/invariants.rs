@@ -358,7 +358,11 @@ pub fn designates_minimal(name: &str) -> bool {
 }
 
 /// Whether a painting's name declares it the `Full` reading. See [`designates_minimal`].
-pub(crate) fn designates_full(name: &str) -> bool {
+///
+/// `pub` for the same reason that one is: `human_solver` asks both questions when it branches a
+/// painting, because invariant 4 below is the rule it can keep for the painter on the way from one
+/// preset to the other.
+pub fn designates_full(name: &str) -> bool {
     super::designates_preset(name, "Full")
 }
 

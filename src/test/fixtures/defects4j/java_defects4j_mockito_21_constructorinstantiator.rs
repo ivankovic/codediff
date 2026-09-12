@@ -18,22 +18,41 @@
 use anyhow::Result;
 
 use crate::test;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants_with_known_violations;
 
 #[test]
 fn mapping() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("java-defects4j-mockito-21-constructorinstantiator")
+    // First measurement, 2026-09-12. The edit replaces a `local_variable_declaration` with an
+    // `enhanced_for_statement` over the same call, so the human carries the call's own leaves -
+    // its identifier, its `.`, its parentheses - across the two containers, while codediff's
+    // `qualified_name` pass reads them as deleted along with the declaration that held them.
+    // One disagreement about which container survives, counted once per carried leaf.
+    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
+        "java-defects4j-mockito-21-constructorinstantiator",
+        7,
+        5,
+    )
 }
 
 #[test]
 fn painting() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test, read the rate it
-    // reports for both modes, and record that instead.
-    assert_matches_human_painting_within_limit("java-defects4j-mockito-21-constructorinstantiator", 100.0)
+    // measured 2026-09-12: minimal 3.777%, full 4.871% (measured, unexamined)
+    assert_matches_human_painting_within_limit(
+        "java-defects4j-mockito-21-constructorinstantiator",
+        4.89,
+    )
 }
 
 #[test]
 fn invariants() -> Result<()> {
-    assert_ground_truth_invariants("java-defects4j-mockito-21-constructorinstantiator")
+    // One invariant-5 violation, recorded as found on 2026-09-12. On after row 24, the
+    // `for (Constructor<?> constructor : cls.getDeclaredConstructors()) {` line, the `Full`
+    // painting leaves the single space at columns 76..77 unpainted between two painted
+    // regions. `Full` is the generous reading and closes such a gap, so this is one space to
+    // add rather than a disagreement about the edit.
+    assert_ground_truth_invariants_with_known_violations(
+        "java-defects4j-mockito-21-constructorinstantiator",
+        1,
+    )
 }
