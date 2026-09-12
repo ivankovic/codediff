@@ -54,15 +54,27 @@ mod java_defects4j_chart_2_datasetutilities;
 #[cfg(test)]
 mod java_defects4j_cli_13_writeablecommandline;
 #[cfg(test)]
+mod java_defects4j_cli_16_option;
+#[cfg(test)]
 mod java_defects4j_cli_21_writeablecommandline;
 #[cfg(test)]
 mod java_defects4j_cli_29_util;
 #[cfg(test)]
 mod java_defects4j_cli_5_util;
 #[cfg(test)]
+mod java_defects4j_closure_165_recordtypebuilder;
+#[cfg(test)]
 mod java_defects4j_compress_42_unixstat;
 #[cfg(test)]
+mod java_defects4j_jacksondatabind_39_nullifyingdeserializer;
+#[cfg(test)]
+mod java_defects4j_jsoup_16_documenttype;
+#[cfg(test)]
+mod java_defects4j_jsoup_40_documenttype;
+#[cfg(test)]
 mod java_defects4j_jsoup_91_uncheckedioexception;
+#[cfg(test)]
+mod java_defects4j_jsoup_92_parsesettings;
 #[cfg(test)]
 mod java_defects4j_jxpath_7_coreoperationgreaterthan;
 #[cfg(test)]
@@ -72,12 +84,30 @@ mod java_defects4j_jxpath_7_coreoperationlessthan;
 #[cfg(test)]
 mod java_defects4j_jxpath_7_coreoperationlessthanorequal;
 #[cfg(test)]
+mod java_defects4j_lang_28_numericentityunescaper;
+#[cfg(test)]
+mod java_defects4j_math_14_weight;
+#[cfg(test)]
+mod java_defects4j_mockito_11_delegatingmethod;
+#[cfg(test)]
 mod java_defects4j_mockito_12_genericmaster;
+#[cfg(test)]
+mod java_defects4j_mockito_15_finalmockcandidatefilter;
+#[cfg(test)]
+mod java_defects4j_mockito_19_finalmockcandidatefilter;
 #[cfg(test)]
 mod java_defects4j_mockito_19_mockcandidatefilter;
 #[cfg(test)]
+mod java_defects4j_mockito_19_namebasedcandidatefilter;
+#[cfg(test)]
 mod java_defects4j_mockito_19_typebasedcandidatefilter;
 #[cfg(test)]
+mod java_defects4j_mockito_22_equality;
+#[cfg(test)]
+mod java_defects4j_mockito_29_same;
+#[cfg(test)]
 mod java_defects4j_mockito_2_timer;
+#[cfg(test)]
+mod java_defects4j_mockito_38_argumentmatchingtool;
 #[cfg(test)]
 mod java_defects4j_mockito_9_callsrealmethods;
