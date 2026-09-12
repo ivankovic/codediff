@@ -68,6 +68,8 @@ mod java_defects4j_closure_165_recordtypebuilder;
 #[cfg(test)]
 mod java_defects4j_closure_28_inlinecostestimator;
 #[cfg(test)]
+mod java_defects4j_codec_1_soundexutils;
+#[cfg(test)]
 mod java_defects4j_compress_42_unixstat;
 #[cfg(test)]
 mod java_defects4j_compress_44_checksumcalculatinginputstream;
@@ -100,6 +102,8 @@ mod java_defects4j_jxpath_7_coreoperationlessthan;
 #[cfg(test)]
 mod java_defects4j_jxpath_7_coreoperationlessthanorequal;
 #[cfg(test)]
+mod java_defects4j_jxpath_7_coreoperationrelationalexpression;
+#[cfg(test)]
 mod java_defects4j_lang_28_numericentityunescaper;
 #[cfg(test)]
 mod java_defects4j_math_14_weight;
@@ -117,6 +121,8 @@ mod java_defects4j_mockito_19_mockcandidatefilter;
 mod java_defects4j_mockito_19_namebasedcandidatefilter;
 #[cfg(test)]
 mod java_defects4j_mockito_19_typebasedcandidatefilter;
+#[cfg(test)]
+mod java_defects4j_mockito_21_constructorinstantiator;
 #[cfg(test)]
 mod java_defects4j_mockito_22_equality;
 #[cfg(test)]
