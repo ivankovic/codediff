@@ -17,7 +17,7 @@
  */
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants_with_known_violations;
 use anyhow::Result;
 
 #[test]
@@ -38,5 +38,14 @@ fn painting() -> Result<()> {
 
 #[test]
 fn invariants() -> Result<()> {
-    assert_ground_truth_invariants("java-refactor-constants")
+    // Invariant 9, found when it was added on 2026-09-13: the painting pairs text that the
+    // fixture's own tree mapping leaves unmatched, so one record says the code survived and the
+    // other says it did not. Recorded rather than repaired - pairing the nodes in the mapping
+    // and dropping the painted Move are both one edit, and which of the two records is the
+    // author's real reading is the author's to say.
+    // Here the literal `3.14159` leaves `return 3.14159 * radius * radius;` on before row 9
+    // and arrives in `private static final double PI = 3.14159;` on after row 2. Both
+    // paintings read that as one relocated literal; the mapping leaves the old occurrence
+    // deleted and the new one inserted. Two sites, counted once per painting.
+    assert_ground_truth_invariants_with_known_violations("java-refactor-constants", 4)
 }

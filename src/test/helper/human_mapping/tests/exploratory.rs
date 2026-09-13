@@ -421,6 +421,104 @@ fn mapping_vs_painting_disagreement_detail_for_fixture() -> Result<()> {
     Ok(())
 }
 
+/// EXPLORATORY: which *kinds* of disagreement exist between the two ground truths, over the whole
+/// corpus, as a census of `(painted, from_tree)` label pairs.
+///
+/// The question it answers is which pairs never occur. A pair that appears nowhere across the
+/// corpus is a candidate invariant - the two humans never once said those two things about the
+/// same byte - while a pair that appears everywhere is the granularity difference the paper
+/// reports rather than a contradiction. Run with `cargo test --lib --features test-fixtures
+/// mapping_vs_painting_label_census -- --ignored --nocapture`.
+///
+/// `move_only` is counted apart for the reason `text_mapping_disagreements`' own doc gives: the
+/// tree side's `Move` comes from `TextDiff::from`'s column-shift heuristic and neither ground
+/// truth expresses `Move` positionally, so a pair involving it measures the renderer rather than
+/// either human.
+#[test]
+#[ignore]
+fn mapping_vs_painting_label_census() -> Result<()> {
+    use std::collections::BTreeMap;
+    use std::fs;
+
+    let diffs_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("src")
+        .join("test")
+        .join("data")
+        .join("diffs");
+    let mut names: Vec<(String, String)> = Vec::new();
+    for dataset in crate::test::helper::DIFF_DATASETS {
+        let dir = diffs_dir.join(dataset);
+        if !dir.is_dir() {
+            continue;
+        }
+        for entry in fs::read_dir(&dir)?.filter_map(|entry| entry.ok()) {
+            if entry.path().is_dir() {
+                names.push((
+                    (*dataset).to_string(),
+                    entry.file_name().to_string_lossy().into_owned(),
+                ));
+            }
+        }
+    }
+    names.sort();
+
+    let mut bytes: BTreeMap<(String, String), usize> = BTreeMap::new();
+    let mut fixtures: BTreeMap<(String, String), usize> = BTreeMap::new();
+    let mut move_only_bytes = 0usize;
+    let mut scored = 0usize;
+    let mut skipped = 0usize;
+    for (_, name) in &names {
+        let Ok(mapping) = load(name) else {
+            continue;
+        };
+        if mapping.text_mappings.is_empty() {
+            continue;
+        }
+        let Ok(pair) = crate::test::helper::handmade_test_code_pair(name) else {
+            skipped += 1;
+            continue;
+        };
+        let (before, after) = &*pair;
+        let Ok(Some(check)) = text_mapping_disagreements(&mapping, before, after) else {
+            skipped += 1;
+            continue;
+        };
+        scored += 1;
+        let mut seen: std::collections::BTreeSet<(String, String)> = Default::default();
+        for d in &check.disagreements {
+            if disagreement_is_move_only(d) {
+                move_only_bytes += d.end_byte - d.start_byte;
+                continue;
+            }
+            let key = (format!("{:?}", d.painted), format!("{:?}", d.from_tree));
+            *bytes.entry(key.clone()).or_default() += d.end_byte - d.start_byte;
+            seen.insert(key);
+        }
+        for key in seen {
+            *fixtures.entry(key).or_default() += 1;
+        }
+    }
+
+    eprintln!("{scored} painted fixture(s) scored, {skipped} skipped (no tree or unreadable)");
+    eprintln!("move-only bytes (renderer artifact, counted apart): {move_only_bytes}");
+    eprintln!(
+        "{:<12} {:<12} {:>10} {:>10}",
+        "painted", "from_tree", "bytes", "fixtures"
+    );
+    let mut rows: Vec<_> = bytes.iter().collect();
+    rows.sort_by_key(|(_, count)| std::cmp::Reverse(**count));
+    for (key, count) in rows {
+        eprintln!(
+            "{:<12} {:<12} {:>10} {:>10}",
+            key.0,
+            key.1,
+            count,
+            fixtures.get(key).copied().unwrap_or(0)
+        );
+    }
+    Ok(())
+}
+
 /// EXPLORATORY: prints just the Minimal/Full percentages for fixtures named by the
 /// `FIXTURES` env var (comma-separated): `FIXTURES=a,b,c cargo test --lib --features test-fixtures
 /// measure_stub_fixtures -- --ignored --nocapture`.

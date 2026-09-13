@@ -21,7 +21,7 @@
 //! `assert_matches_human_painting_within_limit` both ask "is codediff right?", and both answer it
 //! against data whose own internal consistency nothing checks - a painting that ends a highlight
 //! in the middle of a run of spaces, or paints an opening brace and not its closing one, grades
-//! codediff against a claim its author would not defend if it were pointed out. These eight
+//! codediff against a claim its author would not defend if it were pointed out. These nine
 //! invariants are that missing half: they can fail only because the hand-authored data disagrees
 //! with itself.
 //!
@@ -38,6 +38,8 @@
 //! * [`painted_ranges_do_not_overlap`] - no two ranges of one painting claim the same byte.
 //! * [`presets_agree_on_what_survives`] - a byte one preset paints `Move` is never painted
 //!   `Insert` or `Delete` by the other.
+//! * [`mapping_and_painting_agree_on_what_survives`] - a byte the painting paints `Move` is never
+//!   one the tree mapping leaves unmatched.
 //!
 //! Invariants 4 and 5 were added on 2026-09-08 and wired in the same day, at **zero violations
 //! across all 249 painted fixtures** - so unlike the first three they arrived with no clamped
@@ -49,7 +51,10 @@
 //! of eleven measured that day that fired anywhere at all. Invariant 8 followed it the same day at
 //! **zero violations**, and is not vacuous for it: 285 fixtures carry both a `Minimal` and a `Full`
 //! painting, 2,653 bytes are painted `Move` by both of them, and not one of those is called
-//! `Insert` or `Delete` by the other preset.
+//! `Insert` or `Delete` by the other preset. Invariant 9 is the same question asked across the two
+//! *ground truths* rather than across the two presets, and is the only rule here that compares them
+//! at all: they are expected to differ about how one edit is chunked, which is what the paper
+//! reports, and this is the one thing they cannot differ about. Five fixtures break it.
 //!
 //! **Per fixture, not corpus-wide.** These are wired in as a third `invariants()` test in each
 //! `src/test/fixtures/**` file, next to that fixture's `mapping()` and `painting()`, so a fixture
@@ -106,6 +111,9 @@ pub fn ground_truth_invariant_violations_for(
     }
     violations.extend(full_painting_covers_minimal(mapping, before, after)?);
     violations.extend(presets_agree_on_what_survives(mapping, before, after)?);
+    violations.extend(mapping_and_painting_agree_on_what_survives(
+        mapping, before, after,
+    )?);
     violations.extend(delimiter_pairs_agree(mapping, before, after));
     // Invariants 4 and 5 read only the paintings `FULL` answers to, so they take their own pass
     // over `paintings_with_labels` rather than the `paintings` list above - which holds every
@@ -806,6 +814,103 @@ fn painted_ranges_do_not_overlap(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────
+// Invariant 9: the mapping and the painting agree on what survives
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+
+/// **Invariant 9.** A byte the painting calls `Move` is not one the tree mapping leaves unmatched.
+///
+/// The two ground truths are authored independently and are *expected* to differ: they chunk one
+/// edit completely differently, which is what [`super::text_mapping_disagreements`] measures and
+/// what the paper reports. This is the one thing they cannot differ about. A painted `Move` is a
+/// `Match` whose two spans read byte-identically, so the painter has said that code survives; an
+/// unmatched node in the tree mapping is one the same person said has no counterpart. Both
+/// statements are about the same bytes and only one of them can hold.
+///
+/// **Only that direction.** The tree side's own `Move` labels come from `TextDiff::from`'s
+/// column-shift heuristic rather than from either ground truth - neither expresses `Move`
+/// positionally - so a byte the *tree* renders `Move` and the painting calls `Delete` measures the
+/// renderer, not the humans. That pair is the larger of the two in the corpus (753 bytes over 8
+/// fixtures against 96 over 5) and is deliberately not reported. `Delete` and `Insert` on the tree
+/// side carry no such caveat: they are nodes the human left unmatched.
+///
+/// Every painting is checked rather than the best-matching one. Each named painting asserts that
+/// it is a correct rendering of the edit, and a rendering that contradicts the mapping about
+/// survival is wrong whether or not a sibling painting agrees.
+fn mapping_and_painting_agree_on_what_survives(
+    mapping: &super::HumanMapping,
+    before: &Code,
+    after: &Code,
+) -> Result<Vec<String>> {
+    if mapping.text_mappings.is_empty() || mapping.entries.is_empty() {
+        return Ok(Vec::new());
+    }
+    let Ok(ast_diff) = super::as_ast_diff_for_mapping(mapping, before, after) else {
+        return Ok(Vec::new());
+    };
+    let node_cache = crate::diff::NodeCache::build(before, after);
+    let text_diff = crate::diff::text::TextDiff::from(before, after, &ast_diff, &node_cache);
+    let tree = [
+        super::label_bytes_from_ranges(&before.contents, &text_diff.all(0)),
+        super::label_bytes_from_ranges(&after.contents, &text_diff.all(1)),
+    ];
+
+    let mut violations = Vec::new();
+    for named in &mapping.text_mappings {
+        let painted = painted_labels(named, before, after)?;
+        violations.extend(move_against_unmatched(
+            &named.name,
+            &painted,
+            &tree,
+            before,
+            after,
+        ));
+    }
+    Ok(violations)
+}
+
+/// [`mapping_and_painting_agree_on_what_survives`]' comparison, over the two projections it has
+/// already built - split out so it can be tested against label vectors directly. Building the tree
+/// side needs a real `ASTDiff` and a renderer, and what this rule says is about the labels.
+fn move_against_unmatched(
+    painting: &str,
+    painted: &PaintedLabels,
+    tree: &PaintedLabels,
+    before: &Code,
+    after: &Code,
+) -> Vec<String> {
+    let mut violations = Vec::new();
+    for (side, contents) in [(0usize, &before.contents), (1usize, &after.contents)] {
+        let mut count = 0usize;
+        let mut first = String::new();
+        for (offset, (paint, from_tree)) in painted[side].iter().zip(tree[side].iter()).enumerate()
+        {
+            if *paint != Some(TextLabel::Move)
+                || !matches!(from_tree, Some(TextLabel::Delete | TextLabel::Insert))
+            {
+                continue;
+            }
+            if count == 0 {
+                first = format!(
+                    "row {}, which the mapping reads {:?}",
+                    contents[..offset].matches('\n').count() + 1,
+                    from_tree.expect("matched above"),
+                );
+            }
+            count += 1;
+        }
+        if count > 0 {
+            violations.push(format!(
+                "painting '{painting}' {} paints {count} byte(s) Move that the tree mapping leaves \
+                 unmatched, from {first} - a Move says the code survives and an unmatched node \
+                 says it does not",
+                side_name(side),
+            ));
+        }
+    }
+    violations
+}
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────
 // Invariant 3: a delimiter and its partner carry one verdict
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 
@@ -1413,6 +1518,101 @@ mod tests {
             vec![("(", 4), ("{", 7), ("(", 10)],
             "the `(` at column 12 is inside a string literal and must not be paired"
         );
+    }
+
+    // ── Invariant 9 ─────────────────────────────────────────────────────────────────────────
+
+    fn survival_across_records(mapping: &HumanMapping, before: &Code, after: &Code) -> Vec<String> {
+        violations(mapping, before, after)
+            .into_iter()
+            .filter(|v| v.contains("the tree mapping leaves unmatched"))
+            .collect()
+    }
+
+    /// Label vectors rather than a built mapping: the tree side of this rule comes from a real
+    /// `ASTDiff` put through `TextDiff::from`, and that renderer reads the *text*, so a synthetic
+    /// pair contrived to make it emit a `Delete` ends up testing the renderer instead of the rule.
+    /// The five corpus fixtures clamped for this invariant are what exercise the wiring.
+    fn labels(before_len: usize, after_len: usize) -> PaintedLabels {
+        [vec![None; before_len], vec![None; after_len]]
+    }
+
+    #[test]
+    fn a_painted_move_over_a_node_the_mapping_deletes_is_reported() {
+        let source = rust("let value = 1;\n");
+        let mut painted = labels(source.contents.len(), source.contents.len());
+        let mut tree = labels(source.contents.len(), source.contents.len());
+        for offset in 4..9 {
+            painted[0][offset] = Some(TextLabel::Move);
+            tree[0][offset] = Some(TextLabel::Delete);
+        }
+
+        let reported = move_against_unmatched("Minimal", &painted, &tree, &source, &source);
+        assert_eq!(reported.len(), 1, "got {reported:#?}");
+        assert!(reported[0].contains("5 byte(s) Move"), "got {reported:#?}");
+        assert!(reported[0].contains("Delete"), "got {reported:#?}");
+    }
+
+    #[test]
+    fn a_painted_move_over_a_node_the_mapping_inserts_is_reported() {
+        let source = rust("let value = 1;\n");
+        let mut painted = labels(source.contents.len(), source.contents.len());
+        let mut tree = labels(source.contents.len(), source.contents.len());
+        painted[1][4] = Some(TextLabel::Move);
+        tree[1][4] = Some(TextLabel::Insert);
+
+        let reported = move_against_unmatched("Full", &painted, &tree, &source, &source);
+        assert_eq!(reported.len(), 1, "got {reported:#?}");
+        assert!(reported[0].contains("after"), "got {reported:#?}");
+    }
+
+    /// The direction this rule deliberately does not take: the tree side's `Move` comes from
+    /// `TextDiff::from`'s column-shift heuristic rather than from either ground truth, so a byte
+    /// the tree renders `Move` and the painting calls `Delete` measures the renderer. It is also
+    /// the larger of the two in the corpus, which is what makes reporting it a bad trade.
+    #[test]
+    fn a_painted_delete_over_a_node_the_renderer_calls_moved_is_not_reported() {
+        let source = rust("let value = 1;\n");
+        let mut painted = labels(source.contents.len(), source.contents.len());
+        let mut tree = labels(source.contents.len(), source.contents.len());
+        painted[0][4] = Some(TextLabel::Delete);
+        tree[0][4] = Some(TextLabel::Move);
+
+        assert!(
+            move_against_unmatched("Minimal", &painted, &tree, &source, &source).is_empty(),
+            "only a painted Move against an unmatched node is a contradiction"
+        );
+    }
+
+    /// The two records differing about *granularity* is the ordinary case, not a contradiction.
+    #[test]
+    fn a_painted_move_the_mapping_calls_updated_is_not_reported() {
+        let source = rust("let value = 1;\n");
+        let mut painted = labels(source.contents.len(), source.contents.len());
+        let mut tree = labels(source.contents.len(), source.contents.len());
+        painted[0][4] = Some(TextLabel::Move);
+        tree[0][4] = Some(TextLabel::Update);
+
+        assert!(
+            move_against_unmatched("Minimal", &painted, &tree, &source, &source).is_empty(),
+            "an Update says the node survived too"
+        );
+    }
+
+    /// A fixture with one ground truth and not the other has nothing to compare.
+    #[test]
+    fn a_fixture_with_no_tree_mapping_is_skipped() {
+        let source = rust("fn f() { g(); }\n");
+        let mapping = painted(vec![(
+            "Only one solution",
+            vec![HumanTextEntry {
+                operation: HumanTextOperation::Match,
+                before: vec![span(0, 9, 0, 10)],
+                after: vec![span(0, 9, 0, 10)],
+            }],
+        )]);
+
+        assert!(survival_across_records(&mapping, &source, &source).is_empty());
     }
 
     // ── Invariant 3, the mapped half ────────────────────────────────────────────────────────

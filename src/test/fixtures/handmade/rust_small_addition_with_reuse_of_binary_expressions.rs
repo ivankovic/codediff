@@ -56,8 +56,12 @@ fn invariants() -> Result<()> {
     // Here the `Full` before side matches `if` on rows 374 and 399 and separately matches each
     // of those rows from column 0 through the `if`, so the shorter range sits inside the
     // longer one twice over.
+    //
+    // 2 -> 4 on 2026-09-13 with invariant 9: both paintings pair two or three bytes of
+    // `if !column_shift_is_meaningful && !crossed_backwards {` on after row 399 with text the
+    // mapping calls inserted. Recorded rather than repaired, as above.
     assert_ground_truth_invariants_with_known_violations(
         "rust-small-addition-with-reuse-of-binary-expressions",
-        2,
+        4,
     )
 }

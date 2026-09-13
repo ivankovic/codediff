@@ -66,5 +66,10 @@ fn invariants() -> Result<()> {
     // that a single-row range also covers from column 0 (rows 178 and 179 on the before side,
     // row 179 on the after side, plus the `}` of row 181 inside the whole-line range over it).
     // Recorded rather than repaired, as above.
-    assert_ground_truth_invariants_with_known_violations("rust-next-font-imports-generator", 5)
+    //
+    // 5 -> 6 on 2026-09-13 with invariant 9: the `Full` painting pairs the 60 bytes of
+    // `if let Expr::Ident(ident) = &**callee_expr {` on before row 23 with text elsewhere,
+    // while the mapping leaves that condition unmatched - the same `if let` region this
+    // fixture's other residuals sit in.
+    assert_ground_truth_invariants_with_known_violations("rust-next-font-imports-generator", 6)
 }
