@@ -360,6 +360,11 @@ path = "src/bin/file_stats.rs"
 required-features = ["stats"]
 
 [[bin]]
+name = "reclassify_tips"
+path = "src/bin/reclassify_tips.rs"
+required-features = ["stats"]
+
+[[bin]]
 name = "sample_test_diffs"
 path = "src/bin/sample_test_diffs.rs"
 required-features = ["stats"]

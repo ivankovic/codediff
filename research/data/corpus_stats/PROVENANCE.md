@@ -121,3 +121,14 @@ creations.
 `make measure-commit-stats MODE=full` was deliberately not run. No paper macro reads the `commits`
 table, and `stats.sqlite`'s `lines_added`/`lines_removed`/`nodes_*` columns are hardcoded to zero
 by `commit_stats.rs`.
+
+## The file-type classifier changed after this run
+
+`src/code/tip.rs` was widened on 2026-09-13 (many more extensions and file names, measured with
+the new `reclassify_tips` binary), so `tips.png` and the `Unknown` share it shows reflect the
+*old* tables: on the dev machine's Full List snapshot the same change moves Unknown from 29.3% to
+6.6%, almost all of it into Data and Code. To refresh the figure without re-walking the corpus,
+run `make reclassify-tips MODE=full RECLASSIFY_FLAGS=--write` and then `make file-stats-report`
+against this run's `stats.sqlite`, and record it here. Rows reclassified that way carry no
+size/AST numbers (they were never read), so `code_percentiles.csv` is unaffected by them until the
+corpus is re-walked.

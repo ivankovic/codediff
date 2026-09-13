@@ -38,7 +38,7 @@ LIST = $(if $(filter tiny,$(MODE)),$(LIST_TINY),$(if $(filter small,$(MODE)),$(L
 REPOSITORIES_DIR = /var/tmp/research/$(MODE)/repositories/
 RESEARCH_DIR = /var/tmp/research/$(MODE)/
 
-.PHONY: build clean clean-db fetch file-stats-report measure-file-stats measure-commit-stats \
+.PHONY: build clean clean-db fetch file-stats-report measure-file-stats reclassify-tips measure-commit-stats \
 	debug-stats analyze tiny small full sample-pairs sample-pairs-all measure-pairs \
 	measure-code-pair-diffs pairs-diff-report measure-sampled matching-reasons-report \
 	shapes-report measure-edit-shape ambiguity-report rendering-report measure-tools-timing \
@@ -83,6 +83,15 @@ file-stats-report:
 measure-file-stats: build
 	$(BIN_DIR)/file_stats --path $(REPOSITORIES_DIR) --db $(RESEARCH_DIR)/stats.sqlite
 	$(MAKE) file-stats-report
+
+# Recomputes the `tip` (file type) column of an existing stats.sqlite from the stored paths with
+# the current src/code/tip.rs tables, without touching the checkouts. Dry-run: prints the category
+# shares before and after plus what is still unclassified. Add RECLASSIFY_FLAGS=--write to apply,
+# then `make file-stats-report` to regenerate the file-type figure, and record the reclassification
+# in that corpus's PROVENANCE.md. See src/bin/reclassify_tips.rs for what such a row does and does
+# not carry afterwards.
+reclassify-tips: build
+	$(BIN_DIR)/reclassify_tips --db $(RESEARCH_DIR)/stats.sqlite $(RECLASSIFY_FLAGS)
 
 measure-commit-stats: build
 	$(BIN_DIR)/commit_stats --path $(REPOSITORIES_DIR) --db $(RESEARCH_DIR)/stats.sqlite
