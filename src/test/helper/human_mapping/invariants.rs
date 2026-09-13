@@ -21,7 +21,7 @@
 //! `assert_matches_human_painting_within_limit` both ask "is codediff right?", and both answer it
 //! against data whose own internal consistency nothing checks - a painting that ends a highlight
 //! in the middle of a run of spaces, or paints an opening brace and not its closing one, grades
-//! codediff against a claim its author would not defend if it were pointed out. These seven
+//! codediff against a claim its author would not defend if it were pointed out. These eight
 //! invariants are that missing half: they can fail only because the hand-authored data disagrees
 //! with itself.
 //!
@@ -36,6 +36,8 @@
 //! * [`minimal_never_paints_leading_whitespace`] - a `Minimal` painting never claims a line's
 //!   indentation, which is the mirror of the rule above it.
 //! * [`painted_ranges_do_not_overlap`] - no two ranges of one painting claim the same byte.
+//! * [`presets_agree_on_what_survives`] - a byte one preset paints `Move` is never painted
+//!   `Insert` or `Delete` by the other.
 //!
 //! Invariants 4 and 5 were added on 2026-09-08 and wired in the same day, at **zero violations
 //! across all 249 painted fixtures** - so unlike the first three they arrived with no clamped
@@ -43,8 +45,11 @@
 //! [`paintings_with_labels`]; `MINIMAL` is the tight reading and is free to leave whitespace
 //! alone, which is what invariant 6 states in its own right.
 //!
-//! Invariant 7 arrived last, on 2026-09-13, with seven `handmade` fixtures behind it - the only
-//! candidate of eleven measured that day that fired anywhere at all.
+//! Invariant 7 arrived on 2026-09-13 with seven `handmade` fixtures behind it, the only candidate
+//! of eleven measured that day that fired anywhere at all. Invariant 8 followed it the same day at
+//! **zero violations**, and is not vacuous for it: 285 fixtures carry both a `Minimal` and a `Full`
+//! painting, 2,653 bytes are painted `Move` by both of them, and not one of those is called
+//! `Insert` or `Delete` by the other preset.
 //!
 //! **Per fixture, not corpus-wide.** These are wired in as a third `invariants()` test in each
 //! `src/test/fixtures/**` file, next to that fixture's `mapping()` and `painting()`, so a fixture
@@ -100,6 +105,7 @@ pub fn ground_truth_invariant_violations_for(
         violations.extend(painted_ranges_do_not_overlap(named, before, after));
     }
     violations.extend(full_painting_covers_minimal(mapping, before, after)?);
+    violations.extend(presets_agree_on_what_survives(mapping, before, after)?);
     violations.extend(delimiter_pairs_agree(mapping, before, after));
     // Invariants 4 and 5 read only the paintings `FULL` answers to, so they take their own pass
     // over `paintings_with_labels` rather than the `paintings` list above - which holds every
@@ -619,6 +625,105 @@ pub fn full_painting_whitespace_violations(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────
+// Invariant 8: a byte one preset calls Move is not removed or added by the other
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+
+/// **Invariant 8.** A byte one preset paints `Move` is never painted `Insert` or `Delete` by the
+/// other.
+///
+/// `Move` is the one verdict that asserts the bytes *survive*: a `Match` whose two spans read
+/// byte-identically is the same code somewhere else. `Delete` says those bytes leave the file and
+/// `Insert` says they arrive in it. The two presets are two renderings of one edit, so whatever
+/// else they may disagree about, they cannot disagree about whether the code is still there.
+///
+/// **`Move` against `Update` is not a contradiction and is not reported.** That pair is the
+/// ordinary difference between the presets, stated in [`full_painting_covers_minimal`]: `Full`
+/// routinely widens a `Move` into the `Update` that contains it, and both readings agree the code
+/// survived. Only the survive-or-not pair is a contradiction, which is why this rule is narrower
+/// than "the two presets label every shared byte the same" - a rule that shape fires on 20
+/// fixtures and would be measuring the widening.
+///
+/// Alternatives are a disjunction, exactly as in invariant 2: a `Minimal (left)` need only be
+/// consistent with *some* `Full` alternative, so each `Minimal` is scored against its closest
+/// `Full` and only an alternative that contradicts every one of them is reported. A fixture whose
+/// single painting answers for both presets has nothing to compare and is skipped.
+fn presets_agree_on_what_survives(
+    mapping: &super::HumanMapping,
+    before: &Code,
+    after: &Code,
+) -> Result<Vec<String>> {
+    let (Ok(minimal), Ok(full)) = (
+        paintings_for_mode(mapping, RenderOptions::MINIMAL),
+        paintings_for_mode(mapping, RenderOptions::FULL),
+    ) else {
+        return Ok(Vec::new());
+    };
+    if minimal
+        .iter()
+        .all(|m| full.iter().any(|f| std::ptr::eq(*m, *f)))
+    {
+        return Ok(Vec::new());
+    }
+
+    /// Whether one byte's two readings disagree about the code being there at all.
+    fn contradicts(one: TextLabel, other: TextLabel) -> bool {
+        matches!(
+            (one, other),
+            (TextLabel::Move, TextLabel::Insert | TextLabel::Delete)
+                | (TextLabel::Insert | TextLabel::Delete, TextLabel::Move)
+        )
+    }
+
+    let mut violations = Vec::new();
+    for minimal in &minimal {
+        let minimal_labels = painted_labels(minimal, before, after)?;
+        let mut closest: Option<(usize, &str, String)> = None;
+        for full in &full {
+            let full_labels = painted_labels(full, before, after)?;
+            let mut count = 0usize;
+            let mut first = String::new();
+            for (side, contents) in [(0usize, &before.contents), (1usize, &after.contents)] {
+                for (offset, (left, right)) in minimal_labels[side]
+                    .iter()
+                    .zip(full_labels[side].iter())
+                    .enumerate()
+                {
+                    let (Some(left), Some(right)) = (left, right) else {
+                        continue;
+                    };
+                    if !contradicts(*left, *right) {
+                        continue;
+                    }
+                    if count == 0 {
+                        first = format!(
+                            "{} row {} reads {left:?} under '{}' and {right:?} under '{}'",
+                            side_name(side),
+                            contents[..offset].matches('\n').count() + 1,
+                            minimal.name,
+                            full.name,
+                        );
+                    }
+                    count += 1;
+                }
+            }
+            if closest.as_ref().is_none_or(|(best, _, _)| count < *best) {
+                closest = Some((count, full.name.as_str(), first));
+            }
+        }
+        if let Some((count, _, first)) = closest
+            && count > 0
+        {
+            violations.push(format!(
+                "{count} byte(s) survive under one preset and do not under the other - {first}. \
+                 A Move says the code is still there, so the other preset cannot call it removed \
+                 or added"
+            ));
+        }
+    }
+    Ok(violations)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────
 // Invariant 7: two painted ranges never claim the same byte
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 
@@ -985,6 +1090,76 @@ mod tests {
 
     fn violations(mapping: &HumanMapping, before: &Code, after: &Code) -> Vec<String> {
         ground_truth_invariant_violations_for(mapping, before, after).expect("checks run")
+    }
+
+    // ── Invariant 8 ─────────────────────────────────────────────────────────────────────────
+
+    /// A `Match` over the same columns of both sides - byte-identical, so it resolves to `Move`.
+    fn moved(at: usize, count: usize) -> HumanTextEntry {
+        HumanTextEntry {
+            operation: HumanTextOperation::Match,
+            before: vec![span(0, at, 0, at + count)],
+            after: vec![span(0, at, 0, at + count)],
+        }
+    }
+
+    fn survival_violations(mapping: &HumanMapping, before: &Code, after: &Code) -> Vec<String> {
+        violations(mapping, before, after)
+            .into_iter()
+            .filter(|v| v.contains("survive under one preset"))
+            .collect()
+    }
+
+    #[test]
+    fn a_byte_moved_under_one_preset_and_deleted_under_the_other_is_reported() {
+        let source = rust("let value = 1;\n");
+        let mapping = painted(vec![
+            ("Minimal", vec![moved(4, 5)]),
+            ("Full", vec![deleted(4, 5)]),
+        ]);
+
+        let reported = survival_violations(&mapping, &source, &source);
+        assert_eq!(reported.len(), 1, "got {reported:?}");
+        assert!(reported[0].contains("5 byte(s)"), "got {reported:?}");
+    }
+
+    /// The pair the presets are *expected* to differ on: `Full` widening a `Move` into the `Update`
+    /// that contains it. Both readings agree the code survived, so there is nothing to report.
+    #[test]
+    fn a_move_widened_into_an_update_is_not_a_contradiction() {
+        let before = rust("let value = 1;\n");
+        let after = rust("let value = 2;\n");
+        let updated = HumanTextEntry {
+            operation: HumanTextOperation::Match,
+            before: vec![span(0, 4, 0, 13)],
+            after: vec![span(0, 4, 0, 13)],
+        };
+        let mapping = painted(vec![
+            ("Minimal", vec![moved(4, 5)]),
+            ("Full", vec![updated]),
+        ]);
+
+        assert!(
+            survival_violations(&mapping, &before, &after).is_empty(),
+            "a widening changes the colour, not whether the code is there"
+        );
+    }
+
+    /// Alternatives are a disjunction: one `Full` reading contradicting a `Minimal` says nothing
+    /// while another agrees with it.
+    #[test]
+    fn a_minimal_consistent_with_some_full_alternative_is_not_reported() {
+        let source = rust("let value = 1;\n");
+        let mapping = painted(vec![
+            ("Minimal", vec![moved(4, 5)]),
+            ("Full (left)", vec![deleted(4, 5)]),
+            ("Full (right)", vec![moved(4, 5)]),
+        ]);
+
+        assert!(
+            survival_violations(&mapping, &source, &source).is_empty(),
+            "'Full (right)' agrees, which is all a disjunction needs"
+        );
     }
 
     // ── Invariant 7 ─────────────────────────────────────────────────────────────────────────
