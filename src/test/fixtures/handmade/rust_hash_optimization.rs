@@ -19,7 +19,7 @@ use crate::diff;
 use crate::diff::ASTMappingOperation;
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants_with_known_violations;
 use anyhow::Result;
 
 #[test]
@@ -288,5 +288,10 @@ fn painting() -> Result<()> {
 
 #[test]
 fn invariants() -> Result<()> {
-    assert_ground_truth_invariants("rust-hash-optimization")
+    // Invariant 7, found when it was added on 2026-09-13 and recorded rather than repaired:
+    // an overlap is a one-line edit to make, but which of the two ranges is the one to shorten
+    // is the painter's reading of the edit, not a mechanical choice.
+    // Here two `Minimal` inserts start at the same column of row 37, one claiming `)` and the
+    // other `);` - the second contains the first.
+    assert_ground_truth_invariants_with_known_violations("rust-hash-optimization", 1)
 }

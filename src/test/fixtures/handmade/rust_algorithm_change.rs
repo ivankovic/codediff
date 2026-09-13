@@ -17,7 +17,7 @@
  */
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants_with_known_violations;
 use anyhow::Result;
 
 #[test]
@@ -65,5 +65,10 @@ fn painting() -> Result<()> {
 
 #[test]
 fn invariants() -> Result<()> {
-    assert_ground_truth_invariants("rust-algorithm-change")
+    // Invariant 7, found when it was added on 2026-09-13 and recorded rather than repaired:
+    // an overlap is a one-line edit to make, but which of the two ranges is the one to shorten
+    // is the painter's reading of the edit, not a mechanical choice.
+    // Here the `Full` after side inserts rows 4..5 from column 4, and separately inserts the
+    // indentation and `/` of row 4 (columns 0..5), so the two share column 4.
+    assert_ground_truth_invariants_with_known_violations("rust-algorithm-change", 1)
 }

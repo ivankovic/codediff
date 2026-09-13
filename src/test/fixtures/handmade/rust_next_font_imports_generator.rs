@@ -60,5 +60,11 @@ fn invariants() -> Result<()> {
     // rows 92/144 and 97/143 - the `if let Some(decl)` / `if let Some(expr)` nesting, with the
     // human's pairing crossed between them. The 22/86 and 24/84 pair was re-paired by hand on
     // 2026-09-06. Part of the same unreviewed region as this fixture's painting residual.
-    assert_ground_truth_invariants_with_known_violations("rust-next-font-imports-generator", 2)
+    //
+    // 2 -> 5 on 2026-09-13 with invariant 7: three ranges of the `Full` painting land on ground
+    // an earlier range already claimed, all the same shape - a multi-row range ending on a row
+    // that a single-row range also covers from column 0 (rows 178 and 179 on the before side,
+    // row 179 on the after side, plus the `}` of row 181 inside the whole-line range over it).
+    // Recorded rather than repaired, as above.
+    assert_ground_truth_invariants_with_known_violations("rust-next-font-imports-generator", 5)
 }

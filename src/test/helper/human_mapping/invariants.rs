@@ -21,7 +21,7 @@
 //! `assert_matches_human_painting_within_limit` both ask "is codediff right?", and both answer it
 //! against data whose own internal consistency nothing checks - a painting that ends a highlight
 //! in the middle of a run of spaces, or paints an opening brace and not its closing one, grades
-//! codediff against a claim its author would not defend if it were pointed out. These five
+//! codediff against a claim its author would not defend if it were pointed out. These seven
 //! invariants are that missing half: they can fail only because the hand-authored data disagrees
 //! with itself.
 //!
@@ -33,12 +33,18 @@
 //!   inserted, or every one deleted, has no unpainted byte before its last visible character.
 //! * [`no_unpainted_whitespace_between_painted_regions`] - a `Full` painting never breaks one
 //!   highlight in two over whitespace.
+//! * [`minimal_never_paints_leading_whitespace`] - a `Minimal` painting never claims a line's
+//!   indentation, which is the mirror of the rule above it.
+//! * [`painted_ranges_do_not_overlap`] - no two ranges of one painting claim the same byte.
 //!
-//! The last two were added on 2026-09-08 and wired in the same day, at **zero violations across
-//! all 249 painted fixtures** - so unlike the first three they arrive with no clamped fixtures
-//! behind them. Both are scoped to the paintings `FULL` is answerable to, via
+//! Invariants 4 and 5 were added on 2026-09-08 and wired in the same day, at **zero violations
+//! across all 249 painted fixtures** - so unlike the first three they arrived with no clamped
+//! fixtures behind them. Both are scoped to the paintings `FULL` is answerable to, via
 //! [`paintings_with_labels`]; `MINIMAL` is the tight reading and is free to leave whitespace
-//! alone.
+//! alone, which is what invariant 6 states in its own right.
+//!
+//! Invariant 7 arrived last, on 2026-09-13, with seven `handmade` fixtures behind it - the only
+//! candidate of eleven measured that day that fired anywhere at all.
 //!
 //! **Per fixture, not corpus-wide.** These are wired in as a third `invariants()` test in each
 //! `src/test/fixtures/**` file, next to that fixture's `mapping()` and `painting()`, so a fixture
@@ -87,6 +93,11 @@ pub fn ground_truth_invariant_violations_for(
 
     for (name, labels) in &paintings {
         violations.extend(rows_end_on_visible_characters(name, labels, before, after));
+    }
+    // Reads the spans rather than the labels, so it takes the paintings themselves - see
+    // `painted_ranges_do_not_overlap` on why the projection cannot answer this one.
+    for named in &mapping.text_mappings {
+        violations.extend(painted_ranges_do_not_overlap(named, before, after));
     }
     violations.extend(full_painting_covers_minimal(mapping, before, after)?);
     violations.extend(delimiter_pairs_agree(mapping, before, after));
@@ -608,6 +619,88 @@ pub fn full_painting_whitespace_violations(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────
+// Invariant 7: two painted ranges never claim the same byte
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+
+/// **Invariant 7.** No two ranges of one painting claim the same byte.
+///
+/// An overlap is not representable. `render_paint_side` resolves one per byte by `PaintClass`'s
+/// `max`, so the highest-ranked *verdict* wins on screen, while `label_bytes` below fills its array
+/// in list order, so the *last entry* wins when the painting is scored. A painting with an overlap
+/// therefore looks like one thing and grades as another, and neither reader says so.
+///
+/// `human_solver` refuses a new one at the keystroke (`overlapping_painted_range`), which is why
+/// the corpus holds so few: the seven that remain were painted before that check existed. This is
+/// the same rule applied to what is already on disk.
+///
+/// **Checked against the raw spans, not the projected labels**, which is the one design decision
+/// here worth stating. Every other check in this file reads `label_bytes`' output, so that an
+/// invariant can never fire on a byte no comparison would look at. That projection is exactly what
+/// destroys the evidence for this rule - the later span simply wins and the array cannot tell you
+/// anything was ever double-claimed - so this walks the spans themselves.
+///
+/// A line terminator is never painted, whatever span covers it (see `label_bytes`), so two ranges
+/// meeting at a line break share only the newline and do not overlap. On a CRLF file the break is
+/// both bytes.
+///
+/// One violation per range that lands on ground an earlier range of the same painting already
+/// claimed, counted per side. A range overlapping two earlier ones still reports once: the repair
+/// is the same edit either way.
+fn painted_ranges_do_not_overlap(
+    named: &NamedTextMapping,
+    before: &Code,
+    after: &Code,
+) -> Vec<String> {
+    let mut violations = Vec::new();
+    for (side, contents) in [(0usize, &before.contents), (1usize, &after.contents)] {
+        let bytes = contents.as_bytes();
+        // Which entry claimed each byte, in list order - the same order `label_bytes` resolves by.
+        let mut claimed: Vec<Option<usize>> = vec![None; contents.len()];
+        for (index, entry) in named.mapping.entries.iter().enumerate() {
+            let spans = if side == 0 {
+                &entry.before
+            } else {
+                &entry.after
+            };
+            for span in spans {
+                let (Some(start), Some(end)) = (
+                    super::byte_offset(contents, span.start_row, span.start_column),
+                    super::byte_offset(contents, span.end_row, span.end_column),
+                ) else {
+                    continue;
+                };
+                let mut clash: Option<(usize, usize)> = None;
+                for offset in start..end.min(contents.len()) {
+                    if bytes[offset] == b'\n'
+                        || (bytes[offset] == b'\r' && bytes.get(offset + 1) == Some(&b'\n'))
+                    {
+                        continue;
+                    }
+                    match claimed[offset] {
+                        Some(owner) if clash.is_none() => clash = Some((owner, offset)),
+                        _ => {}
+                    }
+                    claimed[offset] = Some(index);
+                }
+                if let Some((owner, offset)) = clash {
+                    let row = contents[..offset].matches('\n').count();
+                    violations.push(format!(
+                        "painting '{}' {} range {} claims byte {offset} (row {}) already claimed by \
+                         range {owner} - an overlap renders by highest verdict and scores by list \
+                         order, so it reads as one painting and grades as another",
+                        named.name,
+                        side_name(side),
+                        index,
+                        row + 1,
+                    ));
+                }
+            }
+        }
+    }
+    violations
+}
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────
 // Invariant 3: a delimiter and its partner carry one verdict
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 
@@ -892,6 +985,92 @@ mod tests {
 
     fn violations(mapping: &HumanMapping, before: &Code, after: &Code) -> Vec<String> {
         ground_truth_invariant_violations_for(mapping, before, after).expect("checks run")
+    }
+
+    // ── Invariant 7 ─────────────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn two_ranges_claiming_the_same_byte_are_reported() {
+        let before = rust("let value = 1;\n");
+        let mapping = painted(vec![(
+            "Only one solution",
+            vec![deleted(4, 5), deleted(8, 3)],
+        )]);
+
+        let all = violations(&mapping, &before, &before);
+        let reported: Vec<&String> = all
+            .iter()
+            .filter(|v| v.contains("already claimed"))
+            .collect();
+        assert_eq!(reported.len(), 1, "got {reported:?}");
+        assert!(reported[0].contains("range 1"), "got {reported:?}");
+    }
+
+    /// The case the solver's own help promises is fine, and the reason this reads the bytes rather
+    /// than the rows: a range ending at column 0 of the next row swallows the break, and nothing
+    /// downstream paints a line terminator.
+    #[test]
+    fn two_ranges_meeting_at_a_line_break_do_not_overlap() {
+        let before = rust("let x = 1;\nlet y = 2;\n");
+        let first = HumanTextEntry {
+            operation: HumanTextOperation::Delete,
+            before: vec![span(0, 0, 1, 0)],
+            after: Vec::new(),
+        };
+        let second = HumanTextEntry {
+            operation: HumanTextOperation::Delete,
+            before: vec![span(1, 0, 1, 10)],
+            after: Vec::new(),
+        };
+        let mapping = painted(vec![("Only one solution", vec![first, second])]);
+
+        assert!(
+            !violations(&mapping, &before, &before)
+                .iter()
+                .any(|v| v.contains("already claimed")),
+            "sharing only the newline is not an overlap"
+        );
+    }
+
+    /// A Windows break is two bytes, and neither is painted - the same fix `label_bytes` carries.
+    #[test]
+    fn a_crlf_break_between_two_ranges_is_not_an_overlap() {
+        let before = rust("let x = 1;\r\nlet y = 2;\r\n");
+        let first = HumanTextEntry {
+            operation: HumanTextOperation::Delete,
+            before: vec![span(0, 0, 1, 0)],
+            after: Vec::new(),
+        };
+        let second = HumanTextEntry {
+            operation: HumanTextOperation::Delete,
+            before: vec![span(1, 0, 1, 10)],
+            after: Vec::new(),
+        };
+        let mapping = painted(vec![("Only one solution", vec![first, second])]);
+
+        assert!(
+            !violations(&mapping, &before, &before)
+                .iter()
+                .any(|v| v.contains("already claimed")),
+            "the CR belongs to the terminator, not to either range"
+        );
+    }
+
+    /// Two paintings are alternatives, not conjuncts, so one may claim a byte the other claims.
+    #[test]
+    fn two_paintings_may_claim_the_same_byte_as_each_other() {
+        let before = rust("let value = 1;\n");
+        let mapping = painted(vec![
+            ("Minimal", vec![deleted(4, 5)]),
+            ("Full", vec![deleted(0, 9)]),
+        ]);
+
+        assert!(
+            !violations(&mapping, &before, &before)
+                .iter()
+                .any(|v| v.contains("already claimed")),
+            "the rule is within one painting, not across them"
+        );
     }
 
     // ── Invariant 1 ─────────────────────────────────────────────────────────────────────────

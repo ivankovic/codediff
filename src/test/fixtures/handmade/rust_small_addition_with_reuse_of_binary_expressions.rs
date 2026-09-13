@@ -17,7 +17,7 @@
  */
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants_with_known_violations;
 use anyhow::Result;
 
 #[test]
@@ -50,5 +50,14 @@ fn painting() -> Result<()> {
 
 #[test]
 fn invariants() -> Result<()> {
-    assert_ground_truth_invariants("rust-small-addition-with-reuse-of-binary-expressions")
+    // Invariant 7, found when it was added on 2026-09-13 and recorded rather than repaired:
+    // an overlap is a one-line edit to make, but which of the two ranges is the one to shorten
+    // is the painter's reading of the edit, not a mechanical choice.
+    // Here the `Full` before side matches `if` on rows 374 and 399 and separately matches each
+    // of those rows from column 0 through the `if`, so the shorter range sits inside the
+    // longer one twice over.
+    assert_ground_truth_invariants_with_known_violations(
+        "rust-small-addition-with-reuse-of-binary-expressions",
+        2,
+    )
 }
