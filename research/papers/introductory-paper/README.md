@@ -71,9 +71,9 @@ closest one-to-one approximations (any consistent `min(N,M)` pairing). RA3.1 the
 ties between the human mapping and the harness's own matcher's mapping at a *different* mapping
 (`CostTieDifferent*` macros). Do not re-split them without touching both sections.
 
-**The title still reads as a tool-paper title** ("CodeDiff: A Fast, Robust, Production-Ready,
-Syntax-Aware Code Diffing Tool") and no longer matches the paper's shape. Left alone deliberately -
-retitling is the author's call.
+**The title still reads as a tool-paper title** ("CodeDiff: A Fast, Robust, Syntax-Aware Code
+Diffing Tool"; "Production-Ready" was dropped on the author's 2026-09-13 review) and no longer
+matches the paper's shape. Left alone deliberately - retitling further is the author's call.
 
 ## Status
 

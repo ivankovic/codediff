@@ -807,8 +807,8 @@ def write_codediff_dataset_table(accuracy_rows, datasets, quality_rows, output_p
         "% regenerate: make timing-report (from research/).",
         r"\begin{table}",
         (
-            r"  \caption{\textsc{CodeDiff} against the human mapping, per dataset of"
-            r" Section~\ref{sec:dataset} and overall. \emph{Perfect} is the share of fixtures with"
+            r"  \caption{\textsc{CodeDiff} against the human mapping."
+            r" \emph{Perfect} is the share of fixtures with"
             r" zero mismatched lines; \emph{Lines} is the pooled line-level mismatch rate on the"
             r" same basis as Table~\ref{tab:agreement-buckets}; \emph{Nodes} is the share of AST"
             r" nodes mapped correctly"
