@@ -2456,6 +2456,9 @@ fn handle_text_view(
         KeyCode::Char('a') => {
             action_paint_align(app, &mut state, before_text, after_text, VIEWPORT_ROWS)
         }
+        // The other half of the align family, one level down: `a` lines the two *text* panels up
+        // with each other, `A` lines this side's *tree* panel up with this text cursor.
+        KeyCode::Char('A') => action_paint_reveal_node(app, &state, before, after),
         // Shift-`p`, next to the `p` that *used* to cycle overlays - now `o`, which `n`/`p`
         // displaced. Kept on `P` anyway: it is the same idea one step further (`o` looks at
         // codediff's rendering, `P` adopts it as the draft to correct), and rebinding a

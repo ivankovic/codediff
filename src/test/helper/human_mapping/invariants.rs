@@ -349,29 +349,35 @@ fn full_painting_covers_minimal(
     let mut violations = Vec::new();
     for minimal in &minimal {
         let minimal_labels = painted_labels(minimal, before, after)?;
-        let mut closest: Option<(usize, &str)> = None;
+        let mut closest: Option<(usize, &str, [Vec<usize>; 2])> = None;
         for full in &full {
             let full_labels = painted_labels(full, before, after)?;
-            let missing: usize = (0..2)
-                .map(|side| {
-                    minimal_labels[side]
-                        .iter()
-                        .zip(full_labels[side].iter())
-                        .filter(|(minimal, full)| minimal.is_some() && full.is_none())
-                        .count()
-                })
-                .sum();
-            if closest.is_none_or(|(best, _)| missing < best) {
-                closest = Some((missing, full.name.as_str()));
+            let mut missing = 0usize;
+            let mut rows: [Vec<usize>; 2] = [Vec::new(), Vec::new()];
+            for (side, contents) in [(0usize, &before.contents), (1usize, &after.contents)] {
+                for (offset, (minimal, full)) in minimal_labels[side]
+                    .iter()
+                    .zip(full_labels[side].iter())
+                    .enumerate()
+                {
+                    if minimal.is_some() && full.is_none() {
+                        missing += 1;
+                        rows[side].push(row_of(contents, offset));
+                    }
+                }
+            }
+            if closest.as_ref().is_none_or(|(best, _, _)| missing < *best) {
+                closest = Some((missing, full.name.as_str(), rows));
             }
         }
-        if let Some((missing, full)) = closest
+        if let Some((missing, full, rows)) = closest
             && missing > 0
         {
             violations.push(format!(
-                "painting '{}' paints {missing} byte(s) that '{full}' leaves unpainted - a Full \
-                 painting must cover everything its Minimal counterpart covers",
+                "painting '{}' paints {missing} byte(s) that '{full}' leaves unpainted, on {} - a \
+                 Full painting must cover everything its Minimal counterpart covers",
                 minimal.name,
+                site_rows(&rows),
             ));
         }
     }
@@ -734,11 +740,14 @@ fn presets_agree_on_what_survives(
     let mut violations = Vec::new();
     for minimal in &minimal {
         let minimal_labels = painted_labels(minimal, before, after)?;
-        let mut closest: Option<(usize, &str, String)> = None;
+        // No `&str` for the `Full` alternative's own name, unlike invariant 2 next door: the
+        // message names both paintings through `first`, so carrying it here would be write-only.
+        let mut closest: Option<(usize, String, [Vec<usize>; 2])> = None;
         for full in &full {
             let full_labels = painted_labels(full, before, after)?;
             let mut count = 0usize;
             let mut first = String::new();
+            let mut rows: [Vec<usize>; 2] = [Vec::new(), Vec::new()];
             for (side, contents) in [(0usize, &before.contents), (1usize, &after.contents)] {
                 for (offset, (left, right)) in minimal_labels[side]
                     .iter()
@@ -753,27 +762,26 @@ fn presets_agree_on_what_survives(
                     }
                     if count == 0 {
                         first = format!(
-                            "{} row {} reads {left:?} under '{}' and {right:?} under '{}'",
-                            side_name(side),
-                            contents[..offset].matches('\n').count() + 1,
-                            minimal.name,
-                            full.name,
+                            "the first reads {left:?} under '{}' and {right:?} under '{}'",
+                            minimal.name, full.name,
                         );
                     }
+                    rows[side].push(row_of(contents, offset));
                     count += 1;
                 }
             }
             if closest.as_ref().is_none_or(|(best, _, _)| count < *best) {
-                closest = Some((count, full.name.as_str(), first));
+                closest = Some((count, first, rows));
             }
         }
-        if let Some((count, _, first)) = closest
+        if let Some((count, first, rows)) = closest
             && count > 0
         {
             violations.push(format!(
-                "{count} byte(s) survive under one preset and do not under the other - {first}. \
-                 A Move says the code is still there, so the other preset cannot call it removed \
-                 or added"
+                "{count} byte(s) survive under one preset and do not under the other, on {} - \
+                 {first}. A Move says the code is still there, so the other preset cannot call it \
+                 removed or added",
+                site_rows(&rows),
             ));
         }
     }
@@ -930,7 +938,8 @@ fn move_against_unmatched(
     let mut violations = Vec::new();
     for (side, contents) in [(0usize, &before.contents), (1usize, &after.contents)] {
         let mut count = 0usize;
-        let mut first = String::new();
+        let mut rows = Vec::new();
+        let mut labels: Vec<&'static str> = Vec::new();
         for (offset, (paint, from_tree)) in painted[side].iter().zip(tree[side].iter()).enumerate()
         {
             if *paint != Some(TextLabel::Move)
@@ -938,21 +947,24 @@ fn move_against_unmatched(
             {
                 continue;
             }
-            if count == 0 {
-                first = format!(
-                    "row {}, which the mapping reads {:?}",
-                    contents[..offset].matches('\n').count() + 1,
-                    from_tree.expect("matched above"),
-                );
+            let label = if *from_tree == Some(TextLabel::Delete) {
+                "Delete"
+            } else {
+                "Insert"
+            };
+            if !labels.contains(&label) {
+                labels.push(label);
             }
+            rows.push(row_of(contents, offset));
             count += 1;
         }
         if count > 0 {
             violations.push(format!(
-                "painting '{painting}' {} paints {count} byte(s) Move that the tree mapping leaves \
-                 unmatched, from {first} - a Move says the code survives and an unmatched node \
-                 says it does not",
+                "painting '{painting}' {} paints {count} byte(s) Move on {} that the tree mapping \
+                 reads {} - a Move says the code survives and an unmatched node says it does not",
                 side_name(side),
+                row_list(&rows),
+                labels.join("/"),
             ));
         }
     }
@@ -1140,6 +1152,44 @@ fn mark_of(node: Node, side: usize, caches: &Caches) -> Option<&'static str> {
 
 fn side_name(side: usize) -> &'static str {
     if side == 0 { "before" } else { "after" }
+}
+
+/// One side's sites as a row list: sorted, deduplicated and capped.
+///
+/// **Capped, at [`MAX_LISTED_ROWS`].** A violation can aggregate hundreds of sites - one fixture
+/// here is 7,800 lines long - and a message that lists every one of them stops being readable as a
+/// single line of a test failure. Ten is enough to start repairing from, and the remainder is
+/// still counted, so nothing is hidden: the count of *sites* lives in the message around this and
+/// the count of *rows* lives in the tail here.
+fn row_list(rows: &[usize]) -> String {
+    const MAX_LISTED_ROWS: usize = 10;
+    let mut rows = rows.to_vec();
+    rows.sort_unstable();
+    rows.dedup();
+    let shown = rows
+        .iter()
+        .take(MAX_LISTED_ROWS)
+        .map(usize::to_string)
+        .collect::<Vec<_>>()
+        .join(", ");
+    match rows.len().checked_sub(MAX_LISTED_ROWS) {
+        None | Some(0) if rows.len() == 1 => format!("row {shown}"),
+        None | Some(0) => format!("rows {shown}"),
+        Some(rest) => format!("rows {shown} and {rest} more"),
+    }
+}
+
+/// Both sides' sites as one row list, naming each side - `before rows 3, 4 and after row 7`.
+///
+/// A side with no sites is left out entirely rather than printed empty, so a violation that only
+/// ever happens on one side reads as though it were written for one side.
+fn site_rows(rows: &[Vec<usize>; 2]) -> String {
+    [0usize, 1]
+        .into_iter()
+        .filter(|&side| !rows[side].is_empty())
+        .map(|side| format!("{} {}", side_name(side), row_list(&rows[side])))
+        .collect::<Vec<_>>()
+        .join(" and ")
 }
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────
@@ -1333,6 +1383,7 @@ fn paired_leaves_are_not_deleted_and_inserted(
 ) -> Vec<String> {
     let mut count = 0usize;
     let mut first = String::new();
+    let mut rows: [Vec<usize>; 2] = [Vec::new(), Vec::new()];
     for leaf in &context.leaves[0] {
         if !is_visible_leaf(*leaf, &before.contents) {
             continue;
@@ -1346,13 +1397,10 @@ fn paired_leaves_are_not_deleted_and_inserted(
             continue;
         }
         if count == 0 {
-            first = format!(
-                "`{}` on before row {} and after row {}",
-                leaf_text(*leaf, &before.contents),
-                row_of(&before.contents, leaf.start_byte()),
-                row_of(&after.contents, partner.start_byte()),
-            );
+            first = leaf_text(*leaf, &before.contents);
         }
+        rows[0].push(row_of(&before.contents, leaf.start_byte()));
+        rows[1].push(row_of(&after.contents, partner.start_byte()));
         count += 1;
     }
     if count == 0 {
@@ -1360,7 +1408,8 @@ fn paired_leaves_are_not_deleted_and_inserted(
     }
     vec![format!(
         "painting '{painting}' paints {count} leaf pair(s) gone on one side and new on the other \
-         that the tree mapping calls the same text, from {first}"
+         that the tree mapping calls the same text, on {} - the first is `{first}`",
+        site_rows(&rows),
     )]
 }
 
@@ -1383,6 +1432,7 @@ fn removed_leaves_are_painted(
     for (side, code) in [(0usize, before), (1usize, after)] {
         let mut count = 0usize;
         let mut first = String::new();
+        let mut rows = Vec::new();
         for leaf in &context.leaves[side] {
             if !is_visible_leaf(*leaf, &code.contents) || !is_named_leaf(*leaf, &code.contents) {
                 continue;
@@ -1393,21 +1443,18 @@ fn removed_leaves_are_painted(
                 continue;
             }
             if count == 0 {
-                first = format!(
-                    "{:?} `{}` on row {}",
-                    leaf.kind(),
-                    leaf_text(*leaf, &code.contents),
-                    row_of(&code.contents, leaf.start_byte()),
-                );
+                first = format!("{:?} `{}`", leaf.kind(), leaf_text(*leaf, &code.contents));
             }
+            rows.push(row_of(&code.contents, leaf.start_byte()));
             count += 1;
         }
         if count > 0 {
             violations.push(format!(
-                "painting '{painting}' leaves {count} removed leaf/leaves unpainted {}, from \
-                 {first} - unpainted text is unchanged and in place, and the tree mapping says \
-                 this is gone",
+                "painting '{painting}' {} leaves {count} removed leaf/leaves unpainted on {}, the \
+                 first {first} - unpainted text is unchanged and in place, and the tree mapping \
+                 says this is gone",
                 side_name(side),
+                row_list(&rows),
             ));
         }
     }
@@ -1431,6 +1478,7 @@ fn edited_leaves_are_painted(
 ) -> Vec<String> {
     let mut count = 0usize;
     let mut first = String::new();
+    let mut rows: [Vec<usize>; 2] = [Vec::new(), Vec::new()];
     for leaf in &context.leaves[0] {
         if !is_visible_leaf(*leaf, &before.contents) {
             continue;
@@ -1450,21 +1498,22 @@ fn edited_leaves_are_painted(
         }
         if count == 0 {
             first = format!(
-                "`{}` on before row {} becoming `{}` on after row {}",
+                "`{}` becoming `{}`",
                 leaf_text(*leaf, &before.contents),
-                row_of(&before.contents, leaf.start_byte()),
                 leaf_text(partner, &after.contents),
-                row_of(&after.contents, partner.start_byte()),
             );
         }
+        rows[0].push(row_of(&before.contents, leaf.start_byte()));
+        rows[1].push(row_of(&after.contents, partner.start_byte()));
         count += 1;
     }
     if count == 0 {
         return Vec::new();
     }
     vec![format!(
-        "painting '{painting}' paints nothing on either side of {count} edited leaf/leaves, from \
-         {first} - the tree mapping says the text changed"
+        "painting '{painting}' paints nothing on either side of {count} edited leaf/leaves, on {} \
+         - the first is {first}; the tree mapping says the text changed",
+        site_rows(&rows),
     )]
 }
 
@@ -1501,27 +1550,34 @@ fn painting_implies_mapping_edits(
             .map(without_whitespace)
             .collect()
     };
-    let edits = named
-        .mapping
-        .entries
-        .iter()
-        .filter(|entry| {
-            let before_text = side_text(&before.contents, &entry.before);
-            let after_text = side_text(&after.contents, &entry.after);
-            match entry.operation {
-                super::HumanTextOperation::Match => before_text != after_text,
-                super::HumanTextOperation::Delete => !before_text.is_empty(),
-                super::HumanTextOperation::Insert => !after_text.is_empty(),
-            }
-        })
-        .count();
+    let mut edits = 0usize;
+    let mut rows: [Vec<usize>; 2] = [Vec::new(), Vec::new()];
+    for entry in &named.mapping.entries {
+        let before_text = side_text(&before.contents, &entry.before);
+        let after_text = side_text(&after.contents, &entry.after);
+        let is_edit = match entry.operation {
+            super::HumanTextOperation::Match => before_text != after_text,
+            super::HumanTextOperation::Delete => !before_text.is_empty(),
+            super::HumanTextOperation::Insert => !after_text.is_empty(),
+        };
+        if !is_edit {
+            continue;
+        }
+        edits += 1;
+        // The spans' own `start_row` is already the row, 0-based - there is no byte offset to
+        // convert here, unlike every other rule in this file.
+        for (side, spans) in [(0usize, &entry.before), (1usize, &entry.after)] {
+            rows[side].extend(spans.iter().map(|span| span.start_row + 1));
+        }
+    }
     if edits == 0 {
         return Vec::new();
     }
     vec![format!(
-        "painting '{}' records {edits} edit(s) to visible text but every entry of the tree \
+        "painting '{}' records {edits} edit(s) to visible text on {} but every entry of the tree \
          mapping is Identical - one of the two records has not been finished",
-        named.name
+        named.name,
+        site_rows(&rows),
     )]
 }
 
@@ -2411,7 +2467,7 @@ mod tests {
         );
         assert_eq!(found.len(), 1, "{found:?}");
         assert!(
-            found[0].contains("`x` on before row 1 and after row 1"),
+            found[0].contains("on before row 1 and after row 1 - the first is `x`"),
             "{found:?}"
         );
     }
@@ -2436,7 +2492,7 @@ mod tests {
         assert_eq!(found.len(), 1, "{found:?}");
         assert!(
             found[0].contains(
-                "1 removed leaf/leaves unpainted before, from \"identifier\" `y` on row 1"
+                "before leaves 1 removed leaf/leaves unpainted on row 1, the first \"identifier\" `y`"
             ),
             "{found:?}"
         );
@@ -2463,7 +2519,7 @@ mod tests {
         let found = violations_mentioning(&mapping, &before, &after, "edited leaf/leaves");
         assert_eq!(found.len(), 1, "{found:?}");
         assert!(
-            found[0].contains("`1` on before row 1 becoming `2` on after row 1"),
+            found[0].contains("on before row 1 and after row 1 - the first is `1` becoming `2`"),
             "{found:?}"
         );
     }

@@ -8254,3 +8254,157 @@ fn a_text_only_fixture_file_carries_a_painting_and_invariants_but_no_mapping() {
         assert!(file.find(import).unwrap() < first_test, "{import}: {file}");
     }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+// `A` in the text view: put this side's tree panel on the leaf under the text cursor
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+
+/// Presses `A` in the text view with the cursor at `(row, column)` on `side`, and answers with the
+/// kind and text of the leaf that side's tree panel ended up on.
+///
+/// Drives it through `handle_modal_key`, for the reason `x_in_the_text_view_banks_the_live_selection`
+/// gives: the failure mode worth pinning is an unwired key, which calling the action directly
+/// cannot see. Both the `Code` passed in and the tree the assertion reads come from one parse -
+/// node ids are addresses inside a particular parse, so a second one would answer about nothing.
+fn press_reveal_node(
+    source: &str,
+    side: usize,
+    row: usize,
+    column: usize,
+) -> (App, String, String, usize) {
+    let code = Code::from_string(source, &Language::Rust);
+    let root = code.ast.as_ref().expect("parsed").root_node();
+    let mut app = App::new(
+        "test".to_string(),
+        CaseOrigin::Diffs,
+        root.id(),
+        root.id(),
+        HumanMapping::default(),
+    );
+    let flat = FlatIndex::new(flatten_visible(root, &app.before.collapsed, None));
+    let caches = rebuild_caches(&app.mapping.entries, root, root);
+
+    let mut state = TextPaintState {
+        side,
+        ..Default::default()
+    };
+    state.cursor[side] = (row, column);
+    app.modal = Some(Modal::TextView { state });
+
+    handle_modal_key(
+        &mut app,
+        KeyCode::Char('A'),
+        &flat,
+        &flat,
+        Some(root),
+        Some(root),
+        &caches,
+        source.as_bytes(),
+        source.as_bytes(),
+        &code,
+        &code,
+    );
+
+    let cursor_id = if side == 0 {
+        app.before.cursor_id
+    } else {
+        app.after.cursor_id
+    };
+    let landed =
+        find_node_by_id_anywhere(root, cursor_id).expect("cursor is on a node in the tree");
+    let kind = landed.kind().to_string();
+    let text = source[landed.byte_range()].to_string();
+    (app, kind, text, root.id())
+}
+
+#[test]
+fn a_in_the_text_view_puts_the_tree_cursor_on_the_leaf_under_it() {
+    let (app, kind, text, _) = press_reveal_node("let alpha = 1;\nlet beta = 2;\n", 0, 1, 4);
+    assert_eq!((kind.as_str(), text.as_str()), ("identifier", "beta"));
+    assert!(
+        matches!(app.modal, Some(Modal::TextView { .. })),
+        "the text view stays open, so several rows can be checked in one pass"
+    );
+    assert_eq!(
+        app.focus,
+        Focus::Before,
+        "focus follows the panel that moved, so Esc returns to it"
+    );
+}
+
+#[test]
+fn a_in_the_text_view_moves_the_panel_for_the_side_it_is_on() {
+    let (app, kind, text, root_id) = press_reveal_node("let alpha = 1;\n", 1, 0, 4);
+    assert_eq!((kind.as_str(), text.as_str()), ("identifier", "alpha"));
+    assert_eq!(app.focus, Focus::After);
+    assert_eq!(
+        app.before.cursor_id, root_id,
+        "the other side's panel is left exactly where it was"
+    );
+}
+
+/// A column in the whitespace between two tokens belongs to no leaf at all, so the next one is
+/// what `A` lands on - and the status line says so rather than letting the jump look exact.
+#[test]
+fn a_in_the_text_view_lands_on_the_next_leaf_from_inter_token_whitespace() {
+    let (app, kind, text, _) = press_reveal_node("let alpha  =  1;\n", 0, 0, 10);
+    assert_eq!((kind.as_str(), text.as_str()), ("=", "="));
+    assert!(
+        app.status
+            .as_deref()
+            .is_some_and(|s| s.contains("next leaf")),
+        "got {:?}",
+        app.status
+    );
+}
+
+/// The CRLF case, which is what `byte_offset` exists for rather than reusing `row_text`: that
+/// strips a trailing `\r`, and a row offset built from stripped rows falls one byte further behind
+/// per row. Here that is two bytes by row 2 - enough to land on `let` instead of `ccc`.
+#[test]
+fn a_in_the_text_view_finds_the_right_leaf_in_a_crlf_file() {
+    let (_, kind, text, _) =
+        press_reveal_node("let aaa = 1;\r\nlet bbb = 2;\r\nlet ccc = 3;\r\n", 0, 2, 4);
+    assert_eq!((kind.as_str(), text.as_str()), ("identifier", "ccc"));
+}
+
+#[test]
+fn byte_offset_counts_a_crlf_terminator_as_two_bytes() {
+    let source = "let aaa = 1;\r\nlet bbb = 2;\r\n";
+    assert_eq!(TextPaintState::byte_offset(source, 0, 4), Some(4));
+    assert_eq!(
+        TextPaintState::byte_offset(source, 1, 4),
+        Some(18),
+        "row 0 is 12 bytes plus a two-byte terminator, not one"
+    );
+    assert_eq!(&source[18..21], "bbb");
+    assert_eq!(
+        TextPaintState::byte_offset(source, 9, 0),
+        None,
+        "past the last row there is no offset to give"
+    );
+}
+
+/// A fixture with no tree-sitter grammar opens in this solver too (text-only mode), and has no
+/// tree for `A` to reveal anything in.
+#[test]
+fn a_in_the_text_view_says_so_on_a_side_with_no_syntax_tree() {
+    let text_only = Code::from_string("plain words\n", &Language::Unknown);
+    let mut app = App::new(
+        "test".to_string(),
+        CaseOrigin::Diffs,
+        usize::MAX,
+        usize::MAX,
+        HumanMapping::default(),
+    );
+    let state = TextPaintState::default();
+    action_paint_reveal_node(&mut app, &state, &text_only, &text_only);
+    assert!(
+        app.status
+            .as_deref()
+            .is_some_and(|s| s.contains("text-only")),
+        "got {:?}",
+        app.status
+    );
+    assert_eq!(app.before.cursor_id, usize::MAX, "nothing moved");
+}

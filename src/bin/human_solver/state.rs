@@ -935,6 +935,25 @@ impl TextPaintState {
         }
     }
 
+    /// The absolute byte offset of `(row, column)` in `source`, or `None` past the last row.
+    ///
+    /// Each preceding row is summed as `line.len() + 1` - its own bytes plus the `\n` that ended
+    /// it - deliberately **not** through [`row_text`], which strips a trailing `\r`. On a CRLF
+    /// file that strip is one byte per preceding row, so an offset built from stripped rows drifts
+    /// further behind the deeper into the file it is taken, and lands in a different token
+    /// entirely. Columns are already byte offsets into their row (see the type's own doc), so the
+    /// column is added as it stands.
+    pub(crate) fn byte_offset(source: &str, row: usize, column: usize) -> Option<usize> {
+        let mut offset = 0usize;
+        for (index, line) in source.split('\n').enumerate() {
+            if index == row {
+                return (column <= line.len()).then_some(offset + column);
+            }
+            offset += line.len() + 1;
+        }
+        None
+    }
+
     /// Where `^` lands: the byte column of the row's first non-whitespace character.
     ///
     /// A whitespace-only row has none, and then this is its end - the same column `$` gives, and
@@ -1203,6 +1222,101 @@ pub(crate) fn action_paint_align(
         status.push_str(" - its selection now reaches there too");
     }
     app.status = Some(status);
+}
+
+/// The first leaf of `node`'s subtree that has not already ended by `offset`.
+///
+/// That is the leaf *containing* `offset` when one does, and otherwise the next leaf after it -
+/// which is what makes this answer usefully in the whitespace between two tokens, where no leaf
+/// contains the offset at all. `None` when every leaf in the subtree ends at or before it, i.e.
+/// `offset` is in the file's trailing whitespace.
+///
+/// Written as a descent rather than `descendant_for_byte_range`, which returns the smallest node
+/// *containing* the offset and so answers with a container - often the root - for exactly the
+/// whitespace case this exists to handle.
+pub(crate) fn first_leaf_from(node: Node, offset: usize) -> Option<Node> {
+    if node.child_count() == 0 {
+        return (node.end_byte() > offset).then_some(node);
+    }
+    let mut cursor = node.walk();
+    node.children(&mut cursor)
+        .filter(|child| child.end_byte() > offset)
+        .find_map(|child| first_leaf_from(child, offset))
+}
+
+/// `A` in the text view: puts *this side's* AST panel on the leaf under the text cursor, and
+/// focuses that panel, without closing the text view.
+///
+/// The one bridge between the two ground truths' two editors. A painting is authored by row and
+/// column and a mapping by node, so "which node is this text" is a question the painter has to
+/// answer constantly - and until now by eye, scrolling a tree of a few thousand nodes to find the
+/// token they were already looking at. Every invariant that crosses the two records (10, 11, 12
+/// and 9 before them) reports a *row*, which is the text view's coordinate; this is what turns
+/// that row into the node whose entry has to change.
+///
+/// The view stays open deliberately: checking a handful of rows in one pass is the normal shape of
+/// repairing a fixture, and closing would cost a `t` per row. Focus moves so that the panel the
+/// cursor landed in is the one `Esc` returns to.
+pub(crate) fn action_paint_reveal_node(
+    app: &mut App,
+    state: &TextPaintState,
+    before: &Code,
+    after: &Code,
+) {
+    let side = state.side;
+    let code = if side == 0 { before } else { after };
+    let name = if side == 0 { "Before" } else { "After" };
+    // A fixture with no grammar opens here too (text-only mode), and has no tree to reveal
+    // anything in - say so rather than move a cursor that addresses nothing.
+    let Some(tree) = code.ast.as_ref() else {
+        app.status = Some(format!(
+            "The {name} side has no syntax tree - this fixture is text-only"
+        ));
+        return;
+    };
+    let (row, column) = state.cursor[side];
+    let Some(offset) = TextPaintState::byte_offset(&code.contents, row, column) else {
+        app.status = Some(format!("No line {} on the {name} side", row + 1));
+        return;
+    };
+
+    let root = tree.root_node();
+    let Some(leaf) = first_leaf_from(root, offset) else {
+        app.status = Some(format!(
+            "Nothing but whitespace from line {} on - the {name} tree ends before here",
+            row + 1
+        ));
+        return;
+    };
+    let exact = leaf.start_byte() <= offset;
+
+    let panel = if side == 0 {
+        &mut app.before
+    } else {
+        &mut app.after
+    };
+    if reveal_node(panel, root, leaf.id()).is_none() {
+        app.status = Some("That leaf is not in this side's tree".to_string());
+        return;
+    }
+    app.focus = if side == 0 {
+        Focus::Before
+    } else {
+        Focus::After
+    };
+
+    let text: String = code.contents[leaf.byte_range()].chars().take(30).collect();
+    app.status = Some(if exact {
+        format!("{name} tree on {:?} `{text}`", leaf.kind())
+    } else {
+        format!(
+            "Nothing on line {} column {} - {name} tree on the next leaf, {:?} `{text}` on line {}",
+            row + 1,
+            column,
+            leaf.kind(),
+            leaf.start_position().row + 1,
+        )
+    });
 }
 
 /// `m`: pairs everything selected on the before side with everything selected on the after side,

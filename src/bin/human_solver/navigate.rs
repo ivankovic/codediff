@@ -284,12 +284,46 @@ pub(crate) fn expand_ancestors(collapsed: &mut std::collections::HashSet<usize>,
     }
 }
 
-/// Shared tail of `action_align`/`action_align_algo`: moves the *other* panel's cursor to
-/// `target_id`. If the target is hidden under a collapsed ancestor, expands every ancestor along
-/// its path so it becomes visible. If the target wasn't already on screen (whether because it was
-/// hidden, or just scrolled out of view), centers the other panel's viewport on it;
-/// `idx.saturating_sub(half).min(max_scroll)` naturally clamps that centering at the start/end of
+/// Puts `panel`'s cursor on `target_id` and makes sure it can actually be seen: expands every
+/// collapsed ancestor along its path, and - if it was not already on screen, whether because it
+/// was hidden or merely scrolled out of view - centers that panel's viewport on it.
+/// `idx.saturating_sub(half).min(max_scroll)` naturally clamps the centering at the start/end of
 /// the tree, where a true center isn't possible.
+///
+/// `None`, without moving anything, when no node in `root` has that id.
+///
+/// Shared by the two things that move a cursor somewhere it wasn't looking: `a`/`A`, which put the
+/// *other* panel on the node this one is matched with, and `A` in the text view, which puts *this
+/// side's* panel on the leaf under the text cursor. The panel is taken as a parameter rather than
+/// picked from `app` precisely because those two want different ones.
+pub(crate) fn reveal_node<'tree>(
+    panel: &mut PanelState,
+    root: Node<'tree>,
+    target_id: usize,
+) -> Option<Node<'tree>> {
+    let was_visible = FlatIndex::new(flatten_visible(root, &panel.collapsed, None))
+        .index_of(target_id)
+        .is_some_and(|idx| {
+            idx >= panel.scroll && idx < panel.scroll + panel.viewport_height.max(1)
+        });
+
+    let target_node = find_node_by_id_anywhere(root, target_id)?;
+    expand_ancestors(&mut panel.collapsed, target_node);
+    panel.cursor_id = target_id;
+
+    if !was_visible {
+        let flat = FlatIndex::new(flatten_visible(root, &panel.collapsed, None));
+        let idx = flat.index_of(target_id).unwrap_or(0);
+        let height = panel.viewport_height.max(1);
+        let max_scroll = flat.len().saturating_sub(height);
+        panel.scroll = idx.saturating_sub(height / 2).min(max_scroll);
+    }
+
+    Some(target_node)
+}
+
+/// Shared tail of `action_align`/`action_align_algo`: moves the *other* panel's cursor to
+/// `target_id`, via [`reveal_node`].
 pub(crate) fn align_cursor_to(
     app: &mut App,
     focus: Focus,
@@ -297,33 +331,13 @@ pub(crate) fn align_cursor_to(
     after_root: Node,
     target_id: usize,
 ) -> Result<String> {
-    let other_root = match focus {
-        Focus::Before => after_root,
-        Focus::After => before_root,
-    };
-    let other = match focus {
-        Focus::Before => &mut app.after,
-        Focus::After => &mut app.before,
+    let (other_root, other) = match focus {
+        Focus::Before => (after_root, &mut app.after),
+        Focus::After => (before_root, &mut app.before),
     };
 
-    let was_visible = FlatIndex::new(flatten_visible(other_root, &other.collapsed, None))
-        .index_of(target_id)
-        .is_some_and(|idx| {
-            idx >= other.scroll && idx < other.scroll + other.viewport_height.max(1)
-        });
-
-    let target_node = find_node_by_id_anywhere(other_root, target_id)
-        .context("Matched node not found in tree")?;
-    expand_ancestors(&mut other.collapsed, target_node);
-    other.cursor_id = target_id;
-
-    if !was_visible {
-        let flat = FlatIndex::new(flatten_visible(other_root, &other.collapsed, None));
-        let idx = flat.index_of(target_id).unwrap_or(0);
-        let height = other.viewport_height.max(1);
-        let max_scroll = flat.len().saturating_sub(height);
-        other.scroll = idx.saturating_sub(height / 2).min(max_scroll);
-    }
+    let target_node =
+        reveal_node(other, other_root, target_id).context("Matched node not found in tree")?;
 
     Ok(format!("Aligned to matched '{}'", target_node.kind()))
 }

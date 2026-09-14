@@ -81,9 +81,15 @@
 *                  whose subtree's text contains it: an ancestor's own text is the concatenation of
 *                  everything inside it, so a whole-subtree check would almost always match the
 *                  nearest enclosing container first, not the actual token
-*   t              show the raw before/after source as plain text, side by side, instead of the
-*                  AST tree -- for just reading the code. j/k scroll (both sides together), T
-*                  switches to the unix diff view instead, Esc closes
+*   t              show the before/after source as plain text, side by side, instead of the AST
+*                  tree -- for reading the code, and for painting the human text-range ground
+*                  truth onto it. T switches to the unix diff view instead, Esc closes. `?` lists
+*                  the painting keys; the one that leads back out of this view is `A`, which puts
+*                  *this side's* AST panel on the leaf under the text cursor (or on the next leaf,
+*                  when the cursor sits in whitespace between two tokens) and focuses that panel,
+*                  without closing the text view. That is the bridge between the two ground truths:
+*                  a painting is authored by row and column and a mapping by node, and every
+*                  invariant that crosses the two records reports a row
 *   T              show the output of the system `diff -u` between the before and after content --
 *                  a plain line-based diff, as a point of comparison against codediff's own
 *                  AST-based diff. j/k scroll, t switches to the text view instead, Esc closes
@@ -348,6 +354,11 @@ t              text view: read the source, and paint the human text-range ground
                  puts the other panel on the same line number as this one and
                  scrolls it to the same place on screen -- the two ways to stop
                  hand-scrolling two independently scrolled panels
+                 A puts THIS side's AST panel on the leaf under the text cursor,
+                 expanding whatever is collapsed over it and focusing that panel,
+                 without closing this view -- so a row an invariant names becomes
+                 the node whose entry has to change. A cursor in the whitespace
+                 between two tokens lands on the next leaf, and says so
                  o cycles what is drawn: your painting, codediff's own rendering
                  of the same pair, or only the bytes where the two disagree
                  P copies codediff's rendering into the current painting as a
