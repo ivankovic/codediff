@@ -191,6 +191,15 @@
 *                  sample (`O`), `s` then prompts for a name to promote it under -- but always into
 *                  `handmade/` (this *is* the handmade dataset's own source), and pre-filled with
 *                  just `<language>-` (e.g. "rust-"), since there's no second repository to name
+*   V              list every way this case's own ground truth contradicts itself - the detail
+*                  behind the `o` picker's `Invariant` column, which can only show a count. One
+*                  row per violation: which of the fifteen rules, which painting it is about, and
+*                  what it says; underneath, each place to look, with the text there and the node
+*                  it falls in. j/k move, g/G jump to the ends, Enter puts both trees and both
+*                  text panels on the selected violation and opens the text view over them (one
+*                  Esc back to the trees, which are already positioned), Esc closes. Checked
+*                  against the mapping *in memory*, so it sees unsaved edits and a repair
+*                  disappears from the list the next time `V` is pressed
 *   ?              show a popup listing every keybinding (`?` or Esc closes it)
 *   q / Esc        quit
 *
@@ -372,6 +381,13 @@ T              view the output of unix `diff -u`, with before/after line numbers
                  (t/T switch between these two views while either is open)
 H              toggle hiding fully solved subtrees (unmarked nodes and their
                  ancestors always stay visible)
+V              list every ground-truth invariant this case breaks: the rule's
+                 number, the painting it is about, what it says, and where --
+                 each site's position, the text there, and the node it falls in.
+                 j/k move, g/G ends, Enter puts both trees and both text panels
+                 on it (opening the text view over them, one Esc from the trees),
+                 Esc closes. Read from the mapping in memory, so it sees unsaved
+                 edits; the o picker's Invariant column is the same count
 
 s              save -- or, on a sample, prompt for a name (pre-filled with
                  <language>-<repository>) and promote it

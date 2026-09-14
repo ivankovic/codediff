@@ -1735,3 +1735,100 @@ fn candidate_invariant_census() -> Result<()> {
     }
     Ok(())
 }
+
+/// EXPLORATORY: for every byte invariant 9 reports, is it inside a node the tree mapping actually
+/// leaves unmatched, or inside one it matched?
+///
+/// Invariant 9's doc asserts the second case cannot happen - "`Delete` and `Insert` on the tree
+/// side carry no such caveat: they are nodes the human left unmatched". That is the claim this
+/// checks, because the tree side is read through `TextDiff::from` rather than through `Caches`,
+/// and that renderer also emits `Delete`/`Insert` for the characters that *changed inside* a
+/// matched-but-edited leaf. Run with `cargo test --release --lib --features test-fixtures
+/// invariant_nine_provenance -- --ignored --nocapture`.
+#[test]
+#[ignore]
+fn invariant_nine_provenance() -> Result<()> {
+    use crate::test::helper::human_mapping::invariants::painted_labels;
+
+    /// The smallest node of `root` covering `offset`.
+    fn leaf_at(root: Node, offset: usize) -> Option<Node> {
+        if root.child_count() == 0 {
+            return (root.start_byte() <= offset && offset < root.end_byte()).then_some(root);
+        }
+        let mut cursor = root.walk();
+        root.children(&mut cursor)
+            .filter(|child| child.start_byte() <= offset && offset < child.end_byte())
+            .find_map(|child| leaf_at(child, offset))
+    }
+
+    println!(
+        "{:<52} {:<22} {:>6} {:>9} {:>9} {:>9}",
+        "fixture", "painting/side", "bytes", "unmatched", "matched", "no node"
+    );
+    for (name, dir) in crate::test::helper::handmade_test_case_dirs()? {
+        let Ok(mapping) = load(&name) else { continue };
+        if mapping.text_mappings.is_empty() || mapping.entries.is_empty() {
+            continue;
+        }
+        let Some((before, after)) = crate::test::helper::code_pair_from_dir(&dir)? else {
+            continue;
+        };
+        let (Some(bt), Some(at)) = (before.ast.as_ref(), after.ast.as_ref()) else {
+            continue;
+        };
+        let Ok(ast_diff) = as_ast_diff_for_mapping(&mapping, &before, &after) else {
+            continue;
+        };
+        let node_cache = crate::diff::NodeCache::build(&before, &after);
+        let text_diff = crate::diff::text::TextDiff::from(&before, &after, &ast_diff, &node_cache);
+        let tree = [
+            label_bytes_from_ranges(&before.contents, &text_diff.all(0)),
+            label_bytes_from_ranges(&after.contents, &text_diff.all(1)),
+        ];
+        let caches = rebuild_caches_for_mapping(&mapping, bt.root_node(), at.root_node());
+
+        for named in &mapping.text_mappings {
+            let painted = painted_labels(named, &before, &after)?;
+            for (side, root) in [(0usize, bt.root_node()), (1usize, at.root_node())] {
+                let (mut unmatched, mut matched, mut absent) = (0usize, 0usize, 0usize);
+                for (offset, (paint, from_tree)) in
+                    painted[side].iter().zip(tree[side].iter()).enumerate()
+                {
+                    if *paint != Some(TextLabel::Move)
+                        || !matches!(from_tree, Some(TextLabel::Delete | TextLabel::Insert))
+                    {
+                        continue;
+                    }
+                    match leaf_at(root, offset).map(|leaf| {
+                        if side == 0 {
+                            status_before(leaf, &caches)
+                        } else {
+                            status_after(leaf, &caches)
+                        }
+                    }) {
+                        Some(NodeStatus::Marked { .. }) => unmatched += 1,
+                        Some(_) => matched += 1,
+                        None => absent += 1,
+                    }
+                }
+                if unmatched + matched + absent == 0 {
+                    continue;
+                }
+                println!(
+                    "{:<52} {:<22} {:>6} {:>9} {:>9} {:>9}",
+                    name,
+                    format!(
+                        "{}/{}",
+                        named.name,
+                        if side == 0 { "before" } else { "after" }
+                    ),
+                    unmatched + matched + absent,
+                    unmatched,
+                    matched,
+                    absent,
+                );
+            }
+        }
+    }
+    Ok(())
+}

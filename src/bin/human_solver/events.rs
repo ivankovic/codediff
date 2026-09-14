@@ -909,6 +909,28 @@ pub(crate) fn handle_tree_independent_key(
             });
             None
         }
+        // `V` for the invariants this case's own ground truth breaks - the detail behind the `o`
+        // picker's `Invariant` column, which can only ever show a count.
+        KeyCode::Char('V') => {
+            match invariant_entries(&app.mapping, before, after) {
+                Ok(entries) if entries.is_empty() => {
+                    app.status =
+                        Some("This case's ground truth breaks none of its invariants".to_string());
+                }
+                Ok(entries) => {
+                    app.status = Some(format!(
+                        "{} invariant violation(s) - j/k to move, Enter to jump, Esc to close",
+                        entries.len()
+                    ));
+                    app.modal = Some(Modal::InvariantList {
+                        entries,
+                        selected: 0,
+                    });
+                }
+                Err(err) => app.status = Some(format!("Could not check invariants: {err:#}")),
+            }
+            None
+        }
         KeyCode::Char('T') => {
             match run_unix_diff(before_src, after_src) {
                 Ok(output) => app.modal = Some(Modal::UnixDiffView { output, scroll: 0 }),
@@ -1600,6 +1622,46 @@ pub(crate) fn handle_modal_key(
                 app.modal = Some(Modal::UnixDiffView { output, scroll });
             }
         },
+        Modal::InvariantList { entries, selected } => {
+            let last = entries.len().saturating_sub(1);
+            match code {
+                KeyCode::Up | KeyCode::Char('k') => {
+                    app.modal = Some(Modal::InvariantList {
+                        entries,
+                        selected: selected.saturating_sub(1),
+                    });
+                }
+                KeyCode::Down | KeyCode::Char('j') => {
+                    app.modal = Some(Modal::InvariantList {
+                        entries,
+                        selected: (selected + 1).min(last),
+                    });
+                }
+                KeyCode::Char('g') => {
+                    app.modal = Some(Modal::InvariantList {
+                        entries,
+                        selected: 0,
+                    });
+                }
+                KeyCode::Char('G') => {
+                    app.modal = Some(Modal::InvariantList {
+                        entries,
+                        selected: last,
+                    });
+                }
+                KeyCode::Enter => {
+                    if let Some(entry) = entries.get(selected) {
+                        action_focus_violation(app, entry, before, after);
+                    }
+                }
+                KeyCode::Esc | KeyCode::Char('V') | KeyCode::Char('q') => {
+                    app.status = Some("Closed the invariant list".to_string());
+                }
+                _ => {
+                    app.modal = Some(Modal::InvariantList { entries, selected });
+                }
+            }
+        }
         Modal::Help { scroll } => match code {
             KeyCode::Up | KeyCode::Char('k') => {
                 app.modal = Some(Modal::Help {

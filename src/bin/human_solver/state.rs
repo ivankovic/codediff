@@ -691,6 +691,156 @@ pub(crate) fn verdict_at(
         .map(|(_, verdict)| *verdict)
 }
 
+/// One row of the `V` popup: a violation, and its sites already rendered for display.
+///
+/// The detail lines are built when the popup opens rather than while it draws, because they need
+/// the parsed `Code` (for the node a site lands in) and the render path is handed only the source
+/// text. That also makes the popup a pure snapshot, which is what it should be.
+#[derive(Debug, Clone)]
+pub(crate) struct InvariantEntry {
+    pub(crate) violation: human_mapping::invariants::GroundTruthViolation,
+    /// One line per site: which side, where, the text under it, and the node it falls in.
+    pub(crate) details: Vec<String>,
+}
+
+/// Every violation of the *in-memory* mapping, each with its sites rendered for display.
+///
+/// Deliberately `ground_truth_invariant_violations_for` and not the by-name form: that one reads
+/// `human_mapping.json` off disk, and this popup exists to be opened mid-edit, where the file on
+/// disk is behind what is on screen - a popup listing violations the reader has just repaired
+/// would be worse than no popup.
+pub(crate) fn invariant_entries(
+    mapping: &HumanMapping,
+    before: &Code,
+    after: &Code,
+) -> Result<Vec<InvariantEntry>> {
+    let violations =
+        human_mapping::invariants::ground_truth_invariant_violations_for(mapping, before, after)?;
+    Ok(violations
+        .into_iter()
+        .map(|violation| {
+            let details = violation
+                .sites
+                .iter()
+                .map(|site| site_detail(*site, before, after))
+                .collect();
+            InvariantEntry { violation, details }
+        })
+        .collect())
+}
+
+/// One site as a line: `before 17:54-17:56  ": "  in line_comment 534..606`.
+///
+/// The node part is dropped for a side with no syntax tree (text-only fixtures open here too) and
+/// for a span that reads back as nothing.
+fn site_detail(
+    site: human_mapping::invariants::ViolationSite,
+    before: &Code,
+    after: &Code,
+) -> String {
+    let code = if site.side == 0 { before } else { after };
+    let span = site.span;
+    let mut line = format!(
+        "{} {}:{}-{}:{}",
+        if site.side == 0 { "before" } else { "after" },
+        span.start_row + 1,
+        span.start_column,
+        span.end_row + 1,
+        span.end_column,
+    );
+    if let Some(text) = human_mapping::span_text(&code.contents, span) {
+        let shown: String = text.chars().take(40).collect();
+        line.push_str(&format!("  {shown:?}"));
+    }
+    let offsets = (
+        TextPaintState::byte_offset(&code.contents, span.start_row, span.start_column),
+        TextPaintState::byte_offset(&code.contents, span.end_row, span.end_column),
+    );
+    if let (Some(tree), (Some(start), Some(end))) = (code.ast.as_ref(), offsets)
+        && let Some(node) = tree
+            .root_node()
+            .descendant_for_byte_range(start, end.max(start))
+    {
+        line.push_str(&format!(
+            "  in {} {}..{}",
+            node.kind(),
+            node.start_byte(),
+            node.end_byte()
+        ));
+    }
+    line
+}
+
+/// `Enter` in the `V` popup: put both trees and both text panels on the violation's sites.
+///
+/// Every side the violation names is moved - its AST panel onto the node the site falls in (via
+/// `reveal_node`, so a collapsed ancestor is expanded and the viewport centred) and its text
+/// cursor onto the site's first byte. The text view is then opened over the result, so the reader
+/// lands looking at the painting with the trees already positioned behind it: one `Esc` away for
+/// the three rules that are about the mapping alone.
+///
+/// Focus, and the text view's own side, follow the violation's *first* site, which is the before
+/// side wherever a rule names both.
+pub(crate) fn action_focus_violation(
+    app: &mut App,
+    entry: &InvariantEntry,
+    before: &Code,
+    after: &Code,
+) {
+    let sites = &entry.violation.sites;
+    let Some(first) = sites.first() else {
+        app.status = Some("This violation has nowhere to jump to".to_string());
+        return;
+    };
+    let mut state = TextPaintState {
+        side: first.side,
+        ..Default::default()
+    };
+    let mut moved: Vec<&str> = Vec::new();
+    for side in [0usize, 1] {
+        let Some(site) = sites.iter().find(|site| site.side == side) else {
+            continue;
+        };
+        let code = if side == 0 { before } else { after };
+        let name = if side == 0 { "before" } else { "after" };
+        state.cursor[side] = (site.span.start_row, site.span.start_column);
+        moved.push(name);
+
+        let (Some(tree), Some(offset)) = (
+            code.ast.as_ref(),
+            TextPaintState::byte_offset(
+                &code.contents,
+                site.span.start_row,
+                site.span.start_column,
+            ),
+        ) else {
+            continue;
+        };
+        let root = tree.root_node();
+        let Some(leaf) = first_leaf_from(root, offset) else {
+            continue;
+        };
+        let panel = if side == 0 {
+            &mut app.before
+        } else {
+            &mut app.after
+        };
+        reveal_node(panel, root, leaf.id());
+    }
+    app.focus = if first.side == 0 {
+        Focus::Before
+    } else {
+        Focus::After
+    };
+    state.scroll_into_view(20);
+    app.modal = Some(Modal::TextView { state });
+    app.status = Some(format!(
+        "Invariant {} - {} side(s) moved, Esc for the trees behind this",
+        entry.violation.invariant,
+        moved.join(" and "),
+    ));
+}
+
 /// Cursor, selection and scroll for the `t` text-painting view, one set per side.
 ///
 /// Both sides carry a live cursor and an independent selection at all times, mirroring the AST
@@ -1824,6 +1974,18 @@ pub(crate) enum Modal {
     /// (see `HumanTextMapping`), which is a second, independent account of the same diff that the
     /// tree mapping cannot supply. `T` while open switches to `UnixDiffView` instead.
     TextView { state: TextPaintState },
+    /// Raised by `V`: every way this case's own ground truth contradicts itself, as a list.
+    ///
+    /// The `o` picker's `Invariant` column counts these per fixture, which is enough to find a
+    /// case worth opening and no help at all once it is open. This is the other half: what each
+    /// one says, where it is, and - on Enter - both trees and both text panels moved onto it.
+    ///
+    /// The entries are a snapshot taken when the popup opens, against the *in-memory* mapping,
+    /// so they reflect unsaved edits. Reopening recomputes; there is no cache to go stale.
+    InvariantList {
+        entries: Vec<InvariantEntry>,
+        selected: usize,
+    },
     /// Raised by `s` (saving) or `L` (loading) inside the text view: which named painting
     /// (`HumanMapping::text_mappings`) to store the current ranges under, or to switch to editing.
     ///

@@ -698,6 +698,9 @@ pub(crate) fn render_modal(
         Modal::Help { scroll } => {
             render_help_modal(frame, area, *scroll);
         }
+        Modal::InvariantList { entries, selected } => {
+            render_invariant_list(frame, area, entries, *selected);
+        }
         Modal::OpenCommitPicker { commits, selected } => {
             render_open_commit_picker(frame, area, commits, *selected);
         }
@@ -1342,6 +1345,117 @@ pub(crate) fn render_help_modal(frame: &mut Frame, area: Rect, scroll: u16) {
     frame.render_widget(
         Paragraph::new(HELP_TEXT).block(block).scroll((scroll, 0)),
         popup_area,
+    );
+}
+
+/// Renders the `V` popup: every way this case's ground truth contradicts itself, one row each,
+/// with the selected row's sites spelled out underneath.
+///
+/// Two panes rather than one wide table: a violation's sentence is long (it has to be - it says
+/// what the rule is as well as what broke it) and its sites are several lines, so putting the list
+/// above and the detail below keeps both readable at any terminal width. The list shows the rule's
+/// number, the painting it is about, and the message; the detail shows each site's position, the
+/// text under it, and the node it falls in.
+pub(crate) fn render_invariant_list(
+    frame: &mut Frame,
+    area: Rect,
+    entries: &[InvariantEntry],
+    selected: usize,
+) {
+    let popup_area = centered_rect(92, 85, area);
+    frame.render_widget(Clear, popup_area);
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .title(format!(
+            "Invariants — {} violation(s), j/k move, Enter jumps, Esc closes",
+            entries.len()
+        ))
+        .border_style(
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        );
+    let inner = block.inner(popup_area);
+    frame.render_widget(block, popup_area);
+
+    // The detail pane is sized to the selected entry but bounded, so one violation with twenty
+    // sites cannot squeeze the list it was chosen from off the screen.
+    let details = entries
+        .get(selected)
+        .map(|entry| entry.details.len())
+        .unwrap_or(0);
+    let detail_height = (details as u16 + 2).clamp(3, inner.height.saturating_sub(3).max(3));
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Min(3), Constraint::Length(detail_height)])
+        .split(inner);
+
+    let rows: Vec<Row> = entries
+        .iter()
+        .enumerate()
+        .map(|(index, entry)| {
+            let style = if index == selected {
+                Style::default()
+                    .fg(Color::Black)
+                    .bg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD)
+            } else {
+                Style::default()
+            };
+            Row::new(vec![
+                Cell::from(entry.violation.invariant.to_string()),
+                Cell::from(entry.violation.painting.clone().unwrap_or_else(|| {
+                    // The three rules that read only the tree mapping have no painting to name.
+                    "(mapping)".to_string()
+                })),
+                Cell::from(entry.violation.message.clone()),
+            ])
+            .style(style)
+        })
+        .collect();
+
+    // Recomputed from `selected` every frame rather than carried on the modal, the same contract
+    // the two open pickers use: nothing to keep in sync, and the selection is always on screen.
+    let height = chunks[0].height.saturating_sub(1).max(1) as usize;
+    let offset = selected
+        .saturating_sub(height / 2)
+        .min(entries.len().saturating_sub(height));
+    let visible: Vec<Row> = rows.into_iter().skip(offset).collect();
+
+    frame.render_widget(
+        Table::new(
+            visible,
+            [
+                Constraint::Length(3),
+                Constraint::Length(18),
+                Constraint::Min(20),
+            ],
+        )
+        .header(
+            Row::new(vec!["#", "Painting", "What it says"])
+                .style(Style::default().add_modifier(Modifier::BOLD)),
+        ),
+        chunks[0],
+    );
+
+    let detail = entries
+        .get(selected)
+        .map(|entry| {
+            if entry.details.is_empty() {
+                "(this violation names no place to jump to)".to_string()
+            } else {
+                entry.details.join("\n")
+            }
+        })
+        .unwrap_or_default();
+    frame.render_widget(
+        Paragraph::new(detail).block(
+            Block::default()
+                .borders(Borders::TOP)
+                .title("Where — Enter puts both trees and both text panels here"),
+        ),
+        chunks[1],
     );
 }
 

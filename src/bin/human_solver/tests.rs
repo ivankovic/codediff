@@ -2599,7 +2599,8 @@ fn the_split_painting_passes_invariant_6_and_the_unsplit_one_does_not() {
         )
         .expect("the invariant checker should read this mapping")
         .into_iter()
-        .filter(|violation| violation.contains("leading whitespace"))
+        .filter(|violation| violation.message.contains("leading whitespace"))
+        .map(|violation| violation.message)
         .collect()
     };
 
@@ -8407,4 +8408,175 @@ fn a_in_the_text_view_says_so_on_a_side_with_no_syntax_tree() {
         app.status
     );
     assert_eq!(app.before.cursor_id, usize::MAX, "nothing moved");
+}
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+// `V`: the invariant list
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+
+/// A case whose `Minimal` painting claims a line's indentation - one invariant-6 violation, and
+/// nothing else: the run ends mid-row rather than in trailing whitespace (so not invariant 1), the
+/// line is only partly painted (so not invariant 4), the painted bytes are contiguous (so not
+/// invariant 5), and the tree mapping is empty (so not invariant 13).
+fn app_with_one_violation(source: &str) -> (App, Code) {
+    let code = Code::from_string(source, &Language::Rust);
+    let root = code.ast.as_ref().expect("parsed").root_node();
+    let mut app = App::new(
+        "test".to_string(),
+        CaseOrigin::Diffs,
+        root.id(),
+        root.id(),
+        HumanMapping::default(),
+    );
+    app.mapping.text_mappings.push(NamedTextMapping {
+        name: "Minimal".to_string(),
+        mapping: HumanTextMapping {
+            entries: vec![HumanTextEntry {
+                operation: HumanTextOperation::Delete,
+                before: vec![HumanTextSpan {
+                    start_row: 1,
+                    start_column: 0,
+                    end_row: 1,
+                    end_column: 8,
+                }],
+                after: Vec::new(),
+            }],
+        },
+    });
+    app.text_solution = "Minimal".to_string();
+    (app, code)
+}
+
+/// Presses `key` at the top level of a case carrying one violation.
+fn press_with_one_violation(key: KeyCode) -> App {
+    let source = "fn f() {\n    let x = 1;\n}\n";
+    let (mut app, code) = app_with_one_violation(source);
+    let root = code.ast.as_ref().unwrap().root_node();
+    let flat = FlatIndex::new(flatten_visible(root, &app.before.collapsed, None));
+    let caches = rebuild_caches(&app.mapping.entries, root, root);
+    let hashes: rustc_hash::FxHashMap<usize, u64> = Default::default();
+
+    handle_key(
+        &mut app,
+        key,
+        &flat,
+        &flat,
+        root,
+        root,
+        &caches,
+        source.as_bytes(),
+        source.as_bytes(),
+        &hashes,
+        &hashes,
+        &code,
+        &code,
+    );
+    app
+}
+
+#[test]
+fn v_lists_the_violations_of_the_in_memory_mapping() {
+    let app = press_with_one_violation(KeyCode::Char('V'));
+    let Some(Modal::InvariantList { entries, selected }) = &app.modal else {
+        panic!("V should open the invariant list, got {:?}", app.modal);
+    };
+    assert_eq!(entries.len(), 1, "{entries:#?}");
+    assert_eq!(*selected, 0);
+    assert_eq!(entries[0].violation.invariant, 6);
+    assert_eq!(entries[0].violation.painting.as_deref(), Some("Minimal"));
+    // The painting only exists in memory - nothing has been saved - so a check that read
+    // `human_mapping.json` off disk would have found nothing to report.
+    assert_eq!(
+        entries[0].details,
+        vec!["before 2:0-2:4  \"    \"  in block 7..25".to_string()],
+        "the site is the claimed indentation itself - columns 0..4, not the whole painted \
+         range - with the text under it and the node it falls in"
+    );
+}
+
+#[test]
+fn v_says_so_when_a_case_breaks_nothing() {
+    let source = "fn f() {\n    let x = 1;\n}\n";
+    let code = Code::from_string(source, &Language::Rust);
+    let root = code.ast.as_ref().unwrap().root_node();
+    let mut app = App::new(
+        "test".to_string(),
+        CaseOrigin::Diffs,
+        root.id(),
+        root.id(),
+        HumanMapping::default(),
+    );
+    let flat = FlatIndex::new(flatten_visible(root, &app.before.collapsed, None));
+    let caches = rebuild_caches(&app.mapping.entries, root, root);
+    let hashes: rustc_hash::FxHashMap<usize, u64> = Default::default();
+    handle_key(
+        &mut app,
+        KeyCode::Char('V'),
+        &flat,
+        &flat,
+        root,
+        root,
+        &caches,
+        source.as_bytes(),
+        source.as_bytes(),
+        &hashes,
+        &hashes,
+        &code,
+        &code,
+    );
+    assert!(app.modal.is_none(), "no popup for a clean case");
+    assert!(
+        app.status.as_deref().is_some_and(|s| s.contains("none")),
+        "got {:?}",
+        app.status
+    );
+}
+
+/// Enter is the whole point of the popup: the row an invariant names becomes both a tree cursor
+/// and a text cursor, without the reader hunting for either.
+#[test]
+fn enter_in_the_invariant_list_moves_the_tree_and_the_text_cursor() {
+    let source = "fn f() {\n    let x = 1;\n}\n";
+    let (mut app, code) = app_with_one_violation(source);
+    let root = code.ast.as_ref().unwrap().root_node();
+    let entries = invariant_entries(&app.mapping, &code, &code).expect("checks run");
+    assert_eq!(entries.len(), 1);
+    app.modal = Some(Modal::InvariantList {
+        entries,
+        selected: 0,
+    });
+    let flat = FlatIndex::new(flatten_visible(root, &app.before.collapsed, None));
+    let caches = rebuild_caches(&app.mapping.entries, root, root);
+
+    handle_modal_key(
+        &mut app,
+        KeyCode::Enter,
+        &flat,
+        &flat,
+        Some(root),
+        Some(root),
+        &caches,
+        source.as_bytes(),
+        source.as_bytes(),
+        &code,
+        &code,
+    );
+
+    let Some(Modal::TextView { state }) = &app.modal else {
+        panic!("Enter should open the text view, got {:?}", app.modal);
+    };
+    assert_eq!(state.side, 0);
+    assert_eq!(
+        state.cursor[0],
+        (1, 0),
+        "the text cursor sits on the site's first byte"
+    );
+    let landed =
+        find_node_by_id_anywhere(root, app.before.cursor_id).expect("the cursor is on a node");
+    assert_eq!(
+        (landed.kind(), &source[landed.byte_range()]),
+        ("let", "let"),
+        "column 0 is indentation, so the tree lands on the next leaf"
+    );
+    assert_eq!(app.focus, Focus::Before);
 }

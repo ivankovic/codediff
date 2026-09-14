@@ -19,7 +19,7 @@ use anyhow::Result;
 
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants_with_known_violations;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 
 #[test]
 fn mapping() -> Result<()> {
@@ -43,12 +43,9 @@ fn painting() -> Result<()> {
 
 #[test]
 fn invariants() -> Result<()> {
-    // Invariant 9, found when it was added on 2026-09-13: the painting pairs text that the
-    // fixture's own tree mapping leaves unmatched, so one record says the code survived and the
-    // other says it did not. Recorded rather than repaired - pairing the nodes in the mapping
-    // and dropping the painted Move are both one edit, and which of the two records is the
-    // author's real reading is the author's to say.
-    // Here two bytes of the `//~^ ERROR: constructing invalid value` comment on before row 17
-    // are painted as relocated by `Full` and left unmatched by the mapping.
-    assert_ground_truth_invariants_with_known_violations("rust-rust-lang-rust-update-comment", 1)
+    // Was clamped at 1 from 2026-09-13 to 2026-09-14, and the clamp was the bug rather than the
+    // data: invariant 9 read a tree-side `Delete` as an unmatched node, and this fixture has no
+    // unmatched node at all - the two bytes it reported were a colon that the painter put at the
+    // head of the surviving comment text and `TextDiff` put at the tail of the deleted text.
+    assert_ground_truth_invariants("rust-rust-lang-rust-update-comment")
 }

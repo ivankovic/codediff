@@ -66,7 +66,9 @@
 //! `Insert` or `Delete` by the other preset. Invariant 9 is the same question asked across the two
 //! *ground truths* rather than across the two presets, and is the only rule here that compares them
 //! at all: they are expected to differ about how one edit is chunked, which is what the paper
-//! reports, and this is the one thing they cannot differ about. Five fixtures break it.
+//! reports, and this is the one thing they cannot differ about. Four fixtures break it - five
+//! until 2026-09-14, when the fifth turned out to be the rule's own false positive rather than a
+//! contradiction in the data; see `unmatched_bytes`.
 //!
 //! Invariants 10 to 15 arrived on 2026-09-14 from `candidate_invariant_census` in
 //! `tests/exploratory.rs`, which reads the tree mapping through [`Caches`] rather than through the
@@ -102,19 +104,184 @@ use crate::diff::text::RenderOptions;
 /// that the raw form reads badly in a signature.
 type PaintedLabels = [Vec<Option<TextLabel>>; 2];
 
-/// Every way `name`'s ground truth contradicts itself, one human-readable line each, in a stable
-/// order. Empty is a pass.
-pub fn ground_truth_invariant_violations(name: &str) -> Result<Vec<String>> {
+/// Where a violation is, on one side.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ViolationSite {
+    /// 0 = before, 1 = after - the same side convention `TextDiff::all` and `PaintedLabels` use.
+    pub side: usize,
+    /// **0-based rows, byte columns** - the [`HumanTextSpan`] convention, which is what a painting
+    /// stores on disk and what `human_solver`'s text cursor addresses. The *messages* alongside
+    /// say 1-based rows instead, because that is what a file's gutter shows a reader. Anything
+    /// that consumes a site programmatically wants the former and anything that reads a message
+    /// wants the latter, so both exist rather than one being converted at every call.
+    pub span: HumanTextSpan,
+}
+
+/// One way a fixture's ground truth contradicts itself: which rule, what it says, and where to
+/// look.
+///
+/// The locations exist so a *tool* can act on the violation - `human_solver`'s `V` popup puts both
+/// trees and both text panels on a site - which a sentence with a row number in it cannot support.
+/// Every rule already holds this data while it builds its message (nodes for 3, 14 and 15, byte
+/// offsets for 2, 8 and 9, rows and columns for 1, 4, 5 and 6, raw spans for 7 and 13, leaves for
+/// 10, 11 and 12), so carrying it out is bookkeeping rather than a second analysis.
+#[derive(Debug, Clone)]
+pub struct GroundTruthViolation {
+    /// Which of the fifteen rules, numbered as the module doc lists them.
+    pub invariant: u8,
+    /// The painting this is about, or `None` for the three rules that read only the tree mapping.
+    pub painting: Option<String>,
+    /// The human-readable line - what a test failure prints and what the popup lists.
+    pub message: String,
+    /// Every place to look, with runs of contiguous bytes already collapsed into one span each.
+    pub sites: Vec<ViolationSite>,
+}
+
+impl std::fmt::Display for GroundTruthViolation {
+    /// `[9] painting 'Full' before paints ...` - the rule's number, then its sentence.
+    ///
+    /// The number is not part of `message` because `human_solver`'s popup shows it in a column of
+    /// its own, where a repeated `[9]` in the text beside it would be noise. Everything that
+    /// prints a violation as one line wants it, so it is added here rather than at each of them.
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "[{}] {}", self.invariant, self.message)
+    }
+}
+
+impl GroundTruthViolation {
+    fn new(
+        invariant: u8,
+        painting: Option<&str>,
+        message: String,
+        sites: Vec<ViolationSite>,
+    ) -> Self {
+        Self {
+            invariant,
+            painting: painting.map(str::to_string),
+            message,
+            sites,
+        }
+    }
+}
+
+/// At most this many sites are carried per violation.
+///
+/// Capped for the same reason the row list in a message is: a violation can cover hundreds of
+/// runs, and neither a popup nor a struct is improved by holding every one. The message's own
+/// count stays exact, so nothing is hidden - this bounds only how many of them can be jumped to.
+const MAX_SITES: usize = 20;
+
+/// The span covering `start..end` of `contents`, in 0-based rows and byte columns.
+fn span_of_bytes(contents: &str, start: usize, end: usize) -> HumanTextSpan {
+    let row_and_column = |offset: usize| {
+        let row = contents[..offset].matches('\n').count();
+        let column = offset - contents[..offset].rfind('\n').map_or(0, |index| index + 1);
+        (row, column)
+    };
+    let (start_row, start_column) = row_and_column(start);
+    let (end_row, end_column) = row_and_column(end);
+    HumanTextSpan {
+        start_row,
+        start_column,
+        end_row,
+        end_column,
+    }
+}
+
+/// The span a node occupies. `tree_sitter::Point::column` is already a byte offset into its row,
+/// which is the one thing that makes this a rename rather than a conversion.
+fn span_of_node(node: Node) -> HumanTextSpan {
+    HumanTextSpan {
+        start_row: node.start_position().row,
+        start_column: node.start_position().column,
+        end_row: node.end_position().row,
+        end_column: node.end_position().column,
+    }
+}
+
+/// Byte offsets on one side as sites, with contiguous offsets collapsed into one span each.
+///
+/// A per-byte site list is the wrong shape for every consumer: invariant 9's 60 bytes on
+/// `rust-next-font-imports-generator` are four runs of indentation, and a popup offering sixty
+/// jumps to four places is a popup nobody can use. `offsets` is expected in ascending order,
+/// which every caller produces by scanning a label vector forwards.
+fn sites_from_offsets(side: usize, contents: &str, offsets: &[usize]) -> Vec<ViolationSite> {
+    let mut sites: Vec<ViolationSite> = Vec::new();
+    let mut run: Option<(usize, usize)> = None;
+    for &offset in offsets {
+        match run {
+            Some((start, end)) if end == offset => run = Some((start, offset + 1)),
+            Some((start, end)) => {
+                sites.push(ViolationSite {
+                    side,
+                    span: span_of_bytes(contents, start, end),
+                });
+                run = Some((offset, offset + 1));
+            }
+            None => run = Some((offset, offset + 1)),
+        }
+        if sites.len() >= MAX_SITES {
+            return sites;
+        }
+    }
+    if let Some((start, end)) = run {
+        sites.push(ViolationSite {
+            side,
+            span: span_of_bytes(contents, start, end),
+        });
+    }
+    sites
+}
+
+/// What invariants 2 and 8 carry while scoring one `Minimal` alternative against every `Full` one.
+///
+/// Both rules report only the closest counterpart, because the alternatives are a disjunction -
+/// see [`full_painting_covers_minimal`] - so both keep a best-so-far and everything needed to
+/// describe it. They differ only in what counts as a disagreement, which is why the bookkeeping is
+/// one type: invariant 2 names the `Full` painting in its message and has no example to give,
+/// invariant 8 gives an example that already names both paintings and so never reads the name.
+struct ClosestFull<'a> {
+    /// Bytes the two disagree about - the number being minimised.
+    count: usize,
+    /// The `Full` alternative's own name (invariant 2's message).
+    name: &'a str,
+    /// 1-based rows, per side, for the message's row list.
+    rows: [Vec<usize>; 2],
+    /// Byte offsets, per side, for the violation's sites.
+    offsets: [Vec<usize>; 2],
+    /// One example, already phrased (invariant 8's message); empty where there is none.
+    detail: String,
+}
+
+/// One site covering a whole row's `start_column..end_column`, 0-based.
+fn site_on_row(side: usize, row: usize, start_column: usize, end_column: usize) -> ViolationSite {
+    ViolationSite {
+        side,
+        span: HumanTextSpan {
+            start_row: row,
+            start_column,
+            end_row: row,
+            end_column,
+        },
+    }
+}
+
+/// Every way `name`'s ground truth contradicts itself, in a stable order. Empty is a pass.
+pub fn ground_truth_invariant_violations(name: &str) -> Result<Vec<GroundTruthViolation>> {
     let (before, after) = &*crate::test::helper::handmade_test_code_pair(name)?;
     ground_truth_invariant_violations_for(&load(name)?, before, after)
 }
 
 /// [`ground_truth_invariant_violations`] over an already-loaded mapping and code pair.
+///
+/// **This is the one `human_solver` must call**, never the by-name form: that one reads
+/// `human_mapping.json` off disk, and the solver's mapping is in memory and usually unsaved, so a
+/// disk read would report violations the reader has just repaired.
 pub fn ground_truth_invariant_violations_for(
     mapping: &super::HumanMapping,
     before: &Code,
     after: &Code,
-) -> Result<Vec<String>> {
+) -> Result<Vec<GroundTruthViolation>> {
     let mut violations = Vec::new();
 
     // One byte-label vector per painting per side, built once: every check that reads the
@@ -238,7 +405,7 @@ fn rows_end_on_visible_characters(
     labels: &PaintedLabels,
     before: &Code,
     after: &Code,
-) -> Vec<String> {
+) -> Vec<GroundTruthViolation> {
     let mut violations = Vec::new();
     for (side, contents) in [(0usize, &before.contents), (1usize, &after.contents)] {
         let mut offset = 0usize;
@@ -296,11 +463,16 @@ fn rows_end_on_visible_characters(
             if line[run_start..run_end].chars().all(char::is_whitespace) {
                 continue;
             }
-            violations.push(format!(
-                "painting '{painting}' {} row {} ends its last painted run on {character:?}, \
-                 not on a visible character: {line:?}",
-                side_name(side),
-                row + 1,
+            violations.push(GroundTruthViolation::new(
+                1,
+                Some(painting),
+                format!(
+                    "painting '{painting}' {} row {} ends its last painted run on {character:?}, \
+                     not on a visible character: {line:?}",
+                    side_name(side),
+                    row + 1,
+                ),
+                vec![site_on_row(side, row, run_start, run_end)],
             ));
         }
     }
@@ -330,7 +502,7 @@ fn full_painting_covers_minimal(
     mapping: &super::HumanMapping,
     before: &Code,
     after: &Code,
-) -> Result<Vec<String>> {
+) -> Result<Vec<GroundTruthViolation>> {
     let (Ok(minimal), Ok(full)) = (
         paintings_for_mode(mapping, RenderOptions::MINIMAL),
         paintings_for_mode(mapping, RenderOptions::FULL),
@@ -349,11 +521,12 @@ fn full_painting_covers_minimal(
     let mut violations = Vec::new();
     for minimal in &minimal {
         let minimal_labels = painted_labels(minimal, before, after)?;
-        let mut closest: Option<(usize, &str, [Vec<usize>; 2])> = None;
+        let mut closest: Option<ClosestFull> = None;
         for full in &full {
             let full_labels = painted_labels(full, before, after)?;
             let mut missing = 0usize;
             let mut rows: [Vec<usize>; 2] = [Vec::new(), Vec::new()];
+            let mut offsets: [Vec<usize>; 2] = [Vec::new(), Vec::new()];
             for (side, contents) in [(0usize, &before.contents), (1usize, &after.contents)] {
                 for (offset, (minimal, full)) in minimal_labels[side]
                     .iter()
@@ -363,21 +536,43 @@ fn full_painting_covers_minimal(
                     if minimal.is_some() && full.is_none() {
                         missing += 1;
                         rows[side].push(row_of(contents, offset));
+                        offsets[side].push(offset);
                     }
                 }
             }
-            if closest.as_ref().is_none_or(|(best, _, _)| missing < *best) {
-                closest = Some((missing, full.name.as_str(), rows));
+            if closest.as_ref().is_none_or(|best| missing < best.count) {
+                closest = Some(ClosestFull {
+                    count: missing,
+                    name: full.name.as_str(),
+                    rows,
+                    offsets,
+                    detail: String::new(),
+                });
             }
         }
-        if let Some((missing, full, rows)) = closest
+        if let Some(ClosestFull {
+            count: missing,
+            name: full,
+            rows,
+            offsets,
+            ..
+        }) = closest
             && missing > 0
         {
-            violations.push(format!(
-                "painting '{}' paints {missing} byte(s) that '{full}' leaves unpainted, on {} - a \
-                 Full painting must cover everything its Minimal counterpart covers",
-                minimal.name,
-                site_rows(&rows),
+            violations.push(GroundTruthViolation::new(
+                2,
+                Some(&minimal.name),
+                format!(
+                    "painting '{}' paints {missing} byte(s) that '{full}' leaves unpainted, on {} \
+                     - a Full painting must cover everything its Minimal counterpart covers",
+                    minimal.name,
+                    site_rows(&rows),
+                ),
+                [
+                    sites_from_offsets(0, &before.contents, &offsets[0]),
+                    sites_from_offsets(1, &after.contents, &offsets[1]),
+                ]
+                .concat(),
             ));
         }
     }
@@ -497,7 +692,7 @@ fn full_paints_a_wholly_changed_line_whole(
     labels: &PaintedLabels,
     before: &Code,
     after: &Code,
-) -> Vec<String> {
+) -> Vec<GroundTruthViolation> {
     let mut violations = Vec::new();
     for (side, contents) in [(0usize, &before.contents), (1usize, &after.contents)] {
         for (row, start, line) in rows_of(contents) {
@@ -539,14 +734,19 @@ fn full_paints_a_wholly_changed_line_whole(
             // The exact columns, not just how many: this list is read by a human repairing the
             // painting by hand, and "12 of 16" does not say *which* twelve.
             if let (Some(&low), Some(&high)) = (unpainted.first(), unpainted.last()) {
-                violations.push(format!(
-                    "painting '{painting}' {} row {} paints every visible character {label:?} but \
-                     leaves columns {low}..{} unpainted ({} byte(s) of whitespace inside the \
-                     line's own content): {line:?}",
-                    side_name(side),
-                    row + 1,
-                    high + 1,
-                    unpainted.len(),
+                violations.push(GroundTruthViolation::new(
+                    4,
+                    Some(painting),
+                    format!(
+                        "painting '{painting}' {} row {} paints every visible character {label:?} \
+                         but leaves columns {low}..{} unpainted ({} byte(s) of whitespace inside \
+                         the line's own content): {line:?}",
+                        side_name(side),
+                        row + 1,
+                        high + 1,
+                        unpainted.len(),
+                    ),
+                    vec![site_on_row(side, row, low, high + 1)],
                 ));
             }
         }
@@ -570,7 +770,7 @@ fn no_unpainted_whitespace_between_painted_regions(
     labels: &PaintedLabels,
     before: &Code,
     after: &Code,
-) -> Vec<String> {
+) -> Vec<GroundTruthViolation> {
     let mut violations = Vec::new();
     for (side, contents) in [(0usize, &before.contents), (1usize, &after.contents)] {
         for (row, start, line) in rows_of(contents) {
@@ -586,13 +786,19 @@ fn no_unpainted_whitespace_between_painted_regions(
                     if let Some(run_start) = run.take()
                         && line[run_start..i].chars().all(char::is_whitespace)
                     {
-                        violations.push(format!(
-                            "painting '{painting}' {} row {} leaves columns {}..{} unpainted \
-                             between two painted regions, and they are only whitespace: {line:?}",
-                            side_name(side),
-                            row + 1,
-                            run_start,
-                            i,
+                        violations.push(GroundTruthViolation::new(
+                            5,
+                            Some(painting),
+                            format!(
+                                "painting '{painting}' {} row {} leaves columns {}..{} unpainted \
+                                 between two painted regions, and they are only whitespace: \
+                                 {line:?}",
+                                side_name(side),
+                                row + 1,
+                                run_start,
+                                i,
+                            ),
+                            vec![site_on_row(side, row, run_start, i)],
                         ));
                     }
                 } else if run.is_none() {
@@ -630,7 +836,7 @@ fn minimal_never_paints_leading_whitespace(
     labels: &PaintedLabels,
     before: &Code,
     after: &Code,
-) -> Vec<String> {
+) -> Vec<GroundTruthViolation> {
     let mut violations = Vec::new();
     for (side, contents) in [(0usize, &before.contents), (1usize, &after.contents)] {
         for (row, start, line) in rows_of(contents) {
@@ -641,13 +847,19 @@ fn minimal_never_paints_leading_whitespace(
                 .filter(|&i| labels[side][start + i].is_some())
                 .collect();
             if let (Some(&low), Some(&high)) = (painted.first(), painted.last()) {
-                violations.push(format!(
-                    "painting '{painting}' {} row {} paints columns {low}..{} of its own leading \
-                     whitespace ({} byte(s)) - Minimal never claims a line's indentation: {line:?}",
-                    side_name(side),
-                    row + 1,
-                    high + 1,
-                    painted.len(),
+                violations.push(GroundTruthViolation::new(
+                    6,
+                    Some(painting),
+                    format!(
+                        "painting '{painting}' {} row {} paints columns {low}..{} of its own \
+                         leading whitespace ({} byte(s)) - Minimal never claims a line's \
+                         indentation: {line:?}",
+                        side_name(side),
+                        row + 1,
+                        high + 1,
+                        painted.len(),
+                    ),
+                    vec![site_on_row(side, row, low, high + 1)],
                 ));
             }
         }
@@ -666,7 +878,11 @@ pub fn full_painting_whitespace_violations(
     mapping: &super::HumanMapping,
     before: &Code,
     after: &Code,
-) -> Result<(Vec<String>, Vec<String>, Vec<String>)> {
+) -> Result<(
+    Vec<GroundTruthViolation>,
+    Vec<GroundTruthViolation>,
+    Vec<GroundTruthViolation>,
+)> {
     let mut leading = Vec::new();
     let mut interior = Vec::new();
     let mut minimal_indentation = Vec::new();
@@ -714,7 +930,7 @@ fn presets_agree_on_what_survives(
     mapping: &super::HumanMapping,
     before: &Code,
     after: &Code,
-) -> Result<Vec<String>> {
+) -> Result<Vec<GroundTruthViolation>> {
     let (Ok(minimal), Ok(full)) = (
         paintings_for_mode(mapping, RenderOptions::MINIMAL),
         paintings_for_mode(mapping, RenderOptions::FULL),
@@ -740,14 +956,13 @@ fn presets_agree_on_what_survives(
     let mut violations = Vec::new();
     for minimal in &minimal {
         let minimal_labels = painted_labels(minimal, before, after)?;
-        // No `&str` for the `Full` alternative's own name, unlike invariant 2 next door: the
-        // message names both paintings through `first`, so carrying it here would be write-only.
-        let mut closest: Option<(usize, String, [Vec<usize>; 2])> = None;
+        let mut closest: Option<ClosestFull> = None;
         for full in &full {
             let full_labels = painted_labels(full, before, after)?;
             let mut count = 0usize;
             let mut first = String::new();
             let mut rows: [Vec<usize>; 2] = [Vec::new(), Vec::new()];
+            let mut offsets: [Vec<usize>; 2] = [Vec::new(), Vec::new()];
             for (side, contents) in [(0usize, &before.contents), (1usize, &after.contents)] {
                 for (offset, (left, right)) in minimal_labels[side]
                     .iter()
@@ -767,21 +982,43 @@ fn presets_agree_on_what_survives(
                         );
                     }
                     rows[side].push(row_of(contents, offset));
+                    offsets[side].push(offset);
                     count += 1;
                 }
             }
-            if closest.as_ref().is_none_or(|(best, _, _)| count < *best) {
-                closest = Some((count, first, rows));
+            if closest.as_ref().is_none_or(|best| count < best.count) {
+                closest = Some(ClosestFull {
+                    count,
+                    name: full.name.as_str(),
+                    rows,
+                    offsets,
+                    detail: first,
+                });
             }
         }
-        if let Some((count, first, rows)) = closest
+        if let Some(ClosestFull {
+            count,
+            rows,
+            offsets,
+            detail: first,
+            ..
+        }) = closest
             && count > 0
         {
-            violations.push(format!(
-                "{count} byte(s) survive under one preset and do not under the other, on {} - \
-                 {first}. A Move says the code is still there, so the other preset cannot call it \
-                 removed or added",
-                site_rows(&rows),
+            violations.push(GroundTruthViolation::new(
+                8,
+                Some(&minimal.name),
+                format!(
+                    "{count} byte(s) survive under one preset and do not under the other, on {} - \
+                     {first}. A Move says the code is still there, so the other preset cannot \
+                     call it removed or added",
+                    site_rows(&rows),
+                ),
+                [
+                    sites_from_offsets(0, &before.contents, &offsets[0]),
+                    sites_from_offsets(1, &after.contents, &offsets[1]),
+                ]
+                .concat(),
             ));
         }
     }
@@ -820,7 +1057,7 @@ fn painted_ranges_do_not_overlap(
     named: &NamedTextMapping,
     before: &Code,
     after: &Code,
-) -> Vec<String> {
+) -> Vec<GroundTruthViolation> {
     let mut violations = Vec::new();
     for (side, contents) in [(0usize, &before.contents), (1usize, &after.contents)] {
         let bytes = contents.as_bytes();
@@ -854,14 +1091,25 @@ fn painted_ranges_do_not_overlap(
                 }
                 if let Some((owner, offset)) = clash {
                     let row = contents[..offset].matches('\n').count();
-                    violations.push(format!(
-                        "painting '{}' {} range {} claims byte {offset} (row {}) already claimed by \
-                         range {owner} - an overlap renders by highest verdict and scores by list \
-                         order, so it reads as one painting and grades as another",
-                        named.name,
-                        side_name(side),
-                        index,
-                        row + 1,
+                    violations.push(GroundTruthViolation::new(
+                        7,
+                        Some(&named.name),
+                        format!(
+                            "painting '{}' {} range {} claims byte {offset} (row {}) already \
+                             claimed by range {owner} - an overlap renders by highest verdict and \
+                             scores by list order, so it reads as one painting and grades as \
+                             another",
+                            named.name,
+                            side_name(side),
+                            index,
+                            row + 1,
+                        ),
+                        // The offending range whole, not just the byte that clashed: shortening
+                        // one of the two ranges is the repair, so the range is what to look at.
+                        vec![ViolationSite {
+                            side,
+                            span: span_of_bytes(contents, start, end.min(contents.len())),
+                        }],
                     ));
                 }
             }
@@ -887,8 +1135,19 @@ fn painted_ranges_do_not_overlap(
 /// column-shift heuristic rather than from either ground truth - neither expresses `Move`
 /// positionally - so a byte the *tree* renders `Move` and the painting calls `Delete` measures the
 /// renderer, not the humans. That pair is the larger of the two in the corpus (753 bytes over 8
-/// fixtures against 96 over 5) and is deliberately not reported. `Delete` and `Insert` on the tree
-/// side carry no such caveat: they are nodes the human left unmatched.
+/// fixtures against 96 over 5) and is deliberately not reported.
+///
+/// **And only where the mapping really does leave the byte unmatched**, which is checked against
+/// [`Caches`] rather than read off the rendering. Until 2026-09-14 this rule took a tree-side
+/// `Delete` or `Insert` as proof of an unmatched node, on the strength of a claim in this very
+/// comment that turned out to be false: `TextDiff::from` also emits them for the characters that
+/// *changed inside a matched-but-edited leaf*. `rust-rust-lang-rust-update-comment` is the case
+/// that exposed it - a fixture with no unmatched node at all (187 `Identical` entries and 12
+/// `MatchButNotIdentical`, nothing else) that was reported for two bytes of an edited comment,
+/// where the painter put a colon at the head of the surviving text and the renderer put it at the
+/// tail of the deleted text. A seam, not a contradiction. [`unmatched_bytes`] is the gate, and it
+/// drops exactly that one violation: the other four fixtures this fires on sit in nodes the
+/// mapping genuinely marks deleted or inserted.
 ///
 /// Every painting is checked rather than the best-matching one. Each named painting asserts that
 /// it is a correct rendering of the edit, and a rendering that contradicts the mapping about
@@ -897,11 +1156,14 @@ fn mapping_and_painting_agree_on_what_survives(
     mapping: &super::HumanMapping,
     before: &Code,
     after: &Code,
-) -> Result<Vec<String>> {
+) -> Result<Vec<GroundTruthViolation>> {
     if mapping.text_mappings.is_empty() || mapping.entries.is_empty() {
         return Ok(Vec::new());
     }
     let Ok(ast_diff) = super::as_ast_diff_for_mapping(mapping, before, after) else {
+        return Ok(Vec::new());
+    };
+    let (Some(before_tree), Some(after_tree)) = (before.ast.as_ref(), after.ast.as_ref()) else {
         return Ok(Vec::new());
     };
     let node_cache = crate::diff::NodeCache::build(before, after);
@@ -909,6 +1171,12 @@ fn mapping_and_painting_agree_on_what_survives(
     let tree = [
         super::label_bytes_from_ranges(&before.contents, &text_diff.all(0)),
         super::label_bytes_from_ranges(&after.contents, &text_diff.all(1)),
+    ];
+    let caches =
+        rebuild_caches_for_mapping(mapping, before_tree.root_node(), after_tree.root_node());
+    let unmatched = [
+        unmatched_bytes(before_tree.root_node(), before.contents.len(), 0, &caches),
+        unmatched_bytes(after_tree.root_node(), after.contents.len(), 1, &caches),
     ];
 
     let mut violations = Vec::new();
@@ -918,6 +1186,7 @@ fn mapping_and_painting_agree_on_what_survives(
             &named.name,
             &painted,
             &tree,
+            &unmatched,
             before,
             after,
         ));
@@ -925,25 +1194,62 @@ fn mapping_and_painting_agree_on_what_survives(
     Ok(violations)
 }
 
-/// [`mapping_and_painting_agree_on_what_survives`]' comparison, over the two projections it has
+/// Per byte of one side, whether the **smallest node containing it** is one the tree mapping
+/// leaves unmatched.
+///
+/// Painted in preorder so a child overwrites its parent. A `Matched` node inside a
+/// `DeleteWithChildren` one therefore reads as matched, while the whitespace *between* that
+/// node's children - which no node of its own covers - keeps the parent's answer. That is exactly
+/// what `descendant_for_byte_range` would say for each byte, in one walk rather than one lookup
+/// per byte, and the inter-token-whitespace case is not a detail: 60 of the bytes this rule still
+/// reports are the indentation inside a `block` the mapping deletes, which no leaf covers.
+fn unmatched_bytes(root: Node, len: usize, side: usize, caches: &Caches) -> Vec<bool> {
+    let mut mask = vec![false; len];
+    let mut stack = vec![root];
+    while let Some(node) = stack.pop() {
+        let status = if side == 0 {
+            status_before(node, caches)
+        } else {
+            status_after(node, caches)
+        };
+        let unmatched = matches!(status, NodeStatus::Marked { .. });
+        let (start, end) = (node.start_byte().min(len), node.end_byte().min(len));
+        mask[start..end].fill(unmatched);
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            stack.push(child);
+        }
+    }
+    mask
+}
+
+/// [`mapping_and_painting_agree_on_what_survives`]' comparison, over the projections it has
 /// already built - split out so it can be tested against label vectors directly. Building the tree
 /// side needs a real `ASTDiff` and a renderer, and what this rule says is about the labels.
+///
+/// `unmatched` is [`unmatched_bytes`]' output per side, and is what keeps a tree-side `Delete`
+/// over a *matched* node from being read as a missing counterpart.
 fn move_against_unmatched(
     painting: &str,
     painted: &PaintedLabels,
     tree: &PaintedLabels,
+    unmatched: &[Vec<bool>; 2],
     before: &Code,
     after: &Code,
-) -> Vec<String> {
+) -> Vec<GroundTruthViolation> {
     let mut violations = Vec::new();
     for (side, contents) in [(0usize, &before.contents), (1usize, &after.contents)] {
         let mut count = 0usize;
         let mut rows = Vec::new();
+        let mut offsets = Vec::new();
         let mut labels: Vec<&'static str> = Vec::new();
         for (offset, (paint, from_tree)) in painted[side].iter().zip(tree[side].iter()).enumerate()
         {
             if *paint != Some(TextLabel::Move)
                 || !matches!(from_tree, Some(TextLabel::Delete | TextLabel::Insert))
+                // The renderer says these bytes went away; only the mapping can say whether that
+                // is a node with no counterpart or a character edited out of one that has one.
+                || !unmatched[side].get(offset).copied().unwrap_or(false)
             {
                 continue;
             }
@@ -956,15 +1262,22 @@ fn move_against_unmatched(
                 labels.push(label);
             }
             rows.push(row_of(contents, offset));
+            offsets.push(offset);
             count += 1;
         }
         if count > 0 {
-            violations.push(format!(
-                "painting '{painting}' {} paints {count} byte(s) Move on {} that the tree mapping \
-                 reads {} - a Move says the code survives and an unmatched node says it does not",
-                side_name(side),
-                row_list(&rows),
-                labels.join("/"),
+            violations.push(GroundTruthViolation::new(
+                9,
+                Some(painting),
+                format!(
+                    "painting '{painting}' {} paints {count} byte(s) Move on {} that the tree \
+                     mapping reads {} - a Move says the code survives and an unmatched node says \
+                     it does not",
+                    side_name(side),
+                    row_list(&rows),
+                    labels.join("/"),
+                ),
+                sites_from_offsets(side, contents, &offsets),
             ));
         }
     }
@@ -1040,7 +1353,7 @@ fn delimiter_pairs_agree(
     mapping: &super::HumanMapping,
     before: &Code,
     after: &Code,
-) -> Vec<String> {
+) -> Vec<GroundTruthViolation> {
     let (Some(before_tree), Some(after_tree)) = (before.ast.as_ref(), after.ast.as_ref()) else {
         return Vec::new();
     };
@@ -1063,14 +1376,28 @@ fn delimiter_pairs_agree(
             if let (Some(opened), Some(closed)) = (opened, closed)
                 && opened != closed
             {
-                violations.push(format!(
-                    "mapping {} marks {:?} on row {} as {opened} but its matching {:?} on row {} \
-                     as {closed}",
-                    side_name(side),
-                    open.kind(),
-                    open.start_position().row + 1,
-                    close.kind(),
-                    close.start_position().row + 1,
+                violations.push(GroundTruthViolation::new(
+                    3,
+                    None,
+                    format!(
+                        "mapping {} marks {:?} on row {} as {opened} but its matching {:?} on row \
+                         {} as {closed}",
+                        side_name(side),
+                        open.kind(),
+                        open.start_position().row + 1,
+                        close.kind(),
+                        close.start_position().row + 1,
+                    ),
+                    vec![
+                        ViolationSite {
+                            side,
+                            span: span_of_node(open),
+                        },
+                        ViolationSite {
+                            side,
+                            span: span_of_node(close),
+                        },
+                    ],
                 ));
             }
         }
@@ -1380,10 +1707,11 @@ fn paired_leaves_are_not_deleted_and_inserted(
     context: &TreeContext,
     before: &Code,
     after: &Code,
-) -> Vec<String> {
+) -> Vec<GroundTruthViolation> {
     let mut count = 0usize;
     let mut first = String::new();
     let mut rows: [Vec<usize>; 2] = [Vec::new(), Vec::new()];
+    let mut sites = Vec::new();
     for leaf in &context.leaves[0] {
         if !is_visible_leaf(*leaf, &before.contents) {
             continue;
@@ -1401,15 +1729,30 @@ fn paired_leaves_are_not_deleted_and_inserted(
         }
         rows[0].push(row_of(&before.contents, leaf.start_byte()));
         rows[1].push(row_of(&after.contents, partner.start_byte()));
+        if sites.len() < MAX_SITES {
+            sites.push(ViolationSite {
+                side: 0,
+                span: span_of_node(*leaf),
+            });
+            sites.push(ViolationSite {
+                side: 1,
+                span: span_of_node(partner),
+            });
+        }
         count += 1;
     }
     if count == 0 {
         return Vec::new();
     }
-    vec![format!(
-        "painting '{painting}' paints {count} leaf pair(s) gone on one side and new on the other \
-         that the tree mapping calls the same text, on {} - the first is `{first}`",
-        site_rows(&rows),
+    vec![GroundTruthViolation::new(
+        10,
+        Some(painting),
+        format!(
+            "painting '{painting}' paints {count} leaf pair(s) gone on one side and new on the \
+             other that the tree mapping calls the same text, on {} - the first is `{first}`",
+            site_rows(&rows),
+        ),
+        sites,
     )]
 }
 
@@ -1427,12 +1770,13 @@ fn removed_leaves_are_painted(
     context: &TreeContext,
     before: &Code,
     after: &Code,
-) -> Vec<String> {
+) -> Vec<GroundTruthViolation> {
     let mut violations = Vec::new();
     for (side, code) in [(0usize, before), (1usize, after)] {
         let mut count = 0usize;
         let mut first = String::new();
         let mut rows = Vec::new();
+        let mut sites = Vec::new();
         for leaf in &context.leaves[side] {
             if !is_visible_leaf(*leaf, &code.contents) || !is_named_leaf(*leaf, &code.contents) {
                 continue;
@@ -1446,15 +1790,26 @@ fn removed_leaves_are_painted(
                 first = format!("{:?} `{}`", leaf.kind(), leaf_text(*leaf, &code.contents));
             }
             rows.push(row_of(&code.contents, leaf.start_byte()));
+            if sites.len() < MAX_SITES {
+                sites.push(ViolationSite {
+                    side,
+                    span: span_of_node(*leaf),
+                });
+            }
             count += 1;
         }
         if count > 0 {
-            violations.push(format!(
-                "painting '{painting}' {} leaves {count} removed leaf/leaves unpainted on {}, the \
-                 first {first} - unpainted text is unchanged and in place, and the tree mapping \
-                 says this is gone",
-                side_name(side),
-                row_list(&rows),
+            violations.push(GroundTruthViolation::new(
+                11,
+                Some(painting),
+                format!(
+                    "painting '{painting}' {} leaves {count} removed leaf/leaves unpainted on {}, \
+                     the first {first} - unpainted text is unchanged and in place, and the tree \
+                     mapping says this is gone",
+                    side_name(side),
+                    row_list(&rows),
+                ),
+                sites,
             ));
         }
     }
@@ -1475,10 +1830,11 @@ fn edited_leaves_are_painted(
     context: &TreeContext,
     before: &Code,
     after: &Code,
-) -> Vec<String> {
+) -> Vec<GroundTruthViolation> {
     let mut count = 0usize;
     let mut first = String::new();
     let mut rows: [Vec<usize>; 2] = [Vec::new(), Vec::new()];
+    let mut sites = Vec::new();
     for leaf in &context.leaves[0] {
         if !is_visible_leaf(*leaf, &before.contents) {
             continue;
@@ -1505,15 +1861,30 @@ fn edited_leaves_are_painted(
         }
         rows[0].push(row_of(&before.contents, leaf.start_byte()));
         rows[1].push(row_of(&after.contents, partner.start_byte()));
+        if sites.len() < MAX_SITES {
+            sites.push(ViolationSite {
+                side: 0,
+                span: span_of_node(*leaf),
+            });
+            sites.push(ViolationSite {
+                side: 1,
+                span: span_of_node(partner),
+            });
+        }
         count += 1;
     }
     if count == 0 {
         return Vec::new();
     }
-    vec![format!(
-        "painting '{painting}' paints nothing on either side of {count} edited leaf/leaves, on {} \
-         - the first is {first}; the tree mapping says the text changed",
-        site_rows(&rows),
+    vec![GroundTruthViolation::new(
+        12,
+        Some(painting),
+        format!(
+            "painting '{painting}' paints nothing on either side of {count} edited leaf/leaves, \
+             on {} - the first is {first}; the tree mapping says the text changed",
+            site_rows(&rows),
+        ),
+        sites,
     )]
 }
 
@@ -1530,7 +1901,7 @@ fn painting_implies_mapping_edits(
     named: &NamedTextMapping,
     before: &Code,
     after: &Code,
-) -> Vec<String> {
+) -> Vec<GroundTruthViolation> {
     if mapping.entries.is_empty()
         || mapping
             .entries
@@ -1552,6 +1923,7 @@ fn painting_implies_mapping_edits(
     };
     let mut edits = 0usize;
     let mut rows: [Vec<usize>; 2] = [Vec::new(), Vec::new()];
+    let mut sites = Vec::new();
     for entry in &named.mapping.entries {
         let before_text = side_text(&before.contents, &entry.before);
         let after_text = side_text(&after.contents, &entry.after);
@@ -1568,16 +1940,29 @@ fn painting_implies_mapping_edits(
         // convert here, unlike every other rule in this file.
         for (side, spans) in [(0usize, &entry.before), (1usize, &entry.after)] {
             rows[side].extend(spans.iter().map(|span| span.start_row + 1));
+            // The painted spans are already in this type - the one rule here that needs no
+            // conversion at all.
+            sites.extend(
+                spans
+                    .iter()
+                    .take(MAX_SITES.saturating_sub(sites.len()))
+                    .map(|span| ViolationSite { side, span: *span }),
+            );
         }
     }
     if edits == 0 {
         return Vec::new();
     }
-    vec![format!(
-        "painting '{}' records {edits} edit(s) to visible text on {} but every entry of the tree \
-         mapping is Identical - one of the two records has not been finished",
-        named.name,
-        site_rows(&rows),
+    vec![GroundTruthViolation::new(
+        13,
+        Some(&named.name),
+        format!(
+            "painting '{}' records {edits} edit(s) to visible text on {} but every entry of the \
+             tree mapping is Identical - one of the two records has not been finished",
+            named.name,
+            site_rows(&rows),
+        ),
+        sites,
     )]
 }
 
@@ -1609,7 +1994,7 @@ fn identical_entries_are_token_identical(
     context: &TreeContext,
     before: &Code,
     after: &Code,
-) -> Vec<String> {
+) -> Vec<GroundTruthViolation> {
     let mut violations = Vec::new();
     let mut pairs: Vec<(usize, usize)> = context
         .caches
@@ -1645,13 +2030,27 @@ fn identical_entries_are_token_identical(
                     after_tokens.len()
                 )
             });
-        violations.push(format!(
-            "mapping calls {:?} on before row {} Identical to {:?} on after row {}, but their \
-             tokens differ: {difference}",
-            before_node.kind(),
-            row_of(&before.contents, before_node.start_byte()),
-            after_node.kind(),
-            row_of(&after.contents, after_node.start_byte()),
+        violations.push(GroundTruthViolation::new(
+            14,
+            None,
+            format!(
+                "mapping calls {:?} on before row {} Identical to {:?} on after row {}, but their \
+                 tokens differ: {difference}",
+                before_node.kind(),
+                row_of(&before.contents, before_node.start_byte()),
+                after_node.kind(),
+                row_of(&after.contents, after_node.start_byte()),
+            ),
+            vec![
+                ViolationSite {
+                    side: 0,
+                    span: span_of_node(*before_node),
+                },
+                ViolationSite {
+                    side: 1,
+                    span: span_of_node(*after_node),
+                },
+            ],
         ));
     }
     violations
@@ -1670,7 +2069,7 @@ fn match_but_not_identical_entries_differ(
     context: &TreeContext,
     before: &Code,
     after: &Code,
-) -> Vec<String> {
+) -> Vec<GroundTruthViolation> {
     let mut violations = Vec::new();
     let mut pairs: Vec<(usize, usize)> = context
         .caches
@@ -1722,12 +2121,26 @@ fn match_but_not_identical_entries_differ(
         if !descendants_stay {
             continue;
         }
-        violations.push(format!(
-            "mapping calls {:?} on before row {} MatchButNotIdentical to after row {}, but the two \
-             read byte-identically and every descendant with an entry pairs inside it",
-            before_node.kind(),
-            row_of(&before.contents, before_node.start_byte()),
-            row_of(&after.contents, after_node.start_byte()),
+        violations.push(GroundTruthViolation::new(
+            15,
+            None,
+            format!(
+                "mapping calls {:?} on before row {} MatchButNotIdentical to after row {}, but \
+                 the two read byte-identically and every descendant with an entry pairs inside it",
+                before_node.kind(),
+                row_of(&before.contents, before_node.start_byte()),
+                row_of(&after.contents, after_node.start_byte()),
+            ),
+            vec![
+                ViolationSite {
+                    side: 0,
+                    span: span_of_node(*before_node),
+                },
+                ViolationSite {
+                    side: 1,
+                    span: span_of_node(*after_node),
+                },
+            ],
         ));
     }
     violations
@@ -1763,6 +2176,7 @@ pub fn assert_ground_truth_invariants_with_known_violations(
     expected: usize,
 ) -> Result<()> {
     let violations = ground_truth_invariant_violations(name)?;
+    let listed = violation_messages(&violations).join("\n  ");
     if violations.len() == expected {
         return Ok(());
     }
@@ -1770,18 +2184,21 @@ pub fn assert_ground_truth_invariants_with_known_violations(
         anyhow::bail!(
             "'{name}' now breaks {} of its own ground-truth invariants, not the {expected} \
              recorded here - if that is a repair, record {} and update the note above this call \
-             to describe what is left:\n  {}",
+             to describe what is left:\n  {listed}",
             violations.len(),
             violations.len(),
-            violations.join("\n  ")
         );
     }
     anyhow::bail!(
         "'{name}' breaks {} of its own ground-truth invariants, more than the {expected} recorded \
-         here:\n  {}",
+         here:\n  {listed}",
         violations.len(),
-        violations.join("\n  ")
     )
+}
+
+/// Each violation's message, numbered by the rule it comes from - what a failure prints.
+pub fn violation_messages(violations: &[GroundTruthViolation]) -> Vec<String> {
+    violations.iter().map(ToString::to_string).collect()
 }
 
 #[cfg(test)]
@@ -1837,7 +2254,11 @@ mod tests {
     }
 
     fn violations(mapping: &HumanMapping, before: &Code, after: &Code) -> Vec<String> {
-        ground_truth_invariant_violations_for(mapping, before, after).expect("checks run")
+        ground_truth_invariant_violations_for(mapping, before, after)
+            .expect("checks run")
+            .into_iter()
+            .map(|violation| violation.message)
+            .collect()
     }
 
     // ── Invariant 8 ─────────────────────────────────────────────────────────────────────────
@@ -2180,6 +2601,12 @@ mod tests {
         [vec![None; before_len], vec![None; after_len]]
     }
 
+    /// An `unmatched_bytes` mask saying every byte is inside a node the mapping leaves unmatched
+    /// - what the rule's own gate looks like when it is not the thing under test.
+    fn all_unmatched(before_len: usize, after_len: usize) -> [Vec<bool>; 2] {
+        [vec![true; before_len], vec![true; after_len]]
+    }
+
     #[test]
     fn a_painted_move_over_a_node_the_mapping_deletes_is_reported() {
         let source = rust("let value = 1;\n");
@@ -2190,10 +2617,22 @@ mod tests {
             tree[0][offset] = Some(TextLabel::Delete);
         }
 
-        let reported = move_against_unmatched("Minimal", &painted, &tree, &source, &source);
+        let unmatched = all_unmatched(source.contents.len(), source.contents.len());
+        let reported =
+            move_against_unmatched("Minimal", &painted, &tree, &unmatched, &source, &source);
         assert_eq!(reported.len(), 1, "got {reported:#?}");
-        assert!(reported[0].contains("5 byte(s) Move"), "got {reported:#?}");
-        assert!(reported[0].contains("Delete"), "got {reported:#?}");
+        assert!(
+            reported[0].message.contains("5 byte(s) Move"),
+            "got {reported:#?}"
+        );
+        assert!(reported[0].message.contains("Delete"), "got {reported:#?}");
+        assert_eq!(reported[0].invariant, 9);
+        // The five bytes are contiguous, so they collapse to one site rather than five.
+        assert_eq!(
+            reported[0].sites,
+            vec![site_on_row(0, 0, 4, 9)],
+            "got {reported:#?}"
+        );
     }
 
     #[test]
@@ -2204,9 +2643,90 @@ mod tests {
         painted[1][4] = Some(TextLabel::Move);
         tree[1][4] = Some(TextLabel::Insert);
 
-        let reported = move_against_unmatched("Full", &painted, &tree, &source, &source);
+        let unmatched = all_unmatched(source.contents.len(), source.contents.len());
+        let reported =
+            move_against_unmatched("Full", &painted, &tree, &unmatched, &source, &source);
         assert_eq!(reported.len(), 1, "got {reported:#?}");
-        assert!(reported[0].contains("after"), "got {reported:#?}");
+        assert!(reported[0].message.contains("after"), "got {reported:#?}");
+        assert_eq!(reported[0].sites, vec![site_on_row(1, 0, 4, 5)]);
+    }
+
+    /// The regression test for the false positive the gate exists to stop, and the one shape this
+    /// rule got wrong for a day: the renderer says these bytes were deleted, but they are inside a
+    /// node the mapping *matched* - a character edited out of a surviving leaf, not a leaf with no
+    /// counterpart. `rust-rust-lang-rust-update-comment` is the corpus case, where a painter and
+    /// `TextDiff` put the same colon on opposite sides of one comment edit.
+    #[test]
+    fn a_painted_move_the_renderer_deletes_from_inside_a_matched_node_is_not_reported() {
+        let source = rust("let value = 1;\n");
+        let mut painted = labels(source.contents.len(), source.contents.len());
+        let mut tree = labels(source.contents.len(), source.contents.len());
+        for offset in 4..9 {
+            painted[0][offset] = Some(TextLabel::Move);
+            tree[0][offset] = Some(TextLabel::Delete);
+        }
+        // Everything else is as in `a_painted_move_over_a_node_the_mapping_deletes_is_reported`,
+        // which reports it; the mask is the only difference.
+        let unmatched = [
+            vec![false; source.contents.len()],
+            vec![false; source.contents.len()],
+        ];
+        assert!(
+            move_against_unmatched("Minimal", &painted, &tree, &unmatched, &source, &source)
+                .is_empty(),
+            "a tree-side Delete inside a matched node is the renderer, not a missing counterpart"
+        );
+    }
+
+    /// The gate's own rule: the smallest node containing a byte decides, so a node the mapping
+    /// matched reads as matched even inside a subtree it deleted - while the whitespace between
+    /// that subtree's children, which no node of its own covers, keeps the deleted answer. That
+    /// whitespace case is not a corner: 60 of the bytes this rule still reports corpus-wide are
+    /// indentation inside a deleted `block`, and a leaf-only lookup would drop every one of them.
+    #[test]
+    fn unmatched_bytes_lets_a_matched_node_override_the_subtree_deleted_around_it() {
+        let before = rust("fn f() { g(); }\n");
+        let root = before.ast.as_ref().unwrap().root_node();
+        let find = |text: &str| {
+            let mut stack = vec![root];
+            while let Some(node) = stack.pop() {
+                if node.child_count() == 0 && &before.contents[node.byte_range()] == text {
+                    return node;
+                }
+                let mut cursor = node.walk();
+                for child in node.children(&mut cursor) {
+                    stack.push(child);
+                }
+            }
+            panic!("no leaf reads {text:?}");
+        };
+        let block = find("{").parent().expect("the brace's block");
+        assert_eq!(block.kind(), "block");
+        let call = find("g");
+
+        let mut caches = Caches::default();
+        // The whole block deleted, children included - so everything under it inherits the mark -
+        // and one leaf inside it matched anyway, which is the case being drawn.
+        caches.before_removed.insert(block.id(), true);
+        caches.before_match.insert(call.id(), call.id());
+
+        let mask = unmatched_bytes(root, before.contents.len(), 0, &caches);
+        assert!(
+            mask[block.start_byte()],
+            "the deleted block's own brace inherits the mark"
+        );
+        assert!(
+            mask[block.start_byte() + 1],
+            "and so does the space after it, which no node of its own covers"
+        );
+        assert!(
+            !mask[call.start_byte()],
+            "but the leaf the mapping matched does not"
+        );
+        assert!(
+            !mask[0],
+            "and nothing outside the block is touched - `fn` is unmarked, which is not unmatched"
+        );
     }
 
     /// The direction this rule deliberately does not take: the tree side's `Move` comes from
@@ -2222,7 +2742,15 @@ mod tests {
         tree[0][4] = Some(TextLabel::Move);
 
         assert!(
-            move_against_unmatched("Minimal", &painted, &tree, &source, &source).is_empty(),
+            move_against_unmatched(
+                "Minimal",
+                &painted,
+                &tree,
+                &all_unmatched(source.contents.len(), source.contents.len()),
+                &source,
+                &source
+            )
+            .is_empty(),
             "only a painted Move against an unmatched node is a contradiction"
         );
     }
@@ -2237,7 +2765,15 @@ mod tests {
         tree[0][4] = Some(TextLabel::Update);
 
         assert!(
-            move_against_unmatched("Minimal", &painted, &tree, &source, &source).is_empty(),
+            move_against_unmatched(
+                "Minimal",
+                &painted,
+                &tree,
+                &all_unmatched(source.contents.len(), source.contents.len()),
+                &source,
+                &source
+            )
+            .is_empty(),
             "an Update says the node survived too"
         );
     }
