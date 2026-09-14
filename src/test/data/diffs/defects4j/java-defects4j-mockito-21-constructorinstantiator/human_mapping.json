@@ -9117,6 +9117,17 @@
               "end_column": 41
             }
           ]
+        },
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 23,
+              "start_column": 76,
+              "end_row": 23,
+              "end_column": 77
+            }
+          ]
         }
       ]
     }
