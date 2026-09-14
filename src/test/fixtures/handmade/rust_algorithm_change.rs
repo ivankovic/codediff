@@ -70,5 +70,9 @@ fn invariants() -> Result<()> {
     // is the painter's reading of the edit, not a mechanical choice.
     // Here the `Full` after side inserts rows 4..5 from column 4, and separately inserts the
     // indentation and `/` of row 4 (columns 0..5), so the two share column 4.
-    assert_ground_truth_invariants_with_known_violations("rust-algorithm-change", 1)
+    //
+    // 1 -> 3 on 2026-09-14 with invariant 10: both paintings call the `//` opening the comment on
+    // before row 2 deleted and the `//` on after row 4 inserted, while the mapping pairs the
+    // two comments as the same text. Recorded rather than repaired, as above.
+    assert_ground_truth_invariants_with_known_violations("rust-algorithm-change", 3)
 }

@@ -21,7 +21,7 @@
 //! `assert_matches_human_painting_within_limit` both ask "is codediff right?", and both answer it
 //! against data whose own internal consistency nothing checks - a painting that ends a highlight
 //! in the middle of a run of spaces, or paints an opening brace and not its closing one, grades
-//! codediff against a claim its author would not defend if it were pointed out. These nine
+//! codediff against a claim its author would not defend if it were pointed out. These fifteen
 //! invariants are that missing half: they can fail only because the hand-authored data disagrees
 //! with itself.
 //!
@@ -40,6 +40,18 @@
 //!   `Insert` or `Delete` by the other.
 //! * [`mapping_and_painting_agree_on_what_survives`] - a byte the painting paints `Move` is never
 //!   one the tree mapping leaves unmatched.
+//! * [`paired_leaves_are_not_deleted_and_inserted`] - a leaf the mapping pairs with a
+//!   byte-identical leaf is never painted `Delete` while its partner is painted `Insert`.
+//! * [`removed_leaves_are_painted`] - a named leaf the mapping deletes or inserts has at least one
+//!   painted byte.
+//! * [`edited_leaves_are_painted`] - a leaf the mapping pairs with a leaf that reads differently is
+//!   painted on at least one side.
+//! * [`painting_implies_mapping_edits`] - a painting that records an edit belongs to a mapping
+//!   that records one too.
+//! * [`identical_entries_are_token_identical`] - an `Identical` entry's two subtrees carry the same
+//!   tokens.
+//! * [`match_but_not_identical_entries_differ`] - a `MatchButNotIdentical` entry's two subtrees do
+//!   not read byte-identically with every descendant paired inside.
 //!
 //! Invariants 4 and 5 were added on 2026-09-08 and wired in the same day, at **zero violations
 //! across all 249 painted fixtures** - so unlike the first three they arrived with no clamped
@@ -55,6 +67,18 @@
 //! *ground truths* rather than across the two presets, and is the only rule here that compares them
 //! at all: they are expected to differ about how one edit is chunked, which is what the paper
 //! reports, and this is the one thing they cannot differ about. Five fixtures break it.
+//!
+//! Invariants 10 to 15 arrived on 2026-09-14 from `candidate_invariant_census` in
+//! `tests/exploratory.rs`, which reads the tree mapping through [`Caches`] rather than through the
+//! renderer - so, unlike invariant 9, these can ask about the tree side's *pairs* and not only its
+//! rendered labels, and none of them inherits the column-shift `Move` artifact that limited 9 to
+//! one direction. Three cross the two ground truths at the leaf (10, 11, 12), one at the whole
+//! fixture (13), and two hold the mapping to itself (14, 15). Invariant 14 arrived at zero
+//! violations and is not vacuous: 159 `Identical` subtrees across 12 fixtures differ in
+//! whitespace, which is why it compares tokens and not text. The census also measured, and
+//! rejected, delimiter agreement *within a painting* (a `}` legitimately moves while its `{` stays
+//! put) and "a matched pair lands in one painting entry" (the ordinary `Delete`+`Insert`
+//! chunking of a rename, 99 fixtures).
 //!
 //! **Per fixture, not corpus-wide.** These are wired in as a third `invariants()` test in each
 //! `src/test/fixtures/**` file, next to that fixture's `mapping()` and `painting()`, so a fixture
@@ -115,6 +139,31 @@ pub fn ground_truth_invariant_violations_for(
         mapping, before, after,
     )?);
     violations.extend(delimiter_pairs_agree(mapping, before, after));
+    if let (Some(before_tree), Some(after_tree)) = (before.ast.as_ref(), after.ast.as_ref()) {
+        let context = TreeContext::build(mapping, before_tree.root_node(), after_tree.root_node());
+        for (name, labels) in &paintings {
+            violations.extend(paired_leaves_are_not_deleted_and_inserted(
+                name, labels, &context, before, after,
+            ));
+            violations.extend(removed_leaves_are_painted(
+                name, labels, &context, before, after,
+            ));
+            violations.extend(edited_leaves_are_painted(
+                name, labels, &context, before, after,
+            ));
+        }
+        for named in &mapping.text_mappings {
+            violations.extend(painting_implies_mapping_edits(
+                mapping, named, before, after,
+            ));
+        }
+        violations.extend(identical_entries_are_token_identical(
+            &context, before, after,
+        ));
+        violations.extend(match_but_not_identical_entries_differ(
+            &context, before, after,
+        ));
+    }
     // Invariants 4 and 5 read only the paintings `FULL` answers to, so they take their own pass
     // over `paintings_with_labels` rather than the `paintings` list above - which holds every
     // painting, `Minimal` ones included, and those two rules have nothing to say about those.
@@ -1020,7 +1069,7 @@ fn delimiter_pairs_agree(
 /// Byte ranges of every `ERROR`/`MISSING` node in `root`'s tree. A `MISSING` node is zero-width,
 /// so its range is widened to one byte - otherwise it could never overlap anything and the pairs
 /// tree-sitter invented around it would be checked as if they were real.
-fn error_ranges(root: Node) -> Vec<(usize, usize)> {
+pub(crate) fn error_ranges(root: Node) -> Vec<(usize, usize)> {
     let mut ranges = Vec::new();
     let mut stack = vec![root];
     while let Some(node) = stack.pop() {
@@ -1039,7 +1088,10 @@ fn error_ranges(root: Node) -> Vec<(usize, usize)> {
 }
 
 /// Every (opener, closer) pair in `root`'s tree - see [`delimiter_pairs_agree`] for the rule.
-fn delimiter_pairs<'tree>(root: Node<'tree>, contents: &str) -> Vec<(Node<'tree>, Node<'tree>)> {
+pub(crate) fn delimiter_pairs<'tree>(
+    root: Node<'tree>,
+    contents: &str,
+) -> Vec<(Node<'tree>, Node<'tree>)> {
     let mut pairs = Vec::new();
     let mut stack = vec![root];
     while let Some(node) = stack.pop() {
@@ -1088,6 +1140,541 @@ fn mark_of(node: Node, side: usize, caches: &Caches) -> Option<&'static str> {
 
 fn side_name(side: usize) -> &'static str {
     if side == 0 { "before" } else { "after" }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+// Invariants 10-15: the tree mapping read at the leaf, against the painting and against itself
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+
+/// What the tree mapping says about one leaf once its ancestors have been consulted.
+///
+/// A mapping speaks about subtrees, not leaves: an `Identical` entry on a function says the whole
+/// function is unchanged and records nothing for the tokens under it, and `DeleteWithChildren`
+/// does the same for a removal. So a leaf's status is the nearest entry on the path from it to the
+/// root - its own, or an ancestor's - read for what it implies about the leaf.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum LeafStatus<'tree> {
+    /// Paired with a leaf that reads the same: the leaf's own `Identical` entry, or the leaf at
+    /// the same offset under an `Identical` ancestor - well defined because such subtrees read
+    /// token-for-token the same (invariant 14).
+    Same(Node<'tree>),
+    /// Paired by the leaf's own `Update` or `MatchButNotIdentical` entry.
+    Paired(Node<'tree>),
+    /// Deleted or inserted, by its own entry or under a `*WithChildren` ancestor.
+    Removed,
+    /// Under an `Update`/`MatchButNotIdentical` ancestor, or a childless `Delete`/`Insert`, with no
+    /// entry of its own: the mapping has not said, and no invariant here asserts anything.
+    Undecided,
+}
+
+/// The two trees indexed for the leaf-level invariants, built once per fixture.
+struct TreeContext<'tree> {
+    caches: Caches,
+    /// Node id to node, per side - how a partner id from [`Caches`] becomes a node again.
+    ids: [std::collections::HashMap<usize, Node<'tree>>; 2],
+    /// Every leaf per side, in source order.
+    leaves: [Vec<Node<'tree>>; 2],
+}
+
+impl<'tree> TreeContext<'tree> {
+    fn build(
+        mapping: &super::HumanMapping,
+        before_root: Node<'tree>,
+        after_root: Node<'tree>,
+    ) -> Self {
+        let caches = rebuild_caches_for_mapping(mapping, before_root, after_root);
+        let (before_ids, before_leaves) = index_tree(before_root);
+        let (after_ids, after_leaves) = index_tree(after_root);
+        Self {
+            caches,
+            ids: [before_ids, after_ids],
+            leaves: [before_leaves, after_leaves],
+        }
+    }
+
+    fn status(&self, leaf: Node<'tree>, side: usize) -> LeafStatus<'tree> {
+        let (matches, operations, removed) = if side == 0 {
+            (
+                &self.caches.before_match,
+                &self.caches.before_operation,
+                &self.caches.before_removed,
+            )
+        } else {
+            (
+                &self.caches.after_match,
+                &self.caches.after_operation,
+                &self.caches.after_removed,
+            )
+        };
+        let mut current = leaf;
+        loop {
+            if let Some(&partner) = matches.get(&current.id()) {
+                let identical = operations.get(&current.id()).copied()
+                    == Some(super::HumanOperation::Identical);
+                let Some(partner) = self.ids[1 - side].get(&partner).copied() else {
+                    return LeafStatus::Undecided;
+                };
+                if current.id() == leaf.id() {
+                    return if identical {
+                        LeafStatus::Same(partner)
+                    } else {
+                        LeafStatus::Paired(partner)
+                    };
+                }
+                if !identical {
+                    return LeafStatus::Undecided;
+                }
+                // The leaf at the same offset in the partner subtree.
+                let start = partner.start_byte() + (leaf.start_byte() - current.start_byte());
+                let end = start + (leaf.end_byte() - leaf.start_byte());
+                return match partner.descendant_for_byte_range(start, end) {
+                    Some(twin)
+                        if twin.start_byte() == start
+                            && twin.end_byte() == end
+                            && twin.kind() == leaf.kind() =>
+                    {
+                        LeafStatus::Same(twin)
+                    }
+                    _ => LeafStatus::Undecided,
+                };
+            }
+            if let Some(&with_children) = removed.get(&current.id()) {
+                return if current.id() == leaf.id() || with_children {
+                    LeafStatus::Removed
+                } else {
+                    LeafStatus::Undecided
+                };
+            }
+            match current.parent() {
+                Some(parent) => current = parent,
+                None => return LeafStatus::Undecided,
+            }
+        }
+    }
+}
+
+fn index_tree<'tree>(
+    root: Node<'tree>,
+) -> (
+    std::collections::HashMap<usize, Node<'tree>>,
+    Vec<Node<'tree>>,
+) {
+    let mut ids = std::collections::HashMap::new();
+    let mut leaves = Vec::new();
+    let mut stack = vec![root];
+    while let Some(node) = stack.pop() {
+        ids.insert(node.id(), node);
+        if node.child_count() == 0 {
+            leaves.push(node);
+        }
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            stack.push(child);
+        }
+    }
+    leaves.sort_by_key(|node| node.start_byte());
+    (ids, leaves)
+}
+
+/// A leaf with something visible in it. Zero-width and whitespace-only leaves (Python's `indent`
+/// and `newline`, and the like) carry nothing a painting could colour.
+fn is_visible_leaf(leaf: Node, contents: &str) -> bool {
+    contents
+        .get(leaf.byte_range())
+        .is_some_and(|text| !text.trim().is_empty())
+}
+
+/// A leaf whose text is not its own kind name: identifiers, literals, comments, string contents.
+/// Punctuation and keywords are excluded by the invariants that say so, because which of two `}`
+/// survives is a choice each ground truth makes on its own - see `delimiter_pairs_agree`.
+fn is_named_leaf(leaf: Node, contents: &str) -> bool {
+    contents.get(leaf.byte_range()) != Some(leaf.kind())
+}
+
+/// The painting's verdict over a whole leaf: `Some(None)` unpainted, `Some(Some(label))` one label
+/// over every byte, `None` a mixture.
+fn whole_leaf_label(labels: &[Option<TextLabel>], leaf: Node) -> Option<Option<TextLabel>> {
+    let slice = labels.get(leaf.byte_range())?;
+    let first = *slice.first()?;
+    slice.iter().all(|label| *label == first).then_some(first)
+}
+
+fn leaf_text(leaf: Node, contents: &str) -> String {
+    contents[leaf.byte_range()].chars().take(40).collect()
+}
+
+fn row_of(contents: &str, byte: usize) -> usize {
+    contents[..byte].matches('\n').count() + 1
+}
+
+/// The text with every whitespace character removed - what two leaves are compared on when the
+/// question is whether they *read* differently, since a reformatting is not an edit to a token.
+fn without_whitespace(text: &str) -> String {
+    text.chars().filter(|c| !c.is_whitespace()).collect()
+}
+
+/// Invariant 10: a leaf the mapping pairs with a byte-identical leaf is never painted `Delete`
+/// while that partner is painted `Insert`.
+///
+/// The mirror of invariant 9, asked of the tree side's pairs rather than its rendered labels. A
+/// `Delete` says the text left the file and an `Insert` says it arrived new; the mapping's
+/// `Identical` says they are one text. Both cannot be so. The painter's chunking is not in
+/// question here - a rewritten line painted whole leaves the mapper's `Identical` tokens inside
+/// it under `Update`/`MatchButNotIdentical` ancestors, which [`LeafStatus::Undecided`] skips -
+/// only the case where the mapper explicitly paired two tokens the painter explicitly called gone
+/// and new. Four fixtures break it, in each of which a whole statement is painted as a deletion
+/// and an unrelated insertion that the mapping reads as one relocated statement.
+fn paired_leaves_are_not_deleted_and_inserted(
+    painting: &str,
+    painted: &PaintedLabels,
+    context: &TreeContext,
+    before: &Code,
+    after: &Code,
+) -> Vec<String> {
+    let mut count = 0usize;
+    let mut first = String::new();
+    for leaf in &context.leaves[0] {
+        if !is_visible_leaf(*leaf, &before.contents) {
+            continue;
+        }
+        let LeafStatus::Same(partner) = context.status(*leaf, 0) else {
+            continue;
+        };
+        if whole_leaf_label(&painted[0], *leaf) != Some(Some(TextLabel::Delete))
+            || whole_leaf_label(&painted[1], partner) != Some(Some(TextLabel::Insert))
+        {
+            continue;
+        }
+        if count == 0 {
+            first = format!(
+                "`{}` on before row {} and after row {}",
+                leaf_text(*leaf, &before.contents),
+                row_of(&before.contents, leaf.start_byte()),
+                row_of(&after.contents, partner.start_byte()),
+            );
+        }
+        count += 1;
+    }
+    if count == 0 {
+        return Vec::new();
+    }
+    vec![format!(
+        "painting '{painting}' paints {count} leaf pair(s) gone on one side and new on the other \
+         that the tree mapping calls the same text, from {first}"
+    )]
+}
+
+/// Invariant 11: a named leaf the mapping deletes or inserts has at least one painted byte.
+///
+/// Unpainted text is a positive claim - "unchanged, and in place" - and a leaf the mapping removes
+/// is the strongest claim the other record can make against it. Limited to named leaves
+/// ([`is_named_leaf`]): a deleted `}` whose partner brace the painter chose to keep instead is
+/// the ordinary brace-identity difference, 43 sites across 11 fixtures, and not a contradiction
+/// either record would concede. An unpainted deleted identifier is - closure-28 inserts the
+/// `Override` of a new `@Override` and neither painting has a byte of it.
+fn removed_leaves_are_painted(
+    painting: &str,
+    painted: &PaintedLabels,
+    context: &TreeContext,
+    before: &Code,
+    after: &Code,
+) -> Vec<String> {
+    let mut violations = Vec::new();
+    for (side, code) in [(0usize, before), (1usize, after)] {
+        let mut count = 0usize;
+        let mut first = String::new();
+        for leaf in &context.leaves[side] {
+            if !is_visible_leaf(*leaf, &code.contents) || !is_named_leaf(*leaf, &code.contents) {
+                continue;
+            }
+            if context.status(*leaf, side) != LeafStatus::Removed
+                || whole_leaf_label(&painted[side], *leaf) != Some(None)
+            {
+                continue;
+            }
+            if count == 0 {
+                first = format!(
+                    "{:?} `{}` on row {}",
+                    leaf.kind(),
+                    leaf_text(*leaf, &code.contents),
+                    row_of(&code.contents, leaf.start_byte()),
+                );
+            }
+            count += 1;
+        }
+        if count > 0 {
+            violations.push(format!(
+                "painting '{painting}' leaves {count} removed leaf/leaves unpainted {}, from \
+                 {first} - unpainted text is unchanged and in place, and the tree mapping says \
+                 this is gone",
+                side_name(side),
+            ));
+        }
+    }
+    violations
+}
+
+/// Invariant 12: a leaf the mapping pairs with a leaf that reads differently is painted on at
+/// least one side.
+///
+/// Only *at least one side*, deliberately: `Minimal` paints the deleted `tuple_` of a
+/// `tuple_length` renamed to `length` and nothing on the after side, which is exact and fires a
+/// one-sided rule 125 times. Nothing on either side is a change nobody painted - jsoup-16 turns
+/// `"<!DOCTYPE html"` into `"<!DOCTYPE "` and both paintings walk past it. Whitespace-only
+/// differences inside a leaf are exempt, as in invariant 14.
+fn edited_leaves_are_painted(
+    painting: &str,
+    painted: &PaintedLabels,
+    context: &TreeContext,
+    before: &Code,
+    after: &Code,
+) -> Vec<String> {
+    let mut count = 0usize;
+    let mut first = String::new();
+    for leaf in &context.leaves[0] {
+        if !is_visible_leaf(*leaf, &before.contents) {
+            continue;
+        }
+        let LeafStatus::Paired(partner) = context.status(*leaf, 0) else {
+            continue;
+        };
+        if without_whitespace(&before.contents[leaf.byte_range()])
+            == without_whitespace(&after.contents[partner.byte_range()])
+        {
+            continue;
+        }
+        if whole_leaf_label(&painted[0], *leaf) != Some(None)
+            || whole_leaf_label(&painted[1], partner) != Some(None)
+        {
+            continue;
+        }
+        if count == 0 {
+            first = format!(
+                "`{}` on before row {} becoming `{}` on after row {}",
+                leaf_text(*leaf, &before.contents),
+                row_of(&before.contents, leaf.start_byte()),
+                leaf_text(partner, &after.contents),
+                row_of(&after.contents, partner.start_byte()),
+            );
+        }
+        count += 1;
+    }
+    if count == 0 {
+        return Vec::new();
+    }
+    vec![format!(
+        "painting '{painting}' paints nothing on either side of {count} edited leaf/leaves, from \
+         {first} - the tree mapping says the text changed"
+    )]
+}
+
+/// Invariant 13: a painting that records an edit belongs to a mapping that records one too.
+///
+/// A mapping whose every entry is `Identical` and whose every group is balanced says the file did
+/// not change. A painting with a `Delete` of visible text, an `Insert` of visible text, or a
+/// `Match` whose two sides differ beyond whitespace says it did. One of them is wrong - and since
+/// an all-`Identical` mapping grades codediff against nothing, it is the one that has been
+/// passing vacuously. Whitespace is the exemption because it lives between nodes, where the tree
+/// cannot record it and the painting can.
+fn painting_implies_mapping_edits(
+    mapping: &super::HumanMapping,
+    named: &NamedTextMapping,
+    before: &Code,
+    after: &Code,
+) -> Vec<String> {
+    if mapping.entries.is_empty()
+        || mapping
+            .entries
+            .iter()
+            .any(|entry| entry.operation != super::HumanOperation::Identical)
+        || mapping
+            .groups
+            .iter()
+            .any(|group| group.before_paths.len() != group.after_paths.len())
+    {
+        return Vec::new();
+    }
+    let side_text = |contents: &str, spans: &[HumanTextSpan]| -> String {
+        spans
+            .iter()
+            .filter_map(|span| super::span_text(contents, *span))
+            .map(without_whitespace)
+            .collect()
+    };
+    let edits = named
+        .mapping
+        .entries
+        .iter()
+        .filter(|entry| {
+            let before_text = side_text(&before.contents, &entry.before);
+            let after_text = side_text(&after.contents, &entry.after);
+            match entry.operation {
+                super::HumanTextOperation::Match => before_text != after_text,
+                super::HumanTextOperation::Delete => !before_text.is_empty(),
+                super::HumanTextOperation::Insert => !after_text.is_empty(),
+            }
+        })
+        .count();
+    if edits == 0 {
+        return Vec::new();
+    }
+    vec![format!(
+        "painting '{}' records {edits} edit(s) to visible text but every entry of the tree \
+         mapping is Identical - one of the two records has not been finished",
+        named.name
+    )]
+}
+
+/// The visible tokens under `node`, in source order, as (kind, text).
+fn tokens_of(node: Node, contents: &str) -> Vec<(&'static str, String)> {
+    let mut tokens = Vec::new();
+    let mut stack = vec![node];
+    while let Some(current) = stack.pop() {
+        if current.child_count() == 0 {
+            if is_visible_leaf(current, contents) {
+                tokens.push((current.kind(), contents[current.byte_range()].to_string()));
+            }
+        } else {
+            let mut cursor = current.walk();
+            let children: Vec<Node> = current.children(&mut cursor).collect();
+            stack.extend(children.into_iter().rev());
+        }
+    }
+    tokens
+}
+
+/// Invariant 14: an `Identical` entry's two subtrees carry the same tokens.
+///
+/// `Identical` is the strongest thing the mapping says - the whole subtree is unchanged - and
+/// every leaf-level invariant above builds on it to find a leaf's twin. Tokens rather than text,
+/// because 159 `Identical` subtrees across 12 fixtures differ in whitespace alone, which is a
+/// reformatting and not an edit; compared token for token, no fixture in the corpus breaks this.
+fn identical_entries_are_token_identical(
+    context: &TreeContext,
+    before: &Code,
+    after: &Code,
+) -> Vec<String> {
+    let mut violations = Vec::new();
+    let mut pairs: Vec<(usize, usize)> = context
+        .caches
+        .before_match
+        .iter()
+        .filter(|(b, _)| {
+            context.caches.before_operation.get(*b).copied()
+                == Some(super::HumanOperation::Identical)
+        })
+        .map(|(b, a)| (*b, *a))
+        .collect();
+    pairs.sort_by_key(|(b, _)| context.ids[0].get(b).map(|n| n.start_byte()));
+    for (b, a) in pairs {
+        let (Some(before_node), Some(after_node)) =
+            (context.ids[0].get(&b), context.ids[1].get(&a))
+        else {
+            continue;
+        };
+        let before_tokens = tokens_of(*before_node, &before.contents);
+        let after_tokens = tokens_of(*after_node, &after.contents);
+        if before_tokens == after_tokens {
+            continue;
+        }
+        let difference = before_tokens
+            .iter()
+            .zip(after_tokens.iter())
+            .find(|(x, y)| x != y)
+            .map(|(x, y)| format!("`{}` against `{}`", x.1, y.1))
+            .unwrap_or_else(|| {
+                format!(
+                    "{} token(s) against {}",
+                    before_tokens.len(),
+                    after_tokens.len()
+                )
+            });
+        violations.push(format!(
+            "mapping calls {:?} on before row {} Identical to {:?} on after row {}, but their \
+             tokens differ: {difference}",
+            before_node.kind(),
+            row_of(&before.contents, before_node.start_byte()),
+            after_node.kind(),
+            row_of(&after.contents, after_node.start_byte()),
+        ));
+    }
+    violations
+}
+
+/// Invariant 15: a `MatchButNotIdentical` entry's two subtrees do not read byte-identically with
+/// every descendant paired inside.
+///
+/// `MatchButNotIdentical` says the subtree differs somewhere. Two nodes of one kind whose text is
+/// the same byte for byte, and whose every descendant with an entry of its own pairs inside the
+/// partner, differ nowhere - and the grader is strict about the operation (`check_entry`), so each
+/// such entry is a claim codediff can only satisfy by calling an identical subtree not identical.
+/// Group members are skipped: a group's operation describes the whole group, and its
+/// representative pairing may well put two identical members together.
+fn match_but_not_identical_entries_differ(
+    context: &TreeContext,
+    before: &Code,
+    after: &Code,
+) -> Vec<String> {
+    let mut violations = Vec::new();
+    let mut pairs: Vec<(usize, usize)> = context
+        .caches
+        .before_match
+        .iter()
+        .filter(|(b, a)| {
+            context.caches.before_operation.get(*b).copied()
+                == Some(super::HumanOperation::MatchButNotIdentical)
+                && !context.caches.before_group.contains_key(*b)
+                && !context.caches.after_group.contains_key(*a)
+        })
+        .map(|(b, a)| (*b, *a))
+        .collect();
+    pairs.sort_by_key(|(b, _)| context.ids[0].get(b).map(|n| n.start_byte()));
+    for (b, a) in pairs {
+        let (Some(before_node), Some(after_node)) =
+            (context.ids[0].get(&b), context.ids[1].get(&a))
+        else {
+            continue;
+        };
+        if before_node.kind() != after_node.kind()
+            || before.contents[before_node.byte_range()] != after.contents[after_node.byte_range()]
+        {
+            continue;
+        }
+        let mut descendants_stay = true;
+        let mut stack = vec![*before_node];
+        while let Some(node) = stack.pop() {
+            if node.id() != before_node.id() {
+                if context.caches.before_removed.contains_key(&node.id()) {
+                    descendants_stay = false;
+                }
+                if let Some(partner) = context
+                    .caches
+                    .before_match
+                    .get(&node.id())
+                    .and_then(|id| context.ids[1].get(id))
+                    && !(after_node.start_byte() <= partner.start_byte()
+                        && partner.end_byte() <= after_node.end_byte())
+                {
+                    descendants_stay = false;
+                }
+            }
+            let mut cursor = node.walk();
+            for child in node.children(&mut cursor) {
+                stack.push(child);
+            }
+        }
+        if !descendants_stay {
+            continue;
+        }
+        violations.push(format!(
+            "mapping calls {:?} on before row {} MatchButNotIdentical to after row {}, but the two \
+             read byte-identically and every descendant with an entry pairs inside it",
+            before_node.kind(),
+            row_of(&before.contents, before_node.start_byte()),
+            row_of(&after.contents, after_node.start_byte()),
+        ));
+    }
+    violations
 }
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────
@@ -1702,5 +2289,260 @@ mod tests {
             assert!(closers.iter().all(|closer| is_closer(closer)));
             assert!(closers_of(open).is_some());
         }
+    }
+
+    // ── Invariants 10-15 ────────────────────────────────────────────────────────────────────
+
+    /// A mapping built from the two texts alone: equal subtrees are `Identical`, differing leaves
+    /// of one kind are `Update`, differing interior nodes are `MatchButNotIdentical` with their
+    /// children paired by index, and leftover children are `Delete`/`Insert`.
+    fn mapping_by_text(before: &Code, after: &Code) -> HumanMapping {
+        fn walk(b: Node, a: Node, before: &str, after: &str, entries: &mut Vec<HumanMappingEntry>) {
+            let entry = |operation, b: Option<Node>, a: Option<Node>| HumanMappingEntry {
+                operation,
+                before_path: b.map(path_for_node),
+                after_path: a.map(path_for_node),
+            };
+            if before[b.byte_range()] == after[a.byte_range()] {
+                entries.push(entry(HumanOperation::Identical, Some(b), Some(a)));
+                return;
+            }
+            if b.child_count() == 0 && a.child_count() == 0 {
+                entries.push(entry(HumanOperation::Update, Some(b), Some(a)));
+                return;
+            }
+            entries.push(entry(
+                HumanOperation::MatchButNotIdentical,
+                Some(b),
+                Some(a),
+            ));
+            let shared = b.child_count().min(a.child_count());
+            for index in 0..shared {
+                walk(
+                    b.child(index).unwrap(),
+                    a.child(index).unwrap(),
+                    before,
+                    after,
+                    entries,
+                );
+            }
+            for index in shared..b.child_count() {
+                entries.push(entry(
+                    HumanOperation::DeleteWithChildren,
+                    Some(b.child(index).unwrap()),
+                    None,
+                ));
+            }
+            for index in shared..a.child_count() {
+                entries.push(entry(
+                    HumanOperation::InsertWithChildren,
+                    None,
+                    Some(a.child(index).unwrap()),
+                ));
+            }
+        }
+        let mut entries = Vec::new();
+        walk(
+            before.ast.as_ref().unwrap().root_node(),
+            after.ast.as_ref().unwrap().root_node(),
+            &before.contents,
+            &after.contents,
+            &mut entries,
+        );
+        HumanMapping {
+            entries,
+            ..Default::default()
+        }
+    }
+
+    fn with_painting(
+        mut mapping: HumanMapping,
+        name: &str,
+        entries: Vec<HumanTextEntry>,
+    ) -> HumanMapping {
+        mapping.text_mappings.push(NamedTextMapping {
+            name: name.to_string(),
+            mapping: HumanTextMapping { entries },
+        });
+        mapping
+    }
+
+    fn inserted(at: usize, count: usize) -> HumanTextEntry {
+        HumanTextEntry {
+            operation: HumanTextOperation::Insert,
+            before: Vec::new(),
+            after: vec![span(0, at, 0, at + count)],
+        }
+    }
+
+    fn matched(before: (usize, usize), after: (usize, usize)) -> HumanTextEntry {
+        HumanTextEntry {
+            operation: HumanTextOperation::Match,
+            before: vec![span(0, before.0, 0, before.1)],
+            after: vec![span(0, after.0, 0, after.1)],
+        }
+    }
+
+    fn violations_mentioning(
+        mapping: &HumanMapping,
+        before: &Code,
+        after: &Code,
+        phrase: &str,
+    ) -> Vec<String> {
+        violations(mapping, before, after)
+            .into_iter()
+            .filter(|v| v.contains(phrase))
+            .collect()
+    }
+
+    #[test]
+    fn a_paired_leaf_painted_gone_and_new_is_reported() {
+        let (before, after) = (rust("let x = 1;\n"), rust("let x = 1;\n"));
+        let mapping = with_painting(
+            mapping_by_text(&before, &after),
+            "Full",
+            vec![deleted(4, 1), inserted(4, 1)],
+        );
+        let found = violations_mentioning(
+            &mapping,
+            &before,
+            &after,
+            "gone on one side and new on the other",
+        );
+        assert_eq!(found.len(), 1, "{found:?}");
+        assert!(
+            found[0].contains("`x` on before row 1 and after row 1"),
+            "{found:?}"
+        );
+    }
+
+    #[test]
+    fn a_paired_leaf_painted_gone_on_one_side_only_is_not_reported() {
+        let (before, after) = (rust("let x = 1;\n"), rust("let x = 1;\n"));
+        let mapping = with_painting(
+            mapping_by_text(&before, &after),
+            "Full",
+            vec![deleted(4, 1)],
+        );
+        assert!(violations_mentioning(&mapping, &before, &after, "gone on one side").is_empty());
+    }
+
+    #[test]
+    fn a_removed_named_leaf_nobody_painted_is_reported_and_punctuation_is_not() {
+        let (before, after) = (rust("f(x, y);\n"), rust("f(x);\n"));
+        let mapping = with_painting(mapping_by_text(&before, &after), "Full", Vec::new());
+        let found =
+            violations_mentioning(&mapping, &before, &after, "removed leaf/leaves unpainted");
+        assert_eq!(found.len(), 1, "{found:?}");
+        assert!(
+            found[0].contains(
+                "1 removed leaf/leaves unpainted before, from \"identifier\" `y` on row 1"
+            ),
+            "{found:?}"
+        );
+    }
+
+    #[test]
+    fn a_removed_leaf_with_one_painted_byte_is_not_reported() {
+        let (before, after) = (rust("f(x, y);\n"), rust("f(x);\n"));
+        let mapping = with_painting(
+            mapping_by_text(&before, &after),
+            "Full",
+            vec![deleted(3, 3)],
+        );
+        assert!(
+            violations_mentioning(&mapping, &before, &after, "removed leaf/leaves unpainted")
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn an_edited_leaf_painted_on_neither_side_is_reported() {
+        let (before, after) = (rust("let x = 1;\n"), rust("let x = 2;\n"));
+        let mapping = with_painting(mapping_by_text(&before, &after), "Minimal", Vec::new());
+        let found = violations_mentioning(&mapping, &before, &after, "edited leaf/leaves");
+        assert_eq!(found.len(), 1, "{found:?}");
+        assert!(
+            found[0].contains("`1` on before row 1 becoming `2` on after row 1"),
+            "{found:?}"
+        );
+    }
+
+    #[test]
+    fn an_edited_leaf_painted_on_one_side_is_enough() {
+        let (before, after) = (rust("let x = 1;\n"), rust("let x = 2;\n"));
+        let mapping = with_painting(
+            mapping_by_text(&before, &after),
+            "Minimal",
+            vec![inserted(8, 1)],
+        );
+        assert!(violations_mentioning(&mapping, &before, &after, "edited leaf/leaves").is_empty());
+    }
+
+    #[test]
+    fn a_painted_edit_over_an_all_identical_mapping_is_reported() {
+        let (before, after) = (rust("let x = 1;\n"), rust("let x = 2;\n"));
+        let mapping = with_painting(
+            mapping_by_text(&before, &before),
+            "Minimal",
+            vec![matched((8, 9), (8, 9))],
+        );
+        let found = violations_mentioning(
+            &mapping,
+            &before,
+            &after,
+            "every entry of the tree mapping is Identical",
+        );
+        assert_eq!(found.len(), 1, "{found:?}");
+    }
+
+    #[test]
+    fn a_whitespace_only_painting_over_an_all_identical_mapping_is_not_reported() {
+        let (before, after) = (rust("let x = 1;\n"), rust("let x =  1;\n"));
+        let mapping = with_painting(
+            mapping_by_text(&before, &after),
+            "Minimal",
+            vec![matched((6, 9), (6, 10))],
+        );
+        assert!(
+            violations_mentioning(&mapping, &before, &after, "every entry of the tree mapping")
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn an_identical_entry_over_differing_tokens_is_reported() {
+        let (before, after) = (rust("let x = 1;\n"), rust("let y = 1;\n"));
+        // The mapping built from `before` alone pairs every node with itself by path, so it is
+        // all `Identical` - and wrong about the root once the after side reads `y`.
+        let mapping = mapping_by_text(&before, &before);
+        let found = violations_mentioning(&mapping, &before, &after, "tokens differ");
+        assert!(!found.is_empty(), "{found:?}");
+        assert!(found[0].contains("`x` against `y`"), "{found:?}");
+    }
+
+    #[test]
+    fn an_identical_entry_over_a_whitespace_difference_is_not_reported() {
+        let (before, after) = (rust("let x = 1;\n"), rust("let x =  1;\n"));
+        let mapping = mapping_by_text(&before, &before);
+        assert!(violations_mentioning(&mapping, &before, &after, "tokens differ").is_empty());
+    }
+
+    #[test]
+    fn a_match_but_not_identical_over_byte_identical_subtrees_is_reported() {
+        let (before, after) = (rust("let x = 1;\n"), rust("let x = 1;\n"));
+        let mut mapping = mapping_by_text(&before, &after);
+        mapping.entries[0].operation = HumanOperation::MatchButNotIdentical;
+        let found = violations_mentioning(&mapping, &before, &after, "read byte-identically");
+        assert_eq!(found.len(), 1, "{found:?}");
+    }
+
+    #[test]
+    fn a_match_but_not_identical_whose_subtrees_differ_is_the_expected_shape() {
+        let (before, after) = (rust("let x = 1;\n"), rust("let x = 2;\n"));
+        let mapping = mapping_by_text(&before, &after);
+        assert!(
+            violations_mentioning(&mapping, &before, &after, "read byte-identically").is_empty()
+        );
     }
 }

@@ -1210,3 +1210,528 @@ fn intra_value_run(code: &crate::code::Code, start: usize, end: usize) -> bool {
     node.children(&mut cursor)
         .all(|c| c.end_byte() <= start || c.start_byte() >= end)
 }
+
+/// EXPLORATORY: candidate invariants beyond the nine in `invariants.rs`, measured over the whole
+/// corpus so their repair cost is known before any is wired in. Every candidate here reads the
+/// tree mapping through `Caches` (no renderer, so no column-shift `Move` artifact) and the
+/// painting through `painted_labels` and its raw spans.
+///
+/// A before leaf's *effective* status walks up to the nearest node the mapping speaks about: its
+/// own entry, an `Identical` ancestor (whose partner leaf is the one at the same offset in the
+/// partner subtree - well defined because the subtrees read identically), or a `*WithChildren`
+/// ancestor. A leaf under an `Update`/`MatchButNotIdentical` ancestor with no entry of its own is
+/// undecided and skipped.
+///
+/// `cargo test --release --lib --features test-fixtures candidate_invariant_census -- --ignored
+/// --nocapture`
+#[test]
+#[ignore]
+fn candidate_invariant_census() -> Result<()> {
+    use std::collections::{BTreeMap, BTreeSet, HashMap};
+
+    use crate::test::helper::human_mapping::invariants::{
+        delimiter_pairs, error_ranges, painted_labels,
+    };
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    enum Eff {
+        Identical(usize),
+        Edited(usize),
+        Removed,
+        Undecided,
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+    enum Cover {
+        Unpainted,
+        Whole(TextLabelKey),
+        Mixed,
+    }
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+    enum TextLabelKey {
+        Move,
+        Update,
+        Delete,
+        Insert,
+    }
+    fn key_of(label: TextLabel) -> TextLabelKey {
+        match label {
+            TextLabel::Move => TextLabelKey::Move,
+            TextLabel::Update => TextLabelKey::Update,
+            TextLabel::Delete => TextLabelKey::Delete,
+            TextLabel::Insert => TextLabelKey::Insert,
+        }
+    }
+    fn cover(labels: &[Option<TextLabel>], start: usize, end: usize) -> Cover {
+        let slice = &labels[start..end];
+        let first = slice[0];
+        if slice.iter().all(|l| *l == first) {
+            match first {
+                None => Cover::Unpainted,
+                Some(l) => Cover::Whole(key_of(l)),
+            }
+        } else {
+            Cover::Mixed
+        }
+    }
+    fn offset(contents: &str, row: usize, col: usize) -> Option<usize> {
+        let mut off = 0usize;
+        for (i, line) in contents.split('\n').enumerate() {
+            if i == row {
+                return (col <= line.len()).then_some(off + col);
+            }
+            off += line.len() + 1;
+        }
+        None
+    }
+    fn row_of(contents: &str, byte: usize) -> usize {
+        contents[..byte].matches('\n').count() + 1
+    }
+    fn index<'t>(root: Node<'t>) -> (HashMap<usize, Node<'t>>, Vec<Node<'t>>) {
+        let mut ids = HashMap::new();
+        let mut leaves = Vec::new();
+        let mut stack = vec![root];
+        while let Some(node) = stack.pop() {
+            ids.insert(node.id(), node);
+            if node.child_count() == 0 {
+                leaves.push(node);
+            }
+            let mut cursor = node.walk();
+            for child in node.children(&mut cursor) {
+                stack.push(child);
+            }
+        }
+        leaves.sort_by_key(|n| n.start_byte());
+        (ids, leaves)
+    }
+    fn effective<'t>(
+        leaf: Node<'t>,
+        matches: &HashMap<usize, usize>,
+        ops: &HashMap<usize, HumanOperation>,
+        removed: &HashMap<usize, bool>,
+        other_ids: &HashMap<usize, Node<'t>>,
+    ) -> Eff {
+        let mut cur = leaf;
+        loop {
+            if let Some(&partner) = matches.get(&cur.id()) {
+                let op = ops.get(&cur.id()).copied();
+                if cur.id() == leaf.id() {
+                    return if op == Some(HumanOperation::Identical) {
+                        Eff::Identical(partner)
+                    } else {
+                        Eff::Edited(partner)
+                    };
+                }
+                if op != Some(HumanOperation::Identical) {
+                    return Eff::Undecided;
+                }
+                let Some(pnode) = other_ids.get(&partner) else {
+                    return Eff::Undecided;
+                };
+                let delta = leaf.start_byte() - cur.start_byte();
+                let (ps, pe) = (
+                    pnode.start_byte() + delta,
+                    pnode.start_byte() + delta + (leaf.end_byte() - leaf.start_byte()),
+                );
+                return match pnode.descendant_for_byte_range(ps, pe) {
+                    Some(d)
+                        if d.start_byte() == ps
+                            && d.end_byte() == pe
+                            && d.kind() == leaf.kind() =>
+                    {
+                        Eff::Identical(d.id())
+                    }
+                    _ => Eff::Undecided,
+                };
+            }
+            if let Some(&with_children) = removed.get(&cur.id()) {
+                return if cur.id() == leaf.id() || with_children {
+                    Eff::Removed
+                } else {
+                    Eff::Undecided
+                };
+            }
+            match cur.parent() {
+                Some(p) => cur = p,
+                None => return Eff::Undecided,
+            }
+        }
+    }
+
+    #[derive(Default)]
+    struct Tally {
+        sites: BTreeMap<String, usize>,
+        fixtures: BTreeMap<String, BTreeSet<String>>,
+        examples: BTreeMap<String, Vec<String>>,
+    }
+    impl Tally {
+        fn hit(&mut self, key: &str, fixture: &str, example: String) {
+            *self.sites.entry(key.to_string()).or_default() += 1;
+            self.fixtures
+                .entry(key.to_string())
+                .or_default()
+                .insert(fixture.to_string());
+            let ex = self.examples.entry(key.to_string()).or_default();
+            if ex.len() < 3 {
+                ex.push(format!("{fixture}: {example}"));
+            }
+        }
+    }
+    let mut tally = Tally::default();
+
+    let mut scored = 0usize;
+    let mut leaves_seen = [0usize; 2];
+    let mut decided = [0usize; 2];
+    for (name, dir) in crate::test::helper::handmade_test_case_dirs()? {
+        let Ok(mapping) = load(&name) else { continue };
+        if mapping.text_mappings.is_empty() {
+            continue;
+        }
+        let Some((before, after)) = crate::test::helper::code_pair_from_dir(&dir)? else {
+            continue;
+        };
+        let (Some(bt), Some(at)) = (before.ast.as_ref(), after.ast.as_ref()) else {
+            continue;
+        };
+        scored += 1;
+        let (broot, aroot) = (bt.root_node(), at.root_node());
+        let caches = rebuild_caches_for_mapping(&mapping, broot, aroot);
+        let (bids, bleaves) = index(broot);
+        let (aids, aleaves) = index(aroot);
+        let contents = [before.contents.as_str(), after.contents.as_str()];
+
+        // ---- M1: the mapping against itself -------------------------------------------------
+        for (&b, &a) in &caches.before_match {
+            let (Some(bn), Some(an)) = (bids.get(&b), aids.get(&a)) else {
+                continue;
+            };
+            let op = caches.before_operation.get(&b).copied();
+            let same_text = contents[0][bn.byte_range()] == contents[1][an.byte_range()];
+            let tokens = |n: Node, c: &str| -> Vec<(String, String)> {
+                let mut out = Vec::new();
+                let mut stack = vec![n];
+                while let Some(x) = stack.pop() {
+                    if x.child_count() == 0 {
+                        let t = &c[x.byte_range()];
+                        if !t.trim().is_empty() {
+                            out.push((x.kind().to_string(), t.to_string()));
+                        }
+                    }
+                    let mut cur = x.walk();
+                    for ch in x.children(&mut cur) {
+                        stack.push(ch);
+                    }
+                }
+                out
+            };
+            let same_tokens = tokens(*bn, contents[0]) == tokens(*an, contents[1]);
+            // Every descendant of `bn` with its own entry stays inside `an`, and none is removed.
+            let descendants_stay = {
+                let mut ok = true;
+                let mut stack = vec![*bn];
+                while let Some(x) = stack.pop() {
+                    if x.id() != bn.id() {
+                        if caches.before_removed.contains_key(&x.id()) {
+                            ok = false;
+                        }
+                        if let Some(&q) = caches.before_match.get(&x.id())
+                            && let Some(qn) = aids.get(&q)
+                            && !(an.start_byte() <= qn.start_byte()
+                                && qn.end_byte() <= an.end_byte())
+                        {
+                            ok = false;
+                        }
+                    }
+                    let mut cur = x.walk();
+                    for ch in x.children(&mut cur) {
+                        stack.push(ch);
+                    }
+                }
+                ok
+            };
+            let ex = format!(
+                "{:?} row {} `{}`",
+                bn.kind(),
+                bn.start_position().row + 1,
+                contents[0][bn.byte_range()]
+                    .chars()
+                    .take(40)
+                    .collect::<String>()
+            );
+            match op {
+                Some(HumanOperation::Identical) if !same_text => {
+                    if same_tokens {
+                        tally.hit(
+                            "M1a Identical entry whose texts differ only in whitespace",
+                            &name,
+                            ex,
+                        )
+                    } else {
+                        tally.hit(
+                            "M1a' Identical entry whose token sequences differ",
+                            &name,
+                            ex,
+                        )
+                    }
+                }
+                Some(HumanOperation::Update) if same_text => {
+                    tally.hit("M1b Update entry whose texts are identical", &name, ex)
+                }
+                Some(HumanOperation::Update) if bn.child_count() > 0 || an.child_count() > 0 => {
+                    tally.hit("M1c Update entry on a node with children", &name, ex)
+                }
+                Some(HumanOperation::MatchButNotIdentical)
+                    if same_text && bn.kind() == an.kind() =>
+                {
+                    if descendants_stay {
+                        tally.hit("M1d' MatchButNotIdentical, identical text+kind, descendants all inside", &name, ex)
+                    } else {
+                        tally.hit(
+                            "M1d MatchButNotIdentical, identical text+kind, a descendant leaves",
+                            &name,
+                            ex,
+                        )
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        let mapping_has_edits = mapping
+            .entries
+            .iter()
+            .any(|e| e.operation != HumanOperation::Identical)
+            || mapping
+                .groups
+                .iter()
+                .any(|g| g.before_paths.len() != g.after_paths.len());
+
+        for named in &mapping.text_mappings {
+            let labels = painted_labels(named, &before, &after)?;
+            let pname = named.name.as_str();
+
+            // ---- C4: an empty painting against a mapping with edits, and vice versa ---------
+            if named.mapping.entries.is_empty() && mapping_has_edits {
+                let ops: Vec<String> = mapping
+                    .entries
+                    .iter()
+                    .filter(|e| e.operation != HumanOperation::Identical)
+                    .map(|e| {
+                        format!(
+                            "{:?} {:?}",
+                            e.operation,
+                            e.before_path
+                                .as_ref()
+                                .or(e.after_path.as_ref())
+                                .and_then(|p| p.last())
+                        )
+                    })
+                    .take(4)
+                    .collect();
+                tally.hit(
+                    "C4a empty painting but the mapping has edits",
+                    &name,
+                    format!("'{pname}' {ops:?}"),
+                );
+            }
+            if !named.mapping.entries.is_empty()
+                && !mapping_has_edits
+                && !mapping.entries.is_empty()
+            {
+                tally.hit(
+                    "C4b painted, but every mapping entry is Identical",
+                    &name,
+                    format!("'{pname}'"),
+                );
+            }
+
+            // Entry byte ranges, for the "same entry" test.
+            let mut ranges: [Vec<(usize, usize, usize)>; 2] = [Vec::new(), Vec::new()];
+            for (e, entry) in named.mapping.entries.iter().enumerate() {
+                for (side, spans) in [(0usize, &entry.before), (1usize, &entry.after)] {
+                    for span in spans {
+                        if let (Some(s), Some(t)) = (
+                            offset(contents[side], span.start_row, span.start_column),
+                            offset(contents[side], span.end_row, span.end_column),
+                        ) {
+                            ranges[side].push((e, s, t));
+                        }
+                    }
+                }
+            }
+            let entries_containing = |side: usize, s: usize, t: usize| -> BTreeSet<usize> {
+                ranges[side]
+                    .iter()
+                    .filter(|&&(_, a, b)| a <= s && t <= b)
+                    .map(|&(e, _, _)| e)
+                    .collect()
+            };
+
+            // ---- C1/C2: correspondence agreement, and C3: edits left unpainted --------------
+            for (side, leaves, matches, ops, removed, other_ids, other_side) in [
+                (
+                    0usize,
+                    &bleaves,
+                    &caches.before_match,
+                    &caches.before_operation,
+                    &caches.before_removed,
+                    &aids,
+                    1usize,
+                ),
+                (
+                    1usize,
+                    &aleaves,
+                    &caches.after_match,
+                    &caches.after_operation,
+                    &caches.after_removed,
+                    &bids,
+                    0usize,
+                ),
+            ] {
+                for leaf in leaves {
+                    let (s, t) = (leaf.start_byte(), leaf.end_byte());
+                    if contents[side][s..t].trim().is_empty() {
+                        continue;
+                    }
+                    leaves_seen[side] += 1;
+                    let eff = effective(*leaf, matches, ops, removed, other_ids);
+                    if eff != Eff::Undecided {
+                        decided[side] += 1;
+                    }
+                    let here = cover(&labels[side], s, t);
+                    let punct = if contents[side][s..t] == *leaf.kind() {
+                        "punct"
+                    } else {
+                        "named"
+                    };
+                    let ex = format!(
+                        "'{pname}' {} row {} {:?} `{}`",
+                        if side == 0 { "before" } else { "after" },
+                        row_of(contents[side], s),
+                        leaf.kind(),
+                        contents[side][s..t].chars().take(30).collect::<String>()
+                    );
+                    match eff {
+                        Eff::Removed => {
+                            if here == Cover::Unpainted {
+                                tally.hit(
+                                    &format!("C3a removed leaf unpainted ({punct})"),
+                                    &name,
+                                    ex.clone(),
+                                );
+                            } else if here == Cover::Whole(TextLabelKey::Move) {
+                                tally.hit(
+                                    "C3c removed leaf painted Move (= invariant 9)",
+                                    &name,
+                                    ex.clone(),
+                                );
+                            }
+                        }
+                        Eff::Edited(p) => {
+                            let pn = other_ids[&p];
+                            let there = cover(&labels[other_side], pn.start_byte(), pn.end_byte());
+                            if side == 0
+                                && contents[side][s..t] != contents[other_side][pn.byte_range()]
+                                && here == Cover::Unpainted
+                                && there == Cover::Unpainted
+                            {
+                                tally.hit(&format!("C3b edited leaf (text differs) unpainted on both sides ({punct})"), &name, ex.clone());
+                            }
+                        }
+                        _ => {}
+                    }
+                    // Correspondence: only from the before side, so each pair is counted once.
+                    if side != 0 {
+                        continue;
+                    }
+                    let (partner, kind) = match eff {
+                        Eff::Identical(p) => (p, "identical"),
+                        Eff::Edited(p) => (p, "edited"),
+                        _ => continue,
+                    };
+                    let pn = other_ids[&partner];
+                    let (ps, pt) = (pn.start_byte(), pn.end_byte());
+                    let there = cover(&labels[1], ps, pt);
+                    if here == Cover::Unpainted && there == Cover::Unpainted {
+                        continue;
+                    }
+                    let eb = entries_containing(0, s, t);
+                    let ea = entries_containing(1, ps, pt);
+                    if eb.intersection(&ea).next().is_some() {
+                        continue;
+                    }
+                    let ex = format!(
+                        "{ex} -> after row {} `{}`",
+                        row_of(contents[1], ps),
+                        contents[1][ps..pt].chars().take(30).collect::<String>()
+                    );
+                    let key = if kind == "identical" {
+                        format!(
+                            "C1 {kind} pair in different entries: {here:?} -> {there:?} ({punct})"
+                        )
+                    } else {
+                        format!("C1 {kind} pair in different entries: {here:?} -> {there:?}")
+                    };
+                    tally.hit(&key, &name, ex);
+                }
+            }
+
+            // ---- C5: delimiter pairs in the painting ----------------------------------------
+            for (side, root) in [(0usize, broot), (1usize, aroot)] {
+                let errors = error_ranges(root);
+                for (open, close) in delimiter_pairs(root, contents[side]) {
+                    let (from, to) = (open.end_byte(), close.start_byte());
+                    if errors.iter().any(|&(a, b)| a < to && b > from) {
+                        continue;
+                    }
+                    let o = cover(&labels[side], open.start_byte(), open.end_byte());
+                    let c = cover(&labels[side], close.start_byte(), close.end_byte());
+                    let ex = format!(
+                        "'{pname}' {} row {} {:?}={o:?} row {} {:?}={c:?}",
+                        if side == 0 { "before" } else { "after" },
+                        open.start_position().row + 1,
+                        open.kind(),
+                        close.start_position().row + 1,
+                        close.kind()
+                    );
+                    match (o, c) {
+                        (Cover::Whole(x), Cover::Whole(y)) if x != y => {
+                            tally.hit("C5a delimiter pair painted with two verdicts", &name, ex)
+                        }
+                        (Cover::Whole(_), Cover::Unpainted)
+                        | (Cover::Unpainted, Cover::Whole(_)) => {
+                            tally.hit("C5b delimiter painted, partner unpainted", &name, ex)
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
+    }
+
+    eprintln!("{scored} painted fixture(s) with an AST scored");
+    eprintln!(
+        "leaves: before {} ({} decided), after {} ({} decided)",
+        leaves_seen[0], decided[0], leaves_seen[1], decided[1]
+    );
+    eprintln!("{:<70} {:>8} {:>9}", "candidate", "sites", "fixtures");
+    for (key, sites) in &tally.sites {
+        eprintln!("{:<70} {:>8} {:>9}", key, sites, tally.fixtures[key].len());
+    }
+    eprintln!();
+    for (key, examples) in &tally.examples {
+        let fx = &tally.fixtures[key];
+        if fx.len() <= 14 {
+            eprintln!(
+                "{key}  [{}]",
+                fx.iter().cloned().collect::<Vec<_>>().join(", ")
+            );
+        } else {
+            eprintln!("{key}");
+        }
+        for ex in examples {
+            eprintln!("    {ex}");
+        }
+    }
+    Ok(())
+}

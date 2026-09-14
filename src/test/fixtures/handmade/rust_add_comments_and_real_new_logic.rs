@@ -17,7 +17,7 @@
  */
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants_with_known_violations;
 use anyhow::Result;
 
 #[test]
@@ -49,5 +49,10 @@ fn painting() -> Result<()> {
 
 #[test]
 fn invariants() -> Result<()> {
-    assert_ground_truth_invariants("rust-add-comments-and-real-new-logic")
+    // Invariant 10, found when it was added on 2026-09-14: both paintings call the statement on
+    // before row 154 (`record.get(4)` and its 16 tokens) deleted and the one on after row 168
+    // inserted, while the mapping pairs every token of the two as the same text - one record
+    // says a relocation, the other a rewrite. Recorded rather than repaired, as with invariant
+    // 9: which reading is the author's is the author's to say. Counted once per painting.
+    assert_ground_truth_invariants_with_known_violations("rust-add-comments-and-real-new-logic", 2)
 }

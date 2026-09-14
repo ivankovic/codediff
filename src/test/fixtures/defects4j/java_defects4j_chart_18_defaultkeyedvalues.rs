@@ -42,8 +42,13 @@ fn invariants() -> Result<()> {
     // past it on the next line of the wrapped expression, so this is a run that stops one
     // character late rather than a stripe of colour hanging off a line end - a repair of the
     // painting, not of the rule, and the painter's to make.
+    //
+    // 2 -> 4 on 2026-09-14 with invariant 10: both paintings call the `;` on before row 335
+    // deleted and the `;` on after row 334 inserted, while the mapping pairs those two as the
+    // same token. Which `;` survives the reshuffled `throw` is a choice each record made on its
+    // own; recorded rather than repaired.
     assert_ground_truth_invariants_with_known_violations(
         "java-defects4j-chart-18-defaultkeyedvalues",
-        2,
+        4,
     )
 }

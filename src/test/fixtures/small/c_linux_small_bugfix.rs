@@ -17,7 +17,7 @@
  */
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants_with_known_violations;
 use anyhow::Result;
 
 #[test]
@@ -42,7 +42,14 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn invariants() -> Result<()> {
-    assert_ground_truth_invariants("c-linux-small-bugfix")
+    // Invariant 15, found when it was added on 2026-09-14: four `MatchButNotIdentical` entries
+    // whose two subtrees read byte-identically, with every descendant paired inside - the
+    // `val |= omr.omr_hitm ? P(SNOOP, HITM) : P(SNOOP, HIT);` chain (assignment, conditional,
+    // both calls) that moves from before row 348 into the new `if` on after row 362. The grader
+    // is strict about the operation, so each is a claim codediff can only meet by calling an
+    // identical subtree not identical; the repair is to relabel them `Identical`, which is the
+    // mapping author's to make.
+    assert_ground_truth_invariants_with_known_violations("c-linux-small-bugfix", 4)
 }
 
 #[test]

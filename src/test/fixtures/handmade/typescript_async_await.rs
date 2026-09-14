@@ -17,7 +17,7 @@
  */
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants_with_known_violations;
 use anyhow::Result;
 
 #[test]
@@ -56,5 +56,10 @@ fn painting() -> Result<()> {
 
 #[test]
 fn invariants() -> Result<()> {
-    assert_ground_truth_invariants("typescript-async-await")
+    // Invariant 10, found when it was added on 2026-09-14: both paintings call the `fetchData`
+    // on before row 7 deleted and the one on after row 10 inserted, while the mapping pairs the
+    // two as the same identifier - the rewrite of the function around it read as a replacement
+    // by the painter and as a survival by the mapper. Recorded rather than repaired, as with
+    // invariant 9. Counted once per painting.
+    assert_ground_truth_invariants_with_known_violations("typescript-async-await", 2)
 }
