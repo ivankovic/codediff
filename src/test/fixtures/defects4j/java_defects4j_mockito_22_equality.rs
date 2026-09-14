@@ -19,7 +19,7 @@ use anyhow::Result;
 
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants_with_known_violations;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 
 #[test]
 fn mapping() -> Result<()> {
@@ -34,11 +34,5 @@ fn painting() -> Result<()> {
 
 #[test]
 fn invariants() -> Result<()> {
-    // One invariant-6 violation, recorded as found on 2026-09-12. The `Minimal` painting claims
-    // the single leading tab of after row 15 (`} else if (o1 == null || o2 == null) {`), and
-    // `Minimal` never claims a line's indentation. A painting-side slip of one byte: the row's
-    // code is painted correctly either way. `human_solver` now keeps this rule at the keystroke
-    // for a multi-row full-line sweep, but this range was painted before that or by a vertical
-    // selection, which names its own columns and is left as drawn.
-    assert_ground_truth_invariants_with_known_violations("java-defects4j-mockito-22-equality", 1)
+    assert_ground_truth_invariants("java-defects4j-mockito-22-equality")
 }

@@ -19,7 +19,7 @@ use anyhow::Result;
 
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants_with_known_violations;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 
 #[test]
 fn mapping() -> Result<()> {
@@ -49,14 +49,5 @@ fn painting() -> Result<()> {
 
 #[test]
 fn invariants() -> Result<()> {
-    // Invariant 11, found when it was added on 2026-09-14: the mapping inserts the
-    // `#include "upb/mini_table/extension_registry.h"` on after row 13 (and reads before row 10's
-    // include as edited into `hpb/multibackend.h`), while the painting reads the old include as
-    // unchanged and merely pushed down to row 13 and after row 10 as the new line - so the
-    // string on row 13 is unpainted. Two coherent readings of one insertion; recorded rather
-    // than repaired, because which one is the author's is the author's to say.
-    assert_ground_truth_invariants_with_known_violations(
-        "cpp-protocolbuffers-protobuf-add-preprocessor-commands",
-        1,
-    )
+    assert_ground_truth_invariants("cpp-protocolbuffers-protobuf-add-preprocessor-commands")
 }

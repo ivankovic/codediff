@@ -19,7 +19,7 @@ use anyhow::Result;
 
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants_with_known_violations;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 
 #[test]
 fn mapping() -> Result<()> {
@@ -34,11 +34,5 @@ fn painting() -> Result<()> {
 
 #[test]
 fn invariants() -> Result<()> {
-    // One invariant-4 violation, recorded as found on 2026-09-12 rather than repaired. On the
-    // after side's row 858 - `clone.data = (List) ObjectUtilities.deepClone(this.data);` - the
-    // `Full` painting calls every visible character `Insert` but leaves the eight spaces of
-    // indentation in front of them unpainted, which reads as a line that arrived in part. What
-    // the indent of an inserted line belongs to is the painter's call, so this records the
-    // state rather than deciding it.
-    assert_ground_truth_invariants_with_known_violations("java-defects4j-chart-17-timeseries", 1)
+    assert_ground_truth_invariants("java-defects4j-chart-17-timeseries")
 }

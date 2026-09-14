@@ -17,7 +17,7 @@
  */
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants_with_known_violations;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 use anyhow::Result;
 
 #[test]
@@ -42,10 +42,5 @@ fn painting() -> Result<()> {
 
 #[test]
 fn invariants() -> Result<()> {
-    // Invariant 7, found when it was added on 2026-09-13 and recorded rather than repaired:
-    // an overlap is a one-line edit to make, but which of the two ranges is the one to shorten
-    // is the painter's reading of the edit, not a mechanical choice.
-    // Here the `Full` after side inserts `}` on row 8 (columns 12..13) and also inserts rows
-    // 6..8 ending at column 13, which swallows it whole.
-    assert_ground_truth_invariants_with_known_violations("javascript-fix-promises", 1)
+    assert_ground_truth_invariants("javascript-fix-promises")
 }
