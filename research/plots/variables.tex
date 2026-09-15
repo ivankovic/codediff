@@ -363,6 +363,31 @@
 \newcommand{\OracleGumTreeGreedyRecall}{93.1}
 \newcommand{\OracleGumTreeGreedyPerfect}{18.1}
 
+% --- The same oracle, with *our own* hand-authored mapping scored against it instead of
+% codediff's, over the units solved so far, plus codediff over the same units as the
+% control (DERIVED from data/comparison/astdiff_oracle_defects4j_human.csv - see
+% `astdiff_oracle_human`). Refresh with `make measure-astdiff-oracle-human`.
+\newcommand{\OracleHumanUnits}{97}
+\newcommand{\OracleHumanCases}{87}
+\newcommand{\OracleHumanRecordsSolved}{292}
+\newcommand{\OracleHumanRecordsRest}{2{,}177}
+\newcommand{\OracleHumanPrecision}{99.74}
+\newcommand{\OracleHumanRecall}{99.43}
+\newcommand{\OracleHumanDisagreements}{89}
+\newcommand{\OracleHumanMappings}{10{,}685}
+\newcommand{\OracleHumanStatementPrecision}{99.88}
+\newcommand{\OracleHumanStatementRecall}{99.65}
+\newcommand{\OracleHumanStatementDisagreements}{8}
+\newcommand{\OracleHumanStatementMappings}{1{,}707}
+\newcommand{\OracleHumanCodeDiffPrecision}{99.37}
+\newcommand{\OracleHumanCodeDiffRecall}{99.42}
+\newcommand{\OracleHumanCodeDiffDisagreements}{129}
+\newcommand{\OracleHumanCodeDiffMappings}{10{,}685}
+\newcommand{\OracleHumanCodeDiffStatementPrecision}{98.72}
+\newcommand{\OracleHumanCodeDiffStatementRecall}{99.30}
+\newcommand{\OracleHumanCodeDiffStatementDisagreements}{34}
+\newcommand{\OracleHumanCodeDiffStatementMappings}{1{,}707}
+
 % --- Design targets and fixed descriptive facts (AUTHORED - see script's TARGETS block).
 \newcommand{\SpeedTargetMs}{400}
 \newcommand{\SpeedTargetPct}{99.99}

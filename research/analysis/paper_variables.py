@@ -74,6 +74,7 @@ import csv
 import glob
 import os
 import re
+import statistics
 import sys
 
 from _common import PAPER_DATASETS, fixture_datasets, in_paper_scope, latex_number
@@ -875,6 +876,78 @@ def astdiff_oracle(research_dir):
     return values
 
 
+
+def astdiff_oracle_human(research_dir):
+    """Section 8.1's second half: our own hand-authored mapping scored against the same oracle, over
+    the compilation units we have solved. DERIVED from
+    `data/comparison/astdiff_oracle_defects4j_human.csv`.
+
+    source: `make measure-astdiff-oracle-human` from research/ (benchmark_astdiff_oracle
+            --human-mappings src/test/data/diffs/defects4j). Measured 2026-09-15.
+
+    Two ground truths against each other, which is the only reading of the corpus that does not
+    depend on our own annotation discipline. Neither is a verdict on the other, so precision here is
+    the share of our pairs the oracle also records and recall the share of the oracle's we do.
+
+    `OracleHumanCodeDiff*` is the control, and the number is unreadable without it: it is codediff's
+    own agreement with the oracle **over the same units**, so the two rows differ only in whose
+    mapping is being scored. Read from the whole-corpus CSV, restricted to the rows the human run
+    covers.
+
+    `OracleHumanRecordsSolved`/`OracleHumanRecordsRest` are the selection caveat, as medians of
+    `oracle_records`: the solved units are not a draw, they are how far annotation has got, and they
+    run far shorter than the rest.
+    """
+    human_path = os.path.join(
+        research_dir, "data", "comparison", "astdiff_oracle_defects4j_human.csv"
+    )
+    all_path = os.path.join(research_dir, "data", "comparison", "astdiff_oracle_defects4j.csv")
+    if not (os.path.exists(human_path) and os.path.exists(all_path)):
+        return {}
+    with open(human_path, newline="") as f:
+        human = list(csv.DictReader(f))
+    with open(all_path, newline="") as f:
+        every = list(csv.DictReader(f))
+    if not human or not every:
+        return {}
+
+    solved = {(r["case"], r["file"]) for r in human}
+    control = [r for r in every if (r["case"], r["file"]) in solved]
+    rest = [r for r in every if (r["case"], r["file"]) not in solved]
+
+    def rate(numerator, denominator):
+        return 100.0 * numerator / denominator if denominator else 0.0
+
+    def scores(rows, granularity, stem):
+        tp = sum(int(r[f"{granularity}_tp"]) for r in rows)
+        fp = sum(int(r[f"{granularity}_fp"]) for r in rows)
+        fn = sum(int(r[f"{granularity}_fn"]) for r in rows)
+        return {
+            f"{stem}Precision": f"{rate(tp, tp + fp):.2f}",
+            f"{stem}Recall": f"{rate(tp, tp + fn):.2f}",
+            f"{stem}Disagreements": latex_number(fp + fn),
+            f"{stem}Mappings": latex_number(
+                sum(int(r[f"{granularity}_oracle_scored"]) for r in rows)
+            ),
+        }
+
+    values = {
+        "OracleHumanUnits": latex_number(len(human)),
+        "OracleHumanCases": latex_number(len({r["case"] for r in human})),
+        "OracleHumanRecordsSolved": latex_number(
+            round(statistics.median(int(r["oracle_records"]) for r in human))
+        ),
+        "OracleHumanRecordsRest": latex_number(
+            round(statistics.median(int(r["oracle_records"]) for r in rest))
+        ),
+    }
+    values.update(scores(human, "all", "OracleHuman"))
+    values.update(scores(human, "statement", "OracleHumanStatement"))
+    values.update(scores(control, "all", "OracleHumanCodeDiff"))
+    values.update(scores(control, "statement", "OracleHumanCodeDiffStatement"))
+    return values
+
+
 def build(
     empirical_lines,
     rq1_lines,
@@ -888,6 +961,7 @@ def build(
     concentration,
     robustness,
     oracle,
+    oracle_human,
 ):
     """Returns the complete variables.tex as a list of lines."""
     out = [
@@ -1031,6 +1105,15 @@ def build(
     ]
     out += [command(name, value) for name, value in oracle.items()]
     out += [command(name, value) for name, value in ORACLE_PUBLISHED.items()]
+
+    out += [
+        "",
+        "% --- The same oracle, with *our own* hand-authored mapping scored against it instead of",
+        "% codediff's, over the units solved so far, plus codediff over the same units as the",
+        "% control (DERIVED from data/comparison/astdiff_oracle_defects4j_human.csv - see",
+        "% `astdiff_oracle_human`). Refresh with `make measure-astdiff-oracle-human`.",
+    ]
+    out += [command(name, value) for name, value in oracle_human.items()]
 
     out += [
         "",
@@ -1213,6 +1296,14 @@ def main():
             "Oracle* macros will be absent. Run `make measure-astdiff-oracle`."
         )
 
+    oracle_human = astdiff_oracle_human(research_dir)
+    if not oracle_human:
+        print(
+            "WARNING: no human-mapping oracle run found "
+            "(data/comparison/astdiff_oracle_defects4j_human.csv) - the OracleHuman* macros will "
+            "be absent. Run `make measure-astdiff-oracle-human`."
+        )
+
     robustness = robustness_fixtures(research_dir)
     if not robustness:
         print(
@@ -1233,6 +1324,7 @@ def main():
         concentration,
         robustness,
         oracle,
+        oracle_human,
     )
 
     os.makedirs(os.path.dirname(output_path), exist_ok=True)

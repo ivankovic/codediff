@@ -859,6 +859,35 @@ RefactoringMiner detects refactorings explicitly and parses Java and only Java, 
 built in part from its output, while \textsc{CodeDiff} has no refactoring catalogue, no Java-specific
 rule, and treats this corpus exactly as it treats the other \NumLanguages{} languages it supports.
 
+\textbf{And the two ground truths against each other.} The oracle can also be read against our own
+annotation rather than against the tool, which is the only check in this paper that does not depend
+on our annotation discipline at all. Over the \OracleHumanUnits{} compilation units
+(\OracleHumanCases{} cases) we have mapped by hand so far, our mapping and the oracle's agree to
+\OracleHumanPrecision{}\% / \OracleHumanRecall{}\%: \OracleHumanDisagreements{} disagreeing node
+pairs out of \OracleHumanMappings{}, and \OracleHumanStatementDisagreements{} of
+\OracleHumanStatementMappings{} at statement level. The control that makes those figures readable is
+\textsc{CodeDiff} over the same units, which agrees with the oracle to
+\OracleHumanCodeDiffPrecision{}\% / \OracleHumanCodeDiffRecall{}\%, or
+\OracleHumanCodeDiffDisagreements{} disagreeing pairs, and to
+\OracleHumanCodeDiffStatementPrecision{}\% / \OracleHumanCodeDiffStatementRecall{}\% over
+\OracleHumanCodeDiffStatementDisagreements{} at statement level.
+
+The difference between the two rows is almost entirely precision, and reading it that way is what
+makes it informative. Recall is the same to within a hundredth of a point
+(\OracleHumanRecall{}\% against \OracleHumanCodeDiffRecall{}\%): both accounts recover the same
+share of what the oracle records, so neither misses pairs the other finds. What separates them is
+pairs *claimed* and not corroborated---28 for our annotation against 67 for the tool, and 2 against
+22 at statement level. Two independently authored accounts of the same changes therefore invent
+about half as many pairs as the tool does, and a tenth as many at statement level, which is the
+shape one would expect if the residue is the tool's rather than a difference of annotation
+opinion.
+
+That reading is bounded by which units are solved. They are not a sample: all \OracleUnits{} were
+taken into the corpus at once, and the solved ones are simply how far annotation has reached. They
+run much shorter than the rest---a median of \OracleHumanRecordsSolved{} oracle records against
+\OracleHumanRecordsRest{}---so this is a statement about the smaller changes in the set, and it may
+move in either direction as annotation reaches the large files.
+
 Two cautions on reading the table across rows. The published figures are computed over the whole
 oracle, ours over the \OracleResolutionRate{}\% of it that resolves to tree-sitter spans, so the
 two populations are close but not identical. And the oracle's own construction consulted the

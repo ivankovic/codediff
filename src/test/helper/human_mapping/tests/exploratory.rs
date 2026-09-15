@@ -2020,6 +2020,9 @@ fn painting_failure_census() -> Result<()> {
     names.sort();
 
     let mut runs: Vec<(&'static str, Run)> = Vec::new();
+    // One row per (fixture, preset), written out at the end: this is the artifact that makes the
+    // renderer's own residue a number the project can watch rather than a table someone read once.
+    let mut rows: Vec<[String; 8]> = Vec::new();
     // preset -> (real, ideal, matcher) mismatched bytes, and the corpus size they are out of.
     let mut totals: BTreeMap<&'static str, [usize; 4]> = BTreeMap::new();
     let mut measured: HashSet<String> = HashSet::new();
@@ -2141,6 +2144,34 @@ fn painting_failure_census() -> Result<()> {
             let Some((theirs, _)) = best else { continue };
 
             measured.insert(name.clone());
+            let per_fixture = {
+                let mut counts = [0usize; 3];
+                for (index, side) in (0..2).flat_map(|side| [(0usize, side), (1usize, side)]) {
+                    counts[index] += ours[index][side]
+                        .iter()
+                        .zip(&theirs[side])
+                        .filter(|(ours, theirs)| ours != theirs)
+                        .count();
+                }
+                for side in 0..2 {
+                    counts[2] += ours[0][side]
+                        .iter()
+                        .zip(&ours[1][side])
+                        .filter(|(real, ideal)| real != ideal)
+                        .count();
+                }
+                counts
+            };
+            rows.push([
+                name.clone(),
+                preset.to_string(),
+                (before.contents.len() + after.contents.len()).to_string(),
+                per_fixture[0].to_string(),
+                per_fixture[1].to_string(),
+                per_fixture[2].to_string(),
+                mapping.text_mappings.len().to_string(),
+                usize::from(violating.contains(name)).to_string(),
+            ]);
             let entry = totals.entry(preset).or_insert([0; 4]);
             entry[3] += before.contents.len() + after.contents.len();
             for (real, ideal) in ours[0].iter().zip(&ours[1]) {
@@ -2226,6 +2257,33 @@ fn painting_failure_census() -> Result<()> {
             }
         }
     }
+
+    // ---- the artifact ----------------------------------------------------------------------
+    let csv_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("research")
+        .join("data")
+        .join("quality")
+        .join("painting_attribution.csv");
+    if let Some(parent) = csv_path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    rows.sort();
+    let mut writer = csv::Writer::from_path(&csv_path)?;
+    writer.write_record([
+        "fixture",
+        "preset",
+        "total_bytes",
+        "real_bytes",
+        "renderer_bytes",
+        "matcher_bytes",
+        "paintings",
+        "breaks_invariants",
+    ])?;
+    for row in &rows {
+        writer.write_record(row)?;
+    }
+    writer.flush()?;
+    eprintln!("{} rows written to {}", rows.len(), csv_path.display());
 
     // ---- what the numbers are over --------------------------------------------------------
     eprintln!(

@@ -44,7 +44,7 @@ RESEARCH_DIR = /var/tmp/research/$(MODE)/
 	shapes-report measure-edit-shape ambiguity-report rendering-report measure-tools-timing \
 	measure-tools-accuracy timing-report install-bdiff apted-budget-report measure-apted-budget \
 	paper-variables introductory-paper introductory-paper-empirical fetch-external \
-	measure-astdiff-oracle measure-robustness-fixtures
+	measure-astdiff-oracle measure-astdiff-oracle-human measure-robustness-fixtures
 
 # Delegates to the root Makefile so the cargo invocation (and its `--features stats` requirement)
 # lives in exactly one place.
@@ -415,6 +415,15 @@ fetch-external:
 measure-astdiff-oracle: fetch-external
 	cd .. && cargo run --release --features test-fixtures --bin benchmark_astdiff_oracle -- \
 		--csv research/data/comparison/astdiff_oracle_defects4j.csv $(ASTDIFF_ORACLE_ARGS)
+
+# The same oracle, with our own hand-authored mappings scored against it instead of codediff's
+# output, over the Defects4J compilation units solved so far. Writes
+# data/comparison/astdiff_oracle_defects4j_human.csv; the paper reads both CSVs together, and
+# codediff's own rows over the same units are the control that makes the figure readable.
+measure-astdiff-oracle-human: fetch-external
+	cd .. && cargo run --release --features test-fixtures --bin benchmark_astdiff_oracle -- \
+		--human-mappings src/test/data/diffs/defects4j \
+		--csv research/data/comparison/astdiff_oracle_defects4j_human.csv $(ASTDIFF_ORACLE_ARGS)
 
 # ── RQ1: whole-tree APTED against a 1-second budget ─────────────────────────────────────────────
 
