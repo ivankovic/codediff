@@ -289,6 +289,8 @@ mod go_fatedier_frp_build_comment_insert_only;
 #[cfg(test)]
 mod go_gin_gonic_gin_one_space_removed_in_a_comment;
 #[cfg(test)]
+mod go_gin_gonic_gin_replace_replaced_with_replaceall;
+#[cfg(test)]
 mod go_gin_gonic_gin_update_version_string;
 #[cfg(test)]
 mod go_gin_gonic_gin_update_version_string_;

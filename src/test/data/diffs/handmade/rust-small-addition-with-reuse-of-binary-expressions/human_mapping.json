@@ -2078,62 +2078,6 @@
       ]
     },
     {
-      "operation": "identical",
-      "before_path": [
-        "function_item:8",
-        "block:1",
-        "expression_statement:1",
-        "match_expression:1",
-        "match_block:1",
-        "match_arm:4",
-        "block:1",
-        "expression_statement:2",
-        "while_expression:1",
-        "block:1",
-        "expression_statement:1",
-        "if_expression:1",
-        "block:1",
-        "expression_statement:1",
-        "match_expression:1",
-        "match_block:1",
-        "match_arm:1",
-        "block:1",
-        "expression_statement:1",
-        "if_expression:1",
-        "block:1",
-        "expression_statement:1",
-        "if_expression:1",
-        "binary_expression:1",
-        "&&:1"
-      ],
-      "after_path": [
-        "function_item:8",
-        "block:1",
-        "expression_statement:1",
-        "match_expression:1",
-        "match_block:1",
-        "match_arm:4",
-        "block:1",
-        "expression_statement:2",
-        "while_expression:1",
-        "block:1",
-        "expression_statement:1",
-        "if_expression:1",
-        "block:1",
-        "expression_statement:1",
-        "match_expression:1",
-        "match_block:1",
-        "match_arm:1",
-        "block:1",
-        "expression_statement:1",
-        "if_expression:1",
-        "block:1",
-        "let_declaration:5",
-        "binary_expression:1",
-        "&&:1"
-      ]
-    },
-    {
       "operation": "insert",
       "after_path": [
         "function_item:8",
@@ -2528,36 +2472,6 @@
         "binary_expression:1",
         "unary_expression:1",
         "identifier:1"
-      ]
-    },
-    {
-      "operation": "insert",
-      "after_path": [
-        "function_item:8",
-        "block:1",
-        "expression_statement:1",
-        "match_expression:1",
-        "match_block:1",
-        "match_arm:4",
-        "block:1",
-        "expression_statement:2",
-        "while_expression:1",
-        "block:1",
-        "expression_statement:1",
-        "if_expression:1",
-        "block:1",
-        "expression_statement:1",
-        "match_expression:1",
-        "match_block:1",
-        "match_arm:1",
-        "block:1",
-        "expression_statement:1",
-        "if_expression:1",
-        "block:1",
-        "expression_statement:1",
-        "if_expression:1",
-        "binary_expression:1",
-        "&&:1"
       ]
     },
     {
@@ -634410,6 +634324,92 @@
         "let_declaration:3",
         ";:1"
       ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "function_item:8",
+        "block:1",
+        "expression_statement:1",
+        "match_expression:1",
+        "match_block:1",
+        "match_arm:4",
+        "block:1",
+        "expression_statement:2",
+        "while_expression:1",
+        "block:1",
+        "expression_statement:1",
+        "if_expression:1",
+        "block:1",
+        "expression_statement:1",
+        "match_expression:1",
+        "match_block:1",
+        "match_arm:1",
+        "block:1",
+        "expression_statement:1",
+        "if_expression:1",
+        "block:1",
+        "let_declaration:5",
+        "binary_expression:1",
+        "&&:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "function_item:8",
+        "block:1",
+        "expression_statement:1",
+        "match_expression:1",
+        "match_block:1",
+        "match_arm:4",
+        "block:1",
+        "expression_statement:2",
+        "while_expression:1",
+        "block:1",
+        "expression_statement:1",
+        "if_expression:1",
+        "block:1",
+        "expression_statement:1",
+        "match_expression:1",
+        "match_block:1",
+        "match_arm:1",
+        "block:1",
+        "expression_statement:1",
+        "if_expression:1",
+        "block:1",
+        "expression_statement:1",
+        "if_expression:1",
+        "binary_expression:1",
+        "&&:1"
+      ],
+      "after_path": [
+        "function_item:8",
+        "block:1",
+        "expression_statement:1",
+        "match_expression:1",
+        "match_block:1",
+        "match_arm:4",
+        "block:1",
+        "expression_statement:2",
+        "while_expression:1",
+        "block:1",
+        "expression_statement:1",
+        "if_expression:1",
+        "block:1",
+        "expression_statement:1",
+        "match_expression:1",
+        "match_block:1",
+        "match_arm:1",
+        "block:1",
+        "expression_statement:1",
+        "if_expression:1",
+        "block:1",
+        "expression_statement:1",
+        "if_expression:1",
+        "binary_expression:1",
+        "&&:1"
+      ]
     }
   ],
   "text_mappings": [
@@ -634825,25 +634825,6 @@
           ]
         },
         {
-          "operation": "Match",
-          "before": [
-            {
-              "start_row": 373,
-              "start_column": 32,
-              "end_row": 373,
-              "end_column": 34
-            }
-          ],
-          "after": [
-            {
-              "start_row": 398,
-              "start_column": 32,
-              "end_row": 398,
-              "end_column": 34
-            }
-          ]
-        },
-        {
           "operation": "Insert",
           "after": [
             {
@@ -634862,25 +634843,6 @@
               "start_column": 0,
               "end_row": 397,
               "end_column": 36
-            }
-          ]
-        },
-        {
-          "operation": "Match",
-          "before": [
-            {
-              "start_row": 373,
-              "start_column": 0,
-              "end_row": 373,
-              "end_column": 35
-            }
-          ],
-          "after": [
-            {
-              "start_row": 398,
-              "start_column": 0,
-              "end_row": 398,
-              "end_column": 35
             }
           ]
         },
@@ -634919,6 +634881,25 @@
               "start_column": 84,
               "end_row": 398,
               "end_column": 85
+            }
+          ]
+        },
+        {
+          "operation": "Match",
+          "before": [
+            {
+              "start_row": 373,
+              "start_column": 0,
+              "end_row": 373,
+              "end_column": 35
+            }
+          ],
+          "after": [
+            {
+              "start_row": 398,
+              "start_column": 0,
+              "end_row": 398,
+              "end_column": 35
             }
           ]
         }

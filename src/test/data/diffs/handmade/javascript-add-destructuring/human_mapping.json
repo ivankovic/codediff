@@ -670,14 +670,6 @@
       "before_path": [
         "lexical_declaration:2",
         "variable_declarator:1",
-        "identifier:1"
-      ]
-    },
-    {
-      "operation": "delete",
-      "before_path": [
-        "lexical_declaration:2",
-        "variable_declarator:1",
         "member_expression:1"
       ]
     },
@@ -708,14 +700,6 @@
       "before_path": [
         "lexical_declaration:3",
         "variable_declarator:1",
-        "identifier:1"
-      ]
-    },
-    {
-      "operation": "delete",
-      "before_path": [
-        "lexical_declaration:3",
-        "variable_declarator:1",
         "member_expression:1"
       ]
     },
@@ -739,14 +723,6 @@
       "before_path": [
         "lexical_declaration:4",
         "variable_declarator:1"
-      ]
-    },
-    {
-      "operation": "delete",
-      "before_path": [
-        "lexical_declaration:4",
-        "variable_declarator:1",
-        "identifier:1"
       ]
     },
     {
@@ -828,12 +804,47 @@
       ]
     },
     {
-      "operation": "match_but_not_identical",
+      "operation": "delete",
+      "before_path": [
+        "lexical_declaration:4",
+        "variable_declarator:1",
+        "member_expression:1",
+        ".:1"
+      ]
+    },
+    {
+      "operation": "delete",
       "before_path": [
         "lexical_declaration:2",
         "variable_declarator:1",
         "member_expression:1",
         "property_identifier:1"
+      ]
+    },
+    {
+      "operation": "delete",
+      "before_path": [
+        "lexical_declaration:3",
+        "variable_declarator:1",
+        "member_expression:1",
+        "property_identifier:1"
+      ]
+    },
+    {
+      "operation": "delete",
+      "before_path": [
+        "lexical_declaration:4",
+        "variable_declarator:1",
+        "member_expression:1",
+        "property_identifier:1"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "lexical_declaration:2",
+        "variable_declarator:1",
+        "identifier:1"
       ],
       "after_path": [
         "lexical_declaration:2",
@@ -847,8 +858,7 @@
       "before_path": [
         "lexical_declaration:3",
         "variable_declarator:1",
-        "member_expression:1",
-        "property_identifier:1"
+        "identifier:1"
       ],
       "after_path": [
         "lexical_declaration:2",
@@ -862,23 +872,13 @@
       "before_path": [
         "lexical_declaration:4",
         "variable_declarator:1",
-        "member_expression:1",
-        "property_identifier:1"
+        "identifier:1"
       ],
       "after_path": [
         "lexical_declaration:2",
         "variable_declarator:1",
         "object_pattern:1",
         "shorthand_property_identifier_pattern:3"
-      ]
-    },
-    {
-      "operation": "delete",
-      "before_path": [
-        "lexical_declaration:4",
-        "variable_declarator:1",
-        "member_expression:1",
-        ".:1"
       ]
     }
   ],

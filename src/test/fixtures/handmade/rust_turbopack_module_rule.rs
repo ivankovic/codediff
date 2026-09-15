@@ -18,6 +18,7 @@
 use crate::diff;
 use crate::diff::ASTMappingOperation;
 use crate::test;
+use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
 use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants_with_known_violations;
 use anyhow::{Ok, Result};
 
@@ -449,4 +450,11 @@ fn invariants() -> Result<()> {
     // satisfy by calling an identical pattern not identical. Both are the mapping author's to
     // relabel.
     assert_ground_truth_invariants_with_known_violations("rust-turbopack-module-rule", 10)
+}
+
+#[test]
+fn painting() -> Result<()> {
+    // Not measured yet: 100.0 passes unconditionally. Run this test, read the rate it
+    // reports for both modes, and record that instead.
+    assert_matches_human_painting_within_limit("rust-turbopack-module-rule", 100.0)
 }

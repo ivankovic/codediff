@@ -114,6 +114,8 @@ mod java_defects4j_mockito_12_genericmaster;
 #[cfg(test)]
 mod java_defects4j_mockito_15_finalmockcandidatefilter;
 #[cfg(test)]
+mod java_defects4j_mockito_17_mocksettingsimpl;
+#[cfg(test)]
 mod java_defects4j_mockito_19_finalmockcandidatefilter;
 #[cfg(test)]
 mod java_defects4j_mockito_19_mockcandidatefilter;

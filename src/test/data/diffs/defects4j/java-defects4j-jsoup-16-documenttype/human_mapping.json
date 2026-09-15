@@ -7295,6 +7295,17 @@
               "end_column": 30
             }
           ]
+        },
+        {
+          "operation": "Delete",
+          "before": [
+            {
+              "start_row": 32,
+              "start_column": 32,
+              "end_row": 32,
+              "end_column": 36
+            }
+          ]
         }
       ]
     },
@@ -7364,6 +7375,17 @@
               "start_column": 25,
               "end_row": 38,
               "end_column": 30
+            }
+          ]
+        },
+        {
+          "operation": "Delete",
+          "before": [
+            {
+              "start_row": 32,
+              "start_column": 32,
+              "end_row": 32,
+              "end_column": 36
             }
           ]
         }

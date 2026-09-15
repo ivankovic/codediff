@@ -1518,6 +1518,11 @@
         "lexical_declaration:1",
         ";:1"
       ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [],
+      "after_path": []
     }
   ],
   "text_mappings": [

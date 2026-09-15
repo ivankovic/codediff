@@ -354,21 +354,6 @@
       ]
     },
     {
-      "operation": "identical",
-      "before_path": [
-        "function_item:1",
-        "block:1",
-        "line_comment:1",
-        "//:1"
-      ],
-      "after_path": [
-        "function_item:1",
-        "block:1",
-        "line_comment:1",
-        "//:1"
-      ]
-    },
-    {
       "operation": "insert",
       "after_path": [
         "function_item:1",
@@ -3693,6 +3678,24 @@
         "for_expression:1",
         "in:1"
       ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "function_item:1",
+        "block:1",
+        "line_comment:1",
+        "//:1"
+      ]
+    },
+    {
+      "operation": "delete",
+      "before_path": [
+        "function_item:1",
+        "block:1",
+        "line_comment:1",
+        "//:1"
+      ]
     }
   ],
   "groups": [
@@ -3796,28 +3799,6 @@
               "start_column": 0,
               "end_row": 0,
               "end_column": 30
-            }
-          ]
-        },
-        {
-          "operation": "Insert",
-          "after": [
-            {
-              "start_row": 4,
-              "start_column": 4,
-              "end_row": 4,
-              "end_column": 34
-            }
-          ]
-        },
-        {
-          "operation": "Insert",
-          "after": [
-            {
-              "start_row": 3,
-              "start_column": 4,
-              "end_row": 3,
-              "end_column": 46
             }
           ]
         },
@@ -4009,6 +3990,28 @@
               "end_column": 33
             }
           ]
+        },
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 3,
+              "start_column": 4,
+              "end_row": 3,
+              "end_column": 46
+            }
+          ]
+        },
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 4,
+              "start_column": 4,
+              "end_row": 4,
+              "end_column": 34
+            }
+          ]
         }
       ]
     },
@@ -4176,28 +4179,6 @@
               "start_column": 8,
               "end_row": 9,
               "end_column": 9
-            }
-          ]
-        },
-        {
-          "operation": "Insert",
-          "after": [
-            {
-              "start_row": 3,
-              "start_column": 4,
-              "end_row": 4,
-              "end_column": 34
-            }
-          ]
-        },
-        {
-          "operation": "Insert",
-          "after": [
-            {
-              "start_row": 3,
-              "start_column": 0,
-              "end_row": 3,
-              "end_column": 5
             }
           ]
         },
@@ -4456,6 +4437,17 @@
               "start_column": 0,
               "end_row": 1,
               "end_column": 4
+            }
+          ]
+        },
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 3,
+              "start_column": 0,
+              "end_row": 4,
+              "end_column": 34
             }
           ]
         }
