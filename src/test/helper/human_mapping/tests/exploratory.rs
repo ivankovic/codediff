@@ -1863,6 +1863,11 @@ fn invariant_nine_provenance() -> Result<()> {
 /// --ignored --nocapture`
 #[test]
 #[ignore]
+// The CSV half needs the `csv` crate, which is only linked under `test-fixtures` (see
+// `helper::sample_provenance`'s own note) - and this measurement has nothing to read without the
+// fixtures anyway. Same gate `the_quality_baseline_accuracy_columns_are_a_projection_of_the_stub_limits`
+// carries for the same reason.
+#[cfg(feature = "test-fixtures")]
 fn painting_failure_census() -> Result<()> {
     use crate::diff::text::{RangeMatch, RenderOptions};
     use std::collections::{BTreeMap, HashSet};
@@ -2153,10 +2158,10 @@ fn painting_failure_census() -> Result<()> {
                         .filter(|(ours, theirs)| ours != theirs)
                         .count();
                 }
-                for side in 0..2 {
-                    counts[2] += ours[0][side]
+                for (real, ideal) in ours[0].iter().zip(&ours[1]) {
+                    counts[2] += real
                         .iter()
-                        .zip(&ours[1][side])
+                        .zip(ideal)
                         .filter(|(real, ideal)| real != ideal)
                         .count();
                 }

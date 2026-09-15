@@ -876,7 +876,6 @@ def astdiff_oracle(research_dir):
     return values
 
 
-
 def astdiff_oracle_human(research_dir):
     """Section 8.1's second half: our own hand-authored mapping scored against the same oracle, over
     the compilation units we have solved. DERIVED from
