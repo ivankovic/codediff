@@ -47,6 +47,7 @@ OUT_DIR ?= research/data/ablation
 
 .PHONY: coverage test test-mapping-site-js test-python build install install-hooks benchmark-quality \
 	diff-inventory lint-python ci benchmark-ablation check-quality update-quality-baseline \
+	check-painting-attribution update-painting-attribution \
 	deploy-checks deploy-crates deploy-github deploy benchmark-speed \
 	benchmark-speed-update-baseline
 
@@ -234,6 +235,32 @@ check-quality:
 	if [ "$$over_2x" = "1" ]; then \
 		echo "warning: runtime is more than 2x the baseline ($$ms ms/fixture vs $$baseline_ms ms/fixture) - investigate before deploying" >&2; \
 	fi
+
+# The painting gate, and its baseline.
+#
+# `research/data/quality/painting_attribution.csv` holds one row per (fixture, preset): how many
+# bytes of the hand-painted ground truth codediff's rendering disagrees with (`real_bytes`), how
+# many of those survive rendering the *human* mapping instead (`renderer_bytes` - the residue no
+# matcher improvement can remove), and how far the two renderings differ from each other
+# (`matcher_bytes`). The 2026-09-15 census that introduced the split is in
+# research/data/quality/painting_failure_census_2026_09_15.md.
+#
+# Per fixture, never pooled, for the reason `quality_baseline.csv` is per fixture: the painted
+# corpus keeps growing, and no single rate over it can tell a real regression from new data. A
+# fixture the run has and the baseline does not is new data and passes.
+#
+# **Unlike `check-quality`, this baseline is a measurement.** That gate's accuracy columns are a
+# projection of the hand-authored stub limits, so no run can re-baseline a regression away; here
+# there is no hand-authored limit to project, so improving a painting or a mapping moves the number
+# legitimately. When that happens, re-run `update-painting-attribution` and say in the commit which
+# ground truth changed. A move with no such change is a rendering or matching regression.
+check-painting-attribution:
+	PAINTING_ATTRIBUTION_CHECK=1 cargo test --release --lib --features test-fixtures \
+		painting_failure_census -- --ignored --nocapture
+
+update-painting-attribution:
+	cargo test --release --lib --features test-fixtures \
+		painting_failure_census -- --ignored --nocapture
 
 # Rewrites both baselines - a deliberate, separate step, never something `deploy` does on its own.
 #

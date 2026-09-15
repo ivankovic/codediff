@@ -139,6 +139,25 @@ jobs:
       # keeping them out of this job's cache is worth the one override.
       - run: make check-quality FEATURES=test-fixtures
 
+  # The painting counterpart of the quality gate, and gated here for the same reason: byte counts
+  # against the hand-painted ground truth are algorithm-only and do not vary by machine. It
+  # separates what a reader sees from the part of it no matcher improvement can remove - see the
+  # target's own comment in the Makefile for why this baseline, unlike the quality one, moves when
+  # the ground truth is improved.
+  painting:
+    name: painting gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: painting
+
+      - run: make check-painting-attribution
+
   build-and-test:
     name: build + test (${{ matrix.features == '' && 'default' || matrix.features }})
     runs-on: ubuntu-latest

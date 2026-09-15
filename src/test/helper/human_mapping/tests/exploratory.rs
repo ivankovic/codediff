@@ -2264,12 +2264,8 @@ fn painting_failure_census() -> Result<()> {
         .join("data")
         .join("quality")
         .join("painting_attribution.csv");
-    if let Some(parent) = csv_path.parent() {
-        fs::create_dir_all(parent)?;
-    }
     rows.sort();
-    let mut writer = csv::Writer::from_path(&csv_path)?;
-    writer.write_record([
+    let header = [
         "fixture",
         "preset",
         "total_bytes",
@@ -2278,7 +2274,72 @@ fn painting_failure_census() -> Result<()> {
         "matcher_bytes",
         "paintings",
         "breaks_invariants",
-    ])?;
+    ];
+    if std::env::var("PAINTING_ATTRIBUTION_CHECK").is_ok() {
+        // Gate mode: compare against the committed baseline instead of overwriting it. A fixture
+        // present in both may not get *worse*; one only in this run is new data, not a regression.
+        //
+        // The baseline is a measurement, not a hand-authored limit, so editing a painting or a
+        // mapping moves it legitimately - unlike `quality_baseline.csv`, whose accuracy columns are
+        // a projection of the stubs precisely so that no run can re-baseline a regression away.
+        // The failure message says so, because otherwise this gate reads as broken every time the
+        // ground truth is improved.
+        let mut baseline: std::collections::HashMap<(String, String), [usize; 3]> =
+            std::collections::HashMap::new();
+        let mut reader = csv::Reader::from_path(&csv_path).with_context(|| {
+            format!(
+                "reading the painting-attribution baseline from {} - write one with \
+                 `make update-painting-attribution`",
+                csv_path.display()
+            )
+        })?;
+        for record in reader.records() {
+            let record = record?;
+            baseline.insert(
+                (record[0].to_string(), record[1].to_string()),
+                [record[3].parse()?, record[4].parse()?, record[5].parse()?],
+            );
+        }
+        let mut worse = Vec::new();
+        let mut fresh = 0usize;
+        for row in &rows {
+            let Some(was) = baseline.get(&(row[0].clone(), row[1].clone())) else {
+                fresh += 1;
+                continue;
+            };
+            let now: [usize; 3] = [row[3].parse()?, row[4].parse()?, row[5].parse()?];
+            for (index, label) in [(0, "a reader sees"), (1, "the renderer owns")] {
+                if now[index] > was[index] {
+                    worse.push(format!(
+                        "  {} {}: {label} {} bytes, was {}",
+                        row[0], row[1], now[index], was[index]
+                    ));
+                }
+            }
+        }
+        eprintln!(
+            "painting attribution: {} rows checked against {}, {fresh} new",
+            rows.len(),
+            csv_path.display()
+        );
+        if !worse.is_empty() {
+            bail!(
+                "painting attribution regressed on {} fixture/preset pair(s):\n{}\n\nIf this \
+                 follows a deliberate change to a painting or a mapping, the baseline is a \
+                 measurement and has to move with it: re-run `make update-painting-attribution` \
+                 and say in the commit which ground truth changed. If it follows a change to \
+                 `diff::text` or to the matcher, it is a regression.",
+                worse.len(),
+                worse.join("\n")
+            );
+        }
+        return Ok(());
+    }
+    if let Some(parent) = csv_path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let mut writer = csv::Writer::from_path(&csv_path)?;
+    writer.write_record(header)?;
     for row in &rows {
         writer.write_record(row)?;
     }
