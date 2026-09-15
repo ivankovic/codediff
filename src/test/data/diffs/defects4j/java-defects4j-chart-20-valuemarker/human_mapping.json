@@ -6840,17 +6840,17 @@
           "before": [
             {
               "start_row": 94,
-              "start_column": 36,
+              "start_column": 29,
               "end_row": 94,
-              "end_column": 37
+              "end_column": 34
             }
           ],
           "after": [
             {
               "start_row": 94,
-              "start_column": 50,
+              "start_column": 36,
               "end_row": 94,
-              "end_column": 51
+              "end_column": 41
             }
           ]
         },
@@ -6859,17 +6859,17 @@
           "before": [
             {
               "start_row": 94,
-              "start_column": 29,
+              "start_column": 36,
               "end_row": 94,
-              "end_column": 30
+              "end_column": 42
             }
           ],
           "after": [
             {
               "start_row": 94,
-              "start_column": 36,
+              "start_column": 50,
               "end_row": 94,
-              "end_column": 37
+              "end_column": 56
             }
           ]
         }

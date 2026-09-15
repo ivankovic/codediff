@@ -9854,22 +9854,6 @@
         "block:1",
         "if_statement:1",
         "block:2",
-        "for_statement:1",
-        "block:1",
-        "}:1"
-      ]
-    },
-    {
-      "operation": "delete",
-      "before_path": [
-        "class_declaration:1",
-        "class_body:1",
-        "method_declaration:3",
-        "block:1",
-        "while_statement:1",
-        "block:1",
-        "if_statement:1",
-        "block:2",
         "expression_statement:1"
       ]
     },
@@ -9933,31 +9917,6 @@
         "block:2",
         "expression_statement:1",
         ";:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "class_declaration:1",
-        "class_body:1",
-        "method_declaration:3",
-        "block:1",
-        "while_statement:1",
-        "block:1",
-        "if_statement:1",
-        "block:2",
-        "}:1"
-      ],
-      "after_path": [
-        "class_declaration:1",
-        "class_body:1",
-        "method_declaration:3",
-        "block:1",
-        "while_statement:1",
-        "block:1",
-        "for_statement:1",
-        "block:1",
-        "}:1"
       ]
     },
     {
@@ -12542,6 +12501,47 @@
         "class_body:1",
         "}:1"
       ]
+    },
+    {
+      "operation": "delete",
+      "before_path": [
+        "class_declaration:1",
+        "class_body:1",
+        "method_declaration:3",
+        "block:1",
+        "while_statement:1",
+        "block:1",
+        "if_statement:1",
+        "block:2",
+        "}:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "class_declaration:1",
+        "class_body:1",
+        "method_declaration:3",
+        "block:1",
+        "while_statement:1",
+        "block:1",
+        "if_statement:1",
+        "block:2",
+        "for_statement:1",
+        "block:1",
+        "}:1"
+      ],
+      "after_path": [
+        "class_declaration:1",
+        "class_body:1",
+        "method_declaration:3",
+        "block:1",
+        "while_statement:1",
+        "block:1",
+        "for_statement:1",
+        "block:1",
+        "}:1"
+      ]
     }
   ],
   "text_mappings": [
@@ -12613,6 +12613,28 @@
           "operation": "Delete",
           "before": [
             {
+              "start_row": 101,
+              "start_column": 12,
+              "end_row": 101,
+              "end_column": 18
+            }
+          ]
+        },
+        {
+          "operation": "Delete",
+          "before": [
+            {
+              "start_row": 100,
+              "start_column": 12,
+              "end_row": 100,
+              "end_column": 13
+            }
+          ]
+        },
+        {
+          "operation": "Delete",
+          "before": [
+            {
               "start_row": 95,
               "start_column": 20,
               "end_row": 95,
@@ -12629,18 +12651,6 @@
               "start_column": 20,
               "end_row": 97,
               "end_column": 21
-            },
-            {
-              "start_row": 98,
-              "start_column": 16,
-              "end_row": 98,
-              "end_column": 17
-            },
-            {
-              "start_row": 99,
-              "start_column": 16,
-              "end_row": 99,
-              "end_column": 22
             }
           ]
         },
@@ -12648,10 +12658,10 @@
           "operation": "Delete",
           "before": [
             {
-              "start_row": 101,
-              "start_column": 12,
-              "end_row": 101,
-              "end_column": 18
+              "start_row": 99,
+              "start_column": 16,
+              "end_row": 99,
+              "end_column": 22
             }
           ]
         }
@@ -12725,41 +12735,6 @@
           "operation": "Delete",
           "before": [
             {
-              "start_row": 95,
-              "start_column": 0,
-              "end_row": 95,
-              "end_column": 28
-            },
-            {
-              "start_row": 96,
-              "start_column": 0,
-              "end_row": 96,
-              "end_column": 30
-            },
-            {
-              "start_row": 97,
-              "start_column": 0,
-              "end_row": 97,
-              "end_column": 21
-            },
-            {
-              "start_row": 98,
-              "start_column": 0,
-              "end_row": 98,
-              "end_column": 17
-            },
-            {
-              "start_row": 99,
-              "start_column": 0,
-              "end_row": 99,
-              "end_column": 22
-            }
-          ]
-        },
-        {
-          "operation": "Delete",
-          "before": [
-            {
               "start_row": 101,
               "start_column": 0,
               "end_row": 101,
@@ -12794,6 +12769,118 @@
               "start_column": 18,
               "end_row": 82,
               "end_column": 32
+            }
+          ]
+        },
+        {
+          "operation": "Delete",
+          "before": [
+            {
+              "start_row": 100,
+              "start_column": 0,
+              "end_row": 100,
+              "end_column": 13
+            }
+          ]
+        },
+        {
+          "operation": "Delete",
+          "before": [
+            {
+              "start_row": 95,
+              "start_column": 20,
+              "end_row": 97,
+              "end_column": 21
+            }
+          ]
+        },
+        {
+          "operation": "Delete",
+          "before": [
+            {
+              "start_row": 95,
+              "start_column": 0,
+              "end_row": 95,
+              "end_column": 20
+            }
+          ]
+        },
+        {
+          "operation": "Delete",
+          "before": [
+            {
+              "start_row": 99,
+              "start_column": 0,
+              "end_row": 99,
+              "end_column": 22
+            }
+          ]
+        },
+        {
+          "operation": "Match",
+          "before": [
+            {
+              "start_row": 98,
+              "start_column": 4,
+              "end_row": 98,
+              "end_column": 17
+            }
+          ],
+          "after": [
+            {
+              "start_row": 95,
+              "start_column": 0,
+              "end_row": 95,
+              "end_column": 13
+            }
+          ]
+        },
+        {
+          "operation": "Delete",
+          "before": [
+            {
+              "start_row": 98,
+              "start_column": 0,
+              "end_row": 98,
+              "end_column": 4
+            }
+          ]
+        },
+        {
+          "operation": "Match",
+          "before": [
+            {
+              "start_row": 94,
+              "start_column": 0,
+              "end_row": 94,
+              "end_column": 78
+            }
+          ],
+          "after": [
+            {
+              "start_row": 94,
+              "start_column": 0,
+              "end_row": 94,
+              "end_column": 78
+            }
+          ]
+        },
+        {
+          "operation": "Match",
+          "before": [
+            {
+              "start_row": 92,
+              "start_column": 0,
+              "end_row": 92,
+              "end_column": 51
+            }
+          ],
+          "after": [
+            {
+              "start_row": 93,
+              "start_column": 0,
+              "end_row": 93,
+              "end_column": 51
             }
           ]
         }

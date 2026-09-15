@@ -11035,17 +11035,6 @@
           "after": [
             {
               "start_row": 19,
-              "start_column": 40,
-              "end_row": 19,
-              "end_column": 52
-            }
-          ]
-        },
-        {
-          "operation": "Insert",
-          "after": [
-            {
-              "start_row": 19,
               "start_column": 57,
               "end_row": 19,
               "end_column": 78
@@ -11060,25 +11049,6 @@
               "start_column": 24,
               "end_row": 5,
               "end_column": 33
-            }
-          ]
-        },
-        {
-          "operation": "Match",
-          "before": [
-            {
-              "start_row": 18,
-              "start_column": 51,
-              "end_row": 18,
-              "end_column": 83
-            }
-          ],
-          "after": [
-            {
-              "start_row": 19,
-              "start_column": 8,
-              "end_row": 19,
-              "end_column": 40
             }
           ]
         },
@@ -11128,6 +11098,44 @@
               "start_column": 0,
               "end_row": 19,
               "end_column": 8
+            }
+          ]
+        },
+        {
+          "operation": "Match",
+          "before": [
+            {
+              "start_row": 18,
+              "start_column": 69,
+              "end_row": 18,
+              "end_column": 83
+            }
+          ],
+          "after": [
+            {
+              "start_row": 19,
+              "start_column": 26,
+              "end_row": 19,
+              "end_column": 52
+            }
+          ]
+        },
+        {
+          "operation": "Match",
+          "before": [
+            {
+              "start_row": 18,
+              "start_column": 51,
+              "end_row": 18,
+              "end_column": 69
+            }
+          ],
+          "after": [
+            {
+              "start_row": 19,
+              "start_column": 8,
+              "end_row": 19,
+              "end_column": 26
             }
           ]
         }

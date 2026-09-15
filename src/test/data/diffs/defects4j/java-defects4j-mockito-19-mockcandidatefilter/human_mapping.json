@@ -1279,7 +1279,7 @@
               "start_row": 14,
               "start_column": 24,
               "end_row": 14,
-              "end_column": 25
+              "end_column": 32
             }
           ],
           "after": [
@@ -1287,7 +1287,7 @@
               "start_row": 15,
               "start_column": 39,
               "end_row": 15,
-              "end_column": 40
+              "end_column": 47
             }
           ]
         }

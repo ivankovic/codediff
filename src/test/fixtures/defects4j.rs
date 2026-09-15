@@ -50,21 +50,39 @@ mod java_defects4j_chart_20_valuemarker;
 #[cfg(test)]
 mod java_defects4j_chart_21_defaultboxandwhiskercategorydataset;
 #[cfg(test)]
+mod java_defects4j_chart_22_keyedobjects2d;
+#[cfg(test)]
 mod java_defects4j_chart_23_minmaxcategoryrenderer;
 #[cfg(test)]
 mod java_defects4j_chart_24_graypaintscale;
+#[cfg(test)]
+mod java_defects4j_chart_25_statisticalbarrenderer;
 #[cfg(test)]
 mod java_defects4j_chart_26_axis;
 #[cfg(test)]
 mod java_defects4j_chart_2_datasetutilities;
 #[cfg(test)]
+mod java_defects4j_chart_3_timeseries;
+#[cfg(test)]
 mod java_defects4j_chart_4_xyplot;
+#[cfg(test)]
+mod java_defects4j_chart_5_xyseries;
 #[cfg(test)]
 mod java_defects4j_chart_6_shapelist;
 #[cfg(test)]
+mod java_defects4j_chart_7_timeperiodvalues;
+#[cfg(test)]
 mod java_defects4j_chart_8_week;
 #[cfg(test)]
+mod java_defects4j_chart_9_timeseries;
+#[cfg(test)]
+mod java_defects4j_cli_10_parser;
+#[cfg(test)]
+mod java_defects4j_cli_11_helpformatter;
+#[cfg(test)]
 mod java_defects4j_cli_12_gnuparser;
+#[cfg(test)]
+mod java_defects4j_cli_13_argumentimpl;
 #[cfg(test)]
 mod java_defects4j_cli_13_writeablecommandline;
 #[cfg(test)]
@@ -75,6 +93,14 @@ mod java_defects4j_cli_21_writeablecommandline;
 mod java_defects4j_cli_27_optiongroup;
 #[cfg(test)]
 mod java_defects4j_cli_29_util;
+#[cfg(test)]
+mod java_defects4j_cli_2_posixparser;
+#[cfg(test)]
+mod java_defects4j_cli_31_helpformatter;
+#[cfg(test)]
+mod java_defects4j_cli_34_option;
+#[cfg(test)]
+mod java_defects4j_cli_34_optionbuilder;
 #[cfg(test)]
 mod java_defects4j_cli_5_util;
 #[cfg(test)]
