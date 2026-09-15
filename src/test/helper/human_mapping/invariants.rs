@@ -324,6 +324,14 @@ pub fn ground_truth_invariant_violations_for(
                 mapping, named, before, after,
             ));
         }
+        for (name, labels) in &paintings {
+            violations.extend(identifier_updates_are_painted_by_preset(
+                name, labels, &context, before, after,
+            ));
+        }
+        violations.extend(boolean_flips_are_one_edit(
+            &paintings, &context, before, after,
+        ));
         violations.extend(identical_entries_are_token_identical(
             &context, before, after,
         ));
@@ -2147,6 +2155,421 @@ fn match_but_not_identical_entries_differ(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────
+// Invariant 16: an identifier the mapping calls edited is painted narrow by Minimal, whole by Full
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+
+/// Byte offsets inside an identifier at which a word may legally be cut: 0, both ends of any run
+/// of `_`, and any uppercase letter that begins a word. The last entry is always the identifier's length,
+/// so "the next word start at or after `n`" always has an answer.
+///
+/// An uppercase letter begins a word when the character before it is not uppercase (`fooBar` ->
+/// 3), or when it is uppercase but the character *after* is lowercase - which is how an acronym
+/// hands off to the next word (`HTTPServer` -> 0, 4). Without that second clause `HTTPServer`
+/// would read as one word and `XMLHttpRequest` as two.
+///
+/// **Both ends of a `_` run, not just the far end.** `open_read_only` ->
+/// `open_read_only_with_config` appends `_with_config`, and the appended text starts *at* the
+/// underscore. Offering only the byte after it leaves the nearest boundary four words back, which
+/// widens the highlight to `only_with_config` and reports an edit larger than the one that
+/// happened.
+pub(crate) fn identifier_word_starts(text: &str) -> Vec<usize> {
+    let characters: Vec<(usize, char)> = text.char_indices().collect();
+    let mut starts = vec![0usize];
+    for (index, &(offset, character)) in characters.iter().enumerate() {
+        if index == 0 {
+            continue;
+        }
+        let previous = characters[index - 1].1;
+        let next = characters.get(index + 1).map(|&(_, character)| character);
+        let underscore_edge = (character == '_') != (previous == '_');
+        let starts_a_word = character.is_uppercase()
+            && (!previous.is_uppercase() || next.is_some_and(char::is_lowercase));
+        if underscore_edge || starts_a_word {
+            starts.push(offset);
+        }
+    }
+    starts.push(text.len());
+    starts.dedup();
+    starts
+}
+
+/// The part of `text` that differs from `other`, widened outward to whole identifier words.
+///
+/// The raw common prefix/suffix is not the answer on its own, and the corpus already recorded why:
+/// scoring a rename by bare common suffix makes `calculateArea` and `area` share `rea`, `Box` and
+/// `Box<T>` share `Box`, `calculatePerimeter` and `perimeter` share `erimeter` - 15 of 16 false
+/// positives in the 2026-08-26 line-tail measurement came from a shared run falling *inside* a
+/// word (see `research/data/quality/text_painting_findings.md`, rule 3). Splitting a highlight
+/// there is not something a reader would ever do by hand. Widening each end to the nearest word
+/// boundary is what makes the narrow reading legible: `EVENT_NEW_FRAME` -> `SC_EVENT_NEW_FRAME`
+/// comes out as exactly `SC_`, and `calculateArea` -> `area` widens to the whole of both, which is
+/// the honest answer for a rename that shares nothing but three letters in the middle of a word.
+///
+/// An empty span (`start == end`) means this side has nothing to paint: every byte of it survives
+/// into the other, as the before side of a pure insertion does.
+pub(crate) fn differing_affix(text: &str, other: &str) -> (usize, usize) {
+    let (prefix, end) = raw_affix(text, other);
+    let starts = identifier_word_starts(text);
+    let start = starts
+        .iter()
+        .rev()
+        .find(|&&start| start <= prefix)
+        .copied()
+        .unwrap_or(0);
+    let end = starts
+        .iter()
+        .find(|&&start| start >= end)
+        .copied()
+        .unwrap_or(text.len());
+    (start, end.max(start))
+}
+
+/// The bare common-prefix/common-suffix span, before any widening.
+fn raw_affix(text: &str, other: &str) -> (usize, usize) {
+    let prefix = text
+        .char_indices()
+        .zip(other.char_indices())
+        .take_while(|((_, ours), (_, theirs))| ours == theirs)
+        .last()
+        .map_or(0, |((offset, ours), _)| offset + ours.len_utf8());
+    let suffix = text[prefix..]
+        .char_indices()
+        .rev()
+        .zip(other[prefix..].char_indices().rev())
+        .take_while(|((_, ours), (_, theirs))| ours == theirs)
+        .count();
+    let end = text[prefix..]
+        .char_indices()
+        .rev()
+        .nth(suffix.saturating_sub(1))
+        .map_or(text.len(), |(offset, _)| prefix + offset);
+    (prefix, if suffix == 0 { text.len() } else { end })
+}
+
+/// Every span a `Minimal` painting may legitimately mark on this side of a rename.
+///
+/// One candidate when the identifier has a word boundary inside it: the widened span, because
+/// that is what the boundary is *for* - `getDeclaredConstructor` -> `getDeclaredConstructors` is
+/// read as the word `Constructors` changing, not as an `s` appearing.
+///
+/// **Two candidates when it has none.** `align` -> `halign` and `v` -> `value` are single words
+/// with nothing to orient on, and there the bare affix is as defensible as the whole token: a
+/// painter marking just the added `h` is saying something true, and so is one marking `halign`
+/// entire. Widening is a rule about where a highlight may be *cut*, and an identifier with no
+/// internal boundary offers no cut to prefer - so both readings pass rather than the corpus being
+/// told to pick one.
+fn minimal_affix_candidates(text: &str, other: &str) -> Vec<(usize, usize)> {
+    let widened = differing_affix(text, other);
+    if identifier_word_starts(text).len() > 2 {
+        return vec![widened];
+    }
+    let (start, end) = raw_affix(text, other);
+    let mut candidates = vec![widened];
+    if (start, end) != widened {
+        candidates.push((start, end.max(start)));
+    }
+    candidates
+}
+
+/// A leaf that is an identifier: a named leaf whose text reads as one, and which is not a keyword.
+///
+/// Deliberately not a list of node kinds. Grammars spell them `identifier`, `type_identifier`,
+/// `field_identifier`, `property_identifier`, `variable_name`, `word`, ... and a kind list would
+/// be a per-language table to keep in step with every grammar upgrade. The text shape plus
+/// [`is_named_leaf`] (whose doc comment explains why a leaf whose text *is* its own kind name -
+/// `true`, `if`, `}` - is excluded) answers the same question without one.
+fn is_identifier_leaf(leaf: Node, contents: &str) -> bool {
+    if leaf.child_count() != 0 || !is_named_leaf(leaf, contents) {
+        return false;
+    }
+    let Some(text) = contents.get(leaf.byte_range()) else {
+        return false;
+    };
+    let mut characters = text.chars();
+    characters
+        .next()
+        .is_some_and(|first| first.is_alphabetic() || first == '_' || first == '$')
+        && characters
+            .all(|character| character.is_alphanumeric() || character == '_' || character == '$')
+}
+
+/// **Invariant 16.** When the tree mapping pairs two identifiers that differ, `Minimal` paints
+/// only the differing words and `Full` paints the whole identifier on both sides.
+///
+/// The two presets are not degrees of care, they are two conventions (see
+/// `text_painting_findings.md`, rule 1), and this is the one edit where they are *obliged* to
+/// differ: `MINIMAL` marks the bytes that carry the change and `FULL` accounts for every byte
+/// whose role changed, and a renamed identifier has both readings at once. Today's renderer
+/// narrows before either preset is consulted, so `FULL` asks for more paint and gets *less* -
+/// the 2026-09-05 census's family D, and 225 runs over 54 fixtures in the 2026-09-15 one.
+///
+/// **Only paintings named for a preset are checked**, and a fixture painted once is skipped
+/// entirely. A single painting is held to *both* presets by `paintings_for_mode`, and the two
+/// halves of this rule contradict each other by construction - demanding both of one painting
+/// would condemn every single-painting fixture that renames anything, which is not a finding
+/// about the data.
+///
+/// The word-boundary widening is what keeps the `Minimal` half from asking for a highlight no
+/// human would draw - see [`differing_affix`].
+fn identifier_updates_are_painted_by_preset(
+    painting: &str,
+    painted: &PaintedLabels,
+    context: &TreeContext,
+    before: &Code,
+    after: &Code,
+) -> Vec<GroundTruthViolation> {
+    let minimal = super::designates_preset(painting, "Minimal");
+    let full = super::designates_preset(painting, "Full");
+    if !minimal && !full {
+        return Vec::new();
+    }
+    let mut violations = Vec::new();
+    for leaf in &context.leaves[0] {
+        let LeafStatus::Paired(partner) = context.status(*leaf, 0) else {
+            continue;
+        };
+        if !is_identifier_leaf(*leaf, &before.contents)
+            || !is_identifier_leaf(partner, &after.contents)
+        {
+            continue;
+        }
+        let (Some(ours), Some(theirs)) = (
+            before.contents.get(leaf.byte_range()),
+            after.contents.get(partner.byte_range()),
+        ) else {
+            continue;
+        };
+        if ours == theirs {
+            continue;
+        }
+        for (side, node, text, other) in [
+            (0usize, *leaf, ours, theirs),
+            (1usize, partner, theirs, ours),
+        ] {
+            let contents = if side == 0 {
+                &before.contents
+            } else {
+                &after.contents
+            };
+            let labels = &painted[side];
+            if full {
+                if whole_leaf_label(labels, node).is_some_and(|label| label.is_some()) {
+                    continue;
+                }
+                violations.push(GroundTruthViolation::new(
+                    16,
+                    Some(painting),
+                    format!(
+                        "painting {painting:?} {} row {} does not paint the whole of {text:?}, \
+                         which the mapping pairs with {other:?} - a Full painting marks a renamed \
+                         identifier entire on both sides",
+                        side_name(side),
+                        row_of(contents, node.start_byte()),
+                    ),
+                    vec![ViolationSite {
+                        side,
+                        span: span_of_node(node),
+                    }],
+                ));
+                continue;
+            }
+            let candidates = minimal_affix_candidates(text, other);
+            let mut nearest: Option<(usize, usize, Vec<usize>, Vec<usize>)> = None;
+            for (start, end) in candidates.iter().copied() {
+                let painted_outside: Vec<usize> = (0..text.len())
+                    .filter(|offset| !(start..end).contains(offset))
+                    .filter(|offset| labels[node.start_byte() + offset].is_some())
+                    .map(|offset| node.start_byte() + offset)
+                    .collect();
+                let unpainted_inside: Vec<usize> = (start..end)
+                    .filter(|offset| labels[node.start_byte() + offset].is_none())
+                    .map(|offset| node.start_byte() + offset)
+                    .collect();
+                if painted_outside.is_empty() && unpainted_inside.is_empty() {
+                    nearest = None;
+                    break;
+                }
+                let wrong = painted_outside.len() + unpainted_inside.len();
+                if nearest
+                    .as_ref()
+                    .is_none_or(|(_, _, outside, inside)| wrong < outside.len() + inside.len())
+                {
+                    nearest = Some((start, end, painted_outside, unpainted_inside));
+                }
+            }
+            // Any candidate matching exactly is agreement; the message names the closest one.
+            let Some((start, end, painted_outside, unpainted_inside)) = nearest else {
+                continue;
+            };
+            let wanted = if start == end {
+                "nothing".to_string()
+            } else {
+                format!("{:?}", &text[start..end])
+            };
+            violations.push(GroundTruthViolation::new(
+                16,
+                Some(painting),
+                format!(
+                    "painting {painting:?} {} row {} paints {text:?} against {other:?} wrongly for \
+                     a Minimal reading - the differing words are {wanted}, and everything else in \
+                     the identifier should be left alone",
+                    side_name(side),
+                    row_of(contents, node.start_byte()),
+                ),
+                sites_from_offsets(
+                    side,
+                    contents,
+                    &painted_outside
+                        .into_iter()
+                        .chain(unpainted_inside)
+                        .collect::<Vec<usize>>(),
+                ),
+            ));
+        }
+    }
+    violations
+}
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+// Invariant 17: a boolean that flipped is an edit to one token, not a deletion and an insertion
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+
+/// `true` against `false`, either way round.
+fn opposite_boolean(text: &str) -> Option<&'static str> {
+    match text {
+        "true" => Some("false"),
+        "false" => Some("true"),
+        _ => None,
+    }
+}
+
+/// **Invariant 17.** A `true` that became a `false` in the same place is one token edited, not a
+/// token deleted and another inserted - in the tree mapping and in every painting.
+///
+/// Flipping a default, a flag or a guard is one of the commonest one-token commits there is, and
+/// both ground truths have a spelling that says so: an `Update` entry on the two literals, and a
+/// painted `Match` whose two sides differ. Recording it as a removal plus an arrival instead says
+/// the old value went somewhere and the new one came from somewhere, which is a different claim
+/// about the same edit and the one a reader is least able to check.
+///
+/// Two halves, reported under one number because they are one rule:
+///
+/// * **mapping** - a `true`/`false` leaf the mapping removes, whose partner subtree contains the
+///   opposite literal also removed. Correspondence is required, not just co-occurrence: the two
+///   leaves must sit under ancestors the mapping pairs with each other, so a `true` deleted in one
+///   method and a `false` added in another is left alone.
+/// * **painting** - a boolean pair the mapping *does* pair, painted `Delete` on one side and
+///   `Insert` on the other. Invariant 10 asks this of byte-identical pairs and so cannot reach
+///   these: `true` and `false` are exactly the pair whose two sides differ.
+fn boolean_flips_are_one_edit(
+    paintings: &[(&str, PaintedLabels)],
+    context: &TreeContext,
+    before: &Code,
+    after: &Code,
+) -> Vec<GroundTruthViolation> {
+    let mut violations = Vec::new();
+    for leaf in &context.leaves[0] {
+        let Some(text) = before.contents.get(leaf.byte_range()) else {
+            continue;
+        };
+        let Some(opposite) = opposite_boolean(text) else {
+            continue;
+        };
+
+        if let LeafStatus::Paired(partner) = context.status(*leaf, 0)
+            && after.contents.get(partner.byte_range()) == Some(opposite)
+        {
+            for (name, painted) in paintings {
+                let ours = whole_leaf_label(&painted[0], *leaf);
+                let theirs = whole_leaf_label(&painted[1], partner);
+                if ours == Some(Some(TextLabel::Delete)) && theirs == Some(Some(TextLabel::Insert))
+                {
+                    violations.push(GroundTruthViolation::new(
+                        17,
+                        Some(name),
+                        format!(
+                            "painting {name:?} deletes {text:?} on before row {} and inserts \
+                             {opposite:?} on after row {}, which the mapping pairs as one edited \
+                             token",
+                            row_of(&before.contents, leaf.start_byte()),
+                            row_of(&after.contents, partner.start_byte()),
+                        ),
+                        vec![
+                            ViolationSite {
+                                side: 0,
+                                span: span_of_node(*leaf),
+                            },
+                            ViolationSite {
+                                side: 1,
+                                span: span_of_node(partner),
+                            },
+                        ],
+                    ));
+                }
+            }
+            continue;
+        }
+
+        if !matches!(context.status(*leaf, 0), LeafStatus::Removed) {
+            continue;
+        }
+        // The nearest ancestor the mapping pairs, and the subtree it pairs with: the flip has to
+        // have happened *here*, not anywhere in the file.
+        let mut ancestor = Some(*leaf);
+        let partner_subtree = loop {
+            let Some(node) = ancestor else { break None };
+            if let Some(partner) = context
+                .caches
+                .before_match
+                .get(&node.id())
+                .and_then(|id| context.ids[1].get(id))
+            {
+                break Some(*partner);
+            }
+            ancestor = node.parent();
+        };
+        let Some(partner_subtree) = partner_subtree else {
+            continue;
+        };
+        let Some(twin) = context.leaves[1]
+            .iter()
+            .filter(|candidate| {
+                partner_subtree.start_byte() <= candidate.start_byte()
+                    && candidate.end_byte() <= partner_subtree.end_byte()
+            })
+            .find(|candidate| {
+                after.contents.get(candidate.byte_range()) == Some(opposite)
+                    && matches!(context.status(**candidate, 1), LeafStatus::Removed)
+            })
+        else {
+            continue;
+        };
+        violations.push(GroundTruthViolation::new(
+            17,
+            None,
+            format!(
+                "mapping removes {text:?} on before row {} and adds {opposite:?} on after row {} \
+                 inside the subtree it pairs with - one flipped literal, which an Update entry on \
+                 the two says and a delete plus an insert does not",
+                row_of(&before.contents, leaf.start_byte()),
+                row_of(&after.contents, twin.start_byte()),
+            ),
+            vec![
+                ViolationSite {
+                    side: 0,
+                    span: span_of_node(*leaf),
+                },
+                ViolationSite {
+                    side: 1,
+                    span: span_of_node(*twin),
+                },
+            ],
+        ));
+    }
+    violations
+}
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────
 // The assertions the per-fixture tests call
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 
@@ -2210,6 +2633,64 @@ mod tests {
         HumanTextOperation,
     };
     use crate::test::helper::path_for_node;
+
+    #[test]
+    fn identifier_words_split_on_case_and_underscores() {
+        assert_eq!(identifier_word_starts("fooBar"), vec![0, 3, 6]);
+        assert_eq!(
+            identifier_word_starts("SC_EVENT_NEW_FRAME"),
+            vec![0, 2, 3, 8, 9, 12, 13, 18]
+        );
+        // An acronym is one word, and hands off to the next at the capital before a lowercase.
+        assert_eq!(identifier_word_starts("XMLHttpRequest"), vec![0, 3, 7, 14]);
+        assert_eq!(identifier_word_starts("lowercase"), vec![0, 9]);
+        assert_eq!(identifier_word_starts(""), vec![0]);
+    }
+
+    #[test]
+    fn a_pure_prefix_insertion_paints_only_the_new_words() {
+        // The shape `c-genymobile-scrcpy-rename-defines` renames five times over.
+        assert_eq!(
+            differing_affix("SC_EVENT_NEW_FRAME", "EVENT_NEW_FRAME"),
+            (0, 3)
+        );
+        // The appended text starts *at* the underscore, and the highlight stays that tight
+        // rather than widening back to the previous word.
+        assert_eq!(
+            differing_affix("open_read_only_with_config", "open_read_only"),
+            (14, 26)
+        );
+        // ... and nothing at all on the side that only lost it.
+        let (start, end) = differing_affix("EVENT_NEW_FRAME", "SC_EVENT_NEW_FRAME");
+        assert_eq!(start, end, "the unchanged side has no differing words");
+    }
+
+    #[test]
+    fn a_single_word_identifier_accepts_the_bare_affix_or_the_whole_token() {
+        // `align` -> `halign` and `v` -> `value` have nothing to orient on, so both readings pass.
+        let candidates = minimal_affix_candidates("halign", "align");
+        assert!(candidates.contains(&(0, 1)), "the added `h` alone");
+        assert!(candidates.contains(&(0, 6)), "or the whole token");
+        let candidates = minimal_affix_candidates("value", "v");
+        assert!(candidates.contains(&(1, 5)));
+        assert!(candidates.contains(&(0, 5)));
+        // With a boundary to orient on there is one reading, and it is the widened one.
+        assert_eq!(
+            minimal_affix_candidates("getDeclaredConstructors", "getDeclaredConstructor"),
+            vec![(11, 23)]
+        );
+    }
+
+    #[test]
+    fn a_shared_run_inside_a_word_does_not_split_it() {
+        // `calculateArea` and `area` share the bare suffix "rea", which is the trap
+        // `text_painting_findings.md` rule 3 records: widening to word boundaries takes the whole
+        // of both rather than highlighting `calculateA` against `a`.
+        assert_eq!(differing_affix("calculateArea", "area"), (0, 13));
+        assert_eq!(differing_affix("area", "calculateArea"), (0, 4));
+        // A suffix added at a word boundary stays narrow.
+        assert_eq!(differing_affix("ReplaceAll", "Replace"), (7, 10));
+    }
 
     fn rust(source: &str) -> Code {
         Code::from_string(source, &Language::Rust)
