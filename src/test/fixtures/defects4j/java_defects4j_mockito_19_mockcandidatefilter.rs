@@ -19,7 +19,7 @@ use anyhow::Result;
 
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants_with_known_violations;
 
 #[test]
 fn mapping() -> Result<()> {
@@ -39,5 +39,11 @@ fn painting() -> Result<()> {
 
 #[test]
 fn invariants() -> Result<()> {
-    assert_ground_truth_invariants("java-defects4j-mockito-19-mockcandidatefilter")
+    // Invariant 16, first measured 2026-09-15 when the rule was added, 2 -> 1 once single-word
+    // identifiers were allowed their bare affix: `fieldInstance` against `instance` is the one
+    // left, where the shared run falls inside a word.
+    assert_ground_truth_invariants_with_known_violations(
+        "java-defects4j-mockito-19-mockcandidatefilter",
+        1,
+    )
 }

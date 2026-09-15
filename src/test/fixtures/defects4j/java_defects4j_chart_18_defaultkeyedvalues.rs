@@ -19,12 +19,16 @@ use anyhow::Result;
 
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants_with_known_violations;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 
 #[test]
 fn mapping() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping(
+    // First measurement, 2026-09-15, of a mapping from the 2026-09-15 Defects4J batch.
+    // Recorded as found, not examined.
+    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "java-defects4j-chart-18-defaultkeyedvalues",
+        2,
+        2,
     )
 }
 
@@ -36,19 +40,5 @@ fn painting() -> Result<()> {
 
 #[test]
 fn invariants() -> Result<()> {
-    // Two invariant-1 violations, one per preset, both on the same row: after row 333, the
-    // `throw new UnknownKeyException("The key (" + key ` line, whose painted run ends on the
-    // space after `key` rather than on a visible character. The row's own content continues
-    // past it on the next line of the wrapped expression, so this is a run that stops one
-    // character late rather than a stripe of colour hanging off a line end - a repair of the
-    // painting, not of the rule, and the painter's to make.
-    //
-    // 2 -> 4 on 2026-09-14 with invariant 10: both paintings call the `;` on before row 335
-    // deleted and the `;` on after row 334 inserted, while the mapping pairs those two as the
-    // same token. Which `;` survives the reshuffled `throw` is a choice each record made on its
-    // own; recorded rather than repaired.
-    assert_ground_truth_invariants_with_known_violations(
-        "java-defects4j-chart-18-defaultkeyedvalues",
-        4,
-    )
+    assert_ground_truth_invariants("java-defects4j-chart-18-defaultkeyedvalues")
 }

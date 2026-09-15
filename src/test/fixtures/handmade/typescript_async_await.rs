@@ -17,7 +17,7 @@
  */
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants_with_known_violations;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 use anyhow::Result;
 
 #[test]
@@ -29,10 +29,12 @@ fn mapping() -> Result<()> {
     // (`TRIVIAL_ENTRY_MAX_SIZE` wrap/reparent fix, 2026-08-17) - some of this gap turned out to be
     // the same trivial-leaf-alongside-a-real-wrap shape as `cpp-add-templates`, not solely the
     // bridge-across-nesting gap described above.
+    // Tightened 2026-09-15 after the ground truth was revised; the baseline measures fewer
+    // mismatches than the old clamp allowed.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "typescript-async-await",
-        3,
-        1,
+        2,
+        0,
     )
 }
 
@@ -56,10 +58,5 @@ fn painting() -> Result<()> {
 
 #[test]
 fn invariants() -> Result<()> {
-    // Invariant 10, found when it was added on 2026-09-14: both paintings call the `fetchData`
-    // on before row 7 deleted and the one on after row 10 inserted, while the mapping pairs the
-    // two as the same identifier - the rewrite of the function around it read as a replacement
-    // by the painter and as a survival by the mapper. Recorded rather than repaired, as with
-    // invariant 9. Counted once per painting.
-    assert_ground_truth_invariants_with_known_violations("typescript-async-await", 2)
+    assert_ground_truth_invariants("typescript-async-await")
 }

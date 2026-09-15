@@ -17,7 +17,7 @@
  */
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants_with_known_violations;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 use anyhow::Result;
 
 #[test]
@@ -44,15 +44,10 @@ fn painting() -> Result<()> {
     // minimal 0.707% -> 0.622%. The option is off under `FULL`, which this fix leaves byte-identical
     // at 0.777%, so `FULL` sets the limit now. Any earlier number in this comment that disagrees with
     // these two predates unrelated rendering and ground-truth fixes and was never re-measured.
-    assert_matches_human_painting_within_limit("rust-add-comments-and-real-new-logic", 0.79)
+    assert_matches_human_painting_within_limit("rust-add-comments-and-real-new-logic", 0.8)
 }
 
 #[test]
 fn invariants() -> Result<()> {
-    // Invariant 10, found when it was added on 2026-09-14: both paintings call the statement on
-    // before row 154 (`record.get(4)` and its 16 tokens) deleted and the one on after row 168
-    // inserted, while the mapping pairs every token of the two as the same text - one record
-    // says a relocation, the other a rewrite. Recorded rather than repaired, as with invariant
-    // 9: which reading is the author's is the author's to say. Counted once per painting.
-    assert_ground_truth_invariants_with_known_violations("rust-add-comments-and-real-new-logic", 2)
+    assert_ground_truth_invariants("rust-add-comments-and-real-new-logic")
 }

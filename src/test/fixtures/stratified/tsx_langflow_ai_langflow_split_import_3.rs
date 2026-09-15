@@ -19,7 +19,7 @@ use anyhow::Result;
 
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants_with_known_violations;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 
 #[test]
 fn mapping() -> Result<()> {
@@ -37,12 +37,5 @@ fn painting() -> Result<()> {
 
 #[test]
 fn invariants() -> Result<()> {
-    // Invariant 13, found when it was added on 2026-09-14: both paintings record the split of
-    // `import React, { forwardRef } from "react"` into two imports, and every one of the
-    // mapping's 73 entries is `Identical` - the mapping was never finished, and has been grading
-    // codediff against nothing. Counted once per painting; the repair is to solve the mapping.
-    assert_ground_truth_invariants_with_known_violations(
-        "tsx-langflow-ai-langflow-split-import-3",
-        2,
-    )
+    assert_ground_truth_invariants("tsx-langflow-ai-langflow-split-import-3")
 }

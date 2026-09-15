@@ -31,10 +31,10 @@ fn mapping() -> Result<()> {
     // copy (`IdenticalHashOfAncestor`, and `WrapGrowth` for the two parents), which leaves the
     // outer include as an insert. Same identical-copy-wins shape as the wrap/reparent cost ties
     // already tracked in TODO.md, not a new defect. Lower once a fix lands.
-    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
+    // Tightened again 2026-09-15 after the ground truth was revised: codediff now matches it
+    // exactly, so the clamp is gone.
+    test::helper::human_mapping::assert_matches_human_mapping(
         "cpp-protocolbuffers-protobuf-add-preprocessor-commands",
-        12,
-        8,
     )
 }
 

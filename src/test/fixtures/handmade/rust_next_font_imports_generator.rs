@@ -35,11 +35,7 @@ fn mapping() -> Result<()> {
     // of them. A limit above the measured number is a test that cannot fail, which is what
     // `the_quality_baseline_accuracy_columns_are_a_projection_of_the_stub_limits` exists to catch
     // - the baseline records the measurement, so the stub has to record it too.
-    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
-        "rust-next-font-imports-generator",
-        2,
-        2,
-    )
+    test::helper::human_mapping::assert_matches_human_mapping("rust-next-font-imports-generator")
 }
 
 #[test]
@@ -56,20 +52,8 @@ fn painting() -> Result<()> {
 
 #[test]
 fn invariants() -> Result<()> {
-    // measured 2026-09-07, down from 4 on 2026-09-06: 2 mapped brace pairs still disagree, on
-    // rows 92/144 and 97/143 - the `if let Some(decl)` / `if let Some(expr)` nesting, with the
-    // human's pairing crossed between them. The 22/86 and 24/84 pair was re-paired by hand on
-    // 2026-09-06. Part of the same unreviewed region as this fixture's painting residual.
-    //
-    // 2 -> 5 on 2026-09-13 with invariant 7: three ranges of the `Full` painting land on ground
-    // an earlier range already claimed, all the same shape - a multi-row range ending on a row
-    // that a single-row range also covers from column 0 (rows 178 and 179 on the before side,
-    // row 179 on the after side, plus the `}` of row 181 inside the whole-line range over it).
-    // Recorded rather than repaired, as above.
-    //
-    // 5 -> 6 on 2026-09-13 with invariant 9: the `Full` painting pairs the 60 bytes of
-    // `if let Expr::Ident(ident) = &**callee_expr {` on before row 23 with text elsewhere,
-    // while the mapping leaves that condition unmatched - the same `if let` region this
-    // fixture's other residuals sit in.
-    assert_ground_truth_invariants_with_known_violations("rust-next-font-imports-generator", 6)
+    // Repaired 2026-09-15 (6 -> 1). What is left is invariant 9: the `Full` painting calls 60 bytes
+    // on before rows 23, 24, 98 and 161 a `Move` while the tree mapping reads them as `Delete`.
+    // The two ground truths still disagree about whether that code survives.
+    assert_ground_truth_invariants_with_known_violations("rust-next-font-imports-generator", 1)
 }

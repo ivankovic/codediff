@@ -19,12 +19,16 @@ use anyhow::Result;
 
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants_with_known_violations;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 
 #[test]
 fn mapping() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping(
+    // Re-measured 2026-09-15 after the mapping was revised; see
+    // `ground-truth-moves-limits-move`.
+    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "php-wordpress-wordpress-not-sure-if-this-parses-correctly",
+        1,
+        1,
     )
 }
 
@@ -39,12 +43,5 @@ fn painting() -> Result<()> {
 
 #[test]
 fn invariants() -> Result<()> {
-    // Invariant 11, found when it was added on 2026-09-14: the mapping inserts two `text` leaves
-    // at after row 7801 (`</script>` and the line break after it, in the region this fixture's
-    // name already doubts the parse of) and neither painting has a byte of them. Counted once
-    // per painting.
-    assert_ground_truth_invariants_with_known_violations(
-        "php-wordpress-wordpress-not-sure-if-this-parses-correctly",
-        2,
-    )
+    assert_ground_truth_invariants("php-wordpress-wordpress-not-sure-if-this-parses-correctly")
 }

@@ -30,11 +30,10 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test, read the rate it
-    // reports for both modes, and record that instead.
+    // measured 2026-09-15: minimal 2.681%, full 0.279% (measured, unexamined)
     assert_matches_human_painting_within_limit(
         "go-gin-gonic-gin-replace-replaced-with-replaceall",
-        100.0,
+        2.7,
     )
 }
 

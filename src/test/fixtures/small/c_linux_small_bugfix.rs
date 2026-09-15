@@ -17,7 +17,7 @@
  */
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants_with_known_violations;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 use anyhow::Result;
 
 #[test]
@@ -33,23 +33,12 @@ fn mapping() -> Result<()> {
     // had outlived the change that closed the gap, and `quality_baseline.csv` was the only thing
     // still holding this fixture to its real number. Any counts above describe the older, larger
     // residual.
-    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
-        "c-linux-small-bugfix",
-        4,
-        0,
-    )
+    test::helper::human_mapping::assert_matches_human_mapping("c-linux-small-bugfix")
 }
 
 #[test]
 fn invariants() -> Result<()> {
-    // Invariant 15, found when it was added on 2026-09-14: four `MatchButNotIdentical` entries
-    // whose two subtrees read byte-identically, with every descendant paired inside - the
-    // `val |= omr.omr_hitm ? P(SNOOP, HITM) : P(SNOOP, HIT);` chain (assignment, conditional,
-    // both calls) that moves from before row 348 into the new `if` on after row 362. The grader
-    // is strict about the operation, so each is a claim codediff can only meet by calling an
-    // identical subtree not identical; the repair is to relabel them `Identical`, which is the
-    // mapping author's to make.
-    assert_ground_truth_invariants_with_known_violations("c-linux-small-bugfix", 4)
+    assert_ground_truth_invariants("c-linux-small-bugfix")
 }
 
 #[test]

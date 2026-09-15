@@ -16,7 +16,7 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 use crate::test;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants_with_known_violations;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 use anyhow::Result;
 
 #[test]
@@ -28,21 +28,16 @@ fn mapping() -> Result<()> {
     // 2026-09-02: 36/19 -> 37/20 when this fixture's human mapping was re-verified by hand. Not
     // an algorithm regression - nothing under `src/diff/` changed, only the ground truth being
     // scored against. One extra node, in the same already-documented cross-boundary move.
+    // Tightened 2026-09-15 after the ground truth was revised; the baseline measures fewer
+    // mismatches than the old clamp allowed.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "swift-swiftlang-swift-actual-logic-change",
-        37,
-        20,
+        36,
+        19,
     )
 }
 
 #[test]
 fn invariants() -> Result<()> {
-    // measured 2026-09-06: 2 mapped brace pairs disagree, one per side: a `{` marked deleted
-    // (before, row 126) or inserted (after, row 144) whose closing brace is matched. Unlike the
-    // other fixtures clamped here these two are not a crossed pairing - each is a single pair
-    // whose halves were marked differently.
-    assert_ground_truth_invariants_with_known_violations(
-        "swift-swiftlang-swift-actual-logic-change",
-        2,
-    )
+    assert_ground_truth_invariants("swift-swiftlang-swift-actual-logic-change")
 }

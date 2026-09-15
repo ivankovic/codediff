@@ -19,7 +19,7 @@ use anyhow::Result;
 
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants_with_known_violations;
 
 #[test]
 fn mapping() -> Result<()> {
@@ -34,5 +34,9 @@ fn painting() -> Result<()> {
 
 #[test]
 fn invariants() -> Result<()> {
-    assert_ground_truth_invariants("java-defects4j-chart-20-valuemarker")
+    // Invariant 16, first measured 2026-09-15 when the rule was added, 4 -> 2 once single-word
+    // identifiers were allowed their bare affix: `paint` -> `outlinePaint` and `stroke` ->
+    // `outlineStroke` share a run inside a word, so the rule wants the whole new identifier
+    // painted and the painting marks less.
+    assert_ground_truth_invariants_with_known_violations("java-defects4j-chart-20-valuemarker", 2)
 }

@@ -17,7 +17,7 @@
  */
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants_with_known_violations;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 use anyhow::Result;
 
 #[test]
@@ -62,8 +62,5 @@ fn painting() -> Result<()> {
 
 #[test]
 fn invariants() -> Result<()> {
-    // Invariant 11, found when it was added on 2026-09-14: the mapping inserts the identifier
-    // `Rectangle` on after row 1 and neither painting has a byte of it. A painting omission or
-    // a mapping that should have paired it, counted once per painting.
-    assert_ground_truth_invariants_with_known_violations("kotlin-refactor-function", 2)
+    assert_ground_truth_invariants("kotlin-refactor-function")
 }

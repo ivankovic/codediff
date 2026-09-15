@@ -19,26 +19,35 @@ use anyhow::Result;
 
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants_with_known_violations;
 
 #[test]
 fn mapping() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping(
+    // First measurement, 2026-09-15, of a mapping from the 2026-09-15 Defects4J batch.
+    // Recorded as found, not examined.
+    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "java-defects4j-lang-17-charsequencetranslator",
+        5,
+        2,
     )
 }
 
 #[test]
 fn painting() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test, read the rate it
-    // reports for both modes, and record that instead.
+    // measured 2026-09-15: minimal 0.298%, full 0.318% (measured, unexamined)
     assert_matches_human_painting_within_limit(
         "java-defects4j-lang-17-charsequencetranslator",
-        100.0,
+        0.33,
     )
 }
 
 #[test]
 fn invariants() -> Result<()> {
-    assert_ground_truth_invariants("java-defects4j-lang-17-charsequencetranslator")
+    // Invariant 3, first measured 2026-09-15: the tree mapping splits two brace pairs - before row
+    // 90's `{` is deleted while its `}` on row 101 is matched, and row 93's `{` is matched while
+    // its `}` on row 99 is deleted. A mapping repair, not a painting one.
+    assert_ground_truth_invariants_with_known_violations(
+        "java-defects4j-lang-17-charsequencetranslator",
+        2,
+    )
 }

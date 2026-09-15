@@ -24,13 +24,15 @@ use anyhow::{Ok, Result};
 
 #[test]
 fn mapping() -> Result<()> {
-    // Lowered from 175 to 52: the 2026-07-15 default-heuristic change (see TODO.md) disabled
+    // 175 -> 52 by the 2026-07-15 default-heuristic change (see TODO.md), which disabled
     // solver_import_nodes/solver_bottom_up_expansion by default (plus solver_similar_flow_control,
-    // deleted outright 2026-08-14), which measurably improved this fixture's match quality.
+    // deleted outright 2026-08-14). Raised to 62/43 on 2026-09-15: the human mapping itself was
+    // revised that day, so this is the ground truth moving, not the algorithm regressing - see
+    // `ground-truth-moves-limits-move`.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "rust-turbopack-module-rule",
-        49,
-        21,
+        62,
+        43,
     )
 }
 
@@ -441,20 +443,16 @@ fn mapping_details() -> Result<()> {
 
 #[test]
 fn invariants() -> Result<()> {
-    // Invariants 14 and 15, found when they were added on 2026-09-14, both in the mapping alone.
-    // Invariant 14, once: the `match_arm` on before row 218 is recorded `Identical` to the one on
-    // after row 215, but the after arm's comment lists `json` among the module types and the
-    // before arm's does not - the comment changed and the entry says nothing did. Invariant 15,
-    // nine times: the `match_pattern`s on before rows 192-217 are recorded `MatchButNotIdentical`
-    // to their byte-identical counterparts on after rows 205-214, which the grader can only
-    // satisfy by calling an identical pattern not identical. Both are the mapping author's to
-    // relabel.
-    assert_ground_truth_invariants_with_known_violations("rust-turbopack-module-rule", 10)
+    // Repaired 2026-09-15 (10 -> 6). What is left: invariant 3 on three delimiter pairs the mapping
+    // splits (after rows 201, 203 and 204 open inserted while their closers are matched),
+    // invariant 11 on removed leaves the `Minimal` painting leaves unpainted (2 on before row
+    // 217, 81 across after rows 202 onward), and invariant 12 on one edited leaf neither side
+    // paints.
+    assert_ground_truth_invariants_with_known_violations("rust-turbopack-module-rule", 6)
 }
 
 #[test]
 fn painting() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test, read the rate it
-    // reports for both modes, and record that instead.
-    assert_matches_human_painting_within_limit("rust-turbopack-module-rule", 100.0)
+    // measured 2026-09-15: minimal 15.927%, full 21.350% (measured, unexamined)
+    assert_matches_human_painting_within_limit("rust-turbopack-module-rule", 21.36)
 }
