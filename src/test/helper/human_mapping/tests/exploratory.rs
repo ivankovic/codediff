@@ -1832,3 +1832,1192 @@ fn invariant_nine_provenance() -> Result<()> {
     }
     Ok(())
 }
+
+/// EXPLORATORY: the painting round's worklist - every run of bytes where codediff's rendering
+/// disagrees with the hand-painted ground truth, classified by what it is, and **attributed** to
+/// the node matcher or to the renderer.
+///
+/// Three label vectors per side per preset:
+///
+/// * `real` - `diff_code`'s own mapping, rendered. What a reader actually sees.
+/// * `ideal` - the fixture's *human tree mapping* pushed through the same `TextDiff` (via
+///   [`as_ast_diff_for_mapping`]). What the renderer would paint if node matching were perfect.
+/// * `painted` - the human painting the preset is answerable to.
+///
+/// `ideal` vs `painted` is the residue **no matcher improvement can remove**: a rendering rule
+/// disagreeing with a human about a mapping the two agree on. That is what a painting-only round
+/// can fix. `real` vs `ideal` is matcher-attributable, and `real` vs `painted` is the number
+/// `painting_disagreement_report` prints.
+///
+/// One caveat on the `ideal` column: `as_ast_diff_for_mapping` leaves `ASTMappingReason::default()`
+/// on every entry, so the two reason-tagged escapes from `Move` (`known_pure_reindent` via
+/// `NestedConditionCollapse`/`WrapGrowth`, `known_pure_relocation` via `HeritageClauseGrowth`)
+/// cannot fire there. It over-attributes `Move` to the renderer, never under-attributes.
+///
+/// Counted by **runs and fixtures first, bytes last**: a stray `}` is one byte and the corpus's
+/// largest fixture is twelve thousand, so the byte-weighted ranking
+/// `painting_disagreement_report` sorts by hides exactly the small repeated mistake this round is
+/// about.
+///
+/// `cargo test --release --lib --features test-fixtures painting_failure_census --
+/// --ignored --nocapture`
+#[test]
+#[ignore]
+fn painting_failure_census() -> Result<()> {
+    use crate::diff::text::{RangeMatch, RenderOptions};
+    use std::collections::{BTreeMap, HashSet};
+
+    /// One classified disagreement run.
+    struct Run {
+        fixture: String,
+        preset: &'static str,
+        ours: Option<TextLabel>,
+        theirs: Option<TextLabel>,
+        bytes: usize,
+        /// `whitespace` / `punctuation` / `code` - see `text_class`.
+        class: &'static str,
+        /// Kind of the smallest node containing the run.
+        kind: String,
+        /// Whether the run covers that node exactly, rather than part of it or a span crossing it.
+        exact: bool,
+        /// What the *human* tree mapping says about the nearest mapped ancestor of that node.
+        human_op: String,
+        /// What the mapping that produced `ours` says about it, and why.
+        ours_op: String,
+        ours_reason: String,
+        /// For a `Move` we painted: the geometry `identical_or_move` decided it on - whether the
+        /// span's start column and start row changed, whether it spans a row boundary, and
+        /// whether the two sides' text is byte-identical. Empty when the run is not a `Move` of
+        /// ours, or when no single range covers its first byte.
+        geometry: String,
+        sample: String,
+    }
+
+    fn label_name(label: Option<TextLabel>) -> &'static str {
+        match label {
+            None => "-",
+            Some(label) => label.name(),
+        }
+    }
+
+    /// `whitespace` when there is no visible character at all, `punctuation` when every visible
+    /// character is one [`crate::diff::text::is_structural_only`] would drop, `code` otherwise.
+    /// The split matters because the first two are what `MINIMAL`'s filters are *for*.
+    fn text_class(text: &str) -> &'static str {
+        if text.chars().all(char::is_whitespace) {
+            "whitespace"
+        } else if crate::diff::text::is_structural_only(text) {
+            "punctuation"
+        } else {
+            "code"
+        }
+    }
+
+    /// Byte offsets of a [`TextRange`] in the file it addresses, `None` for a position the file
+    /// does not have (a row past the end, a column inside a multi-byte character).
+    fn range_bytes(
+        contents: &str,
+        range: &crate::diff::text_range::TextRange,
+    ) -> Option<(usize, usize)> {
+        Some((
+            byte_offset(contents, range.start_row, range.start_column)?,
+            byte_offset(contents, range.end_row, range.end_column)?,
+        ))
+    }
+
+    /// The shape `identical_or_move` read to call the range covering `byte` a `Move`: did its
+    /// start column change (the `column_shift_is_meaningful` branch), did its start row, does it
+    /// span a row boundary (the precondition of both `crossed_backwards` and
+    /// `shifted_within_its_own_line`), and is the text on the two sides byte-identical.
+    ///
+    /// `col-same` with no row boundary cannot have come from a column shift at all, so a `Move`
+    /// there is `crossed_backwards`' doing - the two are the only ways out of `Identical` and
+    /// they need completely different fixes.
+    fn move_geometry(
+        ranges: &[RangeMatch],
+        contents: [&String; 2],
+        side: usize,
+        byte: usize,
+    ) -> String {
+        let covering = ranges.iter().find(|range| {
+            range.operation == crate::diff::text::TextOperation::Move
+                && range_bytes(contents[side], &range.source)
+                    .is_some_and(|(start, end)| start <= byte && byte < end)
+        });
+        let Some(range) = covering else {
+            return "no-single-range".to_string();
+        };
+        let (source, destination) = (&range.source, &range.destination);
+        // Three-valued on purpose. A range whose destination this function cannot address - a
+        // column inside a multi-byte character, a row past the end - is *unknown*, not different,
+        // and folding the two together would invent a family out of the UTF-8-heavy fixtures.
+        let same_text = match (
+            range_bytes(contents[side], source),
+            range_bytes(contents[1 - side], destination),
+        ) {
+            (Some((s, e)), Some((ds, de))) => {
+                match (contents[side].get(s..e), contents[1 - side].get(ds..de)) {
+                    (Some(ours), Some(theirs)) if ours == theirs => "same-text",
+                    (Some(_), Some(_)) => "text-differs",
+                    _ => "text-unknown",
+                }
+            }
+            _ => "text-unknown",
+        };
+        format!(
+            "{}/{}/{}/{}",
+            if source.start_column == destination.start_column {
+                "col-same"
+            } else {
+                "col-shift"
+            },
+            if source.start_row == destination.start_row {
+                "row-same"
+            } else {
+                "row-shift"
+            },
+            if source.end_row > source.start_row {
+                "multi-row"
+            } else {
+                "single-row"
+            },
+            same_text,
+        )
+    }
+
+    /// The nearest ancestor of `node` (itself included) that the mapping says anything about.
+    fn nearest_mapping<'tree>(
+        node: Node<'tree>,
+        diff: &ASTDiff,
+    ) -> Option<(Node<'tree>, crate::diff::ASTMapping)> {
+        let mut current = Some(node);
+        while let Some(node) = current {
+            if let Some((_, mapping)) = diff.mapping_for_node(&node.id()) {
+                return Some((node, mapping));
+            }
+            current = node.parent();
+        }
+        None
+    }
+
+    let diffs_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("src")
+        .join("test")
+        .join("data")
+        .join("diffs");
+    let mut names: Vec<String> = Vec::new();
+    for dataset in crate::test::helper::DIFF_DATASETS {
+        let dir = diffs_dir.join(dataset);
+        if !dir.is_dir() {
+            continue;
+        }
+        for entry in fs::read_dir(&dir)?.filter_map(|entry| entry.ok()) {
+            if entry.path().is_dir() {
+                names.push(entry.file_name().to_string_lossy().into_owned());
+            }
+        }
+    }
+    names.sort();
+
+    let mut runs: Vec<(&'static str, Run)> = Vec::new();
+    // preset -> (real, ideal, matcher) mismatched bytes, and the corpus size they are out of.
+    let mut totals: BTreeMap<&'static str, [usize; 4]> = BTreeMap::new();
+    let mut measured: HashSet<String> = HashSet::new();
+    let mut violating: HashSet<String> = HashSet::new();
+    let mut single_painting: HashSet<String> = HashSet::new();
+    let (mut unpainted, mut no_tree, mut errors) = (0usize, 0usize, Vec::new());
+
+    for name in &names {
+        let Ok(pair) = crate::test::helper::handmade_test_code_pair(name) else {
+            continue;
+        };
+        let (before, after) = &*pair;
+        let Ok(mapping) = load(name) else {
+            continue;
+        };
+        if mapping.text_mappings.is_empty() {
+            unpainted += 1;
+            continue;
+        }
+        if before.ast.is_none() || after.ast.is_none() {
+            // The plain-text fallback has no tree to classify a run against, and no human tree
+            // mapping to build an `ideal` column from. Counted, not measured.
+            no_tree += 1;
+            continue;
+        }
+        let real_diff = crate::diff::diff_code(before, after);
+        let Some(real_ast) = real_diff.ast.as_ref() else {
+            continue;
+        };
+        let human_ast = match as_ast_diff_for_mapping(&mapping, before, after) {
+            Ok(diff) => diff,
+            Err(e) => {
+                errors.push(format!("{name}: human mapping -> ASTDiff: {e:#}"));
+                continue;
+            }
+        };
+        let node_cache = crate::diff::NodeCache::build(before, after);
+        let roots = [
+            before.ast.as_ref().unwrap().root_node(),
+            after.ast.as_ref().unwrap().root_node(),
+        ];
+        let contents = [&before.contents, &after.contents];
+
+        if mapping.text_mappings.len() == 1 {
+            single_painting.insert(name.clone());
+        }
+        if crate::test::helper::human_mapping::invariants::ground_truth_invariant_violations_for(
+            &mapping, before, after,
+        )
+        .is_ok_and(|violations| !violations.is_empty())
+        {
+            violating.insert(name.clone());
+        }
+
+        for (preset, options) in [
+            ("minimal", RenderOptions::MINIMAL),
+            ("full", RenderOptions::FULL),
+        ] {
+            let Ok(candidates) = paintings_for_mode(&mapping, options) else {
+                continue;
+            };
+            // The filtered ranges come back alongside the labels: a label says *what* we
+            // painted, and the range it came from says *why* - which is the half a rule has to
+            // key on.
+            let sides = |ast: &ASTDiff| -> ([Vec<Option<TextLabel>>; 2], [Vec<RangeMatch>; 2]) {
+                let text_diff = crate::diff::text::TextDiff::from_with_options(
+                    before,
+                    after,
+                    ast,
+                    &node_cache,
+                    options,
+                );
+                let ranges = [0usize, 1usize].map(|side| {
+                    crate::diff::text::ranges_for_options(
+                        &text_diff.all(side),
+                        contents[side],
+                        options,
+                    )
+                });
+                let labels = [0usize, 1usize]
+                    .map(|side| label_bytes_from_ranges(contents[side], &ranges[side]));
+                (labels, ranges)
+            };
+            let (real_labels, real_ranges) = sides(real_ast);
+            let (ideal_labels, ideal_ranges) = sides(&human_ast);
+            let ours = [real_labels, ideal_labels];
+            let ours_ranges = [real_ranges, ideal_ranges];
+
+            // One painting per preset for all three comparisons, so the three numbers decompose.
+            // Chosen the way `compare_painting`'s grader chooses: the candidate closest to what a
+            // reader actually sees.
+            let mut best: Option<([Vec<Option<TextLabel>>; 2], usize)> = None;
+            for painting in candidates {
+                let mut spans: [Vec<(HumanTextSpan, TextLabel)>; 2] = [Vec::new(), Vec::new()];
+                for entry in &painting.mapping.entries {
+                    let label =
+                        TextLabel::from_verdict(entry.verdict(&before.contents, &after.contents)?);
+                    for span in &entry.before {
+                        spans[0].push((*span, label));
+                    }
+                    for span in &entry.after {
+                        spans[1].push((*span, label));
+                    }
+                }
+                let theirs = [0usize, 1usize].map(|side| label_bytes(contents[side], &spans[side]));
+                let distance: usize = (0..2)
+                    .map(|side| {
+                        ours[0][side]
+                            .iter()
+                            .zip(&theirs[side])
+                            .filter(|(ours, theirs)| ours != theirs)
+                            .count()
+                    })
+                    .sum();
+                if best.as_ref().is_none_or(|(_, best)| distance < *best) {
+                    best = Some((theirs, distance));
+                }
+            }
+            let Some((theirs, _)) = best else { continue };
+
+            measured.insert(name.clone());
+            let entry = totals.entry(preset).or_insert([0; 4]);
+            entry[3] += before.contents.len() + after.contents.len();
+            for (real, ideal) in ours[0].iter().zip(&ours[1]) {
+                entry[2] += real
+                    .iter()
+                    .zip(ideal)
+                    .filter(|(real, ideal)| real != ideal)
+                    .count();
+            }
+
+            for (stream, index, ast) in [("real", 0usize, real_ast), ("ideal", 1usize, &human_ast)]
+            {
+                for side in 0..2 {
+                    let (ours, theirs) = (&ours[index][side], &theirs[side]);
+                    totals.get_mut(preset).unwrap()[index] += ours
+                        .iter()
+                        .zip(theirs)
+                        .filter(|(ours, theirs)| ours != theirs)
+                        .count();
+                    let mut offset = 0usize;
+                    while offset < ours.len() {
+                        if ours[offset] == theirs[offset] {
+                            offset += 1;
+                            continue;
+                        }
+                        let start = offset;
+                        // One run is one *verdict pair*, not merely one stretch of disagreement:
+                        // a `Delete`-where-`Move`-was-wanted next to an unpainted-where-`Insert`
+                        // are two different mistakes and must not be counted as one.
+                        while offset < ours.len()
+                            && ours[offset] != theirs[offset]
+                            && ours[offset] == ours[start]
+                            && theirs[offset] == theirs[start]
+                        {
+                            offset += 1;
+                        }
+                        let text = &contents[side][start..offset];
+                        let geometry = if ours[start] == Some(TextLabel::Move) {
+                            move_geometry(&ours_ranges[index][side], contents, side, start)
+                        } else {
+                            String::new()
+                        };
+                        let node = roots[side]
+                            .descendant_for_byte_range(start, offset.max(start + 1))
+                            .unwrap_or(roots[side]);
+                        let (human_op, _) = nearest_mapping(node, &human_ast)
+                            .map(|(node, mapping)| {
+                                (format!("{:?}", mapping.operation), node.kind().to_string())
+                            })
+                            .unwrap_or_else(|| ("unmapped".to_string(), String::new()));
+                        let (ours_op, ours_reason) = nearest_mapping(node, ast)
+                            .map(|(_, mapping)| {
+                                (
+                                    format!("{:?}", mapping.operation),
+                                    format!("{:?}", mapping.reason),
+                                )
+                            })
+                            .unwrap_or_else(|| ("unmapped".to_string(), String::new()));
+                        runs.push((
+                            stream,
+                            Run {
+                                fixture: name.clone(),
+                                preset,
+                                ours: ours[start],
+                                theirs: theirs[start],
+                                bytes: offset - start,
+                                class: text_class(text),
+                                kind: node.kind().to_string(),
+                                exact: node.start_byte() == start && node.end_byte() == offset,
+                                human_op,
+                                ours_op,
+                                ours_reason,
+                                geometry,
+                                sample: format!(
+                                    "{name} {preset} side={side} row={} {:?}",
+                                    contents[side][..start].matches('\n').count() + 1,
+                                    if text.len() > 40 { &text[..40] } else { text }
+                                ),
+                            },
+                        ));
+                    }
+                }
+            }
+        }
+    }
+
+    // ---- what the numbers are over --------------------------------------------------------
+    eprintln!(
+        "{} fixtures measured; {unpainted} unpainted, {no_tree} with no tree-sitter grammar, \
+         {} could not be measured",
+        measured.len(),
+        errors.len()
+    );
+    eprintln!(
+        "{} of the measured fixtures break a ground-truth invariant, {} carry a single painting \
+         held to both presets",
+        measured.intersection(&violating).count(),
+        measured.intersection(&single_painting).count(),
+    );
+
+    // ---- attribution ----------------------------------------------------------------------
+    eprintln!("\n=== attribution: who owns the disagreement ===");
+    eprintln!(
+        "{:<9} {:>12} {:>12} {:>12} {:>14}",
+        "preset", "real", "renderer", "matcher", "corpus bytes"
+    );
+    for (preset, [real, ideal, matcher, total]) in &totals {
+        let percent = |part: usize| 100.0 * part as f64 / *total as f64;
+        eprintln!(
+            "{preset:<9} {real:>7} {:>4.2}% {ideal:>7} {:>4.2}% {matcher:>7} {:>4.2}% {total:>14}",
+            percent(*real),
+            percent(*ideal),
+            percent(*matcher),
+        );
+    }
+    eprintln!(
+        "  real = codediff's mapping vs the painting; renderer = the human mapping rendered vs \
+         the painting\n  (what no matcher fix can remove); matcher = the two renderings of the two \
+         mappings against each other."
+    );
+
+    // ---- tables ---------------------------------------------------------------------------
+    struct Bucket {
+        runs: usize,
+        bytes: usize,
+        fixtures: HashSet<String>,
+        sample: String,
+    }
+    let tally = |keep: &dyn Fn(&(&'static str, Run)) -> bool,
+                 key: &dyn Fn(&Run) -> String|
+     -> Vec<(String, Bucket)> {
+        let mut buckets: BTreeMap<String, Bucket> = BTreeMap::new();
+        for run in runs.iter().filter(|run| keep(run)) {
+            let bucket = buckets.entry(key(&run.1)).or_insert_with(|| Bucket {
+                runs: 0,
+                bytes: 0,
+                fixtures: HashSet::new(),
+                sample: run.1.sample.clone(),
+            });
+            bucket.runs += 1;
+            bucket.bytes += run.1.bytes;
+            bucket.fixtures.insert(run.1.fixture.clone());
+        }
+        let mut rows: Vec<(String, Bucket)> = buckets.into_iter().collect();
+        rows.sort_by_key(|(_, bucket)| std::cmp::Reverse((bucket.runs, bucket.bytes)));
+        rows
+    };
+    let print = |title: &str, rows: &[(String, Bucket)], limit: usize, width: usize| {
+        eprintln!("\n=== {title} ===");
+        eprintln!(
+            "{:<width$} {:>7} {:>9} {:>9}   example",
+            "bucket",
+            "runs",
+            "fixtures",
+            "bytes",
+            width = width
+        );
+        for (key, bucket) in rows.iter().take(limit) {
+            eprintln!(
+                "{key:<width$} {:>7} {:>9} {:>9}   {}",
+                bucket.runs,
+                bucket.fixtures.len(),
+                bucket.bytes,
+                bucket.sample,
+                width = width
+            );
+        }
+        if rows.len() > limit {
+            eprintln!("  ... and {} more buckets", rows.len() - limit);
+        }
+    };
+
+    for stream in ["ideal", "real"] {
+        let title = if stream == "ideal" {
+            "renderer's own errors (human mapping rendered vs painting): ours -> theirs"
+        } else {
+            "everything a reader sees (codediff's mapping rendered vs painting): ours -> theirs"
+        };
+        print(
+            title,
+            &tally(&|(run_stream, _)| *run_stream == stream, &|run| {
+                format!(
+                    "{:<8} {:<7} -> {:<7}",
+                    run.preset,
+                    label_name(run.ours),
+                    label_name(run.theirs)
+                )
+            }),
+            24,
+            30,
+        );
+    }
+
+    // The confusion cells above split only by what the text *is*. Coarse on purpose: the
+    // by-node-kind table below fragments a wide family across dozens of kinds and then shows only
+    // its top rows, so a family that is 128 runs over 81 fixtures can fail to appear there at all.
+    print(
+        "renderer's own errors by what the disagreeing text is",
+        &tally(&|(stream, _)| *stream == "ideal", &|run| {
+            format!(
+                "{:<8} {:<7}->{:<7} {:<11}",
+                run.preset,
+                label_name(run.ours),
+                label_name(run.theirs),
+                run.class,
+            )
+        }),
+        40,
+        40,
+    );
+
+    // The confusion cells above, opened up. The kind of the smallest node containing the run and
+    // what the *human* mapping says about it are the two facts a rule has to key on.
+    print(
+        "renderer's own errors, by node kind and what the human mapping calls it",
+        &tally(&|(stream, _)| *stream == "ideal", &|run| {
+            format!(
+                "{:<8} {:<7}->{:<7} {:<11} {:<24} {:<20}",
+                run.preset,
+                label_name(run.ours),
+                label_name(run.theirs),
+                run.class,
+                run.kind,
+                run.human_op,
+            )
+        }),
+        50,
+        86,
+    );
+
+    // The shape the user reports: a matched node painted grey where the painting wants nothing.
+    print(
+        "grey-where-nothing-was-wanted (ours=move, theirs=unpainted), renderer's own",
+        &tally(
+            &|(stream, run)| {
+                *stream == "ideal" && run.ours == Some(TextLabel::Move) && run.theirs.is_none()
+            },
+            &|run| {
+                format!(
+                    "{:<8} {:<11} {:<26} {:<22} exact={:<5}",
+                    run.preset, run.class, run.kind, run.human_op, run.exact
+                )
+            },
+        ),
+        40,
+        80,
+    );
+    print(
+        "grey-where-nothing-was-wanted, as a reader sees it, by the reason that mapped the node",
+        &tally(
+            &|(stream, run)| {
+                *stream == "real" && run.ours == Some(TextLabel::Move) && run.theirs.is_none()
+            },
+            &|run| {
+                format!(
+                    "{:<8} {:<11} {:<26} {:<22} {:<28}",
+                    run.preset, run.class, run.kind, run.ours_op, run.ours_reason
+                )
+            },
+        ),
+        40,
+        100,
+    );
+
+    print(
+        "grey-where-nothing-was-wanted, by the geometry that produced the Move",
+        &tally(
+            &|(stream, run)| {
+                *stream == "ideal" && run.ours == Some(TextLabel::Move) && run.theirs.is_none()
+            },
+            &|run| format!("{:<8} {:<11} {:<46}", run.preset, run.class, run.geometry),
+        ),
+        30,
+        68,
+    );
+
+    print(
+        "renderer's own errors by language (the fixture name's own prefix)",
+        &tally(&|(stream, _)| *stream == "ideal", &|run| {
+            format!(
+                "{:<12} {}",
+                run.fixture.split('-').next().unwrap_or("?"),
+                run.preset
+            )
+        }),
+        60,
+        24,
+    );
+
+    // The worklist for the shape the user reports, by fixture: a single punctuation token the
+    // human mapping calls `Identical`, painted `Move` where the painting wants nothing.
+    print(
+        "the punctuation-painted-grey worklist, by fixture",
+        &tally(
+            &|(stream, run)| {
+                *stream == "ideal"
+                    && run.ours == Some(TextLabel::Move)
+                    && run.theirs.is_none()
+                    && run.class == "punctuation"
+            },
+            &|run| format!("{:<8} {}", run.preset, run.fixture),
+        ),
+        60,
+        72,
+    );
+
+    // The cross-tab the punctuation rule needs: which *reason* mapped the node, per fixture. The
+    // corpus's two reason-tagged carve-outs from `Move` (`known_pure_reindent`,
+    // `known_pure_relocation`) are the house pattern for a narrow rule, and `identical_or_move`
+    // already receives `reason`. Read against `painting_rule_experiments`' better/worse lists:
+    // if the reasons separate the fixtures a blanket rule improves from the ones it breaks, that
+    // is the predicate; if they do not, no available predicate does.
+    print(
+        "the punctuation-painted-grey worklist, by fixture and mapping reason (as a reader sees it)",
+        &tally(
+            &|(stream, run)| {
+                *stream == "real"
+                    && run.ours == Some(TextLabel::Move)
+                    && run.theirs.is_none()
+                    && run.class == "punctuation"
+            },
+            &|run| {
+                format!(
+                    "{:<8} {:<52} {:<30}",
+                    run.preset, run.fixture, run.ours_reason
+                )
+            },
+        ),
+        80,
+        92,
+    );
+
+    print(
+        "fixtures ranked by the renderer's own errors",
+        &tally(&|(stream, _)| *stream == "ideal", &|run| {
+            run.fixture.clone()
+        }),
+        40,
+        62,
+    );
+
+    if !errors.is_empty() {
+        eprintln!("\nerrors:");
+        for error in &errors {
+            eprintln!("  {error}");
+        }
+    }
+    Ok(())
+}
+
+/// EXPLORATORY: measures a candidate painting rule against the whole painted corpus **without
+/// changing the product**, by post-processing the range list `ranges_for_options` produces (or,
+/// where a rule is construction-time, by building the diff under a different `RenderOptions`) and
+/// re-scoring the result against the same hand-painted ground truth.
+///
+/// The point is to keep a proposal falsifiable before it is a code change: every rule in
+/// `painting_failure_census_2026_09_15.md` that could be simulated was, and the numbers here are
+/// what it is worth. A rule that improves the corpus here still has to be implemented in
+/// `diff::text` properly - a post-filter on a range list is not where `MINIMAL`'s punctuation
+/// policy belongs - but a rule that does *not* improve it here never needs to be written at all.
+///
+/// Reported per experiment: bytes better/worse against each preset's own painting, and how many
+/// fixtures moved in each direction. Fixture counts are the honest measure - a single large
+/// fixture can carry a byte total on its own.
+///
+/// `cargo test --release --lib --features test-fixtures painting_rule_experiments --
+/// --ignored --nocapture`
+#[test]
+#[ignore]
+fn painting_rule_experiments() -> Result<()> {
+    use crate::diff::text::{RangeMatch, RenderOptions, TextOperation};
+    use std::collections::BTreeMap;
+
+    /// The candidate rules. Each takes the raw (unfiltered) ranges for one side and returns the
+    /// list to paint, standing in for what `ranges_for_options` would produce if the rule were
+    /// part of it.
+    #[derive(Clone, Copy, PartialEq, Eq)]
+    enum Rule {
+        /// Baseline: exactly what ships today.
+        AsShipped,
+        /// R1 - a single-row range that is nothing but structural punctuation does not become a
+        /// `Move` on a column shift alone. Simulated by dropping such a range after the fact,
+        /// which is what calling it `Identical` in `identical_or_move` would amount to here.
+        NoPunctuationMove,
+        /// R2 - `MINIMAL` drops punctuation that merely moved or stayed, and keeps punctuation
+        /// that was *inserted or deleted*. Simulated by filtering with `structural_punctuation`
+        /// on and then dropping the structural-only ranges that are not `Insert`/`Delete`.
+        MinimalKeepsEditedPunctuation,
+        /// R1b - R1, narrowed by the corpus's own bracket rule: brackets share fate (see
+        /// `text_painting_findings.md`, 426 pairs, zero exceptions). A lone punctuation `Move`
+        /// is dropped only when it is *isolated* - when no bracket in it has a partner that some
+        /// other painted range covers. A `{`/`}` pair both painted `Move` because the construct
+        /// really did relocate keeps both; a `;` shifted sideways by an edit earlier on its line
+        /// has no partner and goes.
+        NoIsolatedPunctuationMove,
+        /// R1c - R1b with the partner test narrowed to a partner that is itself painted `Move`.
+        /// `restore_paired_brackets`' own `covered` asks only whether *some* range covers the
+        /// partner, which keeps a `)` whose `(` sits inside an `Update` because the line was
+        /// rewritten around it - a different fate, not a shared one.
+        NoPunctuationMoveWithoutMovedPartner,
+        /// R1d - a lone punctuation `Move` survives only when something else on its own row also
+        /// painted `Move`. The reading is positional rather than syntactic: a token that shifted
+        /// because its line grew is alone in moving, while a construct that genuinely relocated
+        /// drags its whole row along.
+        NoPunctuationMoveAloneOnItsRow,
+    }
+
+    fn range_bytes(
+        contents: &str,
+        range: &crate::diff::text_range::TextRange,
+    ) -> Option<(usize, usize)> {
+        Some((
+            byte_offset(contents, range.start_row, range.start_column)?,
+            byte_offset(contents, range.end_row, range.end_column)?,
+        ))
+    }
+
+    /// Byte position -> matching partner byte position, for every balanced `(`/`)`, `[`/`]`,
+    /// `{`/`}` pair. A local copy of `render_options::bracket_pair_partners`, which is
+    /// `pub(crate)` inside a private module: re-exporting it to reach one exploratory test would
+    /// leave an import the product itself never uses.
+    fn bracket_pair_partners(source: &str) -> std::collections::HashMap<usize, usize> {
+        let mut partners = std::collections::HashMap::new();
+        let mut stack: Vec<(char, usize)> = Vec::new();
+        for (byte, character) in source.char_indices() {
+            match character {
+                '(' | '[' | '{' => stack.push((character, byte)),
+                ')' | ']' | '}' => {
+                    let opener = match character {
+                        ')' => '(',
+                        ']' => '[',
+                        _ => '{',
+                    };
+                    if stack.last().is_some_and(|&(open, _)| open == opener)
+                        && let Some((_, open_byte)) = stack.pop()
+                    {
+                        partners.insert(open_byte, byte);
+                        partners.insert(byte, open_byte);
+                    }
+                }
+                _ => {}
+            }
+        }
+        partners
+    }
+
+    fn structural_only(contents: &str, range: &RangeMatch) -> bool {
+        range_bytes(contents, &range.source)
+            .and_then(|(start, end)| contents.get(start..end))
+            .is_some_and(crate::diff::text::is_structural_only)
+    }
+
+    let apply = |rule: Rule,
+                 raw: &[RangeMatch],
+                 contents: &str,
+                 options: RenderOptions|
+     -> Vec<RangeMatch> {
+        match rule {
+            Rule::AsShipped => crate::diff::text::ranges_for_options(raw, contents, options),
+            Rule::NoPunctuationMove => {
+                let mut ranges = crate::diff::text::ranges_for_options(raw, contents, options);
+                ranges.retain(|range| {
+                    range.operation != TextOperation::Move
+                        || range.source.end_row != range.source.start_row
+                        || !structural_only(contents, range)
+                });
+                ranges
+            }
+            Rule::NoIsolatedPunctuationMove => {
+                let ranges = crate::diff::text::ranges_for_options(raw, contents, options);
+                let droppable = |range: &RangeMatch| {
+                    range.operation == TextOperation::Move
+                        && range.source.end_row == range.source.start_row
+                        && structural_only(contents, range)
+                };
+                // "Covered by another painted range" in the same sense
+                // `restore_paired_brackets` means it: any surviving range, the punctuation ones
+                // included, so a `{`/`}` pair painted `Move` on both ends keeps itself.
+                let covered = |byte: usize| {
+                    ranges.iter().any(|range| {
+                        range_bytes(contents, &range.source)
+                            .is_some_and(|(start, end)| start <= byte && byte < end)
+                    })
+                };
+                let partners = bracket_pair_partners(contents);
+                let has_painted_partner = |range: &RangeMatch| {
+                    let Some((start, end)) = range_bytes(contents, &range.source) else {
+                        return false;
+                    };
+                    let Some(text) = contents.get(start..end) else {
+                        return false;
+                    };
+                    text.char_indices()
+                        .filter(|&(_, c)| matches!(c, '(' | ')' | '[' | ']' | '{' | '}'))
+                        .any(|(offset, _)| {
+                            partners
+                                .get(&(start + offset))
+                                .is_some_and(|&partner| covered(partner))
+                        })
+                };
+                let keep: Vec<bool> = ranges
+                    .iter()
+                    .map(|range| !droppable(range) || has_painted_partner(range))
+                    .collect();
+                ranges
+                    .into_iter()
+                    .zip(keep)
+                    .filter_map(|(range, keep)| keep.then_some(range))
+                    .collect()
+            }
+            Rule::NoPunctuationMoveWithoutMovedPartner => {
+                let ranges = crate::diff::text::ranges_for_options(raw, contents, options);
+                let droppable = |range: &RangeMatch| {
+                    range.operation == TextOperation::Move
+                        && range.source.end_row == range.source.start_row
+                        && structural_only(contents, range)
+                };
+                let moved_covers = |byte: usize, self_start: usize| {
+                    ranges.iter().any(|range| {
+                        range.operation == TextOperation::Move
+                            && range_bytes(contents, &range.source).is_some_and(|(start, end)| {
+                                start != self_start && start <= byte && byte < end
+                            })
+                    })
+                };
+                let partners = bracket_pair_partners(contents);
+                ranges
+                    .iter()
+                    .filter(|range| {
+                        if !droppable(range) {
+                            return true;
+                        }
+                        let Some((start, end)) = range_bytes(contents, &range.source) else {
+                            return true;
+                        };
+                        let Some(text) = contents.get(start..end) else {
+                            return true;
+                        };
+                        text.char_indices()
+                            .filter(|&(_, c)| matches!(c, '(' | ')' | '[' | ']' | '{' | '}'))
+                            .any(|(offset, _)| {
+                                partners
+                                    .get(&(start + offset))
+                                    .is_some_and(|&partner| moved_covers(partner, start))
+                            })
+                    })
+                    .cloned()
+                    .collect()
+            }
+            Rule::NoPunctuationMoveAloneOnItsRow => {
+                let ranges = crate::diff::text::ranges_for_options(raw, contents, options);
+                let droppable = |range: &RangeMatch| {
+                    range.operation == TextOperation::Move
+                        && range.source.end_row == range.source.start_row
+                        && structural_only(contents, range)
+                };
+                ranges
+                    .iter()
+                    .filter(|range| {
+                        !droppable(range)
+                            || ranges.iter().any(|other| {
+                                other.operation == TextOperation::Move
+                                    && other.source != range.source
+                                    && other.source.start_row <= range.source.start_row
+                                    && other.source.end_row >= range.source.start_row
+                            })
+                    })
+                    .cloned()
+                    .collect()
+            }
+            Rule::MinimalKeepsEditedPunctuation => {
+                let kept = crate::diff::text::ranges_for_options(
+                    raw,
+                    contents,
+                    RenderOptions {
+                        structural_punctuation: true,
+                        ..options
+                    },
+                );
+                kept.into_iter()
+                    .filter(|range| {
+                        matches!(
+                            range.operation,
+                            TextOperation::Insert | TextOperation::Delete
+                        ) || !structural_only(contents, range)
+                    })
+                    .collect()
+            }
+        }
+    };
+
+    let diffs_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("src")
+        .join("test")
+        .join("data")
+        .join("diffs");
+    let mut names: Vec<String> = Vec::new();
+    for dataset in crate::test::helper::DIFF_DATASETS {
+        let dir = diffs_dir.join(dataset);
+        if !dir.is_dir() {
+            continue;
+        }
+        for entry in fs::read_dir(&dir)?.filter_map(|entry| entry.ok()) {
+            if entry.path().is_dir() {
+                names.push(entry.file_name().to_string_lossy().into_owned());
+            }
+        }
+    }
+    names.sort();
+
+    /// `(baseline bytes, candidate bytes, fixtures better, fixtures worse)` per experiment.
+    #[derive(Default)]
+    struct Score {
+        baseline: usize,
+        candidate: usize,
+        better: usize,
+        worse: usize,
+        better_names: Vec<String>,
+        worse_names: Vec<String>,
+    }
+    let mut scores: BTreeMap<String, Score> = BTreeMap::new();
+
+    for name in &names {
+        let Ok(pair) = crate::test::helper::handmade_test_code_pair(name) else {
+            continue;
+        };
+        let (before, after) = &*pair;
+        let Ok(mapping) = load(name) else {
+            continue;
+        };
+        if mapping.text_mappings.is_empty() || before.ast.is_none() || after.ast.is_none() {
+            continue;
+        }
+        let diff = crate::diff::diff_code(before, after);
+        let Some(ast) = diff.ast.as_ref() else {
+            continue;
+        };
+        let node_cache = crate::diff::NodeCache::build(before, after);
+        let contents = [&before.contents, &after.contents];
+
+        for (preset, options) in [
+            ("minimal", RenderOptions::MINIMAL),
+            ("full", RenderOptions::FULL),
+        ] {
+            let Ok(candidates) = paintings_for_mode(&mapping, options) else {
+                continue;
+            };
+            // Every candidate painting for the preset, reduced to labels once - the experiments
+            // are each scored against the closest of them, exactly as the grader does.
+            let mut painted: Vec<[Vec<Option<TextLabel>>; 2]> = Vec::new();
+            for painting in candidates {
+                let mut spans: [Vec<(HumanTextSpan, TextLabel)>; 2] = [Vec::new(), Vec::new()];
+                for entry in &painting.mapping.entries {
+                    let label =
+                        TextLabel::from_verdict(entry.verdict(&before.contents, &after.contents)?);
+                    for span in &entry.before {
+                        spans[0].push((*span, label));
+                    }
+                    for span in &entry.after {
+                        spans[1].push((*span, label));
+                    }
+                }
+                painted
+                    .push([0usize, 1usize].map(|side| label_bytes(contents[side], &spans[side])));
+            }
+
+            let raw = {
+                let text_diff = crate::diff::text::TextDiff::from_with_options(
+                    before,
+                    after,
+                    ast,
+                    &node_cache,
+                    options,
+                );
+                [text_diff.all(0), text_diff.all(1)]
+            };
+            // Scored against the closest of the preset's candidate paintings, exactly as
+            // `compare_painting`'s grader scores: alternatives under one preset are alternative
+            // readings, not a conjunction.
+            let score_labels = |ours: &[Vec<Option<TextLabel>>; 2]| -> usize {
+                painted
+                    .iter()
+                    .map(|theirs| -> usize {
+                        (0..2)
+                            .map(|side| {
+                                ours[side]
+                                    .iter()
+                                    .zip(&theirs[side])
+                                    .filter(|(ours, theirs)| ours != theirs)
+                                    .count()
+                            })
+                            .sum()
+                    })
+                    .min()
+                    .unwrap_or(0)
+            };
+            let distance = |rule: Rule| -> usize {
+                let ours = [0usize, 1usize].map(|side| {
+                    let ranges = apply(rule, &raw[side], contents[side], options);
+                    label_bytes_from_ranges(contents[side], &ranges)
+                });
+                score_labels(&ours)
+            };
+
+            let baseline = distance(Rule::AsShipped);
+            let mut rules = vec![
+                ("R1  no punctuation Move", Rule::NoPunctuationMove),
+                (
+                    "R1b no isolated punctuation Move",
+                    Rule::NoIsolatedPunctuationMove,
+                ),
+                (
+                    "R1c punctuation Move needs a moved partner",
+                    Rule::NoPunctuationMoveWithoutMovedPartner,
+                ),
+                (
+                    "R1d punctuation Move needs company on its row",
+                    Rule::NoPunctuationMoveAloneOnItsRow,
+                ),
+            ];
+            if preset == "minimal" {
+                rules.push((
+                    "R2 minimal keeps edited punctuation",
+                    Rule::MinimalKeepsEditedPunctuation,
+                ));
+            }
+            for (label, rule) in rules {
+                let candidate = distance(rule);
+                let score = scores.entry(format!("{preset:<8} {label}")).or_default();
+                score.baseline += baseline;
+                score.candidate += candidate;
+                if candidate < baseline {
+                    score.better += 1;
+                    score.better_names.push(name.clone());
+                } else if candidate > baseline {
+                    score.worse += 1;
+                    score.worse_names.push(name.clone());
+                }
+            }
+
+            // R3 is construction-time, not a post-filter: `whole_pair_updates` decides which
+            // ranges `TextDiff` builds at all (see its own doc comment), so it needs its own
+            // build rather than a different filtering of `raw`.
+            if preset == "full" {
+                let options = RenderOptions {
+                    whole_pair_updates: true,
+                    ..RenderOptions::FULL
+                };
+                let text_diff = crate::diff::text::TextDiff::from_with_options(
+                    before,
+                    after,
+                    ast,
+                    &node_cache,
+                    options,
+                );
+                let ours = [0usize, 1usize].map(|side| {
+                    let ranges = crate::diff::text::ranges_for_options(
+                        &text_diff.all(side),
+                        contents[side],
+                        options,
+                    );
+                    label_bytes_from_ranges(contents[side], &ranges)
+                });
+                let candidate = score_labels(&ours);
+                let score = scores
+                    .entry("full     R3 whole-pair updates".to_string())
+                    .or_default();
+                score.baseline += baseline;
+                score.candidate += candidate;
+                if candidate < baseline {
+                    score.better += 1;
+                    score.better_names.push(name.clone());
+                } else if candidate > baseline {
+                    score.worse += 1;
+                    score.worse_names.push(name.clone());
+                }
+            }
+        }
+    }
+
+    eprintln!(
+        "{:<48} {:>10} {:>10} {:>9} {:>7} {:>7}",
+        "experiment", "baseline", "candidate", "delta", "better", "worse"
+    );
+    for (label, score) in &scores {
+        eprintln!(
+            "{label:<48} {:>10} {:>10} {:>9} {:>7} {:>7}",
+            score.baseline,
+            score.candidate,
+            score.candidate as i64 - score.baseline as i64,
+            score.better,
+            score.worse,
+        );
+    }
+    for (label, score) in &scores {
+        eprintln!("\n{label}");
+        eprintln!("  better: {}", score.better_names.join(", "));
+        eprintln!("  worse:  {}", score.worse_names.join(", "));
+    }
+    Ok(())
+}
+
+/// EXPLORATORY: every `Move` range codediff paints over text that is nothing but structural
+/// punctuation, for one fixture, raw and after filtering, with both sides' text.
+///
+/// The census reports this family as 89 runs over 35 fixtures - single tokens (`;`, `{`, `)`,
+/// `);`) the human mapping calls `Identical`, painted `Move` under `FULL` where the painting wants
+/// nothing. It also reports their two sides' text as *differing*, which a `;` matched to a `;`
+/// should not do; `RangeMatch::extends` merges same-operation ranges across whitespace, so the
+/// question this answers is whether the range being painted is the token itself or a merged span
+/// that merely starts at one. The rule that fixes the family has to be written against whichever
+/// one it is.
+///
+/// `FIXTURE=<name> SIDE=<0|1> cargo test --release --lib --features test-fixtures
+/// punctuation_move_provenance -- --ignored --nocapture`
+#[test]
+#[ignore]
+fn punctuation_move_provenance() -> Result<()> {
+    use crate::diff::text::{RenderOptions, TextOperation};
+
+    let name = std::env::var("FIXTURE")
+        .unwrap_or_else(|_| "java-defects4j-mockito-17-mocksettingsimpl".to_string());
+    let side: usize = std::env::var("SIDE")
+        .ok()
+        .and_then(|side| side.parse().ok())
+        .unwrap_or(0);
+    let (before, after) = &*crate::test::helper::handmade_test_code_pair(&name)?;
+    let diff = crate::diff::diff_code(before, after);
+    let ast = diff.ast.as_ref().context("no AST diff")?;
+    let node_cache = crate::diff::NodeCache::build(before, after);
+    let contents = [&before.contents, &after.contents];
+
+    let text_at = |side: usize, range: &crate::diff::text_range::TextRange| -> String {
+        match (
+            byte_offset(contents[side], range.start_row, range.start_column),
+            byte_offset(contents[side], range.end_row, range.end_column),
+        ) {
+            (Some(start), Some(end)) => contents[side]
+                .get(start..end)
+                .map(|text| format!("{text:?}"))
+                .unwrap_or_else(|| "<unaddressable>".to_string()),
+            _ => "<unaddressable>".to_string(),
+        }
+    };
+
+    let text_diff = crate::diff::text::TextDiff::from_with_options(
+        before,
+        after,
+        ast,
+        &node_cache,
+        RenderOptions::FULL,
+    );
+    let raw = text_diff.all(side);
+    let filtered = crate::diff::text::ranges_for_options(&raw, contents[side], RenderOptions::FULL);
+
+    for (label, ranges) in [("raw", &raw), ("filtered FULL", &filtered)] {
+        eprintln!("--- {label}: Move ranges whose source text is structural-only ---");
+        for range in ranges.iter() {
+            if range.operation != TextOperation::Move {
+                continue;
+            }
+            let source = text_at(side, &range.source);
+            let structural = source
+                .trim_matches('"')
+                .chars()
+                .all(|c| c.is_whitespace() || "()[]{},;:".contains(c));
+            if !structural {
+                continue;
+            }
+            eprintln!(
+                "  source={:?} {} <-> destination={:?} {}",
+                range.source,
+                source,
+                range.destination,
+                text_at(1 - side, &range.destination),
+            );
+        }
+    }
+    Ok(())
+}
