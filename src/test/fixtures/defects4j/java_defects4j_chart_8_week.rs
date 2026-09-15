@@ -18,19 +18,24 @@
 use anyhow::Result;
 
 use crate::test;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 
 #[test]
 fn mapping() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("java-defects4j-chart-8-week")
+    // First measurement, 2026-09-15, of a mapping from the 2026-09-15 Defects4J batch.
+    // Recorded as found, not examined.
+    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
+        "java-defects4j-chart-8-week",
+        2,
+        2,
+    )
 }
 
 #[test]
 fn painting() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test, read the rate it
-    // reports for both modes, and record that instead.
-    assert_matches_human_painting_within_limit("java-defects4j-chart-8-week", 100.0)
+    // measured 2026-09-15: minimal 0.048%, full 0.048% (measured, unexamined)
+    assert_matches_human_painting_within_limit("java-defects4j-chart-8-week", 0.06)
 }
 
 #[test]
