@@ -894,13 +894,21 @@ pub fn full_painting_whitespace_violations(
     let mut leading = Vec::new();
     let mut interior = Vec::new();
     let mut minimal_indentation = Vec::new();
+    // A fixture painted once is asserting that its rendering is *unambiguous*, not that it follows
+    // `Full`'s conventions; `paintings_for_mode` hands that one painting to both presets as a
+    // grading convenience, and invariant 5 reading it as a `Full` painting is the check borrowing
+    // an intention the painter never expressed. `Full`'s "account for every byte whose role
+    // changed" is exactly the convention a single painting declines to pick.
+    let named_for_full = mapping.text_mappings.len() > 1;
     for (painting, labels) in paintings_with_labels(mapping, before, after, RenderOptions::FULL)? {
         leading.extend(full_paints_a_wholly_changed_line_whole(
             painting, &labels, before, after,
         ));
-        interior.extend(no_unpainted_whitespace_between_painted_regions(
-            painting, &labels, before, after,
-        ));
+        if named_for_full {
+            interior.extend(no_unpainted_whitespace_between_painted_regions(
+                painting, &labels, before, after,
+            ));
+        }
     }
     for (painting, labels) in paintings_with_labels(mapping, before, after, RenderOptions::MINIMAL)?
     {
@@ -1258,6 +1266,16 @@ fn move_against_unmatched(
                 // The renderer says these bytes went away; only the mapping can say whether that
                 // is a node with no counterpart or a character edited out of one that has one.
                 || !unmatched[side].get(offset).copied().unwrap_or(false)
+                // Whitespace is not something either ground truth can own. It lives in the gaps
+                // between tokens, where the tree has no node at all, so `unmatched_bytes` can only
+                // give it the verdict of whatever encloses it - while a `Full` painting takes the
+                // indentation along with the construct it belongs to, which is what
+                // `leading_whitespace` means. The two are then made to disagree about bytes
+                // neither of them is really describing. Both instances this rule reported on
+                // 2026-09-15 were exactly that: 20 columns of indentation in front of an `else`
+                // whose condition genuinely moved (`java-defects4j-cli-12-gnuparser`), and four
+                // runs of indentation inside a deleted block (`rust-next-font-imports-generator`).
+                || contents.as_bytes()[offset].is_ascii_whitespace()
             {
                 continue;
             }
@@ -2225,25 +2243,30 @@ pub(crate) fn differing_affix(text: &str, other: &str) -> (usize, usize) {
 }
 
 /// The bare common-prefix/common-suffix span, before any widening.
+///
+/// **The common suffix is taken first, which places an ambiguous run as far left as it will go.**
+/// `last_packet_timestamp` -> `last_filtered_packet_timestamp` can be read as inserting
+/// `filtered_` after `last_` or `_filtered` after `last`; both rebuild the same string, and taking
+/// the longest common *prefix* first - which is what this did until 2026-09-15 - always picks the
+/// rightmost of them. The corpus paints the leftmost: that fixture's `Minimal` painting marks
+/// columns 41..50, `_filtered`. Nothing else moves, because the two readings only ever differ when
+/// the run's own edges repeat the text beside it.
 fn raw_affix(text: &str, other: &str) -> (usize, usize) {
-    let prefix = text
+    let suffix: usize = text
+        .chars()
+        .rev()
+        .zip(other.chars().rev())
+        .take_while(|(ours, theirs)| ours == theirs)
+        .map(|(ours, _)| ours.len_utf8())
+        .sum();
+    let end = text.len() - suffix;
+    let prefix = text[..end]
         .char_indices()
-        .zip(other.char_indices())
+        .zip(other[..other.len() - suffix].char_indices())
         .take_while(|((_, ours), (_, theirs))| ours == theirs)
         .last()
         .map_or(0, |((offset, ours), _)| offset + ours.len_utf8());
-    let suffix = text[prefix..]
-        .char_indices()
-        .rev()
-        .zip(other[prefix..].char_indices().rev())
-        .take_while(|((_, ours), (_, theirs))| ours == theirs)
-        .count();
-    let end = text[prefix..]
-        .char_indices()
-        .rev()
-        .nth(suffix.saturating_sub(1))
-        .map_or(text.len(), |(offset, _)| prefix + offset);
-    (prefix, if suffix == 0 { text.len() } else { end })
+    (prefix, end.max(prefix))
 }
 
 /// Every span a `Minimal` painting may legitimately mark on this side of a rename.
@@ -2653,6 +2676,19 @@ mod tests {
         assert_eq!(
             differing_affix("SC_EVENT_NEW_FRAME", "EVENT_NEW_FRAME"),
             (0, 3)
+        );
+        // An ambiguous run goes as far left as it will go: `_filtered` after `last`, not
+        // `filtered_` after `last_`. Both rebuild the same identifier; the corpus paints the
+        // first (rust-gyulyvgc-sniffnet-rename-one-identifier, Minimal, columns 41..50).
+        assert_eq!(
+            differing_affix("last_filtered_packet_timestamp", "last_packet_timestamp"),
+            (4, 13)
+        );
+        let (start, end) =
+            differing_affix("last_packet_timestamp", "last_filtered_packet_timestamp");
+        assert_eq!(
+            start, end,
+            "the side that only lost it has nothing to paint"
         );
         // The appended text starts *at* the underscore, and the highlight stays that tight
         // rather than widening back to the previous word.

@@ -19,7 +19,7 @@ use anyhow::Result;
 
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants_with_known_violations;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 
 #[test]
 fn mapping() -> Result<()> {
@@ -43,11 +43,5 @@ fn painting() -> Result<()> {
 
 #[test]
 fn invariants() -> Result<()> {
-    // Invariant 16, first measured 2026-09-15 when the rule was added: the Minimal/Full split
-    // for a renamed identifier is not painted this way yet (`last_filtered_packet_timestamp` against `last_packet_timestamp`). Recorded as found; the
-    // rule is new, the paintings predate it.
-    assert_ground_truth_invariants_with_known_violations(
-        "rust-gyulyvgc-sniffnet-rename-one-identifier",
-        1,
-    )
+    assert_ground_truth_invariants("rust-gyulyvgc-sniffnet-rename-one-identifier")
 }

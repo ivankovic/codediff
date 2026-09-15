@@ -19,7 +19,7 @@ use anyhow::Result;
 
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants_with_known_violations;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 
 #[test]
 fn mapping() -> Result<()> {
@@ -37,13 +37,5 @@ fn painting() -> Result<()> {
 
 #[test]
 fn invariants() -> Result<()> {
-    // Invariant 16, first measured 2026-09-15 when the rule was added, 8 -> 5 once single-word
-    // identifiers were allowed their bare affix: what is left is `Decision` against
-    // `DownloadSpecDecision` and `IDecisionEngineSpecification` against
-    // `IDownloadDecisionEngineSpecification`, where the painting marks the whole identifier and
-    // the rule wants only the words that differ.
-    assert_ground_truth_invariants_with_known_violations(
-        "csharp-sonarr-sonarr-use-a-different-class",
-        5,
-    )
+    assert_ground_truth_invariants("csharp-sonarr-sonarr-use-a-different-class")
 }

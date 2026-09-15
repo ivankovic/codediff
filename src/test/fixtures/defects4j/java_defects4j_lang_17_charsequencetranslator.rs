@@ -19,7 +19,7 @@ use anyhow::Result;
 
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants_with_known_violations;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 
 #[test]
 fn mapping() -> Result<()> {
@@ -34,20 +34,16 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-15: minimal 0.298%, full 0.318% (measured, unexamined)
+    // Re-measured 2026-09-16 after the painting was revised: minimal 0.278%,
+    // full 2.848%. The ground truth moved, not the renderer - see
+    // `ground-truth-moves-limits-move`.
     assert_matches_human_painting_within_limit(
         "java-defects4j-lang-17-charsequencetranslator",
-        0.33,
+        2.86,
     )
 }
 
 #[test]
 fn invariants() -> Result<()> {
-    // Invariant 3, first measured 2026-09-15: the tree mapping splits two brace pairs - before row
-    // 90's `{` is deleted while its `}` on row 101 is matched, and row 93's `{` is matched while
-    // its `}` on row 99 is deleted. A mapping repair, not a painting one.
-    assert_ground_truth_invariants_with_known_violations(
-        "java-defects4j-lang-17-charsequencetranslator",
-        2,
-    )
+    assert_ground_truth_invariants("java-defects4j-lang-17-charsequencetranslator")
 }

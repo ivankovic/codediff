@@ -19,7 +19,7 @@ use anyhow::Result;
 
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants_with_known_violations;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 
 #[test]
 fn mapping() -> Result<()> {
@@ -40,8 +40,5 @@ fn painting() -> Result<()> {
 
 #[test]
 fn invariants() -> Result<()> {
-    // Invariant 9, first measured 2026-09-15: the `Full` painting calls 20 bytes on after row 87
-    // a `Move` while the tree mapping has them as `Insert`. One of the two ground truths is
-    // wrong about whether that code survives; which one is not yet decided.
-    assert_ground_truth_invariants_with_known_violations("java-defects4j-cli-12-gnuparser", 1)
+    assert_ground_truth_invariants("java-defects4j-cli-12-gnuparser")
 }

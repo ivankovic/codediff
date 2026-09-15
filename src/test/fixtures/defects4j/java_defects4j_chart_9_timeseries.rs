@@ -19,7 +19,7 @@ use anyhow::Result;
 
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants_with_known_violations;
 
 #[test]
 fn mapping() -> Result<()> {
@@ -28,12 +28,15 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test, read the rate it
-    // reports for both modes, and record that instead.
-    assert_matches_human_painting_within_limit("java-defects4j-chart-9-timeseries", 100.0)
+    // measured 2026-09-16: minimal 0.003%, full 0.000% (measured, unexamined)
+    assert_matches_human_painting_within_limit("java-defects4j-chart-9-timeseries", 0.02)
 }
 
 #[test]
 fn invariants() -> Result<()> {
-    assert_ground_truth_invariants("java-defects4j-chart-9-timeseries")
+    // First measured 2026-09-16, and all three are the same parenthesis on after row 944: invariant 3
+    // twice, where the mapping matches one of the pair and inserts the other in both directions,
+    // and invariant 9 once, where the `Full (outer parenthesis)` painting calls that `(` a Move
+    // while the mapping inserts it. A mapping repair on one paren pair would settle all three.
+    assert_ground_truth_invariants_with_known_violations("java-defects4j-chart-9-timeseries", 3)
 }

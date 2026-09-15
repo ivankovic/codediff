@@ -931,6 +931,23 @@ fn invariant_violations() -> Result<()> {
         eprintln!("{name} ({})", violations.len());
         for violation in &violations {
             eprintln!("    {violation}");
+            for site in &violation.sites {
+                let contents = if site.side == 0 {
+                    &before.contents
+                } else {
+                    &after.contents
+                };
+                let text = crate::test::helper::human_mapping::span_text(contents, site.span);
+                eprintln!(
+                    "        side={} rows {}..{} cols {}..{} {:?}",
+                    site.side,
+                    site.span.start_row + 1,
+                    site.span.end_row + 1,
+                    site.span.start_column,
+                    site.span.end_column,
+                    text.unwrap_or_default()
+                );
+            }
         }
     }
     eprintln!("{total} violation(s)");
