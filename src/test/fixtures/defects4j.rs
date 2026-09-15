@@ -15,10 +15,10 @@
  *  You should have received a copy of the GNU Affero General Public License
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
-// Empty until the first `defects4j` fixture is solved in `human_solver` (see
-// `test::helper::DIFF_DATASETS` and `research/external/extract_defects4j_fixtures.py`, which
-// creates the fixture directories) - `human_solver`'s `insert_mod_declaration` adds entries here
-// the same way it does for `handmade.rs`/`small.rs`/`full.rs`/`stratified.rs`.
+// One entry per solved `defects4j` fixture (see `test::helper::DIFF_DATASETS`). The dataset's
+// 996 fixture directories are all present; this list grows as they are mapped in `human_solver`,
+// whose `insert_mod_declaration` adds entries here the same way it does for
+// `handmade.rs`/`small.rs`/`full.rs`/`stratified.rs`.
 #[cfg(test)]
 mod java_defects4j_chart_10_standardtooltiptagfragmentgenerator;
 #[cfg(test)]

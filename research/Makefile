@@ -44,7 +44,7 @@ RESEARCH_DIR = /var/tmp/research/$(MODE)/
 	shapes-report measure-edit-shape ambiguity-report rendering-report measure-tools-timing \
 	measure-tools-accuracy timing-report install-bdiff apted-budget-report measure-apted-budget \
 	paper-variables introductory-paper introductory-paper-empirical fetch-external \
-	measure-astdiff-oracle extract-defects4j-fixtures measure-robustness-fixtures
+	measure-astdiff-oracle measure-robustness-fixtures
 
 # Delegates to the root Makefile so the cargo invocation (and its `--features stats` requirement)
 # lives in exactly one place.
@@ -406,13 +406,6 @@ fetch-external:
 	./external/fetch_astdiff_oracle.sh
 	./external/fetch_gumtree_simple_package.sh
 	./external/fetch_defects4j_metadata.sh
-
-# Promote the N compilation units codediff disagrees with the oracle on most into
-# src/test/data/diffs/defects4j/ as unsolved fixtures for human_solver (README + description, no
-# mapping). Never overwrites an existing fixture directory. `DEFECTS4J_TOP=20` by default.
-DEFECTS4J_TOP ?= 20
-extract-defects4j-fixtures:
-	uv run ./external/extract_defects4j_fixtures.py --top $(DEFECTS4J_TOP)
 
 # Score codediff's node mapping against the Alikhanifard & Tsantalis oracle (Defects4J half, 800
 # cases). Writes data/comparison/astdiff_oracle_defects4j.csv and prints precision/recall at the

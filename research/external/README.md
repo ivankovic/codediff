@@ -87,18 +87,22 @@ per-file CSV, the exact oracle commit, the resolution rate (78% of records; 88% 
 inside a comment) and the caveats that go with the comparison are in
 `../data/comparison/PROVENANCE.md`.
 
-## Promoting oracle cases into the corpus
+## The oracle cases in the corpus
 
-`extract_defects4j_fixtures.py` (`make extract-defects4j-fixtures`, or `--cases Closure-157,...`)
-turns the rows of the scorer's CSV where codediff disagrees with the oracle most into fixture
-directories under `src/test/data/diffs/defects4j/`, the corpus's fifth dataset. Each gets the
-buggy/fixed pair as `before.java.test`/`after.java.test`, a `README.md` in the provenance format
-every other fixture carries (Defects4J's revision ids and bug report, via
-`fetch_defects4j_metadata.sh`), and a `description.md` recording the disagreement that got it
-picked. No mapping: the fixtures are unsolved until someone maps them in `human_solver`, whose
-`o` picker lists them under the `defects4j` dataset like any other. The first 20 were promoted
-on 2026-09-11. Our mapping is our own judgement; where it ends up disagreeing with the oracle,
-the fixture's `description.md` is the place to say so.
+**All 996 compilation units are already fixture directories** under
+`src/test/data/diffs/defects4j/`, the corpus's fifth dataset, each holding the buggy/fixed pair as
+`before.java.test`/`after.java.test` and a `README.md` in the provenance format every other fixture
+carries (Defects4J's revision ids and bug report, via `fetch_defects4j_metadata.sh`). They are
+unsolved until someone maps them in `human_solver`, whose `o` picker lists them under the
+`defects4j` dataset like any other.
+
+The script that created them (`extract_defects4j_fixtures.py`, `make extract-defects4j-fixtures`)
+was removed on 2026-09-15: it promoted a disagreement-ranked top-N, and with the whole list
+promoted there is nothing left for it to select. Note what that means for reading any figure over
+the solved subset - **the solved fixtures are whatever annotation has reached, not a draw**, and as
+of 2026-09-15 they run far shorter than the rest (median 292 oracle records against 2177). Our
+mapping is our own judgement; where it ends up disagreeing with the oracle, the fixture's
+`description.md` is the place to say so.
 
 ## Other datasets looked at and not fetched (2026-09-11)
 

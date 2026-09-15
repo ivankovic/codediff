@@ -660,10 +660,12 @@ fn handmade_test_code_pairs_uncached() -> Result<HashMap<String, (Code, Code)>> 
 /// size bucket* (`stats::sampling::SIZE_BUCKETS`, gated by the `stats` feature so not linkable
 /// from here under plain `test-fixtures`), rather than per language alone, so large files get
 /// guaranteed representation instead of being drowned out by the much more common small ones; see
-/// that binary's module doc comment), and `defects4j` (Java bug fixes from Defects4J, picked
-/// because codediff disagreed with the Alikhanifard & Tsantalis AST-diff oracle on them - see
-/// `research/external/extract_defects4j_fixtures.py`; the only dataset whose cases were chosen by
-/// another tool's ground truth rather than sampled). Fixture names are unique across all five (a
+/// that binary's module doc comment), and `defects4j` (the Java bug fixes of the Alikhanifard &
+/// Tsantalis AST-diff oracle - *all* 996 of its compilation units, not a selection, so this is the
+/// one dataset that is a third party's list taken whole rather than sampled by us; see
+/// `research/external/README.md`. Which of them carry a mapping is a matter of how far annotation
+/// has got, not of any property of the case, so a rate over the solved ones is not a rate over
+/// the dataset). Fixture names are unique across all five (a
 /// promoted name can't collide with a handmade one - see `human_solver`'s `action_promote`), so
 /// every reader below treats the split as an implementation detail: a name resolves to whichever
 /// of the five actually holds it, and callers never need to know which.

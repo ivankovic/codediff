@@ -9,8 +9,7 @@
 #
 # The oracle and the replication package both key Defects4J cases as `<Project>-<BugId>` and say
 # nothing about which revision that is; these tables are what turns `Closure-157` back into a
-# commit and a bug report, and `extract_defects4j_fixtures.py` writes both into each promoted
-# fixture's README.
+# commit and a bug report, which is how each `defects4j` fixture's README came to carry both.
 #
 # The revision ids are Defects4J's, from the repositories it bundles (several were converted from
 # SVN), not necessarily the upstream project's GitHub history - the README says so.
