@@ -304,10 +304,10 @@ pub(crate) fn bdiff_spans_from_script(
     // BDiff line numbers are 1-based; `TextRange` rows are 0-based.
     let whole = |spans: &mut Vec<TextRange>, lines: &[&str], start: u64, count: u64| {
         for line_number in start..start + count.max(1) {
-            if let Some(row) = (line_number as usize).checked_sub(1) {
-                if row < lines.len() {
-                    spans.push(whole_row_span(lines, row));
-                }
+            if let Some(row) = (line_number as usize).checked_sub(1)
+                && row < lines.len()
+            {
+                spans.push(whole_row_span(lines, row));
             }
         }
     };

@@ -105,10 +105,10 @@ pub(crate) fn nvim_line_labels(before: &Code, after: &Code) -> Result<(Vec<bool>
         let mut flags = vec![false; line_count];
         if let Some(lines) = side.get("lines").and_then(|v| v.as_array()) {
             for value in lines {
-                if let Some(index) = value.as_u64().and_then(|n| (n as usize).checked_sub(1)) {
-                    if let Some(slot) = flags.get_mut(index) {
-                        *slot = true;
-                    }
+                if let Some(index) = value.as_u64().and_then(|n| (n as usize).checked_sub(1))
+                    && let Some(slot) = flags.get_mut(index)
+                {
+                    *slot = true;
                 }
             }
         }

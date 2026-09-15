@@ -498,10 +498,8 @@ impl App {
         // keystroke that opens it would immediately reach the just-created modal and close it
         // again in the same event cycle - it would open and close within a single frame, i.e.
         // never visibly show up at all.
-        if !globally_handled {
-            if let Some(action) = self.dispatch_event_to_active_screen(event)? {
-                action_tx.send(action)?;
-            }
+        if !globally_handled && let Some(action) = self.dispatch_event_to_active_screen(event)? {
+            action_tx.send(action)?;
         }
         Ok(())
     }
@@ -1725,11 +1723,12 @@ fn compute_diff_with_options_inner(
 /// `compute_diff`), re-parse it as empty content in `fallback_language` instead of leaving it
 /// unsupported.
 fn substitute_missing_language(code: &mut Code, fallback_language: Option<Language>, path: &Path) {
-    if code.ast.is_none() && code.contents.is_empty() {
-        if let Some(language) = fallback_language {
-            *code = Code::from_string("", &language);
-            code.metadata.path = Some(path.to_path_buf());
-        }
+    if code.ast.is_none()
+        && code.contents.is_empty()
+        && let Some(language) = fallback_language
+    {
+        *code = Code::from_string("", &language);
+        code.metadata.path = Some(path.to_path_buf());
     }
 }
 

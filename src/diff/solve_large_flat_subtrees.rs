@@ -97,15 +97,16 @@ pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
     // top-level node on each side (true for any file whose grammar wraps a single root value,
     // and only ever attempted when nothing already matched by name), it's necessarily the same
     // logical thing on both sides - there is nothing else it could correspond to.
-    if before_items.is_empty() && after_items.is_empty() {
-        if let (Some(b), Some(a)) = (
+    if before_items.is_empty()
+        && after_items.is_empty()
+        && let (Some(b), Some(a)) = (
             only_named_child(before_ast.root_node()),
             only_named_child(after_ast.root_node()),
-        ) {
-            let key = ("<whole-file value>".to_string(), String::new());
-            before_items.insert(key.clone(), b.id());
-            after_items.insert(key, a.id());
-        }
+        )
+    {
+        let key = ("<whole-file value>".to_string(), String::new());
+        before_items.insert(key.clone(), b.id());
+        after_items.insert(key, a.id());
     }
 
     for (key, &before_id) in &before_items {

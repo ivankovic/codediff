@@ -122,10 +122,10 @@ pub(crate) fn diffsitter_touched_from_json(
                 continue;
             };
             for entry in entries {
-                if let Some(line_index) = entry["line_index"].as_u64() {
-                    if let Some(slot) = touched.get_mut(line_index as usize) {
-                        *slot = true;
-                    }
+                if let Some(line_index) = entry["line_index"].as_u64()
+                    && let Some(slot) = touched.get_mut(line_index as usize)
+                {
+                    *slot = true;
                 }
             }
         }

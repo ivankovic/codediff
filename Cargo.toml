@@ -2,7 +2,7 @@
 name = "codediff"
 version = "0.0.13"
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.88"
 description = "Fast, robust, syntax-aware code diffing using tree-sitter ASTs"
 license = "AGPL-3.0-or-later"
 repository = "https://github.com/ivankovic/codediff"

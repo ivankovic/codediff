@@ -154,7 +154,7 @@ fn touched_span(mode: Mode, side: &str, index: usize, line: &str) -> Option<(usi
         Mode::All => Some((0, line.len())),
         Mode::Random => {
             let hash = line_hash(side, index, line);
-            if hash % 2 == 0 {
+            if hash.is_multiple_of(2) {
                 return None;
             }
             // A sub-line range rather than the whole line: a real AST-aware tool reports spans

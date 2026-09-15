@@ -284,10 +284,10 @@ fn hash_gap(hasher: &mut MetroHash64, source: &[u8], start: usize, end: usize) {
     if start >= end {
         return;
     }
-    if let Ok(text) = std::str::from_utf8(&source[start..end]) {
-        if !text.trim().is_empty() {
-            hasher.write(text.as_bytes());
-        }
+    if let Ok(text) = std::str::from_utf8(&source[start..end])
+        && !text.trim().is_empty()
+    {
+        hasher.write(text.as_bytes());
     }
 }
 

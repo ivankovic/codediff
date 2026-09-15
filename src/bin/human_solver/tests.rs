@@ -5234,7 +5234,7 @@ fn scan_corpus_returns_the_same_map_at_every_worker_count() {
     // of which thread happened to run which entry.
     let scan = |name: &str| {
         let n: usize = name.trim_start_matches("case-").parse().unwrap();
-        (n % 3 != 0).then_some(n * 2)
+        (!n.is_multiple_of(3)).then_some(n * 2)
     };
 
     let sequential = scan_corpus_with_threads(&names, 1, scan);

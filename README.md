@@ -18,7 +18,7 @@ cargo install codediff
 ```
 
 This command builds CodeDiff from source. You need a C compiler on `PATH` and a Rust toolchain,
-edition 2024 or later (rustc 1.85 or later). The build compiles every tree-sitter grammar from C.
+edition 2024 or later (rustc 1.88 or later). The build compiles every tree-sitter grammar from C.
 The first `cargo install` takes a few minutes, because of this and the `lto = "fat"` release
 profile.
 

@@ -136,15 +136,15 @@ pub(crate) fn difftastic_touched_from_json(
             .as_array()
             .context("difft JSON chunk is not an array")?;
         for entry in entries {
-            if let Some(line_number) = entry["lhs"]["line_number"].as_u64() {
-                if let Some(slot) = before_touched.get_mut(line_number as usize) {
-                    *slot = true;
-                }
+            if let Some(line_number) = entry["lhs"]["line_number"].as_u64()
+                && let Some(slot) = before_touched.get_mut(line_number as usize)
+            {
+                *slot = true;
             }
-            if let Some(line_number) = entry["rhs"]["line_number"].as_u64() {
-                if let Some(slot) = after_touched.get_mut(line_number as usize) {
-                    *slot = true;
-                }
+            if let Some(line_number) = entry["rhs"]["line_number"].as_u64()
+                && let Some(slot) = after_touched.get_mut(line_number as usize)
+            {
+                *slot = true;
             }
         }
     }

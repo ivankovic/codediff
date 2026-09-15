@@ -58,14 +58,13 @@ jobs:
 
       - run: cargo install cargo-audit --locked
 
-      # RUSTSEC-2026-0195/-0194 (quick-xml, pulled in via syntect -> plist): both are DoS vectors
-      # in untrusted-XML parsing. codediff only ever calls syntect's ThemeSet::load_defaults()
-      # (bundled themes baked into the syntect binary - see src/tui/widgets/code_viewer.rs), never
-      # feeds any external/user-supplied plist/XML into it, so this code path is unreachable here.
-      # Can't fix directly: syntect 5.3.0 (latest as of this writing) pins plist ~1.9, which pins
-      # the vulnerable quick-xml; blocked on syntect bumping its own plist dependency upstream.
-      # Re-check by removing these --ignore flags occasionally.
-      - run: cargo audit --ignore RUSTSEC-2026-0195 --ignore RUSTSEC-2026-0194
+      # No --ignore flags, and it should stay that way. RUSTSEC-2026-0195/-0194 (quick-xml, via
+      # syntect -> plist) were ignored here until 2026-09-15 on the stated grounds that syntect
+      # pinned a vulnerable plist. It does not - syntect 5.3.0 asks for `plist ^1.3`, which permits
+      # 1.10.1, and that depends on quick-xml ^0.42, past the >=0.41 fix. What actually held the
+      # resolver back was this crate's own `rust-version`: plist 1.10.1 needs Rust 1.88, so the
+      # MSRV-aware resolver would not take it while we claimed 1.85. Raising the MSRV cleared both.
+      - run: cargo audit
 
   mapping-site-js:
     name: JS tests (human_mapping site, web viewer)

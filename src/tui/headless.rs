@@ -425,21 +425,19 @@ fn render_side(
             continue;
         }
 
-        if !prev_line_shown {
-            if let (Some(parsed), Some(lang)) = (&parsed, &language) {
-                if let Some(ref_row) = nearest_reference_line(parsed, lang, i) {
-                    // Only worth showing if it isn't already going to be visible in this hunk
-                    // (or was already shown, or will be, as part of some other kept line).
-                    if !keep[ref_row] {
-                        let breadcrumb =
-                            format!("{:>number_width$} @ {}", ref_row + 1, lines[ref_row]);
-                        if use_color {
-                            out.push_str(&format!("\u{1b}[90m{breadcrumb}\u{1b}[0m\n"));
-                        } else {
-                            out.push_str(&breadcrumb);
-                            out.push('\n');
-                        }
-                    }
+        if !prev_line_shown
+            && let (Some(parsed), Some(lang)) = (&parsed, &language)
+            && let Some(ref_row) = nearest_reference_line(parsed, lang, i)
+        {
+            // Only worth showing if it isn't already going to be visible in this hunk
+            // (or was already shown, or will be, as part of some other kept line).
+            if !keep[ref_row] {
+                let breadcrumb = format!("{:>number_width$} @ {}", ref_row + 1, lines[ref_row]);
+                if use_color {
+                    out.push_str(&format!("\u{1b}[90m{breadcrumb}\u{1b}[0m\n"));
+                } else {
+                    out.push_str(&breadcrumb);
+                    out.push('\n');
                 }
             }
         }

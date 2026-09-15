@@ -152,21 +152,19 @@ impl<'a> ContainmentCtx<'a> {
         if base >= FORBIDDEN_RENAME_COST {
             return base;
         }
-        if let Some(targets) = self.before_pruned_targets.get(&before_id) {
-            if targets
+        if let Some(targets) = self.before_pruned_targets.get(&before_id)
+            && targets
                 .iter()
                 .any(|&t| !is_ancestor_or_self(after_id, t, self.after_parents))
-            {
-                return FORBIDDEN_RENAME_COST;
-            }
+        {
+            return FORBIDDEN_RENAME_COST;
         }
-        if let Some(targets) = self.after_pruned_targets.get(&after_id) {
-            if targets
+        if let Some(targets) = self.after_pruned_targets.get(&after_id)
+            && targets
                 .iter()
                 .any(|&t| !is_ancestor_or_self(before_id, t, self.before_parents))
-            {
-                return FORBIDDEN_RENAME_COST;
-            }
+        {
+            return FORBIDDEN_RENAME_COST;
         }
         if !self.before_anchor_preorders.is_empty() || !self.after_anchor_preorders.is_empty() {
             let before_pre = self
