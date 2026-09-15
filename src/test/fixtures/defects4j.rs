@@ -50,13 +50,19 @@ mod java_defects4j_chart_20_valuemarker;
 #[cfg(test)]
 mod java_defects4j_chart_21_defaultboxandwhiskercategorydataset;
 #[cfg(test)]
+mod java_defects4j_chart_23_minmaxcategoryrenderer;
+#[cfg(test)]
 mod java_defects4j_chart_24_graypaintscale;
+#[cfg(test)]
+mod java_defects4j_chart_26_axis;
 #[cfg(test)]
 mod java_defects4j_chart_2_datasetutilities;
 #[cfg(test)]
 mod java_defects4j_chart_4_xyplot;
 #[cfg(test)]
 mod java_defects4j_chart_6_shapelist;
+#[cfg(test)]
+mod java_defects4j_chart_8_week;
 #[cfg(test)]
 mod java_defects4j_cli_12_gnuparser;
 #[cfg(test)]
