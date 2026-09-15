@@ -736,6 +736,24 @@ def common_subset_concentration(research_dir):
     }
 
 
+# The oracle paper's own per-tool figures, transcribed from Alikhanifard and Tsantalis (TOSEM
+# 2025). AUTHORED because they are someone else's published measurement: there is no artifact of
+# ours to read them back from, and re-deriving them would mean re-running their six tools.
+# `*Sub` is their Table 12/14 (statement and sub-expression, the granularity our `all` matches);
+# the statement-only Table 11/13 figures are quoted in prose where they are needed.
+ORACLE_PUBLISHED = {
+    "OracleRefactoringMinerPrecision": "99.7",
+    "OracleRefactoringMinerRecall": "99.3",
+    "OracleRefactoringMinerPerfect": "85.9",
+    "OracleGumTreeSimplePrecision": "98.4",
+    "OracleGumTreeSimpleRecall": "97.8",
+    "OracleGumTreeSimplePerfect": "63.3",
+    "OracleGumTreeGreedyPrecision": "97.5",
+    "OracleGumTreeGreedyRecall": "93.1",
+    "OracleGumTreeGreedyPerfect": "18.1",
+}
+
+
 def robustness_fixtures(research_dir):
     """Section 8's Robust target, measured: every fixture in the paper's corpus pushed through
     `diff_code` with no node cap, a per-fixture timeout, panic isolation and allocation counters.
@@ -794,6 +812,69 @@ def robustness_fixtures(research_dir):
     }
 
 
+def astdiff_oracle(research_dir):
+    """Section 7's external check: CodeDiff's node mapping scored against an oracle nobody on this
+    project wrote. DERIVED from `data/comparison/astdiff_oracle_defects4j.csv`.
+
+    source: `make measure-astdiff-oracle` from research/ (benchmark_astdiff_oracle). Measured
+            2026-09-15.
+
+    The oracle is Alikhanifard and Tsantalis' AST node-mapping benchmark (TOSEM 2025), Defects4J
+    half: 800 bug-fixing changes over 996 Java compilation units, each a complete list of which
+    before-side node maps to which after-side node, built by hand over six person-months.
+
+    **`OracleResolutionRate` travels with every rate here.** The oracle's unit is an Eclipse JDT
+    node and ours is a tree-sitter node; the two meet only where a record's character span is one
+    some tree-sitter node also has. Records that do not resolve - JDT's synthetic
+    `METHOD_INVOCATION_RECEIVER`, the `TextElement`s inside a Javadoc that tree-sitter reads as one
+    comment - are dropped from the reference set. That is the part of the oracle we could not ask,
+    and a precision quoted without it would be a rate over an unstated population.
+
+    `all` keeps every record that resolves (their Table 12/14 granularity, statement and
+    sub-expression); `statement` keeps only records whose JDT type is a statement, declaration or
+    block (their Table 11/13).
+    """
+    path = os.path.join(research_dir, "data", "comparison", "astdiff_oracle_defects4j.csv")
+    if not os.path.exists(path):
+        return {}
+    with open(path, newline="") as f:
+        rows = list(csv.DictReader(f))
+    if not rows:
+        return {}
+
+    def rate(numerator, denominator):
+        return 100.0 * numerator / denominator if denominator else 0.0
+
+    values = {
+        "OracleCases": latex_number(len({r["case"] for r in rows})),
+        "OracleUnits": latex_number(len(rows)),
+        "OracleRecords": latex_number(sum(int(r["oracle_records"]) for r in rows)),
+        "OracleResolutionRate": f"{rate(sum(int(r['oracle_resolved']) for r in rows), sum(int(r['oracle_records']) for r in rows)):.1f}",
+    }
+    for granularity, stem in (("all", "Oracle"), ("statement", "OracleStatement")):
+        tp = sum(int(r[f"{granularity}_tp"]) for r in rows)
+        fp = sum(int(r[f"{granularity}_fp"]) for r in rows)
+        fn = sum(int(r[f"{granularity}_fn"]) for r in rows)
+        # Perfect is per *case*, and a case is perfect only when every compilation unit in it is -
+        # the same definition `benchmark_astdiff_oracle` prints and the same one the oracle paper's
+        # own tables use. Counting it per unit would report a different number for the same word.
+        case_perfect = {}
+        for row in rows:
+            unit_perfect = int(row[f"{granularity}_fp"]) == 0 and int(row[f"{granularity}_fn"]) == 0
+            case_perfect[row["case"]] = case_perfect.get(row["case"], True) and unit_perfect
+        values.update(
+            {
+                f"{stem}Mappings": latex_number(
+                    sum(int(r[f"{granularity}_oracle_scored"]) for r in rows)
+                ),
+                f"{stem}Precision": f"{rate(tp, tp + fp):.2f}",
+                f"{stem}Recall": f"{rate(tp, tp + fn):.2f}",
+                f"{stem}Perfect": f"{rate(sum(case_perfect.values()), len(case_perfect)):.1f}",
+            }
+        )
+    return values
+
+
 def build(
     empirical_lines,
     rq1_lines,
@@ -806,6 +887,7 @@ def build(
     cost,
     concentration,
     robustness,
+    oracle,
 ):
     """Returns the complete variables.tex as a list of lines."""
     out = [
@@ -938,6 +1020,17 @@ def build(
         "% corpus - see `robustness_fixtures`). Refresh with `make measure-robustness-fixtures`.",
     ]
     out += [command(name, value) for name, value in robustness.items()]
+
+    out += [
+        "",
+        "% --- The external AST node-mapping oracle (Alikhanifard & Tsantalis, TOSEM 2025),",
+        "% Defects4J half: CodeDiff scored against ground truth nobody on this project wrote",
+        "% (DERIVED from data/comparison/astdiff_oracle_defects4j.csv - see `astdiff_oracle`).",
+        "% Refresh with `make measure-astdiff-oracle`. Their own per-tool figures below are",
+        "% transcribed from their paper.",
+    ]
+    out += [command(name, value) for name, value in oracle.items()]
+    out += [command(name, value) for name, value in ORACLE_PUBLISHED.items()]
 
     out += [
         "",
@@ -1113,6 +1206,13 @@ def main():
                 f"drifted from that script's PAPER_MACRO_STEMS."
             )
 
+    oracle = astdiff_oracle(research_dir)
+    if not oracle:
+        print(
+            "WARNING: no oracle run found (data/comparison/astdiff_oracle_defects4j.csv) - the "
+            "Oracle* macros will be absent. Run `make measure-astdiff-oracle`."
+        )
+
     robustness = robustness_fixtures(research_dir)
     if not robustness:
         print(
@@ -1132,6 +1232,7 @@ def main():
         cost,
         concentration,
         robustness,
+        oracle,
     )
 
     os.makedirs(os.path.dirname(output_path), exist_ok=True)

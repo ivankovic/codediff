@@ -336,6 +336,33 @@
 \newcommand{\RobustnessPeakMemoryMb}{56.6}
 \newcommand{\RobustnessTimeoutSeconds}{120}
 
+% --- The external AST node-mapping oracle (Alikhanifard & Tsantalis, TOSEM 2025),
+% Defects4J half: CodeDiff scored against ground truth nobody on this project wrote
+% (DERIVED from data/comparison/astdiff_oracle_defects4j.csv - see `astdiff_oracle`).
+% Refresh with `make measure-astdiff-oracle`. Their own per-tool figures below are
+% transcribed from their paper.
+\newcommand{\OracleCases}{800}
+\newcommand{\OracleUnits}{996}
+\newcommand{\OracleRecords}{3{,}031{,}434}
+\newcommand{\OracleResolutionRate}{78.0}
+\newcommand{\OracleMappings}{242{,}749}
+\newcommand{\OraclePrecision}{99.42}
+\newcommand{\OracleRecall}{98.86}
+\newcommand{\OraclePerfect}{54.1}
+\newcommand{\OracleStatementMappings}{40{,}024}
+\newcommand{\OracleStatementPrecision}{99.46}
+\newcommand{\OracleStatementRecall}{98.67}
+\newcommand{\OracleStatementPerfect}{80.8}
+\newcommand{\OracleRefactoringMinerPrecision}{99.7}
+\newcommand{\OracleRefactoringMinerRecall}{99.3}
+\newcommand{\OracleRefactoringMinerPerfect}{85.9}
+\newcommand{\OracleGumTreeSimplePrecision}{98.4}
+\newcommand{\OracleGumTreeSimpleRecall}{97.8}
+\newcommand{\OracleGumTreeSimplePerfect}{63.3}
+\newcommand{\OracleGumTreeGreedyPrecision}{97.5}
+\newcommand{\OracleGumTreeGreedyRecall}{93.1}
+\newcommand{\OracleGumTreeGreedyPerfect}{18.1}
+
 % --- Design targets and fixed descriptive facts (AUTHORED - see script's TARGETS block).
 \newcommand{\SpeedTargetMs}{400}
 \newcommand{\SpeedTargetPct}{99.99}

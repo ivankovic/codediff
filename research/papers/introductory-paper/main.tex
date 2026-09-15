@@ -387,16 +387,14 @@ more than 3000 lines of code. In each stratum, \SampleStratifiedPerCell{} diffs 
 sampled per language, and inspected as above. Drawing and solving that stratified sample
 is still in progress; every number in this paper is reported over the \NumFixtures{} changes solved so far.
 
-% TODO(references.bib): this paragraph needs two entries that the bibliography does not yet have -
-% Alikhanifard and Tsantalis' AST node-mapping oracle (TOSEM 2025), and Falleri and Martinez' ICSE
-% 2024 replication package, which supplies the file contents the oracle's offsets index into. Cite
-% both here once they are in the .bib; the oracle is named in prose in the meantime.
 A fourth list extends the corpus beyond our own sampling. The AST node-mapping oracle of
-Alikhanifard and Tsantalis records, for 800 bug-fixing changes of Defects4J~\cite{defects4j}, which
-node of the before file each node of the after file corresponds to, over 996 Java compilation
-units. We solve those same 996 compilation units by hand as well, so that our mappings can be read
-against an independently authored reference on a corpus that other AST-differencing evaluations
-already use. Annotating that list is in progress.
+Alikhanifard and Tsantalis~\cite{astdiffbenchmark} records, for \OracleCases{} bug-fixing changes of
+Defects4J~\cite{defects4j}, which node of the before file each node of the after file corresponds
+to, over \OracleUnits{} Java compilation units; the file contents its offsets index into come from
+Falleri and Martinez' replication package~\cite{gumtreesimple}. Section~\ref{sec:oracle} scores
+\textsc{CodeDiff} against it directly. We solve those same \OracleUnits{} compilation units by hand
+as well, so that our own mappings can be read against an independently authored reference on a
+corpus that other AST-differencing evaluations already use. Annotating that list is in progress.
 
 Each diff was then solved by hand by the authors, who have each at least 15 years of experience in
 software development, and have reviewed tens of thousands of real world code changes in industrial
@@ -814,6 +812,58 @@ Figure~\ref{fig:agreement-by-dataset}, while the node-level accuracy is lowest t
 
 
 
+\subsection{An independently authored oracle}
+\label{sec:oracle}
+
+Every accuracy figure above is scored against ground truth this paper's authors wrote. The AST
+node-mapping oracle of Alikhanifard and Tsantalis~\cite{astdiffbenchmark} is the answer to the
+obvious objection. It records, for \OracleCases{} bug-fixing changes of Defects4J over
+\OracleUnits{} Java compilation units, which before-side node each after-side node corresponds to:
+\OracleRecords{} mappings, built by running six tools, inspecting every diff by hand against six
+stated criteria, and resolving disagreements by vote. It was authored by different people, for a
+different tool, on a different AST, before \textsc{CodeDiff} existed. The file contents its
+character offsets index into come from Falleri and Martinez' replication
+package~\cite{gumtreesimple}.
+
+\textbf{What can be asked of it.} The oracle's unit is an Eclipse JDT node and ours is a
+tree-sitter node, so the two meet only where a record's character span is one some tree-sitter node
+also has. \OracleResolutionRate{}\% of records resolve; the remainder are JDT constructs
+tree-sitter does not model separately, chiefly the elements inside a Javadoc comment, which
+tree-sitter reads as a single token. That share is the part of the oracle we could not ask, and
+every rate below is over the part we could.
+
+\begin{table}
+  \caption{Node-mapping accuracy against the Alikhanifard--Tsantalis oracle, Defects4J half,
+  \OracleCases{} cases. Statement and sub-expression granularity. The upper rows are as published
+  by the oracle's authors; \emph{Perfect} is the share of cases mapped with no error at all.}
+  \label{tab:astdiff-oracle}
+  \begin{tabular}{lrrr}
+    \toprule
+    Tool & Precision & Recall & Perfect \\
+    \midrule
+    RefactoringMiner 3.0 & \OracleRefactoringMinerPrecision{}\% & \OracleRefactoringMinerRecall{}\% & \OracleRefactoringMinerPerfect{}\% \\
+    \textsc{CodeDiff}    & \OraclePrecision{}\%                & \OracleRecall{}\%                 & \OraclePerfect{}\% \\
+    GumTree 3.0 simple   & \OracleGumTreeSimplePrecision{}\%   & \OracleGumTreeSimpleRecall{}\%    & \OracleGumTreeSimplePerfect{}\% \\
+    GumTree 3.0 greedy   & \OracleGumTreeGreedyPrecision{}\%   & \OracleGumTreeGreedyRecall{}\%    & \OracleGumTreeGreedyPerfect{}\% \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\textsc{CodeDiff} maps \OraclePrecision{}\% of what it claims correctly and recovers
+\OracleRecall{}\% of what the oracle records, over \OracleMappings{} mappings, and is exactly right
+on \OraclePerfect{}\% of cases. Restricted to statement-level records it is \OracleStatementPrecision{}\% and
+\OracleStatementRecall{}\% over \OracleStatementMappings{} mappings, exactly right on
+\OracleStatementPerfect{}\% of cases. That places it between GumTree's simple algorithm and
+RefactoringMiner, which is the interesting part of the result rather than the ranking:
+RefactoringMiner detects refactorings explicitly and parses Java and only Java, and the oracle was
+built in part from its output, while \textsc{CodeDiff} has no refactoring catalogue, no Java-specific
+rule, and treats this corpus exactly as it treats the other \NumLanguages{} languages it supports.
+
+Two cautions on reading the table across rows. The published figures are computed over the whole
+oracle, ours over the \OracleResolutionRate{}\% of it that resolves to tree-sitter spans, so the
+two populations are close but not identical. And the oracle's own construction consulted the
+output of the tools in the upper rows, which can only favour them.
+
 \textbf{Speed.} Over the same \CodeDiffFixtures{} fixtures, \textsc{CodeDiff}'s median
 wall-clock time is \SpeedCodeDiffPFifty{}\,ms, its 90th percentile \SpeedCodeDiffPNinety{}\,ms
 and its 99th percentile \SpeedCodeDiffPNinetyNine{}\,ms.
@@ -857,9 +907,12 @@ additionally distorted by run order, whichever tool runs first per fixture absor
 cost; to minimise this effect we quote percentiles rather than means throughout, and every timing number is the result of repeated runs.
 
 The ground truth is authored by the same people who built \textsc{CodeDiff}, which is a real risk
-of bias in its favour. Two things limit it: the mappings are authored against the change itself in
-a dedicated annotation tool with no tool output shown, and the full annotation history is published
-with the corpus so that any individual mapping can be inspected and disputed.
+of bias in its favour. Three things limit it: the mappings are authored against the change itself in
+a dedicated annotation tool with no tool output shown, the full annotation history is published
+with the corpus so that any individual mapping can be inspected and disputed, and
+Section~\ref{sec:oracle} scores the tool against ground truth authored by other people, for a
+different tool, before this one existed. That last check is the only one of the three that does not
+depend on our own discipline, and it is the reason the corpus was extended with Defects4J at all.
 
 \textbf{External validity.} The fixture corpus is deliberately not a fully random sample of
 real commits. It concentrates hard, structurally interesting changes, because easy ones exercise
