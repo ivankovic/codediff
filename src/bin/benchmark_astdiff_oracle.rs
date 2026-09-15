@@ -111,6 +111,75 @@ struct Args {
     /// ... and only when at least this many occurrences were seen.
     #[arg(long, default_value_t = 50)]
     whitelist_min: usize,
+    /// Score **our own hand-authored mapping** against the oracle instead of codediff's output,
+    /// over the compilation units this directory holds a solved fixture for.
+    ///
+    /// This is the one measurement that puts two independently authored ground truths against
+    /// each other: ours was written by the people who built codediff, theirs by Alikhanifard and
+    /// Tsantalis for a different tool on a different AST. Precision and recall keep their usual
+    /// meaning with *their* mapping as the reference, so "precision" here is the share of our
+    /// pairs they also record and "recall" the share of theirs we do - neither is a score, since
+    /// neither is a verdict on the other.
+    ///
+    /// A unit is matched to a fixture by **content**, not by name: the fixture directories carry
+    /// the same before/after bytes the oracle's offsets index into (see their READMEs), and the
+    /// fixture naming is a Python script's business, not this one's.
+    #[arg(long)]
+    human_mappings: Option<PathBuf>,
+}
+
+/// Fixture name by the `(before, after)` content of its pair - see `Args::human_mappings`.
+type HumanIndex = HashMap<(u64, u64), String>;
+
+/// Every solved fixture under `dir`, keyed by what its two files contain.
+fn human_mapping_index(dir: &Path) -> Result<HumanIndex> {
+    use std::hash::{Hash, Hasher};
+    let digest = |bytes: &[u8]| -> u64 {
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        bytes.hash(&mut hasher);
+        hasher.finish()
+    };
+    let mut index = HumanIndex::new();
+    for entry in std::fs::read_dir(dir)
+        .with_context(|| format!("reading fixtures from {}", dir.display()))?
+        .filter_map(Result::ok)
+    {
+        let path = entry.path();
+        if !path.join("human_mapping.json").is_file() {
+            continue;
+        }
+        let mut sides: [Option<Vec<u8>>; 2] = [None, None];
+        for file in std::fs::read_dir(&path)?.filter_map(Result::ok) {
+            let name = file.file_name().to_string_lossy().into_owned();
+            let slot = match name.split('.').next() {
+                Some("before") => 0,
+                Some("after") => 1,
+                _ => continue,
+            };
+            sides[slot] = Some(std::fs::read(file.path())?);
+        }
+        let (Some(before), Some(after)) = (&sides[0], &sides[1]) else {
+            continue;
+        };
+        index.insert(
+            (digest(before), digest(after)),
+            entry.file_name().to_string_lossy().into_owned(),
+        );
+    }
+    Ok(index)
+}
+
+/// The fixture whose pair is byte-identical to this compilation unit's, if we have solved it.
+fn human_fixture_for(index: &HumanIndex, before: &Side, after: &Side) -> Option<String> {
+    use std::hash::{Hash, Hasher};
+    let digest = |text: &str| -> u64 {
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        text.as_bytes().hash(&mut hasher);
+        hasher.finish()
+    };
+    index
+        .get(&(digest(&before.code.contents), digest(&after.code.contents)))
+        .cloned()
 }
 
 /// One record of an oracle JSON file. The `firstLabel`/`secondLabel`/`*ParentType` fields are
@@ -544,13 +613,31 @@ fn score_file(
     whitelist_all: &HashSet<&'static str>,
     whitelist_statement: &HashSet<&'static str>,
     details: bool,
-) -> FileScore {
+    human: Option<(&str, &codediff::test::helper::human_mapping::HumanMapping)>,
+) -> Result<FileScore> {
     let started = Instant::now();
-    let diff = diff::diff_code(&before.code, &after.code);
+    // In human mode the "tool" is our own ground truth, pushed through the same span-pair
+    // projection codediff's output goes through, so the two are compared on identical terms.
+    let human_ast = match human {
+        Some((_, mapping)) => Some(
+            codediff::test::helper::human_mapping::as_ast_diff_for_mapping(
+                mapping,
+                &before.code,
+                &after.code,
+            )
+            .context("building an ASTDiff from the human mapping")?,
+        ),
+        None => None,
+    };
+    let diff = match &human_ast {
+        Some(_) => None,
+        None => Some(diff::diff_code(&before.code, &after.code)),
+    };
     let codediff_ms = started.elapsed().as_secs_f64() * 1000.0;
-    let pairs = diff
-        .ast
+    let ast = human_ast
         .as_ref()
+        .or_else(|| diff.as_ref().and_then(|diff| diff.ast.as_ref()));
+    let pairs = ast
         .map(|ast| codediff_pairs(before, after, ast))
         .unwrap_or_default();
 
@@ -642,7 +729,7 @@ fn score_file(
             score.all = counts;
         }
     }
-    score
+    Ok(score)
 }
 
 fn excerpt(text: &str) -> String {
@@ -722,6 +809,19 @@ fn source_pair(sources: &Path, case: &str, json: &Path) -> Result<(PathBuf, Path
 fn main() -> Result<()> {
     let args = Args::parse();
     let cases = defects4j_cases(&args.oracle, &args.cases)?;
+    let human_index = match &args.human_mappings {
+        Some(dir) => {
+            let index = human_mapping_index(dir)?;
+            eprintln!(
+                "human mode: {} solved fixtures in {}; units without one are skipped, not scored \
+                 as zero",
+                index.len(),
+                dir.display()
+            );
+            Some(index)
+        }
+        None => None,
+    };
     if cases.is_empty() {
         bail!("no cases selected");
     }
@@ -852,6 +952,19 @@ fn main() -> Result<()> {
                 .and_then(|f| f.to_str())
                 .unwrap_or("?")
                 .to_string();
+            // In human mode a unit we have not solved has nothing to score - it is not a zero,
+            // it is silence, and counting it would report our coverage as our accuracy.
+            let mapping = match &human_index {
+                Some(index) => match human_fixture_for(index, &before, &after) {
+                    Some(name) => {
+                        let mapping = codediff::test::helper::human_mapping::load(&name)
+                            .with_context(|| format!("loading the human mapping for {name}"))?;
+                        Some((name, mapping))
+                    }
+                    None => continue,
+                },
+                None => None,
+            };
             scores.push(score_file(
                 case,
                 &file,
@@ -862,7 +975,10 @@ fn main() -> Result<()> {
                 &whitelist_all,
                 &whitelist_statement,
                 args.details,
-            ));
+                mapping
+                    .as_ref()
+                    .map(|(name, mapping)| (name.as_str(), mapping)),
+            )?);
         }
     }
 
