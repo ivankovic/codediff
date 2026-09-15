@@ -17,6 +17,27 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
+# Two jobs, in order: format what is being committed, then keep src/test/data/diffs.csv in step
+# with the fixture corpus it describes. Git runs one pre-commit hook, so both live here.
+#
+# ── 1. Formatting ───────────────────────────────────────────────────────────────────────────────
+#
+# `cargo fmt` and `ruff format` are both CI gates (`make ci`'s `fmt` and `python-lint` jobs), and
+# forgetting either is the single most common way a commit lands red. Formatting here costs the
+# `--check` pass on the overwhelming majority of commits, where nothing needs doing.
+#
+# **Nothing unstaged is ever staged by this hook.** That is the whole constraint, because a partly
+# staged file is a deliberate act - `git add -p` exists - and a formatter that quietly committed the
+# rest of it would be worse than no formatter. So a file that is staged *and* has further unstaged
+# changes is reported and left alone, never re-added.
+#
+# The Rust half cannot avoid touching the working tree, and that is a rustfmt limitation rather than
+# a choice: `--skip-children` is not on stable (checked 2026-09-15, rustfmt 1.9.0), so running it on
+# one file reformats every module that file declares. `cargo fmt --all` is therefore the honest
+# spelling - it is also exactly what CI checks - and any file it touches that this hook will not
+# stage is listed afterwards, so the change is visible rather than silent. The Python half has no
+# such problem: `ruff format` formats the paths it is given and nothing else.
+#
 # Keeps src/test/data/diffs.csv in step with the fixture corpus it describes.
 #
 # The inventory (src/bin/diff_inventory.rs) is entirely derived from src/test/data/diffs/, so a
@@ -32,6 +53,78 @@
 
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
+
+# ── 1. Formatting ───────────────────────────────────────────────────────────────────────────────
+
+# Staged files, and the subset of them that carry *no* further unstaged changes - the only files
+# this hook will ever re-stage.
+staged="$(git diff --cached --name-only --diff-filter=ACMR)"
+unstaged_too="$(git diff --name-only)"
+safe_to_restage() {
+    local file="$1"
+    ! grep -qxF "$file" <<<"$unstaged_too"
+}
+
+staged_rust="$(grep -E '\.rs$' <<<"$staged" || true)"
+if [ -n "$staged_rust" ]; then
+    # The cheap path: the crate is already formatted, which is almost every commit.
+    if ! cargo fmt --all --check >/dev/null 2>&1; then
+        echo "pre-commit: running cargo fmt --all"
+        before="$(git diff --name-only; git diff --cached --name-only)"
+        cargo fmt --all
+        restaged=()
+        while IFS= read -r file; do
+            [ -n "$file" ] || continue
+            if safe_to_restage "$file" && git diff --quiet -- "$file"; then
+                continue  # untouched by the formatter
+            fi
+            if safe_to_restage "$file"; then
+                git add -- "$file"
+                restaged+=("$file")
+            fi
+        done <<<"$staged_rust"
+        [ ${#restaged[@]} -eq 0 ] || echo "pre-commit: reformatted and staged ${restaged[*]}"
+        # Anything else the formatter reached: not staged by this hook, but say so out loud.
+        collateral="$(git diff --name-only | grep -E '\.rs$' | grep -vxF "$before" || true)"
+        if [ -n "$collateral" ]; then
+            echo "pre-commit: cargo fmt also reformatted files this commit does not stage:" >&2
+            sed 's/^/    /' <<<"$collateral" >&2
+            echo "  (rustfmt formats the modules a file declares; they are left for you to review)" >&2
+        fi
+    fi
+fi
+
+staged_python="$(grep -E '\.py$' <<<"$staged" || true)"
+if [ -n "$staged_python" ]; then
+    if ! command -v ruff >/dev/null 2>&1; then
+        echo "pre-commit: ruff not on PATH - skipping Python formatting (CI still checks it)" >&2
+    else
+        formattable=()
+        skipped=()
+        while IFS= read -r file; do
+            [ -n "$file" ] || continue
+            if safe_to_restage "$file"; then
+                formattable+=("$file")
+            else
+                skipped+=("$file")
+            fi
+        done <<<"$staged_python"
+        if [ ${#formattable[@]} -gt 0 ]; then
+            ruff format --quiet "${formattable[@]}"
+            for file in "${formattable[@]}"; do
+                git diff --quiet -- "$file" || {
+                    git add -- "$file"
+                    echo "pre-commit: reformatted and staged $file"
+                }
+            done
+        fi
+        if [ ${#skipped[@]} -gt 0 ]; then
+            echo "pre-commit: not formatting ${skipped[*]} - staged with further unstaged changes" >&2
+        fi
+    fi
+fi
+
+# ── 2. Fixture inventory ────────────────────────────────────────────────────────────────────────
 
 # What the inventory is derived from, and therefore what has to trigger it. `sample.csv` is in the
 # list because the inventory joins its provenance and comment columns per fixture, so editing a

@@ -127,8 +127,10 @@ install:
 install-hooks:
 	git config core.hooksPath .githooks
 	@echo "hooks enabled (git config core.hooksPath .githooks):"
-	@echo "  pre-commit - regenerates src/test/data/diffs.csv when a commit touches the fixture"
-	@echo "               corpus, so the checked-in inventory never goes stale (.githooks/pre-commit)"
+	@echo "  pre-commit - formats the Rust and Python a commit stages (cargo fmt / ruff format),"
+	@echo "               re-staging only files with no further unstaged changes, and regenerates"
+	@echo "               src/test/data/diffs.csv when a commit touches the fixture corpus, so the"
+	@echo "               checked-in inventory never goes stale (.githooks/pre-commit)"
 	@echo "  pre-push   - fmt + clippy + site JS tests, the fast subset of CI (.githooks/pre-push)"
 
 # Scores codediff's diffing accuracy against the human-authored ground truth corpus in
