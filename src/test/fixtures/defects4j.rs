@@ -86,9 +86,31 @@ mod java_defects4j_cli_13_argumentimpl;
 #[cfg(test)]
 mod java_defects4j_cli_13_writeablecommandline;
 #[cfg(test)]
+mod java_defects4j_cli_13_writeablecommandlineimpl;
+#[cfg(test)]
+mod java_defects4j_cli_14_groupimpl;
+#[cfg(test)]
+mod java_defects4j_cli_15_writeablecommandlineimpl;
+#[cfg(test)]
+mod java_defects4j_cli_16_groupimpl;
+#[cfg(test)]
 mod java_defects4j_cli_16_option;
 #[cfg(test)]
+mod java_defects4j_cli_16_optionimpl;
+#[cfg(test)]
+mod java_defects4j_cli_16_writeablecommandlineimpl;
+#[cfg(test)]
+mod java_defects4j_cli_17_posixparser;
+#[cfg(test)]
+mod java_defects4j_cli_18_posixparser;
+#[cfg(test)]
+mod java_defects4j_cli_19_posixparser;
+#[cfg(test)]
+mod java_defects4j_cli_1_commandline;
+#[cfg(test)]
 mod java_defects4j_cli_21_writeablecommandline;
+#[cfg(test)]
+mod java_defects4j_cli_24_helpformatter;
 #[cfg(test)]
 mod java_defects4j_cli_27_optiongroup;
 #[cfg(test)]
@@ -102,11 +124,17 @@ mod java_defects4j_cli_34_option;
 #[cfg(test)]
 mod java_defects4j_cli_34_optionbuilder;
 #[cfg(test)]
+mod java_defects4j_cli_35_options;
+#[cfg(test)]
 mod java_defects4j_cli_5_util;
+#[cfg(test)]
+mod java_defects4j_closure_103_controlflowanalysis;
 #[cfg(test)]
 mod java_defects4j_closure_147_checkglobalthis;
 #[cfg(test)]
 mod java_defects4j_closure_165_recordtypebuilder;
+#[cfg(test)]
+mod java_defects4j_closure_1_removeunusedvars;
 #[cfg(test)]
 mod java_defects4j_closure_28_inlinecostestimator;
 #[cfg(test)]
