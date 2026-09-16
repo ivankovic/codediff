@@ -92,9 +92,16 @@ inside a comment) and the caveats that go with the comparison are in
 **All 996 compilation units are already fixture directories** under
 `src/test/data/diffs/defects4j/`, the corpus's fifth dataset, each holding the buggy/fixed pair as
 `before.java.test`/`after.java.test` and a `README.md` in the provenance format every other fixture
-carries (Defects4J's revision ids and bug report, via `fetch_defects4j_metadata.sh`). They are
+carries (Defects4J's revision ids and bug report, via `fetch_defects4j_metadata.sh`). The rest are
 unsolved until someone maps them in `human_solver`, whose `o` picker lists them under the
 `defects4j` dataset like any other.
+
+**The solved ones are a reported dataset, not a side experiment (2026-09-16).** `defects4j` is in
+`_common.PAPER_DATASETS`, so every research report scores it beside `small`, `full` and
+`stratified` and folds it into each pooled total, and the paper carries a Defects4J row wherever it
+splits a result by dataset. Only fixtures with a `human_mapping.json` are ever scored, so the
+unsolved remainder is invisible to those reports rather than counted as anything - but read the
+selection caveat below before quoting a Defects4J figure as a property of Defects4J.
 
 The script that created them (`extract_defects4j_fixtures.py`, `make extract-defects4j-fixtures`)
 was removed on 2026-09-15: it promoted a disagreement-ranked top-N, and with the whole list

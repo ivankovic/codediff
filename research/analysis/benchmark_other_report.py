@@ -618,11 +618,29 @@ def write_combined_bucket_table(accuracy_rows, output_path, include_codediff):
     print(f"Table written to {output_path}")
 
 
-# The paper's three sampled datasets, as the corpus directory names them and as the paper names
-# them (Section 3's Curated and Full repository lists, and the stratified-by-size sample). "All"
-# is their union, which is the population every pooled number in the paper is over.
-DATASET_LABELS = [("small", "Curated"), ("full", "Full"), ("stratified", "Stratified")]
+# The paper's four datasets, as the corpus directory names them and as the paper names them
+# (Section 3's Curated and Full repository lists, the stratified-by-size sample, and the Defects4J
+# bug fixes added on 2026-09-16). "All" is their union, which is the population every pooled
+# number in the paper is over.
+DATASET_LABELS = [
+    ("small", "Curated"),
+    ("full", "Full"),
+    ("stratified", "Stratified"),
+    ("defects4j", "Defects4J"),
+]
 ALL_DATASETS = "All"
+
+# The LaTeX macro-name stem for each dataset label. A control sequence is letters only, so
+# `Defects4J` cannot be spelled into one: `\CodeDiffPerfectPctDefects4J` is not a macro name, it
+# is `\CodeDiffPerfectPctDefects` followed by the characters `4J`, which `main.tex` would typeset
+# as an undefined-control-sequence error rather than a number. Every other label happens to be
+# letters already and maps to itself, so this dict is the one place the two spellings differ.
+DATASET_MACRO_STEMS = {"Defects4J": "DefectsFourJ"}
+
+
+def macro_stem(label):
+    """The letters-only spelling of a dataset label, for building a LaTeX macro name."""
+    return DATASET_MACRO_STEMS.get(label, label)
 
 
 def rows_in_dataset(accuracy_rows, datasets, dataset):
@@ -659,12 +677,13 @@ FIGURE_NAMES = {"gumtree": "GumTree", "bdiff": "BDiff", "unix_diff": "Unix diff"
 
 
 def plot_dataset_buckets(accuracy_rows, datasets, output_path):
-    r"""One panel per dataset (Curated, Full, Stratified, All), one horizontal 100%-stacked bar
-    per external configuration, segments in BUCKETS order - the per-dataset reading of the
-    line-level table, added 2026-09-11 on review: the corpus is three differently-drawn samples
-    (Section 3), and a pooled rate cannot show whether a tool's accuracy is a property of the tool
-    or of which sample dominates the pool. Tools are ordered by their Perfect share over the whole
-    corpus, so the four panels share one y axis and a row means the same tool everywhere.
+    r"""One panel per dataset (Curated, Full, Stratified, Defects4J, All), one horizontal
+    100%-stacked bar per external configuration, segments in BUCKETS order - the per-dataset
+    reading of the line-level table, added 2026-09-11 on review: the corpus is four
+    differently-drawn samples (Section 3), and a pooled rate cannot show whether a tool's accuracy
+    is a property of the tool or of which sample dominates the pool. Tools are ordered by their
+    Perfect share over the whole corpus, so the panels share one y axis and a row means the same
+    tool everywhere.
 
     \textsc{CodeDiff} is deliberately absent: Section 7 answers RQ4 over other people's tools and
     the paper's own tool is reported in Section 8 (`write_codediff_dataset_table`)."""
@@ -675,8 +694,17 @@ def plot_dataset_buckets(accuracy_rows, datasets, output_path):
     tools.sort(key=lambda t: overall[t][ALL_DATASETS][1][0])
 
     panels = [label for _, label in DATASET_LABELS] + [ALL_DATASETS]
+    # Width scales with the panel count (2.75in each, which is what the four-panel figure was
+    # drawn at before `defects4j` joined DATASET_LABELS) rather than being fixed: the figure is
+    # typeset at \linewidth in a `figure*`, so a fixed canvas would shrink every panel - and with
+    # it every tick label - each time a dataset is added.
     fig, axes = plt.subplots(
-        1, len(panels), figsize=(11, 4.5), sharey=True, facecolor=SURFACE, constrained_layout=True
+        1,
+        len(panels),
+        figsize=(2.75 * len(panels), 4.5),
+        sharey=True,
+        facecolor=SURFACE,
+        constrained_layout=True,
     )
     y = np.arange(len(tools))
     height = 0.72
@@ -1378,10 +1406,13 @@ def write_paper_fragment(
                 )
 
         # Per-dataset readings (2026-09-11, on review): the Perfect share of every configuration
-        # and CodeDiff's pooled line rate, split by the three sampled datasets of Section 3. Same
+        # and CodeDiff's pooled line rate, split by the four datasets of Section 3. Same
         # sources as `plot_dataset_buckets` and `write_codediff_dataset_table`.
         datasets = fixture_datasets()
-        lines.append("% Per-dataset: Curated = small/, Full = full/, Stratified = stratified/.")
+        lines.append(
+            "% Per-dataset: Curated = small/, Full = full/, Stratified = stratified/, "
+            "Defects4J = defects4j/."
+        )
         for id_ in ordered(list(PAPER_MACRO_STEMS)):
             stem = PAPER_MACRO_STEMS[id_]
             for key, label in DATASET_LABELS:
@@ -1390,14 +1421,16 @@ def write_paper_fragment(
                 if buckets is not None:
                     scored, counts = buckets
                     lines.append(
-                        f"\\newcommand{{\\{stem}PerfectPct{label}}}{{{100.0 * counts[0] / scored:.0f}}}"
+                        f"\\newcommand{{\\{stem}PerfectPct{macro_stem(label)}}}"
+                        f"{{{100.0 * counts[0] / scored:.0f}}}"
                     )
                 if id_ == "codediff":
                     totals = accuracy_totals(subset, id_)
                     if totals is not None:
                         _, mismatches, total = totals
                         lines.append(
-                            f"\\newcommand{{\\{stem}LineRate{label}}}{{{100.0 * mismatches / total:.3f}}}"
+                            f"\\newcommand{{\\{stem}LineRate{macro_stem(label)}}}"
+                            f"{{{100.0 * mismatches / total:.3f}}}"
                         )
 
         shared = common_subset(accuracy_rows, list(PAPER_MACRO_STEMS))

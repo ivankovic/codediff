@@ -80,11 +80,14 @@ because the producer is corpus-wide by design ("refresh the whole file, never ap
 Since 2026-09-09 the paper reports the sampled datasets alone, so the *readers*
 (`benchmark_other_report.read_accuracy_rows`, `paper_variables.common_subset_concentration`) filter
 by `_common.PAPER_DATASETS` - do not push that scoping into the producer, or the file stops being
-the corpus-wide record the product side wants.
+the corpus-wide record the product side wants. `defects4j` joined `PAPER_DATASETS` on 2026-09-16,
+so that filter now drops only `handmade`.
 
 Columns: `sample.csv` provenance
 (`language`, `repository`, `commit`, `path` - blank for the handmade fixtures that were never
-promoted from a sample, 60 of 835 as of 2026-09-09), the denominators `total_lines`,
+promoted from a sample, and for the Defects4J units, which come from an external oracle rather
+than from this project's sampling: 175 of 1116 as of 2026-09-16 - 60 handmade, 113 Defects4J, and
+the two fixtures added by hand that `sampling_provenance` names), the denominators `total_lines`,
 `total_nodes`, `total_leaf_nodes`, `total_visible_nodes`, and per tool a `_line_mismatches`,
 `_node_mismatches`, `_leaf_node_mismatches`, `_visible_node_mismatches` and `_status` column.
 Join to `src/test/data/sample.csv` on `solution == sample.csv:promoted_to`.
@@ -159,16 +162,41 @@ diff and the four git algorithms - *not* BDiff or `nvim -d`, see above).
 
 **Tool versions are not recorded per row - record them here on every refresh.**
 
-Refreshed **2026-09-09**, both CSVs, over 835 fixtures (775 of them in the paper's scope). Every
-binary verified by running it, not by reading a path:
+Refreshed **2026-09-16**, both CSVs, over 1116 fixtures (1056 of them in the paper's scope) -
+the pass that added `defects4j` to `_common.PAPER_DATASETS`, so 113 solved Defects4J compilation
+units enter both files. Every binary verified by running it, not by reading a path:
 
 | tool | version | path |
 | --- | --- | --- |
-| GumTree | 4.0.0-beta8 | `/var/tmp/tools/gumtree-4.0.0-beta8/bin/gumtree` (`GUMTREE_BIN`) |
-| difftastic | 0.70.0 | `/var/tmp/tools/bin/difft` (`DIFFT_BIN`) |
-| diffsitter | 0.9.0 | `/var/tmp/tools/bin/diffsitter` (`DIFFSITTER_BIN`) |
-| Neovim | 0.10.2 | `/var/tmp/tools/nvim-linux64/bin/nvim` (`NVIM_BIN`) |
+| GumTree | 4.0.0-beta8 | `/var/tmp/gumtree-installed/gumtree-4.0.0-beta8/bin/gumtree` (`GUMTREE_BIN`) |
+| difftastic | 0.69.0 | `/var/tmp/codediff-tools/bin/difft` (`DIFFT_BIN`) |
+| diffsitter | 0.9.0 | `/var/tmp/codediff-tools/bin/diffsitter` (`DIFFSITTER_BIN`) |
+| Neovim | 0.11.4 | `/opt/nvim-linux-x86_64/bin/nvim` (`NVIM_BIN`) |
 | BDiff | 0.1.0 | `/var/tmp/bdiff-install/venv/bin/python` (`BDIFF_PYTHON`) |
+
+**Two of those five moved since 2026-09-09, and the paths all did.** The previous refresh ran
+difftastic 0.70.0 and Neovim 0.10.2 from `/var/tmp/tools/`; that tree is gone from this machine and
+the binaries on it now are difftastic **0.69.0** (a *lower* version - this is not the same build
+the earlier numbers describe) and Neovim **0.11.4**. GumTree is the same 4.0.0-beta8, re-verified
+by `gumtree list GENERATORS` showing `cpp-treesitter-ng` and `tsx-treesitter-ng` and no JSON
+generator. BDiff was reinstalled from scratch by `make install-bdiff`, since
+`/var/tmp/bdiff-install` was gone too. Do not attribute a difftastic or `nvim -d` movement between
+the 2026-09-09 and 2026-09-16 numbers to the corpus alone.
+
+**`benchmark_other.csv` had been unrefreshable since 2026-09-09, and nothing said so.** The
+timing loop propagated a per-fixture scoring failure instead of skipping it, and
+`handmade/bazel-not-actually-supported-by-treesitter` - a BUILD file no grammar parses, carrying a
+human mapping - was committed a minute after that day's timing run finished. It sorts first
+alphabetically, so every `make measure-tools-timing` from then until 2026-09-16 died on fixture
+1 of N with "Before code has no AST" and wrote nothing, while `--accuracy-csv` kept working
+because `run_accuracy` already skipped such a fixture with a note. The timing loop now does the
+same (see `benchmark_other.rs`). A run that skips a fixture says which one; a run that scores
+none of them still exits 0 today, so read the `[i/N]` progress line before trusting a refresh.
+
+**The timing half of this refresh was not measured on an idle machine.** `benchmark_other --csv`
+ran with a load average around 3 from other users on the same host. The accuracy half
+(`benchmark_accuracy.csv`) is unaffected - it records no wall clock - but treat the speed
+percentiles as an upper bound rather than as comparable with the 2026-09-09 run.
 
 `NVIM_BIN` is the fifth variable and was undocumented here until 2026-09-09. **Set all five before
 either run.** A tool whose variable is unset is skipped with a note and exit 0, so a refresh done

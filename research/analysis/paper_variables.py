@@ -100,36 +100,43 @@ STRATIFIED_PER_CELL = 10
 # Ground-truth corpus size and AST-node accuracy.
 # source: cargo run --release --features test-fixtures --bin benchmark_optimal_solutions -- --csv
 #         (research/data/quality/optimal_solutions_benchmark.csv), totalled over solved fixtures.
-# Measured 2026-09-09, over `_common.PAPER_DATASETS` - the `small`, `full` and `stratified`
-# fixtures, i.e. changes sampled from real commits. The corpus directory also holds 61 `handmade`
-# fixtures, hand-written minimal examples of one change pattern each; the product benchmark scores
-# them and this paper does not, because no rate over cases written to exercise the matcher
-# estimates anything about real changes. That exclusion arrived on 2026-09-09 and took the paper's
-# handmade-versus-sampled comparison with it.
+# Measured 2026-09-16, over `_common.PAPER_DATASETS` - the `small`, `full`, `stratified` and
+# `defects4j` fixtures. The corpus directory also holds 62 `handmade` fixtures, hand-written
+# minimal examples of one change pattern each; the product benchmark scores them and this paper
+# does not, because no rate over cases written to exercise the matcher estimates anything about
+# real changes. That exclusion arrived on 2026-09-09 and took the paper's handmade-versus-sampled
+# comparison with it.
 #
-# In scope: 776 fixture directories, 775 of them carrying a human_mapping.json. The 776th
-# (rust-completely-unrelated-main-files) is deliberately ground-truth-free - it exists as a
-# pathological-latency case, not an accuracy case - and reports `human_unsolved` in the CSV.
+# `defects4j` joined the reported set on 2026-09-16 and is what moved these four numbers most:
+# 113 solved Java compilation units, far longer than the corpus median, which is why NodesTotal
+# rose by more than half again while the fixture count rose by a third. Only solved fixtures
+# count - the other 883 Defects4J directories carry no human_mapping.json and are invisible here.
 #
-# NumFixtures is therefore the ground-truth-bearing count, 775, which is the denominator of every
-# per-tool row, the ablation study, and the node accuracy below.
+# In scope: 1056 fixture directories, all 1056 carrying a human_mapping.json.
+# `rust-completely-unrelated-main-files`, which is deliberately ground-truth-free (a
+# pathological-latency case, not an accuracy case, reporting `human_unsolved` in the CSV), is a
+# `handmade` fixture and so is out of scope here rather than being an in-scope exception.
 #
-# Refreshed together, from one corpus state, on 2026-09-09 (previously 2026-09-08 / 700,
-# 2026-09-07 / 650 and, the same day, 627 and 615; before that 2026-09-05 / 597, 2026-09-02 / 512
-# and 2026-08-20 / 468). These four move as a set and must be
+# NumFixtures is the ground-truth-bearing count, 1056, which is the denominator of every per-tool
+# row, the ablation study, and the node accuracy below.
+#
+# Refreshed together, from one corpus state, on 2026-09-16 (previously 2026-09-09 / 775,
+# 2026-09-08 / 700, 2026-09-07 / 650 and, the same day, 627 and 615; before that 2026-09-05 / 597,
+# 2026-09-02 / 512 and 2026-08-20 / 468). These four move as a set and must be
 # refreshed as a set: re-run the benchmark with --csv, re-run `analyze_human_mappings --csv` so the
 # scope artifact agrees with it, then recompute here. Order matters in one direction: human_mapping_analysis.csv carries a
 # `current_mismatches` column read back from optimal_solutions_benchmark.csv, so the benchmark runs
 # first. The check at the bottom of this file compares NumFixtures against the corpus on disk
 # precisely because the previous values silently outlived the corpus they described.
 CORPUS = {
-    "NumFixtures": 775,
-    "NodesMatched": 5_475_305,
-    "NodesTotal": 5_482_317,
+    "NumFixtures": 1056,
+    "NodesMatched": 8_586_599,
+    "NodesTotal": 8_594_027,
     # Distinct languages across the fixture corpus, from `analyze_human_mappings`' own "By
-    # language" census (24 as of 2026-09-09, and 24 over the sampled datasets alone - dropping the
-    # 61 handmade fixtures cost the paper no language). Not the same number as the empirical
-    # study's \NumLanguages, which counts languages in the 100-repository measure-file-stats corpus.
+    # language" census (24 as of 2026-09-16, unchanged by adding `defects4j`, which is Java only -
+    # a language the corpus already covered - and unchanged by dropping the handmade fixtures).
+    # Not the same number as the empirical study's \NumLanguages, which counts languages in the
+    # 100-repository measure-file-stats corpus.
     "NumFixtureLanguages": 24,
 }
 
@@ -138,8 +145,8 @@ CORPUS = {
 # alongside the all-node figure because the all-node denominator includes every ancestor of every
 # change up to the root, so it partly measures how deep a grammar's tree is.
 CORPUS_VISIBLE = {
-    "VisibleNodesMatched": 3_736_081,
-    "VisibleNodesTotal": 3_740_894,
+    "VisibleNodesMatched": 5_838_776,
+    "VisibleNodesTotal": 5_843_886,
 }
 
 # Leave-one-out ablation deltas, in mismatches, against an all-enabled baseline. A positive number
@@ -765,8 +772,9 @@ def robustness_fixtures(research_dir):
             2026-09-11 on the MACHINE block's hardware.
 
     Scoped to the paper's frozen corpus, not to everything the run measured: the run walks every
-    `small`/`full`/`stratified` fixture directory on disk, and fixtures solved after the 2026-09-09
-    freeze the CORPUS block describes were measured too but are out of scope here. The scope is
+    `small`/`full`/`stratified`/`defects4j` fixture *directory* on disk, which since 2026-09-16
+    includes the 883 Defects4J units nobody has solved yet - robustness needs no ground truth, so
+    the producer measures them, and this scope drops them again. The scope is
     the `solution` column of `data/comparison/benchmark_accuracy.csv`, the artifact the rest of
     the paper's per-fixture numbers are scored over, intersected with `_common.PAPER_DATASETS`,
     so this block describes the same NumFixtures every other rate does. The CSV row's `repository`
@@ -925,6 +933,14 @@ def astdiff_oracle_human(research_dir):
             f"{stem}Precision": f"{rate(tp, tp + fp):.2f}",
             f"{stem}Recall": f"{rate(tp, tp + fn):.2f}",
             f"{stem}Disagreements": latex_number(fp + fn),
+            # The two halves of `Disagreements`, separately. Section 8.1's argument turns on the
+            # split rather than the total - a pair one account claims and the oracle does not
+            # (`fp`) is an invention, a pair the oracle records and the account misses (`fn`) is an
+            # omission, and the two rows differ far more in the first than the second. Those four
+            # counts were bare literals in `main.tex` until 2026-09-16, the only measured numbers
+            # in the paper that were not macros, and by then all but one had gone stale.
+            f"{stem}FalsePositives": latex_number(fp),
+            f"{stem}FalseNegatives": latex_number(fn),
             f"{stem}Mappings": latex_number(
                 sum(int(r[f"{granularity}_oracle_scored"]) for r in rows)
             ),

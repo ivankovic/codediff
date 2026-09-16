@@ -220,7 +220,7 @@ measure-pairs: build
 		--output data/performance/benchmark_$(LANGUAGE).csv \
 		--max-combined-nodes $(PAIRS_NODE_LIMIT)
 
-# The paper's robustness run: every `small`/`full`/`stratified` fixture directory (the datasets the
+# The paper's robustness run: every `small`/`full`/`stratified`/`defects4j` fixture directory (the datasets the
 # paper reports on) pushed through diff_code with no node cap, a per-fixture timeout, panic
 # isolation and the allocation counters, into one CSV with the same schema as measure-pairs.
 # Replaces the 2026-08-20 Rust-only sample (data/performance/robustness_rust.csv), whose clones

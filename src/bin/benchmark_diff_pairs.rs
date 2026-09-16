@@ -92,9 +92,10 @@ struct Args {
     repo_root: Option<PathBuf>,
 
     /// Measure the fixture corpus under src/test/data/diffs/ instead of sampled (repository,
-    /// commit, path) pairs: every `small`, `full` and `stratified` fixture directory, i.e. the
-    /// datasets the introductory paper reports on (`research/analysis/_common.py`'s
-    /// PAPER_DATASETS). Rows then carry the dataset directory in `repository`, the fixture
+    /// commit, path) pairs: every `small`, `full`, `stratified` and `defects4j` fixture directory,
+    /// i.e. the datasets the introductory paper reports on (`research/analysis/_common.py`'s
+    /// PAPER_DATASETS - see FIXTURE_DATASETS for why this one walks directories rather than solved
+    /// fixtures). Rows then carry the dataset directory in `repository`, the fixture
     /// directory name in `path`, and leave `size_bucket` and `commit` empty. This is the paper's
     /// robustness run: the same timeout/panic/memory measurement, over the corpus every other
     /// number in the paper is reported on, rather than over a Rust-only sample whose clones may
@@ -386,10 +387,21 @@ fn write_row(writer: &mut csv::Writer<std::fs::File>, row: &Row) -> Result<()> {
     Ok(())
 }
 
-/// The three `small`/`full`/`stratified` datasets the paper reports on - `handmade` and
-/// `defects4j` are excluded for the same reason `research/analysis/_common.py`'s PAPER_DATASETS
-/// excludes them. Mirrors that constant; keep the two in step.
-const FIXTURE_DATASETS: &[&str] = &["small", "full", "stratified"];
+/// The four datasets the paper reports on - `handmade` is excluded for the same reason
+/// `research/analysis/_common.py`'s PAPER_DATASETS excludes it. Mirrors that constant; keep the
+/// two in step. `defects4j` joined both on 2026-09-16.
+///
+/// One difference from every other producer, and it is deliberate: this one walks fixture
+/// *directories* rather than fixtures with a `human_mapping.json`, so it covers all 996 Defects4J
+/// units and not just the 113 solved ones. Robustness asks whether the engine survives a real file
+/// pair - it scores nothing against ground truth, so an unsolved unit is a perfectly good test
+/// case, and the unsolved Defects4J units are long Java files this measure wants.
+///
+/// The paper does not report all of them. `paper_variables.robustness_fixtures` scopes the CSV
+/// back to the frozen solved corpus, so `\RobustnessFixtures` stays the same population every
+/// other rate in the paper is over. The extra rows stay in the CSV as the complete record of what
+/// the engine was actually put through, which is the question a reader of *this* file has.
+const FIXTURE_DATASETS: &[&str] = &["small", "full", "stratified", "defects4j"];
 
 /// Every fixture directory in the paper's datasets as `(dataset, name, dir)`, in
 /// `handmade_test_case_dirs`' deterministic order.

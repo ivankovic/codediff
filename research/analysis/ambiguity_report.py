@@ -68,10 +68,30 @@ import subprocess
 from collections import Counter
 from pathlib import Path
 
-from _common import PAPER_DATASETS, REPO_ROOT
+from _common import PAPER_DATASETS, REPO_ROOT, latex_number
 
 # Path prefix every fixture directory lives under, relative to the repository root.
 DIFFS_ROOT = "src/test/data/diffs"
+
+# The datasets Table 2 breaks the N:M rate down by, as (macro stem, corpus directory). The stem is
+# also the display name everywhere except Defects4J: a LaTeX control sequence is letters only, so
+# `\AmbiguityDefects4JTotal` is not a macro name at all - see PER_LIST_DISPLAY.
+#
+# All four datasets get a row in Table 2. `small` and `full` are the finished passes and are what
+# the pooled `reviewed_*` rate is over; `stratified` and `defects4j` are printed beside them under
+# a footnote saying their pass is unfinished, so their rows - and the `any_*` rate over all four -
+# read as lower bounds. That is the standing rule for this paper as of 2026-09-16: write the table
+# as though every dataset were finished, and footnote the ones that are not, because the paper and
+# the annotation are being written in parallel.
+PER_LIST_DATASETS = (
+    ("Curated", "small"),
+    ("Full", "full"),
+    ("Stratified", "stratified"),
+    ("DefectsFourJ", "defects4j"),
+)
+
+# Macro stem -> how the dataset is spelled in prose and in the terminal report.
+PER_LIST_DISPLAY = {"DefectsFourJ": "Defects4J"}
 
 
 def fixture_names_in_scope(csv_path: Path) -> set[str]:
@@ -128,7 +148,8 @@ def paired_decisions(csv_path: Path, names: set[str]) -> int:
 
 
 def datasets_for(root: Path, names: set[str]) -> dict[str, str]:
-    """Fixture name -> the dataset directory it lives in (`small`, `full`, `stratified`).
+    """Fixture name -> the dataset directory it lives in (`small`, `full`, `stratified`,
+    `defects4j`).
 
     Section 4 discusses the Curated and Full repository lists separately, which are the `small` and
     `full` directories here (see src/test/helper.rs's DIFF_DATASETS). `handmade` cannot appear:
@@ -153,12 +174,17 @@ def summarize(
     names = sorted(groups_by_fixture)
     with_groups = [n for n in names if groups_by_fixture[n]]
 
-    # Per repository list, over every fixture in it. Section 4 compares the Curated and Full lists,
-    # and the raw rate is what supports that now: both lists have been annotated end to end by
-    # someone with multi-mapping available, so a difference between them is a difference in the
-    # code, not in when the files happened to be written.
+    # Per dataset, over every fixture in it. Section 4 compares the Curated and Full lists, and
+    # the raw rate is what supports that now: both lists have been annotated end to end by someone
+    # with multi-mapping available, so a difference between them is a difference in the code, not
+    # in when the files happened to be written.
+    #
+    # `defects4j` is reported beside them from 2026-09-16 but is NOT in REVIEWED_LISTS below: its
+    # ambiguity pass is not finished, so its row carries a footnote in the paper saying so and its
+    # fixtures stay out of the pooled rate. Reporting the row and pooling it are separate
+    # decisions, and only the second one would turn an annotation gap into a finding.
     per_list = {}
-    for label, dataset in (("Curated", "small"), ("Full", "full")):
+    for label, dataset in PER_LIST_DATASETS:
         members = [n for n in names if (datasets or {}).get(n) == dataset]
         per_list[label] = {
             "total": len(members),
@@ -172,15 +198,22 @@ def summarize(
     # property of those changes. Their mappings are solved; the ambiguity pass over them has not
     # been done. Pooling all three would therefore dilute a measured 11.5% by counting
     # un-reviewed fixtures as unambiguous - the "an empty annotation scores as a perfect one"
-    # trap. `reviewed_*` below is the rate over the lists whose pass is complete, and is what the
-    # paper quotes; `any_pct` over every scored fixture is kept beside it so the dilution is
-    # visible rather than silent. Fold `stratified` in here once it is annotated.
+    # trap. `reviewed_*` below is the rate over the lists whose pass is complete, and is what
+    # RA1.1 states; `any_pct` over every scored fixture is the table's footnoted \emph{All} row,
+    # kept beside it so the dilution is visible rather than silent. Fold `stratified` into
+    # REVIEWED_LISTS once it is annotated.
     #
     # `small` and `full` are complete rather than merely touched: both were revisited fixture by
     # fixture in September 2026 and back-filled wherever a second reading of the correspondence
     # held, which is why the paper claims a finished pass over them rather than a reviewed subset.
     # `handmade`, which the paper does not report on, came out of the same pass at 7 of 61 (11.5%)
     # - a third independent estimate agreeing with both, and the reason the pooling is sound.
+    #
+    # `defects4j` is in the same position and is excluded for the same reason: 5 of its 113 solved
+    # fixtures carry a group (4.4%), against 11.4% and 11.6% for the two finished lists. Both are
+    # nonetheless *printed*, each under a footnote - see PER_LIST_DATASETS. Showing a row and
+    # pooling it are separate decisions, and only the second one would turn an annotation gap into
+    # a finding. Fold both in here once their passes are done.
     REVIEWED_LISTS = ("small", "full")
     reviewed = [n for n in names if (datasets or {}).get(n) in REVIEWED_LISTS]
     reviewed_with = [n for n in reviewed if groups_by_fixture[n]]
@@ -254,7 +287,7 @@ def write_paper_fragment(s: dict, output_path: Path) -> None:
         "AmbiguityMaxGroupsInFixture": s["max_groups_in_fixture"],
         # Pair-weighted: the second reading RA3 quotes alongside the fixture-weighted rate.
         "AmbiguityPairs": s["ambiguous_pairs"],
-        "AmbiguityPairedDecisions": f"{s['paired_decisions']:,}",
+        "AmbiguityPairedDecisions": latex_number(s["paired_decisions"]),
         "AmbiguityPairsPct": f"{pct(s['ambiguous_pairs'], s['paired_decisions']):.1f}",
     }
     lines = [
@@ -304,10 +337,11 @@ def main() -> None:
 
     print(f"=== Ground-truth ambiguity, {s['scored']} fixtures in scope ===")
     print(f"Fixtures with >=1 multi-map group: {s['any_fixtures']} ({s['any_pct']:.1f}%)")
-    print("\nBy repository list:")
+    print("\nBy dataset:")
     for label, stats in sorted(s["per_list"].items()):
+        shown = PER_LIST_DISPLAY.get(label, label)
         print(
-            f"  {label:<10} {stats['with']:>3}/{stats['total']:<3} "
+            f"  {shown:<10} {stats['with']:>3}/{stats['total']:<3} "
             f"({pct(stats['with'], stats['total']):5.1f}%)"
         )
     print(

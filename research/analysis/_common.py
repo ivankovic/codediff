@@ -47,14 +47,20 @@ REPO_ROOT = RESEARCH_DIR.parent
 # research reports, nothing else - which is why the two corpus sizes differ on purpose and every
 # report that reads `optimal_solutions_benchmark.csv` has to filter it here rather than assume
 # the producer did.
-PAPER_DATASETS = ("small", "full", "stratified")
+#
+# `defects4j` joined the reported set on 2026-09-16. It is a real dataset like the other three and
+# is reported next to them and inside every pooled total, with one caveat that belongs to the data
+# rather than to this constant: only the solved subset is scored (a fixture with no
+# `human_mapping.json` is invisible to every report here anyway), and that subset is whatever
+# annotation has reached rather than a draw - see research/external/README.md.
+PAPER_DATASETS = ("small", "full", "stratified", "defects4j")
 
 _DIFFS_ROOT = REPO_ROOT / "src" / "test" / "data" / "diffs"
 
 
 def fixture_datasets() -> dict[str, str]:
     """Fixture name -> the dataset directory it lives in (`handmade`, `small`, `full`,
-    `stratified`), read from the corpus on disk.
+    `stratified`, `defects4j`), read from the corpus on disk.
 
     Mirrors `test::helper::DIFF_DATASETS` in src/test/helper.rs. Not to be confused with Section
     4's Curated and Full *repository* lists, which are the `small` and `full` directories here."""

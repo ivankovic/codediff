@@ -77,7 +77,7 @@ matches the paper's shape. Left alone deliberately - retitling further is the au
 
 ## Status
 
-Compiles cleanly, 16 pages, builds with `latexmk -pdf -g main` (verified locally, `cm-super` +
+Compiles cleanly, 12 pages, builds with `latexmk -pdf -g main` (verified locally, `cm-super` +
 `texlive-publishers` installed). See the `TODO` comments in `main.tex` for the placeholder ACM
 conference/rights metadata and CCS concepts, still to fill in once a venue is chosen.
 
@@ -101,6 +101,38 @@ ceiling marked as unexercised in Threats. Table 2's rewrite-share p99 and max st
 2026-09-07 run recorded only p50/p90 and the Full-list clones no longer exist on disk;
 `edit_shape_stats.py` now emits both so the next run fills them. The 255 Full-list sample is
 explained in the text (R and Scala re-drawn, `\SampleFullResampled`).
+
+### The corpus is four datasets since 2026-09-16
+
+`defects4j` is a reported dataset, not a side experiment. It sits in `_common.PAPER_DATASETS`
+beside `small` (Curated), `full` (Full) and `stratified`, so every research report scores it
+alongside them and folds it into each pooled total, and the paper carries a Defects4J row wherever
+it splits a result by dataset: Table 2 (`ambiguity_report.py`), Table 5
+(`benchmark_codediff_by_dataset.tex`) and Figure 6 (`benchmark_other_buckets_by_dataset.pdf`).
+
+Three things to know before editing anything that touches it:
+
+* **Only the solved units are ever scored.** 996 Defects4J compilation units are fixture
+  directories; 113 carry a `human_mapping.json`. The other 883 have no ground truth and are
+  invisible to every report, so they are never counted as anything. Which 113 are solved is how
+  far annotation has reached rather than a draw, and they run shorter than the rest - Section 3
+  and Threats both say so, and `research/external/README.md` has the measured medians.
+* **`Defects4J` is not a LaTeX macro name.** A control sequence is letters only, so the per-dataset
+  macros are spelled `DefectsFourJ` (`\AmbiguityDefectsFourJPct`,
+  `\CodeDiffPerfectPctDefectsFourJ`). `benchmark_other_report.macro_stem` and
+  `ambiguity_report.PER_LIST_DATASETS` are the two places that translate; the display name stays
+  `Defects4J` everywhere a reader sees it.
+* **Write as though every dataset were finished, and footnote the ones that are not.** The paper
+  and the annotation are being written in parallel, so the body text describes a four-dataset
+  corpus with no hedging, and the unfinished passes are handled in exactly two places: footnote
+  `fn:in-progress` in Section 3, and the asterisk on Table 2's Stratified, Defects4J and
+  \emph{All} rows. Do not scatter "in progress" back into the prose.
+
+The ambiguity pass is the one measurement where this matters numerically. It is complete for
+Curated and Full and unfinished for the other two, so `ambiguity_report.REVIEWED_LISTS` is still
+`("small", "full")` and RA1.1 states the rate over those 452 changes (11.5%). The table prints all
+four datasets plus an \emph{All} row (5.8% of 1056) under the footnote, so the annotation gap is
+visible rather than pooled away. Fold a dataset into `REVIEWED_LISTS` when its pass finishes.
 
 ### Every number is a macro
 
@@ -345,6 +377,43 @@ wedges separated by hue alone are unreadable in greyscale), but regenerating the
 `make introductory-paper-empirical MODE=small`.
 
 ### Known-stale numbers
+
+**Refresh of 2026-09-16.** Re-measured together, from one corpus state, and all describing the
+same \NumFixtures{} = 1056 fixtures: the ground-truth corpus block (`benchmark_optimal_solutions
+--csv`, then `analyze_human_mappings --csv`), the ambiguity, rendering and shape blocks, the
+per-tool accuracy and speed comparison (`measure-tools-accuracy` then `measure-tools-timing`), the
+robustness run, and both halves of the AST-diff oracle. This is the pass that made `defects4j` a
+reported dataset.
+
+Three things that pass turned up, each worth knowing before the next one:
+
+* **The timing benchmark had been silently unrunnable since 2026-09-09.** `benchmark_other.csv`
+  could not be refreshed at all - the run died on its first fixture and wrote nothing. See
+  `research/data/comparison/PROVENANCE.md`. Fixed; check the `[i/N]` progress line before
+  believing a refresh.
+* **`benchmark_diff_pairs.rs` carried its own copy of the dataset list** and so kept excluding
+  `defects4j` from the robustness run after `PAPER_DATASETS` had been updated. Both are now
+  correct and each names the other; if a third copy ever appears, make it name them too.
+* **Four measured numbers in `main.tex` were bare literals**, in Section 8.1's "pairs claimed and
+  not corroborated" sentence, and three of the four had gone stale. They are macros now
+  (`\OracleHuman*FalsePositives`). The claim in "Every number is a macro" below was not true when
+  it was written; it is now.
+
+Two things were deliberately **not** re-measured in that pass:
+
+* **The ablation block** (`\Ablation*`, still the 2026-08-20 / 468-fixture run). The paper does not
+  reference it - the table was cut earlier - and the author's instruction on 2026-09-16 was that
+  the paper does not need an ablation study. The macros are emitted and unused.
+* **RQ1** (`data/rq1/`, the whole-tree APTED budget). It is measured over sampled code pairs rather
+  than over the fixture corpus, so adding a fixture dataset does not stale it, and re-running it is
+  hours on a machine that must be otherwise idle.
+
+Two comparability caveats on the 2026-09-16 tool numbers, both in
+`research/data/comparison/PROVENANCE.md`: difftastic on the measuring machine was **0.69.0**
+against the 0.70.0 the 2026-09-09 run used - a lower version, not a newer one - and Neovim was
+0.11.4 against 0.10.2; and the timing half ran on a machine with other users' load on it, so the
+speed percentiles are an upper bound rather than a like-for-like comparison with 2026-09-09.
+
 
 **The empirical-study numbers (Section 3, Table 1, corpus size) are the full
 \NumRepos{}-repository measurement**, run on the server on 2026-09-07 and landed in commit

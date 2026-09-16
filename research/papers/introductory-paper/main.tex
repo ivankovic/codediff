@@ -208,10 +208,11 @@ This paper makes the following contributions:
     independently of which AST nodes carry them. Often, two visualisations are provided: the minimal one
     and the maximal one, covering human preferences between equally valid solutions.
     The dataset, the tool used to create the dataset and the entire history of the dataset is available
-    freely for future research. To allow comparison with existing research, the dataset is being
-    extended with the Defects4J~\cite{defects4j} changes of the AST node-mapping oracle of
-    Alikhanifard and Tsantalis, so that our mappings can be read against an independently
-    authored reference. The dataset is described in detail in Section~\ref{sec:dataset}.
+    freely for future research. To allow comparison with existing research, the dataset has a
+    fourth part: the Defects4J~\cite{defects4j} changes of the AST node-mapping oracle of
+    Alikhanifard and Tsantalis, solved again by hand here so that our mappings can be read against
+    an independently authored reference. The dataset is described in detail in
+    Section~\ref{sec:dataset}.
   \item \textbf{Evaluation:} Answers to all research questions. An analysis of the real-world code change
     data shape, irrespective of any concrete implementation, and a quantified comparison of several
     state-of-the-art code diffing tools on the human annotated dataset.
@@ -356,7 +357,7 @@ changed lines.
     \midrule
     Lines changed, per file   & \EditsLinesPerFilePFifty{}   & \EditsLinesPerFilePNinety{}   & \EditsLinesPerFilePNinetyNine{}   & \EditsLinesPerFileMax{} \\
     Lines changed, per commit & \EditsLinesPerCommitPFifty{} & \EditsLinesPerCommitPNinety{} & \EditsLinesPerCommitPNinetyNine{} & \EditsLinesPerCommitMax{} \\
-    File rewritten, per file  & \EditsChurnPFiftyPct{}\%     & \EditsChurnPNinetyPct{}\%     & ---                               & --- \\
+    File rewritten, per file  & \EditsChurnPFiftyPct{}\%     & \EditsChurnPNinetyPct{}\%     & \EditsChurnPNinetyNinePct{}\%     & \EditsChurnMaxPct{}\% \\
     \bottomrule
   \end{tabular}
 \end{table}
@@ -364,7 +365,12 @@ changed lines.
 Table~\ref{tab:edit-shape} shows the sizes of real-world edits. Our results are broadly aligned
 with existing research. Arafat and Riehle report that 47.5\% of all commits touch 10 lines or
 fewer~\cite{commit-size-distribution-paper}, with the long tail stretching to tens of thousands of
-lines. The median edit rewrites \EditsChurnPFiftyPct{}\% of the file it touches, and \EditsChurnUnderFivePct{}\% of edits rewrite under 5\%.
+lines. The median edit rewrites \EditsChurnPFiftyPct{}\% of the file it touches, and
+\EditsChurnUnderFivePct{}\% of edits rewrite under 5\%. The tail is the opposite extreme rather
+than a larger fraction of the same shape: by the 99th percentile an edit rewrites the file
+entirely (\EditsChurnPNinetyNinePct{}\%). A diffing tool therefore has to be good at two
+unrelated jobs---finding a handful of changed lines in an otherwise untouched file, which is the
+overwhelming majority of edits, and staying usable when nothing is left to anchor on.
 
 \subsection{Shape of optimal file diffs}
 \label{sec:diff-shape}
@@ -384,8 +390,11 @@ sample would be heavily slanted towards small changes. To account for this, the 
 augmented by a stratified sample based on the lines of code of the files being changed. The larger of the two sizes was used.
 The strata were: 1 to 10 lines, 11 to 30, 31 to 100, 101 to 300, 301 to 1000, 1001 to 3000 and
 more than 3000 lines of code. In each stratum, \SampleStratifiedPerCell{} diffs were randomly
-sampled per language, and inspected as above. Drawing and solving that stratified sample
-is still in progress; every number in this paper is reported over the \NumFixtures{} changes solved so far.
+sampled per language, and inspected as above.\footnote{\label{fn:in-progress}The corpus and this
+paper are being written in parallel. Drawing and solving the stratified sample, and hand-annotating
+the Defects4J list below, are both still in progress, and the ambiguity pass over those two has not
+been made at all. Every figure in this paper is over the \NumFixtures{} changes solved so far, and
+every figure that depends on the ambiguity pass is a lower bound for those two datasets.}
 
 A fourth list extends the corpus beyond our own sampling. The AST node-mapping oracle of
 Alikhanifard and Tsantalis~\cite{astdiffbenchmark} records, for \OracleCases{} bug-fixing changes of
@@ -394,7 +403,12 @@ to, over \OracleUnits{} Java compilation units; the file contents its offsets in
 Falleri and Martinez' replication package~\cite{gumtreesimple}. Section~\ref{sec:oracle} scores
 \textsc{CodeDiff} against it directly. We solve those same \OracleUnits{} compilation units by hand
 as well, so that our own mappings can be read against an independently authored reference on a
-corpus that other AST-differencing evaluations already use. Annotating that list is in progress.
+corpus that other AST-differencing evaluations already use.\textsuperscript{\ref{fn:in-progress}}
+Those \AmbiguityDefectsFourJTotal{} compilation units are reported as a fourth dataset, Defects4J,
+beside the Curated, Full and Stratified samples throughout, and are included in every pooled total.
+One caveat belongs to that dataset and not to the other three: which units are solved is how far
+annotation has reached rather than a draw, so a Defects4J figure is a reading of those units and
+not an estimate over the \OracleUnits{}.
 
 Each diff was then solved by hand by the authors, who have each at least 15 years of experience in
 software development, and have reviewed tens of thousands of real world code changes in industrial
@@ -421,9 +435,13 @@ similar blocks of code are moved into a common function. The correct solution is
 all of them as moved.} That rate is over the \AmbiguityListScored{} changes of the Curated and Full
 lists. The two lists agree closely, at \AmbiguityCuratedPct{}\% of \AmbiguityCuratedTotal{}
 changes on the Curated list and \AmbiguityFullPct{}\% of \AmbiguityFullTotal{} on the Full list
-(Table~\ref{tab:expressibility}). The stratified sample stays out because its ambiguity pass is
-not done, and counting its changes as unambiguous would report a gap in the annotation as a
-property of the code.
+(Table~\ref{tab:expressibility}). Those two are the datasets whose ambiguity pass is finished, and
+the pooled rate RA1.1 states is over them. The table also carries the Stratified sample
+(\AmbiguityStratifiedPct{}\%) and the Defects4J changes (\AmbiguityDefectsFourJPct{}\%), and a rate
+over all \AmbiguityScored{} changes, but all three are lower bounds: those two passes are still
+running, and a change nobody has reviewed for ambiguity is recorded as having none. Read the gap
+between \AmbiguityListPct{}\% and \AmbiguityAnyPct{}\% as the distance annotation still has to
+travel, not as a difference between the datasets.
 
 \begin{table}
   \caption{Changes whose optimal mapping needs an $N{:}M$ site, per dataset of
@@ -435,9 +453,22 @@ property of the code.
     \midrule
     Curated & \AmbiguityCuratedTotal{} & \AmbiguityCuratedWith{} & \AmbiguityCuratedPct{}\% \\
     Full & \AmbiguityFullTotal{} & \AmbiguityFullWith{} & \AmbiguityFullPct{}\% \\
-    \emph{Both} & \AmbiguityListScored{} & \AmbiguityListWith{} & \AmbiguityListPct{}\% \\
+    Stratified\textsuperscript{*} & \AmbiguityStratifiedTotal{} & \AmbiguityStratifiedWith{} &
+      \AmbiguityStratifiedPct{}\% \\
+    Defects4J\textsuperscript{*} & \AmbiguityDefectsFourJTotal{} & \AmbiguityDefectsFourJWith{} &
+      \AmbiguityDefectsFourJPct{}\% \\
+    \midrule
+    \emph{Curated + Full} & \AmbiguityListScored{} & \AmbiguityListWith{} & \AmbiguityListPct{}\% \\
+    \emph{All}\textsuperscript{*} & \AmbiguityScored{} & \AmbiguityAnyFixtures{} &
+      \AmbiguityAnyPct{}\% \\
     \bottomrule
   \end{tabular}
+
+  \vspace{2pt}
+  \footnotesize\textsuperscript{*}The ambiguity pass over the Stratified and Defects4J changes is
+  not finished, so these three figures are lower bounds: a change nobody has reviewed for ambiguity
+  is recorded as having none. \emph{Curated + Full} is the rate over the two datasets whose pass is
+  complete, and is the figure RA1.1 states.
 \end{table}
 
 \begin{resultbox}{RA1.1 (Expressibility)}
@@ -657,13 +688,13 @@ categorically different from one that is merely close. $\ge$99\% and 95--99\% th
 ``a reader would have to check''. Below 95\% the tool is no longer usable.
 
 \begin{resultbox}{RA4.1 (Tool accuracy)}
-No tool maps much more than half the corpus perfectly. By the share of fixtures with zero
-mismatched lines, GumTree leads at \GumTreePerfectPct{}\% and BDiff trails at
-\BDiffPerfectPct{}\%. The choice of line-diff algorithm barely registers: Unix
-\texttt{diff} and all four \texttt{git} algorithms are all within a percentage point of BDiff and
-\texttt{nvim -d}. Syntax-awareness alone does not guarantee that a
-tool recovers a change the way a human reads it: diffsitter, at \DiffsitterPerfectPct{}\%, is
-closer to the line-based tools than to GumTree.
+No tool maps much more than three fifths of the corpus perfectly. By the share of fixtures with
+zero mismatched lines, difftastic leads at \DifftasticPerfectPct{}\% and GumTree follows at
+\GumTreePerfectPct{}\%, while BDiff and diffsitter trail at \BDiffPerfectPct{}\% and
+\DiffsitterPerfectPct{}\%. The choice of line-diff algorithm barely registers: Unix \texttt{diff}
+and all four \texttt{git} algorithms sit within a percentage point of one another. Syntax-awareness
+alone does not guarantee that a tool recovers a change the way a human reads it: diffsitter, at
+\DiffsitterPerfectPct{}\%, is closer to the line-based tools than to difftastic.
 \end{resultbox}
 
 \input{figures/benchmark_other_buckets_combined.tex}
@@ -695,16 +726,16 @@ interpreter, for the same reason.
     \toprule
     Tool & p50 & p90 & p99 \\
     \midrule
+    Unix \texttt{diff} & \SpeedUnixDiffPFifty{} & \SpeedUnixDiffPNinety{} & \SpeedUnixDiffPNinetyNine{} \\
     \texttt{git} (minimal) & \SpeedGitMinimalPFifty{} & \SpeedGitMinimalPNinety{} & \SpeedGitMinimalPNinetyNine{} \\
-    \texttt{git} (Myers) & \SpeedGitMyersPFifty{} & \SpeedGitMyersPNinety{} & \SpeedGitMyersPNinetyNine{} \\
     \texttt{git} (patience) & \SpeedGitPatiencePFifty{} & \SpeedGitPatiencePNinety{} & \SpeedGitPatiencePNinetyNine{} \\
     \texttt{git} (histogram) & \SpeedGitHistogramPFifty{} & \SpeedGitHistogramPNinety{} & \SpeedGitHistogramPNinetyNine{} \\
-    Unix \texttt{diff} & \SpeedUnixDiffPFifty{} & \SpeedUnixDiffPNinety{} & \SpeedUnixDiffPNinetyNine{} \\
+    \texttt{git} (Myers) & \SpeedGitMyersPFifty{} & \SpeedGitMyersPNinety{} & \SpeedGitMyersPNinetyNine{} \\
     BDiff (warm interpreter) & \SpeedBDiffWarmPFifty{} & \SpeedBDiffWarmPNinety{} & \SpeedBDiffWarmPNinetyNine{} \\
     diffsitter & \SpeedDiffsitterPFifty{} & \SpeedDiffsitterPNinety{} & \SpeedDiffsitterPNinetyNine{} \\
-    \texttt{nvim -d} & \SpeedNvimDiffPFifty{} & \SpeedNvimDiffPNinety{} & \SpeedNvimDiffPNinetyNine{} \\
-    difftastic & \SpeedDifftasticPFifty{} & \SpeedDifftasticPNinety{} & \SpeedDifftasticPNinetyNine{} \\
     GumTree (warm JVM) & \SpeedGumTreeWarmPFifty{} & \SpeedGumTreeWarmPNinety{} & \SpeedGumTreeWarmPNinetyNine{} \\
+    difftastic & \SpeedDifftasticPFifty{} & \SpeedDifftasticPNinety{} & \SpeedDifftasticPNinetyNine{} \\
+    \texttt{nvim -d} & \SpeedNvimDiffPFifty{} & \SpeedNvimDiffPNinety{} & \SpeedNvimDiffPNinetyNine{} \\
     BDiff (cold, per-invocation) & \SpeedBDiffColdPFifty{} & \SpeedBDiffColdPNinety{} & \SpeedBDiffColdPNinetyNine{} \\
     GumTree (cold, per-invocation) & \SpeedGumTreeColdPFifty{} & \SpeedGumTreeColdPNinety{} & \SpeedGumTreeColdPNinetyNine{} \\
     \bottomrule
@@ -712,10 +743,10 @@ interpreter, for the same reason.
 \end{table}
 
 \begin{resultbox}{RA4.2 (Tool cost)}
-The ten configurations span more than two orders of magnitude at the median, from \texttt{git}'s
-\SpeedGitMinimalPFifty{}\,ms to GumTree's \SpeedGumTreeColdPFifty{}\,ms per invocation. At the
-99th percentile the same range runs from \SpeedGitPatiencePNinetyNine{}\,ms to
-\SpeedGumTreeColdPNinetyNine{}\,ms.
+The ten configurations span more than two orders of magnitude at the median, from Unix
+\texttt{diff}'s \SpeedUnixDiffPFifty{}\,ms to GumTree's \SpeedGumTreeColdPFifty{}\,ms per
+invocation. At the 99th percentile the same range runs from \SpeedUnixDiffPNinetyNine{}\,ms to
+\SpeedGumTreeColdPNinetyNine{}\,ms, three orders of magnitude apart.
 \end{resultbox}
 
 We report both a cold and a warm figure for GumTree and BDiff because they answer different questions: the cold number is what a developer running a diff from the command line actually waits for, and the warm number is what the matching costs once process startup is amortised away.
@@ -804,9 +835,13 @@ Scored on the same line-level basis as the ten configurations of Section~\ref{se
 the same \CodeDiffFixtures{} fixtures, a rate of \CodeDiffLineRate{}\%, better than every tool in that
 table on its own applicable subset. Holding the fixture set fixed does not change that: on the
 \CommonFixtures{}-fixture subset every tool scored, its rate is \CommonCodeDiffLineRate{}\%.
-Table~\ref{tab:codediff-by-dataset} splits every accuracy figure by dataset: the perfect share
-is highest on the Stratified sample, as it is for every tool in
-Figure~\ref{fig:agreement-by-dataset}, while the node-level accuracy is lowest there.
+Table~\ref{tab:codediff-by-dataset} splits every accuracy figure by dataset. The perfect share is
+highest on the Stratified sample (\CodeDiffPerfectPctStratified{}\%) and lowest on the Full list
+(\CodeDiffPerfectPctFull{}\%), and the node and visible-node rates order the four datasets exactly
+the same way. Figure~\ref{fig:agreement-by-dataset} shows that ordering is not a property of
+\textsc{CodeDiff}: every tool scores its own best on either the Stratified sample or the Defects4J
+changes, and all five line-granularity configurations do best on Defects4J---bug fixes are short,
+localised edits, which is the shape a line-based diff recovers most reliably.
 
 \input{figures/benchmark_codediff_by_dataset.tex}
 
@@ -872,15 +907,16 @@ pairs out of \OracleHumanMappings{}, and \OracleHumanStatementDisagreements{} of
 \OracleHumanCodeDiffStatementPrecision{}\% / \OracleHumanCodeDiffStatementRecall{}\% over
 \OracleHumanCodeDiffStatementDisagreements{} at statement level.
 
-The difference between the two rows is almost entirely precision, and reading it that way is what
-makes it informative. Recall is the same to within a hundredth of a point
-(\OracleHumanRecall{}\% against \OracleHumanCodeDiffRecall{}\%): both accounts recover the same
-share of what the oracle records, so neither misses pairs the other finds. What separates them is
-pairs *claimed* and not corroborated---28 for our annotation against 67 for the tool, and 2 against
-22 at statement level. Two independently authored accounts of the same changes therefore invent
-about half as many pairs as the tool does, and a tenth as many at statement level, which is the
-shape one would expect if the residue is the tool's rather than a difference of annotation
-opinion.
+The difference between the two rows is mostly precision, and reading it that way is what makes it
+informative. The two recover almost the same share of what the oracle records
+(\OracleHumanRecall{}\% against \OracleHumanCodeDiffRecall{}\%), so neither is systematically
+missing pairs the other finds. What separates them is pairs \emph{claimed} and not
+corroborated---\OracleHumanFalsePositives{} for our annotation against
+\OracleHumanCodeDiffFalsePositives{} for the tool, and \OracleHumanStatementFalsePositives{}
+against \OracleHumanCodeDiffStatementFalsePositives{} at statement level. Two independently
+authored accounts of the same changes therefore invent about half as many pairs as the tool does,
+and under a tenth as many at statement level, which is the shape one would expect if the residue is
+the tool's rather than a difference of annotation opinion.
 
 That reading is bounded by which units are solved. They are not a sample: all \OracleUnits{} were
 taken into the corpus at once, and the solved ones are simply how far annotation has reached. They
@@ -916,7 +952,7 @@ rate of any tool measured on the full corpus, and a median well inside its inter
 \textbf{Construct validity.} Every rate this paper reports about ambiguity is a floor rather than
 an estimate. A multi-map group exists where an annotator noticed that two pairings were equally
 correct and recorded it; a change whose alternative mapping nobody saw is filed as unique. The
-same holds for the paintings. We report these as existence results and lower bounds throughout, and RA3.1's second reading---cost ties at differing mappings, which needs no annotation to detect---exists precisely because it does not depend on annotator attention. For the same reason we score RA1.1 and RA3.1 over the \AmbiguityListScored{} changes whose ambiguity pass is complete rather than over all \NumFixtures{}. That pass covers the Curated and Full lists in full, so for those two lists the bound is one on annotator attention rather than one on coverage. The stratified fixtures carry no multi-map group at all, which at the rate the two finished lists show is an annotation gap rather than a finding about those changes.
+same holds for the paintings. We report these as existence results and lower bounds throughout, and RA3.1's second reading---cost ties at differing mappings, which needs no annotation to detect---exists precisely because it does not depend on annotator attention. For the same reason we score RA1.1 and RA3.1 over the \AmbiguityListScored{} changes whose ambiguity pass is complete rather than over all \NumFixtures{}. That pass covers the Curated and Full lists in full, so for those two lists the bound is one on annotator attention rather than one on coverage. The Stratified sample (\AmbiguityStratifiedWith{} groups in \AmbiguityStratifiedTotal{} changes) and the Defects4J units (\AmbiguityDefectsFourJWith{} in \AmbiguityDefectsFourJTotal{}) run far under the rate the two finished lists show, which is an annotation gap rather than a finding about those changes; Table~\ref{tab:expressibility} prints both rows and its \emph{All} row under that caveat.
 
 Because no whole-file exact computation is affordable at these sizes (RA2), RA1.2 compares the
 human mapping's cost to a heuristics-augmented computation's rather than to a proven optimum. Its
@@ -947,8 +983,10 @@ depend on our own discipline, and it is the reason the corpus was extended with 
 real commits. It concentrates hard, structurally interesting changes, because easy ones exercise
 nothing worth measuring---so every tail figure in this paper is a stress reading rather than an
 estimate of what a developer waits for on a typical commit. Every accuracy result is also reported per dataset (Figure~\ref{fig:agreement-by-dataset},
-Table~\ref{tab:codediff-by-dataset}), so a reader can separate the two random samples from the
-stratified one.
+Table~\ref{tab:codediff-by-dataset}), so a reader can separate the two random samples, the
+stratified one, and the Defects4J bug fixes from each other. The Defects4J rows carry the
+selection caveat of Section~\ref{sec:diff-shape}: the units solved so far are how far annotation
+has reached, not a draw, and they run shorter than the ones still unsolved.
 
 The painted subset is smaller still and is not randomly drawn: painting is manual, and which
 changes have been painted is an artifact of the order the annotators worked in. It runs to
