@@ -765,14 +765,17 @@ fn main() -> Result<()> {
                     .collect::<Vec<f64>>()
             })
             .filter(|v| !v.is_empty());
-        rows.push(score_fixture(
-            name,
-            before,
-            after,
-            args.repeats,
-            warm_ms,
-            bdiff_warm,
-        )?);
+        // Skipped with a note rather than propagated, exactly as `run_accuracy` treats the same
+        // failure: a fixture this harness cannot score at all must not take the other 1116 down
+        // with it. `handmade/bazel-not-actually-supported-by-treesitter` is the case that forced
+        // this - a BUILD file no grammar parses, carrying a human mapping, so it reaches
+        // `score_fixture` and fails there with "Before code has no AST". It was added on
+        // 2026-09-09 a minute after that day's timing run finished, so the `?` here aborted every
+        // timing run from then until 2026-09-16 at the very first fixture, alphabetically.
+        match score_fixture(name, before, after, args.repeats, warm_ms, bdiff_warm) {
+            Ok(row) => rows.push(row),
+            Err(err) => eprintln!("  {name}: skipped ({err:#})"),
+        }
     }
     let elapsed = started.elapsed();
 
