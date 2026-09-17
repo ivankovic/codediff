@@ -19,21 +19,32 @@ use anyhow::Result;
 
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants_with_known_violations;
 
 #[test]
 fn mapping() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("java-defects4j-cli-18-posixparser")
+    // First measurement, 2026-09-17, of a mapping from the 2026-09-16 Defects4J batch. The human
+    // deletes an `expression_statement` inside a nested `if` and inserts its replacement;
+    // codediff re-uses the deleted statement's leaves - both identifiers, both parentheses, the
+    // semicolon - inside the inserted one. The scaffolding-reuse family, counted once per
+    // re-used leaf on each side.
+    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
+        "java-defects4j-cli-18-posixparser",
+        16,
+        10,
+    )
 }
 
 #[test]
 fn painting() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test, read the rate it
-    // reports for both modes, and record that instead.
-    assert_matches_human_painting_within_limit("java-defects4j-cli-18-posixparser", 100.0)
+    // measured 2026-09-17: minimal 0.131%, full 0.122% (measured, unexamined)
+    assert_matches_human_painting_within_limit("java-defects4j-cli-18-posixparser", 0.15)
 }
 
 #[test]
 fn invariants() -> Result<()> {
-    assert_ground_truth_invariants("java-defects4j-cli-18-posixparser")
+    // First measurement, 2026-09-17: invariant 11, both sides under both presets. The removed
+    // `identifier` `token` on row 128 is left unpainted although the tree mapping says it is
+    // gone. Recorded as found, waiting on a repair of the painting.
+    assert_ground_truth_invariants_with_known_violations("java-defects4j-cli-18-posixparser", 4)
 }

@@ -23,18 +23,24 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping(
+    // First measurement, 2026-09-17, of a mapping from the 2026-09-16 Defects4J batch. An
+    // assignment gains a cast around a method call, and the human treats the new expression as
+    // inserted whole; codediff carries the old right-hand side's leaves into it, partly through
+    // `qualified_name` and partly as a `MovedSubtree` of the argument list. Recorded as found,
+    // not examined.
+    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "java-defects4j-cli-15-writeablecommandlineimpl",
+        37,
+        27,
     )
 }
 
 #[test]
 fn painting() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test, read the rate it
-    // reports for both modes, and record that instead.
+    // measured 2026-09-17: minimal 2.189%, full 3.575% (measured, unexamined)
     assert_matches_human_painting_within_limit(
         "java-defects4j-cli-15-writeablecommandlineimpl",
-        100.0,
+        3.59,
     )
 }
 

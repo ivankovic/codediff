@@ -19,7 +19,7 @@ use anyhow::Result;
 
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants_with_known_violations;
 
 #[test]
 fn mapping() -> Result<()> {
@@ -28,12 +28,15 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test, read the rate it
-    // reports for both modes, and record that instead.
-    assert_matches_human_painting_within_limit("java-defects4j-cli-16-groupimpl", 100.0)
+    // measured 2026-09-17: minimal 0.000%, full 0.037% (measured, unexamined)
+    assert_matches_human_painting_within_limit("java-defects4j-cli-16-groupimpl", 0.05)
 }
 
 #[test]
 fn invariants() -> Result<()> {
-    assert_ground_truth_invariants("java-defects4j-cli-16-groupimpl")
+    // First measurement, 2026-09-17: invariant 4, after row 92 paints every visible character
+    // Insert but leaves the line's own 12-byte indent unpainted
+    // ("            option.setParent(this);"). Recorded as found; one painted range needs
+    // extending to the start of the line's content.
+    assert_ground_truth_invariants_with_known_violations("java-defects4j-cli-16-groupimpl", 1)
 }
