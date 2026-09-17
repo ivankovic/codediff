@@ -21,10 +21,11 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
+    // 2026-09-17: 20,14 -> 19,13, one leaf recovered by `solve_orphaned_leaves`.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "swift-nextcloud-ios-refactor-and-change",
-        20,
-        14,
+        19,
+        13,
     )
 }
 

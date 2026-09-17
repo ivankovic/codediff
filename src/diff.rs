@@ -30,6 +30,7 @@ pub mod solve_leading_siblings;
 pub mod solve_moved_subtrees;
 pub mod solve_mutual_ancestors;
 pub mod solve_nested_condition_collapse;
+pub mod solve_orphaned_leaves;
 pub mod solve_syntax_aware_matching;
 pub mod solve_unique_type_matching;
 pub mod solve_unresolved_nodes;
@@ -457,6 +458,12 @@ impl<'code> PendingDiff<'code> {
         if config.solver_bottom_up_propagation {
             solve_bottom_up_propagation::solve(&ctx, &mut ast_diff);
         }
+
+        // The census's biggest single-shape family (2026-09-17): a leaf deleted here and inserted
+        // there, under a parent pair the passes above already agreed on. Runs after the fallback
+        // and its propagation precisely because those produce the parent pairs it anchors on, and
+        // before phase 7 so the leaves it re-pairs are not left for the move recovery to guess at.
+        solve_orphaned_leaves::solve(&ctx, &mut ast_diff);
 
         // Phase 7: unanchored-move fallback (`solve_moved_subtrees`). After the terminal
         // residual resolution by necessity, not as a stylistic choice - only phases 8-10, which
@@ -948,6 +955,11 @@ pub enum ASTMappingReason {
     /// like `NestedConditionCollapse`: `rust-add-if`'s own ground truth paints this shape `Move`
     /// under `Full` and unpainted under `Minimal`. See `solve_wrap_growth`.
     WrapGrowth,
+    /// A leaf the pipeline deleted on one side and inserted on the other, re-paired because both
+    /// sit directly under a parent pair everything else already agreed on and read the same text -
+    /// see `solve_orphaned_leaves`, which explains why "same parent pair, same text, same count on
+    /// both sides" is the only shape narrow enough to do this on.
+    OrphanedLeafUnderMatchedParent,
 }
 
 impl ASTMappingReason {
@@ -978,6 +990,7 @@ impl ASTMappingReason {
             ASTMappingReason::NestedConditionCollapse => "CondCollapse",
             ASTMappingReason::HeritageClauseGrowth => "HeritageGrowth",
             ASTMappingReason::WrapGrowth => "WrapGrowth",
+            ASTMappingReason::OrphanedLeafUnderMatchedParent => "OrphanLeaf",
         }
     }
 }

@@ -29,14 +29,17 @@ fn mapping() -> Result<()> {
     // Known gap, characterized above but unfixed. Clamped at the observed count rather than
     // requiring an exact match. Lower (or drop back to `assert_matches_human_mapping`) once
     // a fix lands.
+    // 2026-09-17: 17,17 -> 10,10, from `solve_orphaned_leaves` - leaves this fixture's many
+    // moves left dropped on one side and inserted on the other, under parent pairs the rest of
+    // the mapping already agreed on.
     // 2026-09-03: tightened 263,188 -> 17,17. The limit was stale rather than a deliberate
     // allowance: it had outlived the change that closed the gap, and `quality_baseline.csv` was the
     // only thing still holding this fixture to its real number. Any counts above describe the
     // older, larger residual.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "c-sched-ext-scx-many-many-moves-some-deletes-some-adds",
-        17,
-        17,
+        10,
+        10,
     )
 }
 
