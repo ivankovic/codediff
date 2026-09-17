@@ -22,12 +22,16 @@ use anyhow::Result;
 #[test]
 fn mapping() -> Result<()> {
     // Single-quoted `raw_string`s become double-quoted `string`s (different node kinds), so the 2
-    // conversions aren't recognized as Updates; one `list` also gets wrapped in a new `pipeline`,
-    // shifting its `&&` token's path. 3 mismatches total.
+    // conversions were not recognized as Updates; one `list` also gets wrapped in a new
+    // `pipeline`, shifting its `&&` token's path. 3 mismatches total.
+    //
+    // 2026-09-17: 3 -> 1. `SHELL_STRING_BODY_KINDS` closed the first half exactly as the note
+    // above describes it - the two string bodies now rename into each other instead of being
+    // deleted and re-inserted. What is left is the `&&`, which is the wrap, not the quoting.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "shellscript-langchain-ai-langchain-some-interesting-raw-string-to-string-content",
-        3,
-        3,
+        1,
+        1,
     )
 }
 

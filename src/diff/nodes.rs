@@ -1231,6 +1231,13 @@ const RUBY_HASH_SEPARATORS: &[&str] = &["=>", ":"];
 /// a `return NULL` with an unrelated name in `c-nginx-add-typedef` and buy nothing elsewhere.
 const NULL_LITERAL_KINDS: &[&str] = &["none", "identifier"];
 
+/// Shell string bodies, whose kind changes with the quoting around them: a `raw_string` losing its
+/// quotes to become `string_content`, or a string body rewritten as a `regex`
+/// (`shellscript-scikit-learn-scikit-learn-string-to-regex`,
+/// `shellscript-langchain-ai-langchain-some-interesting-changes`). The text is the subject and the
+/// kind is an artifact of the delimiter, which is exactly the shape a cross-kind family is for.
+const SHELL_STRING_BODY_KINDS: &[&str] = &["string_content", "raw_string", "regex"];
+
 /// A boolean flipped in place: `return true` -> `return false`. In grammars that give each literal
 /// its own kind (Java's `true`/`false`, unlike Rust's single `boolean_literal`) the two cannot pair
 /// without this, so the flip reads as a delete plus an insert - `java-defects4j-math-22-fdistribution`
@@ -1330,6 +1337,7 @@ const ALL_OPERATOR_FAMILIES: &[&[&str]] = &[
     RUBY_HASH_SEPARATORS,
     NULL_LITERAL_KINDS,
     BOOLEAN_LITERAL_KINDS,
+    SHELL_STRING_BODY_KINDS,
 ];
 
 /// The mask type below must have a bit per family - a silent shift-overflow is exactly the bug
@@ -1579,7 +1587,7 @@ fn families_for_language(language: &Language) -> &'static [&'static [&'static st
             ASSIGNMENT_OPS,
             NUMERIC_LITERAL_KINDS,
         ],
-        Language::ShellScript => &[SHELL_TEST_OPS],
+        Language::ShellScript => &[SHELL_TEST_OPS, SHELL_STRING_BODY_KINDS],
         Language::HTML | Language::XML => &[HTML_TAG_END],
         Language::CSS => &[NUMERIC_LITERAL_KINDS],
         _ => &[],
