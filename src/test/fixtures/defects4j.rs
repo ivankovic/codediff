@@ -108,7 +108,15 @@ mod java_defects4j_cli_19_posixparser;
 #[cfg(test)]
 mod java_defects4j_cli_1_commandline;
 #[cfg(test)]
+mod java_defects4j_cli_20_posixparser;
+#[cfg(test)]
+mod java_defects4j_cli_21_groupimpl;
+#[cfg(test)]
 mod java_defects4j_cli_21_writeablecommandline;
+#[cfg(test)]
+mod java_defects4j_cli_21_writeablecommandlineimpl;
+#[cfg(test)]
+mod java_defects4j_cli_22_posixparser;
 #[cfg(test)]
 mod java_defects4j_cli_24_helpformatter;
 #[cfg(test)]
