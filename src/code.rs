@@ -190,10 +190,10 @@ impl Code {
         // Compute AST metadata, but only once there's an AST to compute it from: an unrecognized
         // language (or a grammar `to_treesitter` doesn't map, see `Code::parse`) leaves `ast` as
         // `None`, which is an expected, valid state - not a bug - and matches how `ensure_parsed`
-        // and `metadata::metadata_of` both already treat a parse-less `Code` elsewhere. Before this
-        // guard, every `Code::from_string`/`from_file` call for such a language unconditionally
-        // logged "Failed to compute AST metadata: AST must be parsed before hashing" to stderr,
-        // even though nothing had actually gone wrong.
+        // and `metadata::metadata_of` both already treat a parse-less `Code` elsewhere. Without
+        // the guard, every `Code::from_string`/`from_file` call for such a language logs "Failed
+        // to compute AST metadata: AST must be parsed before hashing" to stderr with nothing
+        // actually wrong.
         //
         // `from_string` is infallible by signature (unlike `ensure_parsed`, which propagates this
         // same error), so a genuine failure here still can't be returned - it's surfaced via
@@ -379,11 +379,11 @@ impl ASTNodeMetadata {
 /// (see [`crate::diff::nodes::operator_family_mask`]), so the two can't disagree.
 ///
 /// Why it exists: `UnitCostModel::ren` is evaluated once per tree-edit-distance DP cell - O(n1*n2)
-/// times and more - and each evaluation used to walk `IDENTIFIER_KINDS` and up to six operator
-/// family arrays comparing `&str`s, tens of string comparisons per cell. Every input to those
-/// scans depends only on the node's kind, never on the pair, so the whole cost moves from the
-/// O(n^2) inner loop to an O(n) precompute (measured 2026-08-17: roughly half of all APTED time
-/// was in `ren` plus the containment adjustment it feeds).
+/// times and more - and answering those questions from the kind string means walking
+/// `IDENTIFIER_KINDS` and up to six operator family arrays comparing `&str`s, tens of string
+/// comparisons per cell. Every input to those scans depends only on the node's kind, never on the
+/// pair, so the whole cost moves from the O(n^2) inner loop to an O(n) precompute - and `ren`
+/// plus the containment adjustment it feeds is a large share of all APTED time.
 ///
 /// Language-independent by construction: `operator_families` records membership in *every* family,
 /// and which subset applies is decided at comparison time from the cost model's own language (see
@@ -429,14 +429,13 @@ pub struct ASTMetadata {
     /// Deliberately a `Vec`, not a `HashSet`: nodes are pushed in the same deterministic traversal
     /// order every time (see `hash::hash_code`), so which duplicate a caller picks first (e.g.
     /// `hash_tree_matching::solve_with_hash_map`'s candidate selection) is reproducible run to
-    /// run. A `HashSet` here previously made that choice depend on the hasher's per-instance random
+    /// run. A `HashSet` here would make that choice depend on the hasher's per-instance random
     /// seed, silently changing codediff's output between otherwise-identical runs whenever a hash
-    /// had more than one node (see `describe_nondeterminism` in test/helper/human_mapping.rs).
+    /// has more than one node (see `describe_nondeterminism` in test/helper/human_mapping.rs).
     /// There are never true duplicate entries within one list (each node is visited exactly once),
-    /// so this loses nothing a `HashSet` provided. See `node_to_full_hash` for why the outer map
-    /// itself is `FxHashMap` - the *values* being `Vec`s (not `HashSet`s) is what already made the
-    /// *content* order-independent-safe; nothing here ever iterates the outer map directly in an
-    /// order-sensitive way (checked 2026-07-26 before converting).
+    /// so a `Vec` gives up nothing a `HashSet` would provide. See `node_to_full_hash` for why the
+    /// outer map itself is `FxHashMap`; nothing here ever iterates that map directly in an
+    /// order-sensitive way.
     pub full_hash_to_node: rustc_hash::FxHashMap<u64, Vec<usize>>,
     /// Map of node->hash. The hash is a structural hash, hashing only the types of AST nodes in
     /// the subtree, not the value of the nodes. This hash is robust to changes like constant value
@@ -515,8 +514,7 @@ pub struct ASTMetadata {
 
 impl ASTMetadata {
     /// Whether `id` is a leaf (has no children) in this tree. `false` for an id with no
-    /// `node_info` entry, matching the conservative default every existing call site already
-    /// used before this helper was extracted.
+    /// `node_info` entry, which is the conservative answer every call site wants.
     pub fn is_leaf(&self, id: usize) -> bool {
         self.node_info
             .get(&id)
@@ -655,9 +653,8 @@ mod tests {
     /// `Code::parse` leaves `ast` unset - an expected, valid outcome (e.g. every add/delete-file
     /// diff run through `tui::app::compute_diff`'s `/dev/null` fallback starts from exactly this
     /// state before it's corrected to the other side's language). `compute_ast_metadata` must not
-    /// even be attempted in that case: it requires a parsed AST and previously logged a spurious
-    /// "Failed to compute AST metadata" error to stderr on every such call despite nothing being
-    /// actually wrong.
+    /// even be attempted in that case: it requires a parsed AST, and attempting it logs a spurious
+    /// "Failed to compute AST metadata" error to stderr with nothing actually wrong.
     #[test]
     fn code_from_string_skips_ast_metadata_when_the_language_has_no_grammar() {
         let code = Code::from_string("", &Language::Unknown);

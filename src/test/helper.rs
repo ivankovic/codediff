@@ -445,16 +445,14 @@ pub fn was_tree_deleted<'a>(path: &[&str], root: Node<'a>, diff: &ASTDiff) -> Re
 pub fn handmade_test_code() -> Result<HashMap<String, Code>> {
     let mut codes = handmade_unparsed_test_code()?;
 
-    // `ensure_parsed`, not the bare `parse`+manual-hasher-setup this used to do: `parse` alone
-    // only sets `code.ast`, leaving `code.metadata.ast_metadata` at `None` - every downstream
-    // `metadata_of` call on a `Code` from this function then has nothing to borrow and silently
-    // recomputes the whole thing from scratch, every single time it's called anywhere in the
-    // pipeline (confirmed 2026-07-26: 20 separate `compute_ast_metadata` calls for one `diff_code`
-    // call on a single fixture pair, ~10 per side, one per pipeline phase that touches metadata -
-    // see TODO.md). `ensure_parsed` parses *and* caches metadata in one idempotent call, matching
-    // what every real caller (`Code::from_string`/`from_file`) already does. Safe now that
-    // `Code`'s hand-written `Clone` drops `ast_metadata` back to `None` on every clone (see its
-    // doc comment) - a caller of this function that clones a returned `Code` before diffing gets a
+    // `ensure_parsed`, not a bare `parse` plus manual hasher setup: `parse` alone only sets
+    // `code.ast`, leaving `code.metadata.ast_metadata` at `None` - every downstream `metadata_of`
+    // call on a `Code` from this function then has nothing to borrow and silently recomputes the
+    // whole thing from scratch, once per pipeline phase that touches metadata, on both sides.
+    // `ensure_parsed` parses *and* caches metadata in one idempotent call, matching what every
+    // real caller (`Code::from_string`/`from_file`) already does. Safe because `Code`'s
+    // hand-written `Clone` drops `ast_metadata` back to `None` on every clone (see its doc
+    // comment) - a caller of this function that clones a returned `Code` before diffing gets a
     // correct, if uncached, copy rather than one with stale root-id-keyed metadata.
     for code in codes.values_mut() {
         if code.metadata.language.is_some() {
@@ -579,13 +577,11 @@ pub fn handmade_test_code_pairs() -> Result<std::sync::Arc<HashMap<String, (Code
     // data at runtime), so memoize the whole map after the first successful build and hand out
     // `Arc` clones from then on.
     //
-    // `Arc`, not a bare clone of the map: this is the *entire* corpus (all `DIFF_DATASETS`,
-    // 500+ fixtures) - `Code`'s hand-written `Clone` deep-copies the `tree_sitter::Tree` per
-    // side, so `.clone()`-ing the whole map used to re-materialize every parsed tree in the
-    // corpus on every single call, including the very first. One `Arc` clone is a refcount bump
-    // instead - see `handmade_test_code_pair`'s doc comment for the same fix on the per-name
-    // cache, diagnosed together (2026-09-01) after a `cargo test` run was observed OOM-killed at
-    // 12-16GB RSS.
+    // `Arc`, not a bare clone of the map: this is the *entire* corpus (every `DIFF_DATASETS`
+    // entry) and `Code`'s hand-written `Clone` deep-copies the `tree_sitter::Tree` per side, so
+    // `.clone()`-ing the whole map re-materializes every parsed tree in the corpus on every single
+    // call. One `Arc` clone is a refcount bump instead - see `handmade_test_code_pair`'s doc
+    // comment for the same reasoning on the per-name cache.
     static CACHE: std::sync::OnceLock<std::sync::Arc<HashMap<String, (Code, Code)>>> =
         std::sync::OnceLock::new();
     if let Some(cached) = CACHE.get() {
@@ -796,19 +792,18 @@ pub struct SampleProvenance {
 /// Provenance read from a fixture's **own** `README.md`, the file that travels with it.
 ///
 /// **The fixture directory is the source of truth for what a fixture is**, and this is what makes
-/// that true rather than aspirational. The same four facts - repository, commit, path, dataset -
-/// used to live in `sample.csv` as well, and `diff_inventory` joined against that CSV on
-/// `promoted_to` to fill its provenance columns. That join is what made a fixture depend on a file
-/// outside itself to describe itself: move the directory, or lose the row, and the fixture goes
-/// anonymous. `README.md` has always carried strictly more (it also records the upstream license,
-/// which `sample.csv` never did), so nothing is lost by preferring it.
+/// that true rather than aspirational. Reading the same four facts - repository, commit, path,
+/// dataset - by joining `sample.csv` on `promoted_to` instead would make a fixture depend on a
+/// file outside itself to describe itself: move the directory, or lose the row, and the fixture
+/// goes anonymous. `README.md` also records the upstream license, which `sample.csv` never
+/// carries.
 ///
 /// `sample.csv` keeps its own job: the append-only record of what was *sampled* and what happened
-/// to each candidate, including the 25 rejections that have no directory at all.
+/// to each candidate, including the rejections that have no directory at all.
 ///
-/// Returns `None` for a fixture with no README - the 61 `handmade` fixtures were written by hand
-/// rather than sampled from a repository, so they have no upstream provenance to record, and they
-/// have no `sample.csv` row either. Blank provenance for them is the same answer the join gave.
+/// Returns `None` for a fixture with no README - the `handmade` fixtures were written by hand
+/// rather than sampled from a repository, so they have no upstream provenance to record, and no
+/// `sample.csv` row either.
 ///
 /// The parse is against `render_readme`'s own generated output (see
 /// `materialize_test_diffs`), not free-form Markdown: each fact is the single backticked span on
@@ -978,13 +973,12 @@ fn data_root() -> std::path::PathBuf {
 */
 ///
 /// Returns an `Arc` rather than an owned `(Code, Code)`: this cache is process-lifetime and never
-/// evicts, and `Code`'s hand-written `Clone` deep-copies the `tree_sitter::Tree` per side - under
-/// `cargo test`'s default parallelism, every one of this function's 50+ call sites requesting the
-/// same fixture concurrently used to each materialize its own full parsed-tree copy on top of the
-/// one the cache itself retains, with nothing ever freed for the life of the process. Diagnosed
-/// 2026-09-01 after a `cargo test` run was observed OOM-killed at 12-16GB RSS: growth was
-/// monotonic with no plateau under an 8GB cap. An `Arc` clone is a refcount bump instead of a
-/// tree copy, so concurrent requesters of the same fixture now share one parse.
+/// evicts, and `Code`'s hand-written `Clone` deep-copies the `tree_sitter::Tree` per side. Under
+/// `cargo test`'s default parallelism, an owned return has every call site requesting the same
+/// fixture materialize its own full parsed-tree copy on top of the one the cache retains, with
+/// nothing freed for the life of the process - monotonic growth with no plateau, and an
+/// OOM-killed run at the end of it. An `Arc` clone is a refcount bump instead of a tree copy, so
+/// concurrent requesters of the same fixture share one parse.
 pub fn handmade_test_code_pair(name: &str) -> Result<std::sync::Arc<(Code, Code)>> {
     type PairCache = std::sync::Mutex<HashMap<String, std::sync::Arc<(Code, Code)>>>;
     static CACHE: std::sync::OnceLock<PairCache> = std::sync::OnceLock::new();

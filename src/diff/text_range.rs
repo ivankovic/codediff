@@ -99,9 +99,9 @@ pub fn paint_row_len(line: &str) -> SourceColumn {
 /// column that is off - a malformed painting, a stale range, an offset derived from a hash - can
 /// slice `line` without panicking inside a multi-byte character.
 ///
-/// The one home for this clamp. Every renderer that slices a row by column used to carry its own
-/// copy, and the byte-versus-character defect behind it was found and fixed separately in two of
-/// them (see [`SourceColumn`]).
+/// The one home for this clamp. Every renderer that slices a row by column needs it, and the
+/// byte-versus-character defect it prevents is easy to reintroduce independently in each of them
+/// (see [`SourceColumn`]).
 pub fn floor_char_boundary(line: &str, column: usize) -> usize {
     let mut column = column.min(line.len());
     while column > 0 && !line.is_char_boundary(column) {
@@ -393,14 +393,11 @@ fn is_whitespace_between(a: &TextRange, b: &TextRange, code: &SourceText) -> boo
 
 /// A file's text plus the byte offset every row starts at.
 ///
-/// **Why this exists.** `is_whitespace_between` needs to turn two (row, column) positions into byte
-/// offsets so it can look at the text between them. It used to do that by walking `code.chars()`
-/// from byte 0 for each position - O(file) per call, and `RangeMatch::extends` makes two of those
-/// calls per side. Profiling the corpus on 2026-08-28 found the result: on
-/// `json-ipfs-ipfs-desktop-only-update-version-strings` (924KB per side), 16,848 calls cost 148
-/// billion instructions - **90% of the entire run** - at 8.8 million instructions each, which is
-/// exactly the cost of walking that file twice. The same fixture's diff took 0.7s and its range
-/// merging took 10.4s.
+/// **Why this exists.** `is_whitespace_between` needs to turn two (row, column) positions into
+/// byte offsets so it can look at the text between them. Walking `code.chars()` from byte 0 for
+/// each position is O(file) per call, and `RangeMatch::extends` makes two of those calls per side.
+/// On a large single-line file that dominates the whole run, costing far more than the diff whose
+/// ranges it is merging.
 ///
 /// With the row offsets computed once, the same lookup is an add and a bounds check. This is the
 /// second instance of this shape in this module; see `ranges_for_options`'s own "built once for the
@@ -509,9 +506,8 @@ mod tests {
             byte_index += len;
         }
         // The walk ran out of text: the position is addressable only if it is exactly the end.
-        // The previous version returned `byte_index` unconditionally here, which is the same
-        // in-band sentinel `byte_index` itself used to have - it made "one past the end" and "not
-        // a real position" indistinguishable in the very test meant to pin the behaviour.
+        // Returning `byte_index` unconditionally here would make "one past the end" and "not a
+        // real position" indistinguishable, in the very test meant to pin the behaviour.
         (current_row == row && current_col == col).then_some(byte_index)
     }
 
@@ -673,7 +669,7 @@ mod tests {
     /// widening the range to the end of the line.
     ///
     /// `let 漢 = "yy";` is 15 bytes and 13 characters, so byte column 13 - where the string's
-    /// content ends - is exactly the coincidence that used to trigger it.
+    /// content ends - is exactly the coincidence that triggers it.
     #[test]
     fn from_treesitter_range_does_not_normalize_a_mid_row_column_that_matches_a_character_count() {
         use tree_sitter::{Point, Range};
@@ -929,10 +925,10 @@ mod tests {
         assert_eq!(row_col_to_byte_index(0, 5, code), Some(5)); // 'c', right after 'b'
     }
 
-    /// Regression test for a real crash: `is_whitespace_between` used to slice `code` with
-    /// character counts instead of byte offsets, so any multi-byte character earlier in the file
-    /// (this reproduces one seen in the wild: an em dash, "—") could land a slice mid-character,
-    /// panicking with "byte index N is not a char boundary".
+    /// Regression test for a crash: slicing `code` with character counts instead of byte offsets
+    /// lets any multi-byte character earlier in the file (this reproduces one seen in the wild: an
+    /// em dash, "—") land a slice mid-character, panicking with "byte index N is not a char
+    /// boundary".
     #[test]
     fn text_range_can_extend_with_whitespace_after_a_multi_byte_character_earlier_in_the_line() {
         let code = "a—b   c"; // "a—b", 3 spaces, "c" - byte columns: a=0, —=1, b=4, c=8

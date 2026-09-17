@@ -368,9 +368,9 @@ fn binary_notice(
 ///
 /// Why it has to exist: `Code::from_file` reads with `read_to_string`, so a binary side fails the
 /// UTF-8 decode and the error propagates out as exit 2. Under `GIT_EXTERNAL_DIFF` git reads any
-/// non-zero exit as "external diff died" and abandons the *whole* run, so one PDF in a commit
-/// used to take every remaining file's diff down with it - `git diff` printed a `fatal:` and
-/// stopped, leaving the source files after it in the sort order undiffed. There is nothing useful
+/// non-zero exit as "external diff died" and abandons the *whole* run, so without this one PDF in
+/// a commit takes every remaining file's diff down with it: `git diff` prints a `fatal:` and
+/// stops, leaving every source file after it in the sort order undiffed. There is nothing useful
 /// to show for a binary file, but "nothing useful" has to be reported as a successful diff of an
 /// unshowable file, not as a crash.
 ///
@@ -558,10 +558,9 @@ mod tests {
 
     /// git appends `other` (the destination path) and a rename/copy score to the seven when it
     /// detected the change as a rename or a copy - `diff.renames` defaults to on for `git diff`,
-    /// so this is the ordinary shape for any commit containing one. Rejecting it used to exit
-    /// non-zero, which git reads as "external diff died", abandoning the whole run: a single
-    /// rename took every file after it down with it. `old-file`/`new-file` stay at indices 1
-    /// and 4.
+    /// so this is the ordinary shape for any commit containing one. Rejecting it exits non-zero,
+    /// which git reads as "external diff died" and abandons the whole run - one rename taking
+    /// every file after it down with it. `old-file`/`new-file` stay at indices 1 and 4.
     #[test]
     fn resolve_before_after_accepts_gits_nine_argument_rename_form() {
         let paths = vec![
@@ -737,9 +736,9 @@ mod tests {
         assert_eq!(exit_code_for(false, true, true), 0);
     }
 
-    /// The regression this whole binary path exists for: `git diff` over a commit touching a PDF
-    /// used to die on the PDF and abandon every file after it. Whatever else changes, the git
-    /// form must keep exiting 0 for a binary pair.
+    /// The case this whole binary path exists for: `git diff` over a commit touching a PDF must
+    /// not die on the PDF and abandon every file after it. Whatever else changes, the git form
+    /// exits 0 for a binary pair.
     #[test]
     fn a_binary_pair_under_the_git_external_diff_form_still_exits_zero() {
         assert_eq!(exit_code_for(true, false, true), 0);

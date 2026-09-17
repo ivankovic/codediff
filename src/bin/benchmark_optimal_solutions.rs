@@ -46,20 +46,18 @@ use csv::Writer;
 /// **This list must cover every label `ASTMappingReason::bucket_label` can return**, and
 /// `non_apted_reason_labels_covers_every_bucket_label` enforces it. An explicit list is only safe
 /// with that test: `bucket_label`'s match is exhaustive, so adding a variant fails to compile
-/// *there*, but nothing previously forced this list to follow. It had drifted by eight labels -
-/// `LeadSib`, `BottomUpProp`, `UniqueType`, `Unresolved`, `MutualAnc`, `CondCollapse`,
-/// `HeritageGrowth` and `WrapGrowth` had no column at all, so every mapping entry those passes
-/// produced was silently dropped from the CSV and from the reason table's TOTAL (measured
-/// 2026-09-02: `rust-add-if` produced 81 mapping entries and recorded 79). Since the attribution
-/// table is what "which pass owns this fixture's mismatches?" is answered from, a pass that fired
-/// reading as absent is the worst shape that failure could take.
+/// *there*, while nothing about this list forces it to follow. A label missing here means every
+/// mapping entry that pass produces is silently dropped from the CSV and from the reason table's
+/// TOTAL - and since the attribution table is what "which pass owns this fixture's mismatches?"
+/// is answered from, a pass that fired reading as absent is the worst shape that failure could
+/// take.
 ///
-/// The first sixteen are kept in their original order, and the eight are appended rather than
-/// slotted in, so existing column positions are unchanged for anything reading the CSV.
+/// New labels are appended rather than slotted in, so existing column positions stay stable for
+/// anything reading the CSV.
 ///
-/// Seven entries below are dead - `Comment`, `BottomUp` and the five `Norm*` variants name passes
-/// deleted in 2026-08-14/16 - and are retained deliberately: `matching_reasons_report.py` indexes
-/// `Comment` and `BottomUp` by name, so dropping them is a separate, consumer-breaking change.
+/// Some entries below name passes that no longer exist and are retained deliberately:
+/// `matching_reasons_report.py` indexes `Comment` and `BottomUp` by name, so dropping them is a
+/// separate, consumer-breaking change.
 const NON_APTED_REASON_LABELS: &[&str] = &[
     "IdHash",
     "IdHashAnc",
@@ -696,10 +694,9 @@ fn print_table(rows: &[Row]) {
     // Only summed over fixtures that also have a human cost, so `total_cost_diff` below compares
     // like for like - an "unsolved" fixture's algorithm cost would otherwise inflate the TOTAL
     // algorithm side against nothing on the human side. This is also the figure the TOTAL row
-    // *prints*: it used to print an all-rows sum beside a solved-only human cost and a solved-only
-    // difference, so `Alg Cost - Hum Cost` did not equal the `Cost Diff` column next to it (off by
-    // 9819 on the 2026-09-02 corpus, exactly the one unsolved fixture's algorithm cost, and
-    // growing with every unsolved fixture added).
+    // *prints*: an all-rows sum beside a solved-only human cost would leave `Alg Cost - Hum Cost`
+    // not equal to the `Cost Diff` column next to it, by exactly the unsolved fixtures' algorithm
+    // cost.
     let mut total_algorithm_cost_where_solved = 0u64;
     let mut total_human_cost = 0u64;
     let mut total_elapsed_ms = 0.0f64;
@@ -811,9 +808,9 @@ fn print_reason_table(rows: &[Row]) {
         .unwrap_or(0);
 
     let active_reasons = active_reason_columns(rows);
-    // Column widths vary now: an `APTED:<source>` label (e.g. "APTED:bottom_up_expansion") can be
-    // much longer than the old fixed 9-char budget, and a fixed width would misalign the table
-    // the moment one appears.
+    // Column widths vary: an `APTED:<source>` label (e.g. "APTED:large_flat_subtree_container")
+    // is far longer than a plain bucket name, and a fixed width would misalign the table the
+    // moment one appears.
     const MIN_COL_WIDTH: usize = 9;
     let col_widths: Vec<usize> = active_reasons
         .iter()
@@ -858,21 +855,18 @@ fn print_reason_table(rows: &[Row]) {
 // `make check-quality` runs this, and `make deploy` runs that, so what follows decides whether a
 // release may go out.
 //
-// **Per fixture, not in aggregate, and that is the whole point.** The gate used to compare one
-// number - the corpus's total mismatch count - against a checked-in baseline. That cannot
-// distinguish the two things it needs to tell apart. This corpus grows deliberately toward *hard*
-// cases: the 35 fixtures added over three days in August 2026 carried mismatches at 0.44% of their
-// nodes against the corpus's own 0.07%, taking the total from 3235 to 6473. The gate read that as
-// a 100% quality regression when the algorithm had not changed at all. Switching the aggregate to
-// a rate does not fix it either - measured on the same corpus change, the rate went 0.0657% ->
-// 0.1142%, a 74% rise. No aggregate over a growing corpus can separate "the algorithm got worse"
-// from "we added hard fixtures", so the gate asks the only question that survives new data: did
-// any fixture *that already had a baseline* get worse?
+// **Per fixture, not in aggregate, and that is the whole point.** A gate comparing the corpus's
+// total mismatch count against a checked-in baseline cannot tell the two things apart that it
+// needs to. This corpus grows deliberately toward *hard* cases, so a batch of new fixtures with a
+// mismatch rate well above the corpus average reads as a large quality regression while the
+// algorithm has not changed at all. Switching the aggregate to a rate does not fix it: the rate
+// rises for the same reason. No aggregate over a growing corpus can separate "the algorithm got
+// worse" from "we added hard fixtures", so the gate asks the only question that survives new
+// data: did any fixture *that already had a baseline* get worse?
 //
 // **Not a second copy of the `optimal_solutions` tests.** Those clamp each fixture at a recorded
-// value, and 151 of the corpus's 509 are clamped above zero - by construction they cannot see a
-// fixture drift from 100 mismatches to 214 under its own 214-mismatch clamp. This is what covers
-// that gap.
+// value, and many are clamped above zero - by construction they cannot see a fixture drift from
+// 100 mismatches to 214 under its own 214-mismatch clamp. This is what covers that gap.
 
 /// One fixture's row in the gate baseline.
 #[derive(Debug, Clone, Copy, PartialEq)]

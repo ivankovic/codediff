@@ -81,10 +81,8 @@ pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
         }
         // Leaves (bare keywords, punctuation, single tokens) are deliberately out of scope: a
         // leaf's own reindent verdict rarely drives `ranges()`'s Move/Identical choice for
-        // anything a reader would notice on its own, and including them measurably regressed
-        // `python-bugfix-loop` (its rewritten `for` header's `in` keyword got tagged, which
-        // shifted an unrelated match's rendering boundary) for no corresponding gain anywhere in
-        // the corpus - restricting to container nodes recovered it with no other change.
+        // anything a reader would notice on its own, while tagging one - a rewritten `for`
+        // header's `in` keyword, say - can shift an unrelated match's rendering boundary.
         if before_node.child_count() == 0 {
             continue;
         }

@@ -26,8 +26,8 @@ use crate::diff::{ASTDiff, ASTMapping, ASTMappingReason};
 /// slow tree edit distance pass has less work left - especially valuable for a modifier like
 /// Rust's `#[cfg(test)]`, which has no name/identity of its own (`nodes::is_reference`/
 /// `is_semantically_structural` don't cover it) and is typically byte-identical across every
-/// occurrence in a file: with nothing here to anchor it, it falls all the way through to
-/// `final_pass`'s real tree-edit-distance, which - facing hundreds of equal-cost candidates for
+/// occurrence in a file: with nothing here to anchor it, it falls all the way through to the
+/// terminal residual resolution, which - facing hundreds of equal-cost candidates for
 /// "which one is new" - has no reason to prefer the one actually nearest the real change
 /// (confirmed against a live case: `rust-adding-to-a-list-of-identical-attributes-should-favour-
 /// near-matches`, see that fixture's own doc comment). Anchoring off the already-matched

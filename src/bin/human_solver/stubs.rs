@@ -200,12 +200,11 @@ pub(crate) fn wrap_comment_lines_with_prefix(comment: &str, prefix: &str) -> Str
 /// Appends a `painting()` test to the fixture's own file, the painting counterpart of
 /// [`ensure_stub_test`]. Returns whether one was actually added.
 ///
-/// **Appends rather than writing its own file.** These used to be a parallel tree,
-/// `src/test/painting_agreement/<name>.rs`, mirroring `optimal_solutions/` one file per fixture.
-/// Everything a fixture's two ground truths have been measured to now lives in one place (see
-/// `test::fixtures`' module doc), so this edits the file `ensure_stub_test` created rather than
-/// starting a second one. Every caller runs after that call, so the file is always there; a fixture
-/// file that somehow is not is an error rather than a silent second home.
+/// **Appends rather than writing its own file.** Everything a fixture's two ground truths have
+/// been measured to lives in one place (see `test::fixtures`' module doc), so this edits the file
+/// `ensure_stub_test` created rather than starting a second one. Every caller runs after that
+/// call, so the file is always there; a fixture file that somehow is not is an error rather than a
+/// silent second home.
 ///
 /// Idempotent: a file that already has a `painting()` test is left exactly as it is, which is the
 /// same "never rewrite an existing clamp" contract `ensure_stub_test` has - the recorded number and

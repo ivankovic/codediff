@@ -756,9 +756,9 @@ pub(crate) fn action_match_subtree(
 ///
 /// Rather than pushing straight into `mapping.entries` (via `apply_match_entry`, which costs
 /// O(current entry count) per call through its dedup scan -- recursing over a subtree of size k
-/// would turn that into O(k^2), exactly the hang `action_match_to_end` (`f`) had before it was
-/// fixed the same way, and `M` hits it too since this function is its recursive workhorse), this
-/// buffers new entries into `new_entries` and records every node id it actually decides on into
+/// would turn that into O(k^2), the hang `action_match_to_end` (`f`) avoids the same way, and one
+/// `M` reaches too since this function is its recursive workhorse), this buffers new entries into
+/// `new_entries` and records every node id it actually decides on into
 /// `touched_before`/`touched_after`. The caller ([`apply_modal_choice`]) removes pre-existing
 /// entries for exactly those touched ids in one batch pass *after* recursion finishes, then
 /// appends `new_entries` -- cheaper than a scan per node, and correct in a way that eagerly

@@ -272,9 +272,8 @@ fn b() {
     #[test]
     fn duplicate_identical_diagnostic_calls_are_matched_one_to_one() {
         // Two identical `bail!` calls on each side: each before-node should claim a distinct
-        // after-node, not both collapse onto the same one (`solve_hash_descent` used to have
-        // exactly that collapse quirk, since fixed - this pass indexes after-candidates in a
-        // `VecDeque` per hash to guarantee one-to-one pairing).
+        // after-node, not both collapse onto the same one. This pass indexes after-candidates in a
+        // `VecDeque` per hash, which is what guarantees the one-to-one pairing.
         let before_src = r#"
 fn a() {
     if true { bail!("dup"); }

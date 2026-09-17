@@ -33,20 +33,16 @@ pub(crate) const FLAT_MAX_EDIT: usize = 1000;
 /// all mapping helpers (`emit_identical_subtree`, `add_delete/insert_mappings`) handle subtrees
 /// recursively, so depth-1 is not a requirement.
 ///
-/// Used to filter out already-matched children before returning them at all - correct as long as
-/// document order alone disambiguates the rest, but wrong once some of those already-matched
-/// children are themselves the only thing that *can* disambiguate a run of otherwise-identical
-/// siblings (e.g. XML whitespace `CharData` between already-matched `element`s - see
-/// `resolve_flat_tree_pair`'s doc comment for the mechanism and a confirmed live case). The full
-/// list, still gated on the same unmatched-count threshold, lets the caller split on those
-/// already-matched positions instead of discarding them.
+/// The full list, not just the unmatched children. Document order alone disambiguates the rest
+/// only until some of those already-matched children are themselves the only thing that *can*
+/// disambiguate a run of otherwise-identical siblings (e.g. XML whitespace `CharData` between
+/// already-matched `element`s - see `resolve_flat_tree_pair`'s doc comment for the mechanism).
+/// Returning them, still gated on the same unmatched-count threshold, lets the caller split on
+/// those positions instead of discarding them.
 ///
 /// The gate is the *unmatched* count on purpose. Tree-edit-distance cost is driven by total node
 /// count, not entry count, which is why `resolve_flat_tree_pair`'s leftover recursion is capped
-/// by `FLAT_UNMATCHED_RECURSE_MAX_TOTAL_SIZE` as well as `FLAT_UNMATCHED_RECURSE_LIMIT` (see that
-/// constant's doc comment for the corpus measurement). The gate was switched to the total count
-/// once, reverted, and re-attempted with that cap - the chronology and the fixtures it broke are
-/// in `src/diff/TODO.md` under "Design history moved out of source".
+/// by `FLAT_UNMATCHED_RECURSE_MAX_TOTAL_SIZE` as well as `FLAT_UNMATCHED_RECURSE_LIMIT`.
 pub(crate) fn flat_children(root_id: usize, meta: &ASTMetadata) -> Option<Vec<usize>> {
     let info = meta.node_info.get(&root_id)?;
     if info.children.len() >= FLAT_MIN_CHILDREN {
@@ -171,38 +167,28 @@ pub(crate) fn backtrack_myers(
 }
 
 /// Above this many Myers-unmatched entries on either side, [`resolve_flat_tree_pair`] falls back
-/// to the old atomic delete/insert behavior instead of recursing them through APTED - see that
-/// function's doc comment for why the recursion exists and why it needs a cap at all. Deliberately
-/// small (not `FLAT_MAX_EDIT`'s 1000): the residual here is exactly the content Myers *couldn't*
-/// place, i.e. plausibly-real edits worth resolving properly, not the "so much changed, don't
-/// bother" case `FLAT_MAX_EDIT` guards against - but each entry can itself be an arbitrarily large
-/// subtree, so recursing an unbounded *number* of them would reintroduce the same "large residual,
-/// full tree-edit-distance" cost this whole fast path exists to avoid. 20 covers "a handful of
-/// entries were actually edited" (confirmed against the fixtures that motivated this - see TODO.md
-/// 2026-08-08) with real margin while still bailing out for a large-scale rewrite.
+/// to atomic delete/insert instead of recursing them through APTED - see that function's doc
+/// comment for why the recursion exists and why it needs a cap at all. Deliberately small (not
+/// `FLAT_MAX_EDIT`'s 1000): the residual here is exactly the content Myers *couldn't* place, i.e.
+/// plausibly-real edits worth resolving properly, not the "so much changed, don't bother" case
+/// `FLAT_MAX_EDIT` guards against - but each entry can itself be an arbitrarily large subtree, so
+/// recursing an unbounded *number* of them would reintroduce the same "large residual, full
+/// tree-edit-distance" cost this whole fast path exists to avoid. 20 covers "a handful of entries
+/// were actually edited" with real margin while still bailing out for a large-scale rewrite.
 pub(crate) const FLAT_UNMATCHED_RECURSE_LIMIT: usize = 20;
 
 /// Total-node-count cap (summed across every leftover entry on *both* sides combined) for
 /// `resolve_flat_tree_pair`'s leftover recursion when there's more than one entry on either side,
 /// alongside `FLAT_UNMATCHED_RECURSE_LIMIT`'s entry count (the exactly-one-entry-per-side case is
-/// exempt from this cap entirely - see the call site). Added 2026-08-16 (phases-4-7 rearchitecture,
-/// `TODO.md`) closing the gap a 2026-08-14 attempt at widening `flat_children`'s gate got stuck on:
-/// entry count alone is the wrong signal for "is real APTED still affordable on this residual" -
-/// tree-edit-distance cost is driven by total node count, not how many separate entries it's split
-/// across.
+/// exempt from this cap entirely - see the call site). Entry count alone is the wrong signal for
+/// "is real APTED still affordable on this residual": tree-edit-distance cost is driven by total
+/// node count, not by how many separate entries it is split across.
 ///
-/// An uncapped version (this constant removed entirely, always recursing regardless of size,
-/// including multi-entry pools) was tried and reverted the same day: it fixed `xml-odoo-odoo-add-
-/// two-attributes` (turned out to be the single-entry case now exempted above), but made `tsx-
-/// excalidraw-excalidraw-huge-file-with-real-logic-change` (6 before / 12 after - a genuine
-/// multi-candidate pool with mismatched counts) *worse* on both axes at once (1458 mismatches and
-/// 19.3s, vs. 231 mismatches and 2.4s capped) - a large, unbounded, multi-entry pooled real-APTED
-/// call can apparently produce a *worse* match than atomic delete/insert would for some of those
-/// entries (plausibly the same cost-minimization-picks-a-plausible-but-wrong-cross-match risk
-/// Phase 3b's own single-entry-gap work hit and fixed by restricting to exactly one entry), not
-/// just a slower one. So for the genuine multi-entry-pool case this cap isn't only a latency
-/// guard, it's also load-bearing for quality - re-verify both axes together (not just latency)
-/// before ever loosening it for that case.
+/// For a genuine multi-entry pool the cap is load-bearing for quality, not only for latency. A
+/// large, unbounded, pooled APTED call over unrelated entries can produce a *worse* match than
+/// atomic delete/insert rather than merely a slower one - the same
+/// cost-minimization-picks-a-plausible-but-wrong-cross-match risk that restricts the single-entry
+/// gap case. Re-verify both axes together, not just latency, before loosening it there.
 pub(crate) const FLAT_UNMATCHED_RECURSE_MAX_TOTAL_SIZE: usize = 2000;
 
 /// Splits `before_children`/`after_children` into segments delimited by children already
@@ -215,7 +201,7 @@ pub(crate) const FLAT_UNMATCHED_RECURSE_MAX_TOTAL_SIZE: usize = 2000;
 /// point on the after side - defensive against a match that landed outside `after_children`
 /// entirely (or, in principle, out of order); either way not a usable local anchor, so it's left
 /// where it falls instead. Each returned segment is pre-filtered to drop any child still matched
-/// in `diff` (mirrors `flat_children`'s original exclusion, now applied per segment).
+/// in `diff`.
 pub(crate) fn split_into_anchored_segments(
     before_children: &[usize],
     after_children: &[usize],
@@ -276,24 +262,23 @@ pub(crate) fn split_into_anchored_segments(
 ///
 /// Runs Myers per segment, split at children already matched in `diff` (`split_into_anchored_
 /// segments`), rather than once over the whole pooled list of still-unmatched children. Pooling
-/// everything together - the original behavior - discards exactly the anchors that would
-/// otherwise disambiguate a run of hash-identical children: a run of N indistinguishable entries
-/// with one inserted or deleted somewhere inside gives Myers N tied-optimal alignments to choose
-/// from, and its own tie-break (not ground truth) decides which one "moved". Splitting first means
-/// each run is diffed independently between its bounding anchors, so a shift on one side of an
-/// anchor can no longer misalign anything on the other side of it - confirmed against a live case
-/// (`xml-nextcloud-android-delete-element`: one `<string>` deleted from ~1137 already-matched
-/// `element` siblings; the resulting drift chain spanned every remaining whitespace `CharData`
-/// node after it, since none of the ~1137 anchors were part of the Myers input at all).
+/// everything together discards exactly the anchors that would otherwise disambiguate a run of
+/// hash-identical children: a run of N indistinguishable entries with one inserted or deleted
+/// somewhere inside gives Myers N tied-optimal alignments to choose from, and its own tie-break
+/// (not ground truth) decides which one "moved". Splitting first means each run is diffed
+/// independently between its bounding anchors, so a shift on one side of an anchor cannot misalign
+/// anything on the other side of it. Pooled, one deleted entry among a thousand already-matched
+/// siblings starts a drift chain through every unmatched node after it, because none of those
+/// anchors are part of the Myers input at all.
 ///
 /// Whether the whitespace immediately before or after the deleted entry is "the" deleted one
 /// remains a genuine tie even after splitting - a segment of length >1 either side of a single
 /// deletion has no ground truth to prefer one over the other. This narrows the tie to that one
 /// local segment instead of letting it propagate through the rest of the list.
 ///
-/// Reduces to exactly the old single-pool behavior whenever nothing is matched yet (one segment,
-/// spanning the whole list) - the common case where the flat parent itself was just matched and
-/// none of its children have been touched by an earlier phase.
+/// Reduces to a single pool whenever nothing is matched yet: one segment spanning the whole list,
+/// which is the common case where the flat parent itself was just matched and none of its children
+/// have been touched by an earlier phase.
 // Each parameter is a genuinely distinct piece of context (both roots, both metadata sets, the
 // pre-computed children, the source string, the mutable diff) - grouping them into a struct built
 // once at this single call site would just move the same information around, not clarify it.
@@ -444,10 +429,9 @@ pub(crate) enum LeftoverPool {
     /// An oversized pair's children (`resolve_oversized_pair`): the whole point is to stay under
     /// `APTED_MAX_CELLS`, so the pool is bounded by that product rather than by entry count, and
     /// a pool that still doesn't fit goes through `resolve_unequal_segment_via_kind_only_anchors`
-    /// (shape anchors, then similarity, then atomic) instead of straight to atomic - the pair
-    /// would have been solved exactly by APTED before the gate existed, so plain atomic
-    /// delete/insert here is the one outcome measurably worse than the old behaviour
-    /// (`lua-luakit-...-merging-two-tests-into-one` 107 -> 389 with atomic, 2026-09-02).
+    /// (shape anchors, then similarity, then atomic) instead of straight to atomic. Such a pair
+    /// is one APTED would solve exactly if it fit, so atomic delete/insert is the worst outcome
+    /// available for it.
     Oversized,
 }
 

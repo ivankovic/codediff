@@ -1208,13 +1208,13 @@ pub(crate) fn spf1(ctx: &EngineCtx, root1: usize, root2: usize) -> u64 {
 
 /// Which postorder direction a single-path decomposition is walking - `Left` (left-to-right,
 /// `spfL`'s world) or `Right` (right-to-left, `spfR`'s world). Bundled with the four accessor
-/// functions below so the functions that used to be hand-duplicated once per direction
-/// (`computeKeyRoots`/`computeRevKeyRoots` -> `compute_keyroots`; `treeEditDist`/`treeEditDistR`
-/// -> `apted_tree_edit_dist`; `spfL`/`spfR` -> `spf_path`) can share one implementation instead,
-/// the same way `path_is_before: bool` already lets `spf_a` share one implementation across the
-/// before/after axis. This is genuine mechanical duplication and was worth removing like any
-/// other. `compute_opt_strategy_post_l`/`compute_opt_strategy_post_r` are deliberately NOT unified
-/// this way - they aren't a pure accessor-swap mirror (the post-`min_cost` parent-propagation step
+/// functions below so that the per-direction pairs (`computeKeyRoots`/`computeRevKeyRoots` ->
+/// `compute_keyroots`; `treeEditDist`/`treeEditDistR` -> `apted_tree_edit_dist`; `spfL`/`spfR` ->
+/// `spf_path`) can share one implementation each, the same way `path_is_before: bool` already lets
+/// `spf_a` share one implementation across the before/after axis. This is genuine mechanical
+/// duplication and was worth removing like any other.
+/// `compute_opt_strategy_post_l`/`compute_opt_strategy_post_r` are deliberately NOT unified this
+/// way - they aren't a pure accessor-swap mirror (the post-`min_cost` parent-propagation step
 /// swaps which owned mutable buffer plays which role between the two), so merging them would be a
 /// materially bigger and riskier change than this one.
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -1484,12 +1484,12 @@ const INNER_DISABLED: i64 = i64::MAX / 4;
 /// would have on a "subtree size" scale.
 ///
 /// `clamp_to_left_right` disables the two INNER candidates at selection time only (the
-/// `cost1_I`/`cost2_I` *maintenance* below still runs unconditionally) - used to validate the
-/// bidirectional `gted` plus this function's L/R candidates in isolation, before `spfA` exists to
-/// handle an INNER choice. Forcing L/R instead of the truly optimal path only affects efficiency,
-/// never correctness: `gted`/`spfL`/`spfR` compute the exact distance for *any* valid strategy,
-/// optimal or not - which is exactly why the oracle (a distance comparison) can validate this
-/// clamped strategy on its own before INNER is enabled.
+/// `cost1_I`/`cost2_I` *maintenance* below still runs unconditionally), which exercises the
+/// bidirectional `gted` and this function's L/R candidates in isolation from `spfA`. Forcing L/R
+/// instead of the truly optimal path only affects efficiency, never correctness:
+/// `gted`/`spfL`/`spfR` compute the exact distance for *any* valid strategy, optimal or not -
+/// which is why the oracle, a distance comparison, can validate the clamped strategy on its
+/// own.
 ///
 /// `cost1_L/R/I` are `Vec<Option<Vec<i64>>>`, each row allocated fresh the first time a node
 /// needs one, rather than recycled through free lists once a node has been fully consumed -

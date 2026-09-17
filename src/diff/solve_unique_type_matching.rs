@@ -22,11 +22,9 @@ use std::collections::HashMap;
 
 /// "Unique type matching", the third and last-resort sub-phase of GumTree Simple's recovery phase
 /// (Falleri & Martinez, ICSE 2024, "Fine-grained, accurate and scalable source differencing" -
-/// itself inspired by XYDiff's type-matching step) - see `TODO.md`'s 2026-08-17 literature survey
-/// for the corpus-wide cross-check that motivated adding this. Not present anywhere in codediff
-/// before this: exact-subtree isomorphism is `solve_hash_descent`, and structural isomorphism
-/// ignoring leaf values is codediff's own `KindOnlyHash` sub-anchoring - this pass is the one piece
-/// of GumTree Simple's recovery phase that had no equivalent here.
+/// itself inspired by XYDiff's type-matching step). Distinct from the isomorphism passes around
+/// it: exact-subtree isomorphism is `solve_hash_descent`, and structural isomorphism ignoring leaf
+/// values is codediff's own `KindOnlyHash` sub-anchoring.
 ///
 /// For every currently-matched `(before_id, after_id)` pair, look at that pair's own direct
 /// children still unmatched on both sides. If exactly one before-child and exactly one after-child
@@ -178,10 +176,9 @@ mod tests {
     /// produced by any real pass) and runs *only* `solve` - no `solve_hash_descent` or any other
     /// pass in the setup path, so a passing assertion can only be this pass's own doing, not an
     /// accident of an earlier, more powerful mechanism (`solve_hash_descent`'s `KindOnlyHash`
-    /// sub-anchoring already covers same-*shape* subtrees differing only in leaf values - a test
-    /// fixture whose children differ only by an identifier, as an earlier draft of this test used,
-    /// would pass via that mechanism with this pass never actually running, silently proving
-    /// nothing).
+    /// sub-anchoring already covers same-*shape* subtrees differing only in leaf values, so a
+    /// fixture whose children differ only by an identifier would pass via that mechanism with this
+    /// pass never running, silently proving nothing).
     fn solve_with_container_pre_matched(
         before: &Code,
         after: &Code,

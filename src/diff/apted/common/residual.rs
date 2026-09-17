@@ -30,15 +30,12 @@ pub(crate) const FALLBACK_MAX_EDIT: usize = 1000;
 /// Minimum `node_to_subtree_size` a `resolve_unequal_segment_via_kind_only_anchors` candidate must
 /// have on *both* sides before its `KindOnlyHash` match is trusted. `KindOnlyHash` never hashes
 /// leaf values (`compute_kind_only_hash`, `code/hash.rs`), so small subtrees collide on shape alone
-/// far more than their size suggests is safe - not just true leaves, but shallow, commonly-repeated
-/// containers too (`html-gohugoio-hugo-enclose-table-with-div-and-add-thead-tbody`, 2026-08-16: two
-/// *different* size-11 `element` nodes, both structurally unique within their segment - i.e. not an
-/// ambiguous-hash case either - shared a `KindOnlyHash` purely from having the same tag/attribute
-/// shape, and the wrong one got matched, regressing 9 mismatches to 27; `css-mozilla-firefox-
-/// firefox-actual-style-changes` regressed the same way at size 14). The one confirmed genuine win
-/// found this session (`vimscript-neovim-neovim-improved-asserts`, 53 mismatches to 0) anchored at
-/// size 186 - over 10x either false positive - so 50 cleanly separates the known good case from the
-/// known bad ones without being reverse-engineered to fit only one fixture.
+/// far more than their size suggests is safe - not just true leaves, but shallow,
+/// commonly-repeated containers too. Two *different* small `element` nodes, each structurally
+/// unique within its own segment so not an ambiguous-hash case either, can share a `KindOnlyHash`
+/// purely from having the same tag and attribute shape. The floor sits above the sizes where that
+/// happens and well below the sizes at which a shape match is distinctive enough to mean
+/// something.
 pub(crate) const KIND_ONLY_ANCHOR_MIN_SIZE: usize = 50;
 
 /// Max `node_to_subtree_size` for a `resolve_residual_forest_via_myers_lcs` segment entry to be
@@ -125,7 +122,7 @@ pub(crate) fn subtree_has_any_match(
     any_matched
 }
 
-/// The terminal fallback (phase 6, unconditional since the phases-4-7 rearchitecture): collects every maximal still-unmatched subtree root on
+/// The terminal fallback (phase 6, unconditional): collects every maximal still-unmatched subtree root on
 /// each side (`maximal_unmatched_roots`), hashes each with its existing full-subtree content hash
 /// (`ASTMetadata::node_to_full_hash`), and runs the same `myers_lcs` primitive
 /// `resolve_flat_tree_pair` already uses for one parent's flat children - generalized here to the
@@ -140,17 +137,14 @@ pub(crate) fn subtree_has_any_match(
 /// two such anchors (or the sequence ends) then gets one more chance - equal-count segments recurse
 /// per position (see below) - before falling back to `add_delete_mappings`/`add_insert_mappings`.
 ///
-/// Phase 3b finding (`TODO.md`, 2026-08-15): a maximal-unmatched-root's *whole-subtree* hash can
-/// fail to match even when almost everything inside it is real, reusable structure - a long chain
-/// of the same repeated node kind (a left-associative `binary_expression` chain from string
-/// concatenation; nested `element`s from nested `<li>`s) has every ancestor's hash change the
-/// instant one link is removed, so this function used to see N differing entries where the truth
-/// is one deletion plus N-1 relabels through the nesting - and, being a coarse exact-hash-only
-/// pass by original design, atomically deleted+inserted every one of them. Confirmed directly (not
-/// just inferred) that real bounded APTED already resolves this class correctly when given just
-/// the affected region: isolated `apted::for_nodes` on one such fixture's affected `expression_
-/// statement` (206/200 nodes) produced 187 Identical/13 MatchButNotIdentical/6 Delete - essentially
-/// the correct alignment - rather than a wholesale replace.
+/// A maximal-unmatched-root's *whole-subtree* hash can fail to match even when almost everything
+/// inside it is real, reusable structure: a long chain of the same repeated node kind (a
+/// left-associative `binary_expression` chain from string concatenation; nested `element`s from
+/// nested `<li>`s) has every ancestor's hash change the instant one link is removed, so an
+/// exact-hash-only pass sees N differing entries where the truth is one deletion plus N-1 relabels
+/// through the nesting, and deletes and re-inserts all of them. Real bounded APTED resolves that
+/// class correctly when handed just the affected region, which is what the recursion below is
+/// for.
 ///
 /// Split entries left unpaired after the exact-hash pass into anchored segments (reusing `split_
 /// into_anchored_segments`, keyed off the mappings the exact-hash pass above just wrote - the same
@@ -162,33 +156,31 @@ pub(crate) fn subtree_has_any_match(
 /// paired only with `after_seg[i]`, never pooled (unlike `resolve_flat_tree_pair`'s pooled
 /// recursion of up to `FLAT_UNMATCHED_RECURSE_LIMIT` entries): `resolve_flat_tree_pair`'s entries
 /// are genuine ordered siblings under one shared parent, while this residual's maximal-unmatched-
-/// roots are scattered, semantically *unrelated* fragments from anywhere in the file. Confirmed
-/// empirically that pooling here is unsafe, not just theoretically risky (`kotlin-refactor-
-/// function`, 2026-08-15): with a multi-entry pool, APTED found a plausible-looking but wrong
-/// cross-match between an unrelated deleted function's descendants and merely-similar nodes
-/// elsewhere in the same gap, flipping a fixture from 0 to 32 mismatches. Per-position recursion
-/// avoids that: each call only ever sees one candidate per side, a true, unambiguous 1:1 "this
-/// replaced that" correspondence, with no room for APTED to invent a relationship across pairs -
-/// generalizing the original "exactly one entry" case (still handled, as `N=1`) to any equal-count
-/// gap. Unequal counts (a real insert/delete happened inside the gap too, so there's no fixed
+/// roots are scattered, semantically *unrelated* fragments from anywhere in the file. Pooling here
+/// is unsafe rather than merely risky: given a multi-entry pool, APTED will find a
+/// plausible-looking but wrong cross-match between an unrelated deleted function's descendants and
+/// merely-similar nodes elsewhere in the same gap. Per-position recursion avoids that: each call
+/// only ever sees one candidate per side, a true, unambiguous 1:1 "this replaced that"
+/// correspondence, with no room for APTED to invent a relationship across pairs - the "exactly one
+/// entry" case is simply `N = 1`. Unequal counts (a real insert/delete happened inside the gap
+/// too, so there's no fixed
 /// positional correspondence left to exploit safely) fall back to the original atomic
 /// delete/insert - this can only find *more* reuse than the purely exact-hash version, never less.
 ///
 /// If the top-level `myers_lcs` itself gives up (edit distance exceeds `FALLBACK_MAX_EDIT`), there
 /// are no exact-hash anchors to split around - `split_into_anchored_segments` degrades to a single
 /// segment spanning everything, which will only qualify for recursion if both sides happen to have
-/// equal counts, falling back to the original atomic behavior otherwise, same as before this
-/// function recursed at all.
-/// Resolve the trivial (leaf) entries the wrap/reparent branch filtered out, rescuing the ones
-/// that were wrapped *along with* the code instead of deleting every one of them.
+/// equal counts, and falls back to atomic delete/insert otherwise. Resolve the trivial (leaf)
+/// entries the wrap/reparent branch filtered out, rescuing the ones that were wrapped *along with*
+/// the code instead of deleting every one of them.
 ///
 /// The calling branch pairs a reparented segment's substantial entries - a `class_specifier` that
-/// became a `template_declaration`'s child - and used to delete and re-insert every leaf it had
-/// filtered out. Right when the leaf is unrelated; wrong when the leaf moved with the code.
-/// `cpp-add-templates` is the minimal case and was its entire remaining mismatch: the
-/// declaration's trailing `;` ends up *inside* the new `template_declaration`, and got deleted.
+/// became a `template_declaration`'s child - and deleting and re-inserting every leaf it filtered
+/// out is right when the leaf is unrelated and wrong when the leaf moved with the code. The
+/// minimal shape is a declaration's trailing `;` ending up *inside* the new
+/// `template_declaration`.
 ///
-/// Two things the tracing (2026-08-24) established, both of which shape this:
+/// Two facts about that shape drive the design:
 ///
 /// * The counterpart is **not a peer** in this segment - the before side has one leftover leaf and
 ///   the after side has zero, because the after `;` is a descendant of the partner. A
@@ -201,7 +193,7 @@ pub(crate) fn subtree_has_any_match(
 /// this gap guesses: matching a `;` to "random other `;` in the code" is the exact failure it
 /// warns about. A leftover leaf is rescued only when the partner subtree contains **exactly one**
 /// inserted leaf of the same kind (`node_to_kind_only_hash`, which for a leaf is its kind). One
-/// candidate means no choice is being made. Everything else keeps the old behaviour exactly.
+/// candidate means no choice is being made. Everything else is deleted and inserted as before.
 pub(crate) fn rescue_wrapped_trivial_entries(
     before_seg: &[usize],
     after_seg: &[usize],
@@ -345,7 +337,7 @@ pub(crate) fn resolve_residual_forest_via_myers_lcs(
                 );
             }
         } else if !before_seg.is_empty() && !after_seg.is_empty() {
-            // Wrap/reparent case (2026-08-17): a raw count mismatch can be entirely explained by a
+            // Wrap/reparent case: a raw count mismatch can be entirely explained by a
             // trivial leaf entry (punctuation - a stray `;`, `,`, etc.) appearing alongside a real
             // structural change, e.g. `class_specifier` (before) becoming `template_declaration`'s
             // child (after) while an unrelated `;` in the same gap is a genuine, unrelated
@@ -425,34 +417,28 @@ pub(crate) fn resolve_residual_forest_via_myers_lcs(
     }
 }
 
-/// Unequal-count fallback for a `resolve_residual_forest_via_myers_lcs` gap (2026-08-16): rather
+/// Unequal-count fallback for a `resolve_residual_forest_via_myers_lcs` gap: rather
 /// than atomically deleting every `before_seg` entry and inserting every `after_seg` entry, run a
 /// second, finer `myers_lcs` pass over the segment's `node_to_kind_only_hash` values (the same
 /// coarse-but-order-preserving discriminator phase 1's second hash pass already trusts globally,
 /// here further constrained to entries already known to fall inside one shared gap between two
 /// exact-hash anchors). A matched pair is still recursed per-position, one candidate per side,
 /// exactly like the equal-count branch above - APTED never gets a pool to invent a cross-match
-/// from, so the correctness argument that makes that branch safe (`kotlin-refactor-function`,
-/// 2026-08-15) carries over verbatim. Entries `myers_lcs` leaves unpaired (a real insert/delete,
-/// not just a same-shaped reparent) fall back to atomic delete/insert, same as before this
-/// function existed - so this can only find *more* reuse than the plain unequal-count fallback,
-/// never less, and degrades to today's behavior whenever no kind-only anchors are found.
+/// from, so the correctness argument that makes that branch safe carries over verbatim. Entries
+/// `myers_lcs` leaves unpaired (a real insert/delete, not just a same-shaped reparent) fall back
+/// to atomic delete/insert - so this can only find *more* reuse than the plain unequal-count
+/// fallback, never less, and degrades to it whenever no kind-only anchors are found.
 ///
-/// Two extra safety filters beyond plain LCS matching, both found empirically necessary
-/// (2026-08-16), not assumed up front - `KindOnlyHash`'s safety in phase 1 turned out to come from
-/// its node selector (`reference_nodes_ordered`, large declaration-level nodes only), not from the
-/// hash itself, which this local segment doesn't get for free:
-/// - **`KIND_ONLY_ANCHOR_MIN_SIZE` floor**: `KindOnlyHash` hashes kind + child hashes but never leaf
-///   values (`compute_kind_only_hash`, `code/hash.rs`), so shape alone drives the hash. At the
-///   extreme (a leaf, `subtree_size == 1`) this reduces to a pure function of kind, colliding every
-///   same-kind leaf in the segment - caught on `swift-swiftlang-swift-enable-checks-remove-todo-
-///   comment`: two unrelated `comment` leaves got sub-anchored to each other, regressing 2
-///   mismatches to 4. But it isn't only leaves: `html-gohugoio-hugo-enclose-table-with-div-and-add-
-///   thead-tbody` regressed 9 mismatches to 27 from two *different*, size-11 `element` nodes (same
-///   tag/attribute shape, unrelated content) sharing a hash with no ambiguity to catch (see below) -
-///   `css-mozilla-firefox-firefox-actual-style-changes` regressed the same way at size 14. The one
-///   confirmed genuine win found this session (`vimscript-neovim-neovim-improved-asserts`, 53 to 0)
-///   anchored at size 186 - see `KIND_ONLY_ANCHOR_MIN_SIZE`'s own doc comment for why 50 was picked.
+/// Two safety filters beyond plain LCS matching. `KindOnlyHash`'s safety in phase 1 comes from its
+/// node selector (`reference_nodes_ordered`, large declaration-level nodes only) rather than from
+/// the hash itself, and this local segment does not get that for free:
+/// - **`KIND_ONLY_ANCHOR_MIN_SIZE` floor**: `KindOnlyHash` hashes kind + child hashes but never
+///   leaf values (`compute_kind_only_hash`, `code/hash.rs`), so shape alone drives the hash. At
+///   the extreme (a leaf, `subtree_size == 1`) it reduces to a pure function of kind and collides
+///   every same-kind leaf in the segment - two unrelated `comment` leaves sub-anchor to each
+///   other. It is not only leaves, either: two *different* small `element` nodes with the same tag
+///   and attribute shape share a hash with no ambiguity to catch (see below). See
+///   `KIND_ONLY_ANCHOR_MIN_SIZE`'s own doc comment for where the floor sits.
 /// - **Segment-local uniqueness**: even above the size floor, a hash can still repeat within one
 ///   segment if two different candidates are genuinely the same shape - LCS will happily pick *some*
 ///   pairing among same-hash candidates, but nothing constrains it to the *true* correspondent
@@ -461,8 +447,7 @@ pub(crate) fn resolve_residual_forest_via_myers_lcs(
 ///   `before_seg` and `after_seg` - i.e. there was truly only one candidate per side.
 ///
 /// Both filters only ever *withhold* a match, never invent one that plain LCS didn't already
-/// propose - so an excluded entry just falls through to the atomic delete/insert loops below, same
-/// as before this function existed.
+/// propose - an excluded entry just falls through to the atomic delete/insert loops below.
 pub(crate) fn resolve_unequal_segment_via_kind_only_anchors(
     before_seg: &[usize],
     after_seg: &[usize],
@@ -807,9 +792,8 @@ pub(crate) fn subtree_size_sum(ids: &[usize], meta: &ASTMetadata) -> usize {
 /// Filter out nodes already mapped in `node_map` (pass `diff.before_node_map`/
 /// `diff.after_node_map` for the before/after side respectively). Takes `node_ids` by reference,
 /// not by value: every `emit_*`/`emit_match` call site below already has a borrowed
-/// `&info.children` in hand and previously had to `.clone()` it just to satisfy an owned-`Vec`
-/// signature this function never needed (it only ever reads each id, never mutates or reuses the
-/// input `Vec` itself).
+/// `&info.children` in hand, and this only ever reads each id - it never mutates or reuses the
+/// input `Vec` itself.
 pub(crate) fn filter_mapped_nodes(
     node_ids: &[usize],
     node_map: &rustc_hash::FxHashMap<usize, usize>,

@@ -320,15 +320,13 @@ pub(crate) fn gumtree_warm_batch(
             .as_str()
             .context("batch driver response missing `id`")?
             .to_string();
-        // One fixture GumTree cannot parse is a per-fixture gap, not a run-ending failure. This
-        // used to `bail!`, which aborted the entire timing benchmark - and did, on 2026-08-20:
-        // `css-fortawesome-font-awesome-upgrade-version-comment` makes beta8's `css-phcss`
-        // generator throw a `SyntaxException`, and that single fixture killed a run covering all
-        // 469. The per-invocation GumTree path already tolerates exactly this (it records the
-        // fixture as an `error` and moves on), so the warm-JVM path treating it as fatal was an
-        // inconsistency between two measurements of the same tool, not a deliberate policy.
-        // Omitted ids simply have no `gumtree_warm_ms`, which every consumer already handles as
-        // "not scored" rather than as a zero.
+        // One fixture GumTree cannot parse is a per-fixture gap, not a run-ending failure: a
+        // `bail!` here lets a single `SyntaxException` from one of its generators kill a whole
+        // corpus run. The per-invocation GumTree path tolerates exactly this, recording the
+        // fixture as an `error` and moving on, and the warm-JVM path must agree with it - two
+        // measurements of the same tool should not differ on what counts as fatal. Omitted ids
+        // simply have no `gumtree_warm_ms`, which every consumer already handles as "not scored"
+        // rather than as a zero.
         if let Some(error) = json["error"].as_str() {
             failures.push(format!("  {id}: {error}"));
             continue;

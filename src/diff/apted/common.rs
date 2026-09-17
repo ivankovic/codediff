@@ -327,9 +327,9 @@ impl PostorderIndexer {
 /// Dense, flat-backed 2D buffer indexed as `grid[(row, col)]`. A flat `Vec<T>` (rather than
 /// `Vec<Vec<T>>`) avoids one heap allocation and pointer indirection per row, which matters since
 /// every table built on this is on the algorithm's hottest inner loops. Shared storage/indexing
-/// behind `ForestDist`, `DeltaTable`, `StrategyTable`, and `Mat`, which used to each hand-roll
-/// this same flat-`Vec` layout independently, with no reason to stay textually separate (see
-/// `StrategyTable`'s doc comment for why `delta` and `strategy` still get a buffer each).
+/// behind `ForestDist`, `DeltaTable`, `StrategyTable` and `Mat`, which all want the same
+/// flat-`Vec` layout (see `StrategyTable`'s doc comment for why `delta` and `strategy` still get
+/// a buffer each).
 pub(crate) struct Grid<T> {
     pub(crate) cols: usize,
     pub(crate) data: Vec<T>,
@@ -644,8 +644,8 @@ pub(crate) enum AfterDecision {
 }
 
 /// What [`BeforeDecision`] and [`AfterDecision`] have in common, so the before/after halves of
-/// the emission and slot logic can share one body instead of a mirrored copy each - every fix
-/// that used to have to be made twice (and was, once, made only once) is made once.
+/// the emission and slot logic can share one body instead of a mirrored copy each, so a fix
+/// lands on both sides at once.
 pub(crate) trait SideDecision: Copy {
     /// The fresh match target, or `None` for the side's prune decision (`Delete`/`Insert`).
     fn match_target(self) -> Option<usize>;

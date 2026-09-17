@@ -938,7 +938,7 @@ fn code_counterparts(
 ///
 /// One page now holds several of these per side - the tree mapping projected to text, plus one per
 /// human painting (see [`painting_panels`]) - which is why `side` is a *string* prefix rather than
-/// the `'b'`/`'a'` char it used to be. Every `data-range` and row `id` is built from it, and
+/// a single `'b'`/`'a'` char. Every `data-range` and row `id` is built from it, and
 /// `viewer.js`'s `spansForRange` looks ids up document-wide, so two renderings sharing a prefix
 /// would have clicks in the visible panel selecting spans in a hidden one.
 struct PanelRanges {
@@ -1686,9 +1686,9 @@ mod tests {
         assert!(!visible[0] && !visible[29]);
     }
 
-    /// The regression `anchor_rows` was written for: on a pure deletion the after side has no
-    /// changed row at all, only the caret marking where the deleted text used to be. Anchoring on
-    /// `line_operations` alone folds that whole panel away.
+    /// The case `anchor_rows` exists for: on a pure deletion the after side has no changed row at
+    /// all, only the caret marking where the deleted text was. Anchoring on `line_operations`
+    /// alone folds that whole panel away.
     #[test]
     fn anchor_rows_anchors_on_a_caret_with_no_changed_row() {
         use codediff::diff::text_range::TextRange;

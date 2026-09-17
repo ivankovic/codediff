@@ -20,16 +20,14 @@
 //! distinct purposes in one binary:
 //!
 //! 1. **Dataset characterization** (fixture/language/size counts, operation mix, multi-map group
-//!    prevalence) - the kind of table a paper's evaluation section needs, and which didn't exist
-//!    anywhere before this: `benchmark_optimal_solutions` reports codediff's *performance* against
-//!    the corpus, not the corpus's own shape.
-//! 2. **Settling open pipeline-design questions with real numbers.** Two came up directly in the
-//!    same session this binary was written in (see `TODO.md`'s 2026-08-17 entries): "how common is
+//!    prevalence) - the kind of table a paper's evaluation section needs, and the one thing
+//!    `benchmark_optimal_solutions` does not report: that measures codediff's *performance*
+//!    against the corpus, not the corpus's own shape.
+//! 2. **Settling open pipeline-design questions with real numbers.** Questions like "how common is
 //!    the wrap/reparent shape `TRIVIAL_ENTRY_MAX_SIZE` targets, corpus-wide?" and "how common is
-//!    sibling reordering (the commutative-matching gap), corpus-wide?" - both were previously
-//!    answered by manually reading 2-3 fixtures' mismatch paths, which twice turned out to be
-//!    actively misleading once checked against the real source diff. This computes both signals
-//!    over the whole corpus instead.
+//!    sibling reordering (the commutative-matching gap), corpus-wide?". Reading 2-3 fixtures'
+//!    mismatch paths by hand answers them misleadingly; this computes the signal over the whole
+//!    corpus instead.
 //!
 //! Every stat here comes from one of two cheap sources: `human_mapping.json`'s `before_path`/
 //! `after_path` strings (already `"kind:sibling_ordinal"`, so kind/depth/position signals need no

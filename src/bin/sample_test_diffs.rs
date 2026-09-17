@@ -243,11 +243,10 @@ fn resolve_dataset(args: &Args) -> Result<String> {
 }
 
 /// What `row` counts towards for top-up purposes: `(language, None)` normally, aggregating every
-/// existing row for that language regardless of its own `size_bucket` (unchanged from this tool's
-/// pre-`--stratified` behavior); `(language, size_bucket)` under `--stratified`, so a legacy or
-/// non-stratified row (whose `size_bucket` is `None`) correctly counts towards nothing, per
-/// `Row::size_bucket`'s doc comment - it's not a real sample of that bucket, just a row that
-/// predates bucket tracking or was sampled a different way.
+/// existing row for that language regardless of its own `size_bucket`; `(language, size_bucket)`
+/// under `--stratified`, so a row whose `size_bucket` is `None` correctly counts towards nothing,
+/// per `Row::size_bucket`'s doc comment - it is not a real sample of that bucket, just a row
+/// sampled a different way.
 fn capacity_key(language: &str, bucket: Option<&str>, stratified: bool) -> CapacityKey {
     (
         language.to_string(),

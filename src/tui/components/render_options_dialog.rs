@@ -37,9 +37,9 @@ const HINT: &str = "↑/↓ move  Enter/Space toggle  1: minimal  2: full  Esc: 
 /// already on disk.
 ///
 /// The presets are on `1`/`2` rather than `m`/`f` for the same reason. The panel is opened with
-/// `M`, and lowercase `m` used to mean [`RenderOptions::MINIMAL`] - every field off - so pressing
-/// the opening key twice silently wiped the whole setting and persisted the result. Digits cannot
-/// collide with the key that opens the panel.
+/// `M`, so binding lowercase `m` to [`RenderOptions::MINIMAL`] - every field off - would let
+/// pressing the opening key twice silently wipe the whole setting and persist the result. Digits
+/// cannot collide with the key that opens the panel.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RenderOptionsDialog {
     options: RenderOptions,
@@ -197,8 +197,9 @@ mod tests {
         );
     }
 
-    /// The panel opens on `M`, so a stray lowercase `m` inside it used to mean MINIMAL - every
-    /// field off, applied and persisted before the user could react. It must now do nothing.
+    /// The panel opens on `M`, so a stray lowercase `m` inside it must do nothing: bound to
+    /// MINIMAL it would turn every field off, applied and persisted, before the user could
+    /// react.
     #[test]
     fn the_key_that_opens_the_panel_is_inert_inside_it() {
         let mut dialog = RenderOptionsDialog::new(RenderOptions::FULL);

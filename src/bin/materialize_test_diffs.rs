@@ -397,10 +397,9 @@ fn materialize_row(row: &Row, repo_roots: &[PathBuf], output_dir: &Path) -> Resu
         Resolution::AlreadyPresent(dir) => dir,
     };
 
-    // Backfills README.md onto directories materialized before this file recorded license
-    // provenance, same "safe to re-run" spirit as `resolve_target` above - only ever written if
-    // missing, never overwritten, so a hand-edited README.md (e.g. a corrected license
-    // classification) survives a later re-run.
+    // Backfills README.md onto any directory that lacks one, in the same "safe to re-run" spirit
+    // as `resolve_target` above - only ever written if missing, never overwritten, so a
+    // hand-edited README.md (e.g. a corrected license classification) survives a later re-run.
     let readme_path = dir.join("README.md");
     if !readme_path.exists() {
         let license_files = license::find_license_files(&repo, &tree);

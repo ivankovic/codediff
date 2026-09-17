@@ -367,8 +367,8 @@ pub(crate) fn is_text_only(before: &Code, after: &Code) -> bool {
 /// A file pair tree-sitter has no grammar for is exactly what the product's own text fallback
 /// exists for (`app::compute_diff`), and it is what the painting for such a fixture is graded
 /// against (`compare_painting_with_diff`), so the `p` overlay and `P`'s seed have to show it.
-/// Returning two empty lists here - what this used to do - left a human painting a case with no
-/// visible answer to compare against, and seeding one with nothing at all.
+/// Returning two empty lists here would leave a human painting such a case with no visible answer
+/// to compare against, and seed one with nothing at all.
 pub(crate) fn codediff_text_spans(
     before: &Code,
     after: &Code,
@@ -880,8 +880,8 @@ pub(crate) struct TextPaintState {
     /// How a selection spanning several rows reads, toggled with `V`.
     ///
     /// `true` (the default): vertical - one span per row, all sharing the anchor-to-cursor column
-    /// range, for picking the same columns down a stack of lines. `false`: the old full-line
-    /// sweep, still needed for a single contiguous multi-line block - e.g. selecting a whole
+    /// range, for picking the same columns down a stack of lines. `false`: a full-line sweep,
+    /// needed for a single contiguous multi-line block - e.g. selecting a whole
     /// moved function body, where `m` requires every span on a side to read identical text and a
     /// per-row decomposition of one block would fail that check on every row but the first.
     pub(crate) vertical: bool,
@@ -971,13 +971,13 @@ impl TextPaintState {
     /// `self.vertical` (toggled with `V`) picks the shape: vertical is a stack of squares - each
     /// row in range gets its own span sharing the anchor-to-cursor column range, clamped to that
     /// row's own length - for picking the same columns down several lines without also grabbing
-    /// the untouched tail of every line in between. Non-vertical is the older full-line sweep -
+    /// the untouched tail of every line in between. Non-vertical is the full-line sweep -
     /// one span running from the anchor straight through to the cursor, covering every line in
     /// between end to end - which a contiguous multi-line block (an entire moved function body)
     /// still needs: `m` requires every span on a side to read identical text, so decomposing one
     /// block into per-row squares would fail that check on every row but the first. A same-row
-    /// selection reads the same either way: with one row in range both shapes collapse to the
-    /// single span every earlier version of this method returned.
+    /// selection reads the same either way: with one row in range both shapes collapse to a
+    /// single span.
     ///
     /// Each span's end is exclusive and includes the character *under* whichever endpoint sits
     /// further right, which is what a reader painting a range sees highlighted - a selection that
@@ -1741,8 +1741,8 @@ pub(crate) fn skip_leading_whitespace(span: HumanTextSpan, source: &str) -> Vec<
     (span.start_row..=span.end_row)
         .filter_map(|row| {
             // Against `row_text`, not a raw line: it drops a CRLF file's trailing `\r`, which is
-            // part of the terminator rather than of the row, and clamping to a length that still
-            // counted it would hand back the phantom last column that byte used to add.
+            // part of the terminator rather than of the row; clamping to a length that still
+            // counted it would hand back a phantom last column for that byte.
             let length = TextPaintState::row_text(source, row).len();
             let start = if row == span.start_row {
                 span.start_column
@@ -2114,9 +2114,8 @@ pub(crate) struct App {
     pub(crate) sample_view: SamplePickerView,
     /// Cached `sample_diff_line_count` per sample name, for the `O` picker's size column and its
     /// two size-based sort orders. Cached because that count costs an external `diff` per sample
-    /// and the picker needs *every* sample's before it can draw: measured at 3.9s for the 1489
-    /// samples the stratified draw produced, paid on every single `O` press, where a few dozen
-    /// samples used to make it imperceptible. A materialized sample's before/after files never
+    /// and the picker needs *every* sample's before it can draw - seconds of it at corpus scale,
+    /// paid on every single `O` press. A materialized sample's before/after files never
     /// change (promotion copies them out, it does not rewrite them), so a count only ever has to
     /// be taken once per session; new samples appearing on disk mid-session are still picked up,
     /// because only the names missing from this map get scanned.

@@ -124,13 +124,13 @@ impl DiffViewer {
     /// Re-filters the ranges captured by the last `load_diff` rather than recomputing anything:
     /// the mapping is identical under every set of options, and only how much of it is shown
     /// differs. Applying and persisting the choice is the caller's job (the `M` panel's own action
-    /// handler in `App`) - unlike the old blind `M`-key toggle this replaces, there is no single
-    /// "next" state to compute here.
+    /// handler in `App`): the options are independent, so there is no single "next" state to
+    /// compute here.
     pub fn set_render_options(&mut self, options: RenderOptions) {
         self.render_options = options;
         self.apply_render_options(false);
-        // The counterpart highlight was dropped with the old ranges; recompute it for whatever the
-        // cursor is now sitting on, so the two panels stay in step across the switch.
+        // The counterpart highlight goes with the ranges it was computed from; recompute it for
+        // whatever the cursor is now sitting on, so the two panels stay in step across the switch.
         self.sync_cross_highlight();
     }
 
@@ -173,11 +173,10 @@ impl DiffViewer {
 
     /// Every change in the pair, once each, ordered as a reader meets them going down the diff.
     ///
-    /// `n`/`p` used to walk one panel at a time, which reads badly: a diff is one sequence of
-    /// edits that happens to be *displayed* in two columns, and stepping through the before column
-    /// to its end before starting on the after column is not the order anybody reads it in. Worse,
-    /// a pure insertion put no stops in the before panel at all, so `n` there had nowhere to go and
-    /// had to stop and ask whether to switch sides.
+    /// One walk across both panels, not one per panel. A diff is a single sequence of edits that
+    /// happens to be *displayed* in two columns, and stepping through the before column to its end
+    /// before starting on the after column is not the order anybody reads it in; a pure insertion
+    /// would also leave the before panel with no stops at all, and `n` there with nowhere to go.
     ///
     /// Each change appears exactly once, on the side that actually holds its text:
     ///
@@ -882,9 +881,8 @@ impl Component for DiffViewer {
         self.update_display_mode(area.width);
 
         // No border anywhere around the code display, in either mode - see `panel_title`'s doc
-        // comment for why. Exactly one plain title row, so exactly 1 row reserved here,
-        // uniformly, rather than the old per-mode border-row bookkeeping (2 rows for a single
-        // nested border, 4 for two).
+        // comment for why. Exactly one plain title row, so exactly 1 row reserved here, in both
+        // modes - no per-mode border-row bookkeeping.
         let viewport_height = area.height.saturating_sub(1) as usize;
         self.left_viewer.set_viewport_height(viewport_height);
         self.right_viewer.set_viewport_height(viewport_height);
@@ -1063,11 +1061,10 @@ fn split_panels(area: Rect) -> (Rect, Rect) {
 /// border to distinguish it) - and returns the remaining area below it for the panel's own
 /// content.
 ///
-/// No `Block`/`Borders::ALL` here (nor in single-panel mode, nor in `CodeViewerWidget::render`
-/// anymore either): this and the widget's own border used to *both* draw, each with their own
-/// title showing the filename, so dual-panel mode showed it twice; single-panel mode hid the
-/// widget's own border but not consistently, leaving the two modes' framing visibly different for
-/// no reason. One plain title line, always drawn the same way in both modes, replaces both.
+/// No `Block`/`Borders::ALL` here, nor in single-panel mode, nor in `CodeViewerWidget::render`.
+/// Two nested borders, each with its own title, show the filename twice in dual-panel mode and
+/// leave the two modes' framing visibly different for no reason. One plain title line, drawn the
+/// same way in both modes, is the whole of it.
 fn panel_title(
     frame: &mut Frame,
     area: Rect,
@@ -1188,9 +1185,8 @@ mod tests {
             .collect()
     }
 
-    /// Regression test: dual-panel mode used to draw *two* titles per side - `panel_title`'s own
-    /// (" Before  before.txt") plus the (since-removed) `CodeViewerWidget`'s own border/title,
-    /// which repeated the filename a second time. One title per side, one filename each.
+    /// Dual-panel mode draws exactly one title per side - `panel_title`'s own (" Before
+    /// before.txt") and nothing from `CodeViewerWidget` - so a filename appears once.
     #[test]
     fn draw_dual_panel_shows_each_filename_exactly_once() -> Result<()> {
         let mut viewer = DiffViewer::new();
@@ -1517,9 +1513,9 @@ mod tests {
     /// `n` on the empty "before" side of a pure-insertion diff walks straight to the change on the
     /// "after" side, switching panels on the way.
     ///
-    /// This used to stop and ask, because the walk was per-panel and the before side had no stops
-    /// at all. Merging the two sides into one ordered walk makes the question moot: there is one
-    /// sequence of changes, and `n` goes to the next one wherever it lives.
+    /// A per-panel walk would have to stop and ask, the before side having no stops at all. One
+    /// ordered walk across both sides makes the question moot: there is a single sequence of
+    /// changes, and `n` goes to the next one wherever it lives.
     #[test]
     fn n_crosses_to_the_other_panel_when_that_is_where_the_next_change_is() {
         let mut viewer = DiffViewer::new();

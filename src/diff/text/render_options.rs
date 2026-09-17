@@ -265,9 +265,8 @@ pub struct RenderOptions {
     /// diff reload when it changes.
     ///
     /// `#[serde(default = "paint_displaced_moves_default")]` for the same reason
-    /// `paint_reindent_only_moves` has one: a `.codediff.toml` written before this field existed
-    /// must keep the behaviour every prior release had, which is `true` (always paint the
-    /// `Move`), not `bool::default()`'s `false`.
+    /// `paint_reindent_only_moves` has one: a `.codediff.toml` with no entry for this field must
+    /// get `true` (always paint the `Move`), not `bool::default()`'s `false`.
     #[serde(default = "paint_displaced_moves_default")]
     pub paint_displaced_moves: bool,
     /// Whether a relocation the two sides describe over *different extents* paints on both sides.
@@ -380,9 +379,8 @@ impl RenderOptions {
 }
 
 impl Default for RenderOptions {
-    /// Matches every release before this setting existed, and `RenderMode`'s own prior default:
-    /// an existing config or script that never mentions this setting keeps behaving exactly as it
-    /// did.
+    /// The fullest rendering, so a config or script that never mentions these options gets
+    /// everything painted rather than nothing.
     fn default() -> Self {
         Self::FULL
     }
@@ -606,7 +604,7 @@ pub(crate) fn restore_paired_brackets(
     let mut restored = Vec::new();
     for candidate in dropped {
         // An unaddressable candidate is skipped rather than treated as an empty range at the end
-        // of the file, which is what the old sentinel silently made it.
+        // of the file, which is what an in-band sentinel would silently make it.
         let Some((start, end)) = byte_range(&candidate.source) else {
             continue;
         };

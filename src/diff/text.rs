@@ -93,8 +93,7 @@ pub(crate) fn own_content(node: Node, source: &[u8]) -> String {
 /// of concatenating every gap into a `String` - `None` if the node's own content is split across
 /// more than one gap (e.g. a container with content both before its first child and after its
 /// last). Precise sub-node positions (see `intra_node_update_ranges`) only make sense for a single
-/// contiguous span; a node with multiple gaps keeps reporting the whole node as changed, same as
-/// before this existed.
+/// contiguous span; a node with multiple gaps keeps reporting the whole node as changed.
 fn own_content_span(node: Node) -> Option<(Point, usize, usize)> {
     let mut pos = node.start_byte();
     let mut gap_start_point = node.start_position();
@@ -396,19 +395,18 @@ pub(crate) enum NodeChange<'c> {
 /// container (e.g. a function `block` that gained a statement) also maps `MatchButNotIdentical`,
 /// and its whole text almost always differs too - but comparing only the gap text between its
 /// children correctly finds nothing (containers rarely have real content outside their named
-/// children), so the existing descent finds the real, much smaller change instead. Confirmed as
-/// a real false positive during development: an earlier version compared each child's own
-/// `mapping.operation` instead, which missed a statement moving one level deeper (still mapped
-/// `Identical` at the AST level - only its rendered `TextOperation` becomes `Move`, from the
-/// column shift) and wrongly treated the whole enclosing block as one giant `Update`.
+/// children), so the existing descent finds the real, much smaller change instead. Comparing
+/// each child's own `mapping.operation` instead misses a statement moving one level deeper -
+/// still mapped `Identical` at the AST level, with only its rendered `TextOperation` becoming
+/// `Move` from the column shift - and treats the whole enclosing block as one giant `Update`.
 ///
 /// **`OwnContentChanged` additionally requires both sides' own content to sit in a single
 /// contiguous gap**, because that is the only shape the branch can actually paint: it returns
 /// `descend = false`, so whatever it reports is the node's *whole* rendering, and
 /// `own_content_update_ranges` can only place a sub-node range when `own_content_span` gives it
 /// one - with multiple gaps it falls back to painting the entire node `Update`. Without this
-/// guard the two halves disagreed, and a container was selected for painting on the strength of
-/// *all* its gaps and then painted whole because there was more than one of them.
+/// guard the two halves disagree: a container is selected for painting on the strength of *all*
+/// its gaps and then painted whole because there is more than one of them.
 ///
 /// That is not hypothetical, and "containers rarely have real content outside their named
 /// children" is exactly the assumption it breaks: a `\`-continued vim `dictionnary` or shell
@@ -680,9 +678,8 @@ impl RangeWalk<'_> {
         // spanning a row boundary: sub-line tokens (a `}`, an operator) can legitimately match an
         // earlier identical occurrence when matching is imperfect, and flagging those would
         // paint noise, while a multi-row (or full-line) match landing backwards is a real
-        // reorder. Before this check, a pure sibling reorder produced no non-Identical range at
-        // all - the diff rendered as completely unchanged (the gap `DiffSummary::
-        // RefactorMovedOnly`'s doc comment used to describe).
+        // reorder. Without this check a pure sibling reorder produces no non-Identical range at
+        // all and the diff renders as completely unchanged.
         let crossed_backwards = s.end_row > s.start_row
             && (d.start_row, d.start_column)
                 < (
@@ -694,17 +691,15 @@ impl RangeWalk<'_> {
         // that line pushing it rightwards, and only its first row moved at all.
         //
         // Marking the whole subtree moved on that evidence over-reports by the size of the
-        // subtree: adding `const ` to one parameter used to paint an entire function body as
-        // moved (`cpp-add-const-correctness`, where the human paints only the inserted `const`).
+        // subtree: adding `const ` to one parameter would paint an entire function body as moved
+        // (`cpp-add-const-correctness`, where the human paints only the inserted `const`).
         //
-        // The two exclusions are both load-bearing, and each was put here by a measurement:
+        // The two exclusions are both load-bearing:
         //
-        // * single-row nodes keep the old treatment - the painted corpus holds 16 human-painted
-        //   moves that are column-only on one row, across six fixtures, so the rule is right
-        //   there;
-        // * a multi-row node that *also* changed rows keeps it too - that is a real relocation,
-        //   and excluding it regressed `rust-add-if` (a block genuinely moved into a new `if`)
-        //   from 0.7% to 56.5% disagreement with its painting.
+        // * single-row nodes still count as moved - a column-only shift on a single row is what a
+        // human paints as a move;
+        // * a multi-row node that *also* changed rows counts too - a block genuinely relocating
+        //   into a new `if` has exactly that shape.
         //
         // "Its own starting row" is about the row's *content*, not its index. A multi-row node
         // can be pushed sideways by an edit on its first row *and* down the file by an insertion
@@ -720,10 +715,10 @@ impl RangeWalk<'_> {
         // exactly like `shifted_by_an_edit_beside_it` below, because the two presets disagree
         // about displaced moves.
         //
-        // The `rust-add-if` regression the bullet above records does not come back: that block's
-        // geometry is the same, but under `MINIMAL` `known_pure_reindent` already renders it
-        // `Identical` by `WrapGrowth`, and under `FULL` this disjunct is switched off. Measured -
-        // it is not among the fixtures whose painting changed.
+        // The `rust-add-if` shape the bullet above records is not reachable through this
+        // disjunct: that block's geometry is the same, but under `MINIMAL` `known_pure_reindent`
+        // already renders it `Identical` by `WrapGrowth`, and under `FULL` the disjunct is
+        // switched off.
         let displaced_beside_an_edit_on_its_first_row = !self.options.paint_displaced_moves
             && d.end_row as i64 - s.end_row as i64 == d.start_row as i64 - s.start_row as i64
             && s.end_column == d.end_column
@@ -743,24 +738,22 @@ impl RangeWalk<'_> {
         // *rewritten* part of the row keeps the Move treatment: `function fetchData(callback:
         // ...): void {` -> `async function fetchData(): Promise<string> {` shifts `function
         // fetchData(` the same way, but the row was rewritten around it and its painter calls
-        // the surviving fragments moved (`typescript-async-await`, which a plain
-        // same-row-same-indent rule regressed 27.5% -> 36.1% on 2026-09-01, the fourth attempt
-        // at this shape; the three before it are in the fix log). Restricted to nodes that
+        // the surviving fragments moved, which a plain same-row-same-indent rule gets wrong.
+        // Restricted to nodes that
         // stayed on their own row and were not reindented, so a reindent-only move keeps
         // reaching `paint_reindent_only_moves` below.
         //
         // The node also has to still *be* on a row whose content places it beside the edit - but
         // not necessarily on the row it started on. Requiring `s.start_row == d.start_row` here
-        // (as this did until 2026-09-08) made the whole check unreachable for a node that had
-        // additionally been pushed down the file by an insertion above it, which is the ordinary
-        // case rather than a corner one: in `shellscript-ansible-ansible-a-small-add` a
-        // `set -eux -o pipefail` two lines up moved `diff -w <(...)` from row 3 to row 5 and the
-        // untouched tail of the command painted `Move` under both presets. The row *indices* are
-        // not the evidence; `node_untouched_on_its_row` already compares the two rows' own
-        // content, and it reads whichever rows the two sides actually sit on. Dropping the index
-        // requirement is gated on `paint_displaced_moves` because the two presets disagree about
-        // it - see that option's doc comment for the corpus measurement (17 `MINIMAL` fixtures
-        // improved and none regressed; `FULL` net worse).
+        // would make the whole check unreachable for a node that has additionally been pushed down
+        // the file by an insertion above it, which is the ordinary case rather than a corner one:
+        // a line inserted above a command moves it down the file while its own row is untouched,
+        // and the untouched tail would then paint `Move`. The row *indices* are not the evidence;
+        // `node_untouched_on_its_row` already compares the two rows' own content, and it reads
+        // whichever rows the two sides actually sit on. Dropping the index requirement is gated on
+        // `paint_displaced_moves` because the two presets disagree about it - see that option's
+        // doc comment for the corpus measurement (17 `MINIMAL` fixtures improved and none
+        // regressed; `FULL` net worse).
         let shifted_by_an_edit_beside_it = s.end_row == s.start_row
             && (s.start_row == d.start_row || !self.options.paint_displaced_moves)
             && node_untouched_on_its_row(&self.source.contents, &self.destination.contents, &s, &d);
@@ -875,11 +868,11 @@ impl RangeWalk<'_> {
     /// leaf (`//`) plus un-decomposed trailing text - and so has to be painted by
     /// [`Self::own_gap_ranges`] rather than by descending. The same shape `own_content`/
     /// `own_content_span` exist for on the `MatchButNotIdentical` case, but for a *whole* node
-    /// insertion/deletion rather than a changed one. Without this, the childless-leaf case only
-    /// ever painted the marker (`//`), and the comment's actual words (not covered by any child)
-    /// were silently dropped: confirmed on `rust-cost-optimization`, where a brand-new `// Early
-    /// termination optimization` comment rendered with only its `//` highlighted and the rest in
-    /// plain, unpainted text.
+    /// insertion/deletion rather than a changed one. Without this, the childless-leaf case paints
+    /// only the marker (`//`) and the comment's actual words - not covered by any child - are
+    /// silently dropped: in `rust-cost-optimization` a brand-new `// Early termination
+    /// optimization` comment renders with only its `//` highlighted and the rest in plain,
+    /// unpainted text.
     ///
     /// Three guards, each load-bearing:
     ///
@@ -894,14 +887,12 @@ impl RangeWalk<'_> {
     /// * `own_content_span(node).is_some_and(...)` keeps this from firing on a node whose
     ///   children already fully reconstruct it with no real gap at all (a Java `string_literal`
     ///   made of a `"` / `string_fragment` / `"` triple with nothing between them, extremely
-    ///   common, unlike a genuinely gappy comment). Confirmed as a real regression: an earlier
-    ///   version fired there too and, despite painting every one of those three children
-    ///   correctly on their own, the multi-range bypass in [`Self::push`] skipped the accumulator
-    ///   that silently absorbs a *whitespace-only* gap into an adjacent Insert/Delete range - so
-    ///   cutting a no-gap node over to the bypass path dropped whitespace at its *boundary* with
-    ///   a sibling (a single space between a string literal and a `+` in `"Dividing " + a`) that
-    ///   isn't part of this node at all. Regressed `java-add-logging` from exact agreement to six
-    ///   dropped bytes before this guard was added.
+    ///   common, unlike a genuinely gappy comment). Firing there paints every one of those three
+    ///   children correctly on their own and still loses bytes, because the multi-range bypass in
+    ///   [`Self::push`] skips the accumulator that silently absorbs a *whitespace-only* gap into
+    ///   an adjacent Insert/Delete range: cutting a no-gap node over to the bypass path drops
+    ///   whitespace at its *boundary* with a sibling - a single space between a string literal
+    ///   and a `+` in `"Dividing " + a` - that isn't part of this node at all.
     fn whole_content_prune(
         &self,
         node: Node,

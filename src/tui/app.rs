@@ -90,15 +90,13 @@ struct ReviewPosition {
 /// screen's own dialog (via `Action::DialogCancelled`).
 ///
 /// `Diffing` is deliberately *not* a quit screen: Esc there cancels the in-flight computation
-/// and returns to the viewer (see the Esc arm in `handle_events`) - previously it quit the whole
-/// app, making a slow diff the one situation where a reflexive Esc lost the entire session.
+/// and returns to the viewer (see the Esc arm in `handle_events`), so a slow diff is not the one
+/// situation where a reflexive Esc loses the entire session.
 ///
-/// Deliberately an exhaustive match, not a list of `!=` exclusions: that list was extended twice
-/// before and `SelectTheme` was missed *both* times, letting Esc silently quit the whole app
-/// instead of closing the theme picker - the only dialog that happened to (found in a 2026-07
-/// code-health pass). An exhaustive match means the compiler itself forces every future
-/// `AppScreen` variant to be considered here, instead of relying on someone remembering to
-/// extend a growing exclusion list.
+/// Deliberately an exhaustive match, not a list of `!=` exclusions. A growing exclusion list is
+/// easy to forget to extend, and a screen missing from it lets Esc silently quit the whole app
+/// instead of closing that screen's own dialog. An exhaustive match makes the compiler force
+/// every future `AppScreen` variant to be considered here.
 fn esc_should_quit(screen: AppScreen) -> bool {
     match screen {
         AppScreen::Viewer => true,
@@ -1231,9 +1229,8 @@ impl App {
         // deliberately leaves something unpainted (standalone brackets, leading whitespace), so
         // without a badge a reader who forgot they pressed `M` - or inherited the setting from a
         // previous run, since it persists - would read the missing highlights as codediff having
-        // missed them. `FULL` is the default and what every release before this setting existed
-        // rendered, so labelling it would put a permanent badge on a screen that has nothing to
-        // report.
+        // missed them. `FULL` is the default and the fullest rendering there is, so labelling it
+        // would put a permanent badge on a screen that has nothing to report.
         let render_options = self.diff_viewer.render_options();
         if render_options != RenderOptions::FULL {
             if render_options == RenderOptions::MINIMAL {
@@ -1656,21 +1653,18 @@ pub(crate) fn compute_diff(before: &Path, after: &Path) -> Result<(DiffSessionDa
 /// Mirrors `file_stats.rs`'s `WORKER_STACK_SIZE` and its rationale: real-world corpora contain
 /// pathologically deep trees (huge generated/minified files, deeply nested JSON, long chained
 /// expressions) whose recursive AST walks (e.g. `apted`'s `gted`/`compute_has_match_below`,
-/// `stats::count_nodes`) can overflow a default-size stack. Every caller of this function runs it
-/// on a thread smaller than the plain OS default: the TUI's `tokio::task::spawn_blocking` pool
-/// (2MB) and, historically, the plain calling thread for `headless::run`/`json_output::run`. A
-/// stack overflow aborts the whole process unconditionally - unlike a panic, it can't be caught by
-/// the `catch_unwind` already wrapping the TUI's `spawn_blocking` closure - so raising the ceiling
-/// here is the only fix, and doing it in this one choke point covers all three entry points at
-/// once.
+/// `stats::count_nodes`) can overflow a default-size stack, and the TUI's
+/// `tokio::task::spawn_blocking` pool gives each task only 2MB. A stack overflow aborts the whole
+/// process unconditionally - unlike a panic, it can't be caught by the `catch_unwind` already
+/// wrapping the TUI's `spawn_blocking` closure - so raising the ceiling here is the only fix, and
+/// doing it in this one choke point covers all three entry points at once.
 const DIFF_COMPUTE_STACK_SIZE: usize = 256 * 1024 * 1024;
 
-/// The real diff computation every production caller uses -
+/// The real diff computation every production caller uses, with
 /// [`RenderOptions::whole_pair_updates`]/[`RenderOptions::paint_reindent_only_moves`] threaded
-/// through to the AST-backed path rather than hardcoded to their legacy defaults.
-/// `App::start_diff` reads them off the live `DiffViewer`; `tui::headless::run`/
-/// `tui::json_output::run` read them off the `RenderOptions` CLI/config already resolved before a
-/// diff is computed.
+/// through to the AST-backed path rather than fixed. `App::start_diff` reads them off the live
+/// `DiffViewer`; `tui::headless::run`/ `tui::json_output::run` read them off the `RenderOptions`
+/// CLI/config already resolved before a diff is computed.
 ///
 /// Runs the actual work on a dedicated thread with [`DIFF_COMPUTE_STACK_SIZE`] - see that
 /// constant's doc comment - and joins it. A panic on that thread is re-raised here via
@@ -1803,9 +1797,9 @@ mod tests {
     }
 
     /// Regression guard for `git`'s add/delete convention (`difftool`/`GIT_EXTERNAL_DIFF` both
-    /// hand codediff `/dev/null` for the missing side of an added or deleted file): before this
-    /// fallback, `Code::from_file("/dev/null")` detected no language (no extension) and left
-    /// `ast` unset, so `compute_diff` bailed with "unsupported or unrecognized file type" even
+    /// hand codediff `/dev/null` for the missing side of an added or deleted file). Without the
+    /// fallback, `Code::from_file("/dev/null")` detects no language (no extension) and leaves
+    /// `ast` unset, so `compute_diff` bails with "unsupported or unrecognized file type" even
     /// though the other side parsed fine.
     #[test]
     fn compute_diff_treats_dev_null_before_as_an_empty_file_in_the_afters_language() -> Result<()> {
@@ -1848,11 +1842,10 @@ mod tests {
 
     /// The `/dev/null` fallback only kicks in for a genuinely empty, language-less side - a pair
     /// where neither side is empty (so there's real content on both sides, just no recognizable
-    /// language) must fall through to the plain-text diff instead, not bail. Before that fallback
-    /// existed, this bailed with "unsupported or unrecognized file type" - see
-    /// `parse_before_after`'s own doc comment on why that used to be worse than it sounds
-    /// (`GIT_EXTERNAL_DIFF` treats any non-zero exit as aborting the *whole* multi-file
-    /// `git diff`, not just this one file).
+    /// language) must fall through to the plain-text diff instead, not bail with "unsupported or
+    /// unrecognized file type" - see `parse_before_after`'s own doc comment on why bailing is
+    /// worse than it sounds (`GIT_EXTERNAL_DIFF` treats any non-zero exit as aborting the *whole*
+    /// multi-file `git diff`, not just this one file).
     #[test]
     fn compute_diff_falls_back_to_plain_text_when_neither_side_has_a_recognizable_language()
     -> Result<()> {
@@ -1889,11 +1882,10 @@ mod tests {
         Ok(())
     }
 
-    /// Regression test: Esc used to quit the whole app instead of closing the theme picker,
-    /// because `SelectTheme` was missing from a hand-maintained exclusion list (twice-extended,
-    /// missed both times). Every screen with its own dialog must resolve Esc itself, not quit.
-    /// A repository with two unstaged modifications, and the process moved into it - nextest
-    /// runs every test in its own process, so `set_current_dir` cannot leak into another test.
+    /// Every screen with its own dialog must resolve Esc itself rather than quitting the app - the
+    /// theme picker being the one easiest to leave out of such a rule. A repository with two
+    /// unstaged modifications, and the process moved into it - nextest runs every test in its own
+    /// process, so `set_current_dir` cannot leak into another test.
     fn enter_sample_repository() -> tempfile::TempDir {
         let dir = tempfile::tempdir().unwrap();
         let root = dir.path();
@@ -2137,8 +2129,8 @@ mod tests {
     }
 
     /// Raw mode turns off ISIG, so the terminal never converts Ctrl-Z into SIGTSTP and the TUI
-    /// used to swallow the keystroke entirely. Only the recognition is tested: calling the
-    /// suspend path itself would stop the test process, hanging the run instead of failing it.
+    /// has to recognize the keystroke itself. Only the recognition is tested: calling the suspend
+    /// path would stop the test process, hanging the run instead of failing it.
     #[test]
     fn ctrl_z_is_recognised_as_suspend_and_a_bare_z_is_not() {
         use crossterm::event::{KeyEvent, KeyModifiers};
@@ -2427,8 +2419,8 @@ mod tests {
         Ok(())
     }
 
-    /// `FULL` is the default and what every release before this setting existed rendered, so a
-    /// badge for it would sit permanently on a screen with nothing to report.
+    /// `FULL` is the default, so a badge for it would sit permanently on a screen with nothing
+    /// to report.
     #[test]
     fn draw_viewer_does_not_badge_full_options() -> Result<()> {
         let mut app = App::new(4.0, 60.0)?;

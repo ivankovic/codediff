@@ -15,14 +15,6 @@
  *  You should have received a copy of the GNU Affero General Public License
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
-// Split out of nodes.rs (formerly its trailing #[cfg(test)] mod tests block plus a second,
-// separately-nested #[cfg(test)] mod is_commutative_container_tests further down - the two are
-// merged into this one file/module) purely to shrink that file's visible size and stop production
-// code (is_statement_sequence_body, is_commutative_container) from sitting between two test
-// blocks. No behavior change - is_commutative_container_tests's own two local helpers
-// (assert_recognizes, find_kind) and its `use crate::code::{Code, Language}` are folded in
-// directly rather than kept as a nested module, since nothing else needs that extra layer and
-// `use super::*` below already covers what its `use super::is_commutative_container` did.
 
 use anyhow::Result;
 
@@ -245,11 +237,9 @@ fn kinds_update_allowed_identifiers_do_not_match_non_identifiers() {
 
 #[test]
 fn flow_control_similarity_of_sets_ignores_wildcards_and_scores_jaccard() {
-    // Regression guard for `flow_control_similarity_of_sets` after the arm-extraction helpers
-    // that used to be its only caller (`solve_similar_flow_control`) were deleted 2026-08-14 -
-    // `solve_import_list_overlap` is the sole remaining caller now, building its sets directly
-    // from import symbols rather than flow-control arm signatures, but the Jaccard scoring
-    // itself is generic and still worth its own direct test.
+    // `solve_import_list_overlap` is the only caller, and it builds its sets from import symbols
+    // rather than from flow-control arm signatures - but the Jaccard scoring itself is generic and
+    // worth its own direct test.
     let before: std::collections::HashSet<&str> =
         ["asset", "ecmascript", "wasm"].into_iter().collect();
     let after: std::collections::HashSet<&str> =
@@ -376,7 +366,7 @@ fn leaf_texts_similar_rejects_unrelated_and_tiny_texts() {
     assert!(!leaf_texts_similar("0", "1"));
 }
 
-// Tests for is_reference (formerly node_matches from reference_nodes.rs)
+// Tests for is_reference
 
 #[test]
 fn root_nodes_are_reference_in_all_languages() -> Result<()> {
@@ -409,7 +399,7 @@ fn root_nodes_are_reference_in_all_languages() -> Result<()> {
     Ok(())
 }
 
-// Tests for is_semantically_structural (formerly node_matches from semantic_structure_nodes.rs)
+// Tests for is_semantically_structural
 
 fn collect_matches(src: &str) -> Vec<(String, String)> {
     let code = Code::from_string(src, &Language::Rust);
@@ -589,11 +579,11 @@ func TestThings(t *testing.T) {
     );
 }
 
-/// Regression guard for the 2026-07-23 fix: a top-level `var`/`const` declaration gets an
-/// identity keyed on its own name (not just its `var_spec`/`const_spec` child), so
-/// `solve_large_flat_subtrees`'s direct-children-only `top_level_identities` can see it - a
-/// large data literal assigned to a top-level `var` (Go's common table-driven-test-data
-/// idiom, e.g. `var tests = []T{...}`) previously had no identity signal at all.
+/// A top-level `var`/`const` declaration gets an identity keyed on its own name, not just on its
+/// `var_spec`/`const_spec` child, so `solve_large_flat_subtrees`'s direct-children-only
+/// `top_level_identities` can see it. Without that, a large data literal assigned to a top-level
+/// `var` - Go's common table-driven-test-data idiom, `var tests = []T{...}` - has no identity
+/// signal at all.
 #[test]
 fn go_top_level_var_and_const_declarations_are_matched() {
     let src = r#"

@@ -15,8 +15,6 @@
  *  You should have received a copy of the GNU Affero General Public License
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
-// Split out of common.rs (formerly its trailing #[cfg(test)] mod tests block, ~1760 of
-// common.rs's then-4119 lines) purely to shrink that file's visible size - no behavior change.
 
 use super::super::engine::*;
 use super::*;
@@ -883,7 +881,7 @@ fn debug_dump_minimal_repro() {
     }
 
     // Dump the strategy table's choices (virtual-space, vroot included) to see which
-    // (v, w) pairs picked INNER (the new, previously-unexercised path).
+    // (v, w) pairs picked INNER.
     let mut bidx = AptedIndexer::build(&before, &[0], &empty_map);
     let mut aidx = AptedIndexer::build(&after, &[7], &empty_map);
     bidx.fill_subtree_costs(&before, &cost_model);
@@ -1791,17 +1789,16 @@ fn resolve_residual_forest_via_myers_lcs_matches_identical_and_recurses_the_rest
     // children shares a hash (should match via the exact-hash pass), the other pair is left as
     // the sole entry on each side of the one gap between that anchor and the sequence end.
     //
-    // Historically (pre Phase 3b, `TODO.md` 2026-08-15) this function only ever did exact-hash
-    // matching, so the "unique" pair always fell through to delete+insert. Phase 3b added a
-    // real-APTED recursion for exactly this shape - a single leftover entry on each side of a gap
-    // - specifically so a genuinely-edited node (not a coincidence) gets a real match instead of
-    // a lossy atomic replace. That recursion goes through the real cost model
-    // (`UnitCostModel::ren`), which - by design, same as every other APTED call site in this
-    // codebase - prefers relabeling two *same-kind* leaves (`COST_UPDATE = 1`) over deleting one
-    // and inserting the other (`COST_DELETE + COST_INSERT = 2`), regardless of whether they're
-    // "really" related. `leaf`'s helper nodes are both `kind: "leaf"`, so that's what happens
-    // here now - an accepted trade-off, not a bug (see `resolve_residual_forest_via_myers_lcs_
-    // does_not_relabel_across_different_kinds` below for the safety net that's still enforced).
+    // Exact-hash matching alone would drop the "unique" pair through to delete+insert. The
+    // real-APTED recursion exists for exactly this shape - a single leftover entry on each side of
+    // a gap - so that a genuinely-edited node gets a real match instead of a lossy atomic replace.
+    // That recursion goes through the real cost model (`UnitCostModel::ren`), which - by design,
+    // same as every other APTED call site in this codebase - prefers relabeling two *same-kind*
+    // leaves (`COST_UPDATE = 1`) over deleting one and inserting the other (`COST_DELETE +
+    // COST_INSERT = 2`), regardless of whether they're "really" related. `leaf`'s helper nodes are
+    // both `kind: "leaf"`, so that's what happens here now - an accepted trade-off, not a bug (see
+    // `resolve_residual_forest_via_myers_lcs_ does_not_relabel_across_different_kinds` below for
+    // the safety net that's still enforced).
     let mut before_meta = ASTMetadata::default();
     let mut after_meta = ASTMetadata::default();
     interior(1, vec![2, 3], &mut before_meta);

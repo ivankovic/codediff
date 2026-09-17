@@ -477,10 +477,10 @@ fn load_case(name: &str) -> Result<(Code, Code)> {
     // A fixture whose language tree-sitter has no grammar for (a Bazel `BUILD` file, say) opens
     // anyway, in *text-only* mode: no tree to map, but the text views and the painting - which
     // read the raw source and nothing else - work exactly as they do anywhere else, and the
-    // painting is what such a fixture exists to record. This used to bail, which left a case a
-    // user had reported impossible to even look at. See `FrameState::before_root` for what the
-    // rest of the tool does with the missing tree, and `codediff_text_spans` for the plain-text
-    // diff codediff itself falls back to on this pair.
+    // painting is what such a fixture exists to record. Bailing here would leave such a case
+    // impossible to even look at. See `FrameState::before_root` for what the rest of the tool
+    // does with the missing tree, and `codediff_text_spans` for the plain-text diff codediff
+    // itself falls back to on this pair.
     //
     // `ensure_parsed` only when there is something to compute metadata *for*: it errors on a
     // language with no `to_treesitter` mapping rather than returning an empty result.
@@ -718,9 +718,8 @@ fn next_dataset_filter(current: Option<&'static str>) -> Option<&'static str> {
 }
 
 /// Runs `scan` over every case name in `names` across several threads, collecting the `Some`
-/// results into a map. The shared shape of all four of the `o` picker's corpus scans - each is a
-/// pure per-case function of the filesystem, so the only thing they had in common before this was
-/// a `filter_map` over `list_available_cases`, and the only thing they need now is a work queue.
+/// results into a map. The shared shape of all four of the `o` picker's corpus scans: each is a
+/// pure per-case function of the filesystem, so all any of them needs is a work queue.
 ///
 /// **Why this is safe to run concurrently.** Every scan body reaches the filesystem through
 /// `code_pair_from_dir`, `human_mapping::mapping_path`/`load` or `read_note`, all of which read and
@@ -740,10 +739,9 @@ fn next_dataset_filter(current: Option<&'static str>) -> Option<&'static str> {
 /// through `visible_diff_options`, which breaks every tie on the case name. All four scans were
 /// measured to return byte-identical entry counts single-threaded and parallel.
 ///
-/// Used for all four scans even though two of them are already cheap (`compute_diff_text_painted`
-/// 616ms -> 292ms, `compute_diff_comments` 14ms -> 1.6ms over 513 fixtures): they are I/O-bound
-/// rather than CPU-bound, so the gain is smaller, but it is a gain on the measurements above and
-/// keeping one code path for all four is worth more than the handful of milliseconds either way.
+/// Used for all four scans even though two of them are already cheap and I/O-bound rather than
+/// CPU-bound, so the gain there is small: keeping one code path for all four is worth more than
+/// the handful of milliseconds either way.
 fn scan_corpus<T, F>(names: &[String], scan: F) -> std::collections::HashMap<String, T>
 where
     T: Send,
@@ -948,21 +946,15 @@ fn refresh_diff_unmarked(app: &mut App, name: &str) {
 /// picker's `Cmpl` and `Unmarked` columns need this for the whole corpus before either can filter
 /// or sort, unlike `O`'s `hide_solved` (a cheap lookup against sample.csv, no parsing involved).
 ///
-/// **The most expensive of the four scans.** Measured over this repo's 513 fixtures (release
-/// build, 4-core machine, 2026-09-02): **38.9s single-threaded, 12.4s through `scan_corpus`**
-/// (peak RSS 833 MB and 2053 MB respectively), returning the same 512 entries either way - one
-/// case fails to load and stays absent. The old comment here claimed "roughly 10s", which dated
-/// from a ~230-fixture corpus and was never true at this size.
-///
-/// Almost all of the single-threaded 38.9s is per-case work with no shared state -
-/// `code_pair_from_dir` (tree-sitter, both sides) plus `human_mapping::load` (the corpus' mapping
-/// JSON runs to over a gigabyte, one file of it 80 MB) - which is exactly why it parallelizes
-/// nearly linearly. The two tree walks are about 8s of it, which is what made counting affordable
-/// in place of the short-circuiting "is any node unmarked?" predicate this replaced.
+/// **The most expensive of the four scans**, and the reason `scan_corpus` exists: almost all of
+/// its cost is per-case work with no shared state - `code_pair_from_dir` (tree-sitter, both
+/// sides) plus `human_mapping::load` (the corpus' mapping JSON runs to over a gigabyte, one file
+/// of it 80 MB) - so it parallelizes nearly linearly. A case that fails to load stays absent from
+/// the map rather than failing the scan.
 ///
 /// It is bearable at all only because `rebuild_caches_for_mapping` resolves every entry's path
 /// through a `PathCache` rather than rescanning siblings per entry - see `rebuild_caches`'s own
-/// doc comment for the very different cost that used to be.
+/// doc comment.
 fn compute_diff_unmarked() -> std::collections::HashMap<String, usize> {
     let Ok(names) = list_available_case_names() else {
         return std::collections::HashMap::new();
@@ -1450,9 +1442,8 @@ fn sample_diff_line_count(name: &str) -> usize {
 
 /// One column of the `o` picker's table, left to right - the unit `h`/`l` move the cursor
 /// between, and the thing both `s` (sort) and `f` (filter) act on. Every column supports both, so
-/// there is one pair of keys to remember rather than one letter per dimension (this picker used to
-/// bind `d`/`H`/`X`/`Y` for four separate filters and `s` for a fixed four-way sort cycle, which
-/// did not extend to a fifth column and gave no way to sort by anything but disagreement).
+/// there is one pair of keys to remember rather than one letter per dimension, and a new column
+/// costs no new keys.
 ///
 /// `Cmpl` and `Unmarked` are two readings of one number (`App::diff_unmarked`): a yes/no glyph for
 /// glancing down the column, and the count itself for ranking how much annotation a fixture still
@@ -1535,10 +1526,8 @@ impl DiffColumn {
 /// friends), and a fixture the scan couldn't load reads as unknown too - so "unknown" covers both
 /// "not measured yet" and "failed to measure", and neither is evidence the row should be dropped.
 /// The picker's whole job is surfacing fixtures that need attention; silently hiding the ones it
-/// could not measure would hide exactly the wrong rows. This replaces the three separate,
-/// individually-argued fail-open rules the `H`/`X`/`Y` filters used to have (one treated a missing
-/// entry as "needs attention", one as "unpainted", one as "agrees") with a single rule that reads
-/// the same in both directions.
+/// could not measure would hide exactly the wrong rows. One rule for every column, reading the
+/// same in both directions, rather than a separately-argued fail-open per filter.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 enum FlagFilter {
     #[default]
@@ -1576,7 +1565,7 @@ struct DiffFilters {
     /// never stores an empty string, since that would filter nothing while still reading as on.
     name: Option<String>,
     /// Which of `DIFF_DATASETS` to show, cycled through by `f` on `Dataset` and wrapping back to
-    /// `None` ("all") - the filter the old `d` key used to own.
+    /// `None` ("all").
     dataset: Option<&'static str>,
     cmpl: FlagFilter,
     unmarked: FlagFilter,
@@ -1948,8 +1937,7 @@ impl SampleSort {
 }
 
 /// The `O` picker's whole cursor/sort/filter state, carried on `Modal::OpenSamplePicker` and
-/// persisted on `App::sample_view` so it survives closing and reopening - the contract
-/// `App::sample_hide_solved`/`sample_sort_order` used to hold between them.
+/// persisted on `App::sample_view` so it survives closing and reopening.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 struct SamplePickerView {
     column: SampleColumn,
@@ -2204,9 +2192,9 @@ fn default_promoted_name_for_path(path: &str) -> String {
 
 /// Which of `DIFF_DATASETS` `s`'s promote prompt (`Modal::PromptPromoteName`) would write the
 /// current case into - shared by that prompt's own display text and `action_promote`'s actual
-/// destination, so the two can never say something different (see the stale hardcoded "small" this
-/// replaced: the prompt's text used to name a fixed folder regardless of `source.dataset`).
-/// `None` for `CaseOrigin::Diffs`, which never raises this prompt at all (it saves directly via
+/// destination, so the two can never say something different - a prompt naming a fixed folder
+/// regardless of `source.dataset` is the failure this shape rules out. `None` for
+/// `CaseOrigin::Diffs`, which never raises this prompt at all (it saves directly via
 /// `action_save`) - kept in the match anyway so a fourth origin can't silently fall through here.
 fn promote_target_dataset(origin: &CaseOrigin) -> Option<&str> {
     match origin {

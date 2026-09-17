@@ -143,16 +143,10 @@ mod tests {
     /// compile error - it is not compiled at all. The file sits in the tree looking exactly like a
     /// fixture that passes, and its `mapping()`, `painting()` and `invariants()` never run.
     ///
-    /// Found on 2026-09-12 with **21 stubs and 63 tests in that state** for a day: `human_solver`
-    /// had written the declarations (`insert_mod_declaration`, which does its job), and a
-    /// `git checkout -- $(git diff --name-only | grep defects4j)` meant to undo `cargo fmt` churn
-    /// on `fixtures/defects4j/*.rs` reverted `fixtures/defects4j.rs` along with them. The stub
-    /// files survived because they were still untracked; the declarations did not because the
-    /// module file was not. Nothing noticed until `quality_baseline.csv` disagreed with a stub
-    /// whose tests had never run.
-    ///
-    /// Whoever drops a declaration next - a bad merge, a revert, a generator that errors after
-    /// writing the file - this is the check that says so on the next run.
+    /// `human_solver` writes the declaration alongside the stub, so the two only come apart by
+    /// accident - a bad merge, a revert that catches the module file but not the untracked stubs
+    /// beside it, a generator that errors after writing the file. Nothing else notices: the
+    /// undeclared stub compiles nowhere and fails nothing. This is the check that says so.
     #[test]
     #[cfg(feature = "test-fixtures")]
     fn every_fixture_stub_is_declared_in_its_dataset_module() -> Result<()> {
@@ -243,12 +237,11 @@ mod tests {
     /// **`quality_baseline.csv`'s accuracy columns are a projection of the `optimal_solutions`
     /// stubs, not a second opinion about them.**
     ///
-    /// The two used to be maintained independently and drifted: 461 of 510 fixtures agreed
-    /// exactly, 49 carried a stub limit looser than the baseline's recorded number (one allowed
-    /// 66/58 against an actual of 0/0), and a single re-verification of the ground truth meant
-    /// editing the same six fixtures in both places. `write_baseline` now fills those columns from
-    /// `stub_mapping_limits`, and this fails if the checked-in file stops matching - which is what
-    /// makes "derived" a property of the repository rather than of whoever last ran the command.
+    /// Maintained independently the two drift, a stub limit ending up looser than the baseline's
+    /// recorded number, and a single re-verification of the ground truth means editing the same
+    /// fixtures in both places. `write_baseline` fills those columns from `stub_mapping_limits`,
+    /// and this fails if the checked-in file stops matching - which is what makes "derived" a
+    /// property of the repository rather than of whoever last ran the command.
     ///
     /// Only the accuracy columns are pinned. `elapsed_ms` is a measurement of the machine that
     /// produced it and legitimately changes on every run.

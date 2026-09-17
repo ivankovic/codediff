@@ -325,8 +325,8 @@ fn discover_reference_nodes(nodes: &[NodeRecord], metadata: &mut ASTMetadata) {
     // `Language::Unknown` by `compute_ast_metadata` (this function's only caller).
     let language = &metadata.language;
 
-    // Collected in the order the old tree walk visited them (preorder, children right to left)
-    // so the stable sort below breaks size ties exactly as before.
+    // Collected in preorder, children right to left, which is the order the stable sort below
+    // breaks size ties in.
     let mut reference_nodes_with_sizes = Vec::new();
     let mut stack = vec![0usize];
     while let Some(index) = stack.pop() {
@@ -358,12 +358,11 @@ mod tests {
 
     use std::path::PathBuf;
 
-    /// Regression test: `discover_reference_nodes` used to read `code.metadata.language` and
-    /// `.expect()` it directly, instead of the `metadata.language` its own caller
-    /// (`compute_ast_metadata`) had already fail-safed a few lines earlier - so a `Code` with a
-    /// real parsed AST but an unset `metadata.language` (constructible directly, since every
-    /// field here is `pub`) panicked instead of degrading gracefully like everything else in this
-    /// pipeline.
+    /// `discover_reference_nodes` must take the `metadata.language` its caller
+    /// (`compute_ast_metadata`) has already fail-safed, rather than reading
+    /// `code.metadata.language` and `.expect()`ing it: a `Code` with a real parsed AST but an
+    /// unset `metadata.language` is constructible directly, every field here being `pub`, and must
+    /// degrade gracefully like everything else in this pipeline rather than panicking.
     #[test]
     fn compute_ast_metadata_does_not_panic_when_language_is_unset() {
         let mut code = crate::code::Code::from_string("fn main() {}", &crate::code::Language::Rust);

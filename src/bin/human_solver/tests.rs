@@ -840,8 +840,8 @@ fn render_modal_prompt_search_shows_the_prefilled_query_and_instructions() {
 
 #[test]
 fn render_modal_prompt_promote_name_shows_the_actual_target_dataset_not_a_fixed_one() {
-    // Regression guard for the bug this replaced: the prompt used to name a hardcoded
-    // "small" folder no matter what `promote_dataset` (i.e. `app.origin`) actually was.
+    // The prompt must name the folder `promote_dataset` (i.e. `app.origin`) actually resolves
+    // to, not a hardcoded one.
     let backend = ratatui::backend::TestBackend::new(90, 20);
     let mut terminal = Terminal::new(backend).unwrap();
     let area = Rect::new(0, 0, 90, 20);
@@ -1223,8 +1223,8 @@ fn press_on_case(origin: CaseOrigin, name: &str, code: KeyCode) -> App {
     app
 }
 
-/// `e` on a diff opens the comment prompt. It used to refuse - comments lived only in
-/// sample.csv, which a handmade fixture has no row in at all.
+/// `e` on a diff opens the comment prompt, rather than refusing because a handmade fixture has no
+/// sample.csv row to hold a comment.
 #[test]
 fn e_on_a_diff_opens_the_comment_prompt() {
     let app = press_on_case(CaseOrigin::Diffs, "rust-no-change", KeyCode::Char('e'));
@@ -1492,9 +1492,9 @@ fn d_on_an_unused_suggestion_deletes_nothing() {
     assert!(!app.dirty, "nothing changed, so nothing needs saving");
 }
 
-/// The property this whole feature exists for: a fixture can hold more than one painting at
-/// once. An earlier version *moved* the ranges to the new name and dropped the old one, so
-/// however many times you saved you still ended up with exactly one.
+/// The property this whole feature exists for: a fixture can hold more than one painting at once.
+/// Renaming must copy the ranges under the new name rather than move them, or however many times
+/// you save you still end up with exactly one.
 #[test]
 fn branching_keeps_both_paintings_on_file() {
     let (before_src, after_src) = ("gone\n", "\n");
@@ -2609,7 +2609,7 @@ fn the_split_painting_passes_invariant_6_and_the_unsplit_one_does_not() {
 
     // The negative control, which is what keeps the assertion above from passing vacuously: the
     // same sweep painted under a name the split does not apply to, then renamed to `Minimal`, is
-    // exactly the painting a human used to have to repair by hand.
+    // exactly the painting a human would otherwise have to repair by hand.
     let (mut unsplit, _) = press_in_text_view_painting(
         "Full",
         source,
@@ -2911,9 +2911,8 @@ fn the_navigation_keys_work_in_text_only_mode() {
     );
 }
 
-/// `o` cycles the overlay `p` used to cycle, now that `n`/`p` navigate. Pinned as a pair: the
-/// rebinding is only half done if the old key still cycles too, and a reader following the help
-/// would then find two keys doing it.
+/// `o` cycles the overlay and `p` navigates. Pinned as a pair: the binding is only half right if
+/// `p` cycles as well, and a reader following the help would then find two keys doing it.
 #[test]
 fn o_cycles_the_overlay_and_p_no_longer_does() {
     let (before_src, after_src) = navigable_pair();
@@ -2926,8 +2925,8 @@ fn o_cycles_the_overlay_and_p_no_longer_does() {
     assert_eq!(app.text_overlay, TextOverlay::CodeDiff);
 
     // Each press starts a fresh app, so `Human` here is the *default* rather than a value `p`
-    // restored - what actually rules out the old binding is the status line, which reports a jump
-    // instead of the overlay `p` would have switched to.
+    // restored - what actually rules out `p` cycling is the status line, which reports a jump
+    // instead of an overlay switch.
     let (app, _) = press_in_text_view(
         &before_src,
         &after_src,
@@ -4060,9 +4059,9 @@ fn open_sample_picker_enter_opens_the_visible_entry_not_the_raw_index() {
 }
 #[test]
 fn open_sample_picker_s_sorts_by_the_cursor_column_and_keeps_the_selected_row() {
-    // Unlike the old fixed four-way cycle, `s` takes the sort over to whichever column `h`/`l`
-    // last moved to, and the selection follows the row it was on - which is the point of
-    // re-sorting while looking at a particular sample.
+    // `s` takes the sort over to whichever column `h`/`l` last moved to, and the selection
+    // follows the row it was on - which is the point of re-sorting while looking at a particular
+    // sample.
     let source = "fn main() {}\n";
     let tree = parse_rust(source);
     let root = tree.root_node();
@@ -8037,8 +8036,8 @@ fn resetting_a_case_needs_the_explicit_key_and_enter_will_not_do() {
 // Text-only mode: a fixture tree-sitter has no grammar for
 // ---------------------------------------------------------------------------------------------
 
-/// A Bazel `BUILD`-shaped pair, in a language tree-sitter has no grammar for - the shape a user
-/// reported, which the solver used to refuse to open at all ("Before code for '...' has no AST").
+/// A Bazel `BUILD`-shaped pair, in a language tree-sitter has no grammar for. The solver must
+/// open it rather than refusing with "Before code for '...' has no AST".
 fn unparseable_pair() -> (Code, Code) {
     let before = "cc_library(\n    name = \"a\",\n    srcs = [\"a.cc\"],\n)\n";
     let after = "cc_library(\n    name = \"a\",\n    srcs = [\"b.cc\"],\n)\n";
@@ -8151,9 +8150,9 @@ fn a_tree_key_explains_itself_in_text_only_mode() {
     assert!(app.mapping.entries.is_empty(), "and must not map anything");
 }
 
-/// The same key with a tree present stays silent, exactly as it was before this mode existed:
-/// `handle_key` claims `m` itself and never reaches the fallthrough, so the explanation must not
-/// fire there and overwrite whatever `m` had to say.
+/// The same key with a tree present stays silent: `handle_key` claims `m` itself and never
+/// reaches the fallthrough, so the explanation must not fire there and overwrite whatever `m` had
+/// to say.
 #[test]
 fn the_same_key_is_not_explained_away_when_there_is_a_tree() {
     let (before, after) = unparseable_pair();

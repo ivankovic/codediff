@@ -250,10 +250,10 @@ fn moved_chunk_destination(
 /// rather than coloring the whole line by one dominant operation.
 ///
 /// `spans` are **byte** columns, the unit `TextRange` carries throughout (see
-/// `text_range::SourceColumn`), and this slices `line` by those bytes directly. It used to collect
-/// `line.chars()` and index that, which silently read a byte column as a character offset: on
-/// `let é = "yy";` the range for the changed string is byte columns 10..12, and indexing
-/// characters there highlighted `y";` instead of `yy`.
+/// `text_range::SourceColumn`), and this slices `line` by those bytes directly. Collecting
+/// `line.chars()` and indexing that instead silently reads a byte column as a character offset:
+/// on `let é = "yy";` the range for the changed string is byte columns 10..12, and indexing
+/// characters there highlights `y";` instead of `yy`.
 ///
 /// Terminal *cells* deliberately do not enter here. Colouring a substring only needs the right
 /// substring; how wide the result renders is the terminal's business, and a `ScreenColumn` would
@@ -624,10 +624,8 @@ mod tests {
         );
     }
 
-    /// This is the actual regression case: a large file with one small change used to print
-    /// every unchanged line on both sides in full - see this module's own history for a real
-    /// fixture (`c-microsoft-terminal-add-function`) where a 1-line change produced 981 lines of
-    /// output. Reproduced synthetically here with a controlled line count.
+    /// The case that matters: a large file with one small change must not print every unchanged
+    /// line on both sides in full. Reproduced synthetically here with a controlled line count.
     #[test]
     fn render_side_collapses_a_long_run_of_unchanged_lines() {
         let mut lines: Vec<String> = (0..50).map(|i| format!("line{i}")).collect();
@@ -720,10 +718,10 @@ mod tests {
         out
     }
 
-    /// The columns a `TextRange` carries are byte offsets, and this renderer used to read them as
-    /// character offsets. The two agree on an ASCII row and diverge on every other one, so the
-    /// same edit at the same visual position highlighted the wrong text as soon as a multi-byte
-    /// character appeared earlier in the line.
+    /// The columns a `TextRange` carries are byte offsets, and this renderer must not read them
+    /// as character offsets. The two agree on an ASCII row and diverge on every other one, so the
+    /// same edit at the same visual position highlights the wrong text as soon as a multi-byte
+    /// character appears earlier in the line.
     ///
     /// Driven through the real diff pipeline rather than hand-written ranges: hand-written columns
     /// would encode whichever unit the test author had in mind, which is the bug, not the check.

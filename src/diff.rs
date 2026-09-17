@@ -210,22 +210,17 @@ impl Diff {
             ..Default::default()
         };
 
-        // Matching pipeline (`TODO.md`, 2026-07-17/18) - originally "seven-phase," replaced the
-        // previous ~15-pass pipeline outright once verified to be at least as accurate on every
-        // fixture in the `optimal_solutions` benchmark corpus (778 vs. the old pipeline's 782
-        // mismatches, zero fixtures worse). Grew three more phases since (8-10, added for the same
-        // "re-tag an already-correct match, don't invent a new one" reason as 1b/1c) without a
-        // renumber, so it now runs ten. See `TODO.md` for the full design history and the accuracy
-        // gap the original seven had to close. Phases 1-4 live here, in `pending_with_config`;
-        // phases 6-10 live in `PendingDiff::finish` (phases 3 and 5 were removed, see below) - see
-        // `PendingDiff`'s doc comment for why the two halves are split. Execution order, each with
-        // its own comment at the call site below:
+        // The matching pipeline. Ten phases, numbered 1-10 with gaps: phases 3 and 5 no longer
+        // exist, and 1b/1c/8/9 re-tag an already-correct match rather than making a new one.
+        // Phases 1-4 live here, in `pending_with_config`; phases 6-10 live in
+        // `PendingDiff::finish` - see `PendingDiff`'s doc comment for why the two halves are
+        // split. Execution order, each with its own comment at the call site below:
         //   1  solve_hash_descent               - hash-based largest-subtree-first descent
         //   1b solve_nested_condition_collapse   - if-let-chain attribution fix-up on phase 1
         //   1c solve_heritage_clause_growth      - implements/extends-clause attribution fix-up
         //   2  solve_leading_siblings,
         //      solve_identical_diagnostic_statements - cheap high-confidence exact matches
-        //   (3, 5 removed 2026-08-16 - net-negative in ablation, see below)
+        //   (3 and 5 do not exist - both were net-negative in ablation)
         //   4  solve_syntax_aware_matching       - fully-resolved-name N:M matching
         //   6  prematch_unique_named_locals, solve_bottom_up_propagation (rearchitecture step 2),
         //      solve_unique_type_matching, apted::for_roots_fallback, solve_bottom_up_propagation
@@ -269,10 +264,7 @@ impl Diff {
         // strict, non-heuristic mechanism that occupies the same conceptual slot today.
 
         // Phase 4: syntax-aware subtree matching (fully-resolved-name N:M matching, absorbing
-        // solve_greedy_anchor_blocks and solve_large_flat_subtrees unconditionally). Used to also
-        // absorb solve_similar_flow_control (arm-overlap matching), gated on
-        // `solver_similar_flow_control` - deleted 2026-08-14, net-negative in the 2026-07-15
-        // ablation study (-82) and never re-enabled; see `TODO.md`.
+        // solve_greedy_anchor_blocks and solve_large_flat_subtrees unconditionally).
         solve_syntax_aware_matching::solve(&ctx, &mut ast_diff);
 
         // `PendingDiff::large_residual`'s inputs: how many nodes on each side are still unmatched
@@ -411,9 +403,7 @@ impl<'code> PendingDiff<'code> {
         // shift caused by an unrelated insertion elsewhere in the file - see
         // `apted::prematch_unique_named_locals`'s doc comment ("shift-due-to-insertion") - then
         // resolve the whole-file residual via the cheap Myers-LCS-based fallback
-        // (`apted::for_roots_fallback`), unconditionally. This used to be a whole-residual full
-        // APTED pass gated on residual size; why it went, what it cost at the time, and how the
-        // later phases recovered that quality is in `src/diff/TODO.md` under "Phase 6 history".
+        // (`apted::for_roots_fallback`), unconditionally.
         if let (Some(before_ast), Some(after_ast)) = (before.ast.as_ref(), after.ast.as_ref()) {
             let before_metadata = crate::code::metadata::metadata_of(before);
             let after_metadata = crate::code::metadata::metadata_of(after);
@@ -558,22 +548,18 @@ pub struct HeuristicConfig {
     /// flipped to `true` on that basis.
     pub solver_bottom_up_propagation: bool,
     /// Gates `solve_unique_type_matching` (GumTree Simple's "unique type matching" recovery
-    /// sub-phase - see `TODO.md`'s 2026-08-17 literature survey and that module's own doc comment).
-    /// MEASURED (2026-08-17, full 417-fixture corpus, `--nocapture`-instrumented run then reverted):
-    /// **zero firings corpus-wide** - `research/data/quality/optimal_solutions_benchmark.csv` is byte-for-byte
-    /// identical with this on vs. off (2835/2835 total mismatches, 310/417 zero-mismatch either
-    /// way). Unit-tested and confirmed correct in isolation (`solve_unique_type_matching`'s own
-    /// tests, which pre-match a node directly rather than relying on an earlier pass, so a pass
-    /// couldn't silently do nothing and still pass) - the mechanism works, it just has no customer
-    /// in this corpus: by the time it runs (after hash-descent, syntax-aware matching, and bottom-up
-    /// propagation), `KindOnlyHash` sub-anchoring already resolves the "same shape, different leaf
-    /// values" cases GumTree Simple's own earlier recovery sub-phases target, and codediff's
-    /// existing passes are comprehensive enough that a matched parent's leftover unmatched children
-    /// essentially never land on "exactly one of this kind on each side" - either every child is
-    /// already resolved, or several share a kind and the count-ambiguity guard correctly blocks it.
-    /// Kept default `true`: zero measured risk (it never fires), unit-tested, and may find a
-    /// customer if the pipeline's mechanism ordering changes later - but this is a real negative
-    /// result for the corpus as it exists today, not a proven win, and should be described that way.
+    /// sub-phase - see that module's own doc comment).
+    ///
+    /// The pass is unit-tested and correct in isolation (its own tests pre-match a node directly
+    /// rather than relying on an earlier pass, so it cannot silently do nothing and still pass),
+    /// but it has essentially no customer in this corpus. By the time it runs - after hash
+    /// descent, syntax-aware matching and bottom-up propagation - `KindOnlyHash` sub-anchoring has
+    /// already resolved the "same shape, different leaf values" cases GumTree Simple's earlier
+    /// recovery sub-phases target, and a matched parent's leftover unmatched children rarely land
+    /// on "exactly one of this kind on each side": either every child is already resolved, or
+    /// several share a kind and the count-ambiguity guard correctly blocks it. Default `true`
+    /// costs nothing for that reason, and the pass may find a customer if the pipeline's ordering
+    /// changes - it is not a proven win on the corpus as it stands.
     pub solver_unique_type_matching: bool,
     /// Gates `solve_mutual_ancestors` (mutual lowest-common-ancestor container pairing).
     pub solver_mutual_ancestors: bool,
@@ -940,10 +926,9 @@ pub enum ASTMappingReason {
     /// (`implements`/`extends`) was inserted as an earlier sibling within the same declaration,
     /// shifting the body's row and column - a re-tag of phase 1's already-correct `Identical`
     /// match, not a new mapping, so `ranges()` can tell this apart from a genuine relocation by
-    /// reason alone rather than re-deriving it from position at render time (which measurably
-    /// cannot make that distinction safely - see `RenderOptions::paint_reindent_only_moves`'s doc
-    /// comment and the two reverted general heuristics documented in text.rs's Move/Identical
-    /// branch history). See `solve_heritage_clause_growth`.
+    /// reason alone rather than re-deriving it from position at render time, which cannot make
+    /// that distinction safely - see `RenderOptions::paint_reindent_only_moves`'s doc comment and
+    /// `solve_heritage_clause_growth`.
     HeritageClauseGrowth,
     /// A node is byte-identical before and after, but now sits one or more levels deeper because a
     /// brand-new wrapper construct (`try`/`catch`, a new `if`/`else if`, ...) was inserted directly
@@ -966,10 +951,10 @@ impl ASTMappingReason {
     /// Short, stable column/label abbreviation for a mapping reason, independent of `APTED`'s
     /// provenance payload (bucketed to the bare `"APTED"`). Shared by `src/bin/human_solver/`'s
     /// per-node display and `src/bin/benchmark_optimal_solutions.rs`'s reason-count columns, so
-    /// the same abbreviation means the same thing in both tools - previously two independently
-    /// hand-maintained copies of this match that could silently drift when a variant was added.
-    /// Callers that need the `APTED` provenance itself (e.g. one CSV column per call site)
-    /// should match `ASTMappingReason::APTED(source)` directly instead of using this label.
+    /// the same abbreviation means the same thing in both tools, rather than two hand-maintained
+    /// copies of this match that drift when a variant is added. Callers that need the `APTED`
+    /// provenance itself (e.g. one CSV column per call site) should match
+    /// `ASTMappingReason::APTED(source)` directly instead of using this label.
     pub fn bucket_label(&self) -> &'static str {
         match self {
             ASTMappingReason::IdenticalHash => "IdHash",
@@ -1022,12 +1007,12 @@ mod tests {
 
     use super::*;
 
-    /// Regression test for a real panic: `diff_code`/`from_code` used to `unwrap()` a `None`
-    /// `Code.ast` whenever either side's language has no tree-sitter grammar (`Language::Unknown`
-    /// and several others - `Code::from_string` deliberately leaves `ast: None` for those, a
-    /// valid state, not a bug). `Diff`'s own doc comment promises every function taking a `Code`
-    /// should "fail-safe... returning a safe zero result" - this pins that phase 6 (`for_roots`/
-    /// `for_roots_fallback`) actually honors that instead of crashing.
+    /// `diff_code`/`from_code` must not `unwrap()` a `None` `Code.ast`, which is what either side
+    /// carries when its language has no tree-sitter grammar (`Language::Unknown` and several
+    /// others - `Code::from_string` deliberately leaves `ast: None` for those, a valid state, not
+    /// a bug). `Diff`'s own doc comment promises every function taking a `Code` should
+    /// "fail-safe... returning a safe zero result"; this pins that phase 6
+    /// (`for_roots`/`for_roots_fallback`) honors it instead of crashing.
     #[test]
     fn diff_code_does_not_panic_when_language_is_unknown() {
         let before = Code::from_string("this is not code, just text", &Language::Unknown);
@@ -1052,21 +1037,17 @@ mod tests {
         assert!(diff.ast.is_some());
     }
 
-    /// Regression guard for the pathological case that motivated the terminal fallback: two files
-    /// with nothing structurally in common (see the fixture's own `before.rs.test`/`after.rs.test`)
-    /// used to take 14.5s under the old always-exact pipeline, ~36x this project's 400ms budget,
-    /// because phases 1-4 left the bulk of both trees unmatched and full APTED had almost nothing
-    /// to prune against. `PendingDiff::large_residual()` should report exactly that shape, and
-    /// the fallback should finish well before that.
+    /// Guard for the pathological case the terminal fallback exists for: two files with nothing
+    /// structurally in common (see the fixture's own `before.rs.test`/`after.rs.test`), where
+    /// phases 1-4 leave the bulk of both trees unmatched and a full APTED pass has almost nothing
+    /// to prune against. `PendingDiff::large_residual()` should report exactly that shape, and the
+    /// fallback should finish well inside the budget.
     ///
-    /// The timing assertion below only runs in release (`#[cfg(not(debug_assertions))]`), where
-    /// this fixture takes ~1s with wide margin. It used to carry a "generous" 5s bound meant to
-    /// cover debug-build slowness too, but that bound was never actually generous: measured
-    /// 2026-08-18, real elapsed time in an unoptimized debug build is ~4.6-5.1s, unchanged all the
-    /// way back to the v0.0.7 release - under 10% headroom, so ordinary machine jitter flakes it
-    /// on a debug `cargo test` run. `large_residual()` (a cheap node-count check, not a timing
-    /// measurement) still runs unconditionally above, so debug builds keep the regression guard
-    /// that doesn't depend on wall-clock time.
+    /// The timing assertion below only runs in release (`#[cfg(not(debug_assertions))]`). A bound
+    /// loose enough to also cover an unoptimized debug build would have too little headroom there
+    /// to be stable, and would flake on ordinary machine jitter. `large_residual()` - a cheap
+    /// node-count check, not a timing measurement - still runs unconditionally above, so a debug
+    /// build keeps the half of this guard that doesn't depend on wall-clock time.
     #[test]
     fn rust_completely_unrelated_main_files_resolves_fast() -> Result<()> {
         let (before, after) =

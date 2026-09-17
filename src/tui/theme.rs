@@ -27,12 +27,10 @@ use strum::{Display, EnumIter};
 ///
 /// Picked explicitly by the user via the `c` theme picker (`tui/components/theme_dialog.rs`)
 /// and persisted across runs (`tui/app.rs`), since no single hardcoded palette reads well on
-/// every terminal: the original all-dark bands are unreadable on a light-background terminal.
+/// every terminal: an all-dark band set is unreadable on a light-background one.
 ///
-/// `Dracula` is the `#[default]` (2026-08-24, was `Dark`). The variant order below is the theme
-/// picker's display order and is deliberately left alone - only the `#[default]` attribute and
-/// the two "(default)" labels moved, so an existing `.codediff.toml` with an explicit `theme` is
-/// unaffected. Anyone who never opened the picker gets Dracula on the next run.
+/// `Dracula` is the `#[default]`. The variant order below is the theme picker's display order,
+/// which is independent of which variant is the default.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, EnumIter, Display)]
 pub enum OverlayTheme {
     #[strum(to_string = "Dark")]
@@ -197,10 +195,10 @@ pub struct OverlayPalette {
     pub overlay_fg: Color,
     pub cross_highlight_bg: Color,
     /// Search-match highlight (the `/` modal's results). A separate color from
-    /// `cross_highlight_bg`: while a search is active, "search hit" and "counterpart of the
-    /// cursor" used to be visually identical, which made it impossible to tell which blue block
-    /// the `>`/`<` keys would step to next. Every theme uses its own orange accent - the one hue
-    /// none of the four diff bands or the blue/cyan cursor highlight occupy.
+    /// `cross_highlight_bg`: sharing one would make "search hit" and "counterpart of the cursor"
+    /// indistinguishable while a search is active, with no way to tell which blue block the
+    /// `>`/`<` keys step to next. Every theme uses its own orange accent - the one hue none of
+    /// the four diff bands or the blue/cyan cursor highlight occupy.
     pub search_bg: Color,
     /// Foreground for the "Before" panel title, and its "After" counterpart below. Hardcoded as
     /// `Color::Red`/`Color::Green` in `diff_viewer` until 2026-08-24; moved here so the custom
@@ -240,8 +238,7 @@ impl OverlayTheme {
     /// the result is still recognizably "Solarized" rather than a clashing overlay. `overlay_fg`
     /// is likewise a Solarized base shade chosen for contrast against its own bands: light text
     /// (`base2`) for the dark variant, dark text (`base02`) for the light one - the light variant
-    /// is the actual fix for "too dark on a light terminal", since every other color here was
-    /// previously a fixed dark RGB triple regardless of terminal background.
+    /// being the one that answers "too dark on a light terminal".
     pub fn palette(self) -> OverlayPalette {
         match self {
             OverlayTheme::Custom => custom_palette().to_palette(),
@@ -280,8 +277,8 @@ impl OverlayTheme {
                 before_title_fg: PRESET_BEFORE_TITLE_FG,
                 after_title_fg: PRESET_AFTER_TITLE_FG,
             },
-            // The five palettes below all follow the same recipe, reverse-engineered from the
-            // Solarized variants above (whose values were hand-picked before this helper existed):
+            // The five palettes below all follow the same recipe, which the hand-picked
+            // Solarized variants above also follow:
             // each band is that theme's own canonical accent color (from its official public
             // spec/palette - not invented) blended 60% toward the theme's own background via
             // `blend_toward_base`, and `cross_highlight_bg` is blended only 40% toward it so it
@@ -434,10 +431,10 @@ const MAX_RECENT_PAIRS: usize = 9;
 struct ThemeConfig {
     /// Falls back to the default theme rather than failing the parse.
     ///
-    /// `#[serde(default)]` alone is not enough and was the trap here: it covers a *missing* field,
+    /// `#[serde(default)]` alone is not enough, and that is the trap: it covers a *missing* field,
     /// while an unknown enum *value* - a config written by a newer codediff, or hand-edited with a
-    /// typo - is a hard error that fails the whole document. Every other setting in the file then
-    /// silently reverted. `theme_or_default` matches the name against the variants this build
+    /// typo - is a hard error that fails the whole document, silently reverting every other
+    /// setting in the file. `theme_or_default` matches the name against the variants this build
     /// actually has and shrugs at anything else.
     #[serde(default, deserialize_with = "theme_or_default")]
     theme: OverlayTheme,
@@ -458,13 +455,8 @@ struct ThemeConfig {
     #[serde(default)]
     node_highlight: bool,
     /// Which parts of the diff to paint (the `M` key) - see `crate::diff::text::RenderOptions`.
-    /// Defaults to `RenderOptions::FULL`, which is what every release before this setting existed
-    /// rendered, so an existing config file keeps behaving exactly as it did.
-    ///
-    /// Supersedes a now-removed `render_mode: RenderMode` field of the same purpose. An existing
-    /// config file's old `render_mode` key is simply ignored (serde skips unknown fields by
-    /// default) and this field falls back to its own default the first time it loads - a one-time
-    /// reset of a single local dotfile setting, not worth a migration shim for.
+    /// Defaults to `RenderOptions::FULL`, so a config file with no entry for it gets the fullest
+    /// rendering rather than an empty one.
     #[serde(default)]
     render_options: crate::diff::text::RenderOptions,
 }
@@ -573,8 +565,8 @@ fn nearest_project_config_from(start: &Path) -> Option<PathBuf> {
 /// Resolved from the environment rather than through the `dirs`/`directories` crate deliberately:
 /// a new dependency means regenerating the 293-crate `CRATES=` block every Gentoo ebuild bump
 /// reads, which is a real cost for two `std::env::var` calls. Falling back to `./.codediff.toml`
-/// when neither variable is set keeps the old behaviour on a system with no HOME at all, rather
-/// than writing to a path that resolves to the filesystem root.
+/// when neither variable is set is what happens on a system with no HOME at all, rather than
+/// writing to a path that resolves to the filesystem root.
 #[cfg_attr(test, allow(dead_code))]
 fn user_config_path() -> PathBuf {
     user_config_path_from(
@@ -600,9 +592,10 @@ fn user_config_path_from(xdg_config_home: Option<String>, home: Option<String>) 
 
 /// The last config parse failure, for the TUI to surface. `None` once a load succeeds.
 ///
-/// A parse failure used to be entirely silent: `unwrap_or_default()` turned it into a fresh set of
-/// defaults, and the next setting the user changed wrote those defaults over the file. One bad
-/// line therefore cost every other setting in it, with nothing on screen to say so.
+/// Without something to surface it, a parse failure is entirely silent: `unwrap_or_default()`
+/// turns it into a fresh set of defaults, and the next setting the user changes writes those
+/// defaults over the file - one bad line costing every other setting in it, with nothing on
+/// screen to say so.
 static CONFIG_ERROR: std::sync::RwLock<Option<String>> = std::sync::RwLock::new(None);
 
 /// The current config parse error, if the last load hit one.
@@ -643,10 +636,10 @@ fn read_config(path: &Path) -> Result<ThemeConfig, Unreadable> {
 
 /// Read-modify-write one setting, resolving the config path exactly once.
 ///
-/// Refuses to write when the existing file does not parse. Every setter used to be
-/// `load_from(config_path())` - which silently yielded defaults on a parse error - followed by
-/// `save_to(config_path(), ...)`, so changing any single setting overwrote every other one with a
-/// default. Resolving the path once also matters now that it is layered: two calls could
+/// Refuses to write when the existing file does not parse. A setter written as
+/// `load_from(config_path())` - which silently yields defaults on a parse error - followed by
+/// `save_to(config_path(), ...)` overwrites every other setting with a default whenever the file
+/// does not parse. Resolving the path once also matters because it is layered: two calls could
 /// otherwise read one layer and write another.
 fn update_config(mutate: impl FnOnce(&mut ThemeConfig)) {
     let path = config_path();
@@ -753,11 +746,10 @@ fn is_throwaway(path: &Path) -> bool {
 /// digit shortcuts (`tui::app::draw_viewer`).
 ///
 /// Entries whose files have since disappeared are dropped rather than offered: a recents list is
-/// only useful if selecting an item works. This also cleans up the `/tmp/git-blob-*` pairs written
-/// by builds before `record_recent_pair` learned to refuse them.
+/// only useful if selecting an item works. It also drops any `/tmp/git-blob-*` pairs already on
+/// the list; `record_recent_pair` refuses to add new ones.
 ///
-/// Note that this list became **per-user** on 2026-09-10, along with the rest of the config; it
-/// was previously per-directory, because the config file itself was.
+/// The list is **per-user**, like the rest of the config.
 pub fn load_recent_pairs() -> Vec<(PathBuf, PathBuf)> {
     let mut pairs = load_from(config_path()).recent_pairs;
     pairs.retain(|(before, after)| before.exists() && after.exists());
@@ -822,8 +814,8 @@ mod tests {
         assert!(config.node_highlight);
     }
 
-    /// The load/save asymmetry that made one bad line destroy a whole config: every setter used to
-    /// read with `unwrap_or_default()` and then write the result back.
+    /// The load/save asymmetry that lets one bad line destroy a whole config: reading with
+    /// `unwrap_or_default()` and then writing the result back.
     #[test]
     fn a_file_that_does_not_parse_is_never_overwritten() {
         let file = tempfile::NamedTempFile::new().expect("temp file");
@@ -858,8 +850,7 @@ mod tests {
     }
 
     /// A pair whose files no longer exist is dead weight in a recents list - selecting it fails.
-    /// This is also the migration that clears the `/tmp/git-blob-*` entries written by builds
-    /// before `record_recent_pair` learned to refuse them.
+    /// This also clears any `/tmp/git-blob-*` entries already on the list.
     #[test]
     fn recent_pairs_drops_entries_whose_files_are_gone() {
         let alive = tempfile::NamedTempFile::new().expect("temp file");
@@ -1015,14 +1006,13 @@ mod tests {
         );
     }
 
-    /// The node highlight persists, and - the part that matters - a config file written before
-    /// the setting existed loads as **off**, not as "unset means the old always-on behaviour".
-    /// The exact hazard `RenderOptions::whole_pair_updates`'s own `#[serde(default)]` exists to
-    /// prevent: a config written before that field existed - which every `.codediff.toml` on disk
-    /// today is - has a `[render_options]` table with the two older keys but not this one.
-    /// Without the attribute, `confy`'s deserialization of the whole file fails on the missing
-    /// key, and `load_from`'s `.unwrap_or_default()` would silently reset *everything* - theme,
-    /// syntax theme, node highlight, all of it - not just this one option.
+    /// The node highlight persists, and - the part that matters - a config file with no entry for
+    /// the setting loads as **off**, not as "unset means always on". The exact hazard
+    /// `RenderOptions::whole_pair_updates`'s own `#[serde(default)]` exists to prevent: a
+    /// `[render_options]` table that carries the other keys but not this one. Without the
+    /// attribute, `confy`'s deserialization of the whole file fails on the missing key, and
+    /// `load_from`'s `.unwrap_or_default()` would silently reset *everything* - theme, syntax
+    /// theme, node highlight, all of it - not just this one option.
     #[test]
     fn a_pre_existing_render_options_table_without_whole_pair_updates_still_loads() {
         let file = tempfile::NamedTempFile::new().expect("temp file");

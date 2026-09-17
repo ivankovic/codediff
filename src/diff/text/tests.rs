@@ -249,13 +249,12 @@ fn paint_displaced_moves_gates_a_multi_row_node_edited_on_its_first_row() {
     );
 }
 
-/// `reconcile_moves` used to ask whether the *other* walk had a range with this pair's
-/// destination extent **exactly**, and treated anything else as the two walks disagreeing about
-/// which pair relocated. The two walks routinely decompose the same subtree differently, so a
-/// relocation both of them saw could be read as a conflict - and the tie-break then withdrew one
-/// side's correct claim while its own counterpart lookup found nothing to promote, leaving the
-/// relocation painted on one side and blank on the other. That is what blanked sixty-one rows of
-/// `rust-next-font-imports-generator`'s after side.
+/// `reconcile_moves` must not require the *other* walk to hold a range with this pair's
+/// destination extent **exactly**, treating anything else as the two walks disagreeing about which
+/// pair relocated. The two walks routinely decompose the same subtree differently, so a relocation
+/// both of them saw reads as a conflict - and the tie-break then withdraws one side's correct
+/// claim while its own counterpart lookup finds nothing to promote, leaving the relocation painted
+/// on one side and blank on the other.
 ///
 /// Here the two sides name the same relocation over extents a column or two apart, so neither
 /// side's exact-extent lookup finds the other. Neither claim may be withdrawn.
@@ -2079,13 +2078,10 @@ fn unrelated_insertion_does_not_flag_shifted_content_as_moved() {
 }
 
 /// A comment whose text changed (as opposed to being wholly inserted/deleted) is tagged
-/// `MatchButNotIdentical` by the pipeline, not `Update` - confirmed via a real parse. This
-/// used to be a real, separate gap shared with `ranges` (which had no arm for
-/// `MatchButNotIdentical` at all, so a changed comment produced no visible diff whatsoever -
-/// confirmed via `codediff --headless` against the real binary): `is_comment_only_diff`
-/// deliberately mirrored that blind spot rather than "fixing" it unilaterally, since the
-/// status bar must never claim something changed when the diff below it shows nothing. Now
-/// that `ranges` handles `MatchButNotIdentical` (via `own_content`), this must too, and does.
+/// `MatchButNotIdentical` by the pipeline, not `Update` - confirmed via a real parse. This has to
+/// agree with `ranges`, which handles `MatchButNotIdentical` via `own_content`: the status bar
+/// must never claim something changed when the diff below it shows nothing, nor stay silent about
+/// a change the diff does show.
 #[test]
 fn is_comment_only_diff_is_true_when_only_a_comments_text_changed() {
     let (before, after, ast, node_cache) = diff_ast(
@@ -2414,9 +2410,9 @@ fn ranges_decomposition_survives_an_unrelated_earlier_insertion() {
         1
     );
 }
-/// The defect this split exists to prevent: a phrase appended inside a string literal used to
-/// render yellow, because the middle was unconditionally an `Update` even when one side of it
-/// was empty. Nothing was replaced there - the words are new.
+/// The defect this split exists to prevent: a phrase appended inside a string literal rendering
+/// yellow, because the middle is unconditionally an `Update` even when one side of it is empty.
+/// Nothing was replaced there - the words are new.
 #[test]
 fn a_phrase_added_inside_a_string_renders_as_an_insert_not_an_update() {
     let before = Code::from_string(

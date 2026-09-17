@@ -21,16 +21,11 @@ use rand::Rng;
 /// count. Shared here rather than duplicated so every caller that stratifies by size
 /// (`sample_code_pairs`, `sample_test_diffs --stratified`) provably uses the same buckets.
 ///
-/// Human-readable ranges by deliberate choice (2026-08-19, on request): "10-30 lines" means
-/// something to a person skimming a sample; the byte-size scheme this replaced (small/medium/
-/// large/xlarge, <1,000/<10,000/<100,000/>=100,000 bytes) is what originally built the RQ1 corpus
-/// underlying the introductory paper's empirical study (see `research/analysis/
-/// apted_only_report.py`'s docstring, which cites it directly) - kept only as history here, not
-/// reproduced: the already-committed `research/data/samples/sampled_code_pairs_*.csv` files still carry those
-/// old byte-based labels in their own `size_bucket` column (that column name is unchanged - see
-/// this module's `pub fn loc_bucket`'s doc comment - only what gets written into it going
-/// forward), and aren't retroactively relabeled by this change; only a fresh `sample_code_pairs`
-/// run produces LOC-based labels.
+/// Human-readable ranges by deliberate choice: "10-30 lines" means something to a person skimming
+/// a sample. Committed `research/data/samples/sampled_code_pairs_*.csv` files can still carry
+/// byte-based labels in their own `size_bucket` column - the column name is unchanged, see this
+/// module's `pub fn loc_bucket` - and are not retroactively relabeled; only a fresh
+/// `sample_code_pairs` run writes LOC-based ones.
 ///
 /// LOC, not AST node count, even though node count is the truer cost driver for tree-edit-distance
 /// work (LOC-per-node varies widely by language): every caller here is picking candidates during a

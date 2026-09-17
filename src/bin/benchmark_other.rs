@@ -353,8 +353,8 @@ impl ExternalTool {
 /// bundled or auto-installed, since each is a separate project this codebase merely shells out to.
 /// `hint` is folded into the "not set" error to say specifically what to point the variable at
 /// (each call site's own doc comment gives the fuller install story). Shared by
-/// `gumtree_bin`/`difftastic_bin`/`diffsitter_bin`, which used to each hand-roll this identical
-/// env-var-lookup -> `PathBuf` -> `is_file` check -> `bail!` sequence independently.
+/// `gumtree_bin`/`difftastic_bin`/`diffsitter_bin`, which all want the same env-var-lookup ->
+/// `PathBuf` -> `is_file` check -> `bail!` sequence.
 fn external_tool_bin(env_var: &str, hint: &str) -> Result<std::path::PathBuf> {
     let path = std::env::var(env_var).with_context(|| format!("{env_var} is not set - {hint}"))?;
     let path = std::path::PathBuf::from(path);
@@ -366,12 +366,12 @@ fn external_tool_bin(env_var: &str, hint: &str) -> Result<std::path::PathBuf> {
 
 /// Writes `before`/`after`'s contents into two fresh temp files - shared by every `ExternalTool`
 /// that needs real files on disk to shell out to (GumTree, difftastic, diffsitter all take file
-/// paths, not stdin), which previously each hand-rolled this identical "build a
-/// `NamedTempFile`, write the contents, wrap both errors with which side failed" sequence.
-/// `suffix`, when `Some`, gives both files the same extension (e.g. `".rs"`) - GumTree and
-/// difftastic each key some of their own behavior off the file extension even when also told
-/// explicitly which language/generator to use, so those two need a real one; diffsitter is told
-/// its language purely via `-t` and doesn't care, so its own call site passes `None`.
+/// paths, not stdin) and all need the same "build a `NamedTempFile`, write the contents, wrap both
+/// errors with which side failed" sequence. `suffix`, when `Some`, gives both files the same
+/// extension (e.g. `".rs"`) - GumTree and difftastic each key some of their own behavior off the
+/// file extension even when also told explicitly which language/generator to use, so those two
+/// need a real one; diffsitter is told its language purely via `-t` and doesn't care, so its own
+/// call site passes `None`.
 fn write_temp_pair(
     before: &Code,
     after: &Code,
@@ -428,16 +428,14 @@ struct Row {
     /// Milliseconds to go from `before`/`after` to codediff's per-line touched labels
     /// (`diff::diff_code` plus the `touched_lines` projection).
     ///
-    /// **Not comparable to an `ExternalTool`'s timing as it stands, and this comment used to claim
-    /// it was.** `main` calls `ensure_parsed()` on every fixture before any timing begins, so this
-    /// number excludes parsing entirely, while a tool's timed region is its whole subprocess:
-    /// temp-file write, spawn, its own parse and diff, and parsing its output back. Measured
-    /// 2026-09-02, the omission was worth codediff's entire parse cost - a p50 of 7.09 ms against
-    /// diffsitter's 8.62, which became 10.07 once the parse was added back, reversing the ordering
-    /// the paper reported.
+    /// **Not comparable to an `ExternalTool`'s timing as it stands.** `main` calls
+    /// `ensure_parsed()` on every fixture before any timing begins, so this number excludes
+    /// parsing entirely, while a tool's timed region is its whole subprocess: temp-file write,
+    /// spawn, its own parse and diff, and parsing its output back. The omission is worth
+    /// codediff's entire parse cost, which is large enough to reverse a tool ordering.
     ///
     /// The parse is measured, per repeat, as `treesitter_parse_ms`, and
-    /// `benchmark_other_report.py`'s `speed_percentiles` now adds the two for the published
+    /// `benchmark_other_report.py`'s `speed_percentiles` adds the two for the published
     /// figure. Both columns stay separate here on purpose: the split is what makes "algorithm
     /// only" and "end to end" both answerable from one run. Anything reading `codediff_ms` alone
     /// and putting it beside a `tool_ms` is comparing a bare algorithm against a whole process.
@@ -523,14 +521,12 @@ fn score_fixture(
         for i in 0..repeats {
             let started = std::time::Instant::now();
             // A tool that fails on one fixture is a gap in that tool's coverage, not a reason to
-            // abandon a benchmark run over the whole corpus. This used to be a `?`, and on
-            // 2026-08-20 that ended a full run 59 fixtures in, when GumTree's `css-phcss`
-            // generator produced empty output for `css-fortawesome-font-awesome-upgrade-version-
-            // comment` (exit status 0, so the `status.success()` check above did not catch it).
-            // `score_accuracy` already treats a per-tool failure this way, recording an `error`
-            // status and continuing; the timing path diverging from it was an oversight rather
-            // than a decision. A failed tool contributes no timing and no mismatch count for this
-            // fixture, which every consumer already reads as "not scored" rather than as a zero.
+            // abandon a benchmark run over the whole corpus. A `?` here ends the whole run on the
+            // first fixture a tool chokes on - and a generator producing empty output at exit
+            // status 0 gets past the `status.success()` check above. `score_accuracy` treats a
+            // per-tool failure the same way, recording an `error` status and continuing. A failed
+            // tool contributes no timing and no mismatch count for this fixture, which every
+            // consumer already reads as "not scored" rather than as a zero.
             match tool.line_labels(before, after) {
                 Ok((tool_before, tool_after)) => {
                     ms.push(started.elapsed().as_secs_f64() * 1000.0);
@@ -1048,11 +1044,11 @@ fn print_runtime_table(rows: &[Row]) {
 
 /// Serializes a repeat-timing sample as a single CSV field: every repeat's value, in run order,
 /// joined by `;` - e.g. `"12.3;13.1;12.8"` for 3 repeats. Keeps `benchmark_other.csv`'s column
-/// count and shape stable regardless of `--repeats` (1 column per metric, same as before repeats
-/// existed) while still recording every individual measurement, not a mean - `benchmark_other_
-/// report.py` splits this back into a `list[float]` per fixture. A single-repeat run (`--repeats
-/// 1`) produces a one-element field, so the format is a strict superset of the old single-float
-/// column, not a breaking change to what "no repeats" output looks like.
+/// count and shape stable regardless of `--repeats` - one column per metric - while still
+/// recording every individual measurement rather than a mean; `benchmark_other_report.py` splits
+/// this back into a `list[float]` per fixture. A single-repeat run (`--repeats 1`) produces a
+/// one-element field, so a plain single-float column is just the degenerate case of this
+/// format.
 fn join_ms(values: &[f64]) -> String {
     values
         .iter()
@@ -1766,11 +1762,10 @@ mod tests {
         assert_eq!(gumtree_line_range(contents, 0, 6), 0..=0);
     }
 
-    /// Regression test for a real crash: GumTree's `[start,end]` are *character* offsets, not
-    /// byte offsets. A file containing multi-byte UTF-8 text (e.g. Thai, 3 bytes/char) before the
-    /// touched range used to panic with "byte index N is not a char boundary" when
-    /// `gumtree_line_range` sliced `contents` directly at the character-offset value as if it were
-    /// a byte index - confirmed on a real fixture (a RustDesk Thai-locale string constant change).
+    /// Regression test for a crash: GumTree's `[start,end]` are *character* offsets, not byte
+    /// offsets. Slicing `contents` directly at the character-offset value as if it were a byte
+    /// index panics with "byte index N is not a char boundary" as soon as multi-byte UTF-8 text
+    /// (Thai, 3 bytes/char) appears before the touched range.
     #[test]
     fn gumtree_line_range_handles_multi_byte_utf8_text_before_the_touched_range() {
         // "สวัสดี" (Thai, 6 characters, 18 bytes) sits entirely on line 0; the touched range is on

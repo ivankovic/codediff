@@ -152,13 +152,11 @@ pub(crate) fn solve_with_hash_map(
         // same recursive descent, so charging COST_UPDATE again at every ancestor would double-
         // count it.
         //
-        // This closure previously always returned `Update` regardless of leaf-vs-interior -
-        // confirmed against a live case (`go-caddy-rename-type`, all 69 mismatches) that a single
-        // renamed identifier deep inside several declarations bubbles its hash mismatch up to
-        // every ancestor (`const_declaration`, `var_declaration`, `method_declaration`, ...), and
-        // every one of them was mislabeled `Update` instead of `MatchButNotIdentical` - every
-        // mismatch in that fixture has an identical before/after path, so this was purely an
-        // operation-label bug, not a matching/pairing one.
+        // The distinction is not cosmetic: a single renamed identifier deep inside several
+        // declarations bubbles its hash mismatch up to every ancestor (`const_declaration`,
+        // `var_declaration`, `method_declaration`, ...), so labelling all of them `Update` turns
+        // one renamed leaf into a mismatch at every level above it - an operation-label error
+        // rather than a matching one, since the paths still agree.
         if before_metadata.is_leaf(before_id) && after_metadata.is_leaf(after_id) {
             (ASTMappingOperation::Update, crate::diff::COST_UPDATE)
         } else if before_metadata

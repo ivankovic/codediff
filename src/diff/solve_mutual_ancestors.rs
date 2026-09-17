@@ -219,8 +219,7 @@ mod tests {
     /// after_index)` into each block's named children) and then runs *only* this pass, so a passing
     /// assertion can only be this pass's own doing. Going through the real pipeline instead would
     /// prove nothing here: APTED reaches its own verdict about these containers and claims them
-    /// before this pass ever sees them (an earlier draft of these tests did exactly that and failed
-    /// for that reason, not because the rule was wrong).
+    /// before this pass ever sees them.
     fn solve_with_statements_prematched(
         before: &Code,
         after: &Code,

@@ -251,8 +251,8 @@ mod tests {
         );
     }
 
-    /// `diff_cost` must derive that flag from the nodes, not be told it - the regression guard for
-    /// the whole-pipeline path, where a gap-owning pair used to contribute nothing at all.
+    /// `diff_cost` must derive that flag from the nodes rather than be told it, so that a
+    /// gap-owning pair cannot contribute nothing on the whole-pipeline path.
     #[test]
     fn diff_cost_charges_a_gap_owning_matched_pair() {
         let node = |owned_text_hash: u64| crate::code::ASTNodeMetadata {

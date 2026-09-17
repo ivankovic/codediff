@@ -66,9 +66,7 @@ pub fn map_identical_descendants<'a>(
 /// `mapped`. Doesn't descend into already-mapped nodes - their contents are presumed already
 /// resolved by an earlier pass - but does keep descending past a collected node itself, in case a
 /// second match is nested inside the first (e.g. one diagnostic call nested in another's
-/// arguments). Originally factored out of two near-duplicate walks, one of which
-/// (`solve_similar_flow_control`'s `collect_unmatched_containers`) was deleted 2026-08-14;
-/// `solve_identical_diagnostic_statements` is the current caller.
+/// arguments). Its caller is `solve_identical_diagnostic_statements`.
 pub fn collect_unmatched<'a>(
     root: Node<'a>,
     mapped: &rustc_hash::FxHashMap<usize, usize>,
@@ -338,17 +336,16 @@ pub fn is_import_kind(node_kind: &str, language: &Language) -> bool {
 /// with everything else in `apted/common` this feeds, and sufficient here since every case
 /// below only needs to walk to a specific child by *kind*, not by field name.
 ///
-/// Confirmed against real parse trees for each arm below (a throwaway `ascii_visualizer` dump per
-/// language, 2026-08-06) - not assumed from other languages' grammars.
+/// Every arm below is confirmed against that language's real parse tree, not assumed from
+/// another language's grammar.
 ///
 /// Cheap upfront filter for `apted::prematch_unique_named_locals`'s file-root-level call site
 /// (`diff.rs`, phase 6): that call runs unconditionally on every diff regardless of language, so
 /// without this, every fixture pays a full O(n) tree walk (`collect_local_identities`) that can
-/// never find anything for the many languages `local_identity_name` has no arm for - measured
-/// (`TODO.md`) to cost a real, corpus-wide p90 regression (~120ms -> ~150ms) before this guard was
-/// added. Keep in sync with `local_identity_name`'s own `match` arms by construction: both list
-/// exactly the same languages, on purpose, so a future language added to one is easy to notice is
-/// missing from the other.
+/// never find anything for the many languages `local_identity_name` has no arm for. Keep in sync
+/// with `local_identity_name`'s own `match` arms by construction: both list exactly the same
+/// languages, on purpose, so a future language added to one is easy to notice is missing from the
+/// other.
 pub(crate) fn has_local_identity_coverage(language: &Language) -> bool {
     matches!(
         language,
@@ -473,15 +470,14 @@ pub(crate) fn local_identity_name(
             let text = meta.node_info.get(&name_id)?.text.clone();
             Some(("variable_assignment", text))
         }
-        // Deliberately no CSS `declaration` arm, although `css-wordpress-reformat` (a formatter
-        // swapping `margin-bottom`/`margin-top` inside every rule, 30 -> 0 with one) is exactly
-        // the shape this pass exists for. Keyed on (enclosing selector, property) it is unique
-        // per side, yet in `css-madmaxms-theme-obsidian-2-add-gnome-44-...` (125 -> 343,
-        // measured 2026-09-02) the same selector text names *different* rules on the two sides:
-        // one rule's selector was renamed in place and a copy under the old name added far
-        // away, and the human keeps the positional pair (rule 747 <-> rule 747, selector
-        // updated) while the key follows the name to rule 832. A declaration's identity is its
-        // rule's, and a rule's identity in a theme stylesheet is not its selector text alone.
+        // Deliberately no CSS `declaration` arm, although a formatter swapping
+        // `margin-bottom`/`margin-top` inside every rule is exactly the shape this pass exists
+        // for. Keyed on (enclosing selector, property) a declaration is unique per side, but the
+        // same selector text can name *different* rules on the two sides: a selector renamed in
+        // place with a copy under the old name added far away leaves the human holding the
+        // positional pair, selector updated, while the key follows the name elsewhere. A
+        // declaration's identity is its rule's, and a rule's identity in a theme stylesheet is not
+        // its selector text alone.
         _ => None,
     }
 }
@@ -573,17 +569,15 @@ pub fn is_semantically_structural<'a>(
                 named_child_text(node, bytes, "name", Some("type_identifier"))
             }
             // A top-level `var tests = []T{...}` (or `const`) declaration is exactly as common a
-            // home for a large, table-driven data literal as a named function is, but had no
-            // identity signal at all before this - confirmed via a live case
-            // (jesseduffield/lazygit's `test_list.go`, a single `var tests = []*IntegrationTest{
-            // ...}`): with no name for `solve_large_flat_subtrees`'s `top_level_identities` (which
-            // only looks at direct children of the file root, not arbitrary depth) to key off, the
-            // file's entire ~2,600-node content fell through every pass onto `final_pass`'s
-            // unconstrained tree-edit-distance on every edit (4.6s). Keyed on the *declaration*
-            // itself (not its `var_spec`/`const_spec` child) specifically so `top_level_identities`
-            // can see it without recursing; a grouped `var (a = 1; b = 2)` block is keyed by its
-            // first name only (a simplification, not a correctness issue - the group is still
-            // matched as one unit across before/after as long as that first name is unchanged).
+            // home for a large, table-driven data literal as a named function is, and without a
+            // name here it has no identity signal at all: `solve_large_flat_subtrees`'s
+            // `top_level_identities` only looks at direct children of the file root, not at
+            // arbitrary depth, so with nothing to key off the whole file falls through every pass
+            // to whole-tree APTED. Keyed on the *declaration* itself (not its
+            // `var_spec`/`const_spec` child) specifically so `top_level_identities` can see it
+            // without recursing; a grouped `var (a = 1; b = 2)` block is keyed by its first name
+            // only (a simplification, not a correctness issue - the group is still matched as one
+            // unit across before/after as long as that first name is unchanged).
             // `var_spec`/`const_spec` are *also* matched independently below, for
             // `solve_qualified_name_groups`'s fully-recursive, finer-grained walk - the two
             // consumers have different needs (direct-children-only vs. any depth), so both arms
@@ -667,21 +661,15 @@ pub fn is_semantically_structural<'a>(
             "type_alias" => named_child_text(node, bytes, "type", Some("identifier")),
             _ => None,
         },
-        // Previously entirely unhandled here (confirmed empirically 2026-07-25, chasing a
-        // 30s-on-235-lines pathology in `csharp-radarr-add-object-instance`): `is_reference`
-        // above already lists these C# kinds for hash-candidate selection, but nothing extracted
-        // a *name* from them, so `solve_qualified_name_groups`/`solve_large_flat_subtrees` (both
-        // keyed on `is_semantically_structural`) silently treated every C# file as having zero
-        // named declarations - no class, method, or field ever got the cheap identity-based match
-        // every other supported language gets. The 49-vs-50-entry `new IsoLanguage(...)` list in
-        // that fixture's one field was too small to qualify for `NodeSelectionConfig`'s
-        // exact-hash candidate list (`min_subtree_size: 45`, each entry ~30 nodes) and never
-        // reached `solve_large_flat_subtrees`'s Myers fast path either (scoped to *named*
-        // top-level items only, and C# had none) - so the whole ~2,300-node file fell to
-        // `final_pass`'s unconstrained tree-edit-distance on every edit: 30.6s, of which 30.3s
-        // was that one pass (profiled - see `TODO.md`'s speed-tuning entry). Field names verified
-        // empirically against the real grammar (a throwaway binary dumping `child_by_field_name`
-        // results on this fixture), not assumed from other C-family grammars.
+        // `is_reference` above lists these C# kinds for hash-candidate selection, but without a
+        // *name* extracted from them `solve_qualified_name_groups`/`solve_large_flat_subtrees`
+        // (both keyed on `is_semantically_structural`) see every C# file as having zero named
+        // declarations, and no class, method or field gets the cheap identity-based match every
+        // other supported language gets. A C# file whose one large list is too small for
+        // `NodeSelectionConfig`'s exact-hash candidate list and whose container is unnamed cannot
+        // reach `solve_large_flat_subtrees`'s Myers fast path either (named top-level items
+        // only), so the whole file goes to whole-tree APTED. Field names are verified against the
+        // real grammar, not assumed from other C-family grammars.
         Language::CSharp => match node_kind {
             "class_declaration"
             | "struct_declaration"
@@ -959,13 +947,12 @@ pub fn is_semantically_structural<'a>(
 /// deliberately not checked (it varies: `t`, `c`, `s`, `suite`, ...); "a `.Run(\"literal\", ...)`"
 /// call is itself already a strong, low-false-positive signal.
 ///
-/// Confirmed via a live case (`gohugoio/hugo`'s `securitypolicies_test.go`): a single test
-/// function's 12 subtests, individually renamed/restructured internally but keeping the same 12
-/// subtest names, had no identity signal at all before this - `call_expression` isn't a
-/// declaration `is_semantically_structural` otherwise recognizes - so the *entire* surrounding
-/// test function (whichever one happened to contain them) fell to the old whole-file `final_pass` APTED as one 3,286-node
-/// blob on every edit (24s wall-clock) instead of 12 small, independently-anchored ~130-270-node
-/// diffs. Only a mismatched (wrong-position, wrong-content) false positive elsewhere could make
+/// Without this, such a call has no identity signal at all - `call_expression` isn't a
+/// declaration `is_semantically_structural` otherwise recognizes - and the *entire* surrounding
+/// test function goes to whole-tree APTED as one blob rather than as one small, independently
+/// anchored diff per subtest. That is the common shape in a table-driven test file: subtests
+/// renamed and restructured internally while keeping their names. Only a
+/// mismatched (wrong-position, wrong-content) false positive elsewhere could make
 /// this heuristic *wrong* rather than merely a no-op miss, and even then only affects match
 /// quality (a coincidental non-test `.Run("...")` call getting grouped as if it had an identity),
 /// never correctness - `solve_qualified_name_groups` still runs real APTED on whatever it groups.
@@ -1257,10 +1244,10 @@ const BOOLEAN_LITERAL_KINDS: &[&str] = &["true", "false"];
 /// Deliberately the *keyword* leaves, not `predefined_type` itself: `predefined_type` is their
 /// parent and `type_identifier` is a bare leaf with no children, so pairing the parent instead
 /// costs the same as pairing the leaf (both land on `COST_UPDATE` + one `COST_DELETE` for the
-/// keyword child) - APTED took the parent-level pairing when tried, which is structurally wrong
-/// per the human mapping (it wants `predefined_type` deleted and its keyword child matched to
-/// `type_identifier` directly), and regressed `typescript-add-generics` (14 -> 18 mismatches).
-/// Restricting the family to the keyword leaves removes that spurious parent-level option.
+/// keyword child), so APTED is free to take the parent-level pairing - which is structurally
+/// wrong per the human mapping, which wants `predefined_type` deleted and its keyword child
+/// matched to `type_identifier` directly. Restricting the family to the keyword leaves removes
+/// that spurious parent-level option.
 const TS_TYPE_KEYWORD_KINDS: &[&str] = &[
     "any",
     "number",
@@ -1352,8 +1339,8 @@ pub type FamilyMask = u32;
 /// (e.g. `+` is in both `ARITHMETIC_OPS` and `PHP_ARITHMETIC_OPS`), which is why this is a mask
 /// rather than a single family id.
 ///
-/// Computed once per node at metadata-build time (see `ASTNodeMetadata::kind_cost_class`), turning
-/// what used to be a linear scan over every family on every comparison into a bitwise AND - see
+/// Computed once per node at metadata-build time (see `ASTNodeMetadata::kind_cost_class`), so a
+/// comparison is a bitwise AND rather than a linear scan over every family - see
 /// [`update_allowed_from_masks`].
 pub fn operator_family_mask(kind: &str) -> FamilyMask {
     let mut mask: FamilyMask = 0;
@@ -1809,13 +1796,10 @@ pub fn matching_allowed(
     parents_matched()
 }
 
-/// A flow-control construct family. Originally existed to keep the since-deleted
-/// `solve_similar_flow_control` (`MatchSimilarFlowControl`) from ever pairing a `match` against a
-/// `switch`, etc.; its only remaining consumer is [`flow_control_family`], used by
+/// A flow-control construct family. Its consumer is [`flow_control_family`], used by
 /// [`is_block_container`] to recognize `if`/`match`/`switch` constructs as anonymous-container
-/// candidates for `solve_greedy_anchor_blocks`. `Hash` (alongside `Eq`) is a holdover from once
-/// serving as `grouped_greedy_matcher`'s compatibility key - harmless to keep, not required by the
-/// current use.
+/// candidates for `solve_greedy_anchor_blocks`. `Hash` (alongside `Eq`) is not required by that
+/// use.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum FlowControlFamily {
     Match,
@@ -1862,14 +1846,13 @@ pub fn flow_control_family(node_kind: &str, language: &Language) -> Option<FlowC
 /// True if `node_kind` is a statement-sequence container ("a block") for `language`: its direct
 /// children are an ordered sequence of statements/expressions - exactly the shape
 /// `solve_greedy_anchor_blocks::sequence_edit_cost` treats each child as an opaque token of.
-/// Deliberately narrow (not "any node with several children"): an early version of that pass
-/// considered every such node a candidate and regressed 9 `optimal_solutions` fixtures by
-/// occasionally anchoring two unrelated `call_expression`/`binary_expression` nodes whose
-/// `argument_list`/operator happened to hash-match by coincidence - restricting candidates to
-/// genuine statement containers (plus the flow-control constructs themselves via
-/// [`flow_control_family`], since a whole `if`/`match`/`switch` is exactly the kind of anonymous
-/// "block" a name- or arm-based heuristic could still miss) keeps that cheap, position-blind cost
-/// estimate from firing on expression-level coincidences.
+/// Deliberately narrow (not "any node with several children"): treating every such node as a
+/// candidate anchors unrelated `call_expression`/`binary_expression` nodes whose
+/// `argument_list`/operator happens to hash-match by coincidence. Restricting candidates to
+/// genuine statement containers (plus the flow-control constructs themselves via [`flow_control_family`], since a whole
+/// `if`/`match`/`switch` is exactly the kind of anonymous "block" a name- or arm-based heuristic
+/// could still miss) keeps that cheap, position-blind cost estimate from firing on
+/// expression-level coincidences.
 pub fn is_block_container(node_kind: &str, language: &Language) -> bool {
     if flow_control_family(node_kind, language).is_some() {
         return true;
@@ -1891,9 +1874,8 @@ pub fn is_block_container(node_kind: &str, language: &Language) -> bool {
 }
 
 /// Jaccard similarity (shared entries / all distinct entries across both sides) of two precomputed
-/// string sets - generic set-overlap scoring, originally written for comparing flow-control arm
-/// signatures (the name and doc comment predate that caller's 2026-08-14 deletion; the name stuck
-/// since `solve_import_list_overlap` reuses it unchanged for import-symbol-set overlap).
+/// string sets - generic set-overlap scoring, used by `solve_import_list_overlap` for
+/// import-symbol-set overlap.
 ///
 /// Returns 0.0 if either side is empty (nothing meaningful to compare), so two empty sets never
 /// spuriously "match" each other.
@@ -1980,16 +1962,15 @@ fn callee_text<'a>(node: Node, language: &Language, source: &'a [u8]) -> Option<
 /// a separate child, say, leaving the comment's actual words on the parent. False for a `block`,
 /// `argument_list` or `declaration_list`, whose entire visible content is its children's.
 ///
-/// **A pure function of the AST and the source bytes - deliberately not of any diff.** An earlier
-/// version of this idea derived visibility from the renderer instead (does `diff::text::ranges`
-/// emit a span for this node), which made it depend on the mapping: the same `block` is one
-/// `Identical` span inside an unchanged function and is descended into inside a changed one. That
-/// is a fine description of what got drawn, but it is unusable as a measurement, because both the
-/// numerator and the denominator of any rate built on it move when the algorithm changes - a diff
-/// that renders coarsely has almost nothing "visible" and so almost nothing it can get visibly
-/// wrong. Measured on the corpus at the time: `css-shadcn-ui-ui-completely-broken-treesitter-
-/// parsing` collapsed 32,682 nodes into 2 rendered spans and thereby scored 0 visible mismatches
-/// while holding 124 real ones. Structural visibility cannot be gamed that way: the set is fixed
+/// **A pure function of the AST and the source bytes - deliberately not of any diff.** Deriving
+/// visibility from the renderer instead (does `diff::text::ranges` emit a span for this node)
+/// would make it depend on the mapping: the same `block` is one `Identical` span inside an
+/// unchanged function and is descended into inside a changed one. That is a fine description of
+/// what got drawn, but it is unusable as a measurement, because both the numerator and the
+/// denominator of any rate built on it move when the algorithm changes - a diff that renders
+/// coarsely has almost nothing "visible" and so almost nothing it can get visibly wrong - a file
+/// whose parse collapses to a handful of rendered spans scores a perfect visible rate while its
+/// mapping is wrong throughout. Structural visibility cannot be gamed that way: the set is fixed
 /// by the input alone.
 ///
 /// Non-ASCII bytes count as content (they are not ASCII whitespace), which biases toward calling a
@@ -2074,11 +2055,10 @@ pub fn is_diagnostic_statement(node: Node, language: &Language, source: &[u8]) -
 ///   over the 21-statement `block` sitting right next to it, so the pre-match found nothing worth
 ///   matching there at all).
 ///
-/// Not exhaustive - only the kinds this session's own measurements confirmed against real
-/// fixtures (`TODO.md`, 2026-08-05). Safe to extend as more languages show the same pattern: this
-/// is a pure performance pre-pass (see that function's doc comment for why a missing or wrong
-/// entry here only costs a missed optimization, never a wrong answer), so a narrow list is a
-/// reasonable starting point, not a correctness risk.
+/// Not exhaustive - only the kinds confirmed against real fixtures. Safe to extend as more
+/// languages show the same pattern: this is a pure performance pre-pass (see that function's doc
+/// comment for why a missing or wrong entry here only costs a missed optimization, never a wrong
+/// answer), so a narrow list is a reasonable starting point, not a correctness risk.
 pub fn is_statement_sequence_body(node_kind: &str) -> bool {
     matches!(
         node_kind,
@@ -2100,39 +2080,20 @@ pub fn is_statement_sequence_body(node_kind: &str) -> bool {
 /// Note: This is intentionally conservative. We only mark containers that are definitively
 /// order-independent according to the language semantics (not just "often reordered" by formatters).
 ///
-/// KNOWN ISSUE, fixed 2026-07-29 (originally logged 2026-07-15, JSON/YAML fixed 2026-07-23):
-/// every kind string below is now verified against ground truth, not just each grammar's
-/// node-types.json (which can omit or rename aliased node kinds) but the actual node kinds a real
-/// `tree_sitter::Parser` reports for a representative snippet in each language (see git history
-/// for the throwaway `examples/grammar_check.rs` used to confirm these). Before this pass, most of
-/// this function was near-dead weight: `Go` checked `field_list` (real name:
-/// `field_declaration_list`); `Python` checked `pair_list` (real container: `dictionary`, whose
-/// children are `pair` nodes); `JS`/`TS`/`TSX` also checked `pair_list` (real container: `object`);
-/// `Java` and `CSharp` shared one arm checking `enum_constants` (doesn't exist for either - and the
-/// real containers differ per language: `enum_body` for Java, `enum_member_declaration_list` for
-/// C#, so they can no longer share an arm); `Swift` checked `enum_member_list` (real name:
-/// `enum_class_body`); `Scala` checked `import_expr_list` (real name: `namespace_selectors` - and
-/// only the braced `import a.b.{X, Y, Z}` selector list is wrapped in a node at all; the top-level
-/// comma-separated import list itself has no wrapper). `Rust` was the only originally-correct arm,
-/// and was still missing `field_declaration_list` (struct fields - same node kind name as Go's).
+/// Every kind string below is verified against the node kinds a real `tree_sitter::Parser`
+/// reports for a representative snippet in that language - **not** against the grammar's
+/// `node-types.json`, which can omit or rename aliased node kinds. A string that looks right and
+/// does not exist makes its arm dead weight, silently and without any test noticing.
 ///
-/// `Kotlin` has no fix available: imports are direct repeated children of `source_file`
+/// `Kotlin` has no arm available: imports are direct repeated children of `source_file`
 /// (interleaved with the package header and top-level statements in the grammar), never wrapped in
 /// any list/container node at all - confirmed via `tree-sitter-kotlin-ng`'s `grammar.js`. There is
 /// no string that could make this arm correct, so it's left `false` rather than guessing.
 ///
-/// The 2026-07-15 version of this comment additionally claimed that even corrected strings would
-/// have no effect, because `compute_commutative_structural_hash` (a separate, bolted-on third
-/// hash) only applied commutative sorting to the container node itself, not to its ancestors, and
-/// `hash_tree_matching`'s descendant-pairing wasn't commutative-aware either. Both of those are
-/// now stale: the 2026-07-17/18 pipeline rework replaced that separate hash with `is_commutative_
-/// container` support folded directly into `compute_kind_and_value_hash`/`compute_kind_only_hash`
-/// at every recursion level (`code::hash`), and `pair_children_for_descent`
-/// (`hash_tree_matching.rs`) now checks `is_commutative_container` itself when pairing children.
-/// JSON's fix (confirmed against a real 3,075-node case: a single deleted key in a ~140-key
-/// localization JSON object was landing 100% of its mapping on the expensive `APTED` fallback
-/// before that fix, vs. instantly beforehand) is the model for what fixing the rest should do too,
-/// now that the plumbing actually respects this function's answer.
+/// The answer here is respected all the way down: `is_commutative_container` support is folded
+/// into `compute_kind_and_value_hash`/`compute_kind_only_hash` at every recursion level
+/// (`code::hash`), and `pair_children_for_descent` (`hash_tree_matching.rs`) consults it when
+/// pairing children.
 pub fn is_commutative_container(node_kind: &str, language: &Language) -> bool {
     match language {
         Language::Rust => {
@@ -2182,17 +2143,14 @@ pub fn is_commutative_container(node_kind: &str, language: &Language) -> bool {
             node_kind == "enum_class_body"
         }
         // JSON, YAML - object/mapping keys are commutative. Verified directly against
-        // tree-sitter-json/tree-sitter-yaml's actual parse trees (2026-07-23) - the previous
-        // strings here ("pair_list", "mapping_content") don't exist in either grammar at all (see
-        // this function's doc comment), so this arm was pure dead code: `is_commutative_container`
-        // always returned `false` for JSON/YAML, meaning `pair_children_for_descent`
-        // (`hash_tree_matching.rs`) always took the plain positional-zip path for every JSON object
-        // and YAML mapping. A single inserted/deleted key anywhere in a large flat object (e.g. one
-        // new string added to a localization file) then desyncs every subsequent key's position,
-        // orphaning the whole rest of the object onto the expensive the old whole-file `final_pass` APTED fallback - this is
-        // confirmed to be the exact mechanism behind a real observed case (jellyfin-jellyfin's
-        // `cs.json`, one deleted key out of ~140: 1.2s and 100% `APTED`-attributed mappings for a
-        // 3,075-combined-node file before this fix).
+        // tree-sitter-json/tree-sitter-yaml's actual parse trees; a wrong string here is not a
+        // near miss but dead code, since `is_commutative_container` then answers `false` for every
+        // JSON object and YAML mapping and `pair_children_for_descent` (`hash_tree_matching.rs`)
+        // takes the plain positional-zip path for all of them. A single inserted or deleted key
+        // anywhere in a large flat object then desyncs every subsequent key's position and orphans
+        // the whole rest of the object onto whole-tree APTED: jellyfin-jellyfin's `cs.json`, one
+        // deleted key out of ~140, is 1.2s and 100% `APTED`-attributed mappings for a
+        // 3,075-combined-node file that way.
         Language::JSON => node_kind == "object",
         // YAML has two mapping shapes: `block_mapping` (the common indented `key: value` form) and
         // `flow_mapping` (the JSON-style inline `{key: value}` form) - both are order-independent.

@@ -51,9 +51,9 @@ pub mod invariants;
 
 /// What a human decided should happen to a node (or pair of nodes) between before and after.
 ///
-/// `Identical`, `Update` and `MatchButNotIdentical` all pair a before node with an after node
-/// (like the old single `Match` variant did), but also pin down *which* [`ASTMappingOperation`]
-/// codediff is expected to have chosen for that pair, not just that the pair is mapped together.
+/// `Identical`, `Update` and `MatchButNotIdentical` all pair a before node with an after node, and
+/// each also pins down *which* [`ASTMappingOperation`] codediff is expected to have chosen for
+/// that pair, not just that the pair is mapped together.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum HumanOperation {
@@ -126,9 +126,8 @@ pub struct MultiMapGroup {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct HumanMapping {
     pub entries: Vec<HumanMappingEntry>,
-    /// Multi-map groups (see [`MultiMapGroup`]) -- absent from any `human_mapping.json` written
-    /// before this field existed, and from any current one with no groups in it, so every
-    /// existing fixture keeps parsing (and re-saving byte-for-byte) unchanged.
+    /// Multi-map groups (see [`MultiMapGroup`]) -- absent from any `human_mapping.json` with no
+    /// groups in it, which keeps such a file parsing and re-saving byte-for-byte unchanged.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub groups: Vec<MultiMapGroup>,
     /// The human-painted *text* accounts of the same diff (see [`HumanTextMapping`]) - a second,
@@ -145,8 +144,7 @@ pub struct HumanMapping {
     /// somebody painted it and there was nothing to paint (two identical files) - the distinction
     /// a completeness count needs, carried by the name's presence rather than by an `Option`.
     ///
-    /// As with `groups`, a file written before this field existed still parses, and one with no
-    /// paintings still re-saves byte-for-byte unchanged.
+    /// As with `groups`, a file with no paintings parses and re-saves byte-for-byte unchanged.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub text_mappings: Vec<NamedTextMapping>,
 }
@@ -239,14 +237,12 @@ pub struct HumanTextEntry {
 
 /// Reads a side's spans from either shape: a bare span object, or a list of them.
 ///
-/// These fields held **one** span before N:M matches existed (2026-08-25), and fixtures painted
-/// against that schema are already committed. Rejecting them would turn every one into a parse
-/// error - the loudest possible failure for data that is perfectly readable and that nobody can
-/// re-paint from memory. A single span is exactly a one-element list, so accepting both costs one
-/// adaptor and no ambiguity.
+/// Committed fixtures carry the bare-span form, from before an N:M match needed a list. Rejecting
+/// it would turn every one of those into a parse error - the loudest possible failure for data
+/// that is perfectly readable and that nobody can re-paint from memory. A single span is exactly a
+/// one-element list, so accepting both costs one adaptor and no ambiguity.
 ///
-/// Serialization is always a list: a file re-saved by the solver comes out in the current shape,
-/// so the old one fades rather than being maintained forever.
+/// Serialization is always a list, so a file re-saved by the solver comes out in the list form.
 fn spans_from_one_or_many<'de, D>(
     deserializer: D,
 ) -> std::result::Result<Vec<HumanTextSpan>, D::Error>
@@ -616,25 +612,22 @@ pub struct TextMappingCheck {
 /// debatable design choice in either function indistinguishable, in the result, from a genuine
 /// disagreement between the two ground truths - the same kind of contamination as using
 /// `diff_code` itself, just relocated into the mode-selection machinery instead of the matcher.
-/// (An earlier version of this function did exactly that, mirroring `compare_painting`'s
-/// structure; reverted once this was noticed.) "Best of all paintings, by bytes" needs neither
-/// function, so it can't inherit either one's bugs.
+/// "Best of all paintings, by bytes" needs neither function, so it cannot inherit either one's
+/// bugs.
 ///
-/// **Byte count, not run count** - the metric this function used before recording only
-/// `disagreements.len()`, which lets one huge disagreeing run beat two tiny ones. Byte count is
-/// what every caller that reports a percentage actually sums, so the selection should optimize the
-/// same quantity being reported.
+/// **Byte count, not run count.** Selecting on `disagreements.len()` lets one huge disagreeing run
+/// beat two tiny ones. Byte count is what every caller that reports a percentage actually sums, so
+/// the selection optimizes the same quantity being reported.
 ///
 /// One rendering choice from [`crate::diff::text::TextDiff::from`] is still unavoidably present:
 /// turning a tree-level node mapping into byte-level labels requires *some* decision about which
 /// matched nodes render as `Move`, and `TextDiff::from`'s column-shift heuristic is that decision.
 /// Neither ground truth expresses `Move` positionally (`HumanOperation` has no `Move` variant;
 /// `HumanTextEntry::verdict` derives it from content identity alone), so no renderer setting
-/// recovers it correctly - a `crossed_backwards`-only variant (real reorders only, never column
-/// shift) was tried and reverted: it fixed nothing `rust-multi-map-duplicate-calls` needed (its
-/// genuine reorder doesn't cross an anchor in the synthetic tree built from `entries`) and broke
-/// `rust-add-if` the other way. Use [`disagreement_is_move_only`] to separate that unavoidable
-/// rendering artifact from genuine structural disagreement, rather than trusting the raw count.
+/// recovers it correctly - including a `crossed_backwards`-only variant, real reorders and never
+/// column shift, which trades one fixture's artifact for another's. Use
+/// [`disagreement_is_move_only`] to separate that unavoidable rendering artifact from genuine
+/// structural disagreement, rather than trusting the raw count.
 ///
 /// `Ok(None)` when nothing has been painted - not the same as agreement, and callers counting
 /// fixtures should test `text_mappings.is_empty()` themselves rather than read `None` as a pass.
@@ -838,9 +831,8 @@ pub fn paintings_for_mode(
 /// `Minimal (right)`. The qualified form is how a painter records that an edit has **more than one
 /// defensible rendering under the same preset** - deleting one of two identical substrings can be
 /// read as deleting either, and both are correct. `human_solver`'s own help promises that a check
-/// passes on any of them; before this, the mode lookup wanted one exact name and a fixture
-/// painted that way failed with "no 'Minimal' painting" despite being painted more carefully than
-/// one that passed.
+/// passes on any of them, so a lookup wanting one exact name would fail a fixture with "no
+/// 'Minimal' painting" for having been painted more carefully than one that passes.
 pub(crate) fn designates_preset(name: &str, preset: &str) -> bool {
     name == preset
         || name
@@ -881,8 +873,8 @@ pub enum PaintingDiff {
     /// renders such a pair with [`crate::diff::text::plain_text_line_diff`] (see
     /// `app::compute_diff`), so what the human paints against, and what a reader sees, is that
     /// fallback; grading the painting against anything else would be grading a rendering the
-    /// product never produces. This used to error out (`codediff produced no AST diff for ...`),
-    /// which left such a fixture unable to carry a painting at all.
+    /// product never produces. Erroring out with "codediff produced no AST diff for ..." instead
+    /// would leave such a fixture unable to carry a painting at all.
     ///
     /// The two range lists go through exactly the same `ranges_for_options` filtering the AST
     /// side does, so the `Minimal`/`Full` presets still mean what they mean everywhere else -
@@ -1130,8 +1122,7 @@ pub fn save(name: &str, mapping: &HumanMapping) -> Result<()> {
 
 /// `pub`, not private: `src/bin/human_solver/` (a separate binary crate that depends on this
 /// one, so `pub(crate)` wouldn't reach it) needs the identical `Vec<String>` -> `Vec<&str>`
-/// conversion (for the same `node_for_path`/`PathCache::resolve` calls this module makes) and
-/// previously carried its own byte-for-byte copy rather than reusing this one.
+/// conversion, for the same `node_for_path`/`PathCache::resolve` calls this module makes.
 pub fn path_refs(path: &[String]) -> Vec<&str> {
     path.iter().map(String::as_str).collect()
 }
@@ -3293,11 +3284,10 @@ pub fn assert_matches_human_mapping_within_limit(
 ///
 /// **The stubs are the single source of truth for how far codediff may be from the human mapping**,
 /// and this is what lets everything else be a projection of them rather than a second copy.
-/// `quality_baseline.csv`'s two accuracy columns used to be hand-maintained alongside these limits:
-/// 461 of 510 agreed exactly, 49 did not, and the same six fixtures had to be edited in both files
-/// on the same day. Now `benchmark_optimal_solutions --write-baseline` fills those columns from
-/// here, so the only way to move a limit is to edit the stub - the file that also holds the prose
-/// explaining *why* it moved, and that no tool rewrites.
+/// Hand-maintained alongside these limits, `quality_baseline.csv`'s two accuracy columns drift
+/// from them and have to be edited in lockstep. `benchmark_optimal_solutions --write-baseline`
+/// fills those columns from here instead, so the only way to move a limit is to edit the stub -
+/// the file that also holds the prose explaining *why* it moved, and that no tool rewrites.
 ///
 /// Two call shapes, both written by `human_solver`'s own `ensure_stub_test`, so the parse is
 /// against generated text rather than free-form code:
@@ -4906,12 +4896,12 @@ mod tests {
     /// A pair with no tree-sitter grammar is graded against the product's own plain-text
     /// fallback, not rejected.
     ///
-    /// The fixture this exists for is a Bazel `BUILD` file a user reported; `diff_code` returns no
-    /// `ASTDiff` for it, which used to make `codediff_diff_for_painting` bail and left the fixture
-    /// unable to carry a painting at all. What codediff *renders* for such a pair is
-    /// `plain_text_line_diff` (`app::compute_diff`), so that is what its painting is answerable
-    /// to - checked here by comparing against that function directly rather than against a
-    /// recorded range list, so the two cannot drift.
+    /// The shape this exists for is a Bazel `BUILD` file: `diff_code` returns no `ASTDiff` for it,
+    /// and a bail in `codediff_diff_for_painting` would leave the fixture unable to carry a
+    /// painting at all. What codediff *renders* for such a pair is `plain_text_line_diff`
+    /// (`app::compute_diff`), so that is what its painting is answerable to - checked here by
+    /// comparing against that function directly rather than against a recorded range list, so the
+    /// two cannot drift.
     #[test]
     fn a_pair_with_no_grammar_paints_from_the_plain_text_fallback() -> Result<()> {
         let before_text = "cc_library(\n    name = \"a\",\n    srcs = [\"a.cc\"],\n)\n";

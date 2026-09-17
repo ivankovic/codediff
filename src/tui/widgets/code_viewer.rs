@@ -38,8 +38,8 @@ static THEME_SET: OnceLock<ThemeSet> = OnceLock::new();
 /// Get or initialize the syntax set. `two_face::syntax::extra_newlines()` - not plain syntect
 /// `SyntaxSet::load_defaults_newlines()` - since syntect's own bundled set (derived from Sublime
 /// Text's stock package) has no definition at all for several languages this project actually
-/// diffs: Dart, Kotlin, Swift, TypeScript/TSX, and Vimscript all silently fell back to unstyled
-/// plain text before this. `two-face` bundles the much larger syntax set `bat` ships with, which
+/// diffs - Dart, Kotlin, Swift, TypeScript/TSX and Vimscript would all silently fall back to
+/// unstyled plain text. `two-face` bundles the much larger syntax set `bat` ships with, which
 /// covers all of those - confirmed against every `language_to_syntect` name below. Bazel/Starlark
 /// still has no definition in either set and remains an unhighlighted gap.
 pub(crate) fn syntax_set() -> &'static SyntaxSet {
@@ -707,8 +707,8 @@ impl CodeViewerWidget {
     /// Get the theme for highlighting. Falls back to `base16-ocean.dark` (one of syntect's own
     /// bundled default themes, always present in `ThemeSet::load_defaults()`) if `theme_name` is
     /// unset or names a theme that doesn't exist - `set_theme` takes an arbitrary caller-supplied
-    /// `String` with no validation, so indexing `theme_set.themes` directly on that name (as this
-    /// used to) panicked on any unrecognized name instead of degrading gracefully.
+    /// `String` with no validation, so indexing `theme_set.themes` directly on that name would
+    /// panic on any unrecognized one instead of degrading gracefully.
     fn get_theme(&self) -> Theme {
         let theme_set = theme_set();
         let theme_name = self.theme_name.as_deref().unwrap_or("base16-ocean.dark");
@@ -845,11 +845,10 @@ impl CodeViewerWidget {
             }
         }
 
-        // Search matches (from the `/` modal), painted in the theme's dedicated search color -
-        // previously they shared the cross-highlight blue, which made a search hit and the
-        // cursor's counterpart indistinguishable while a search was active (see
-        // `OverlayPalette::search_bg`). Usually empty (no active search), so this loop is a
-        // no-op on every other frame.
+        // Search matches (from the `/` modal), painted in the theme's own dedicated search color
+        // rather than the cross-highlight blue, which would make a search hit and the cursor's
+        // counterpart indistinguishable while a search is active (see `OverlayPalette::search_bg`).
+        // Usually empty (no active search), so this loop is a no-op on every other frame.
         for search_match in &state.search_matches {
             if let Some((start_col, end_col)) = search_match.columns_on_row(row, row_len) {
                 line = paint_columns(
@@ -929,9 +928,8 @@ const GUTTER_STYLE: Style = Style::new().fg(Color::DarkGray);
 
 /// The horizontal window of `line` from character column `from`, `width` characters wide,
 /// preserving each span's styling. When content is cut off at either edge, the outermost visible
-/// character on that side is replaced with a dimmed `…` so the truncation is visible at all -
-/// previously long lines were silently hard-cut at the panel edge with no indication anything was
-/// missing.
+/// character on that side is replaced with a dimmed `…`, so a long line reads as truncated rather
+/// than as hard-cut at the panel edge with nothing to say anything is missing.
 fn slice_columns(line: &Line<'static>, from: usize, width: usize) -> Line<'static> {
     if width == 0 {
         return Line::from("");
@@ -981,9 +979,8 @@ impl StatefulWidget for &CodeViewerWidget {
     fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
         // No border, no title of its own - `DiffViewer` (the only caller) always draws exactly
         // one title line above whatever area it hands this widget, in both dual- and single-panel
-        // mode. This widget used to draw a second one (filename + language) inside its own
-        // bordered block, which in dual-panel mode just repeated the filename `DiffViewer`'s own
-        // outer block already showed.
+        // mode. A second one here (filename + language, inside this widget's own bordered block)
+        // would just repeat what `DiffViewer`'s outer block already shows in dual-panel mode.
         let inner = area;
 
         let gutter_width = self.gutter_width();
@@ -1116,9 +1113,9 @@ mod tests {
         }
     }
 
-    /// Regression test: `get_theme` used to index `theme_set.themes[name]` directly, which
+    /// `get_theme` falls back rather than indexing `theme_set.themes[name]` directly, which
     /// panics for any name that isn't a real syntect theme - `set_theme` takes an arbitrary
-    /// caller-supplied `String` with no validation, so this was trivially reachable.
+    /// caller-supplied `String` with no validation, so that is trivially reachable.
     #[test]
     fn set_theme_with_an_unknown_name_falls_back_instead_of_panicking() {
         let mut widget = CodeViewerWidget::default();
@@ -1284,14 +1281,10 @@ mod tests {
     /// A fresh widget must paint **nothing** extra over the focused side's cursor range: the node
     /// highlight is off until `H` turns it on.
     ///
-    /// This test asserted the exact opposite until 2026-08-23, and the flip is deliberate, so the
-    /// full history is worth keeping in one place. The highlight was originally behind an `x`
-    /// toggle; that toggle was removed on 2026-08-08 because it "didn't improve the UX" and the
-    /// highlight became unconditional. It is now toggleable again, under `H` - but off by
-    /// default, which is the part the first attempt got wrong. On by default, a toggle only helps
-    /// a user who already knows the key; the highlight repaints on every cursor movement and
-    /// covers the diff-operation color underneath it, so the default is what determines whether
-    /// it reads as a feature or as interference.
+    /// Off by default is the load-bearing half of that. A toggle only helps a user who already
+    /// knows the key, and the highlight repaints on every cursor movement and covers the
+    /// diff-operation color underneath it - so the default is what decides whether it reads as a
+    /// feature or as interference.
     #[test]
     fn node_highlight_is_off_until_enabled() {
         let widget = widget_with_line("hello world");
@@ -1924,11 +1917,10 @@ mod tests {
         );
     }
 
-    /// This widget never draws its own border or title (that used to be togglable via
-    /// `hide_border`/`set_hide_border`, removed once `DiffViewer` - the only caller - was made to
-    /// always draw its own single title line instead, so nothing ever needed the widget's own
-    /// border shown). Content should be flush against the top-left corner of whatever area it's
-    /// given, with no title text drawn anywhere in the buffer.
+    /// This widget never draws its own border or title: `DiffViewer`, its only caller, always
+    /// draws a single title line of its own instead. Content should be flush against the
+    /// top-left corner of whatever area it's given, with no title text drawn anywhere in the
+    /// buffer.
     #[test]
     fn render_never_draws_its_own_border_or_title() {
         let area = Rect::new(0, 0, 20, 5);

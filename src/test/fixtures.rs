@@ -24,38 +24,33 @@
 //!   * `mapping()` - codediff's node mapping against `human_mapping.json`'s `entries`, exact or
 //!     clamped to a recorded number of mismatches.
 //!   * `mapping_details()` - where a fixture needs specific nodes asserted by hand rather than the
-//!     whole mapping compared at once. Ten fixtures have one; it is not a substitute for
-//!     `mapping()` and most carry both.
+//!     whole mapping compared at once. Not a substitute for `mapping()`; a fixture with one
+//!     usually carries both.
 //!   * `painting()` - codediff's *rendering* against the same file's `text_mappings`, clamped to a
 //!     percentage of disagreeing bytes, checked under both the `Minimal` and `Full` presets of
 //!     [`RenderOptions`](crate::diff::text::RenderOptions). Present only for the fixtures that
 //!     have been painted.
 //!
-//! **The names are fixed, and there are only four.** They used to vary - `optimal_solution`,
-//! `matches_human_solution`, and one named after its own fixture - and three files carried two
-//! tests asserting byte-for-byte the same thing under two of those names. A test whose name is a
-//! matter of taste is a test nobody can find, and a duplicate nobody notices is one more place a
-//! change has to be made twice.
+//! **The names are fixed, and there are only four.** A test whose name is a matter of taste is a
+//! test nobody can find, and two tests asserting the same thing under different names are one more
+//! place a change has to be made twice.
 //!
-//! These were two parallel module trees, `optimal_solutions/` and `painting_agreement/`, with one
-//! file per fixture in each. Merging them costs nothing structurally - every painted fixture
-//! already had a mapping stub, so there were no orphans - and buys the thing the split was
-//! quietly denying: everything anyone has concluded about one fixture is now in one place, rather
-//! than split across two files nobody reads together.
+//! Both ground truths live in the one file, rather than in parallel trees keyed by fixture name:
+//! everything anyone has concluded about a fixture is then in one place, rather than split across
+//! two files nobody reads together.
 //!
 //! **The one-file-per-fixture layout is load-bearing and stays.** A clamp accretes an explanation
 //! of why codediff and the ground truth differ, and that explanation needs somewhere nothing
 //! overwrites. It also makes the rule that a clamp only moves when the measurement no longer fits
 //! it *structural* rather than remembered: a fixture whose number did not change is a file nobody
-//! rewrites. Regenerating a single shared file twice once loosened a clamp that still held, on
-//! nothing but the regenerator's own rounding - which is also why
-//! `human_mapping::stub_mapping_limits` reads these files rather than the other way round.
+//! rewrites. A single shared file regenerated wholesale loosens clamps that still hold, on nothing
+//! but the regenerator's own rounding - which is also why `human_mapping::stub_mapping_limits`
+//! reads these files rather than the other way round.
 //!
-//! **Every painting clamp is large.** Nothing agrees exactly yet; the rates run from hundredths of
-//! a percent to about 60%. These are recorded distances, not targets, and the rate is a percentage
-//! rather than a count because the fixtures span three orders of magnitude in size - a count would
-//! let one large fixture's residual dwarf every small fixture's exactness. Lower one when a change
-//! earns it; a rise is a regression.
+//! **A painting clamp is a recorded distance, not a target.** The rate is a percentage rather than
+//! a count because the fixtures span three orders of magnitude in size, and a count would let one
+//! large fixture's residual dwarf every small fixture's exactness. Lower one when a change earns
+//! it; a rise is a regression.
 //!
 //! **What belongs in a stub comment, and what does not.**
 //!
@@ -76,7 +71,7 @@
 //!
 //! `the_clamped_stubs_explain_their_limits` enforces the second half: a limit is a claim that
 //! codediff cannot currently do better, and a claim with no argument behind it is indistinguishable
-//! from a number nobody has revisited - which is exactly what 49 of these turned out to be.
+//! from a number nobody has revisited.
 
 // Mirrors src/test/data/diffs/'s five-way split (see `test::helper::DIFF_DATASETS`): each of
 // these is its own mod-list file, one `#[cfg(test)] mod <name>;` per fixture in that dataset.

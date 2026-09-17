@@ -61,13 +61,12 @@ pub(crate) fn walk_visible<'a>(
 /// `flatten_visible`'s output, paired with a node id -> index lookup table built alongside it.
 /// Resolving a node id back to its position in the flat list -- almost always
 /// `PanelState::cursor_id`, to move it or to find where the cursor row is for scrolling/rendering
-/// -- used to mean an O(n) linear scan of the flat list (`.position()`/`.find()`), repeated on
-/// every cursor move, every mark, and every single redraw. On a 30k-node tree that scan alone
-/// showed up as real per-keystroke latency; this makes it O(1) instead.
+/// -- would otherwise be an O(n) linear scan of the flat list (`.position()`/`.find()`), repeated
+/// on every cursor move, every mark and every redraw. On a 30k-node tree that scan alone is real
+/// per-keystroke latency; the table makes it O(1).
 ///
-/// Derefs to `[(Node, usize)]`, so any caller that only ever iterated or indexed the flat list
-/// positionally (never by node id) needs no changes at all -- it's a drop-in replacement for the
-/// bare `Vec<(Node, usize)>` `flatten_visible` used to hand back directly.
+/// Derefs to `[(Node, usize)]`, so a caller that only iterates or indexes the flat list
+/// positionally, never by node id, needs nothing from this type at all.
 pub(crate) struct FlatIndex<'a> {
     pub(crate) nodes: Vec<(Node<'a>, usize)>,
     pub(crate) by_id: rustc_hash::FxHashMap<usize, usize>,
@@ -157,8 +156,8 @@ pub(crate) enum AlgoStatus {
 }
 
 /// `side`'s node map in `diff_ast`, and the `(before, after)` mapping key that pairs `own` on
-/// that side with `partner` on the other - the two things every before/after twin below used to
-/// differ in.
+/// that side with `partner` on the other - the two things every before/after twin below differs
+/// in.
 fn side_node_map(side: Side, diff_ast: &ASTDiff) -> &rustc_hash::FxHashMap<usize, usize> {
     match side {
         Side::Before => &diff_ast.before_node_map,

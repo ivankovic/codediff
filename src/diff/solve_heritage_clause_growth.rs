@@ -29,16 +29,12 @@ use crate::diff::{ASTDiff, ASTMappingOperation, ASTMappingReason};
 /// skip painting it `Move`, the same mechanism `solve_nested_condition_collapse` established for
 /// Rust's let-chain collapse. It never creates a new mapping.
 ///
-/// Two general rendering heuristics for this same "shift explained by an unrelated preceding
-/// insertion" shape were tried and reverted in `ranges()` itself (see the Move/Identical branch's
-/// own history and `RenderOptions::paint_reindent_only_moves`'s doc comment): one keyed on parent-
-/// match alone, one on nearest-mapped-sibling adjacency, applied to *any* node. Both broke other
-/// fixtures - `rust-add-if` (a genuine relocation into a new `if`) and a JS destructuring rewrite
-/// where the human ground truth *itself* wants a coincidentally-duplicated literal painted `Move`.
-/// Neither failure is reachable here: this pass only ever looks at `class_body`/`interface_body`
-/// nodes whose immediate parent is `class_declaration`/`interface_declaration`, which by
-/// construction excludes both counter-examples' node kinds entirely - narrow-by-shape rather than
-/// narrow-by-threshold.
+/// Deliberately a pass over two node kinds rather than a general rule in `ranges()`. "Shift
+/// explained by an unrelated preceding insertion" is not decidable from parent-match or
+/// sibling-adjacency alone - a genuine relocation into a new block has the same geometry, and a
+/// coincidentally-duplicated literal is sometimes a `Move` in the ground truth itself. Keying on
+/// `class_body`/`interface_body` under `class_declaration`/`interface_declaration` decides it by
+/// shape instead: those kinds gain a heritage clause and nothing else.
 pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
     let (before, after, node_cache) = (ctx.before, ctx.after, ctx.node_cache);
     let before_src = before.contents.as_bytes();

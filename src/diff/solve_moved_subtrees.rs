@@ -29,14 +29,14 @@
 //! only ever convert delete+insert leftovers into matches - it can never take a node away from a
 //! better mapping.
 //!
-//! Guardrails, each protecting against a previously-observed failure mode:
+//! Guardrails, each closing a failure mode this pairing otherwise has:
 //!
 //! - Only *fully*-deleted subtrees may pair with *fully*-inserted ones. A subtree with even one
 //!   matched descendant already has a footprint in the other tree; re-mapping it here could
 //!   contradict that footprint's ancestry.
 //! - Only subtrees of at least `MIN_MOVE_SUBTREE_SIZE` nodes participate. Hash-matching arbitrary
-//!   small nodes re-creates the "stray `;` matches a random other `;`" disease this project spent
-//!   the generic-token gate curing; small identical statements (`return None`, `i += 1`) are so
+//!   small nodes re-creates the "stray `;` matches a random other `;`" disease the generic-token
+//!   gate exists to prevent; small identical statements (`return None`, `i += 1`) are so
 //!   common that pairing them across unrelated regions is noise, not signal.
 //! - Largest-first with claiming: a moved function claims its whole subtree in one piece, rather
 //!   than its statements each finding their own (possibly different) partners.
@@ -155,9 +155,8 @@ pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
         //
         // Note this is *not* the same question `MIN_MOVE_SUBTREE_SIZE` asks. That one gates whether
         // a subtree is worth considering at all; this one gates whether a *choice between several
-        // equals* can be made honestly. Raising `MIN_MOVE_SUBTREE_SIZE` instead was tried and
-        // rejected (see its own doc comment): it discards unambiguous small moves too, regressing
-        // 11 fixtures to fix one.
+        // equals* can be made honestly. Raising `MIN_MOVE_SUBTREE_SIZE` instead is not an answer
+        // (see its own doc comment): it discards unambiguous small moves too.
         //
         // Before refusing outright, the sketch gets a chance to make the choice honestly: the
         // candidates are identical to each other by construction (they share a full hash), but
@@ -207,15 +206,14 @@ pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
 /// "is this container similar enough" but "is one of these containers clearly the right one".
 const CONTEXT_TIEBREAK_MARGIN: f32 = 0.15;
 
-/// Candidate count above which the tie-break is not even attempted, and the guard refuses as it
-/// did before.
+/// Candidate count above which the tie-break is not attempted at all and the guard simply
+/// refuses.
 ///
 /// A pure cost bound, not a quality/cost tradeoff. A commodity hash (a `,`, a `;`, `self`) has
-/// hundreds of candidates, and scoring all of them for every deleted node made the whole corpus
-/// ~8% slower (measured 2026-08-18: `rust-rustdesk-...-io-loop` 2218ms -> 2405ms, and the same
-/// ~10-20% on every large fixture). Swept 8/32/uncapped: 8 costs 4 mismatches, **32 matches
-/// uncapped exactly** - no fixture in the corpus needs more than 32 candidates - so 32 is simply
-/// the smallest cap tried that loses nothing.
+/// hundreds of candidates, and scoring all of them for every deleted node is a measurable share of
+/// a large fixture's runtime. The cap is set where it matches an uncapped search exactly, so it
+/// costs nothing in quality - `benchmark_optimal_solutions` is what re-checks that as the corpus
+/// grows.
 const MAX_AMBIGUOUS_CANDIDATES: usize = 32;
 
 /// Picks the one candidate whose *parent* is clearly the most similar to `source`'s parent, or

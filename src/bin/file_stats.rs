@@ -158,9 +158,8 @@ fn worker_loop(path_rx: Receiver<PathBuf>, stats_tx: Sender<(PathBuf, CodeStats)
     while let Ok(path) = path_rx.recv() {
         let mut s = codediff::stats::for_path(&path, &mut parser);
         // The raw file contents are only needed to compute the derived stats above; keeping them
-        // around after that just inflates the size of every in-flight item on the channel and,
-        // previously, the size of the final in-memory accumulation. Drop them as soon as we're
-        // done with them.
+        // around after that just inflates the size of every in-flight item on the channel. Drop
+        // them as soon as we're done with them.
         s.code.contents = String::new();
         if stats_tx.send((path, s)).is_err() {
             break;

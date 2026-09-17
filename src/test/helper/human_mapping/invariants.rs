@@ -671,13 +671,12 @@ fn rows_of(contents: &str) -> impl Iterator<Item = (usize, usize, &str)> {
 /// closure `RenderOptions::leading_whitespace` already applies when rendering under `FULL` (see
 /// that field's doc comment, and `extend_leading_whitespace`).
 ///
-/// **The condition is "all of them", not "the first one".** An earlier draft asked only whether
-/// the first visible character was `Insert`/`Delete` and required the indentation to match; that
-/// is a different and wrong claim, because a *surviving* line can begin with an inserted token and
-/// keep every space after it untouched, which no rule should forbid. Requiring the whole line to
-/// be one verdict before saying anything about its whitespace is what makes the conclusion follow:
-/// there is nothing on the line that survived, so there is nothing for the unpainted whitespace to
-/// belong to.
+/// **The condition is "all of them", not "the first one".** Asking only whether the first visible
+/// character is `Insert`/`Delete` and requiring the indentation to match is a different and wrong
+/// claim, because a *surviving* line can begin with an inserted token and keep every space after
+/// it untouched, which no rule should forbid. Requiring the whole line to be one verdict before
+/// saying anything about its whitespace is what makes the conclusion follow: there is nothing on
+/// the line that survived, so there is nothing for the unpainted whitespace to belong to.
 ///
 /// Scoped to `Insert`/`Delete` deliberately. A line entirely `Move`d or `Update`d is still a
 /// surviving line whose whitespace genuinely may not have changed - `Full` widening a `Move` over

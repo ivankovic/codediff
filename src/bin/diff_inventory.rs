@@ -273,9 +273,8 @@ fn row_for(name: &str, dataset: &str, dir: &Path) -> Result<Option<Row>> {
         repository: sample.map(|s| s.repository.clone()).unwrap_or_default(),
         commit: sample.map(|s| s.commit.clone()).unwrap_or_default(),
         source_path: sample.map(|s| s.path.clone()).unwrap_or_default(),
-        // `description.md` is the only place a promoted fixture's note lives. sample.csv used to
-        // be a second home for it and this column used to fall back to that; promotion now moves
-        // the note into the file and clears the cell, so there is nothing left to fall back to
+        // `description.md` is the only place a promoted fixture's note lives: promotion moves the
+        // note into the file and clears the sample.csv cell, so there is nothing to fall back to
         // and no way for two copies to disagree (see `action_promote`, and the
         // `no_promoted_row_carries_a_comment` test that pins it).
         comment: read_note(name)

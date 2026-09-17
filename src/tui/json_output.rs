@@ -203,8 +203,7 @@ struct JsonDiff {
     /// (`PendingDiff::large_residual`), so the terminal pass's coarser whole-subtree matching
     /// covered more of the file than usual. `headless::run` reports this as a one-line stderr
     /// note; JSON mode is meant for machine consumption, so it is a field here instead - a script
-    /// parsing stdout as JSON shouldn't also have to watch stderr for a caveat. Named
-    /// `fallback_used` until 2026-09-05, when it described a substitution that no longer happened.
+    /// parsing stdout as JSON shouldn't also have to watch stderr for a caveat.
     large_residual: bool,
     /// The diff's overall shape (see `JsonDiffSummary`) - `None` for the ordinary case (a genuine
     /// mix of edits that doesn't cleanly fit one of `DiffSummary`'s special cases), same as

@@ -28,6 +28,29 @@ pull request.
 No Rust check errors are allowed. Run `cargo clippy` frequently. CI also enforces `cargo clippy`,
 across all three Cargo feature configs (see "CI" below).
 
+### Comments describe how the code *is*
+
+A comment explains what the code does and why it is that way. It does not narrate what the code
+used to be, what was tried and reverted, or when either happened. "An earlier version derived this
+from the renderer" and "widening this gate regressed 9 fixtures on 2026-08-14" both read as live
+facts to someone skimming, and neither can be checked against the code in front of them.
+
+Where the *reason* for a choice is that the alternative is worse, say so in the present tense and
+leave the measurement out: **"treating every such node as a candidate anchors unrelated nodes whose
+operators happen to hash-match"**, not "an early version did that and cost 9 fixtures". The corpus
+grows, so a number frozen in a comment goes stale silently; `benchmark_optimal_solutions` and
+`research/data/quality/` are where the current ones live, and they are regenerated rather than
+remembered.
+
+Two things this does **not** mean:
+
+* Runtime state is not history. "an earlier hop in this chain", "the previously submitted query",
+  "the old partner" describe what the program is doing now.
+* A test whose subject is a past bug keeps its subject - stated as the property it pins. "Esc
+  closes the theme picker rather than quitting", not "Esc used to quit the whole app".
+
+`git log` and `git blame` hold the history, and they hold it accurately.
+
 ## Testing
 
 Run automated tests frequently during coding.
@@ -121,12 +144,10 @@ The benchmark prints both (`Mismatches` / `Vis Mism`), and every clamped `fixtur
 pins both (`assert_matches_human_mapping_within_limit(name, total, visible)`, which fails if
 *either* limit is exceeded).
 
-**Visibility is a property of the tree and the source, never of a diff.** An earlier version
-derived it from the renderer - does `diff::text::ranges` emit a span for this node - which made
-both the numerator and the denominator move with the algorithm, so a diff that rendered coarsely
-had almost nothing it could get visibly wrong. If you are tempted to reintroduce anything
-diff-dependent here, see `is_structurally_visible`'s doc comment for the fixture that scored a
-perfect zero on 124 real mismatches under the old definition.
+**Visibility is a property of the tree and the source, never of a diff.** Deriving it from the
+renderer - does `diff::text::ranges` emit a span for this node - makes both the numerator and the
+denominator move with the algorithm, so a diff that renders coarsely has almost nothing it can get
+visibly wrong. `is_structurally_visible`'s doc comment has the reasoning in full.
 
 ### Speed
 

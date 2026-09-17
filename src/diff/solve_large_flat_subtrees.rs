@@ -84,13 +84,10 @@ pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
 
     // A data-shaped file (JSON, YAML, ...) has no named top-level declarations to key off at
     // all - its whole content is one anonymous value (an `object`/`array`/mapping/...), so
-    // `top_level_identities` above always comes back empty for it and this pass previously did
-    // nothing for such files whatsoever. That's a real gap, not just a missed optimization:
-    // confirmed against a live case (jellyfin-jellyfin's `cs.json`, a single deleted key out of
-    // ~140 in a flat object) that the *entire* file then falls through every other pass onto
-    // the old whole-file `final_pass` APTED's unconstrained tree-edit-distance - 1.2s and 100% `APTED`-attributed mappings
-    // for a 3,075-combined-node file, versus 0.6ms when the same top-level object is fed through
-    // this pass's existing Myers machinery directly.
+    // `top_level_identities` above always comes back empty for it. Without this arm the pass does
+    // nothing for such files at all, which is a real gap rather than a missed optimization: the
+    // *entire* file then falls through every other pass onto whole-tree APTED, when the same
+    // top-level object fed through this pass's Myers machinery resolves directly.
     //
     // Unlike the general "match top-level items by name" case above, this doesn't need a name to
     // disambiguate *which* top-level item corresponds to which: when there's exactly one named
@@ -143,14 +140,10 @@ pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
         // `solve_qualified_name_groups_within`'s doc comment for the confirmed live cases this
         // fixes.
         //
-        // Tried moving both pre-match calls here to *before* the Myers call above (2026-08-08),
-        // hoping they'd rescue reusable substructure inside a flat-descendant entry that changed
-        // internally (see TODO.md's vimscript entry) before Myers atomically deletes+inserts it.
-        // Zero effect - identical mismatch count and content. Neither helper fires on a
-        // `dictionnary_entry`: `solve_qualified_name_groups_within` only matches named
-        // declarations, `prematch_identical_statement_siblings` only matches statement sequences,
-        // and a dictionary entry is neither. Reverted; left as a doc note so this isn't
-        // re-attempted without a reason to expect a different result.
+        // Neither helper fires on a `dictionnary_entry`: `solve_qualified_name_groups_within`
+        // matches only named declarations and `prematch_identical_statement_siblings` only
+        // statement sequences, so the ordering against the Myers call above is not load-bearing
+        // for a data entry - there is no substructure either of them could claim first.
         if let (Some(&before_node), Some(&after_node)) = (
             node_cache.before.get(&before_id),
             node_cache.after.get(&after_id),
@@ -240,10 +233,8 @@ fn top_level_identities(
     // through to that mechanism). Exists because a large flat data literal can be buried
     // arbitrarily deep inside such a wrapper (an `if`/`try` guard around most of a script's body,
     // say) with nothing above it in the tree to name-match on - confirmed against a live case
-    // (`vimscript-neovim-neovim-i-have-no-idea-what-this-diff-does`: a single top-level
-    // `if_statement` wrapping a 370-direct-child `dictionnary` 8 levels down; the old whole-file `final_pass` APTED alone
-    // took ~30s per diff with this pass unable to reach it, ~instant once matched here - see
-    // TODO.md's 2026-08-08 entry).
+    // (a single top-level `if_statement` wrapping a several-hundred-child `dictionnary` many
+    // levels down, which goes to whole-tree APTED when this pass cannot reach it).
     if root_node.named_child_count() > 1 {
         let mut kind_counts: HashMap<&str, usize> = HashMap::new();
         let mut cursor = root_node.walk();
@@ -371,14 +362,13 @@ const DATA_LITERAL_MIN_CHILDREN: usize = 8;
 /// ... }` idiom - the whole reason this exists - is exactly this shape and commonly has well under
 /// 50 entries.
 ///
-/// Deliberately does *not* include ordinary code containers (`block`, `statement_list`, ...): a
-/// uniformly-lowered `FLAT_CONTAINER_MIN_CHILDREN` was tried and reverted (2026-07-23) after it
-/// regressed two previously-exact fixtures (`python-refactoring`, `kotlin-nextcloud-a-few-small-
-/// removals`) - Myers-by-exact-hash can only recognize byte-identical elements, and unlike a data
-/// table's independent entries, ordinary statements are routinely related-but-different, which
-/// real tree-edit-distance can still partially match (`Update`) and hash-only Myers cannot (it can
-/// only call each one an outright delete+insert). Restricting to kinds that are genuinely
-/// data-literal bodies keeps the low threshold from ever applying to that case at all.
+/// Deliberately does *not* include ordinary code containers (`block`, `statement_list`, ...), and
+/// lowering `FLAT_CONTAINER_MIN_CHILDREN` uniformly is not the same thing: Myers-by-exact-hash can
+/// only recognize byte-identical elements, and unlike a data table's independent entries, ordinary
+/// statements are routinely related-but-different - which real tree-edit-distance can still
+/// partially match (`Update`) and hash-only Myers cannot (it can only call each one an outright
+/// delete+insert). Restricting to kinds that are genuinely data-literal bodies keeps the low
+/// threshold from ever applying to that case at all.
 fn is_data_literal_container(kind: &str, language: &Language) -> bool {
     match language {
         Language::Go => kind == "literal_value",
@@ -450,13 +440,10 @@ mod tests {
         );
     }
 
-    /// Regression guard for the 2026-07-23 fix: a JSON (or YAML, ...) file has no named
-    /// top-level declaration to key off - its whole content is one anonymous `object` - so this
-    /// pass used to never fire for such files at all, no matter how large the top-level object
-    /// was. Confirmed against a real case (a single deleted key out of ~140 in a jellyfin
-    /// localization file) that this used to send the *entire* file through the old whole-file `final_pass` APTED's
-    /// unconstrained tree-edit-distance: 1.2s and 100% `APTED`-attributed mappings for a
-    /// 3,075-combined-node file, vs. ~2ms once this pass can see it.
+    /// Regression guard: a JSON (or YAML, ...) file has no named top-level declaration to key
+    /// off - its whole content is one anonymous `object` - so without the single-root arm this
+    /// pass never fires for such a file at all, however large the top-level object is, and the
+    /// *entire* file goes to whole-tree APTED.
     #[test]
     fn large_flat_top_level_json_object_is_myers_diffed() {
         let mut pairs_before: Vec<String> = (0..80)
@@ -537,8 +524,7 @@ mod tests {
         // picked up by `widest_data_literal_container`'s kind-filtered walk) makes the enclosing
         // `block`/`statement_list` wider than the 15-element testCases table, so the *overall*
         // widest-subtree-of-any-kind precomputation points here instead - all identical content,
-        // so it's still instant to diff (an `IdenticalHash` match), unlike the switch-statement
-        // padding this test originally used, which took 8+ seconds in an unoptimized debug build.
+        // so it's still instant to diff (an `IdenticalHash` match).
         let padding: String = "_ = 0\n".repeat(16);
 
         let before_src = format!(
@@ -576,12 +562,10 @@ mod tests {
 
     /// Regression guard for the 2026-07-23 fix (`solve_qualified_name_groups_within`): a Go test
     /// function containing *both* a large data-literal table and an independent, literal-named
-    /// `t.Run(...)` subtest call should get the subtest call pre-matched by name (`qualified_name`)
-    /// before the container-wide `large_flat_subtree_container` call, rather than paying full
-    /// tree-edit-distance for it - confirmed against live cases (cockroachdb's
-    /// `api_v2_grants_test.go`, jesseduffield/lazygit's `graph_test.go`) that this was previously
-    /// the residual cost keeping those files multi-second even after the data table itself got the
-    /// Myers fast path.
+    /// `t.Run(...)` subtest call should get the subtest call pre-matched by name
+    /// (`qualified_name`) before the container-wide `large_flat_subtree_container` call, rather
+    /// than paying full tree-edit-distance for it: in such a file the subtest call is the
+    /// residual cost left over once the data table itself has the Myers fast path.
     #[test]
     fn named_subtest_inside_a_data_literal_function_is_prematched_by_name() {
         let cases_before: String = (0..15)

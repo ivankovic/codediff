@@ -532,12 +532,11 @@ impl Component for CodeViewer {
     }
 
     // No `handle_key_event` override: `DiffViewer::handle_key_event` (the only place a
-    // `CodeViewer` is ever constructed) intercepts every key this component used to handle
-    // itself - arrows/hjkl via `move_cursor_vertical`/`move_cursor_horizontal`, PageUp/PageDown/
+    // `CodeViewer` is ever constructed) intercepts every key this component could handle itself:
+    // arrows/hjkl via `move_cursor_vertical`/`move_cursor_horizontal`, PageUp/PageDown/
     // Home/End via `scroll_up`/`scroll_down`/`scroll_to` - before ever reaching the fallback that
-    // forwards to `left_viewer`/`right_viewer`. Those arms were dead code (verified: nothing
-    // constructs a bare `CodeViewer` outside `diff_viewer.rs`, and no test called this method
-    // directly), so this now just falls through to `Component`'s default `Ok(None)`.
+    // forwards to `left_viewer`/`right_viewer`. Nothing constructs a bare `CodeViewer` outside
+    // `diff_viewer.rs`, so this falls through to `Component`'s default `Ok(None)`.
 
     fn update(&mut self, action: Action) -> Result<Option<Action>> {
         match action {

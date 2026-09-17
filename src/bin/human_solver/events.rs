@@ -278,14 +278,14 @@ pub(crate) fn run_event_loop(
 /// directly off `App` by `render_panel`, not through `FrameState`), and view/display toggles
 /// (`p`/`r`/`t`/`T`/`/`/`?`) whose own state (`algo_diff`, `show_reason`) is likewise read
 /// straight off `App`. On a large case, rebuilding `FrameState` for every one of these -- which is
-/// what browsing a case mostly consists of -- used to mean paying `rebuild_caches_for_mapping`
-/// (documented up to ~2s on a heavily-annotated fixture), two `fully_solved_nodes` walks, and two
+/// what browsing a case mostly consists of -- would mean paying `rebuild_caches_for_mapping`
+/// (documented up to ~2s on a heavily-annotated fixture), two `fully_solved_nodes` walks and two
 /// `flatten_visible` walks on every single keystroke, whether or not anything `FrameState` derives
 /// from had actually changed.
 ///
 /// Deliberately conservative: `h`/`l`/`a`/`A` (which sometimes mutate a `collapsed` set, depending
 /// on where the cursor already is) and `s`/`R`/`o`/`O`/`C` (which open a modal or save, and are
-/// rare enough that the existing full-rebuild cost isn't worth the extra classification surface)
+/// rare enough that the full-rebuild cost isn't worth the extra classification surface)
 /// are NOT included here, even though some of their branches don't actually need a rebuild either
 /// -- see `handle_key` for the exact effect of every key this list omits.
 pub(crate) fn is_navigation_or_display_key(code: KeyCode) -> bool {
@@ -2132,10 +2132,10 @@ pub(crate) fn update_sample_csv_at(
     row.promoted_to = new_name.to_string();
     row.status = "PROMOTED".to_string();
     // The note **moves** to the fixture's own `description.md` (written by `action_promote` just
-    // before this call) rather than being copied there. A promoted row keeping its comment is how
-    // one fixture ended up with two notes that could drift - and one pair had, by the time the
-    // duplication was found. `no_promoted_row_carries_a_comment` pins the invariant; a rejection
-    // keeps its reason here, because a rejected sample has no directory to hold one.
+    // before this call) rather than being copied there. A promoted row that kept its comment would
+    // leave the fixture with two notes that can drift apart. `no_promoted_row_carries_a_comment`
+    // pins the invariant; a rejection keeps its reason here, because a rejected sample has no
+    // directory to hold one.
     row.comment.clear();
 
     write_sample_csv_rows(path, &rows)?;
