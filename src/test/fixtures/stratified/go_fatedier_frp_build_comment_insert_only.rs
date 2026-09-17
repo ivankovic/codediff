@@ -30,7 +30,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-08: minimal 0.188%, full 0.188%
     assert_matches_human_painting_within_limit("go-fatedier-frp-build-comment-insert-only", 0.20)
 }
 

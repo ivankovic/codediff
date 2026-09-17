@@ -30,7 +30,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-10: minimal 0.013%, full 0.015%
     assert_matches_human_painting_within_limit("xml-nextcloud-android-add-translation", 0.03)
 }
 

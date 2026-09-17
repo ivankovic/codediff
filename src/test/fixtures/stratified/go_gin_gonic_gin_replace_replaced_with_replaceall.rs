@@ -30,7 +30,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-15: minimal 2.681%, full 0.279% (measured, unexamined)
     assert_matches_human_painting_within_limit(
         "go-gin-gonic-gin-replace-replaced-with-replaceall",
         2.7,

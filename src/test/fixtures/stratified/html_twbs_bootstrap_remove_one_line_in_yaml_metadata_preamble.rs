@@ -30,7 +30,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-10: minimal 0.679%, full 0.679%
     assert_matches_human_painting_within_limit(
         "html-twbs-bootstrap-remove-one-line-in-yaml-metadata-preamble",
         0.69,

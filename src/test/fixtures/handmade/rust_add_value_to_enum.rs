@@ -141,7 +141,6 @@ fn mapping_details_reversed() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-08-26: minimal 0.000%, full 0.069%
     assert_matches_human_painting_within_limit("rust-add-value-to-enum", 0.08)
 }
 

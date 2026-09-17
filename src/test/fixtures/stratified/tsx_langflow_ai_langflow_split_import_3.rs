@@ -31,7 +31,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-08: minimal 11.314% (68/601 bytes), full 7.987% (48/601) (measured, unexamined)
     assert_matches_human_painting_within_limit("tsx-langflow-ai-langflow-split-import-3", 11.33)
 }
 

@@ -28,15 +28,14 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-10: minimal 0.054%, full 0.054%
     assert_matches_human_painting_within_limit("vimscript-neovim-neovim-only-delete", 0.07)
 }
 
 #[test]
 fn invariants() -> Result<()> {
-    // Repaired in the ground truth on 2026-09-11 and back to 0, from the 2 violations this
-    // pinned since 2026-08-31. Both presets deleted `iskeyword< ` on row 24 and ended the run on
-    // a space; `Full` now takes ` iskeyword<` (the left-anchored spelling) and `Minimal`
-    // `iskeyword<`. Both end on `<`, so the no-trailing-whitespace invariant holds.
+    // Repaired in the ground truth and back to 0, from the 2 violations this pinned since. Both
+    // presets deleted `iskeyword< ` on row 24 and ended the run on a space; `Full` now takes `
+    // iskeyword<` (the left-anchored spelling) and `Minimal` `iskeyword<`. Both end on `<`, so the
+    // no-trailing-whitespace invariant holds.
     assert_ground_truth_invariants("vimscript-neovim-neovim-only-delete")
 }

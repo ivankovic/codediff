@@ -258,8 +258,8 @@ pub(crate) fn insert_use_line(existing: &str, use_line: &str) -> String {
 pub(crate) fn painting_test_block(name: &str) -> String {
     format!(
         "\n#[test]\nfn painting() -> Result<()> {{\n\
-         \x20   // Not measured yet: 100.0 passes unconditionally. Run this test, read the rate it\n\
-         \x20   // reports for both modes, and record that instead.\n\
+         \x20   // Not measured yet: 100.0 passes unconditionally. Run this test and record the\n\
+         \x20   // limit it reports instead.\n\
          \x20   assert_matches_human_painting_within_limit(\"{name}\", 100.0)\n}}\n"
     )
 }

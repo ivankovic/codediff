@@ -27,7 +27,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-08-26: minimal 7.266%, full 7.266%
     assert_matches_human_painting_within_limit("java-fix-array-index", 7.28)
 }
 

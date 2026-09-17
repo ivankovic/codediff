@@ -28,7 +28,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-09: minimal 5.669%, full 5.896% (measured, unexamined)
     assert_matches_human_painting_within_limit("xml-odoo-odoo-insert-only", 5.91)
 }
 

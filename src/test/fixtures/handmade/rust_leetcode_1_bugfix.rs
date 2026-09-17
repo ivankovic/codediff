@@ -91,7 +91,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-01: minimal 1.546%, full 0.000% (measured, unexamined)
     assert_matches_human_painting_within_limit("rust-leetcode-1-bugfix", 1.57)
 }
 

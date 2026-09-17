@@ -30,7 +30,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-09: minimal 1.241%, full 1.241% (measured, unexamined)
     assert_matches_human_painting_within_limit(
         "ruby-mastodon-mastodon-add-func-and-attribute",
         1.26,

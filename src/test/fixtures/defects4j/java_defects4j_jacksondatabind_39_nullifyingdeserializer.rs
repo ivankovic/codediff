@@ -30,7 +30,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-12: minimal 1.443%, full 1.613% (measured, unexamined)
     assert_matches_human_painting_within_limit(
         "java-defects4j-jacksondatabind-39-nullifyingdeserializer",
         1.63,

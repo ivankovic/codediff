@@ -28,7 +28,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-16: minimal 0.023%, full 0.025% (measured, unexamined)
     assert_matches_human_painting_within_limit("java-defects4j-cli-11-helpformatter", 0.04)
 }
 

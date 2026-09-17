@@ -21,15 +21,14 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // Recorded distance from the human mapping, not a target: 458 mismatches (320 visible) of
-    // 20684 nodes, 2.2%, measured 2026-08-27 when this fixture's mapping was authored.
-    //
-    // Unlike its two siblings in this bucket, every mismatch here is attributed, and to just two
-    // reasons: `StructurallyIdenticalAncestor` (352) and `IdenticalHashOfAncestor` (96). Both are
+    // Recorded distance from the human mapping, not a target: 458 mismatches (320 visible) of 20684
+    // nodes, 2.2%, when this fixture's mapping was authored. Unlike its two siblings in this
+    // bucket, every mismatch here is attributed, and to just two reasons:
+    // `StructurallyIdenticalAncestor` (352) and `IdenticalHashOfAncestor` (96). Both are
     // inheritance - a container is matched, on shape or on hash, and its descendants take the
-    // operation that follows from that rather than the one the human gave them. So this is a
-    // single mechanism disagreeing at scale, not a scattering of separate defects, which makes it
-    // a better candidate to root-cause than the raw count suggests.
+    // operation that follows from that rather than the one the human gave them. So this is a single
+    // mechanism disagreeing at scale, not a scattering of separate defects, which makes it a better
+    // candidate to root-cause than the raw count suggests.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "html-chennes-med-extreme-test",
         458,

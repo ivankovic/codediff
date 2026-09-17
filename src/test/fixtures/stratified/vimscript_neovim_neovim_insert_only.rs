@@ -28,7 +28,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-10: minimal 0.156%, full 0.156%
     assert_matches_human_painting_within_limit("vimscript-neovim-neovim-insert-only", 0.17)
 }
 

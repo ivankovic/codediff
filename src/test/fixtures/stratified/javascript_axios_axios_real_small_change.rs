@@ -39,7 +39,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-09: minimal 2.374%, full 11.732% (measured, unexamined)
     assert_matches_human_painting_within_limit("javascript-axios-axios-real-small-change", 11.75)
 }
 

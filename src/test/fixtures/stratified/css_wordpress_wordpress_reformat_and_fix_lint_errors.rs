@@ -30,7 +30,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-05: minimal 64.394%, full 50.758%
     assert_matches_human_painting_within_limit(
         "css-wordpress-wordpress-reformat-and-fix-lint-errors",
         64.41,

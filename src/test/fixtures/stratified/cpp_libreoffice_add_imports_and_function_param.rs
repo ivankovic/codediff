@@ -30,7 +30,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-06: minimal 2.526%, full 2.617%
     assert_matches_human_painting_within_limit(
         "cpp-libreoffice-add-imports-and-function-param",
         2.63,

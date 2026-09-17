@@ -30,16 +30,14 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-09: minimal 4.824%, full 0.981% (measured, unexamined)
     assert_matches_human_painting_within_limit("php-nextcloud-server-real-small-change", 4.84)
 }
 
 #[test]
 fn invariants() -> Result<()> {
-    // Was pinned at 2 until 2026-09-12: two `Full` rows - the `@var IClientService` docblock line
-    // and the `private $clientService;` beside it - painted every visible character `Delete` but
-    // left their one leading tab unpainted, which invariant 4 reads as a line changed in whole but
-    // painted in part. The note left the call to the author, and the author made it: both tabs are
-    // now painted, matching the deleted lines around them, so the fixture is at 0.
+    // Two `Full` rows - the `@var IClientService` docblock line and the `private $clientService;`
+    // beside it - painted every visible character `Delete` but left their one leading tab
+    // unpainted, which invariant 4 reads as a line changed in whole but painted in part. Both tabs
+    // are painted, matching the deleted lines around them, so the fixture is at 0.
     assert_ground_truth_invariants("php-nextcloud-server-real-small-change")
 }

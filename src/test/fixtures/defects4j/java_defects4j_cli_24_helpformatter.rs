@@ -23,11 +23,10 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // First measurement, 2026-09-17, of a mapping from the 2026-09-16 Defects4J batch. A
-    // `throw_statement` is replaced by an `expression_statement`: the human deletes one and
-    // inserts the other, while codediff re-uses the `;` and reads the old `type_identifier`
-    // against the new `identifier`. Four re-used leaves, two on each side - the
-    // scaffolding-reuse family again.
+    // A `throw_statement` is replaced by an `expression_statement`: the human deletes one and
+    // inserts the other, while codediff re-uses the `;` and reads the old `type_identifier` against
+    // the new `identifier`. Four re-used leaves, two on each side - the scaffolding-reuse family
+    // again.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "java-defects4j-cli-24-helpformatter",
         4,
@@ -37,15 +36,13 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-17: minimal 0.068%, full 0.106% (measured, unexamined)
     assert_matches_human_painting_within_limit("java-defects4j-cli-24-helpformatter", 0.12)
 }
 
 #[test]
 fn invariants() -> Result<()> {
-    // First measurement, 2026-09-17: invariant 1 under both presets, before row 825's last painted
-    // run ends on a space rather than on a visible character (the `+` continuation of the
-    // `IllegalStateException` message). Recorded as found; one painted range needs its trailing
-    // space trimmed.
+    // Invariant 1 under both presets, before row 825's last painted run ends on a space rather than
+    // on a visible character (the `+` continuation of the `IllegalStateException` message).
+    // Recorded as found; one painted range needs its trailing space trimmed.
     assert_ground_truth_invariants_with_known_violations("java-defects4j-cli-24-helpformatter", 2)
 }

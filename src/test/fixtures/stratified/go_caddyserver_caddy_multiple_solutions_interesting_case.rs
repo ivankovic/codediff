@@ -23,9 +23,9 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // measured 2026-09-11: 3 mismatch(es), 3 visible. The fixture's own name records the reason:
-    // several genuinely different mappings are defensible here depending on whether given node
-    // kinds are preferred to match, and codediff takes a different one than the painter did.
+    // 3 mismatch(es), 3 visible. The fixture's own name records the reason: several genuinely
+    // different mappings are defensible here depending on whether given node kinds are preferred to
+    // match, and codediff takes a different one than the painter did.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "go-caddyserver-caddy-multiple-solutions-interesting-case",
         3,
@@ -35,7 +35,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-11: minimal 0.014%, full 0.015%
     assert_matches_human_painting_within_limit(
         "go-caddyserver-caddy-multiple-solutions-interesting-case",
         0.03,

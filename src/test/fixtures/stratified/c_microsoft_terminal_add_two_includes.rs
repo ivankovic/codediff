@@ -30,7 +30,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-05: minimal 0.000%, full 0.360%
     assert_matches_human_painting_within_limit("c-microsoft-terminal-add-two-includes", 0.37)
 }
 

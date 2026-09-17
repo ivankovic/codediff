@@ -55,7 +55,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-01: minimal 0.626%, full 0.823% (measured, unexamined)
     assert_matches_human_painting_within_limit("rust-firefox-webrenderer-borders", 0.85)
 }
 

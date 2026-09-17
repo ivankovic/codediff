@@ -31,11 +31,10 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-06: minimal 4.800%, full 11.189%
-    // The largest disagreement among the fixtures added on 2026-09-06, and not a mapping defect:
-    // this commit only reflows whitespace, and interior whitespace lives in the gaps between AST
-    // nodes, where no painting can reach it. codediff paints the reflowed statements themselves;
-    // the human painted nothing under Minimal. Recorded as the distance it is, not as a target.
+    // The largest disagreement among the fixtures added, and not a mapping defect: this commit only
+    // reflows whitespace, and interior whitespace lives in the gaps between AST nodes, where no
+    // painting can reach it. codediff paints the reflowed statements themselves; the human painted
+    // nothing under Minimal. Recorded as the distance it is, not as a target.
     assert_matches_human_painting_within_limit("c-openssl-openssl-format-only-change", 11.20)
 }
 

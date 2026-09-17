@@ -30,9 +30,7 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // Re-measured 2026-09-16 after the painting was revised: minimal 3.384%,
-    // full 1.856%. The ground truth moved, not the renderer - see
-    // `ground-truth-moves-limits-move`.
+    // The ground truth moved, not the renderer - see `ground-truth-moves-limits-move`.
     assert_matches_human_painting_within_limit("java-defects4j-mockito-19-mockcandidatefilter", 3.4)
 }
 

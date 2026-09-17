@@ -30,7 +30,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-11: minimal 0.000%, full 0.000% (measured, unexamined)
     assert_matches_human_painting_within_limit("c-godotengine-godot-add-two-enum-values", 0.0)
 }
 

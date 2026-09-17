@@ -22,17 +22,12 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // This test contains an interesting ambigous situation:
-    //
-    // The added if clause can be mapped in two equally good ways. Either the inner or the outer
-    // after if can map to the if in the before code. Expressed as two multi-map groups (inner and
-    // outer `if`) since either pairing is valid - but codediff actually matches the inner `if` as
-    // Identical rather than the group's declared MatchButNotIdentical, one mismatch beyond the
-    // pre-multi-map 4.
-    // 2026-09-03: tightened 5,0 -> 4,0. The limit was stale rather than a deliberate allowance: it
-    // had outlived the change that closed the gap, and `quality_baseline.csv` was the only thing
-    // still holding this fixture to its real number. Any counts above describe the older, larger
-    // residual.
+    // This test contains an interesting ambigous situation: The added if clause can be mapped in
+    // two equally good ways. Either the inner or the outer after if can map to the if in the before
+    // code. Expressed as two multi-map groups (inner and outer `if`) since either pairing is valid
+    // - but codediff actually matches the inner `if` as Identical rather than the group's declared
+    // MatchButNotIdentical, one mismatch beyond the pre-multi-map 4. Any counts above describe the
+    // older, larger residual.
     test::helper::human_mapping::assert_matches_human_mapping("c-linux-small-bugfix")
 }
 
@@ -43,6 +38,5 @@ fn invariants() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-11: minimal 0.053%, full 0.004%
     assert_matches_human_painting_within_limit("c-linux-small-bugfix", 0.07)
 }

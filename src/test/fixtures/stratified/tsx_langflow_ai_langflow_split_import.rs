@@ -31,12 +31,10 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-08: minimal 15.606%, full 9.446% (measured, unexamined)
-    // re-measured 2026-09-08 after `RenderOptions::paint_displaced_moves` stopped `MINIMAL` painting a
-    // span that kept its own text and its own place and shifted only because of an edit before it:
-    // minimal 15.606% -> 13.963%. The option is off under `FULL`, which this fix leaves byte-identical
-    // at 9.446%, so `MINIMAL` sets the limit now. Any earlier number in this comment that disagrees
-    // with these two predates unrelated rendering and ground-truth fixes and was never re-measured.
+    // After `RenderOptions::paint_displaced_moves` stopped `MINIMAL` painting a span that kept its
+    // own text and its own place and shifted only because of an edit before it: minimal 15.606% ->
+    // 13.963%. The option is off under `FULL`, which this fix leaves byte-identical at 9.446%, so
+    // `MINIMAL` sets the limit now.
     assert_matches_human_painting_within_limit("tsx-langflow-ai-langflow-split-import", 13.98)
 }
 

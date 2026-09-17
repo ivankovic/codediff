@@ -28,7 +28,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-06: minimal 0.000%, full 0.701%
     assert_matches_human_painting_within_limit("c-htop-dev-htop-update-import", 0.72)
 }
 

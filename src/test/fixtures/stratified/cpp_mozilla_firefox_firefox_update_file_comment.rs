@@ -30,8 +30,8 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // remeasured 2026-09-06 after the Delete on rows 1-2 was pulled back off the space in the
-    // comment's ` * ` prefix: minimal 0.111% -> 0.055%, full 0.055% -> 0.000%.
+    // After the Delete on rows 1-2 was pulled back off the space in the comment's ` * ` prefix:
+    // minimal 0.111% -> 0.055%, full 0.055% -> 0.000%.
     assert_matches_human_painting_within_limit(
         "cpp-mozilla-firefox-firefox-update-file-comment",
         0.07,

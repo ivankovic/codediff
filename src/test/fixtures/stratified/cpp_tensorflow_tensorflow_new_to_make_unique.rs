@@ -23,12 +23,11 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // measured 2026-09-11: 6 mismatch(es), 4 visible. `new Foo(a, b)` became
-    // `absl::make_unique<Foo>(a, b)`. The human maps the old `argument_list` and its parens to
-    // nothing - the call is a different call - while APTED pairs them with the new call's
-    // `argument_list` on qualified_name, because the arguments inside really are identical. 4 of
-    // the 6 are the two paren pairs; this is the flat delimiter-pairing family, not something
-    // specific to this fixture.
+    // 6 mismatch(es), 4 visible. `new Foo(a, b)` became `absl::make_unique<Foo>(a, b)`. The human
+    // maps the old `argument_list` and its parens to nothing - the call is a different call - while
+    // APTED pairs them with the new call's `argument_list` on qualified_name, because the arguments
+    // inside really are identical. 4 of the 6 are the two paren pairs; this is the flat
+    // delimiter-pairing family, not something specific to this fixture.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "cpp-tensorflow-tensorflow-new-to-make-unique",
         6,
@@ -38,7 +37,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-11: minimal 0.220%, full 0.220%
     assert_matches_human_painting_within_limit("cpp-tensorflow-tensorflow-new-to-make-unique", 0.23)
 }
 

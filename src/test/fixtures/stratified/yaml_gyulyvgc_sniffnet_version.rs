@@ -28,7 +28,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-08: minimal 0.000% (0/341 bytes), full 6.745% (23/341) (measured, unexamined)
     assert_matches_human_painting_within_limit("yaml-gyulyvgc-sniffnet-version", 6.76)
 }
 

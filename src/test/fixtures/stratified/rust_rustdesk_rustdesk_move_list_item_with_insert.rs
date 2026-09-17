@@ -30,7 +30,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-11: minimal 0.070%, full 0.074%
     assert_matches_human_painting_within_limit(
         "rust-rustdesk-rustdesk-move-list-item-with-insert",
         0.09,

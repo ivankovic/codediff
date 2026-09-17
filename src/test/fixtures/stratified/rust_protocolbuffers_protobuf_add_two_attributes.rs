@@ -30,7 +30,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-11: minimal 0.095%, full 0.048%
     assert_matches_human_painting_within_limit(
         "rust-protocolbuffers-protobuf-add-two-attributes",
         0.11,

@@ -30,7 +30,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-11: minimal 0.503%, full 0.510%
     assert_matches_human_painting_within_limit(
         "c-protocolbuffers-protobuf-add-to-preproc-define",
         0.52,

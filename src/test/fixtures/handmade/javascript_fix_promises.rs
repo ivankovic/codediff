@@ -24,19 +24,14 @@ use anyhow::Result;
 fn mapping() -> Result<()> {
     // Three pairs inside 2<->3 and 1<->2 multi-map groups where the human recorded
     // `MatchButNotIdentical` and codediff chose `Identical`. The pairing itself is accepted - the
-    // group permits any consistent one - so this is purely a disagreement about whether the
-    // matched pair counts as identical, on nodes whose *subtrees* differ even though the pair is
+    // group permits any consistent one - so this is purely a disagreement about whether the matched
+    // pair counts as identical, on nodes whose *subtrees* differ even though the pair is
     // byte-identical. Zero visible mismatches: nothing on screen renders differently.
-    // 2026-09-03: the clamp at 3,0 is gone - this fixture now maps exactly. The limit was stale
-    // rather than a deliberate allowance: it had outlived the change that closed the gap, and
-    // `quality_baseline.csv` was the only thing still holding this fixture to its real number. Any
-    // counts above describe a residual that no longer exists.
     test::helper::human_mapping::assert_matches_human_mapping("javascript-fix-promises")
 }
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-08-26: minimal 6.745%, full 2.698%
     assert_matches_human_painting_within_limit("javascript-fix-promises", 6.76)
 }
 

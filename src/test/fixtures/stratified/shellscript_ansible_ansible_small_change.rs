@@ -30,7 +30,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-09: minimal 0.159%, full 0.159% (measured, unexamined)
     assert_matches_human_painting_within_limit("shellscript-ansible-ansible-small-change", 0.17)
 }
 

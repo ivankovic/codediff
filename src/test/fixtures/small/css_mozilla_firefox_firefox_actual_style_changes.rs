@@ -21,9 +21,7 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // 2026-09-03: tightened 6,4 -> 5,3. The limit was stale rather than a deliberate allowance: it
-    // had outlived the change that closed the gap, and `quality_baseline.csv` was the only thing
-    // still holding this fixture to its real number.
+    // Clamped at the measured residual; what the remainder is has not been analysed here.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "css-mozilla-firefox-firefox-actual-style-changes",
         5,

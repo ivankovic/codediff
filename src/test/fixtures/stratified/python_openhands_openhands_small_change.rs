@@ -30,7 +30,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-09: minimal 7.807%, full 8.622% (measured, unexamined)
     assert_matches_human_painting_within_limit("python-openhands-openhands-small-change", 8.64)
 }
 

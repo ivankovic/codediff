@@ -30,7 +30,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-10: minimal 0.000%, full 0.000% (measured, unexamined)
     assert_matches_human_painting_within_limit("cpp-godotengine-godot-insert-one-include", 0.0)
 }
 

@@ -23,11 +23,11 @@ use anyhow::Result;
 #[test]
 fn mapping() -> Result<()> {
     // Known, pre-existing gap against the human-authored mapping - not yet root-caused, so clamped
-    // rather than fixed here. 84 -> 85 (2026-08-18) from the `COST_LITERAL_UPDATE` tie fix (see
+    // rather than fixed here. 84 -> 85 from the `COST_LITERAL_UPDATE` tie fix (see
     // `rust_sniffnet_protocol.rs`): a deliberate, measured +1 - the fixture's `algorithm_cost`
-    // *improved* 273 -> 271 (human 261) under the same change, so the extra mismatch is the
-    // mapping moving further from the human's labels while getting cheaper by the objective, on a
-    // fixture whose gap is unexplained to begin with. Lower (or drop back to
+    // *improved* 273 -> 271 (human 261) under the same change, so the extra mismatch is the mapping
+    // moving further from the human's labels while getting cheaper by the objective, on a fixture
+    // whose gap is unexplained to begin with. Lower (or drop back to
     // `assert_matches_human_mapping`) once the gap is root-caused.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "rust-add-comments-and-real-new-logic",
@@ -38,12 +38,10 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-01: minimal 1.129%, full 0.780% (measured, unexamined)
-    // re-measured 2026-09-08 after `RenderOptions::paint_displaced_moves` stopped `MINIMAL` painting a
-    // span that kept its own text and its own place and shifted only because of an edit before it:
-    // minimal 0.707% -> 0.622%. The option is off under `FULL`, which this fix leaves byte-identical
-    // at 0.777%, so `FULL` sets the limit now. Any earlier number in this comment that disagrees with
-    // these two predates unrelated rendering and ground-truth fixes and was never re-measured.
+    // After `RenderOptions::paint_displaced_moves` stopped `MINIMAL` painting a span that kept its
+    // own text and its own place and shifted only because of an edit before it: minimal 0.707% ->
+    // 0.622%. The option is off under `FULL`, which this fix leaves byte-identical at 0.777%, so
+    // `FULL` sets the limit now.
     assert_matches_human_painting_within_limit("rust-add-comments-and-real-new-logic", 0.8)
 }
 

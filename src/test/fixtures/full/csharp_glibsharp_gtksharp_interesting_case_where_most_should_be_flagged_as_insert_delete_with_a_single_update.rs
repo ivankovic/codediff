@@ -21,10 +21,10 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // One `identifier` the human pairs across a reshape (a method body's call becomes a
-    // property's `return`) is deleted instead, by `APTED("qualified_name")`. The same
-    // search-quality gap that bucket has carried since 2026-08-17: the name matches, but the
-    // enclosing path differs enough that the pass does not reach for it.
+    // One `identifier` the human pairs across a reshape (a method body's call becomes a property's
+    // `return`) is deleted instead, by `APTED("qualified_name")`. The same search-quality gap that
+    // bucket has carried since: the name matches, but the enclosing path differs enough that the
+    // pass does not reach for it.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "csharp-glibsharp-gtksharp-interesting-case-where-most-should-be-flagged-as-insert-delete-with-a-single-update",
         1,

@@ -28,7 +28,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-08: minimal 0.623% (2/321 bytes), full 0.623% (2/321) (measured, unexamined)
     assert_matches_human_painting_within_limit("yaml-jekyll-jekyll-true-to-false", 0.64)
 }
 

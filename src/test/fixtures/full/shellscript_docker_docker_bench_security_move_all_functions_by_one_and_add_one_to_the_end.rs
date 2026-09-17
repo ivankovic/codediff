@@ -21,20 +21,16 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // Recorded distance from the human mapping, not a target: 334 mismatches (227 visible) of
-    // 19036 nodes, 1.75%, measured 2026-08-27 when this fixture's mapping was authored. Lower it
-    // when a change earns it; a rise is a regression.
-    //
-    // The fixture's name is the mechanism: every `function_definition` shifts by one, so the human
-    // paired each before function with its neighbour on the after side, while codediff paired them
-    // positionally and called the leftover an insert. 303 of the mismatches are
-    // `StructurallyIdenticalAncestor` and 31 `StructurallyIdenticalSubtrees` - descendants
-    // inheriting the container decision, not 334 independent ones.
-    //
-    // Codediff's answer costs 210 against the human's 175. A gap of 35 rather than a tie, so this
-    // is not the indifferent-cost case `research/data/quality/move_attribution.md` describes: the
-    // positional pairing really is the more expensive answer here, and something is picking it
-    // anyway.
+    // Recorded distance from the human mapping, not a target: 334 mismatches (227 visible) of 19036
+    // nodes, 1.75%, when this fixture's mapping was authored. Lower it when a change earns it; a
+    // rise is a regression. The fixture's name is the mechanism: every `function_definition` shifts
+    // by one, so the human paired each before function with its neighbour on the after side, while
+    // codediff paired them positionally and called the leftover an insert. 303 of the mismatches
+    // are `StructurallyIdenticalAncestor` and 31 `StructurallyIdenticalSubtrees` - descendants
+    // inheriting the container decision, not 334 independent ones. Codediff's answer costs 210
+    // against the human's 175. A gap of 35 rather than a tie, so this is not the indifferent-cost
+    // case `research/data/quality/move_attribution.md` describes: the positional pairing really is
+    // the more expensive answer here, and something is picking it anyway.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "shellscript-docker-docker-bench-security-move-all-functions-by-one-and-add-one-to-the-end",
         334,

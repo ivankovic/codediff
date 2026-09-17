@@ -30,7 +30,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-09: minimal 0.111%, full 0.000% (measured, unexamined)
     assert_matches_human_painting_within_limit("kotlin-nextcloud-android-add-param-to-class", 0.13)
 }
 

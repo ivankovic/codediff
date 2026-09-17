@@ -30,7 +30,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-08: minimal 0.000% (0/2011 bytes), full 0.050% (1/2011) (measured, unexamined)
     assert_matches_human_painting_within_limit(
         "go-prometheus-prometheus-remove-copyright-year",
         0.06,

@@ -23,11 +23,11 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // 2026-09-12: 0/0 -> 1/1 because the ground truth moved - the human mapping was re-annotated
-    // to pair `=` with the `.=` that replaced it. Exact again since 2026-09-17: that note called it
-    // "a cross-kind operator match of exactly the kind `kinds_update_allowed` exists for", and the
-    // reason it did not work was that Vimscript reached `families_for_language`'s empty default and
-    // had no operator families at all. It has them now.
+    // 0/0 -> 1/1 because the ground truth moved - the human mapping was re-annotated to pair `=`
+    // with the `.=` that replaced it. Exact again since: that note called it "a cross-kind operator
+    // match of exactly the kind `kinds_update_allowed` exists for", and the reason it did not work
+    // was that Vimscript reached `families_for_language`'s empty default and had no operator
+    // families at all. It has them now.
     test::helper::human_mapping::assert_matches_human_mapping(
         "vimscript-neovim-neovim-small-change-2",
     )
@@ -35,7 +35,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-10: minimal 0.590%, full 5.605%
     // codediff splits into Insert+Delete what the human painting calls one Update. Note this
     // fixture also has a known ground-truth invariant violation (see invariants() below), so part
     // of this rate may be the data rather than the algorithm.
@@ -44,9 +43,9 @@ fn painting() -> Result<()> {
 
 #[test]
 fn invariants() -> Result<()> {
-    // Was pinned at 1: `Minimal` inserts `| ` on row 18 of the after side and the run ends on
-    // that space. It is mid-row - `setl com< cms<'` follows it - so this was the invariant
-    // over-firing, not a painting to repair. Back to 0 since `rows_end_on_visible_characters`
-    // was narrowed to genuinely trailing whitespace on 2026-09-11.
+    // Was pinned at 1: `Minimal` inserts `| ` on row 18 of the after side and the run ends on that
+    // space. It is mid-row - `setl com< cms<'` follows it - so this was the invariant over-firing,
+    // not a painting to repair. Back to 0 since `rows_end_on_visible_characters` was narrowed to
+    // genuinely trailing whitespace.
     assert_ground_truth_invariants("vimscript-neovim-neovim-small-change-2")
 }

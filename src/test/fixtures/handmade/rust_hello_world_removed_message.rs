@@ -62,8 +62,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-08-27: minimal 0.000% (0 bytes), full 0.685% (1 of 146 bytes)
-    //
     // The mirror image of `rust-hello-world-added-message`, and it scores identically - which is
     // the useful part: the same edit read backwards costs the same, so nothing here is
     // direction-dependent.

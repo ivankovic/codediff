@@ -30,7 +30,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-11: minimal 0.003%, full 0.003%
     assert_matches_human_painting_within_limit(
         "cpp-microsoft-terminal-remove-unary-expression-from-binary",
         0.02,

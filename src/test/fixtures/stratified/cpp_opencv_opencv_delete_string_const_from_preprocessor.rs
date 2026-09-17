@@ -30,7 +30,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-06: minimal 0.225%, full 0.225%
     assert_matches_human_painting_within_limit(
         "cpp-opencv-opencv-delete-string-const-from-preprocessor",
         0.24,

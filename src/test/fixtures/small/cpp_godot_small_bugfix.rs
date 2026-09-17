@@ -22,11 +22,8 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // Re-baselined 2026-09-07 from 11/5, and NOT an algorithm regression: this fixture's human
-    // mapping was re-paired by hand on 2026-09-06 (the crossed inner/outer braces its
-    // `invariants()` test used to record), so the limits now score codediff against a different,
-    // corrected ground truth. The residual is the nested `if` this commit did not touch - the
-    // container choice, not the delimiters.
+    // The residual is the nested `if` this commit did not touch - the container choice, not the
+    // delimiters.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "cpp-godot-small-bugfix",
         13,
@@ -41,6 +38,5 @@ fn invariants() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-11: minimal 0.551%, full 0.206%
     assert_matches_human_painting_within_limit("cpp-godot-small-bugfix", 0.57)
 }

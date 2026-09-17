@@ -28,14 +28,12 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-09: minimal 0.000%, full 0.166% (measured, unexamined)
     assert_matches_human_painting_within_limit("kotlin-nextcloud-android-rename", 0.18)
 }
 
 #[test]
 fn invariants() -> Result<()> {
-    // Invariant 16, first measured 2026-09-15 when the rule was added: the Minimal/Full split
-    // for a renamed identifier is not painted this way yet (`PermanentFailure` against `NonRetryable`, which share nothing). Recorded as found; the
-    // rule is new, the paintings predate it.
+    // Invariant 16: the Minimal/Full split for a renamed identifier is not painted this way yet
+    // (`PermanentFailure` against `NonRetryable`, which share nothing). Recorded as found.
     assert_ground_truth_invariants_with_known_violations("kotlin-nextcloud-android-rename", 2)
 }

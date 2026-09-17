@@ -39,7 +39,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-09: minimal 2.965%, full 3.877% (measured, unexamined)
     assert_matches_human_painting_within_limit("javascript-microsoft-typescript-refactor", 3.89)
 }
 

@@ -30,15 +30,14 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-11: minimal 0.000%, full 0.004%
     assert_matches_human_painting_within_limit("csharp-sonarr-sonarr-fix-comment-typo", 0.02)
 }
 
 #[test]
 fn invariants() -> Result<()> {
-    // Repaired in the ground truth on 2026-09-11 and back to 0. `Full` used to delete the
-    // second of the two `// ` copies on row 234, ending its run on a space; it now deletes the
-    // first, which covers the same bytes, ends on `/`, and is the left-anchored spelling the
-    // rule in RULES_AND_PREFERENCES.md asks for. The invariant and the rule agreed here.
+    // `Full` must not delete the second of the two `// ` copies on row 234, ending its run on a
+    // space; it now deletes the first, which covers the same bytes, ends on `/`, and is the
+    // left-anchored spelling the rule in RULES_AND_PREFERENCES.md asks for. The invariant and the
+    // rule agreed here.
     assert_ground_truth_invariants("csharp-sonarr-sonarr-fix-comment-typo")
 }

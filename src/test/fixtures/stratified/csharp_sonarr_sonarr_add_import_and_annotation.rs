@@ -30,8 +30,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-08: minimal 0.000%, full 0.000% - codediff's rendering is byte-identical to the
-    // painting under both presets.
     assert_matches_human_painting_within_limit(
         "csharp-sonarr-sonarr-add-import-and-annotation",
         0.0,

@@ -27,7 +27,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-08-26: minimal 22.103%, full 22.103%
     assert_matches_human_painting_within_limit("cpp-add-const-correctness", 22.12)
 }
 

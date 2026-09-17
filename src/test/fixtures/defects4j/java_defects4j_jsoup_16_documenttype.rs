@@ -23,12 +23,12 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // First measurement, 2026-09-12. The edit wraps an existing call in another one, so the
-    // after side has a `method_invocation` inside a `method_invocation` where the before side
-    // has one. The human reads the inner pair as the surviving call and the outer one as new;
-    // codediff's `qualified_name` pass pairs the receiver's `.` and `identifier` with the outer
-    // call instead, which makes the same four leaves disagree twice - once as a wrong pairing,
-    // once as an insert that was matched. One reading of one wrap, not four faults.
+    // The edit wraps an existing call in another one, so the after side has a `method_invocation`
+    // inside a `method_invocation` where the before side has one. The human reads the inner pair as
+    // the surviving call and the outer one as new; codediff's `qualified_name` pass pairs the
+    // receiver's `.` and `identifier` with the outer call instead, which makes the same four leaves
+    // disagree twice - once as a wrong pairing, once as an insert that was matched. One reading of
+    // one wrap, not four faults.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "java-defects4j-jsoup-16-documenttype",
         4,
@@ -38,7 +38,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-12: minimal 1.117%, full 4.276% (measured, unexamined)
     assert_matches_human_painting_within_limit("java-defects4j-jsoup-16-documenttype", 4.29)
 }
 

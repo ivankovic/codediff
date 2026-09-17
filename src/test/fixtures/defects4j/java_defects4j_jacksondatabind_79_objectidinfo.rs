@@ -30,7 +30,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-15: minimal 0.000%, full 0.326% (measured, unexamined)
     assert_matches_human_painting_within_limit(
         "java-defects4j-jacksondatabind-79-objectidinfo",
         0.34,

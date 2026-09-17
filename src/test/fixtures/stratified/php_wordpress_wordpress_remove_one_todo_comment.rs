@@ -30,7 +30,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-10: minimal 0.000%, full 0.000% (measured, unexamined)
     assert_matches_human_painting_within_limit(
         "php-wordpress-wordpress-remove-one-todo-comment",
         0.0,

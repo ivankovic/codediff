@@ -22,14 +22,11 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // The 4 predefined_type<->type_identifier mismatches (e.g. "number" becoming a generic "T")
-    // are fixed - see TS_TYPE_KEYWORD_KINDS in nodes.rs. The remaining 10/7 is an unrelated
+    // The 4 predefined_type<->type_identifier mismatches (e.g. "number" becoming a generic "T") are
+    // fixed - see TS_TYPE_KEYWORD_KINDS in nodes.rs. The remaining 10/7 is an unrelated
     // fast_fallback issue: the renamed "const container = new NumberContainer(42)" line fails to
-    // match its "const numberContainer = new Container<number>(42)" counterpart at all.
-    // 2026-09-03: tightened 10,7 -> 1,1. The limit was stale rather than a deliberate allowance: it
-    // had outlived the change that closed the gap, and `quality_baseline.csv` was the only thing
-    // still holding this fixture to its real number. Any counts above describe the older, larger
-    // residual.
+    // match its "const numberContainer = new Container<number>(42)" counterpart at all. Any counts
+    // above describe the older, larger residual.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "typescript-add-generics",
         1,
@@ -39,14 +36,12 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-01: minimal 18.626%, full 19.084% (measured, unexamined)
     assert_matches_human_painting_within_limit("typescript-add-generics", 19.11)
 }
 
 #[test]
 fn invariants() -> Result<()> {
-    // Invariant 16, first measured 2026-09-15 when the rule was added: the Minimal/Full split
-    // for a renamed identifier is not painted this way yet (`NumberContainer` against `Container`). Recorded as found; the
-    // rule is new, the paintings predate it.
+    // Invariant 16: the Minimal/Full split for a renamed identifier is not painted this way yet
+    // (`NumberContainer` against `Container`). Recorded as found.
     assert_ground_truth_invariants_with_known_violations("typescript-add-generics", 4)
 }

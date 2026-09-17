@@ -28,7 +28,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-08: minimal 0.000% (0/594 bytes), full 0.673% (4/594) (measured, unexamined)
     assert_matches_human_painting_within_limit("java-genymobile-scrcpy-only-insert", 0.69)
 }
 

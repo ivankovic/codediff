@@ -21,12 +21,12 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // 2026-08-06: fixed exactly (28 -> 0) by `apted::prematch_unique_named_locals` - `group`
-    // ("shift-due-to-insertion": `group="${args[4]}"` shifts to `group="${args[5]}"` when a new
-    // `powershell="${args[4]}"` line is inserted right before it) is now pre-matched by variable
-    // name before the file-root `final_pass` call gets a chance to prefer the cheaper-but-wrong
-    // by-position pairing. See that function's doc comment and `TODO.md`'s "shift-due-to-
-    // insertion" entry for the full cost-model root cause this closes.
+    // Resolved by `apted::prematch_unique_named_locals` - `group` ("shift-due-to-insertion":
+    // `group="${args[4]}"` shifts to `group="${args[5]}"` when a new `powershell="${args[4]}"` line
+    // is inserted right before it) is now pre-matched by variable name before the file-root
+    // `final_pass` call gets a chance to prefer the cheaper-but-wrong by-position pairing. See that
+    // function's doc comment and `TODO.md`'s "shift-due-to- insertion" entry for the full
+    // cost-model root cause this closes.
     test::helper::human_mapping::assert_matches_human_mapping(
         "shellscript-ansible-ansible-add-variable-and-string-expansion",
     )

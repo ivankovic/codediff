@@ -30,7 +30,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-09: minimal 1.563%, full 1.563% (measured, unexamined)
     assert_matches_human_painting_within_limit(
         "html-ladybirdbrowser-ladybird-update-two-pixel-numbers",
         1.58,

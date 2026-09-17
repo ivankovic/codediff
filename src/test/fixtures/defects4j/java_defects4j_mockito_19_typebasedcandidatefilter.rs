@@ -30,7 +30,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-12: minimal 1.389%, full 1.389% (measured, unexamined)
     assert_matches_human_painting_within_limit(
         "java-defects4j-mockito-19-typebasedcandidatefilter",
         1.4,

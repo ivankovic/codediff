@@ -27,8 +27,7 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // limit set 2026-08-28 (commit bd84cd3, a rendering fix, not this stub's own measurement);
-    // re-measured 2026-09-01, unchanged: minimal 13.793%, full 7.635%
+    // Minimal 13.793%, full 7.635%
     assert_matches_human_painting_within_limit("rust-data-structure", 13.8)
 }
 

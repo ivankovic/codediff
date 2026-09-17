@@ -21,14 +21,10 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // True best mapping would be a 2:1 mapping of the string constant
-    // Beyond that 2:1, 32 of the 64 sit in the `qualified_name` bucket.
-    // Known gap, characterized above but unfixed. Clamped at the observed count rather than
-    // requiring an exact match. Lower (or drop back to `assert_matches_human_mapping`) once
-    // a fix lands.
-    // 2026-09-03: tightened 64,34 -> 63,33. The limit was stale rather than a deliberate allowance:
-    // it had outlived the change that closed the gap, and `quality_baseline.csv` was the only thing
-    // still holding this fixture to its real number. Any counts above describe the older, larger
+    // True best mapping would be a 2:1 mapping of the string constant Beyond that 2:1, 32 of the 64
+    // sit in the `qualified_name` bucket. Known gap, characterized above but unfixed. Clamped at
+    // the observed count rather than requiring an exact match. Lower (or drop back to
+    // `assert_matches_human_mapping`) once a fix lands. Any counts above describe the older, larger
     // residual.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "swift-apple-swift-argument-parser-refactor-and-improve-tests",

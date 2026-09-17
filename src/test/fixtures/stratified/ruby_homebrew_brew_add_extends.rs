@@ -28,7 +28,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-10: minimal 0.061%, full 0.000%
     assert_matches_human_painting_within_limit("ruby-homebrew-brew-add-extends", 0.08)
 }
 

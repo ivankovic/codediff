@@ -23,13 +23,12 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // First measurement, 2026-09-17, of a mapping from the 2026-09-16 Defects4J batch. **The
-    // mapping is deliberately incomplete**: its own description.md says "Requires N:M mapping",
-    // and diffs.csv records 30 nodes it leaves unmapped because the format cannot express the
-    // pairing. The five residuals measured here are a nested `if_statement`, its block and its
-    // braces, which the human pairs and codediff's `qualified_name` pass deletes. Expect this
-    // limit to move when the mapping can be finished - that will be the ground truth changing,
-    // not the algorithm regressing.
+    // **The mapping is deliberately incomplete**: its own description.md says "Requires N:M
+    // mapping", and diffs.csv records 30 nodes it leaves unmapped because the format cannot express
+    // the pairing. The five residuals measured here are a nested `if_statement`, its block and its
+    // braces, which the human pairs and codediff's `qualified_name` pass deletes. Expect this limit
+    // to move when the mapping can be finished - that will be the ground truth changing, not the
+    // algorithm regressing.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "java-defects4j-cli-19-posixparser",
         5,
@@ -39,7 +38,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-17: minimal 0.264%, full 0.401% (measured, unexamined)
     assert_matches_human_painting_within_limit("java-defects4j-cli-19-posixparser", 0.42)
 }
 

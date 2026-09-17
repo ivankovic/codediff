@@ -38,7 +38,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-09: minimal 3.880%, full 9.524% (measured, unexamined)
     assert_matches_human_painting_within_limit("ruby-mastodon-mastodon-normal-change", 9.54)
 }
 

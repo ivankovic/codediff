@@ -30,7 +30,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-11: minimal 0.046%, full 0.046%
     assert_matches_human_painting_within_limit("css-wordpress-wordpress-change-comment", 0.06)
 }
 

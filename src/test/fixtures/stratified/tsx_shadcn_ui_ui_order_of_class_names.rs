@@ -30,9 +30,8 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-10: minimal 3.226%, full 3.226%
-    // Two `ours=Update, theirs=Move` - a class-attribute reorder that codediff reads as a
-    // rewrite. Move-vs-Update, the second-largest painting family.
+    // Two `ours=Update, theirs=Move` - a class-attribute reorder that codediff reads as a rewrite.
+    // Move-vs-Update, the second-largest painting family.
     assert_matches_human_painting_within_limit("tsx-shadcn-ui-ui-order-of-class-names", 3.24)
 }
 

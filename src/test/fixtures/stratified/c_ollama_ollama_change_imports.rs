@@ -23,8 +23,8 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // First baseline (2026-09-05), not a regression: this fixture was promoted with its human
-    // mapping already written, so the stub's generated 0/0 never reflected a measurement.
+    // First baseline, not a regression: this fixture was promoted with its human mapping already
+    // written, so the stub's generated 0/0 never reflected a measurement.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "c-ollama-ollama-change-imports",
         8,
@@ -34,7 +34,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-05: minimal 2.483%, full 2.483%
     assert_matches_human_painting_within_limit("c-ollama-ollama-change-imports", 2.50)
 }
 

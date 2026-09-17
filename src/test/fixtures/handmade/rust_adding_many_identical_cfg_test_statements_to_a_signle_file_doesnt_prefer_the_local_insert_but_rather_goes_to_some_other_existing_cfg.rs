@@ -29,7 +29,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-01: minimal 0.533%, full 0.533% (measured, unexamined)
     assert_matches_human_painting_within_limit(
         "rust-adding-many-identical-cfg-test-statements-to-a-signle-file-doesnt-prefer-the-local-insert-but-rather-goes-to-some-other-existing-cfg",
         0.55,

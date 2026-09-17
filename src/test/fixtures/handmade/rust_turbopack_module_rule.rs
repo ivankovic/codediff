@@ -24,11 +24,7 @@ use anyhow::{Ok, Result};
 
 #[test]
 fn mapping() -> Result<()> {
-    // 175 -> 52 by the 2026-07-15 default-heuristic change (see TODO.md), which disabled
-    // solver_import_nodes/solver_bottom_up_expansion by default (plus solver_similar_flow_control,
-    // deleted outright 2026-08-14). Raised to 62/43 on 2026-09-15: the human mapping itself was
-    // revised that day, so this is the ground truth moving, not the algorithm regressing - see
-    // `ground-truth-moves-limits-move`.
+    // Clamped at the measured residual; what the remainder is has not been analysed here.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "rust-turbopack-module-rule",
         62,
@@ -443,16 +439,14 @@ fn mapping_details() -> Result<()> {
 
 #[test]
 fn invariants() -> Result<()> {
-    // Repaired 2026-09-15 (10 -> 6). What is left: invariant 3 on three delimiter pairs the mapping
-    // splits (after rows 201, 203 and 204 open inserted while their closers are matched),
-    // invariant 11 on removed leaves the `Minimal` painting leaves unpainted (2 on before row
-    // 217, 81 across after rows 202 onward), and invariant 12 on one edited leaf neither side
-    // paints.
+    // What is left: invariant 3 on three delimiter pairs the mapping splits (after rows 201, 203
+    // and 204 open inserted while their closers are matched), invariant 11 on removed leaves the
+    // `Minimal` painting leaves unpainted (2 on before row 217, 81 across after rows 202 onward),
+    // and invariant 12 on one edited leaf neither side paints.
     assert_ground_truth_invariants_with_known_violations("rust-turbopack-module-rule", 6)
 }
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-15: minimal 15.927%, full 21.350% (measured, unexamined)
     assert_matches_human_painting_within_limit("rust-turbopack-module-rule", 21.36)
 }

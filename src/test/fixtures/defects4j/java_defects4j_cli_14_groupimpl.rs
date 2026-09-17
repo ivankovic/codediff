@@ -23,11 +23,10 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // First measurement, 2026-09-17, of a mapping from the 2026-09-16 Defects4J batch. An
-    // `if_statement` is inserted ahead of an existing one inside the same `for` body, so the
-    // human pairs before `if_statement:1` with after `if_statement:2`; codediff's
-    // `qualified_name` pass keeps the ordinals and reads the original as deleted. The
-    // same-kind-sibling rotation family - one mis-pairing, counted once per leaf beneath it.
+    // An `if_statement` is inserted ahead of an existing one inside the same `for` body, so the
+    // human pairs before `if_statement:1` with after `if_statement:2`; codediff's `qualified_name`
+    // pass keeps the ordinals and reads the original as deleted. The same-kind-sibling rotation
+    // family - one mis-pairing, counted once per leaf beneath it.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "java-defects4j-cli-14-groupimpl",
         29,
@@ -37,15 +36,13 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-17: minimal 0.364%, full 0.743% (measured, unexamined)
     assert_matches_human_painting_within_limit("java-defects4j-cli-14-groupimpl", 0.76)
 }
 
 #[test]
 fn invariants() -> Result<()> {
-    // First measurement, 2026-09-17: invariant 10 under both presets, one leaf pair - the `;` on
-    // before row 262 / after row 258 - painted gone on one side and new on the other while the
-    // tree mapping calls the text the same. Recorded as found, waiting on a repair of the
-    // painting.
+    // Invariant 10 under both presets, one leaf pair - the `;` on before row 262 / after row 258 -
+    // painted gone on one side and new on the other while the tree mapping calls the text the same.
+    // Recorded as found, waiting on a repair of the painting.
     assert_ground_truth_invariants_with_known_violations("java-defects4j-cli-14-groupimpl", 2)
 }

@@ -30,7 +30,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-08: minimal 0.177% (2/1128 bytes), full 0.000% (0/1128) (measured, unexamined)
     assert_matches_human_painting_within_limit("csharp-radarr-radarr-remove-import-and-func", 0.19)
 }
 

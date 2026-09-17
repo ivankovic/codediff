@@ -170,19 +170,14 @@ fn mapping_details() -> Result<()> {
 
 #[test]
 fn mapping() -> Result<()> {
-    // One pair inside a 2<->1 multi-map group where the human recorded `MatchButNotIdentical`
-    // and codediff chose `Identical`. The pairing is accepted; only the operation differs, and
-    // nothing renders differently (0 visible).
-    // 2026-09-03: the clamp at 1,0 is gone - this fixture now maps exactly. The limit was stale
-    // rather than a deliberate allowance: it had outlived the change that closed the gap, and
-    // `quality_baseline.csv` was the only thing still holding this fixture to its real number. Any
-    // counts above describe a residual that no longer exists.
+    // One pair inside a 2<->1 multi-map group where the human recorded `MatchButNotIdentical` and
+    // codediff chose `Identical`. The pairing is accepted; only the operation differs, and nothing
+    // renders differently (0 visible).
     test::helper::human_mapping::assert_matches_human_mapping("rust-add-to-existing-use")
 }
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-08-26: minimal 11.189%, full 4.196%
     assert_matches_human_painting_within_limit("rust-add-to-existing-use", 11.20)
 }
 

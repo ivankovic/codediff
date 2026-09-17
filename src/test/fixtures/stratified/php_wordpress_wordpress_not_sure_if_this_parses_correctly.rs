@@ -23,8 +23,7 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // Re-measured 2026-09-15 after the mapping was revised; see
-    // `ground-truth-moves-limits-move`.
+    // Re- after the mapping was revised; see `ground-truth-moves-limits-move`.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "php-wordpress-wordpress-not-sure-if-this-parses-correctly",
         1,
@@ -34,7 +33,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-10: minimal 0.008%, full 0.009%
     assert_matches_human_painting_within_limit(
         "php-wordpress-wordpress-not-sure-if-this-parses-correctly",
         0.02,

@@ -30,7 +30,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-08: minimal 2.007%, full 2.007% (measured, unexamined)
     assert_matches_human_painting_within_limit(
         "shellscript-paddlepaddle-paddleocr-insert-inside-a-string",
         2.02,

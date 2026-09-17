@@ -27,7 +27,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-08-26: minimal 0.000%, full 0.997%
     assert_matches_human_painting_within_limit("java-add-interface", 1.01)
 }
 

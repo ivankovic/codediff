@@ -30,7 +30,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-08: minimal 0.000%, full 0.000%
     assert_matches_human_painting_within_limit(
         "typescript-microsoft-typescript-add-es-target-6",
         0.0,

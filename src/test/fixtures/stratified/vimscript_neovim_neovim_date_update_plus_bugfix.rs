@@ -30,7 +30,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-10: minimal 0.078%, full 0.078%
     assert_matches_human_painting_within_limit(
         "vimscript-neovim-neovim-date-update-plus-bugfix",
         0.09,

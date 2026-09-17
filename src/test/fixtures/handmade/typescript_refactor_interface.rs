@@ -27,9 +27,9 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-01: minimal 2.211%, full 0.526% - dropped from 81.789%/80.105% after
-    // solve_heritage_clause_growth shipped (class/interface gaining a heritage clause no longer
-    // paints its untouched body as Move)
+    // `solve_heritage_clause_growth` keeps a class or interface that gains a heritage clause from
+    // painting its untouched body as Move, which is most of what this fixture would otherwise
+    // disagree about.
     assert_matches_human_painting_within_limit("typescript-refactor-interface", 2.24)
 }
 

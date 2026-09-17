@@ -28,7 +28,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-11: minimal 0.053%, full 0.056%
     assert_matches_human_painting_within_limit("csharp-sonarr-sonarr-update-regex", 0.07)
 }
 

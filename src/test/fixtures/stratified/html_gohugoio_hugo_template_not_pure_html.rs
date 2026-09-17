@@ -32,7 +32,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-05: minimal 16.798%, full 22.572%
     assert_matches_human_painting_within_limit("html-gohugoio-hugo-template-not-pure-html", 22.59)
 }
 

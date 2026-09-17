@@ -30,8 +30,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-08: minimal 10.409% (140/1345 bytes), full 11.152% (150/1345) (measured,
-    // unexamined)
     assert_matches_human_painting_within_limit("html-gohugoio-hugo-update-href-template", 11.17)
 }
 

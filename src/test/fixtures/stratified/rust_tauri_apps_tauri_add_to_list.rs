@@ -28,7 +28,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-11: minimal 0.601%, full 1.177%
     assert_matches_human_painting_within_limit("rust-tauri-apps-tauri-add-to-list", 1.19)
 }
 

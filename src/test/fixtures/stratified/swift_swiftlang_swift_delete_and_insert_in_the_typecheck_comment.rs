@@ -30,7 +30,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-08: minimal 66.150%, full 66.432% (measured, unexamined)
     assert_matches_human_painting_within_limit(
         "swift-swiftlang-swift-delete-and-insert-in-the-typecheck-comment",
         66.45,

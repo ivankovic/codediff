@@ -30,8 +30,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-08: minimal 10.145% (21/207 bytes), full 10.145% (21/207) (measured,
-    // unexamined)
     assert_matches_human_painting_within_limit(
         "xml-genymobile-scrcpy-remove-package-attribute",
         10.16,

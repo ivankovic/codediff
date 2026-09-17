@@ -30,7 +30,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-11: minimal 0.025%, full 0.074%
     assert_matches_human_painting_within_limit("c-ffmpeg-ffmpeg-rename-two-identifiers", 0.09)
 }
 

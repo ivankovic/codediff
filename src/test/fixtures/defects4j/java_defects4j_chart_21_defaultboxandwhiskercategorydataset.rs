@@ -23,11 +23,10 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // First measurement, 2026-09-12, of a mapping added in the 2026-09-11 Defects4J batch. The
-    // one residual is invisible scaffolding: the human pairs the method's `if_statement` with
-    // its counterpart, while codediff's APTED pass reads it as deleted because it sits in a
-    // large flat subtree whose siblings it matched instead. Nothing a reader of the diff sees
-    // moves - hence 1 total, 0 visible.
+    // The one residual is invisible scaffolding: the human pairs the method's `if_statement` with
+    // its counterpart, while codediff's APTED pass reads it as deleted because it sits in a large
+    // flat subtree whose siblings it matched instead. Nothing a reader of the diff sees moves -
+    // hence 1 total, 0 visible.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "java-defects4j-chart-21-defaultboxandwhiskercategorydataset",
         1,
@@ -37,7 +36,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-12: minimal 0.000%, full 0.000% (measured, unexamined)
     assert_matches_human_painting_within_limit(
         "java-defects4j-chart-21-defaultboxandwhiskercategorydataset",
         0.01,

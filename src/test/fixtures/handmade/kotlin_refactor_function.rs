@@ -24,24 +24,22 @@ use anyhow::Result;
 fn mapping() -> Result<()> {
     // Two top-level functions are moved verbatim into a new class's body (method extraction). The
     // human ground truth marks both as Delete (before) + Insert (after) - a new class, not a
-    // refactor of the existing functions. codediff's move-detection instead matches them across
-    // the new `class_declaration` wrapper, since their content is untouched - the same "container
-    // added around moved code" pattern as `java_add_exception_handling`'s documented gap, but with
-    // the *opposite* human preference (there, outer-to-outer match wins; here, no match at all is
-    // wanted). That conflict between two real fixtures is itself evidence there's no single
-    // correct general heuristic - this is fixture-specific human judgment, not a bug. Not
-    // attempted.
+    // refactor of the existing functions. codediff's move-detection instead matches them across the
+    // new `class_declaration` wrapper, since their content is untouched - the same "container added
+    // around moved code" pattern as `java_add_exception_handling`'s documented gap, but with the
+    // *opposite* human preference (there, outer-to-outer match wins; here, no match at all is
+    // wanted). That conflict between two real fixtures is itself evidence there's no single correct
+    // general heuristic - this is fixture-specific human judgment, not a bug. Not attempted.
     // Top-level functions become methods of a new class - every one of them gains an enclosing
     // level. The human pairs each `identifier` across the reparent; `APTED("fast_fallback")`
     // deletes them, because the Myers LCS it ends in cannot align a node that moved deeper in the
     // residual forest. The canonical wrap/reparent gap, at the largest scale in the handmade set.
-    //
-    // Limit bumped 46/32 -> 47/33 (2026-09-01, `solve_wrap_growth`): that pass only re-tags
-    // already-`Identical` matches' `reason` field, never creates a new match, so it isn't the
-    // direct cause - but its pipeline placement change (running right before the terminal
-    // completeness sweep) shifted downstream matching for this fixture by one node. Confirms
-    // rather than contradicts the comment above: this fixture wants strictly *less* matching than
-    // `java_add_exception_handling`'s analogous shape, and remains deliberately unattempted.
+    // `solve_wrap_growth` that pass only re-tags already-`Identical` matches' `reason` field, never
+    // creates a new match, so it isn't the direct cause - but its pipeline placement change
+    // (running right before the terminal completeness sweep) shifted downstream matching for this
+    // fixture by one node. Confirms rather than contradicts the comment above: this fixture wants
+    // strictly *less* matching than `java_add_exception_handling`'s analogous shape, and remains
+    // deliberately unattempted.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "kotlin-refactor-function",
         47,
@@ -51,12 +49,10 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-08-26: minimal 60.888%, full 61.605%
-    // re-measured 2026-09-08 after `RenderOptions::paint_displaced_moves` stopped `MINIMAL` painting a
-    // span that kept its own text and its own place and shifted only because of an edit before it:
-    // minimal 57.307% -> 55.014%. The option is off under `FULL`, which this fix leaves byte-identical
-    // at 58.596%, so `FULL` sets the limit now. Any earlier number in this comment that disagrees with
-    // these two predates unrelated rendering and ground-truth fixes and was never re-measured.
+    // After `RenderOptions::paint_displaced_moves` stopped `MINIMAL` painting a span that kept its
+    // own text and its own place and shifted only because of an edit before it: minimal 57.307% ->
+    // 55.014%. The option is off under `FULL`, which this fix leaves byte-identical at 58.596%, so
+    // `FULL` sets the limit now.
     assert_matches_human_painting_within_limit("kotlin-refactor-function", 58.61)
 }
 

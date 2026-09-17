@@ -30,7 +30,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-06: minimal 0.000%, full 1.952%
     assert_matches_human_painting_within_limit(
         "c-ladybirdbrowser-ladybird-change-to-a-different-class",
         1.97,
@@ -39,9 +38,8 @@ fn painting() -> Result<()> {
 
 #[test]
 fn invariants() -> Result<()> {
-    // Invariant 16, first measured 2026-09-15 when the rule was added: the Minimal/Full split
-    // for a renamed identifier is not painted this way yet (`WebGL2RenderingContext` against `WebGLRenderingContextBase`). Recorded as found; the
-    // rule is new, the paintings predate it.
+    // Invariant 16: the Minimal/Full split for a renamed identifier is not painted this way yet
+    // (`WebGL2RenderingContext` against `WebGLRenderingContextBase`). Recorded as found.
     assert_ground_truth_invariants_with_known_violations(
         "c-ladybirdbrowser-ladybird-change-to-a-different-class",
         3,

@@ -28,7 +28,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-09: minimal 0.067%, full 0.000% (measured, unexamined)
     assert_matches_human_painting_within_limit("ruby-mastodon-mastodon-insert-only", 0.08)
 }
 

@@ -27,12 +27,10 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-08-27: minimal 35.610% (146 of 410 bytes), full 32.927% (135 of 410)
-    //
     // Among the largest residuals in the corpus, behind kotlin-refactor-function (~61%) and
     // java-add-exception-handling (~54%) - and, like both of those, an edit that wraps existing
-    // code in new error-handling structure. That is the shape codediff renders least like a
-    // human does, and three fixtures now say so.
+    // code in new error-handling structure. That is the shape codediff renders least like a human
+    // does, and three fixtures now say so.
     assert_matches_human_painting_within_limit("typescript-add-error-handling", 35.61)
 }
 

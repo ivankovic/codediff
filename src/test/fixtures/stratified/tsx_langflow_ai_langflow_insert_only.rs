@@ -30,7 +30,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-10: minimal 0.270%, full 1.351%
     assert_matches_human_painting_within_limit("tsx-langflow-ai-langflow-insert-only", 1.37)
 }
 

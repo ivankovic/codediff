@@ -27,7 +27,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-08-26: minimal 0.000%, full 0.239%
     assert_matches_human_painting_within_limit("kotlin-add-null-check", 0.25)
 }
 

@@ -22,14 +22,14 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // A new attribute_item is inserted among many textually-identical siblings. Used to be 470
-    // mismatches: `attribute_item` has no name/identity of its own (`nodes::is_reference`/
-    // `is_semantically_structural` don't cover it), so with nothing to anchor it, every one of
-    // them fell through to `final_pass`'s tree-edit-distance, which - facing hundreds of
-    // equal-cost candidates for "which one is new" - had no reason to prefer the one actually
-    // nearest the real change. Fixed by `solve_leading_siblings` (generalized from comment-only
-    // matching to also cover attribute/decorator modifiers): each `#[cfg(test)]` now anchors off
-    // the already-matched `mod_item` it precedes instead of needing its own identity signal.
+    // A new attribute_item is inserted among many textually-identical siblings. Was 470 mismatches:
+    // `attribute_item` has no name/identity of its own (`nodes::is_reference`/
+    // `is_semantically_structural` don't cover it), so with nothing to anchor it, every one of them
+    // fell through to `final_pass`'s tree-edit-distance, which - facing hundreds of equal-cost
+    // candidates for "which one is new" - had no reason to prefer the one actually nearest the real
+    // change. Fixed by `solve_leading_siblings` (generalized from comment-only matching to also
+    // cover attribute/decorator modifiers): each `#[cfg(test)]` now anchors off the already-matched
+    // `mod_item` it precedes instead of needing its own identity signal.
     test::helper::human_mapping::assert_matches_human_mapping(
         "rust-adding-to-a-list-of-identical-attributes-should-favour-near-matches",
     )
@@ -37,7 +37,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-01: minimal 0.007%, full 0.007% (measured, unexamined)
     assert_matches_human_painting_within_limit(
         "rust-adding-to-a-list-of-identical-attributes-should-favour-near-matches",
         0.02,

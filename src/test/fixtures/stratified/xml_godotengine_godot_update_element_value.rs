@@ -30,7 +30,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-10: minimal 0.326%, full 0.331%
     assert_matches_human_painting_within_limit("xml-godotengine-godot-update-element-value", 0.35)
 }
 

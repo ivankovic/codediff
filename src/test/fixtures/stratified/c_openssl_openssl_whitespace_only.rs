@@ -29,7 +29,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-05: minimal 0.000%, full 0.000% (measured, unexamined)
     assert_matches_human_painting_within_limit("c-openssl-openssl-whitespace-only", 0.0)
 }
 

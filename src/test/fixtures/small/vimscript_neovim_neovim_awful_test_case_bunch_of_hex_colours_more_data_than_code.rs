@@ -21,19 +21,17 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // 22 -> 24 (2026-08-17) -> 19 (2026-08-18), and the round trip is the point. The ambiguity
-    // guard `solve_moved_subtrees` gained in 626045c refuses to pick between several identical
-    // move targets below `AMBIGUOUS_MOVE_MIN_SIZE` nodes, which cost this file (a hex colour table
-    // - "more data than code", so its content is short, repetitive and genuinely relocated) 11 ->
-    // 23 mismatches; the guard was still worth -38 corpus-wide, so the ceiling was raised
-    // deliberately rather than silently. The guard now consults the similarity sketch before
-    // refusing (`disambiguate_by_context`), which recovers most of that here and takes the file
-    // below where it started. See `TODO.md`'s 2026-08-18 similarity-sketch section.
-    //
-    // 2026-09-05: the mapping was re-solved (9317 unmarked nodes down to 5677, the remainder an
-    // N:M correspondence), and 19/15 -> 1072/761 is that annotation arriving rather than the
-    // sketch tiebreak above coming undone. The narrative in the paragraph above still describes
-    // the mechanism; only the nodes it is measured over changed.
+    // The ambiguity guard in `solve_moved_subtrees` refuses to pick between several identical move
+    // targets below `AMBIGUOUS_MOVE_MIN_SIZE` nodes, which cost this file (a hex colour table -
+    // "more data than code", so its content is short, repetitive and genuinely relocated) 11 -> 23
+    // mismatches; the guard was still worth -38 corpus-wide, so the ceiling was raised deliberately
+    // rather than silently. The guard now consults the similarity sketch before refusing
+    // (`disambiguate_by_context`), which recovers most of that here and takes the file below where
+    // it started. See `TODO.md`'s similarity-sketch section. The mapping was re-solved (9317
+    // unmarked nodes down to 5677, the remainder an N:M correspondence), and 19/15 -> 1072/761 is
+    // that annotation arriving rather than the sketch tiebreak above coming undone. The narrative
+    // in the paragraph above still describes the mechanism; only the nodes it is measured over
+    // changed.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "vimscript-neovim-neovim-awful-test-case-bunch-of-hex-colours-more-data-than-code",
         1072,

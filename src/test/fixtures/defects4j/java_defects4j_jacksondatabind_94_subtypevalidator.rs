@@ -23,7 +23,6 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // First measurement, 2026-09-15, of a mapping from the 2026-09-15 Defects4J batch.
     // Recorded as found, not examined.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "java-defects4j-jacksondatabind-94-subtypevalidator",
@@ -34,7 +33,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-15: minimal 5.985%, full 7.885% (measured, unexamined)
     assert_matches_human_painting_within_limit(
         "java-defects4j-jacksondatabind-94-subtypevalidator",
         7.9,
@@ -43,9 +41,9 @@ fn painting() -> Result<()> {
 
 #[test]
 fn invariants() -> Result<()> {
-    // Invariant 1, first measured 2026-09-15: both paintings end a run on the trailing space of a
-    // commented-out class name - before row 103 and after row 106, once per side per painting.
-    // Four spans to shorten by one character.
+    // Invariant 1: both paintings end a run on the trailing space of a commented-out class name -
+    // before row 103 and after row 106, once per side per painting. Four spans to shorten by one
+    // character.
     assert_ground_truth_invariants_with_known_violations(
         "java-defects4j-jacksondatabind-94-subtypevalidator",
         4,

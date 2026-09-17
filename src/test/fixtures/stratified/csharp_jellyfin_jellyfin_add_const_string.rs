@@ -30,7 +30,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-11: minimal 0.000%, full 0.000%
     assert_matches_human_painting_within_limit("csharp-jellyfin-jellyfin-add-const-string", 0.02)
 }
 

@@ -30,7 +30,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-08: minimal 0.000% (0/1624 bytes), full 0.246% (4/1624) (measured, unexamined)
     assert_matches_human_painting_within_limit("go-gohugoio-hugo-add-and-upadate-list-items", 0.26)
 }
 

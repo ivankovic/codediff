@@ -41,7 +41,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-09: minimal 3.170%, full 3.170% (measured, unexamined)
     assert_matches_human_painting_within_limit("lua-awesomewm-awesome-insert-only", 3.18)
 }
 

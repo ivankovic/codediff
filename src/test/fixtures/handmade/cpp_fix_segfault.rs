@@ -27,7 +27,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-08-26: minimal 2.817%, full 2.817%
     assert_matches_human_painting_within_limit("cpp-fix-segfault", 2.83)
 }
 

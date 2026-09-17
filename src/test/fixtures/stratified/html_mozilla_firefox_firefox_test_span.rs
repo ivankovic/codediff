@@ -31,7 +31,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-09: minimal 1.083%, full 2.706% (measured, unexamined)
     assert_matches_human_painting_within_limit("html-mozilla-firefox-firefox-test-span", 2.72)
 }
 

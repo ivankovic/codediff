@@ -23,13 +23,12 @@ use anyhow::Result;
 #[test]
 fn mapping() -> Result<()> {
     // The edit hoists an `if` condition into two `let` declarations, so every operator and
-    // identifier in it gains an enclosing `let_declaration` where it used to sit under
+    // identifier in it gains an enclosing `let_declaration` where it otherwise sits under
     // `expression_statement`. The human pairs them across that reparent; `APTED("qualified_name")`
     // deletes them, because the names still match but the enclosing path no longer does - the same
-    // search-quality gap that bucket has carried since 2026-08-17.
-    //
-    // Fittingly, the before/after here is this repository's own `diff/text.rs` across the
-    // move-classification fix, so the fixture is a diff of the code that renders it.
+    // search-quality gap that bucket has carried since. Fittingly, the before/after here is this
+    // repository's own `diff/text.rs` across the move-classification fix, so the fixture is a diff
+    // of the code that renders it.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "rust-small-addition-with-reuse-of-binary-expressions",
         10,
@@ -39,9 +38,9 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-08: minimal 0.043%, full 0.055%. The minimal side fell from 0.279% when
-    // `displaced_beside_an_edit_on_its_first_row` stopped calling a multi-row node `Move` for a
-    // sideways shift on its own first row that an insertion above it had also pushed down the file.
+    // The minimal side fell from 0.279% when `displaced_beside_an_edit_on_its_first_row` stopped
+    // calling a multi-row node `Move` for a sideways shift on its own first row that an insertion
+    // above it had also pushed down the file.
     assert_matches_human_painting_within_limit(
         "rust-small-addition-with-reuse-of-binary-expressions",
         0.07,

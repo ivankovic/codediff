@@ -30,8 +30,8 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-05, unchanged when `Full`'s Insert on row 4 was pulled back off the
-    // source line's own trailing space on 2026-09-06: minimal 39.227%, full 41.436%
+    // unchanged when `Full`'s Insert on row 4 was pulled back off the source line's own trailing
+    // space: minimal 39.227%, full 41.436%
     assert_matches_human_painting_within_limit(
         "html-prettier-prettier-not-pure-html-includes-yaml-as-well",
         41.45,

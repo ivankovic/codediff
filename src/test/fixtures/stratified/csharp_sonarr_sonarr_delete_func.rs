@@ -28,7 +28,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-08: minimal 0.170% (2/1175 bytes), full 0.000% (0/1175) (measured, unexamined)
     assert_matches_human_painting_within_limit("csharp-sonarr-sonarr-delete-func", 0.18)
 }
 

@@ -30,7 +30,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-08: minimal 0.000% (0/394 bytes), full 22.335% (88/394) (measured, unexamined)
     assert_matches_human_painting_within_limit(
         "xml-jellyfin-jellyfin-update-attribute-values",
         22.35,

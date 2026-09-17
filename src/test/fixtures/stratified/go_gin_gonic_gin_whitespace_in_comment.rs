@@ -30,16 +30,14 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-11: minimal 0.069%, full 0.069%
     assert_matches_human_painting_within_limit("go-gin-gonic-gin-whitespace-in-comment", 0.08)
 }
 
 #[test]
 fn invariants() -> Result<()> {
-    // Was pinned at 1 from 2026-09-08 to 2026-09-11: one of the two spaces after "Gin Core
-    // Team." on row 1 is deleted, and the run therefore ended on a space. The invariant was the
-    // thing that was wrong, not the painting - that space is mid-row, with `All rights
-    // reserved.` still to come, so nothing about it is *trailing*. The invariant now says
-    // trailing and means it, and this is back to 0.
+    // One of the two spaces after "Gin Core Team." on row 1 is deleted, and the run therefore ended
+    // on a space. The invariant was the thing that was wrong, not the painting - that space is
+    // mid-row, with `All rights reserved.` still to come, so nothing about it is *trailing*. The
+    // invariant says trailing and means it.
     assert_ground_truth_invariants("go-gin-gonic-gin-whitespace-in-comment")
 }

@@ -30,7 +30,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-08: minimal 0.000% (0/2021 bytes), full 0.742% (15/2021) (measured, unexamined)
     assert_matches_human_painting_within_limit(
         "go-grafana-grafana-real-small-change-with-a-move",
         0.76,

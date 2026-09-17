@@ -27,7 +27,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-08-26: minimal 3.800%, full 3.800%
     assert_matches_human_painting_within_limit("kotlin-fix-loop-bug", 3.81)
 }
 

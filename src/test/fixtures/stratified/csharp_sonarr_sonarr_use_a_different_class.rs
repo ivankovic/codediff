@@ -30,8 +30,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-08: minimal 3.236% (64/1978 bytes), full 18.150% (359/1978) (measured,
-    // unexamined)
     assert_matches_human_painting_within_limit("csharp-sonarr-sonarr-use-a-different-class", 18.16)
 }
 

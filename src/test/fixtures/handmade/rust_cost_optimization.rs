@@ -27,7 +27,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-08-26: minimal 5.288%, full 5.495%
     assert_matches_human_painting_within_limit("rust-cost-optimization", 5.51)
 }
 

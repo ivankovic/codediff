@@ -21,11 +21,8 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // 2026-09-03: backfilled. This fixture had a `quality_baseline.csv` row and no test at all,
-    // so the release gate was the only thing watching it - which is exactly the asymmetry that
-    // made the baseline a second source of truth for accuracy. Its 16.3 MB human_mapping.json
-    // is not why it was missing: three larger ones (79.8 MB, 56.8 MB, 52.6 MB) have always had
-    // stubs. It maps exactly.
+    // Its 16.3 MB human_mapping.json is not why it was missing: three larger ones (79.8 MB, 56.8
+    // MB, 52.6 MB) have always had stubs. It maps exactly.
     test::helper::human_mapping::assert_matches_human_mapping(
         "typescript-lxqt-lxqt-panel-not-actually-ts-but-still",
     )

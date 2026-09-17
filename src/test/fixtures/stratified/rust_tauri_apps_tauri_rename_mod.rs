@@ -28,14 +28,12 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-05: minimal 0.000%, full 1.765%
     assert_matches_human_painting_within_limit("rust-tauri-apps-tauri-rename-mod", 1.78)
 }
 
 #[test]
 fn invariants() -> Result<()> {
-    // Invariant 16, first measured 2026-09-15 when the rule was added: the Minimal/Full split
-    // for a renamed identifier is not painted this way yet (the Full half: `v2_rc`/`v2_beta` are not painted whole). Recorded as found; the
-    // rule is new, the paintings predate it.
+    // Invariant 16: the Minimal/Full split for a renamed identifier is not painted this way yet
+    // (the Full half: `v2_rc`/`v2_beta` are not painted whole). Recorded as found.
     assert_ground_truth_invariants_with_known_violations("rust-tauri-apps-tauri-rename-mod", 2)
 }

@@ -30,7 +30,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-09: minimal 19.502%, full 19.502% (measured, unexamined)
     assert_matches_human_painting_within_limit(
         "html-mozilla-firefox-firefox-interesting-case",
         19.52,

@@ -26,16 +26,12 @@ fn mapping() -> Result<()> {
     // top-level `block` keeps the same *role* (the method body) but now contains just the one
     // `try_statement`, while the `try`'s own new inner `block` contains the original 5 statements
     // verbatim - byte-identical to the *before* side's top-level block. codediff's hash matcher
-    // (correctly, by content) pairs the before top-level block with the try's inner block (both
-    // are the same bytes), instead of the human's structurally-preferred outer-to-outer pairing
-    // with the try's inner block as a fresh Insert. This is the documented "container added around
-    // moved code" class of gap (see `TODO.md` / prior `GreedyAnchorBlocks`/`final_pass cost gate`
+    // (correctly, by content) pairs the before top-level block with the try's inner block (both are
+    // the same bytes), instead of the human's structurally-preferred outer-to-outer pairing with
+    // the try's inner block as a fresh Insert. This is the documented "container added around moved
+    // code" class of gap (see `TODO.md` / prior `GreedyAnchorBlocks`/`final_pass cost gate`
     // investigations) - not attempted again here, since past attempts at a general fix for this
-    // pattern were net-negative or reverted.
-    // 2026-09-03: tightened 7,4 -> 6,4. The limit was stale rather than a deliberate allowance: it
-    // had outlived the change that closed the gap, and `quality_baseline.csv` was the only thing
-    // still holding this fixture to its real number. Any counts above describe the older, larger
-    // residual.
+    // pattern were net-negative or reverted. Any counts above describe the older, larger residual.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "java-add-exception-handling",
         6,
@@ -45,7 +41,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-08-26: minimal 57.587%, full 57.770%
     assert_matches_human_painting_within_limit("java-add-exception-handling", 57.78)
 }
 

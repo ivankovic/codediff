@@ -22,12 +22,12 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // A small residual of the 2026-08-08 `solve_large_flat_subtrees` recursion fix (see TODO.md):
-    // one new `typedef` insertion sits right next to a `;` that should've mapped identically, and
-    // the APTED sub-resolution over the Myers-unmatched residual picks a slightly different, still
-    // globally-optimal-cost mapping for that one semicolon. Small, understood, and dominated by the
-    // fix's corpus-wide net improvement (-9 mismatches; this fixture alone went 16 -> 4 after the
-    // fix, from a pre-fix baseline of 0 before `solve_large_flat_subtrees` could even reach it).
+    // A small residual of `solve_large_flat_subtrees` (see TODO.md): one new `typedef` insertion
+    // sits right next to a `;` that should've mapped identically, and the APTED sub-resolution over
+    // the Myers-unmatched residual picks a slightly different, still globally-optimal-cost mapping
+    // for that one semicolon. Small, understood, and dominated by the fix's corpus-wide net
+    // improvement (-9 mismatches; this fixture alone went 16 -> 4 after the fix, from a pre-fix
+    // baseline of 0 before `solve_large_flat_subtrees` could even reach it).
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "c-ffmpeg-added-typedef-to-enum",
         1,
@@ -37,7 +37,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-01: minimal 0.180%, full 0.180% (measured, unexamined)
     assert_matches_human_painting_within_limit("c-ffmpeg-added-typedef-to-enum", 0.20)
 }
 

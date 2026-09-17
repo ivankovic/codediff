@@ -27,14 +27,11 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-01: minimal 3.310%, full 9.929% - the clamp here was stale (5.22%, from
-    // 2026-08-26) against this already-current reality, unrelated to this session's own fixes
-    // (confirmed unchanged by every one of them). See painting_disagreement_census_2026_09_01.md's
-    // own row for this fixture: a genuine matching gap, not a rendering-option question - human
-    // marks shifted name/age parameter names Move, codediff leaves them Identical - not attempted.
-    // re-measured 2026-09-08: minimal 3.310%, full 8.983% - four bytes of the gap above were a
-    // relocation the after side had not been told about, see `reconcile_moves`. The matching gap
-    // described above is the rest and is still not attempted.
+    // A genuine matching gap, not a rendering-option question - human marks shifted name/age
+    // parameter names Move, codediff leaves them Identical - not attempted. minimal 3.310%, full
+    // 8.983% - four bytes of the gap above were a relocation the after side had not been told
+    // about, see `reconcile_moves`. The matching gap described above is the rest and is still not
+    // attempted.
     assert_matches_human_painting_within_limit("kotlin-add-data-class", 9.0)
 }
 

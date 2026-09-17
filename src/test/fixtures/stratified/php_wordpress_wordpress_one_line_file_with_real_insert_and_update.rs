@@ -30,7 +30,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-08: minimal 47.966%, full 37.473% (measured, unexamined)
     assert_matches_human_painting_within_limit(
         "php-wordpress-wordpress-one-line-file-with-real-insert-and-update",
         47.98,

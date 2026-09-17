@@ -28,7 +28,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-09: minimal 0.657%, full 1.315% (measured, unexamined)
     assert_matches_human_painting_within_limit("lua-neovim-neovim-rename", 1.33)
 }
 

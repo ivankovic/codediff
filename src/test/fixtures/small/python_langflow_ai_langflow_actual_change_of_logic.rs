@@ -21,13 +21,9 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // Most of the gap is codediff classifying several genuinely-unchanged matched pairs (same
-    // path on both sides) as MatchButNotIdentical rather than Identical; the rest is one
-    // multi-map group pairing codediff doesn't realize.
-    // 2026-09-03: tightened 8,5 -> 1,1. The limit was stale rather than a deliberate allowance: it
-    // had outlived the change that closed the gap, and `quality_baseline.csv` was the only thing
-    // still holding this fixture to its real number. Any counts above describe the older, larger
-    // residual.
+    // Most of the gap is codediff classifying several genuinely-unchanged matched pairs (same path
+    // on both sides) as MatchButNotIdentical rather than Identical; the rest is one multi-map group
+    // pairing codediff doesn't realize. Any counts above describe the older, larger residual.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "python-langflow-ai-langflow-actual-change-of-logic",
         1,

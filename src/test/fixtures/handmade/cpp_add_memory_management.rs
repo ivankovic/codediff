@@ -27,7 +27,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-08-26: minimal 7.778%, full 1.667%
     assert_matches_human_painting_within_limit("cpp-add-memory-management", 7.79)
 }
 

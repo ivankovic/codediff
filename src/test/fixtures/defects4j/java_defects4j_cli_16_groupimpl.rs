@@ -28,15 +28,13 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-17: minimal 0.000%, full 0.037% (measured, unexamined)
     assert_matches_human_painting_within_limit("java-defects4j-cli-16-groupimpl", 0.05)
 }
 
 #[test]
 fn invariants() -> Result<()> {
-    // First measurement, 2026-09-17: invariant 4, after row 92 paints every visible character
-    // Insert but leaves the line's own 12-byte indent unpainted
-    // ("            option.setParent(this);"). Recorded as found; one painted range needs
-    // extending to the start of the line's content.
+    // Invariant 4, after row 92 paints every visible character Insert but leaves the line's own
+    // 12-byte indent unpainted (" option.setParent(this);"). Recorded as found; one painted range
+    // needs extending to the start of the line's content.
     assert_ground_truth_invariants_with_known_violations("java-defects4j-cli-16-groupimpl", 1)
 }

@@ -23,11 +23,10 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // measured 2026-09-10: 10 total, 7 visible. The fixture is a moved import, which is the
-    // import/include-list alignment family the 2026-09-08 mismatch census isolated as its own
-    // cluster - a rotation in a run of same-kind siblings mis-pairs the members. The import-path
-    // similarity matcher shipped in 4099ab9c reduced this family without closing it. Lower both
-    // numbers when it closes.
+    // 10 total, 7 visible. The fixture is a moved import, which is the import/include-list
+    // alignment family the mismatch census isolates as its own cluster - a rotation in a run of
+    // same-kind siblings mis-pairs the members. The import-path similarity matcher reduces this
+    // family without closing it. Lower both numbers when it closes.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "tsx-mui-material-ui-move-import",
         10,
@@ -37,9 +36,8 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-10: minimal 6.951%, full 6.951%
-    // Update-vs-nothing in both directions plus one Move: the import/include-list alignment
-    // family, the same one this fixture's mapping() clamp above records. Both should move together.
+    // Update-vs-nothing in both directions plus one Move: the import/include-list alignment family,
+    // the same one this fixture's mapping() clamp above records. Both should move together.
     assert_matches_human_painting_within_limit("tsx-mui-material-ui-move-import", 6.97)
 }
 

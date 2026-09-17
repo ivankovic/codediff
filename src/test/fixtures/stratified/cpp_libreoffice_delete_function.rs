@@ -28,7 +28,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-06: minimal 0.028%, full 0.000%
     assert_matches_human_painting_within_limit("cpp-libreoffice-delete-function", 0.04)
 }
 

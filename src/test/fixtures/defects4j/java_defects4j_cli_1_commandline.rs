@@ -23,10 +23,9 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // First measurement, 2026-09-17, of a mapping from the 2026-09-16 Defects4J batch. The human
-    // deletes whole import declarations and a method and inserts their replacements, while
-    // codediff's `qualified_name` pass re-uses the deleted leaves - the identifiers, the dots,
-    // the semicolons - inside the inserted ones. One disagreement about which container
+    // The human deletes whole import declarations and a method and inserts their replacements,
+    // while codediff's `qualified_name` pass re-uses the deleted leaves - the identifiers, the
+    // dots, the semicolons - inside the inserted ones. One disagreement about which container
     // survives, counted once per re-used leaf; 32 of the residuals name that pass. The largest
     // clamp in this batch, recorded as found, not examined line by line.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
@@ -38,19 +37,16 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-17: minimal 3.079%, full 3.816% (measured, unexamined)
     assert_matches_human_painting_within_limit("java-defects4j-cli-1-commandline", 3.83)
 }
 
 #[test]
 fn invariants() -> Result<()> {
-    // Measured at ten on 2026-09-17, eight once invariants 3 and 9 learned to read a multi-map
-    // group: two of invariant 3 and one byte of each `Full` painting's invariant 9 were
-    // `representative_entries`' arbitrary flattening of the 1:2 `(` and `)` groups on after row
-    // 67, not anything the mapping claims.
-    //
-    // The eight left are real and uniform - every one of the four paintings paints 3 bytes Move
-    // on before row 93 and 3 on after row 91 that the tree mapping reads Delete/Insert. Those two
-    // ground truths have to be reconciled by hand.
+    // Measured at ten, eight once invariants 3 and 9 learned to read a multi-map group: two of
+    // invariant 3 and one byte of each `Full` painting's invariant 9 were `representative_entries`'
+    // arbitrary flattening of the 1:2 `(` and `)` groups on after row 67, not anything the mapping
+    // claims. The eight left are real and uniform - every one of the four paintings paints 3 bytes
+    // Move on before row 93 and 3 on after row 91 that the tree mapping reads Delete/Insert. Those
+    // two ground truths have to be reconciled by hand.
     assert_ground_truth_invariants_with_known_violations("java-defects4j-cli-1-commandline", 8)
 }

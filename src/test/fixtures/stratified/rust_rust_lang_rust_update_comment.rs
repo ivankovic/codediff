@@ -28,24 +28,19 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-11: minimal 0.193%, full 4.499%
-    // The right-anchored alternative painting was removed on 2026-09-11: inside a node
-    // whose value we read character by character, ground truth anchors an ambiguous
-    // add/delete LEFT. `intra_node_update_ranges` takes the common prefix first and the
-    // suffix of the remainder, so it is right-anchored by construction and still emits the
-    // dropped spelling. This residual is that disagreement, and it is expected - it is the
-    // price of the rule, not a regression. See TODO.md for why the renderer was not
-    // flipped to match (it would fix 4 fixtures and break 12).
-    // Superseded the 2026-09-06 remeasurement, which tracked a `Minimal (right)` Delete
-    // that no longer exists.
+    // The right-anchored alternative painting was removed: inside a node whose value we read
+    // character by character, ground truth anchors an ambiguous add/delete LEFT.
+    // `intra_node_update_ranges` takes the common prefix first and the suffix of the remainder, so
+    // it is right-anchored by construction and still emits the dropped spelling. This residual is
+    // that disagreement, and it is expected - it is the price of the rule, not a regression. See
+    // TODO.md for why the renderer was not flipped to match (it would fix 4 fixtures and break 12).
     assert_matches_human_painting_within_limit("rust-rust-lang-rust-update-comment", 4.51)
 }
 
 #[test]
 fn invariants() -> Result<()> {
-    // Was clamped at 1 from 2026-09-13 to 2026-09-14, and the clamp was the bug rather than the
-    // data: invariant 9 read a tree-side `Delete` as an unmatched node, and this fixture has no
-    // unmatched node at all - the two bytes it reported were a colon that the painter put at the
-    // head of the surviving comment text and `TextDiff` put at the tail of the deleted text.
+    // Invariant 9 read a tree-side `Delete` as an unmatched node, and this fixture has no unmatched
+    // node at all - the two bytes it reported were a colon that the painter put at the head of the
+    // surviving comment text and `TextDiff` put at the tail of the deleted text.
     assert_ground_truth_invariants("rust-rust-lang-rust-update-comment")
 }

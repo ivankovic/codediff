@@ -23,9 +23,9 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // measured 2026-09-11: 8 mismatch(es), 7 visible. This fixture is in the corpus because both
-    // sides contain CSS that tree-sitter cannot parse, so much of the tree is ERROR nodes and the
-    // mapping is being asked to align rubble. Recorded as-is rather than tuned against.
+    // 8 mismatch(es), 7 visible. This fixture is in the corpus because both sides contain CSS that
+    // tree-sitter cannot parse, so much of the tree is ERROR nodes and the mapping is being asked
+    // to align rubble. Recorded as-is rather than tuned against.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "css-twbs-bootstrap-parse-errors",
         8,
@@ -35,7 +35,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-11: minimal 2.138%, full 3.246%
     assert_matches_human_painting_within_limit("css-twbs-bootstrap-parse-errors", 3.26)
 }
 

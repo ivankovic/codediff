@@ -30,7 +30,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-09: minimal 0.000%, full 0.477% (measured, unexamined)
     assert_matches_human_painting_within_limit(
         "python-langflow-ai-langflow-real-small-change",
         0.49,

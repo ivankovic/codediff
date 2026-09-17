@@ -27,7 +27,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-01: minimal 28.571%, full 58.095% (measured, unexamined)
     assert_matches_human_painting_within_limit("rust-multi-map-duplicate-calls", 58.12)
 }
 

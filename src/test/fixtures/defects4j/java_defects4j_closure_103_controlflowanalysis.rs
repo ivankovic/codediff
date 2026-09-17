@@ -23,10 +23,9 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // First measurement, 2026-09-17, of a mapping from the 2026-09-16 Defects4J batch. A `case`
-    // group is inserted into a run of `switch_block_statement_group` siblings, and codediff's
-    // `large_flat_subtree` pass pairs group 8 with group 9 and shifts every member of the run
-    // after it. The same-kind-sibling rotation family, counted once per leaf in the two
+    // A `case` group is inserted into a run of `switch_block_statement_group` siblings, and
+    // codediff's `large_flat_subtree` pass pairs group 8 with group 9 and shifts every member of
+    // the run after it. The same-kind-sibling rotation family, counted once per leaf in the two
     // mis-paired groups.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "java-defects4j-closure-103-controlflowanalysis",
@@ -37,7 +36,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-17: minimal 0.060%, full 0.080% (measured, unexamined)
     assert_matches_human_painting_within_limit(
         "java-defects4j-closure-103-controlflowanalysis",
         0.10,

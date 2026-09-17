@@ -23,7 +23,6 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // First measurement, 2026-09-15, of a mapping from the 2026-09-15 Defects4J batch.
     // Recorded as found, not examined.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "java-defects4j-jsoup-79-leafnode",
@@ -34,7 +33,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-15: minimal 0.870%, full 0.960% (measured, unexamined)
     assert_matches_human_painting_within_limit("java-defects4j-jsoup-79-leafnode", 0.97)
 }
 

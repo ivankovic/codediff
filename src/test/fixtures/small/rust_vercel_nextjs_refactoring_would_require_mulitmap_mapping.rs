@@ -21,12 +21,12 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // Re-baselined 2026-09-07 from 6/4, and the one fixture `reclaim_slot_level_twins` costs. Its
-    // nested `token_tree`s are matched one level off - the multimap gap this fixture's name
-    // records - and its delimiters used to contradict that decision in a way that happened to land
-    // on the human's answer. They now follow their own container, so they are wrong for the same
-    // reason it is, rather than by a second bug cancelling the first. See that function's doc
-    // comment for why that trade is the right way round.
+    // The one fixture `reclaim_slot_level_twins` costs. Its nested `token_tree`s are matched one
+    // level off - the multimap gap this fixture's name records - and its delimiters would otherwise
+    // contradict that decision in a way that happened to land on the human's answer. They now
+    // follow their own container, so they are wrong for the same reason it is, rather than by a
+    // second bug cancelling the first. See that function's doc comment for why that trade is the
+    // right way round.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "rust-vercel-nextjs-refactoring-would-require-mulitmap-mapping",
         10,

@@ -28,7 +28,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-05: minimal 2.521%, full 38.992%
     assert_matches_human_painting_within_limit("c-genymobile-scrcpy-rename-defines", 39.01)
 }
 

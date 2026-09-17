@@ -23,7 +23,6 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // First measurement, 2026-09-15, of a mapping from the 2026-09-15 Defects4J batch.
     // Recorded as found, not examined.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "java-defects4j-chart-18-defaultkeyedvalues",
@@ -34,7 +33,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-12: minimal 0.010%, full 0.017% (measured, unexamined)
     assert_matches_human_painting_within_limit("java-defects4j-chart-18-defaultkeyedvalues", 0.03)
 }
 

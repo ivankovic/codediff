@@ -29,7 +29,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-09: minimal 1.579%, full 1.579% (measured, unexamined)
     assert_matches_human_painting_within_limit("xml-libreoffice-unicode", 1.59)
 }
 

@@ -28,9 +28,9 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-07: minimal 0.000%, full 0.000%. Measurable only since the accidental
-    // duplicate painting was dropped: the fixture carried two byte-identical paintings named
-    // "Minimal" and "Only one solution", which is not a valid pair, and the helper refused it.
+    // Measurable only since the accidental duplicate painting was dropped: the fixture carried two
+    // byte-identical paintings named "Minimal" and "Only one solution", which is not a valid pair,
+    // and the helper refused it.
     assert_matches_human_painting_within_limit("python-odoo-odoo-add-two-imports", 0.0)
 }
 

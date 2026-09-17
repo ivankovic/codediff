@@ -23,10 +23,10 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // measured 2026-09-11: 2 mismatch(es), 2 visible. One of two `::` tokens in a nested
-    // `scoped_identifier` is dropped. Both are identical and either may be called the deleted one;
-    // the human picked the inner, codediff the outer, and the pair costs two mismatches. Same
-    // ambiguity the painting rule is about, one level up in the tree - see TODO.md.
+    // 2 mismatch(es), 2 visible. One of two `::` tokens in a nested `scoped_identifier` is dropped.
+    // Both are identical and either may be called the deleted one; the human picked the inner,
+    // codediff the outer, and the pair costs two mismatches. Same ambiguity the painting rule is
+    // about, one level up in the tree - see TODO.md.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "rust-rust-lang-rust-remove-path-from-using",
         2,
@@ -36,7 +36,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-11: minimal 0.000%, full 0.000% (measured, unexamined)
     assert_matches_human_painting_within_limit("rust-rust-lang-rust-remove-path-from-using", 0.0)
 }
 

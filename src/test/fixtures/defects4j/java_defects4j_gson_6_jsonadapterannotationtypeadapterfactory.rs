@@ -30,7 +30,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-15: minimal 0.072%, full 0.000% (measured, unexamined)
     assert_matches_human_painting_within_limit(
         "java-defects4j-gson-6-jsonadapterannotationtypeadapterfactory",
         0.09,

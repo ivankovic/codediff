@@ -29,13 +29,11 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // repainted 2026-09-06, and the limit went UP: 8.19 -> 21.12 (minimal 21.109%, full 21.109%).
     // The whole commit is the alignment run between `NULL,` and `/* opener */` collapsing to one
-    // space, and the painting used to be exactly that - five whitespace-only Delete spans, each
-    // ending on a space. There is no narrower painting that ends on a visible character, so the
-    // five rows are now painted whole, as the Updates a reader sees. The bigger number is the
-    // honest one: it measures codediff painting nothing at all here, because interior whitespace
-    // lives in the gaps between AST nodes where no painting can reach (same wall as
+    // space, There is no narrower painting that ends on a visible character, so the five rows are
+    // now painted whole, as the Updates a reader sees. The bigger number is the honest one: it
+    // measures codediff painting nothing at all here, because interior whitespace lives in the gaps
+    // between AST nodes where no painting can reach (same wall as
     // c-openssl-openssl-format-only-change). Recorded as the distance it is, not as a target.
     assert_matches_human_painting_within_limit("c-openssl-openssl-whitepsace-only", 21.12)
 }

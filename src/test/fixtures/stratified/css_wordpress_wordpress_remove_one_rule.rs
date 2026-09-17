@@ -30,7 +30,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-05: minimal 11.391%, full 11.391%
     assert_matches_human_painting_within_limit("css-wordpress-wordpress-remove-one-rule", 11.41)
 }
 

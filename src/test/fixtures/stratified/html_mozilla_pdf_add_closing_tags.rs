@@ -28,7 +28,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-05: minimal 0.415%, full 0.415%
     assert_matches_human_painting_within_limit("html-mozilla-pdf-add-closing-tags", 0.43)
 }
 

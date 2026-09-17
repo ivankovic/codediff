@@ -30,7 +30,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-08: minimal 0.335% (2/597 bytes), full 0.335% (2/597) (measured, unexamined)
     assert_matches_human_painting_within_limit("yaml-puppeteer-puppeteer-false-to-true", 0.35)
 }
 

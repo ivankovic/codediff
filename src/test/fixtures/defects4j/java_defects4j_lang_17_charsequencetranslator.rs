@@ -23,9 +23,8 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // Tightened 2026-09-16, 5/2 -> 3/0, after the mapping was revised: codediff now agrees
-    // with it on every visible node. A limit above the measurement is a test that cannot
-    // fail, which is what the quality-baseline projection test exists to catch.
+    // codediff now agrees with it on every visible node. A limit above the measurement is a test
+    // that cannot fail, which is what the quality-baseline projection test exists to catch.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "java-defects4j-lang-17-charsequencetranslator",
         3,
@@ -35,9 +34,7 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // Re-measured 2026-09-16 after the painting was revised: minimal 0.278%,
-    // full 2.848%. The ground truth moved, not the renderer - see
-    // `ground-truth-moves-limits-move`.
+    // The ground truth moved, not the renderer - see `ground-truth-moves-limits-move`.
     assert_matches_human_painting_within_limit(
         "java-defects4j-lang-17-charsequencetranslator",
         2.86,

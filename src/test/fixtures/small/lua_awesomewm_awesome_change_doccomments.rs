@@ -25,10 +25,9 @@ fn mapping() -> Result<()> {
     // parallel, each swapping prose and reformatting a `* **word**` bullet list to `` * `"word"` ``
     // - comment nodes carry no syntactic substructure to disambiguate by, so matching individual
     // rewritten comment lines to their old counterparts across two near-duplicate blocks is
-    // inherently ambiguous, not a matcher bug. `solve_leading_siblings` (formerly
-    // `solve_comment_nodes`) walks a whole chain of leading comments rather than just one hop,
-    // which correctly anchors some of the unchanged comment lines in these blocks; the rest are
-    // the genuinely ambiguous rewritten ones.
+    // inherently ambiguous, not a matcher bug. `solve_leading_siblings` walks a whole chain of
+    // leading comments rather than just one hop, which correctly anchors some of the unchanged
+    // comment lines in these blocks; the rest are the genuinely ambiguous rewritten ones.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "lua-awesomewm-awesome-change-doccomments",
         21,

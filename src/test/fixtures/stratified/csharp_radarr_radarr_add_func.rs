@@ -28,8 +28,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-08: minimal 0.000%, full 0.000% - codediff's rendering is byte-identical to the
-    // painting under both presets.
     assert_matches_human_painting_within_limit("csharp-radarr-radarr-add-func", 0.0)
 }
 

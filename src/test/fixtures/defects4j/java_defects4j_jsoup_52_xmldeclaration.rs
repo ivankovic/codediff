@@ -23,10 +23,10 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // First measurement, 2026-09-12. The statement carrying the call moved from position 1 to
-    // position 3 of its block; the human keeps its receiver `.` paired across the move, while
-    // codediff's `qualified_name` pass reads that leaf as deleted. The statement itself is
-    // matched either way, so the residual is the one leaf inside it.
+    // The statement carrying the call moved from position 1 to position 3 of its block; the human
+    // keeps its receiver `.` paired across the move, while codediff's `qualified_name` pass reads
+    // that leaf as deleted. The statement itself is matched either way, so the residual is the one
+    // leaf inside it.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "java-defects4j-jsoup-52-xmldeclaration",
         1,
@@ -36,7 +36,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-12: minimal 5.008%, full 7.753% (measured, unexamined)
     assert_matches_human_painting_within_limit("java-defects4j-jsoup-52-xmldeclaration", 7.77)
 }
 

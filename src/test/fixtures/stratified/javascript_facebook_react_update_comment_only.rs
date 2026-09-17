@@ -30,7 +30,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-05: minimal 0.322%, full 0.000%
     assert_matches_human_painting_within_limit(
         "javascript-facebook-react-update-comment-only",
         0.34,

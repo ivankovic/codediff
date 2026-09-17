@@ -30,7 +30,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-05: minimal 0.592%, full 0.592%
     assert_matches_human_painting_within_limit("cpp-ollama-ollama-update-commit-hash-2", 0.61)
 }
 

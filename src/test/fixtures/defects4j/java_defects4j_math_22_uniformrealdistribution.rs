@@ -23,9 +23,9 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // Clamped at 1/1 on 2026-09-15; exact since 2026-09-17, when Java gained
-    // `BOOLEAN_LITERAL_KINDS`. The one residual was a `false` -> `true` flip - the mirror of
-    // `java-defects4j-math-22-fdistribution`, and fixed by the same kind family.
+    // Clamped at 1/1; exact since Java gained `BOOLEAN_LITERAL_KINDS`. The one residual was a
+    // `false` -> `true` flip - the mirror of `java-defects4j-math-22-fdistribution`, and fixed by
+    // the same kind family.
     test::helper::human_mapping::assert_matches_human_mapping(
         "java-defects4j-math-22-uniformrealdistribution",
     )
@@ -33,7 +33,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-15: minimal 0.070%, full 0.070% (measured, unexamined)
     assert_matches_human_painting_within_limit(
         "java-defects4j-math-22-uniformrealdistribution",
         0.09,

@@ -30,7 +30,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-08: minimal 0.214%, full 0.214%
     assert_matches_human_painting_within_limit(
         "go-gin-gonic-gin-one-space-removed-in-a-comment",
         0.23,
@@ -39,9 +38,7 @@ fn painting() -> Result<()> {
 
 #[test]
 fn invariants() -> Result<()> {
-    // Was pinned at 1 from 2026-09-08 to 2026-09-11, and for the same reason as its twin
-    // go-gin-gonic-gin-whitespace-in-comment: the deleted space is mid-comment, not trailing, so
-    // the no-trailing-whitespace invariant should never have fired on it. Back to 0 now that the
-    // invariant checks what its name says.
+    // The deleted space is mid-comment, not trailing, so the no-trailing-whitespace invariant
+    // should never have fired on it. The invariant checks what its name says.
     assert_ground_truth_invariants("go-gin-gonic-gin-one-space-removed-in-a-comment")
 }

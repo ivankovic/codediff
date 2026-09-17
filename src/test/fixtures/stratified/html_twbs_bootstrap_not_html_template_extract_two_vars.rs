@@ -23,15 +23,12 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // Not pure HTML, actually a template. This doesn't parse fully. And even if, it requires
-    // N:M mapping.
-    //
-    // The 2 residual mismatches are both the same shape: an `attribute_value` the human calls
-    // newly inserted, which codediff pairs with the old one as an `Update` via
+    // Not pure HTML, actually a template. This doesn't parse fully. And even if, it requires N:M
+    // mapping. The 2 residual mismatches are both the same shape: an `attribute_value` the human
+    // calls newly inserted, which codediff pairs with the old one as an `Update` via
     // `StructurallyIdenticalAncestor` - the enclosing `attribute`/`start_tag`/`element` chain is
     // identical on both sides, so that pass matches the values positionally rather than reading
-    // them as one value replaced by another. Recorded 2026-09-03 as a measured gap, not accepted
-    // as correct.
+    // them as one value replaced by another. Recorded as a measured gap, not accepted as correct.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "html-twbs-bootstrap-not-html-template-extract-two-vars",
         2,
@@ -41,12 +38,10 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-05: minimal 24.734%, full 24.127%
-    // re-measured 2026-09-08 after `RenderOptions::paint_displaced_moves` stopped `MINIMAL` painting a
-    // span that kept its own text and its own place and shifted only because of an edit before it:
-    // minimal 24.734% -> 24.127%. The option is off under `FULL`, which this fix leaves byte-identical
-    // at 24.127%, so `FULL` sets the limit now. Any earlier number in this comment that disagrees with
-    // these two predates unrelated rendering and ground-truth fixes and was never re-measured.
+    // After `RenderOptions::paint_displaced_moves` stopped `MINIMAL` painting a span that kept its
+    // own text and its own place and shifted only because of an edit before it: minimal 24.734% ->
+    // 24.127%. The option is off under `FULL`, which this fix leaves byte-identical at 24.127%, so
+    // `FULL` sets the limit now.
     assert_matches_human_painting_within_limit(
         "html-twbs-bootstrap-not-html-template-extract-two-vars",
         24.14,

@@ -28,7 +28,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-08: minimal 0.462% (2/433 bytes), full 0.693% (3/433) (measured, unexamined)
     assert_matches_human_painting_within_limit("go-junegunn-fzf-real-small-change", 0.71)
 }
 

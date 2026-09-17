@@ -28,7 +28,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-05: minimal 0.000%, full 0.000% (measured, unexamined)
     assert_matches_human_painting_within_limit("rust-zed-industries-zed-change-mods", 0.0)
 }
 

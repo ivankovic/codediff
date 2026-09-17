@@ -23,10 +23,9 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // measured 2026-09-11: 2 mismatch(es), 2 visible. Two wrapping calls are removed and an
-    // argument list loses one of two identical `,` tokens. As with
-    // rust-rust-lang-rust-remove-path-from-using, either comma is a defensible choice and
-    // disagreeing about which costs exactly two.
+    // 2 mismatch(es), 2 visible. Two wrapping calls are removed and an argument list loses one of
+    // two identical `,` tokens. As with rust-rust-lang-rust-remove-path-from-using, either comma is
+    // a defensible choice and disagreeing about which costs exactly two.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "cpp-libreoffice-remove-two-wrapping-functions",
         2,
@@ -36,7 +35,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-11: minimal 0.091%, full 0.006%
     assert_matches_human_painting_within_limit(
         "cpp-libreoffice-remove-two-wrapping-functions",
         0.11,

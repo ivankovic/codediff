@@ -98,7 +98,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-08-26: minimal 43.478%, full 0.725%
     assert_matches_human_painting_within_limit("rust-add-if", 43.49)
 }
 

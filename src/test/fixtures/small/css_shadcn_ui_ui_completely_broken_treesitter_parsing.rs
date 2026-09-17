@@ -22,14 +22,13 @@ use anyhow::Result;
 #[test]
 fn mapping() -> Result<()> {
     // Deliberately pathological: the source isn't valid CSS, so tree-sitter's error recovery
-    // produces thousands of ERROR nodes on both sides. Node correspondence through an ERROR
-    // subtree is essentially undefined - codediff's APTED pass maps most of them to 0 rather than
-    // following the human's chosen (necessarily somewhat arbitrary) correspondence.
-    // 2026-09-17: 124 -> 74. `solve_orphaned_leaves` re-pairs identical leaves under parent
-    // pairs everything else agreed on, and this fixture is where its neighbour guard had to
-    // learn the difference between "the neighbour disagrees" and "nothing has matched the
-    // neighbour either" - inside an ERROR region almost nothing around a leaf is matched, and
-    // holding that against the pair left all 50 of these on the floor.
+    // produces thousands of ERROR nodes on both sides. Node correspondence through an ERROR subtree
+    // is essentially undefined - codediff's APTED pass maps most of them to 0 rather than following
+    // the human's chosen (necessarily somewhat arbitrary) correspondence. `solve_orphaned_leaves`
+    // re-pairs identical leaves under parent pairs everything else agreed on, and this fixture is
+    // where its neighbour guard had to learn the difference between "the neighbour disagrees" and
+    // "nothing has matched the neighbour either" - inside an ERROR region almost nothing around a
+    // leaf is matched, and holding that against the pair left all 50 of these on the floor.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "css-shadcn-ui-ui-completely-broken-treesitter-parsing",
         74,

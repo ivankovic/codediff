@@ -129,7 +129,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-08-26: minimal 3.833%, full 0.213%
     assert_matches_human_painting_within_limit("python-added-if-block", 3.85)
 }
 

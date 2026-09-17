@@ -30,11 +30,10 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-10: minimal 0.001%, full 0.003%
-    // Was 48.305% until the `own_content_span` guard in `classify_node` landed the same
-    // day: this fixture's container separates its children with `\` line continuations, so
-    // every gap held a non-whitespace character and the whole container was painted
-    // `Update` for a one-line change. See that guard's doc comment in `diff::text`.
+    // Was 48.305% until the `own_content_span` guard in `classify_node` landed the same day: this
+    // fixture's container separates its children with `\` line continuations, so every gap held a
+    // non-whitespace character and the whole container was painted `Update` for a one-line change.
+    // See that guard's doc comment in `diff::text`.
     assert_matches_human_painting_within_limit("vimscript-neovim-neovim-add-one-line-to-dict", 0.02)
 }
 

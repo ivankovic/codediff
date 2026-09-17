@@ -30,7 +30,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-10: minimal 0.096%, full 0.000%
     assert_matches_human_painting_within_limit("swift-swiftlang-swift-add-target-comment", 0.11)
 }
 

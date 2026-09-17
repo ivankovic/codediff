@@ -23,11 +23,11 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // First baseline (2026-09-08), a measured gap and not a regression: the added
-    // `it('To do', () => {});` carries an arrow function byte-identical to the `() => {}` that
-    // was already there, so IdenticalHashOfAncestor anchors the outer arrow's punctuation onto
-    // the newly inserted inner copy. The known phase-1 hash-matching preference for the
-    // byte-identical inner copy on a wrap; 14 of the 23 are visible.
+    // First baseline, a measured gap and not a regression: the added `it('To do', () => {});`
+    // carries an arrow function byte-identical to the `() => {}` that was already there, so
+    // IdenticalHashOfAncestor anchors the outer arrow's punctuation onto the newly inserted inner
+    // copy. The known phase-1 hash-matching preference for the byte-identical inner copy on a wrap;
+    // 14 of the 23 are visible.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "tsx-mui-material-ui-add-to-empty-block",
         23,
@@ -37,12 +37,10 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // measured 2026-09-08: minimal 29.808%, full 27.885% (measured, unexamined)
-    // re-measured 2026-09-08 after `RenderOptions::paint_displaced_moves` stopped `MINIMAL` painting a
-    // span that kept its own text and its own place and shifted only because of an edit before it:
-    // minimal 29.808% -> 20.192%. The option is off under `FULL`, which this fix leaves byte-identical
-    // at 27.885%, so `FULL` sets the limit now. Any earlier number in this comment that disagrees with
-    // these two predates unrelated rendering and ground-truth fixes and was never re-measured.
+    // After `RenderOptions::paint_displaced_moves` stopped `MINIMAL` painting a span that kept its
+    // own text and its own place and shifted only because of an edit before it: minimal 29.808% ->
+    // 20.192%. The option is off under `FULL`, which this fix leaves byte-identical at 27.885%, so
+    // `FULL` sets the limit now.
     assert_matches_human_painting_within_limit("tsx-mui-material-ui-add-to-empty-block", 27.90)
 }
 

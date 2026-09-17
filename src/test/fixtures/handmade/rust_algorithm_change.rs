@@ -53,20 +53,18 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // re-measured 2026-09-08: minimal 17.078%, full 27.984% (the 2026-09-01 comment's 25.823% /
-    // 28.807% predate unrelated rendering and ground-truth fixes and were never re-measured).
-    // `MINIMAL` is two bytes worse than it was the moment before, and this is the corpus's only
-    // fixture that `displaced_beside_an_edit_on_its_first_row` cost anything: it stops calling a
-    // multi-row node `Move` for a sideways shift on its own first row, and here two bytes of that
-    // span are ones the human does paint. Kept - the same rule is worth 2505 bytes across the
-    // corpus. `FULL` is untouched and still sets the limit. Residual unexamined beyond that.
+    // Minimal 17.078%, full 27.984%. `MINIMAL` is two bytes worse than it was the moment before,
+    // and this is the corpus's only fixture that `displaced_beside_an_edit_on_its_first_row` cost
+    // anything: it stops calling a multi-row node `Move` for a sideways shift on its own first row,
+    // and here two bytes of that span are ones the human does paint. Kept - the same rule is worth
+    // 2505 bytes across the corpus. `FULL` is untouched and still sets the limit. Residual
+    // unexamined beyond that.
     assert_matches_human_painting_within_limit("rust-algorithm-change", 28.0)
 }
 
 #[test]
 fn invariants() -> Result<()> {
-    // Invariant 16, first measured 2026-09-15 when the rule was added: the Minimal/Full split
-    // for a renamed identifier is not painted this way yet (`num` against `nums`). Recorded as found; the
-    // rule is new, the paintings predate it.
+    // Invariant 16: the Minimal/Full split for a renamed identifier is not painted this way yet
+    // (`num` against `nums`). Recorded as found.
     assert_ground_truth_invariants_with_known_violations("rust-algorithm-change", 1)
 }
