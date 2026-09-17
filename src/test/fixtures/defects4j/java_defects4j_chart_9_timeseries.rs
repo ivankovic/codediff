@@ -19,7 +19,7 @@ use anyhow::Result;
 
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants_with_known_violations;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 
 #[test]
 fn mapping() -> Result<()> {
@@ -34,9 +34,9 @@ fn painting() -> Result<()> {
 
 #[test]
 fn invariants() -> Result<()> {
-    // First measured 2026-09-16, and all three are the same parenthesis on after row 944: invariant 3
-    // twice, where the mapping matches one of the pair and inserts the other in both directions,
-    // and invariant 9 once, where the `Full (outer parenthesis)` painting calls that `(` a Move
-    // while the mapping inserts it. A mapping repair on one paren pair would settle all three.
-    assert_ground_truth_invariants_with_known_violations("java-defects4j-chart-9-timeseries", 3)
+    // Measured at three on 2026-09-16 and at zero on 2026-09-17, with no change to the data:
+    // all three were one parenthesis on after row 944, and all three were invariants reading a
+    // 1:2 multi-map group through `representative_entries`' arbitrary flattening - two of
+    // invariant 3, one of invariant 9. Both now ask whether *some* admissible pairing agrees.
+    assert_ground_truth_invariants("java-defects4j-chart-9-timeseries")
 }

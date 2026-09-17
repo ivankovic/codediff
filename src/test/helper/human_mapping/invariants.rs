@@ -1191,8 +1191,20 @@ fn mapping_and_painting_agree_on_what_survives(
     let caches =
         rebuild_caches_for_mapping(mapping, before_tree.root_node(), after_tree.root_node());
     let unmatched = [
-        unmatched_bytes(before_tree.root_node(), before.contents.len(), 0, &caches),
-        unmatched_bytes(after_tree.root_node(), after.contents.len(), 1, &caches),
+        unmatched_bytes(
+            before_tree.root_node(),
+            before.contents.len(),
+            0,
+            &mapping.groups,
+            &caches,
+        ),
+        unmatched_bytes(
+            after_tree.root_node(),
+            after.contents.len(),
+            1,
+            &mapping.groups,
+            &caches,
+        ),
     ];
 
     let mut violations = Vec::new();
@@ -1213,13 +1225,26 @@ fn mapping_and_painting_agree_on_what_survives(
 /// Per byte of one side, whether the **smallest node containing it** is one the tree mapping
 /// leaves unmatched.
 ///
+/// **A node its multi-map group leaves free does not count as unmatched**, for the reason
+/// [`delimiter_pairs_agree`] gives at length: which member of a group is the one left over is
+/// [`representative_entries`](super::representative_entries)' choice, not the human's, so reading
+/// it as "the mapping says this is gone" contradicts a painting that simply made the other choice.
+/// `java-defects4j-chart-9-timeseries` was exactly that - one `(` of a 1:2 group, painted as
+/// surviving by `Full (outer parenthesis)` and inserted by the flattening.
+///
 /// Painted in preorder so a child overwrites its parent. A `Matched` node inside a
 /// `DeleteWithChildren` one therefore reads as matched, while the whitespace *between* that
 /// node's children - which no node of its own covers - keeps the parent's answer. That is exactly
 /// what `descendant_for_byte_range` would say for each byte, in one walk rather than one lookup
 /// per byte, and the inter-token-whitespace case is not a detail: 60 of the bytes this rule still
 /// reports are the indentation inside a `block` the mapping deletes, which no leaf covers.
-fn unmatched_bytes(root: Node, len: usize, side: usize, caches: &Caches) -> Vec<bool> {
+fn unmatched_bytes(
+    root: Node,
+    len: usize,
+    side: usize,
+    groups: &[super::MultiMapGroup],
+    caches: &Caches,
+) -> Vec<bool> {
     let mut mask = vec![false; len];
     let mut stack = vec![root];
     while let Some(node) = stack.pop() {
@@ -1228,7 +1253,8 @@ fn unmatched_bytes(root: Node, len: usize, side: usize, caches: &Caches) -> Vec<
         } else {
             status_after(node, caches)
         };
-        let unmatched = matches!(status, NodeStatus::Marked { .. });
+        let unmatched = matches!(status, NodeStatus::Marked { .. })
+            && !group_leaves_status_open(node, side, groups, caches);
         let (start, end) = (node.start_byte().min(len), node.end_byte().min(len));
         mask[start..end].fill(unmatched);
         let mut cursor = node.walk();
@@ -1368,6 +1394,24 @@ fn is_closer(kind: &str) -> bool {
 /// asks: tree-sitter's recovery invents structure, and a `{` it paired with a `}` three functions
 /// away is not a pair a human ever saw. 6819 of the corpus's ~42k pairs are skipped this way.
 ///
+/// **A half whose multi-map group leaves it free is not a claim either.** A group of one before
+/// `(` against two after `(` says one of the two survives without saying which, and the same
+/// fixture records its `)` the same way; `representative_entries` has to pick one pairing, and it
+/// sorts each side by start byte, which for a nested call takes the *outer* opener and the *inner*
+/// closer. Reading statuses off that flattening split every such pair and reported two violations
+/// against ground truth that has a consistent reading (outer with outer). So the question asked
+/// here is the one `check_group_entry` asks of codediff - does *some* admissible pairing agree -
+/// and [`group_leaves_status_open`] answers it: a member the group could leave over intersects
+/// both statuses, so it can never disagree with its partner. Seen on
+/// `java-defects4j-cli-1-commandline` and `java-defects4j-chart-9-timeseries`, two violations
+/// each.
+///
+/// **Per pair, not across pairs.** Two pairs drawing halves from one group can each be satisfiable
+/// on their own and jointly infeasible, because the group's count couples them - one member being
+/// the leftover decides that another is not. Answering that exactly is a feasibility problem over
+/// the whole set of groups, and this takes the false negative instead: a contradiction reported
+/// here is always real, and the shape that would hide one has no instance in the corpus.
+///
 /// Compares **status only** - deleted, inserted, or matched - and not the derived
 /// move flag or the recorded operation. `moved` is `before_path != after_path`, a consequence of
 /// where a node landed rather than a judgement anyone entered, and a `{` whose path shifted while
@@ -1398,7 +1442,10 @@ fn delimiter_pairs_agree(
                 continue;
             }
 
-            let (opened, closed) = (mark_of(open, side, &caches), mark_of(close, side, &caches));
+            let (opened, closed) = (
+                mark_of(open, side, &mapping.groups, &caches),
+                mark_of(close, side, &mapping.groups, &caches),
+            );
             if let (Some(opened), Some(closed)) = (opened, closed)
                 && opened != closed
             {
@@ -1483,7 +1530,52 @@ pub(crate) fn delimiter_pairs<'tree>(
 }
 
 /// What the tree mapping says happened to `node`, or `None` if it says nothing.
-fn mark_of(node: Node, side: usize, caches: &Caches) -> Option<&'static str> {
+/// True when the pairings `node`'s [`MultiMapGroup`](super::MultiMapGroup) admits disagree about
+/// whether *this* member is matched - in which case the mapping has made no claim here to
+/// contradict.
+///
+/// A group of N before members and M after members matches `min(N, M)` pairs and leaves the rest
+/// of the longer side over. Every member of the shorter side is therefore matched under every
+/// pairing, and if the other side is empty nothing is matched at all: both are claims. Strictly
+/// between the two, whether this particular member is the one left over is a choice
+/// [`representative_entries`](super::representative_entries) makes to have something concrete to
+/// hand a caller, not something the human wrote down.
+///
+/// Nothing propagates to descendants, because a delimiter pair cannot straddle two members: both
+/// halves are direct children of one parent, so a member that contains one half contains the
+/// other.
+fn group_leaves_status_open(
+    node: Node,
+    side: usize,
+    groups: &[super::MultiMapGroup],
+    caches: &Caches,
+) -> bool {
+    let index = if side == 0 {
+        caches.before_group.get(&node.id())
+    } else {
+        caches.after_group.get(&node.id())
+    };
+    let Some(group) = index.and_then(|index| groups.get(*index)) else {
+        return false;
+    };
+    let (mine, theirs) = if side == 0 {
+        (group.before_paths.len(), group.after_paths.len())
+    } else {
+        (group.after_paths.len(), group.before_paths.len())
+    };
+    let matched = mine.min(theirs);
+    matched > 0 && matched < mine
+}
+
+fn mark_of(
+    node: Node,
+    side: usize,
+    groups: &[super::MultiMapGroup],
+    caches: &Caches,
+) -> Option<&'static str> {
+    if group_leaves_status_open(node, side, groups, caches) {
+        return None;
+    }
     let status = if side == 0 {
         status_before(node, caches)
     } else {
@@ -1566,13 +1658,17 @@ enum LeafStatus<'tree> {
     /// Deleted or inserted, by its own entry or under a `*WithChildren` ancestor.
     Removed,
     /// Under an `Update`/`MatchButNotIdentical` ancestor, or a childless `Delete`/`Insert`, with no
-    /// entry of its own: the mapping has not said, and no invariant here asserts anything.
+    /// entry of its own, or inside a multi-map group member the group could leave over: the
+    /// mapping has not said, and no invariant here asserts anything.
     Undecided,
 }
 
 /// The two trees indexed for the leaf-level invariants, built once per fixture.
 struct TreeContext<'tree> {
     caches: Caches,
+    /// The mapping's multi-map groups, for [`group_leaves_status_open`]: a leaf whose group could
+    /// leave it over is `Undecided`, not `Removed`.
+    groups: Vec<super::MultiMapGroup>,
     /// Node id to node, per side - how a partner id from [`Caches`] becomes a node again.
     ids: [std::collections::HashMap<usize, Node<'tree>>; 2],
     /// Every leaf per side, in source order.
@@ -1590,12 +1686,16 @@ impl<'tree> TreeContext<'tree> {
         let (after_ids, after_leaves) = index_tree(after_root);
         Self {
             caches,
+            groups: mapping.groups.clone(),
             ids: [before_ids, after_ids],
             leaves: [before_leaves, after_leaves],
         }
     }
 
     fn status(&self, leaf: Node<'tree>, side: usize) -> LeafStatus<'tree> {
+        if group_leaves_status_open(leaf, side, &self.groups, &self.caches) {
+            return LeafStatus::Undecided;
+        }
         let (matches, operations, removed) = if side == 0 {
             (
                 &self.caches.before_match,
@@ -1642,7 +1742,11 @@ impl<'tree> TreeContext<'tree> {
                 };
             }
             if let Some(&with_children) = removed.get(&current.id()) {
-                return if current.id() == leaf.id() || with_children {
+                return if group_leaves_status_open(current, side, &self.groups, &self.caches) {
+                    // The group could just as well have paired this member and left another over,
+                    // so "removed" is the flattening talking - see `delimiter_pairs_agree`.
+                    LeafStatus::Undecided
+                } else if current.id() == leaf.id() || with_children {
                     LeafStatus::Removed
                 } else {
                     LeafStatus::Undecided
@@ -3227,7 +3331,7 @@ mod tests {
         caches.before_removed.insert(block.id(), true);
         caches.before_match.insert(call.id(), call.id());
 
-        let mask = unmatched_bytes(root, before.contents.len(), 0, &caches);
+        let mask = unmatched_bytes(root, before.contents.len(), 0, &[], &caches);
         assert!(
             mask[block.start_byte()],
             "the deleted block's own brace inherits the mark"
@@ -3358,6 +3462,107 @@ mod tests {
             found
                 .iter()
                 .any(|v| v.contains("as deleted but its matching")),
+            "got {found:#?}"
+        );
+    }
+
+    /// Every leaf in `code` whose text is exactly `text` and whose parent is `parent`, in document
+    /// order. The parent is what keeps `fn f()`'s own parentheses out of a group about a call's.
+    fn leaves_reading<'a>(code: &'a Code, text: &str, parent: &str) -> Vec<Node<'a>> {
+        let root = code.ast.as_ref().unwrap().root_node();
+        let mut found = Vec::new();
+        let mut stack = vec![root];
+        while let Some(node) = stack.pop() {
+            if node.child_count() == 0
+                && &code.contents[node.byte_range()] == text
+                && node
+                    .parent()
+                    .is_some_and(|node_parent| node_parent.kind() == parent)
+            {
+                found.push(node);
+            }
+            let mut cursor = node.walk();
+            for child in node.children(&mut cursor) {
+                stack.push(child);
+            }
+        }
+        found.sort_by_key(Node::start_byte);
+        found
+    }
+
+    #[test]
+    fn a_delimiter_whose_group_leaves_it_free_contradicts_nothing() {
+        // The shape that motivated this: one call becomes two nested calls, so the human records
+        // the single before `(` against both after `(` and the single before `)` against both
+        // after `)`, each as a 1:2 group. Either choice is valid, and pairing outer with outer is
+        // consistent - but `representative_entries` sorts each side by start byte, so it takes the
+        // outer opener and the *inner* closer and splits both pairs.
+        let before = rust("fn f() { g(x); }\n");
+        let after = rust("fn f() { g(h(x)); }\n");
+
+        let mut groups = Vec::new();
+        for delimiter in ["(", ")"] {
+            groups.push(super::super::MultiMapGroup {
+                before_paths: leaves_reading(&before, delimiter, "arguments")
+                    .iter()
+                    .map(|node| path_for_node(*node))
+                    .collect(),
+                after_paths: leaves_reading(&after, delimiter, "arguments")
+                    .iter()
+                    .map(|node| path_for_node(*node))
+                    .collect(),
+                operation: HumanOperation::Identical,
+                with_children: false,
+            });
+        }
+        assert_eq!(groups[0].before_paths.len(), 1);
+        assert_eq!(
+            groups[0].after_paths.len(),
+            2,
+            "the after side nests two calls"
+        );
+
+        let mapping = HumanMapping {
+            groups,
+            ..Default::default()
+        };
+
+        assert!(
+            violations(&mapping, &before, &after).is_empty(),
+            "a member the group could leave over states nothing to contradict"
+        );
+    }
+
+    #[test]
+    fn a_delimiter_its_group_pins_is_still_checked() {
+        // A 1:1 group matches its only member under every pairing it admits, so "matched" here is
+        // a claim the group really makes - and an entry deleting the partner contradicts it.
+        let before = rust("fn f() { g(); }\n");
+        let after = rust("fn f() { g(); }\n");
+
+        let open = leaves_reading(&before, "(", "arguments");
+        let after_open = leaves_reading(&after, "(", "arguments");
+        let close = leaves_reading(&before, ")", "arguments");
+        let mapping = HumanMapping {
+            entries: vec![HumanMappingEntry {
+                operation: HumanOperation::Delete,
+                before_path: Some(path_for_node(close[0])),
+                after_path: None,
+            }],
+            groups: vec![super::super::MultiMapGroup {
+                before_paths: vec![path_for_node(open[0])],
+                after_paths: vec![path_for_node(after_open[0])],
+                operation: HumanOperation::Identical,
+                with_children: false,
+            }],
+            ..Default::default()
+        };
+
+        let found = violations(&mapping, &before, &after);
+        assert!(
+            found
+                .iter()
+                .any(|v| v.contains("as matched but its matching")),
             "got {found:#?}"
         );
     }

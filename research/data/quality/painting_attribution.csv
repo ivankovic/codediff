@@ -447,8 +447,8 @@ java-defects4j-chart-7-timeperiodvalues,full,37306,0,0,0,1,0
 java-defects4j-chart-7-timeperiodvalues,minimal,37306,0,0,0,1,0
 java-defects4j-chart-8-week,full,43809,21,0,21,1,0
 java-defects4j-chart-8-week,minimal,43809,21,0,21,1,0
-java-defects4j-chart-9-timeseries,full,74736,0,5,5,4,1
-java-defects4j-chart-9-timeseries,minimal,74736,2,27,29,4,1
+java-defects4j-chart-9-timeseries,full,74736,0,5,5,4,0
+java-defects4j-chart-9-timeseries,minimal,74736,2,27,29,4,0
 java-defects4j-cli-1-commandline,full,16954,647,130,545,4,1
 java-defects4j-cli-1-commandline,minimal,16954,522,40,504,4,1
 java-defects4j-cli-10-parser,full,26625,2,2,0,2,0
