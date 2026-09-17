@@ -23,12 +23,12 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // First measurement, 2026-09-15, of a mapping from the 2026-09-15 Defects4J batch.
-    // Recorded as found, not examined.
-    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
+    // Clamped at 1/1 on 2026-09-15; exact since 2026-09-17, when Java gained
+    // `BOOLEAN_LITERAL_KINDS`. The one residual was the `return true` -> `return false` flip: the
+    // human pairs the two literals, and until then no pass could, because `true` and `false` are
+    // separate kinds in this grammar and nothing let them rename into each other.
+    test::helper::human_mapping::assert_matches_human_mapping(
         "java-defects4j-math-22-fdistribution",
-        1,
-        1,
     )
 }
 

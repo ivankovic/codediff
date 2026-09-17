@@ -1231,6 +1231,15 @@ const RUBY_HASH_SEPARATORS: &[&str] = &["=>", ":"];
 /// a `return NULL` with an unrelated name in `c-nginx-add-typedef` and buy nothing elsewhere.
 const NULL_LITERAL_KINDS: &[&str] = &["none", "identifier"];
 
+/// A boolean flipped in place: `return true` -> `return false`. In grammars that give each literal
+/// its own kind (Java's `true`/`false`, unlike Rust's single `boolean_literal`) the two cannot pair
+/// without this, so the flip reads as a delete plus an insert - `java-defects4j-math-22-fdistribution`
+/// and `java-defects4j-math-22-uniformrealdistribution` are one visible mismatch each, and both are
+/// exactly this. Java only, on the same "add a language when a fixture asks for it" rule
+/// [`NULL_LITERAL_KINDS`] above follows: a grammar with one boolean kind needs nothing here, and a
+/// grammar with two but no fixture has no measurement behind it.
+const BOOLEAN_LITERAL_KINDS: &[&str] = &["true", "false"];
+
 /// TypeScript's built-in type keywords - the anonymous leaf tokens tree-sitter yields *inside* a
 /// `predefined_type` node (`number`, `string`, `boolean`, ... - tree-sitter names an anonymous
 /// token by its own literal text, so the keyword `number` really does have kind `"number"`; see
@@ -1320,6 +1329,7 @@ const ALL_OPERATOR_FAMILIES: &[&[&str]] = &[
     HTML_TAG_END,
     RUBY_HASH_SEPARATORS,
     NULL_LITERAL_KINDS,
+    BOOLEAN_LITERAL_KINDS,
 ];
 
 /// The mask type below must have a bit per family - a silent shift-overflow is exactly the bug
@@ -1449,6 +1459,7 @@ fn families_for_language(language: &Language) -> &'static [&'static [&'static st
             INCREMENT_OPS,
             NUMERIC_LITERAL_KINDS,
             ACCESS_MODIFIERS,
+            BOOLEAN_LITERAL_KINDS,
         ],
         Language::Go => &[
             COMPARISON_OPS,
@@ -1555,6 +1566,18 @@ fn families_for_language(language: &Language) -> &'static [&'static [&'static st
             NUMERIC_LITERAL_KINDS,
             ACCESS_MODIFIERS,
             DECLARATION_KEYWORDS,
+        ],
+        // Vimscript reached the empty default until 2026-09-17, so no operator could ever pair
+        // with a related one: `vimscript-neovim-neovim-small-change-2`'s single visible mismatch is
+        // a `let x = ...` becoming `let x .= ...`, and `.=` is already in `ASSIGNMENT_OPS`. The
+        // families given here are the ones whose tokens the grammar actually emits as their own
+        // kinds; no fixture asks for more yet.
+        Language::Vimscript => &[
+            COMPARISON_OPS,
+            ARITHMETIC_OPS,
+            LOGICAL_OPS,
+            ASSIGNMENT_OPS,
+            NUMERIC_LITERAL_KINDS,
         ],
         Language::ShellScript => &[SHELL_TEST_OPS],
         Language::HTML | Language::XML => &[HTML_TAG_END],

@@ -23,12 +23,11 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // First measurement, 2026-09-15, of a mapping from the 2026-09-15 Defects4J batch.
-    // Recorded as found, not examined.
-    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
+    // Clamped at 1/1 on 2026-09-15; exact since 2026-09-17, when Java gained
+    // `BOOLEAN_LITERAL_KINDS`. The one residual was a `false` -> `true` flip - the mirror of
+    // `java-defects4j-math-22-fdistribution`, and fixed by the same kind family.
+    test::helper::human_mapping::assert_matches_human_mapping(
         "java-defects4j-math-22-uniformrealdistribution",
-        1,
-        1,
     )
 }
 

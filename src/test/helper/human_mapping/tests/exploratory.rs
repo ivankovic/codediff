@@ -2101,8 +2101,8 @@ fn mismatch_census() -> Result<()> {
         csv_path.display()
     );
     println!(
-        "\n{:<28} {:<24} {:<18} {}",
-        "expected", "actual", "reason", "count"
+        "\n{:<28} {:<24} {:<18} count",
+        "expected", "actual", "reason"
     );
     let mut shapes: Vec<_> = by_shape.into_iter().collect();
     shapes.sort_by_key(|(_, count)| std::cmp::Reverse(*count));

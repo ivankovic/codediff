@@ -23,15 +23,13 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // 2026-09-12: 0/0 -> 1/1, and the ground truth moved, not the algorithm. The human mapping was
-    // re-annotated in the 2026-09-11 batch to pair `=` with the `.=` that replaced it - a
-    // cross-kind operator match of exactly the kind `kinds_update_allowed` exists for. codediff's
-    // APTED fallback still reads the old operator as deleted and the new one as inserted, so the
-    // one residual is that pairing, not a regression against what this fixture asserted before.
-    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
+    // 2026-09-12: 0/0 -> 1/1 because the ground truth moved - the human mapping was re-annotated
+    // to pair `=` with the `.=` that replaced it. Exact again since 2026-09-17: that note called it
+    // "a cross-kind operator match of exactly the kind `kinds_update_allowed` exists for", and the
+    // reason it did not work was that Vimscript reached `families_for_language`'s empty default and
+    // had no operator families at all. It has them now.
+    test::helper::human_mapping::assert_matches_human_mapping(
         "vimscript-neovim-neovim-small-change-2",
-        1,
-        1,
     )
 }
 
