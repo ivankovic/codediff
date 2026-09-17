@@ -33,10 +33,10 @@ fn apted_debug() -> bool {
 }
 
 /// `strategy[(pre_v, pre_w)]` from `computeOptStrategy_postL`/`_postR`: a *signed* encoded path
-/// id (not a distance), separate from `DeltaTable` rather than overloading one buffer for both
-/// the way Java does - Java's `delta`/`strategy` are the same `float[][]`, reused in place once
-/// `gted` starts consuming a cell (it never needs the strategy value again after routing).
-/// Keeping them apart avoids relying on that consumption order, at the cost of one extra buffer.
+/// id (not a distance), kept in its own buffer rather than overloaded onto `DeltaTable`. One
+/// buffer could serve both - `gted` never needs a cell's strategy value again once it has routed
+/// on it - but keeping them apart avoids relying on that consumption order, at the cost of one
+/// extra buffer.
 pub(crate) struct StrategyTable {
     grid: Grid<i64>,
 }
@@ -68,11 +68,10 @@ impl StrategyTable {
 /// postorder is unaffected by the wrapping (vroot, having every other node as a descendant, is
 /// simply the last postorder index, `size - 1`).
 ///
-/// Field names and the formulas that derive them mirror Java APTED's `NodeIndexer` (indexNodes /
-/// postTraversalIndexing), with one deviation: `kr_sum`/`rev_kr_sum`/`desc_sum` are computed via
-/// closed-form bottom-up recurrences instead of replicating Java's single-pass-with-mutable-
-/// "Tmp"-fields threading - both compute the exact same values, but the recurrence form doesn't
-/// require smuggling a child's partial state through instance fields across recursive calls.
+/// `kr_sum`/`rev_kr_sum`/`desc_sum` are computed via closed-form bottom-up recurrences rather
+/// than a single pass threading each child's partial state through mutable fields across
+/// recursive calls. Both compute the same values; the recurrence form keeps that state out of
+/// the struct.
 pub(crate) struct AptedIndexer {
     /// Number of nodes including the virtual root.
     pub(crate) size: usize,
@@ -117,9 +116,9 @@ pub(crate) struct AptedIndexer {
     pub(crate) sum_del_cost: Vec<u64>,
     /// 0-based preorder index -> total insert cost of every node in its subtree.
     pub(crate) sum_ins_cost: Vec<u64>,
-    /// Count of leaf nodes that are their parent's first (leftmost) child [2, Section 5.3].
+    /// Count of leaf nodes that are their parent's first (leftmost) child [APTED paper, Section 5.3].
     pub(crate) lchl: usize,
-    /// Count of leaf nodes that are their parent's last (rightmost) child [2, Section 5.3].
+    /// Count of leaf nodes that are their parent's last (rightmost) child [APTED paper, Section 5.3].
     pub(crate) rchl: usize,
 }
 
@@ -282,7 +281,7 @@ impl AptedIndexer {
 
         // Nearest leaf strictly to the left (in preorder)/right (in right-to-left preorder),
         // `-1` if none - needed by `spf_a`'s `updateFnArray` to seed its "next forest member"
-        // linked list. A single forward scan each, mirroring Java's `postTraversalIndexing`.
+        // linked list. A single forward scan each.
         let mut pre_to_ln = vec![-1i64; size];
         {
             let mut current_leaf: i64 = -1;
@@ -307,7 +306,7 @@ impl AptedIndexer {
         let sum_del_cost = vec![0u64; size];
         let sum_ins_cost = vec![0u64; size];
 
-        // `lchl`/`rchl` [2, Section 5.3]: count of leaf nodes that are their parent's first/last
+        // `lchl`/`rchl` [APTED paper, Section 5.3]: count of leaf nodes that are their parent's first/last
         // child, used by `compute_delta` to pick whichever of postL/postR's preorder direction is
         // cheaper for this tree's shape.
         let mut lchl = 0usize;
@@ -374,7 +373,7 @@ impl AptedIndexer {
 
     /// 0-based right-to-left postorder index of `pre`. Trivially `size - 1 - pre`: the
     /// right-to-left-postorder rank of any node equals `size - 1` minus its left-to-right-
-    /// preorder rank, for any tree shape (mirrors Java's `preL_to_postR`).
+    /// preorder rank, for any tree shape.
     pub(crate) fn pre_to_post_r(&self, pre: usize) -> usize {
         self.size - 1 - pre
     }
@@ -540,21 +539,19 @@ pub(crate) fn vren_adjusted(ctx: &EngineCtx, before_pre: i64, after_pre: i64, ba
     }
 }
 
-/// Flat, `i64`-valued 2D matrix - backs `spf_a`'s `s`/`t` tables (the role Java's `float[][]`
-/// plays there).
+/// Flat, `i64`-valued 2D matrix - backs `spf_a`'s `s`/`t` tables.
 pub(crate) type Mat = Grid<i64>;
 
-/// Direct port of APTED.java's `spfA` (the general "inner path" single-path function -
-/// Algorithm 3 in the APTED paper), **specialized to `pathType == INNER`**: `gted` only ever
-/// calls this once it has already routed `pathType == LEFT`/`RIGHT` to `spf_path` directly, so
-/// Java's `pathType == 0`/`pathType == 1` branches (handling this function as a
-/// hypothetically general LEFT/RIGHT/INNER entry point) are dead code from that call site and
-/// are omitted; every conditional that depended on them is simplified accordingly (e.g. the
-/// "deal with nodes to the left of the path" guard becomes plain `leftPart`).
+/// `spfA`, the general "inner path" single-path function (Algorithm 3 in the APTED paper),
+/// **specialized to `pathType == INNER`**: `gted` only ever calls this once it has already
+/// routed `pathType == LEFT`/`RIGHT` to `spf_path` directly, so the LEFT and RIGHT branches -
+/// which would handle this function as a general LEFT/RIGHT/INNER entry point - are dead code
+/// from that call site and are omitted; every conditional that depended on them is simplified
+/// accordingly (e.g. the "deal with nodes to the left of the path" guard becomes plain
+/// `leftPart`).
 ///
-/// Variable names mirror Java's as closely as possible (`lF`/`rF` range over `path_idx`'s
-/// subtree, `lG`/`rG` over `other_idx`'s) to keep this checkable line-by-line against the
-/// original; `treesSwapped` is replaced by `path_is_before` throughout, same as `spf_path`.
+/// `lF`/`rF` range over `path_idx`'s subtree, `lG`/`rG` over `other_idx`'s; `path_is_before`
+/// carries the orientation the algorithm states as `treesSwapped`, same as `spf_path`.
 /// Costs are `i64` (never negative in practice for a metric cost model, but several
 /// intermediate `sp3` terms are differences, so `i64` avoids an underflow panic `u64` would risk
 /// on the way to a non-negative result) and cast to `u64` only at the `DeltaTable`/return
@@ -686,8 +683,8 @@ pub(crate) fn spf_a(
         let right_part =
             start_path_node >= 0 && start_path_node_in_pre_r - end_path_node_in_pre_r > 1;
 
-        // Deal with nodes to the left of the path. Java: `pathType == 1 || pathType == 2 &&
-        // leftPart`; simplified to `leftPart` per this function's INNER-only specialization.
+        // Deal with nodes to the left of the path - the general form's path-type guard,
+        // simplified to plain `leftPart` by this function's INNER-only specialization.
         if left_part {
             let (r_f_first, l_f_first);
             if start_path_node == -1 {
@@ -728,8 +725,8 @@ pub(crate) fn spf_a(
                         other_idx.pre_r_to_pre_l[(r_g - 1) as usize] as i64
                     };
                 let parent_of_r_g_in_pre_l = other_idx.parents[r_g_in_pre_l as usize];
-                // Decides on the last lG node for Loop D - INNER-only, so always the `else`
-                // branch of Java's `if (pathType == 1)`.
+                // Decides on the last lG node for Loop D - INNER-only, so the path-type
+                // branch the general form has here collapses to a single case.
                 let l_g_last = if l_g_first == current_subtree_pre_l2 {
                     l_g_first
                 } else {
@@ -874,8 +871,8 @@ pub(crate) fn spf_a(
                         if left_part {
                             // `other`-axis index is `parent_of_r_g_in_pre_l` (== `r_g_minus1_in_pre_l`
                             // per the gate above) - *not* `+ 1`. The `+1` belongs only to the
-                            // s-table's own relative-offset lookup on the line below; Java's
-                            // `delta[endPathNode][parent_of_rG_in_preL]` uses the bare value.
+                            // s-table's own relative-offset lookup on the line below. The
+                            // delta write takes the bare value.
                             let (b, a) = delta_order(end_path_node, parent_of_r_g_in_pre_l);
                             let v = s[(
                                 l_f_last + 1 - it1_pre_l_off,
@@ -911,7 +908,7 @@ pub(crate) fn spf_a(
                         l_f2 -= 1;
                     }
                 }
-                // Inherited from APTED.java's own `spfA`: `fta`'s chain here is walked fresh on
+                // `fta`'s chain here is walked fresh on
                 // every outer iteration rather than cached, a known but unclaimed micro-
                 // optimization (not correctness-affecting - `fta` itself doesn't change during
                 // this sweep) that hasn't been prioritized since `spfA` isn't this pipeline's
@@ -926,9 +923,8 @@ pub(crate) fn spf_a(
             }
         }
 
-        // Deal with nodes to the right of the path. Java: `pathType == 0 || pathType == 2 &&
-        // rightPart || pathType == 2 && !leftPart && !rightPart`; simplified to `rightPart ||
-        // !leftPart` per this function's INNER-only specialization.
+        // Deal with nodes to the right of the path - the general form's path-type guard,
+        // simplified to `rightPart || !leftPart` by this function's INNER-only specialization.
         if right_part || !left_part {
             let (l_f_first, r_f_first);
             if start_path_node == -1 {
@@ -1148,7 +1144,7 @@ pub(crate) fn spf_a(
                         r_f2 -= 1;
                     }
                 }
-                // Inherited from APTED.java's own `spfA`: `fta`'s chain here is walked fresh on
+                // `fta`'s chain here is walked fresh on
                 // every outer iteration rather than cached, a known but unclaimed micro-
                 // optimization (not correctness-affecting - `fta` itself doesn't change during
                 // this sweep) that hasn't been prioritized since `spfA` isn't this pipeline's
@@ -1171,10 +1167,9 @@ pub(crate) fn spf_a(
     min_cost as u64
 }
 
-/// Direct port of APTED.java's `spf1`: closed-form tree edit distance when at least one of the
-/// two subtrees is a single node, avoiding the overhead of the general single-path machinery.
-/// Writes nothing into `delta` - the size-1-side cells it would otherwise touch are already
-/// covered by `ted_init`.
+/// `spf1`: closed-form tree edit distance when at least one of the two subtrees is a single node,
+/// avoiding the overhead of the general single-path machinery. Writes nothing into `delta` - the
+/// size-1-side cells it would otherwise touch are already covered by `ted_init`.
 pub(crate) fn spf1(ctx: &EngineCtx, root1: usize, root2: usize) -> u64 {
     let size1 = ctx.before_idx.sizes[root1];
     let size2 = ctx.after_idx.sizes[root2];
@@ -1214,15 +1209,14 @@ pub(crate) fn spf1(ctx: &EngineCtx, root1: usize, root2: usize) -> u64 {
 /// Which postorder direction a single-path decomposition is walking - `Left` (left-to-right,
 /// `spfL`'s world) or `Right` (right-to-left, `spfR`'s world). Bundled with the four accessor
 /// functions below so the functions that used to be hand-duplicated once per direction
-/// (`computeKeyRoots`/`computeRevKeyRoots` -> `compute_keyroots`; `treeEditDist`/`treeEditDistR` ->
-/// `apted_tree_edit_dist`; `spfL`/`spfR` -> `spf_path`) can share one implementation instead, the
-/// same way `path_is_before: bool` already lets `spf_a` share one implementation across the
-/// before/after axis. Checkability against the original Java (which keeps these as separate,
-/// unparameterized functions) is no longer a goal here, so this genuine mechanical duplication was
-/// worth removing like any other. `compute_opt_strategy_post_l`/`compute_opt_strategy_post_r` are
-/// deliberately NOT unified this way - they aren't a pure accessor-swap mirror (the post-`min_cost`
-/// parent-propagation step swaps which owned mutable buffer plays which role between the two), so
-/// merging them would be a materially bigger and riskier change than this one.
+/// (`computeKeyRoots`/`computeRevKeyRoots` -> `compute_keyroots`; `treeEditDist`/`treeEditDistR`
+/// -> `apted_tree_edit_dist`; `spfL`/`spfR` -> `spf_path`) can share one implementation instead,
+/// the same way `path_is_before: bool` already lets `spf_a` share one implementation across the
+/// before/after axis. This is genuine mechanical duplication and was worth removing like any
+/// other. `compute_opt_strategy_post_l`/`compute_opt_strategy_post_r` are deliberately NOT unified
+/// this way - they aren't a pure accessor-swap mirror (the post-`min_cost` parent-propagation step
+/// swaps which owned mutable buffer plays which role between the two), so merging them would be a
+/// materially bigger and riskier change than this one.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(crate) enum PostDir {
     Left,
@@ -1264,13 +1258,12 @@ fn pre_to_extreme_leaf(idx: &AptedIndexer, dir: PostDir, pre: usize) -> usize {
     }
 }
 
-/// Direct port of APTED.java's `computeKeyRoots`/`computeRevKeyRoots`, generalized over `dir`:
-/// collects, into `keyroots`, every node that is a keyroot of `subtree_root`'s decomposition along
-/// `dir` - i.e. `subtree_root` itself, plus (recursively) every sibling on the side opposite `dir`
-/// encountered while walking up from `path_id` (the extreme leaf descendant of `subtree_root` in
-/// direction `dir`) back to `subtree_root`. `Left`: every node with a left sibling is its own
-/// keyroot, reached via each subtree's leftmost leaf descendant. `Right`: the mirror image, via
-/// rightmost leaf descendants.
+/// `computeKeyRoots`/`computeRevKeyRoots`, generalized over `dir`: collects, into `keyroots`, every
+/// node that is a keyroot of `subtree_root`'s decomposition along `dir` - i.e. `subtree_root`
+/// itself, plus (recursively) every sibling on the side opposite `dir` encountered while walking up
+/// from `path_id` (the extreme leaf descendant of `subtree_root` in direction `dir`) back to
+/// `subtree_root`. `Left`: every node with a left sibling is its own keyroot, reached via each
+/// subtree's leftmost leaf descendant. `Right`: the mirror image, via rightmost leaf descendants.
 pub(crate) fn compute_keyroots(
     idx: &AptedIndexer,
     dir: PostDir,
@@ -1297,9 +1290,9 @@ pub(crate) fn compute_keyroots(
     }
 }
 
-/// Direct port of APTED.java's `treeEditDist`/`treeEditDistR` (the core of `spfL`/`spfR`),
-/// generalized over `dir`: fills `forestdist` with the distances between every subforest pair
-/// spanning `[extreme_leaf(path_subtree), path_subtree]` on the path side against
+/// `treeEditDist`/`treeEditDistR` (the core of `spfL`/`spfR`), generalized over `dir`: fills
+/// `forestdist` with the distances between every subforest pair spanning
+/// `[extreme_leaf(path_subtree), path_subtree]` on the path side against
 /// `[extreme_leaf(other_subtree), other_subtree]` on the other side, and - as a side effect,
 /// exactly like `forest_dist` above - writes `delta` for every aligned (tree-vs-tree) position
 /// encountered along the way. `dir == Left`: "extreme leaf" means leftmost (`lld`), boundaries are
@@ -1309,9 +1302,9 @@ pub(crate) fn compute_keyroots(
 ///
 /// `path_is_before` says whether the path side is `before` (the "T1" of the global
 /// before/after orientation) or `after`; this alone determines both the delete/insert cost
-/// direction and which axis of `delta` each side's preorder id belongs on - see Java's
-/// `treesSwapped` parameter, which this replaces (it served exactly the same purpose, just
-/// re-derived here from the orientation that's already implied by `path_is_before`).
+/// direction and which axis of `delta` each side's preorder id belongs on. It replaces the
+/// algorithm's separate `treesSwapped` parameter, which serves the same purpose: the orientation
+/// is already implied by `path_is_before`.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn apted_tree_edit_dist(
     ctx: &EngineCtx,
@@ -1408,12 +1401,11 @@ pub(crate) fn apted_tree_edit_dist(
     }
 }
 
-/// Direct port of APTED.java's `spfL`/`spfR`, generalized over `dir`: the path side
-/// (`path_subtree`, already reduced to a single remaining path by `gted`'s caller) against the
-/// *entire* other side, decomposed via its own keyroots (in direction `dir`) in one combined
-/// sweep - this single combined sweep across all of `other_subtree`'s keyroots, rather than one
-/// call per (keyroot, keyroot) pair, is what makes APTED asymptotically cheaper than the classic
-/// Zhang-Shasha keyroot loop.
+/// `spfL`/`spfR`, generalized over `dir`: the path side (`path_subtree`, already reduced to a
+/// single remaining path by `gted`'s caller) against the *entire* other side, decomposed via its
+/// own keyroots (in direction `dir`) in one combined sweep - this single combined sweep across all
+/// of `other_subtree`'s keyroots, rather than one call per (keyroot, keyroot) pair, is what makes
+/// APTED asymptotically cheaper than the classic Zhang-Shasha keyroot loop.
 pub(crate) fn spf_path(
     ctx: &EngineCtx,
     delta: &mut DeltaTable,
@@ -1484,25 +1476,24 @@ pub(crate) fn spf_path(
 /// overflow.
 const INNER_DISABLED: i64 = i64::MAX / 4;
 
-/// Direct port of APTED.java's `computeOptStrategy_postL`: for every `(v, w)` pair, picks
-/// whichever of v's LEFT/RIGHT/INNER path or w's LEFT/RIGHT/INNER path minimizes the cost of the
-/// single-path sweep `gted` would have to run, and encodes that choice as a signed path id (see
-/// `getStrategyPathType`/`gted`'s decode). Costs are `i64` here rather than Java's `float` - the
-/// products involved (`size * krSum`) are well within `i64` range for any real input, and exact
-/// integers sidestep the precision loss `float` would have on a "subtree size" scale.
+/// `computeOptStrategy_postL`: for every `(v, w)` pair, picks whichever of v's LEFT/RIGHT/INNER
+/// path or w's LEFT/RIGHT/INNER path minimizes the cost of the single-path sweep `gted` would have
+/// to run, and encodes that choice as a signed path id (see `getStrategyPathType`/`gted`'s decode).
+/// Costs are `i64` rather than floating point - the products involved (`size * krSum`) are well
+/// within `i64` range for any real input, and exact integers sidestep the precision loss `float`
+/// would have on a "subtree size" scale.
 ///
-/// `clamp_to_left_right`, *not* in the Java original, disables the two INNER candidates at
-/// selection time only (the `cost1_I`/`cost2_I` *maintenance* below still runs unconditionally) -
-/// used to validate the bidirectional `gted` plus this function's L/R candidates in isolation,
-/// before `spfA` exists to handle an INNER choice. Forcing L/R instead of the truly optimal path
-/// only affects efficiency, never correctness: `gted`/`spfL`/`spfR` compute the exact distance
-/// for *any* valid strategy, optimal or not - which is exactly why the oracle (a distance
-/// comparison) can validate this clamped strategy on its own before INNER is enabled.
+/// `clamp_to_left_right` disables the two INNER candidates at selection time only (the
+/// `cost1_I`/`cost2_I` *maintenance* below still runs unconditionally) - used to validate the
+/// bidirectional `gted` plus this function's L/R candidates in isolation, before `spfA` exists to
+/// handle an INNER choice. Forcing L/R instead of the truly optimal path only affects efficiency,
+/// never correctness: `gted`/`spfL`/`spfR` compute the exact distance for *any* valid strategy,
+/// optimal or not - which is exactly why the oracle (a distance comparison) can validate this
+/// clamped strategy on its own before INNER is enabled.
 ///
-/// Skips Java's `rowsToReuse_L/R/I` stacks (which only recycle `cost1_*` row allocations across
-/// nodes that have already been fully consumed - a pure allocation-count optimization with no
-/// effect on the values computed); `cost1_L/R/I` are instead `Vec<Option<Vec<i64>>>`, each row
-/// allocated fresh the first time a node needs one.
+/// `cost1_L/R/I` are `Vec<Option<Vec<i64>>>`, each row allocated fresh the first time a node
+/// needs one, rather than recycled through free lists once a node has been fully consumed -
+/// that would be a pure allocation-count optimization with no effect on the values computed.
 pub(crate) fn compute_opt_strategy_post_l(
     before_idx: &AptedIndexer,
     after_idx: &AptedIndexer,
@@ -1555,7 +1546,7 @@ pub(crate) fn compute_opt_strategy_post_l(
         }
 
         // Reset for every `v` - `cost2_*` accumulate `w`'s contributions *within this v's own
-        // sweep* (mirrors Java's per-`v` `Arrays.fill`); carrying values over from a previous
+        // sweep*; carrying values over from a previous
         // `v` would both be wrong and accumulate unboundedly across the outer loop.
         cost2_l.fill(0);
         cost2_r.fill(0);
@@ -1580,7 +1571,7 @@ pub(crate) fn compute_opt_strategy_post_l(
             }
 
             let mut min_cost = INNER_DISABLED;
-            // Java leaves this `-1`: it's never decoded, since `gted` short-circuits straight to
+            // Left at `-1`: it's never decoded, since `gted` short-circuits straight to
             // `spf1` (writing no `delta`) whenever either side is this small.
             let mut strategy_path: i64 = -1;
 
@@ -1682,12 +1673,12 @@ pub(crate) fn compute_opt_strategy_post_l(
 /// pass over the *plain* (left-to-right) preorder indices from `size-1` down to `0`, since a
 /// node's preorder index is always smaller than every one of its descendants') instead of
 /// left-to-right postorder, with the parent-propagation step's L/R roles swapped to match - this
-/// is a direct port of APTED.java's `computeOptStrategy_postR`. Unlike `compute_opt_strategy_post_l`
-/// this needs no `post_l_to_pre_l`/`pre_to_post_l` translation at all: `v`/`w` already *are*
-/// preorder indices throughout, simplifying every lookup. The (kr_sum/revkr_sum/desc_sum)
-/// candidate-comparison section is unchanged from postL - only the post-`min_cost`
-/// parent-propagation swaps which of L/R absorbs `cost_*_v - min_cost` (gated by
-/// `node_type_l`/`node_type_r` respectively) versus which one unconditionally adds `min_cost`.
+/// is `computeOptStrategy_postR`. Unlike `compute_opt_strategy_post_l` this needs no
+/// `post_l_to_pre_l`/`pre_to_post_l` translation at all: `v`/`w` already *are* preorder indices
+/// throughout, simplifying every lookup. The (kr_sum/revkr_sum/desc_sum) candidate-comparison
+/// section is unchanged from postL - only the post-`min_cost` parent-propagation swaps which of
+/// L/R absorbs `cost_*_v - min_cost` (gated by `node_type_l`/`node_type_r` respectively) versus
+/// which one unconditionally adds `min_cost`.
 pub(crate) fn compute_opt_strategy_post_r(
     before_idx: &AptedIndexer,
     after_idx: &AptedIndexer,
@@ -1851,9 +1842,9 @@ pub(crate) fn compute_opt_strategy_post_r(
     strategy
 }
 
-/// Direct port of APTED.java's `getStrategyPathType`: decodes a signed, offset-encoded path id
-/// (see `compute_opt_strategy_post_l`) into which kind of path it is. Java's `it` parameter is
-/// unused in the original (dead code) and is dropped here.
+/// `getStrategyPathType`: decodes a signed, offset-encoded path id (see
+/// `compute_opt_strategy_post_l`) into which kind of path it is. The algorithm's `it` parameter is
+/// unused and is dropped here.
 pub(crate) fn get_strategy_path_type(
     path_id_with_offset: i64,
     path_id_offset: i64,
@@ -1873,18 +1864,16 @@ pub(crate) fn get_strategy_path_type(
     2 // INNER
 }
 
-/// Direct port of APTED.java's `tedInit`: densely pre-fills `delta[x][y]` for every (x, y) pair
-/// where at least one side's subtree has size 1 - the "subtree distance without the root nodes"
-/// in that case is just the cost to insert/delete everything except the size-1 side's own root,
-/// computed directly from the subtree cost sums (no recursion needed). `gted`'s own spfL/spfR/spfA
-/// write conditions are sparse by design and never populate these size-1-side cells themselves
-/// (Java's `gted` bypasses them entirely via the `spf1` shortcut whenever one side has size 1);
-/// without this pre-fill, any (x, y) pair absorbed into a path's own contiguous sweep - rather
-/// than being given an independent recursive `gted` call - is silently left at delta=0, corrupting
-/// later `forest_dist` reads that need the true value. Must run after the strategy is computed
-/// (matching Java's `delta = computeOptStrategy_postL(...)` followed immediately by `tedInit()`)
-/// and before `gted` starts, since `gted`'s own writes for both-size>1 pairs are disjoint from
-/// (and must not be clobbered by) this pre-fill.
+/// `tedInit`: densely pre-fills `delta[x][y]` for every (x, y) pair where at least one side's
+/// subtree has size 1 - the "subtree distance without the root nodes" in that case is just the cost
+/// to insert/delete everything except the size-1 side's own root, computed directly from the
+/// subtree cost sums (no recursion needed). `gted`'s own spfL/spfR/spfA write conditions are sparse
+/// by design and never populate these size-1-side cells themselves (`gted` bypasses them entirely
+/// via the `spf1` shortcut whenever one side has size 1); without this pre-fill, any (x, y) pair
+/// absorbed into a path's own contiguous sweep - rather than being given an independent recursive
+/// `gted` call - is silently left at delta=0, corrupting later `forest_dist` reads that need the
+/// true value. Must run after the strategy is computed and before `gted` starts, since `gted`'s own
+/// writes for both-size>1 pairs are disjoint from (and must not be clobbered by) this pre-fill.
 pub(crate) fn ted_init(ctx: &EngineCtx, delta: &mut DeltaTable) {
     for x in 1..ctx.before_idx.size {
         let size_x = ctx.before_idx.sizes[x];
@@ -1903,11 +1892,11 @@ pub(crate) fn ted_init(ctx: &EngineCtx, delta: &mut DeltaTable) {
     }
 }
 
-/// Direct port of APTED.java's `gted`: reads the strategy chosen for `(current1, current2)`,
-/// walks the indicated path on whichever side it lives on (recursing into every off-path
-/// sibling first), then dispatches to the matching single-path function for the resolved path.
+/// `gted`: reads the strategy chosen for `(current1, current2)`, walks the indicated path on
+/// whichever side it lives on (recursing into every off-path sibling first), then dispatches to the
+/// matching single-path function for the resolved path.
 ///
-/// Two deliberate deviations from the Java original:
+/// Two deliberate departures from the textbook recursion:
 /// - No `spf1` shortcut for `size <= 1` (see `gted_forced_right`'s comment - `current2`/`current1`
 ///   can sit at a much larger node than the strategy "expects" mid-recursion here exactly the way
 ///   it could in that forced-right driver, for the same structural reason: the virtual
@@ -1951,16 +1940,16 @@ pub(crate) fn gted(
 
     let size1 = ctx.before_idx.sizes[current1];
     let size2 = ctx.after_idx.sizes[current2];
-    // Direct port of Java's `gted`: whenever EITHER side has size 1, shortcut to `spf1` - a pure
-    // scalar computation that writes nothing into `delta`. This must be `||`, not `&&`: any
-    // size-1-side pair that instead falls through to spf_path/spf_a gets its boundary cells
-    // *written* by that call's keyroot sweep, clobbering the values `ted_init` already deposited
-    // for exactly these size-1-side pairs (confirmed via a 10-node repro, commit `60453b6`: `&&`
-    // let an off-path `gted(id3-alone, id8-subtree)` call run spf_path (then still named spf_l),
-    // which overwrote `ted_init`'s delta[id3][id9]=0 mid-computation, corrupting a sibling spf_a
-    // call's read of that same cell even though the final delta value looked correct again by the
-    // time `gted` returned). Since `ted_init` already covers every size-1-side cell spf_path could
-    // otherwise write, this loses no coverage.
+    // Whenever EITHER side has size 1, shortcut to `spf1` - a pure scalar computation that writes
+    // nothing into `delta`. This must be `||`, not `&&`: any size-1-side pair that instead falls
+    // through to spf_path/spf_a gets its boundary cells *written* by that call's keyroot sweep,
+    // clobbering the values `ted_init` already deposited for exactly these size-1-side pairs
+    // (confirmed via a 10-node repro, commit `60453b6`: `&&` let an off-path `gted(id3-alone,
+    // id8-subtree)` call run spf_path (then still named spf_l), which overwrote `ted_init`'s
+    // delta[id3][id9]=0 mid-computation, corrupting a sibling spf_a call's read of that same cell
+    // even though the final delta value looked correct again by the time `gted` returned). Since
+    // `ted_init` already covers every size-1-side cell spf_path could otherwise write, this loses
+    // no coverage.
     if size1 <= 1 || size2 <= 1 {
         return spf1(ctx, current1, current2);
     }
@@ -2103,27 +2092,18 @@ pub(crate) fn compute_delta(
     before_idx.fill_subtree_costs(before_meta, cost_model);
     after_idx.fill_subtree_costs(after_meta, cost_model);
 
-    // `lchl < rchl` heuristic from APTED.java's `ted()` [2, Section 5.3]: pick whichever of
-    // postL/postR's preorder direction is cheaper for this tree's shape (counted via `lchl`/
-    // `rchl` on `before_idx` - matching Java, which only ever looks at `it1`, the source tree).
-    // The strategy table's *contents* (signed, offset-encoded path ids) mean the same thing
-    // regardless of which function computed them, so `gted`/`spf_path`/`spf_a` don't need to
-    // know or care which branch ran.
+    // `lchl < rchl` heuristic [APTED paper, Section 5.3]: pick whichever of postL/postR's preorder
+    // direction is cheaper for this tree's shape (counted via `lchl`/`rchl` on `before_idx` - only
+    // the source tree is ever looked at). The strategy table's *contents* (signed, offset-encoded
+    // path ids) mean the same thing regardless of which function computed them, so
+    // `gted`/`spf_path`/`spf_a` don't need to know or care which branch ran.
     //
     // Unclamped (INNER/spfA enabled) is correctness-verified: full fuzz suite
     // (test_apted_engine_matches_oracle_fuzz) and a 20,000-seed shrinker sweep
-    // (shrink_apted_engine_fuzz_failure) both pass. Getting here required three real, ground-
-    // truthed fixes against the actual Java APTED.java source (built and instrumented under
-    // tmp/apted):
-    //   1. `ted_init` was missing entirely - Java's `tedInit()` densely pre-fills `delta[x][y]`
-    //      for every pair where one side's subtree has size 1, computed directly from subtree
-    //      cost sums; gted's spfL/spfR/spfA write conditions never cover these cells themselves.
-    //   2. spfA's write-A/B used a stray `+ 1` on the delta write's "other"-axis index (copied
-    //      from the adjacent s-table lookup, which legitimately needs the offset; the delta
-    //      write does not).
-    //   3. gted's spf1 shortcut required `size1 <= 1 && size2 <= 1`; Java uses `||`. With `&&`,
-    //      a size-1-side pair fell through to spf_path, whose keyroot sweep overwrote cells
-    //      `ted_init` had already correctly populated.
+    // (shrink_apted_engine_fuzz_failure) both pass. The three conditions that took the longest to
+    // get right are documented where they are enforced rather than here: `ted_init`'s own doc
+    // comment, the bare-index note in `spf_a`'s write-A/B, and the `||`-not-`&&` note on `gted`'s
+    // `spf1` shortcut.
     let strategy = if before_idx.lchl < before_idx.rchl {
         compute_opt_strategy_post_l(&before_idx, &after_idx, false)
     } else {

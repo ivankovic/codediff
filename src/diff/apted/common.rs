@@ -168,10 +168,9 @@ fn is_marker_only(text: &str) -> bool {
 /// already been fully resolved by an earlier pass (or an earlier step of this same recursion)
 /// and must not be touched again.
 ///
-/// Indices follow the same convention as the Java APTED reference: postorder ids and the
-/// "boundary" variables used by `forest_dist`/`compute_edit_mapping` represent prefix lengths
-/// (0..=size), while the underlying arrays are plain 0-based `Vec`s. This is deliberately kept
-/// close to the Java reference to reduce the risk of off-by-one translation bugs.
+/// Index convention: postorder ids and the "boundary" variables used by
+/// `forest_dist`/`compute_edit_mapping` represent prefix lengths (0..=size), while the underlying
+/// arrays are plain 0-based `Vec`s.
 pub(crate) struct PostorderIndexer {
     /// Number of nodes in the pruned forest.
     pub(crate) size: usize,
@@ -329,10 +328,8 @@ impl PostorderIndexer {
 /// `Vec<Vec<T>>`) avoids one heap allocation and pointer indirection per row, which matters since
 /// every table built on this is on the algorithm's hottest inner loops. Shared storage/indexing
 /// behind `ForestDist`, `DeltaTable`, `StrategyTable`, and `Mat`, which used to each hand-roll
-/// this same flat-`Vec` layout independently - no longer necessary to keep them textually separate
-/// now that this code isn't a line-by-line port of APTED.java (whose `float[][]` tables were
-/// distinct arrays too, but for reasons - reuse across `delta`/`strategy` - that don't apply here;
-/// see `StrategyTable`'s doc comment).
+/// this same flat-`Vec` layout independently, with no reason to stay textually separate (see
+/// `StrategyTable`'s doc comment for why `delta` and `strategy` still get a buffer each).
 pub(crate) struct Grid<T> {
     pub(crate) cols: usize,
     pub(crate) data: Vec<T>,
@@ -407,7 +404,7 @@ impl DeltaTable {
     }
 }
 
-/// Generic forest-distance recurrence: a direct port of APTED.java's `forestDist`.
+/// Generic forest-distance recurrence - `forestDist`.
 ///
 /// Fills `forestdist[(di, dj)]` for every `lld(i) <= di <= i`, `lld(j) <= dj <= j`, where deleting
 /// or inserting a *single* node (leaf or internal) always costs exactly one unit, and matching
@@ -417,8 +414,8 @@ impl DeltaTable {
 /// allows reused content to be discovered even when it has moved to a different depth.
 ///
 /// Whenever the aligned branch is taken, this also writes `delta[(pre_di, pre_dj)] =
-/// forestdist[(di-1, dj-1)]` as a side effect - mirroring Java's `treeEditDist` (the spfL/spfR
-/// helper), which is what actually populates `delta` for every aligned position encountered
+/// forestdist[(di-1, dj-1)]` as a side effect - the same thing `treeEditDist` (the spfL/spfR
+/// helper) does, and what actually populates `delta` for every aligned position encountered
 /// along the way, not just the final corner of whichever outer (i, j) call triggered it. This is
 /// essential: a great many of the `(pre_di, pre_dj)` pairs later looked up by the unaligned
 /// branch are *not* themselves a (keyroot, keyroot) pair that `compute_delta`'s outer loop would
@@ -485,12 +482,12 @@ pub(crate) fn forest_dist(
                 forestdist[(di, dj)] = (forestdist[(di - 1, dj)] + cost_model.del(node1))
                     .min(forestdist[(di, dj - 1)] + cost_model.ins(node2))
                     .min(forestdist[(di - 1, dj - 1)] + cost_ren);
-                // Java's `forestDist` deliberately never writes `delta` here (the equivalent
-                // line is commented out in APTED.java): overwriting it would clobber the sparse,
-                // already-correct values spfL/spfR/spfA wrote during the forward pass with this
-                // call's local (possibly different) forestdist value at the same cell. Only the
-                // Zhang-Shasha oracle's own keyroot-sweep construction (which has no pre-existing
-                // delta to protect - it's building delta from scratch) needs this side effect.
+                // `forestDist` deliberately never writes `delta` here: overwriting it would
+                // clobber the sparse, already-correct values spfL/spfR/spfA wrote during the
+                // forward pass with this call's local (possibly different) forestdist value at the
+                // same cell. Only the Zhang-Shasha oracle's own keyroot-sweep construction (which
+                // has no pre-existing delta to protect - it's building delta from scratch) needs
+                // this side effect.
                 if write_delta_on_aligned {
                     delta.set(pre_di, pre_dj, forestdist[(di - 1, dj - 1)]);
                 }
@@ -512,8 +509,8 @@ pub(crate) enum RawDecision {
     Insert(usize),
 }
 
-/// Backtracks through `forest_dist` to produce the globally optimal node-level edit mapping - a
-/// direct port of APTED.java's `computeEditMapping`. Every node in both pruned forests ends up
+/// Backtracks through `forest_dist` to produce the globally optimal node-level edit mapping -
+/// `computeEditMapping`. Every node in both pruned forests ends up
 /// with exactly one decision.
 pub(crate) fn compute_edit_mapping(
     before: &PostorderIndexer,
