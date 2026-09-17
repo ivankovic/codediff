@@ -55,9 +55,9 @@ use csv::Writer;
 /// New labels are appended rather than slotted in, so existing column positions stay stable for
 /// anything reading the CSV.
 ///
-/// Some entries below name passes that no longer exist and are retained deliberately:
-/// `matching_reasons_report.py` indexes `Comment` and `BottomUp` by name, so dropping them is a
-/// separate, consumer-breaking change.
+/// `Comment` and `BottomUp` name passes that no longer exist and are retained deliberately:
+/// `matching_reasons_report.py` indexes both by name, so dropping them is a consumer-breaking
+/// change rather than a cleanup.
 const NON_APTED_REASON_LABELS: &[&str] = &[
     "IdHash",
     "IdHashAnc",
@@ -70,11 +70,6 @@ const NON_APTED_REASON_LABELS: &[&str] = &[
     "Comment",
     "BottomUp",
     "GreedyAnchor",
-    "NormImport",
-    "NormNoPunct",
-    "NormNoLit",
-    "NormNoId",
-    "NormNoPunctLit",
     // Appended 2026-09-02 - live passes that had no column until then.
     "LeadSib",
     "BottomUpProp",
