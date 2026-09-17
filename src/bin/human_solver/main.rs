@@ -1026,9 +1026,8 @@ fn compute_diff_text_painted() -> std::collections::HashMap<String, bool> {
 }
 
 /// How many bytes `name`'s human tree mapping and human text painting disagree about, via
-/// `text_mapping_disagreements` - the same pure ground-truth-vs-ground-truth comparison
-/// `test::helper::human_mapping::exploratory_mapping_vs_painting_agreement_census` reports,
-/// excluding `disagreement_is_move_only` runs (the one unavoidable rendering artifact from
+/// `text_mapping_disagreements` - a pure ground-truth-vs-ground-truth comparison with codediff's
+/// own matching taken out of the loop entirely, excluding `disagreement_is_move_only` runs (the one unavoidable rendering artifact from
 /// `TextDiff::from`'s column-shift `Move` heuristic - see that function's own doc comment). `None`
 /// when the case can't be loaded, or has no text painting yet at all (nothing to compare against -
 /// distinct from "compared and agrees exactly", which is `Some(0)`).

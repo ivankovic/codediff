@@ -247,8 +247,7 @@ pub struct RenderOptions {
     /// That is the two presets' own conventions disagreeing, exactly as they do on
     /// `paint_reindent_only_moves`: `MINIMAL` paints as few bytes as it can and does not want a
     /// pure displacement painted, while `FULL` keeps the displaced span painted along with the
-    /// construct that contains it. Measured 2026-09-08 with
-    /// `painting_disagreement_detail_batch` over every painted fixture, both presets.
+    /// construct that contains it.
     ///
     /// **Two call sites, one shape.** `shifted_by_an_edit_beside_it` reads a *single-row* node;
     /// `displaced_beside_an_edit_on_its_first_row` reads the multi-row one, where the node's
@@ -284,8 +283,7 @@ pub struct RenderOptions {
     /// mirroring a relocation onto the second panel doubles the bytes it paints, which is exactly
     /// what `MINIMAL` is specified not to do ("paints as few bytes as possible, greatly preferring
     /// not to paint pure identical moves"). `FULL` wants the opposite: a `Move` a reader can
-    /// follow to a highlighted node rather than to an unmarked one. Measured 2026-09-08 with
-    /// `painting_disagreement_report` over all 292 painted fixtures.
+    /// follow to a highlighted node rather than to an unmarked one.
     ///
     /// **Construction-time**, like [`Self::paint_reindent_only_moves`] and
     /// [`Self::paint_displaced_moves`]: it decides which ranges survive reconciliation while

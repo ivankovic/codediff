@@ -70,11 +70,10 @@
 //! until 2026-09-14, when the fifth turned out to be the rule's own false positive rather than a
 //! contradiction in the data; see `unmatched_bytes`.
 //!
-//! Invariants 10 to 15 arrived on 2026-09-14 from `candidate_invariant_census` in
-//! `tests/exploratory.rs`, which reads the tree mapping through [`Caches`] rather than through the
-//! renderer - so, unlike invariant 9, these can ask about the tree side's *pairs* and not only its
-//! rendered labels, and none of them inherits the column-shift `Move` artifact that limited 9 to
-//! one direction. Three cross the two ground truths at the leaf (10, 11, 12), one at the whole
+//! Invariants 10 to 15 read the tree mapping through [`Caches`] rather than through the renderer -
+//! so, unlike invariant 9, they can ask about the tree side's *pairs* and not only its rendered
+//! labels, and none of them inherits the column-shift `Move` artifact that limits 9 to one
+//! direction. Three cross the two ground truths at the leaf (10, 11, 12), one at the whole
 //! fixture (13), and two hold the mapping to itself (14, 15). Invariant 14 arrived at zero
 //! violations and is not vacuous: 159 `Identical` subtrees across 12 fixtures differ in
 //! whitespace, which is why it compares tokens and not text. The census also measured, and
@@ -877,8 +876,8 @@ fn minimal_never_paints_leading_whitespace(
 /// The three preset-scoped whitespace rules, as `(invariant 4, invariant 5, invariant 6)`.
 ///
 /// [`ground_truth_invariant_violations_for`] calls this and flattens all three into its own list;
-/// they stay separate here for `measure_full_painting_whitespace_invariants`, which reports the
-/// counts apart so a corpus-wide sweep says which rule a fixture is failing. The first two read
+/// they stay separate here so a caller sweeping the corpus can say which of the three a fixture is
+/// failing rather than only that it failed. The first two read
 /// the paintings `FULL` answers to and the third those `MINIMAL` answers to, which on a
 /// two-painting fixture are different objects entirely.
 pub fn full_painting_whitespace_violations(

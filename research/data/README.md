@@ -76,8 +76,4 @@ whole-tree APTED run finished inside a 1-second budget, for every sampled pair. 
 so each file (and each restart, if a run is interrupted) stays a manageable size; they are measured
 serially, never in parallel, because the measurement is wall-clock against a fixed budget.
 
-Also holds `archive_pre_resample_*/` (the last measurements taken against the older, byte-bucket
-corpus) and, currently, `partial_resample_*_INCOMPLETE/` - see that directory's own README for why
-it is not reportable.
-
 Read with `make apted-budget-report`; re-measure with `make measure-apted-budget` (hours, needs an idle machine).

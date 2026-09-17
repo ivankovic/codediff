@@ -39,11 +39,3 @@ only 22 of the 24 languages, so no per-language CSV existed for either. Both wer
 Makefile on 2026-08-21 and their CSVs generated from `sampled_code_pairs_all.csv`, so the next
 `make measure-apted-budget` covers all 24 — but the numbers currently committed here, and the ones the paper cites,
 are the 22-language measurement. Do not describe this measurement as covering the whole sample.
-
-## Superseded data
-
-* `archive_pre_resample_2026-08-18/` - the last measurement against the older, byte-bucket corpus.
-  Its numbers are what the paper cited before 2026-08-21.
-* `partial_resample_2026-08-18_INCOMPLETE/` and `partial_resample_2026-08-20_INCOMPLETE/` - two
-  stopped runs, kept only so a resumed run need not restart from zero. Each covers a
-  non-representative slice of one group; neither is reportable. See their own READMEs.
