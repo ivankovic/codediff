@@ -1877,6 +1877,247 @@ fn invariant_nine_provenance() -> Result<()> {
 /// about.
 ///
 /// `cargo test --release --lib --features test-fixtures painting_failure_census --
+/// **Every mismatch in the corpus, classified - the matching-side counterpart of
+/// [`painting_failure_census`].**
+///
+/// That census answers "who owns the painting disagreement" and its answer is the renderer. This
+/// one asks the same question of the *mapping*: of the mismatches `assert_matches_human_mapping`
+/// counts, what shapes are they, and which pass produced the mapping that disagrees. One row per
+/// mismatch in `research/data/quality/mismatch_census.csv`, so the taxonomy is a file to group by
+/// rather than a table someone read once.
+///
+/// The three fields that discriminate are `expected_op` (what the human said), `actual_op` (what
+/// codediff produced) and `reason` (the [`crate::diff::ASTMappingReason`] of the mapping it
+/// produced instead), all parsed back out of the mismatch message - the message is generated text,
+/// not free-form, so the parse is against a format this file's own `compute_mismatches_*` writes.
+/// `kind`/`parent_kind`/`named` come from the node id the mismatch already carries.
+#[test]
+#[ignore]
+// The CSV half needs the `csv` crate, which is only linked under `test-fixtures` - the same gate
+// `painting_failure_census` below carries, for the same reason.
+#[cfg(feature = "test-fixtures")]
+fn mismatch_census() -> Result<()> {
+    use std::collections::BTreeMap;
+
+    /// `Delete (with children)` / `Identical` / ... - the leading operation word of a message.
+    fn expected_op_of(message: &str) -> String {
+        let head = message.split(&[' ', '['][..]).next().unwrap_or("");
+        if message.starts_with(&format!("{head} (with children)")) {
+            format!("{head}WithChildren")
+        } else {
+            head.to_string()
+        }
+    }
+
+    /// The `(op X, reason Y)` tail, when the message carries one. `Delete (with children)` style
+    /// messages name neither, and report `-`.
+    fn op_and_reason_of(message: &str) -> (String, String) {
+        let Some(start) = message.rfind("(op ") else {
+            return ("-".to_string(), "-".to_string());
+        };
+        let tail = &message[start + 4..];
+        let tail = tail.strip_suffix(')').unwrap_or(tail);
+        match tail.split_once(", reason ") {
+            Some((op, reason)) => (op.trim().to_string(), reason.trim().to_string()),
+            None => (tail.trim().to_string(), "-".to_string()),
+        }
+    }
+
+    /// `APTED("qualified_name")` -> `APTED`, so the reason groups by pass rather than by pass and
+    /// argument. The argument is kept as its own column.
+    fn split_reason(reason: &str) -> (String, String) {
+        match reason.split_once('(') {
+            Some((pass, rest)) => (
+                pass.to_string(),
+                rest.trim_end_matches(')').trim_matches('"').to_string(),
+            ),
+            None => (reason.to_string(), String::new()),
+        }
+    }
+
+    fn node_for_id(root: Node, id: usize) -> Option<Node> {
+        let mut stack = vec![root];
+        while let Some(node) = stack.pop() {
+            if node.id() == id {
+                return Some(node);
+            }
+            let mut cursor = node.walk();
+            for child in node.children(&mut cursor) {
+                stack.push(child);
+            }
+        }
+        None
+    }
+
+    let diffs_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("src")
+        .join("test")
+        .join("data")
+        .join("diffs");
+    let mut names: Vec<String> = Vec::new();
+    for dataset in crate::test::helper::DIFF_DATASETS {
+        let dir = diffs_dir.join(dataset);
+        if !dir.is_dir() {
+            continue;
+        }
+        for entry in fs::read_dir(&dir)?.filter_map(|entry| entry.ok()) {
+            if entry.path().is_dir() {
+                names.push(entry.file_name().to_string_lossy().into_owned());
+            }
+        }
+    }
+    names.sort();
+
+    let mut rows: Vec<[String; 10]> = Vec::new();
+    let mut by_shape: BTreeMap<(String, String, String), usize> = BTreeMap::new();
+    let mut by_fixture: BTreeMap<String, usize> = BTreeMap::new();
+    let (mut solved, mut skipped) = (0usize, 0usize);
+
+    for name in &names {
+        let Ok(pair) = crate::test::helper::handmade_test_code_pair(name) else {
+            skipped += 1;
+            continue;
+        };
+        let (before, after) = &*pair;
+        if load(name).is_err() {
+            skipped += 1;
+            continue;
+        }
+        let config = crate::diff::HeuristicConfig::default();
+        let Ok(found) = compute_visible_mismatches_for_with_config(name, before, after, &config)
+        else {
+            skipped += 1;
+            continue;
+        };
+        // A `*WithChildren` message names no pass - `check_subtree_maps_to_zero` reports the node
+        // it found a mapping for, not the mapping. That is 22% of the corpus's mismatches, so the
+        // diff is recomputed here and the node's own entry read out of it directly, the way
+        // `actual_mapping_info` does for the messages that do carry one.
+        let diff = crate::diff::diff_code_with_config(before, after, &config);
+        let diff_ast = diff.ast.as_ref();
+        solved += 1;
+        let roots = [
+            before.ast.as_ref().map(|tree| tree.root_node()),
+            after.ast.as_ref().map(|tree| tree.root_node()),
+        ];
+
+        for (visible, mismatch) in found
+            .visible
+            .iter()
+            .map(|mismatch| (true, mismatch))
+            .chain(found.invisible.iter().map(|mismatch| (false, mismatch)))
+        {
+            let side = match mismatch.side {
+                Side::Before => 0usize,
+                Side::After => 1usize,
+            };
+            let node = roots[side].and_then(|root| node_for_id(root, mismatch.node_id));
+            let (kind, parent_kind, named) = match node {
+                Some(node) => {
+                    let contents = if side == 0 {
+                        &before.contents
+                    } else {
+                        &after.contents
+                    };
+                    (
+                        node.kind().to_string(),
+                        node.parent()
+                            .map(|parent| parent.kind().to_string())
+                            .unwrap_or_default(),
+                        (node.child_count() == 0
+                            && contents.get(node.byte_range()) != Some(node.kind()))
+                        .to_string(),
+                    )
+                }
+                None => ("-".to_string(), String::new(), "-".to_string()),
+            };
+            let expected = expected_op_of(&mismatch.message);
+            let (mut actual, mut reason) = op_and_reason_of(&mismatch.message);
+            if reason == "-"
+                && let Some(diff_ast) = diff_ast
+            {
+                let key = if side == 0 {
+                    diff_ast
+                        .before_node_map
+                        .get(&mismatch.node_id)
+                        .map(|partner| (mismatch.node_id, *partner))
+                } else {
+                    diff_ast
+                        .after_node_map
+                        .get(&mismatch.node_id)
+                        .map(|partner| (*partner, mismatch.node_id))
+                };
+                if let Some(entry) = key.and_then(|key| diff_ast.mapping.get(&key)) {
+                    actual = format!("{:?}", entry.operation);
+                    reason = format!("{:?}", entry.reason);
+                }
+            }
+            let (pass, argument) = split_reason(&reason);
+            *by_shape
+                .entry((expected.clone(), actual.clone(), pass.clone()))
+                .or_default() += 1;
+            *by_fixture.entry(name.clone()).or_default() += 1;
+            rows.push([
+                name.clone(),
+                if side == 0 { "before" } else { "after" }.to_string(),
+                visible.to_string(),
+                expected,
+                actual,
+                pass,
+                argument,
+                kind,
+                parent_kind,
+                named,
+            ]);
+        }
+    }
+
+    let csv_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("research")
+        .join("data")
+        .join("quality")
+        .join("mismatch_census.csv");
+    let mut writer = csv::Writer::from_path(&csv_path)?;
+    writer.write_record([
+        "fixture",
+        "side",
+        "visible",
+        "expected_op",
+        "actual_op",
+        "reason",
+        "reason_argument",
+        "kind",
+        "parent_kind",
+        "named_leaf",
+    ])?;
+    for row in &rows {
+        writer.write_record(row)?;
+    }
+    writer.flush()?;
+
+    println!(
+        "{} mismatches over {solved} solved fixtures ({skipped} skipped) -> {}",
+        rows.len(),
+        csv_path.display()
+    );
+    println!(
+        "\n{:<28} {:<24} {:<18} {}",
+        "expected", "actual", "reason", "count"
+    );
+    let mut shapes: Vec<_> = by_shape.into_iter().collect();
+    shapes.sort_by_key(|(_, count)| std::cmp::Reverse(*count));
+    for ((expected, actual, reason), count) in shapes.iter().take(30) {
+        println!("{expected:<28} {actual:<24} {reason:<18} {count}");
+    }
+    println!("\nTop fixtures");
+    let mut fixtures: Vec<_> = by_fixture.into_iter().collect();
+    fixtures.sort_by_key(|(_, count)| std::cmp::Reverse(*count));
+    for (fixture, count) in fixtures.iter().take(25) {
+        println!("  {count:>5}  {fixture}");
+    }
+    Ok(())
+}
+
 /// --ignored --nocapture`
 #[test]
 #[ignore]

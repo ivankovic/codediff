@@ -1,5 +1,83 @@
 # Diff Module Notes
 
+## 2026-09-17: re-measured at 1130 solved fixtures, and one ranking reversal
+
+The ranked plan below was drawn on **468** solved fixtures (2026-08-20). The corpus is now **1130**,
+and `mismatch_census` (`exploratory.rs`, one row per mismatch into
+`research/data/quality/mismatch_census.csv`) re-derives the same table from the same
+`ASTMappingReason` tags. Nothing here is a new idea - it is the old table, re-measured, and two of
+its conclusions do not survive.
+
+**Standing.** 190 of 1130 fixtures carry a visible mismatch, 5545 visible of 8069 total. 59 sit
+within 3 visible mismatches of zero, 59 are above 1%. Cost framing over the 198 fixtures with any
+mismatch: **134 search failures** (`algorithm_cost > human_cost`), 41 cheaper-than-human, 23 ties -
+still overwhelmingly a search problem, in the same proportion as 2026-08-20.
+
+| producer | fixtures dominated | visible | of the 59 cheap wins | of the 59 above 1% |
+| --- | --- | --- | --- | --- |
+| `APTED("fast_fallback")` | 45 | 1600 | 18 | 18 |
+| `StructurallyIdenticalAncestor` | 15 | 1413 | 3 | 10 |
+| `APTED("qualified_name")` | 96 | 1385 | **28** | **23** |
+| `APTED("large_flat_subtree")` | 19 | 533 | 9 | 1 |
+| `IdenticalHashOfAncestor` | 7 | 380 | 0 | 4 |
+| `MovedSubtree` | 3 | 119 | 0 | 2 |
+| `large_flat_subtree_container` / `greedy_anchor_block` / `import_list_overlap` | 4 | 43 | 1 | 1 |
+
+**Reversal 1: `fast_fallback` no longer leads both target lists.** Item 1 below opens "leads both
+target lists ... no other producer leads both". At 1130 fixtures `qualified_name` leads the cheap
+wins (28 v 18) and the above-1% list (23 v 18), and dominates more than twice as many fixtures
+(96 v 45). `fast_fallback` leads volume alone, and its volume is concentrated: 1023 of its 2029
+mismatches are in `vimscript-neovim-neovim-awful-test-case-bunch-of-hex-colours`, and its *fixture*
+count barely moved (37 -> 45) while the corpus grew 2.4x. It is now a narrow, deep bucket; item 2 is
+the broad one.
+
+**Reversal 2: ancestor propagation is no longer a rounding error.** `StructurallyIdenticalAncestor`
+went from 1 dominated fixture and 100 mismatches to **15 and 1413**, and now leads 10 above-1%
+fixtures. With `IdenticalHashOfAncestor` that is 22 fixtures and 1793 visible mismatches - a third
+of the corpus's visible total - and this file's own reading of the bucket says why that number is
+misleading in a useful way: these passes map every descendant of an already-matched pair in
+lockstep, so **the root cause is whatever mis-paired the ancestor**. 1431 of them sit in 18
+fixtures, under 4-11 distinct parent kinds each. A handful of wrong pairings, each dragging
+hundreds of leaves. The three worst are
+`javascript-microsoft-typescript-broken-js-remove-string-fragment` (456, half under `ERROR` parents
+- a broken parse, not a matcher bug), `html-chennes-med-extreme-test` (438, under `start_tag` /
+`attribute`) and `shellscript-docker-docker-bench-security-move-all-functions-by-one-and-add-one-to-the-end`
+(242), whose own name states the shape: a rotation in a run of same-kind siblings, the family
+recorded in `project_corpus_836_and_v0012_2026_09_09`.
+
+**What the mismatches *are*,** independent of which pass produced them (all 8069):
+
+| shape | count | share | fixtures |
+| --- | --- | --- | --- |
+| the human pairs it, we drop it (`-> Delete`/`Insert`) | 3146 | 39.0% | 136 |
+| right operation, **wrong partner** | 2061 | 25.5% | 72 |
+| a leaf re-used inside a subtree the human deletes/inserts whole | 1803 | 22.3% | 56 |
+| the human drops it, we pair it | 582 | 7.2% | 93 |
+| operation disagreement (`Identical` v `Update`/`MatchButNotIdentical`) | 422 | 5.2% | 64 |
+
+The third row is the scaffolding-reuse family the Defects4J clamps kept naming, and it is now
+attributed: the passes that re-use those leaves are `StructurallyIdenticalAncestor` (528),
+`qualified_name` (482), `fast_fallback` (415) and `MovedSubtree` (181), and in 1196 of 1803 cases
+the re-use is an `Identical` pairing of byte-identical punctuation or an identifier - `;`, `(`, `)`,
+`=`, `"`, `.` and `identifier` are the top kinds. The human says "this construct was replaced"; we
+say "these seven characters survived inside it". That is exactly the trivial-leaf question item 1
+already lists as open, seen from the other end.
+
+**Painting needs no new census and no matcher work.** `painting_attribution.csv` (fresh, 1342 rows
+over 671 fixtures): 44,507 disagreeing bytes of 38.2M, **0.1165%**, of which the renderer owns
+38,842 (87%) - a perfect matcher removes almost none of it. Five fixtures are 100% renderer-owned
+and large in their own terms: `java-defects4j-mockito-19-finalmockcandidatefilter` (45.98% of its
+bytes), `swift-swiftlang-swift-delete-and-insert-in-the-typechecker` (66.43%),
+`c-openssl-openssl-format-only-change` (11.19%), `rust-next-font-imports-generator` (6.90%),
+`java-defects4j-chart-5-xyseries` (1.31%). Those are renderer bugs with a matcher-side cost of
+zero, and they are the cheapest painting wins on the board.
+
+**Reading of the ranking, unchanged in method:** go after `qualified_name` for breadth (28 cheap
+wins), the ancestor-propagation root causes for depth (22 fixtures, 1793 mismatches from a handful
+of pairings), and `fast_fallback`'s still-open trivial-leaf item for the scaffolding family. Nothing
+in this section was attempted - it is a measurement, and the items below still hold the analysis of
+each pass.
+
 ## 2026-08-20: ranked plan against the visible-node goals
 
 Every pass-level conclusion below this section was drawn on the **all-nodes** mismatch count. The
