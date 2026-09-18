@@ -357,6 +357,28 @@ class Accumulator:
             }
         return out
 
+    def distribution_rows(self):
+        """Every distribution the paper's edit-size table summarises, as (metric, value, count)
+        rows - the exact empirical distribution, not a sketch, at a size that can be committed.
+
+        The per-edit population is hundreds of thousands of integers, but the *distinct* values
+        number a few thousand, so value->count is a small file where a per-edit CSV was not (see
+        the class doc comment). Churn is a fraction in [0, 1] and is binned to 0.1 percentage
+        points. Added 2026-09-18 so the paper can draw the whole distribution rather than four
+        percentiles of it."""
+        per_file = collections.Counter()
+        for values in self.changed_by_language.values():
+            per_file.update(values)
+        series = {
+            "lines_per_file": per_file,
+            "lines_per_commit": collections.Counter(self.per_commit.values()),
+            "files_per_commit": collections.Counter(self.files_per_commit.values()),
+            "churn_permille": collections.Counter(round(c * 1000) for c in self.churn),
+        }
+        for metric, counter in series.items():
+            for value in sorted(counter):
+                yield {"metric": metric, "value": value, "count": counter[value]}
+
     def language_rows(self):
         """One row per language - the committable artifact, in place of the per-edit rows."""
         for language, values in sorted(self.changed_by_language.items()):
@@ -393,6 +415,7 @@ def main():
     parser.add_argument("--max-commits", type=int, default=50)
     parser.add_argument("--output", default=None)
     parser.add_argument("--fragment", default=None)
+    parser.add_argument("--distribution", default=None)
     args = parser.parse_args()
 
     here = os.path.dirname(os.path.abspath(__file__))
@@ -400,6 +423,9 @@ def main():
     repositories = args.repositories
     output = args.output or os.path.join(research_dir, "data", "corpus_stats", "edit_shape.csv")
     fragment = args.fragment or os.path.join(research_dir, "plots", "variables_edits.tex")
+    distribution = args.distribution or os.path.join(
+        research_dir, "data", "corpus_stats", "edit_shape_distribution.csv"
+    )
 
     if not os.path.isdir(repositories):
         sys.exit(f"no repositories under {repositories} - run `make fetch MODE=<mode>` first")
@@ -438,6 +464,11 @@ def main():
         writer.writeheader()
         writer.writerows(rows)
     print(f"per-language edit shape for {len(rows)} languages written to {output}")
+    with open(distribution, "w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=["metric", "value", "count"])
+        writer.writeheader()
+        writer.writerows(accumulator.distribution_rows())
+    print(f"edit-size distributions written to {distribution}")
 
     summary = accumulator.summary(counted)
     for name, value in summary.items():

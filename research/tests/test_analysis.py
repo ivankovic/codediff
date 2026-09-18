@@ -241,3 +241,60 @@ def test_the_ruff_version_named_outside_ci_matches_the_one_ci_pins():
     contributing = (root / "CONTRIBUTING.md").read_text()
     named = set(re.findall(r"ruff@([0-9]+(?:\.[0-9]+)*)", contributing))
     assert named == {pin}, f"CONTRIBUTING.md names ruff@{named or '(none)'}, ci.yml pins {pin}"
+
+
+# ── distributions_report ────────────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.parametrize("q", [50, 90, 99])
+def test_percentile_of_counts_agrees_with_the_list_percentile(q):
+    """The dots on the paper's cumulative curves must land on the numbers its prose prints, and
+    those come from `edit_shape_stats.percentile` over the sorted list."""
+    import distributions_report
+
+    population = [1, 1, 2, 2, 2, 3, 5, 8, 8, 13, 21, 34]
+    values, counts = (
+        np.array([1, 2, 3, 5, 8, 13, 21, 34], float),
+        np.array([2, 3, 1, 1, 2, 1, 1, 1], float),
+    )
+    assert distributions_report.percentile_of(values, counts, q) == edit_shape_stats.percentile(
+        sorted(population), q
+    )
+
+
+def test_ecdf_is_monotone_and_ends_at_one_hundred():
+    import distributions_report
+
+    y = distributions_report.ecdf(np.array([1.0, 2.0, 4.0]), np.array([1.0, 1.0, 2.0]))
+    assert list(y) == [25.0, 50.0, 100.0]
+
+
+def test_rq1_series_keeps_timed_out_pairs_in_the_denominator(tmp_path):
+    """A pair the budget killed has no elapsed time but is still a pair attempted: the curve's
+    height at the budget is completions over *every* pair, which is what RA2 states."""
+    import distributions_report
+
+    csv_path = tmp_path / "g.csv"
+    csv_path.write_text(
+        "language,status,elapsed_ms\n"
+        "Rust,ok,10\nRust,ok,20\nRust,timed_out,\nRust,timed_out,\n"
+        "YAML,ok,5\n"
+    )
+    series = distributions_report.rq1_series([csv_path])
+    times, total = series[apted_only_report.CODE]
+    assert list(times) == [10.0, 20.0] and total == 4
+    assert series[apted_only_report.CONFIG_DATA][1] == 1
+
+
+def test_distribution_rows_are_the_whole_population_as_value_counts():
+    acc = edit_shape_stats.Accumulator()
+    acc.add("c1", "a.rs", 3, 0, 100)  # 3 lines changed, churn 3/100
+    acc.add("c1", "b.rs", 1, 2, 50)  # 3 lines changed, churn 3/52
+    acc.add("c2", "a.rs", 10, 0, 100)
+    rows = list(acc.distribution_rows())
+    by = {(r["metric"], r["value"]): r["count"] for r in rows}
+    assert by[("lines_per_file", 3)] == 2 and by[("lines_per_file", 10)] == 1
+    assert by[("lines_per_commit", 6)] == 1 and by[("lines_per_commit", 10)] == 1
+    assert by[("files_per_commit", 2)] == 1 and by[("files_per_commit", 1)] == 1
+    churn = {v: c for (m, v), c in by.items() if m == "churn_permille"}
+    assert sum(churn.values()) == 3 and 30 in churn and 100 in churn

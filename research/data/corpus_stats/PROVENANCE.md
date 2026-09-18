@@ -116,6 +116,27 @@ The residual gap between 75.2% and the Curated 90.5% is real, not an artifact: t
 long tail holds many small and young repositories, where a larger share of edits genuinely are file
 creations.
 
+## The whole distributions, 2026-09-18
+
+`code_file_size_distribution.csv` and `edit_shape_distribution.csv` are the two populations
+above in full, as `metric,value,count` rows, added so the introductory paper can draw them as
+cumulative curves (its corpus-shape figure, `analysis/distributions_report.py`) instead of
+quoting four percentiles of each. Neither is a new measurement:
+
+* The file-size file is a re-read of the same `stats.sqlite` the 2026-09-07 run left behind,
+  written by `analysis/file_stats.py`'s new `export_size_distribution` during
+  `make file-stats-report MODE=full` (2026-09-18, about 30 minutes). Same code-only filter as
+  `code_percentiles.csv`; the empty and unparseable files are in it, as they are in Table 1's
+  percentiles.
+* The edit-size file needed the corpus walk re-run, because the 2026-09-07 walk kept only
+  aggregates. `analysis/edit_shape_stats.py --repositories /var/tmp/research/full/repositories
+  --max-commits 50`, started 15:50 and finished 17:47 on 2026-09-18 (1h57m; the machine was
+  otherwise busy with a report and a smaller walk for the first half hour). Its `edit_shape.csv`
+  and `variables_edits.tex` were byte-identical to the committed ones, so the walk is the same
+  population and the distribution file is exactly the one behind the committed percentiles. 11
+  repositories reported `git log failed`, against 9 on 2026-09-07; two more clones have lost
+  their HEAD since, which does not move any number at the precision the paper prints.
+
 ## What is not here
 
 `make measure-commit-stats MODE=full` was deliberately not run. No paper macro reads the `commits`

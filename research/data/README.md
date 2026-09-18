@@ -37,14 +37,19 @@ per-language files are the artifact.
 ## corpus_stats/
 
 What the corpus *looks like*, independent of any diff: per-file size percentiles
-(`code_percentiles.csv`, the source of the introductory paper's Table 1), the AST node-kind
-distribution per language, and size/LOC-changed statistics for the sampled Rust pairs. Written by
-`analysis/file_stats.py` and `analysis/code_pair_diff_stats.py`.
+(`code_percentiles.csv`), the whole per-file size distribution behind them
+(`code_file_size_distribution.csv`, one `metric,value,count` row per distinct size - the source of
+the introductory paper's corpus-shape figure, drawn by `analysis/distributions_report.py`), the
+AST node-kind distribution per language, and size/LOC-changed statistics for the sampled Rust
+pairs. Written by `analysis/file_stats.py` and `analysis/code_pair_diff_stats.py`.
 
 `edit_shape.csv` is how big a real-world *edit* is, per language, over the most recent 50 commits
 of each repository (`make measure-edit-shape MODE=<mode>`, `analysis/edit_shape_stats.py`) - the source of
-the paper's Table 2. Per-language rows only: the per-edit population is ~48k modifications and the
-uncapped one ~20M, neither of which belongs in git. The 50-commit cap is load-bearing rather than
+the paper's edit-size numbers. Per-language rows only: the per-edit population is ~435k modifications
+and the uncapped one ~20M, neither of which belongs in git. `edit_shape_distribution.csv`, written
+by the same run, is the whole distribution in committable form - `metric,value,count` rows for
+lines changed per file edit, lines changed per commit, files per commit and share of the file
+rewritten (in permille) - and is what the paper's corpus-shape figure draws. The 50-commit cap is load-bearing rather than
 a speed measure - these clones are shallow but not uniformly so, and `torvalds-linux.git` alone
 carries 1.29M of the corpus's 2.31M reachable commits, so an uncapped walk measures the Linux
 kernel and calls it the corpus.

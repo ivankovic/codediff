@@ -375,6 +375,13 @@ measure-tools-accuracy:
 timing-report:
 	uv run ./analysis/benchmark_other_report.py
 
+# The paper's two distribution figures (corpus shape; the one-second budget), every size-or-time
+# distribution drawn as a cumulative curve in one idiom. Reads only committed artifacts - the
+# value->count files file-stats-report and measure-edit-shape write, data/rq1/*.csv and
+# data/comparison/benchmark_other.csv - so it is always cheap to re-run and never re-measures.
+distributions-report:
+	uv run ./analysis/distributions_report.py
+
 # Installs BDiff (arXiv 2510.21094, block-aware text-based differencing) into a virtualenv under
 # /var/tmp, matching where this project's other comparison tools live, and prints the BDIFF_PYTHON
 # export the benchmark targets need.

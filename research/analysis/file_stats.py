@@ -495,6 +495,28 @@ def compute_code_only_stats(df):
     return language_count, bytes_percentiles, loc_percentiles, ast_percentiles, correlation
 
 
+def export_size_distribution(
+    df, output_filename="data/corpus_stats/code_file_size_distribution.csv"
+):
+    """The whole empirical distribution behind Table 1, as (metric, value, count) rows.
+
+    `export_percentiles_to_csv` keeps four points of each distribution; the paper's corpus-shape
+    figure (analysis/distributions_report.py) draws all of it. Value->count is the committable
+    form: millions of files collapse to the few hundred thousand distinct sizes they take. Same
+    population as the percentiles - `df` is the code-only frame, no further filter."""
+    frames = []
+    for metric in ("lines_of_code", "bytes", "ast_nodes"):
+        frames.append(
+            df.group_by(pl.col(metric).alias("value"))
+            .agg(pl.len().alias("count"))
+            .with_columns(pl.lit(metric).alias("metric"))
+            .select(["metric", "value", "count"])
+            .sort("value")
+        )
+    pl.concat(frames).write_csv(output_filename)
+    print(f"Code-file size distributions written to {output_filename}")
+
+
 # Main execution
 if __name__ == "__main__":
     # Get database path from command line argument or use default
@@ -515,6 +537,8 @@ if __name__ == "__main__":
     language_count, bytes_percentiles, loc_percentiles, ast_percentiles, correlation = (
         compute_code_only_stats(code_df)
     )
+
+    export_size_distribution(code_df)
 
     # Distribution of AST node kinds per language, and the 100 most common per language
     node_kind_df = load_node_kind_counts(db_path)
