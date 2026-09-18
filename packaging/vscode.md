@@ -1,10 +1,17 @@
 # What a VS Code extension needs
 
-Short answer: **the codediff side is already done.** `codediff --mode json BEFORE AFTER` emits
-everything an extension needs, and this commit's man page / completions work adds nothing it
-depends on. What is missing is the extension itself, which belongs in its own repository —
-`codediff-vscode`, mirroring how [codediff.nvim](https://github.com/ivankovic/codediff.nvim) is
-kept separate.
+> **Built and published.**
+> [codediff-vscode](https://github.com/ivankovic/codediff-vscode) v0.0.1 is on the
+> [Marketplace](https://marketplace.visualstudio.com/items?itemName=ivankovic.codediff) and
+> [Open VSX](https://open-vsx.org/extension/ivankovic/codediff). This page is kept as the
+> requirements it was written as — every heading below names a problem the extension had to solve,
+> and the extension is where the solutions now live. Read it for *why* those parts are shaped the
+> way they are; read that repository for how.
+
+Short answer: **the codediff side was already done.** `codediff --mode json BEFORE AFTER` emits
+everything an extension needs. What was missing was the extension itself, which belongs in its own
+repository — `codediff-vscode`, mirroring how
+[codediff.nvim](https://github.com/ivankovic/codediff.nvim) is kept separate.
 
 ## What codediff already provides
 

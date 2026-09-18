@@ -33,9 +33,9 @@ On NixOS, or anywhere with Nix installed, no installation step is needed at all:
 nix run github:ivankovic/codediff
 ```
 
-Recipes for Arch (AUR), Gentoo, Debian and Nix live in [`packaging/`](packaging/), together with
-what a VS Code extension would take. None of them are submitted to their respective repositories
-yet.
+Recipes for Arch (AUR), Gentoo, Debian and Nix live in [`packaging/`](packaging/). None of them are
+submitted to their respective repositories yet - unlike the VS Code extension, which is published;
+see [Editor integration](#editor-integration).
 
 ## Shell completions and the man page
 
@@ -57,18 +57,21 @@ dependencies. The diffing tool itself does not need these dependencies. Build th
 
 ## Editor integration
 
-For Neovim, see [codediff.nvim](https://github.com/ivankovic/codediff.nvim).
+* **VS Code** - [codediff-vscode](https://github.com/ivankovic/codediff-vscode), v0.0.1. Search for
+  **CodeDiff** in the Extensions view, or `code --install-extension ivankovic.codediff`. Also on
+  [Open VSX](https://open-vsx.org/extension/ivankovic/codediff) for VSCodium, Cursor and Windsurf.
+  It paints codediff's verdict onto real editors as decorations, and adds five commands: diff two
+  files, diff against HEAD, against any revision, against the last save, and clear the highlights.
+  The binary ships with the extension, per platform.
+* **Neovim** - [codediff.nvim](https://github.com/ivankovic/codediff.nvim).
 
-Editors integrate through `codediff --mode json BEFORE AFTER`, which prints one JSON object
-describing each side's changed ranges, their operation (insert/delete/update/move), a move's real
-counterpart range in the other file, and the nearest enclosing declaration - enough to place
-highlights on buffers the editor already has open, with no ANSI parsing. The schema is documented
-at the top of `src/tui/json_output.rs`. **Its columns are byte offsets**, which is what tree-sitter
-reports and what Neovim consumes directly; an editor using UTF-16 (VS Code) or character offsets
-must convert per line.
-
-There is no VS Code extension yet. [`packaging/vscode.md`](packaging/vscode.md) writes up what one
-would need.
+Both drive `codediff --mode json BEFORE AFTER`, which prints one JSON object describing each side's
+changed ranges, their operation (insert/delete/update/move), a move's real counterpart range in the
+other file, and the nearest enclosing declaration - enough to place highlights on buffers the editor
+already has open, with no ANSI parsing. The schema is documented at the top of
+`src/tui/json_output.rs`. **Its columns are byte offsets**, which is what tree-sitter reports and
+what Neovim consumes directly; an editor using UTF-16 (VS Code) or character offsets must convert
+per line, which is what the VS Code extension does and tests.
 
 # Using CodeDiff
 

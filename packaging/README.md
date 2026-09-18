@@ -1,9 +1,10 @@
 # Packaging
 
-Recipes for distributing `codediff` through system package managers. **Nothing here is submitted
-anywhere yet** — these are the source of truth for the recipes, kept in-repo so they version
-alongside the code they build. The actual submission targets (the AUR, a Gentoo overlay, nixpkgs)
-all live outside this repository.
+Recipes for distributing `codediff` through system package managers. **None of the system-package
+recipes is submitted anywhere yet** — these are the source of truth for them, kept in-repo so they
+version alongside the code they build. The actual submission targets (the AUR, a Gentoo overlay,
+nixpkgs) all live outside this repository. The one entry below that *is* published is the VS Code
+extension, which is a separate repository rather than a recipe here.
 
 | Target | Files | Status |
 | --- | --- | --- |
@@ -11,7 +12,7 @@ all live outside this repository.
 | Gentoo | `gentoo/dev-util/codediff/` | ready for an overlay |
 | Debian/Ubuntu | `[package.metadata.deb]` in `../Cargo.toml` | built by CI, attached to each release |
 | Nix / NixOS | `nix/package.nix`, `../flake.nix` | works today via `nix run` |
-| VS Code | [`vscode.md`](vscode.md) | requirements written up; extension not built |
+| VS Code | [`vscode.md`](vscode.md) | **published** — v0.0.1 on the Marketplace and Open VSX, built from [codediff-vscode](https://github.com/ivankovic/codediff-vscode) |
 
 ## The one thing you cannot skip: checksums
 
