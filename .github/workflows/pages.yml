@@ -39,6 +39,12 @@ jobs:
       - name: Generate site
         run: cargo run --release --features test-fixtures --bin generate_mapping_site -- --out site
 
+      # Into a subdirectory of the same artifact, after the step above has wiped and recreated
+      # `site`. Needs GNU diff on PATH (ubuntu-latest has it): every case is baked once as `diff`
+      # marks it, by running the real tool.
+      - name: Generate showcase
+        run: cargo run --release --features test-fixtures,web --bin generate_showcase -- --out site/showcase
+
       - uses: actions/configure-pages@v6
 
       # v4 dropped dotfiles from the artifact. `generate_mapping_site` wipes and recreates its
