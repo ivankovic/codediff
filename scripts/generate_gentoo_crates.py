@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Regenerate the ``CRATES`` block of the Gentoo ebuild from Cargo.lock.
+"""Regenerate the Gentoo ebuild's ``CRATES`` block, and the Manifest's crate digests, from Cargo.lock.
 
 Lives here rather than beside the ebuild so ruff covers it: CI lints research/, scripts/ and
 assets/ only.
@@ -15,15 +15,32 @@ would any git or path dependency - none exist today, and if one is ever added it
 explicitly in the ebuild rather than silently dropped into ``CRATES``, so this script fails loudly
 instead of skipping it.
 
-Usage:  python3 scripts/generate_gentoo_crates.py [--check]
+Usage:  python3 scripts/generate_gentoo_crates.py [--check] [--manifest]
 
-Rewrites the ``CRATES="..."`` block of every ebuild under packaging/gentoo/ in place. ``--check`` exits
-non-zero instead of writing, for CI.
+Rewrites the ``CRATES="..."`` block of every ebuild under packaging/gentoo/ in place. ``--check``
+exits non-zero instead of writing, for CI.
+
+**The Manifest is checked too, and that is a separate failure from the ebuild's.** Gentoo fetches
+each crate against the Manifest's digests, and until 2026-09-18 nothing compared it to anything:
+``--check`` passed on a Manifest whose ``CRATES`` list was current while **65 of its 293 crate
+digests named older versions and one crate had no line at all**, because the two files had drifted
+apart over dependency bumps that only ever touched the ebuild. ``--check`` now also asserts that
+the set of ``name-version.crate`` DIST lines is exactly Cargo.lock's - the drift that actually
+happened, caught without needing a single byte of any crate.
+
+It does not check the *digests*, because BLAKE2B and SHA512 cannot be derived from the sha256
+Cargo.lock records; that needs the files. ``--manifest`` rebuilds those lines from ``.crate`` files
+in the local cargo registry cache, verifying each one's sha256 against Cargo.lock before hashing
+it, and downloading whatever the cache is missing. The ``.tar.gz`` line is left alone either way:
+it hashes the GitHub *tag* tarball, which does not exist until a release is tagged, so it is a
+post-release step by construction (see packaging/README.md).
 """
 
+import hashlib
 import re
 import sys
 import tomllib
+import urllib.request
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -60,6 +77,87 @@ def crates_from_lockfile(lockfile: Path) -> list[str]:
     return sorted(crates)
 
 
+MANIFEST = EBUILD_DIR / "Manifest"
+# Where cargo keeps the `.crate` files it has already fetched. One directory per registry.
+CARGO_CACHE = Path.home() / ".cargo" / "registry" / "cache"
+CRATES_IO_DOWNLOAD = "https://static.crates.io/crates/{name}/{name}-{version}.crate"
+
+
+def packages_from_lockfile(lockfile: Path) -> list[tuple[str, str, str]]:
+    """``(name, version, sha256)`` for every registry crate, in Manifest order."""
+    data = tomllib.loads(lockfile.read_text())
+    packages = []
+    for package in data["package"]:
+        if package.get("source") is None:
+            continue
+        checksum = package.get("checksum")
+        if checksum is None:
+            raise SystemExit(
+                f"error: {package['name']} {package['version']} has no checksum in Cargo.lock - "
+                f"there is nothing to verify a downloaded crate against, so it is not hashed"
+            )
+        packages.append((package["name"], package["version"], checksum))
+    return sorted(packages)
+
+
+def crate_bytes(name: str, version: str, sha256: str) -> bytes:
+    """The crate's own bytes, from the cargo cache or crates.io, verified against Cargo.lock.
+
+    The verification is the point, and it is why this can use a cache it does not control: a file
+    whose sha256 is the one Cargo.lock already records is the file cargo itself would build, and
+    one whose sha256 is anything else is not hashed into a Manifest under any circumstances.
+    """
+    filename = f"{name}-{version}.crate"
+    for cached in CARGO_CACHE.glob(f"*/{filename}"):
+        data = cached.read_bytes()
+        if hashlib.sha256(data).hexdigest() == sha256:
+            return data
+    url = CRATES_IO_DOWNLOAD.format(name=name, version=version)
+    with urllib.request.urlopen(url) as response:  # noqa: S310 - fixed https host
+        data = response.read()
+    actual = hashlib.sha256(data).hexdigest()
+    if actual != sha256:
+        raise SystemExit(
+            f"error: {filename} downloaded from crates.io hashes to {actual}, but Cargo.lock "
+            f"records {sha256} - refusing to write a digest for it"
+        )
+    return data
+
+
+def manifest_dist_line(name: str, version: str, data: bytes) -> str:
+    return (
+        f"DIST {name}-{version}.crate {len(data)} "
+        f"BLAKE2B {hashlib.blake2b(data).hexdigest()} "
+        f"SHA512 {hashlib.sha512(data).hexdigest()}"
+    )
+
+
+def manifest_crate_names(manifest: Path) -> set[str]:
+    """The ``name-version.crate`` files the Manifest carries a digest for."""
+    return {
+        line.split()[1]
+        for line in manifest.read_text().splitlines()
+        if line.startswith("DIST ") and line.split()[1].endswith(".crate")
+    }
+
+
+def rewrite_manifest(packages: list[tuple[str, str, str]]) -> None:
+    """Replace every ``.crate`` DIST line, keeping the tarball's - see the module doc comment."""
+    kept = [
+        line
+        for line in MANIFEST.read_text().splitlines()
+        if not (line.startswith("DIST ") and line.split()[1].endswith(".crate"))
+    ]
+    lines = []
+    for index, (name, version, sha256) in enumerate(packages, start=1):
+        data = crate_bytes(name, version, sha256)
+        lines.append(manifest_dist_line(name, version, data))
+        if index % 50 == 0:
+            print(f"  hashed {index}/{len(packages)}")
+    MANIFEST.write_text("\n".join(sorted(lines + kept)) + "\n")
+    print(f"updated {MANIFEST.relative_to(REPO_ROOT)} ({len(lines)} crates + the tag tarball)")
+
+
 # Everything outside the CRATES block that must survive a substitution. The regex above is
 # anchored and shape-restricted so it cannot overrun today, but a destroyed ebuild is perfectly
 # self-consistent - `--check` reported "up to date" on a headerless one - so nothing else in this
@@ -85,7 +183,14 @@ def _assert_intact(ebuild: Path, updated: str) -> None:
 
 def main() -> int:
     check_only = "--check" in sys.argv[1:]
-    crates = crates_from_lockfile(REPO_ROOT / "Cargo.lock")
+    lockfile = REPO_ROOT / "Cargo.lock"
+    packages = packages_from_lockfile(lockfile)
+
+    if "--manifest" in sys.argv[1:]:
+        rewrite_manifest(packages)
+        return 0
+
+    crates = crates_from_lockfile(lockfile)
     block = 'CRATES="\n' + "\n".join(f"\t{crate}" for crate in crates) + '\n"'
 
     ebuilds = sorted(EBUILD_DIR.glob("*.ebuild"))
@@ -115,8 +220,24 @@ def main() -> int:
             )
         print("run: python3 scripts/generate_gentoo_crates.py", file=sys.stderr)
         return 1
+
+    # The Manifest, which drifts independently of the ebuild - see the module doc comment.
+    expected = {f"{name}-{version}.crate" for name, version, _ in packages}
+    present = manifest_crate_names(MANIFEST)
+    if expected != present:
+        for missing in sorted(expected - present):
+            print(f"error: {MANIFEST.name} has no digest for {missing}", file=sys.stderr)
+        for extra in sorted(present - expected):
+            print(f"error: {MANIFEST.name} still carries {extra}", file=sys.stderr)
+        print(
+            "run: python3 scripts/generate_gentoo_crates.py --manifest",
+            file=sys.stderr,
+        )
+        return 1
+
     if check_only:
         print(f"CRATES up to date ({len(crates)} crates)")
+        print(f"Manifest up to date ({len(present)} crate digests)")
     return 0
 
 

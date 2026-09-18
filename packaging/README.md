@@ -15,15 +15,29 @@ all live outside this repository.
 
 ## The one thing you cannot skip: checksums
 
-Real for v0.0.13, and **every one of them has to be regenerated on the next version bump**:
+Real for v0.0.14, and **every one of them has to be regenerated on the next version bump**:
 
-* `aur/PKGBUILD` carries the sha256 of the v0.0.13 tag tarball
-* `gentoo/dev-util/codediff/Manifest` carries 294 `DIST` lines - the tag tarball plus all 293
+* `aur/PKGBUILD` carries the sha256 of the v0.0.14 tag tarball
+* `gentoo/dev-util/codediff/Manifest` carries 295 `DIST` lines - the tag tarball plus all 294
   vendored crates, each with its size, BLAKE2B and SHA512
 * Nix needs a `hash =` only if you switch `package.nix` to `fetchFromGitHub`; as long as `src` is
   a parameter and `cargoLock.lockFile` points at the in-tree lock, there is nothing to hash
 
-Regenerate with the real tools where you have them:
+**The crate half is generated now, and CI checks it.** The Manifest's 294 crate digests drifted
+silently through every dependency bump between v0.0.13 and v0.0.14 - 65 of them named older
+versions and one crate had no line at all - because `generate_gentoo_crates.py --check` validated
+the ebuild's `CRATES` list and nothing looked at the Manifest. It checks both now, and
+`--manifest` rebuilds the crate lines from the cargo cache, verifying each `.crate` against the
+sha256 Cargo.lock already records before hashing it:
+
+```sh
+python3 scripts/generate_gentoo_crates.py            # the ebuild's CRATES block
+python3 scripts/generate_gentoo_crates.py --manifest  # the Manifest's 294 crate digests
+```
+
+The two *tarball* hashes are the part no script can do ahead of time, because they hash the GitHub
+tag tarball and that does not exist until the release is tagged. Regenerate them with the real
+tools where you have them:
 
 ```sh
 cd packaging/aur && updpkgsums                      # rewrites sha256sums=() in place
@@ -40,11 +54,12 @@ has to come from the tarball itself.
 Do not hand-write a checksum. A wrong one looks correct until the moment somebody's build fails.
 
 Computing one from the downloaded artifact is not hand-writing it, and is what those tools do
-anyway - but check your work. The v0.0.13 values were produced without `updpkgsums`/`ebuild`
-available, so: the tarball was fetched twice and both fetches hashed identically, every crate file
-was verified against the sha256 `Cargo.lock` already records for it before being hashed, the
-ebuild's `CRATES` list was diffed against `Cargo.lock` (293 = 293, no drift), and the generated
-BLAKE2B/SHA512 digests were cross-checked against `b2sum` and `sha512sum`.
+anyway - but check your work. The v0.0.14 values were produced without `updpkgsums`/`ebuild`
+available, so: the tag tarball was fetched twice and both fetches hashed identically
+(`b9192d9c…`, 68,557,321 bytes), its BLAKE2B/SHA512 were cross-checked against `b2sum` and
+`sha512sum`, every crate file was verified against the sha256 `Cargo.lock` already records for it
+before being hashed, and `--check` confirmed both the ebuild's `CRATES` list and the Manifest's
+crate set against `Cargo.lock` afterwards (294 = 294, no drift).
 
 ## Decisions that apply to every recipe
 

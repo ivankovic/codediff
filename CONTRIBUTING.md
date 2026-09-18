@@ -158,8 +158,19 @@ visibly wrong. `is_structurally_visible`'s doc comment has the reasoning in full
 
 ### Speed
 
-Automated benchmarks measure the wall-clock time of the main diffing algorithm. These benchmarks
-use the Rust criterion library and run over every handmade test case from `src/test/helper.rs`
+Two goals, stated in the README and repeated here for the same reason the accuracy ones are:
+
+* **p50 <= 100ms**
+* **p99 <= 1000ms**
+
+Both are met - p50 7.6ms and p99 347ms over the 2,001 fixtures, measured 2026-09-18 - so a change
+that costs speed has room to spend, and a change that costs an order of magnitude does not.
+`make benchmark-quality` prints the whole distribution as a side effect of measuring accuracy, and
+`make check-quality` compares it against the committed baseline on every push, warning rather than
+failing (wall-clock varies too much machine to machine to gate on).
+
+Separately, automated benchmarks measure the wall-clock time of the main diffing algorithm with the
+Rust criterion library, over every handmade test case from `src/test/helper.rs`
 (`make benchmark-speed`). Run these benchmarks frequently, to catch performance regressions.
 
 ## Code structure

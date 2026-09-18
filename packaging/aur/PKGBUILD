@@ -1,7 +1,7 @@
 # Maintainer: Marko Ivankovic <marko@ivankovic.me>
 
 pkgname=codediff
-pkgver=0.0.13
+pkgver=0.0.14
 pkgrel=1
 pkgdesc="Fast, robust, syntax-aware code diffing using tree-sitter ASTs"
 arch=('x86_64' 'aarch64')
@@ -13,12 +13,12 @@ makedepends=('cargo')
 # tests/, src/bin/ and the fixture corpus (see Cargo.toml's `exclude`), so `check()` would have
 # nothing to run. The tradeoff is that this download also carries research/ and the test corpus.
 source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
-# sha256 of the v0.0.13 tag tarball, computed from the downloaded artifact on 2026-09-10 and
+# sha256 of the v0.0.14 tag tarball, computed from the downloaded artifact on 2026-09-18 and
 # confirmed identical across two independent fetches. Re-run `updpkgsums` in this directory on
 # every version bump; do not guess it, and do not read it from the release's SHA256SUMS.txt -
 # that asset covers the *release assets* (the prebuilt binaries, the .deb, the completions
 # tarball), and GitHub's auto-generated source tarball is not one of them.
-sha256sums=('b1fbed505e1e3acb604f6483d81ebe3cc5ce26312cd145f3962b9710135801d8')
+sha256sums=('b9192d9c3116963d2d2c237eee0cd098a997622079ef34f175a5ecb13b1d2ddb')
 
 prepare() {
 	cd "$pkgname-$pkgver"

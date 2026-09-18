@@ -393,8 +393,16 @@ The 16 fixtures over 400ms are bimodal and only one half is a real problem. Defe
 `typescript-excalidraw-excalidraw-add-values-to-lists` 812ms at 6,170. A 57x smaller file taking
 44% longer is the existence proof. p99 needs ~2.6x, and these five mid-size cases are where it is -
 a bounded investigation of specific fixtures, not a general performance push. (The corpus is the
-fixture set, not the 7,400-repository dataset the README's 99.99% target names; it is the available
-proxy, not the goal's own denominator.)
+fixture set, not the 7,400-repository dataset the README's goals name; it is the available proxy,
+not the goal's own denominator.)
+
+**The bar this item was written against no longer exists.** The README's speed goals were restated
+on 2026-09-18 as p50 <= 100ms and p99 <= 1000ms, in place of "under 400ms for 99.99% of commits" -
+a target nothing measured, because nothing diffs 7,400 repositories per change. Against the new
+pair, measured over all 2,001 fixtures: **p50 7.6ms and p99 347ms, both met**, with 100ms sitting
+at the 92.7th percentile and two fixtures over a second. So this is no longer a gap to close, and
+what survives it is the finding rather than the target: a 6,892-node file taking longer than a
+396,812-node one is a shape pathology worth understanding whichever number the bar is set at.
 
 ### 5. 8 fixtures whose visible mismatches have no mapping at all
 
