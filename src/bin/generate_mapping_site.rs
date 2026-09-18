@@ -105,6 +105,17 @@ fn main() -> Result<()> {
 
     for name in names {
         let (before, after) = &pairs[name];
+        // A fixture whose language has no tree-sitter grammar (`bazel-not-actually-supported-
+        // by-treesitter`, kept to exercise the plain-text fallback) has no trees to draw. It is
+        // skipped like an unsolved one, and said so, rather than failing the whole site: this
+        // stopped every Pages deployment between 2026-09-09 and 2026-09-18.
+        if before.ast.is_none() || after.ast.is_none() {
+            warnings.push(format!(
+                "{name}: no AST on one side (no grammar for its language), not rendered"
+            ));
+            skipped += 1;
+            continue;
+        }
         let mapping = match human_mapping::load(name) {
             Ok(mapping) => mapping,
             // No human_mapping.json yet (e.g. a sample never promoted, or promoted but not yet
@@ -184,7 +195,7 @@ fn main() -> Result<()> {
         .count();
     println!(
         "Generated {} fixture page(s) into {:?} ({painted} with a painting, {incomplete} with \
-         unmarked nodes, {skipped} skipped, no human_mapping.json)",
+         unmarked nodes, {skipped} skipped: no human_mapping.json, or no grammar)",
         index_entries.len(),
         args.out,
     );
