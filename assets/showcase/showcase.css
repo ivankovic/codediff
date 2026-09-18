@@ -1,0 +1,137 @@
+/* The strip above the viewer. style.css (the viewer's own) sizes html/body to the viewport and
+   #app to 100% of it; here body becomes a column so the strip takes its height and the viewer
+   the rest. Colours come from the viewer's variables so the two read as one page. */
+body {
+  display: flex;
+  flex-direction: column;
+}
+
+#app {
+  flex: 1;
+  min-height: 0;
+  height: auto;
+}
+
+#showcase {
+  flex: none;
+  padding: 10px 14px 8px;
+  border-bottom: 1px solid var(--chrome);
+  background: var(--page-bg);
+  color: var(--page-fg);
+  font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+#showcase code,
+#showcase kbd {
+  font: 12.5px/1 ui-monospace, "JetBrains Mono", "Fira Code", Menlo, Consolas, monospace;
+}
+
+#showcase kbd {
+  padding: 1px 4px;
+  border: 1px solid var(--chrome);
+  border-radius: 3px;
+}
+
+#showcase a {
+  color: var(--accent);
+}
+
+.showcase-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+}
+
+.showcase-head .brand {
+  font-weight: 700;
+  font-size: 18px;
+  text-decoration: none;
+  letter-spacing: 0.02em;
+}
+
+.showcase-head .tagline {
+  flex: 1 1 320px;
+  opacity: 0.9;
+}
+
+.showcase-head .install {
+  padding: 3px 10px;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  text-decoration: none;
+}
+
+.showcase-controls {
+  margin-top: 8px;
+}
+
+.case-picker select {
+  max-width: min(60vw, 520px);
+  margin-left: 6px;
+  padding: 3px 6px;
+  font: inherit;
+  color: var(--page-fg);
+  background: var(--page-bg);
+  border: 1px solid var(--chrome);
+  border-radius: 4px;
+}
+
+.toggle {
+  display: inline-flex;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.view-button {
+  padding: 4px 12px;
+  font: inherit;
+  color: var(--page-fg);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.view-button + .view-button {
+  border-left: 1px solid var(--accent);
+}
+
+.view-button.active {
+  color: #000;
+  background: var(--accent);
+  font-weight: 600;
+}
+
+.view-button:focus-visible {
+  outline: 2px solid var(--page-fg);
+  outline-offset: -2px;
+}
+
+#case-stats {
+  opacity: 0.85;
+}
+
+#case-blurb {
+  margin: 8px 0 2px;
+  max-width: 110ch;
+}
+
+#case-blurb .group-note {
+  opacity: 0.7;
+}
+
+.hint {
+  margin: 2px 0 0;
+  font-size: 12.5px;
+  opacity: 0.8;
+}
+
+@media (max-width: 640px) {
+  #showcase {
+    font-size: 13px;
+  }
+  .showcase-head .tagline {
+    flex-basis: 100%;
+  }
+}

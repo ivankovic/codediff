@@ -100,6 +100,12 @@ test-mapping-site-js:
 test-web-js:
 	node assets/web/model.test.js
 
+# And for the GitHub Pages showcase's shim (assets/showcase/showcase.js - the URL <-> selection
+# mapping and the table that answers the viewer's /api/ calls from baked JSON). Embedded via
+# include_str! into src/bin/generate_showcase.rs, never executed by anything Rust runs.
+test-showcase-js:
+	node assets/showcase/showcase.test.js
+
 # $(FEATURES) defaults to `stats` because every research target that depends on this one
 # (measure-file-stats, measure-commit-stats, sample-pairs, measure-pairs, and the language-specific
 # variants) runs a stats-gated binary (file_stats/commit_stats/sample_code_pairs/

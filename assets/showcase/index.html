@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CodeDiff live examples</title>
+<meta name="description" content="Twenty real code changes, each shown as Unix diff marks it and as CodeDiff maps it, in CodeDiff's own browser viewer.">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="showcase.css">
+</head>
+<body data-token="showcase">
+<header id="showcase">
+  <div class="showcase-row showcase-head">
+    <a class="brand" href="https://github.com/ivankovic/codediff">CodeDiff</a>
+    <span class="tagline">Fast, robust, syntax-aware code diffing. Twenty real changes, each shown as
+      <code>diff</code> marks it and as CodeDiff maps it, in CodeDiff's own viewer.</span>
+    <a class="install" href="https://github.com/ivankovic/codediff#installation">Install</a>
+  </div>
+  <div class="showcase-row showcase-controls">
+    <label class="case-picker">Change
+      <select id="case-select" aria-label="Which change to show"></select>
+    </label>
+    <div class="toggle" role="group" aria-label="Which tool's view is shown">
+      <button id="view-diff" type="button" class="view-button">Unix <code>diff</code></button>
+      <button id="view-codediff" type="button" class="view-button">CodeDiff</button>
+    </div>
+    <span id="case-stats"></span>
+  </div>
+  <p id="case-blurb"></p>
+  <p class="hint">
+    <span id="case-links"></span>
+    Keys as in the real viewer: <kbd>n</kbd>/<kbd>p</kbd> next and previous change, <kbd>/</kbd> search,
+    <kbd>M</kbd> render options, <kbd>?</kbd> help. The address bar links to what is on screen.
+  </p>
+</header>
+<span id="measure" aria-hidden="true">MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM</span>
+<div id="app">
+  <div id="status" hidden></div>
+  <div id="panels">
+    <section class="panel" id="panel-0">
+      <div class="title"><span class="label"> Before </span><span class="file"></span></div>
+      <div class="body"><div class="code"><div class="rows"></div></div><canvas class="minimap" width="8"></canvas></div>
+    </section>
+    <section class="panel" id="panel-1">
+      <div class="title"><span class="label"> After </span><span class="file"></span></div>
+      <div class="body"><div class="code"><div class="rows"></div></div><canvas class="minimap" width="8"></canvas></div>
+    </section>
+  </div>
+  <div id="error" hidden></div>
+  <footer><span id="footer-left"></span><span id="footer-right"></span></footer>
+</div>
+<div id="recent" class="popup" hidden></div>
+<div id="toast" class="popup" hidden></div>
+<div id="overlay" hidden></div>
+<div id="diffing" class="screen" hidden></div>
+<div id="editing" class="screen" hidden>Editing is not available in the showcase.</div>
+<div id="quit" class="screen" hidden>This page never quits. Pick another change above.</div>
+<script src="model.js"></script>
+<script src="showcase.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

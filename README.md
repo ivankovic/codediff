@@ -11,6 +11,9 @@ Fast, robust, syntax-aware code diffing.
 ![A screenshot showing codediff diffing a Python refactoring. It correctly identifies assignment
 operator as changed, instead of anchoring on the text as unix diff would](/readme-screenshot.png)
 
+**[Try it in the browser](https://ivankovic.github.io/codediff/showcase/)**: twenty real changes in
+codediff's own viewer, each shown as Unix `diff` marks it and as codediff maps it, one click apart.
+
 # Installation
 
 ```

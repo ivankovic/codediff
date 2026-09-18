@@ -77,3 +77,6 @@ venv.bak/
 # checkouts, so it doesn't belong in git - it was tracked until the stratified draw made that
 # ~3000 files at a time (previously it was emptied by hand after each triage round, e.g. 920efe8).
 src/test/data/samples/
+
+# What generate_mapping_site and generate_showcase write (the Pages artifact) when run locally.
+/site/

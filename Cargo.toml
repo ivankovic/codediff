@@ -297,6 +297,15 @@ path = "src/bin/generate_mapping_site.rs"
 required-features = ["test-fixtures"]
 
 [[bin]]
+# The GitHub Pages showcase: twenty fixture changes baked into static JSON in the exact shape
+# codediff-web's page consumes, so the real browser viewer runs on Pages with no server - one
+# JSON per case as `diff` marks it and as codediff maps it. `web` for the payload and the page
+# assets, `test-fixtures` for the corpus and the unix-diff labeller.
+name = "generate_showcase"
+path = "src/bin/generate_showcase.rs"
+required-features = ["test-fixtures", "web"]
+
+[[bin]]
 # Research-only: scores codediff against the Alikhanifard & Tsantalis AST node-mapping oracle
 # (see research/external/README.md). Needs `csv`, hence the gate; touches nothing in the product.
 name = "benchmark_astdiff_oracle"

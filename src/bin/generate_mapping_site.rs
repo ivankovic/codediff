@@ -1374,6 +1374,9 @@ fn render_index_page(entries: &[IndexEntry]) -> String {
 <body>
 <header class="page-header">
 <h1>Human-authored ground-truth mappings</h1>
+<p class="notice">Looking for the tool rather than its ground truth? <a href="showcase/index.html">Twenty
+of these changes in codediff's own viewer</a>, each shown as Unix <code>diff</code> marks it and as
+codediff maps it.</p>
 <p>Each page below shows one fixture's before/after AST, annotated with what a human decided
 should match, get deleted, or get inserted. Disagree with one? Open the fixture, select the node,
 and use the "file an issue" button.</p>

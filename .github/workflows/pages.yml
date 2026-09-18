@@ -1,4 +1,4 @@
-name: Publish human mapping site
+name: Publish human mapping site and showcase
 
 # Builds and deploys the read-only human_mapping.json viewer (generate_mapping_site) to GitHub
 # Pages on every push to main - both halves of that file: the node mapping, as two annotated ASTs

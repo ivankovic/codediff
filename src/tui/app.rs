@@ -1682,7 +1682,10 @@ const DIFF_COMPUTE_STACK_SIZE: usize = 256 * 1024 * 1024;
 /// `resume_unwind` rather than converted to an `Err`, so it still looks like an ordinary panic on
 /// the calling thread to every existing caller (the TUI's `catch_unwind`, and headless/json's
 /// unwrapped default panic behavior).
-pub(crate) fn compute_diff_with_options(
+///
+/// Public since 2026-09-18 for `src/bin/generate_showcase.rs`, which bakes the same session data
+/// the web front end serves into static JSON for GitHub Pages; the other callers are in-crate.
+pub fn compute_diff_with_options(
     before: &Path,
     after: &Path,
     render_options: RenderOptions,
