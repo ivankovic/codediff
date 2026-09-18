@@ -84,10 +84,11 @@ Appearance
                    real change. Unchanged content is never highlighted either way.
   M                Open the render-options panel: independent checkboxes for which
                    parts of the diff get painted (leading whitespace, standalone
-                   punctuation), plus m/f shortcuts for the Minimal/Full presets.
+                   punctuation), plus 1/2 shortcuts for the Minimal/Full presets.
                    Every choice applies immediately and persists. Trailing whitespace
                    is never painted, regardless of any option. Up/Down moves,
-                   Enter/Space toggles, Esc closes.
+                   Space toggles, Enter keeps what is set and closes, Esc puts
+                   back what the panel opened with.
 
 Other
   ?                Toggle this help

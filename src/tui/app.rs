@@ -750,6 +750,11 @@ impl App {
                 // doc comment) - apply it to the live viewer and persist it in the same step,
                 // rather than waiting for the dialog to close.
                 Action::RenderOptionsChanged(options) => self.apply_render_options(*options)?,
+                // `Enter`: keep what is set. Nothing to apply - `RenderOptionsChanged` already did
+                // that for every keystroke - so accepting is exactly dropping the panel without
+                // running `handle_dialog_cancelled`'s restore. The counterpart of
+                // `apply_theme_selection`, which likewise only has the closing left to do.
+                Action::RenderOptionsAccepted => self.handle_render_options_accepted(),
                 _ => {}
             }
 
@@ -1033,6 +1038,15 @@ impl App {
         self.diff_viewer.set_overlay_theme(selected_theme);
         theme::save_overlay_theme(selected_theme);
         self.theme_dialog = None;
+        self.screen = AppScreen::Viewer;
+    }
+
+    /// `Enter` in the render-options panel: keep what is set and close. Nothing to apply -
+    /// `RenderOptionsChanged` already did that for every keystroke - so accepting is exactly
+    /// dropping the panel *without* running `handle_dialog_cancelled`'s restore. The counterpart
+    /// of `apply_theme_selection`, which likewise has only the closing left to do.
+    fn handle_render_options_accepted(&mut self) {
+        self.render_options_dialog = None;
         self.screen = AppScreen::Viewer;
     }
 
@@ -2365,6 +2379,33 @@ mod tests {
     /// Safe under `cargo nextest`, which the repository uses and which runs every test in its own
     /// process. Under a threaded `cargo test` this would be visible to a concurrent test; no other
     /// test reads the variable.
+    /// `Enter` keeps what the panel applied, where `Esc` puts back what it opened with
+    /// (`cancelling_the_render_options_panel_restores_what_it_opened_with`, above). Before
+    /// 2026-09-18 nothing accepted at all, so the panel could only be left by reverting it or by
+    /// quitting the application.
+    #[test]
+    fn accepting_the_render_options_panel_keeps_what_it_applied() -> Result<()> {
+        // `apply_render_options` persists, so redirect the write - see the note on
+        // `apply_theme_selection_updates_viewer_and_returns_to_the_viewer_screen`.
+        let config = tempfile::NamedTempFile::new().expect("temp config");
+        unsafe { std::env::set_var(theme::CONFIG_ENV, config.path()) };
+
+        let mut app = App::new(4.0, 60.0)?;
+        app.diff_viewer.set_render_options(RenderOptions::FULL);
+        app.screen = AppScreen::RenderOptions;
+        app.render_options_dialog = Some(RenderOptionsDialog::new(RenderOptions::FULL));
+        app.apply_render_options(RenderOptions::MINIMAL)?;
+
+        app.handle_render_options_accepted();
+
+        assert_eq!(app.diff_viewer.render_options(), RenderOptions::MINIMAL);
+        assert!(app.render_options_dialog.is_none());
+        assert_eq!(app.screen, AppScreen::Viewer);
+
+        unsafe { std::env::remove_var(theme::CONFIG_ENV) };
+        Ok(())
+    }
+
     #[test]
     fn apply_theme_selection_updates_viewer_and_returns_to_the_viewer_screen() {
         let config = tempfile::NamedTempFile::new().expect("temp config");

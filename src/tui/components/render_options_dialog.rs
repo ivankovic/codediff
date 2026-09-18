@@ -25,16 +25,21 @@ use crate::tui::actions::Action;
 
 /// A hint line explaining every key this dialog answers to, drawn under the option list by
 /// `render_list_dialog` - the same scaffold `FileDialog` uses.
-const HINT: &str = "↑/↓ move  Enter/Space toggle  1: minimal  2: full  Esc: cancel";
+const HINT: &str = "↑/↓ move  Space toggle  Enter apply  Esc cancel  1/2 presets";
 
 /// The `M` key's settings panel: one checkbox row per [`RenderOptions`] field, plus two preset
 /// shortcuts.
 ///
-/// Every toggle applies and persists immediately (see [`Action::RenderOptionsChanged`]'s doc
-/// comment for why this doesn't need `ThemeDialog`'s full preview/commit machinery), so `Esc`
-/// restores the options the panel was opened with rather than merely closing it - see
-/// [`Self::initial`]. Without that, there is no way back from a mistaken keystroke: the mistake is
-/// already on disk.
+/// Every toggle applies and persists immediately, so the diff behind the panel shows what the
+/// setting does while it is still open. That is what makes `Esc` restore the options the panel was
+/// opened with rather than merely closing it (see [`Self::initial`]): without it there is no way
+/// back from a mistaken keystroke, because the mistake is already on disk.
+///
+/// **`Enter` accepts and closes, `Esc` reverts and closes** - the same split `ThemeDialog` makes,
+/// which is the app's only other dialog that writes to the viewer while it is open. Until
+/// 2026-09-18 `Enter` was a second toggle key beside `Space` and nothing accepted, so the only
+/// ways out of the panel were `Esc`, which undid the visit, and `q`, which quit the application
+/// (it is handled globally, before the event reaches any dialog). `Space` remains the toggle.
 ///
 /// The presets are on `1`/`2` rather than `m`/`f` for the same reason. The panel is opened with
 /// `M`, so binding lowercase `m` to [`RenderOptions::MINIMAL`] - every field off - would let
@@ -69,8 +74,13 @@ impl RenderOptionsDialog {
 
     /// Centered popup, sized to fit every option row plus the hint line - same centering formula
     /// as `ThemeDialog::popup_area`.
+    ///
+    /// The width is the wider of the option rows and [`HINT`], rather than a constant: at 56 the
+    /// hint was cut off after `2: ful` and `Esc` - the one key a reader opens the panel not
+    /// knowing - was the half that vanished. Derived, so editing the hint cannot silently truncate
+    /// it again.
     pub fn popup_area(&self, area: Rect) -> Rect {
-        let width = 56.min(area.width);
+        let width = (HINT.chars().count() as u16 + 2).max(56).min(area.width);
         let height = (self.row_count() as u16 + 3).min(area.height);
         let x = area.x + (area.width.saturating_sub(width)) / 2;
         let y = area.y + (area.height.saturating_sub(height)) / 2;
@@ -91,10 +101,11 @@ impl Component for RenderOptionsDialog {
                 move_selection(&mut self.selected, 1, len);
                 Ok(Some(Action::Render))
             }
-            KeyCode::Enter | KeyCode::Char(' ') => {
+            KeyCode::Char(' ') => {
                 self.options.toggle(self.selected);
                 Ok(Some(Action::RenderOptionsChanged(self.options)))
             }
+            KeyCode::Enter => Ok(Some(Action::RenderOptionsAccepted)),
             KeyCode::Char('1') => {
                 self.options = RenderOptions::MINIMAL;
                 Ok(Some(Action::RenderOptionsChanged(self.options)))
@@ -142,10 +153,10 @@ mod tests {
     }
 
     #[test]
-    fn enter_toggles_the_selected_option_and_reports_it() {
+    fn space_toggles_the_selected_option_and_reports_it() {
         let mut dialog = RenderOptionsDialog::new(RenderOptions::MINIMAL);
 
-        let action = dialog.handle_key_event(key(KeyCode::Enter)).unwrap();
+        let action = dialog.handle_key_event(key(KeyCode::Char(' '))).unwrap();
 
         assert_eq!(
             action,
@@ -194,6 +205,25 @@ mod tests {
         assert_eq!(
             to_full,
             Some(Action::RenderOptionsChanged(RenderOptions::FULL))
+        );
+    }
+
+    /// `Enter` accepts: it closes the panel and reports nothing to change, because every toggle
+    /// already applied itself on the way in. Until 2026-09-18 it was a second toggle key and no
+    /// key accepted at all, so `Esc` (which reverts) and `q` (which quits the application) were
+    /// the only ways out of the panel.
+    #[test]
+    fn enter_accepts_and_changes_nothing_on_the_way_out() {
+        let mut dialog = RenderOptionsDialog::new(RenderOptions::MINIMAL);
+        dialog.handle_key_event(key(KeyCode::Char(' '))).unwrap();
+        let toggled = dialog.options;
+
+        let action = dialog.handle_key_event(key(KeyCode::Enter)).unwrap();
+
+        assert_eq!(action, Some(Action::RenderOptionsAccepted));
+        assert_eq!(
+            dialog.options, toggled,
+            "accepting must not edit the options it accepts"
         );
     }
 

@@ -131,8 +131,14 @@ pub enum Action {
     /// already parsed by the prompt itself.
     JumpToLineSubmitted(usize),
     /// A toggle or preset changed in the render-options panel (the `M` key) - apply it to the
-    /// viewer behind the dialog and persist it immediately. Unlike `ThemePreviewed`/`ThemeSelected`
-    /// above, there is no separate preview/commit split: a boolean flip has nothing to revert on
-    /// `Esc`, so every change here is already final.
+    /// viewer behind the dialog and persist it immediately, so the diff behind the panel shows
+    /// what the setting does while it is still open. Unlike `ThemePreviewed`, which previews
+    /// without persisting, this writes through: `DialogCancelled` is what puts the panel's opening
+    /// options back, and it has to do so actively because they are already on disk.
     RenderOptionsChanged(RenderOptions),
+    /// `Enter` in the render-options panel: keep what is set and close. The counterpart of
+    /// `ThemeSelected`, and the same split - `Enter` accepts, `Esc` reverts - for the app's only
+    /// other dialog that writes to the viewer while it is open. Carries nothing, because
+    /// `RenderOptionsChanged` has already applied and persisted every change it would name.
+    RenderOptionsAccepted,
 }
