@@ -198,7 +198,10 @@ ABLATION_VISIBLE = {
 # Design targets and fixed descriptive facts. Chosen, not measured - a refresh means a decision,
 # not a re-run - except GumTreeVersion, which is whichever build benchmark_other was run against.
 TARGETS = {
-    "SpeedTargetMs": "400",
+    # Raised from 400 to 1000 on 2026-09-18, on review of the introductory paper. 400 was a number
+    # with no argument behind it; 1000 is the one the paper already cites Nielsen for in
+    # Section 5, so the design target and the budget RQ2 measures against are now the same number.
+    "SpeedTargetMs": "1000",
     "SpeedTargetPct": "99.99",
     # Clone depth the corpus under /var/tmp/research/full/ was fetched at, per commit from each
     # branch tip (`make fetch MODE=full DEPTH=50`, 2026-08-20). Not a measurement - a parameter of

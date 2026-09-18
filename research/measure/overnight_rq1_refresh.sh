@@ -27,6 +27,15 @@
 #
 # Usage (from research/):  ./measure/overnight_rq1_refresh.sh [log-file]
 #
+# Environment knobs, both defaulting to what the committed measurement used:
+#
+#   COUNT=1000       pairs per language, split over stats::sampling::LOC_BUCKETS' 7 buckets.
+#   SKIP_FETCH=1     skip stage 1. Legitimate only when the corpus on disk is already at DEPTH and
+#                    the sample is being re-drawn (stage 2) rather than re-measured: a fresh draw
+#                    reads the checkouts themselves, so every pair it names resolves by
+#                    construction, and stage 2b still proves it. Never skip it when re-measuring an
+#                    existing sample, which is the decay case this script was written for.
+#
 # THE PROBLEM THIS FIXES (2026-08-20). The committed data/samples/sampled_code_pairs_*.csv named
 # (repository, commit, path) triples that no checkout on this machine could resolve: ~41% of pairs
 # failed to read, and the failures were concentrated in whole repositories rather than spread
@@ -42,8 +51,11 @@ cd "$(dirname "$0")/.."
 LOG="${1:-/var/tmp/rq1_overnight_$(date +%Y%m%d_%H%M%S).log}"
 MODE=full
 DEPTH=50
-# 20 pairs per language per LOC bucket, over stats::sampling::LOC_BUCKETS' 7 buckets.
-COUNT=140
+# Pairs per language, split over stats::sampling::LOC_BUCKETS' 7 buckets. Was a hardcoded 140 (20
+# per bucket) until 2026-09-18, when the paper review asked for 1000 per language - roughly 24,000
+# pairs over the corpus's 24 languages, against the 2,922 the committed RQ1 numbers are measured on.
+COUNT="${COUNT:-140}"
+SKIP_FETCH="${SKIP_FETCH:-0}"
 REPOS=/var/tmp/research/$MODE/repositories
 
 exec > >(tee -a "$LOG") 2>&1
@@ -69,7 +81,12 @@ echo "Log: $LOG"
 # `failed` file with no locking, and a half-corrupted record of which repositories failed is worse
 # than a slower run that finishes before the sampling stage needs it.
 stage "Stage 1/4: fetch $MODE corpus at --depth=$DEPTH"
-make fetch MODE=$MODE DEPTH=$DEPTH || fail "fetch failed"
+if [ "$SKIP_FETCH" = 1 ]; then
+  echo "SKIP_FETCH=1: leaving the corpus on disk as it is. Stage 2 draws from these checkouts, so"
+  echo "the sample resolves by construction; stage 2b still checks."
+else
+  make fetch MODE=$MODE DEPTH=$DEPTH || fail "fetch failed"
+fi
 if [ -s "$REPOS/failed" ]; then
   echo "NOTE: $(wc -l < "$REPOS/failed") repositories failed to fetch (see $REPOS/failed)."
   echo "Not fatal: sampling draws from whatever resolved, and a repository absent from the corpus"

@@ -31,6 +31,20 @@ matters.
 well as deepening it, so re-fetching below the depth a sample was drawn at destroys that sample's
 resolvability in place.
 
+## Sample size
+
+`COUNT` (pairs per language, split over the 7 LOC buckets) is a parameter of
+`measure/overnight_rq1_refresh.sh`, not a constant in it, since 2026-09-18 - the paper review asked
+for 1000 per language, roughly 24,000 pairs, against the 140 (20 per bucket) this measurement used:
+
+    cd research && COUNT=1000 SKIP_FETCH=1 ./measure/overnight_rq1_refresh.sh
+
+`SKIP_FETCH=1` skips stage 1. That is sound when the sample is being **re-drawn**, because stage 2
+reads the checkouts themselves and every pair it names therefore resolves by construction, and
+stage 2b proves it before stage 3 measures anything. It is never sound when re-measuring an
+existing sample - that is the decay case the whole script exists for, and the fetch is what fixes
+it.
+
 ## Known gap in this measurement
 
 **2,922 of 3,089 sampled pairs were measured.** The missing 167 are R (79) and Scala (88): the
