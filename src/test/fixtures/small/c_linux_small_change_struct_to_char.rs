@@ -21,11 +21,7 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
-        "c-linux-small-change-struct-to-char",
-        2,
-        2,
-    )
+    test::helper::human_mapping::assert_matches_human_mapping("c-linux-small-change-struct-to-char")
 }
 
 #[test]

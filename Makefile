@@ -157,9 +157,31 @@ diff-inventory:
 #
 # Two passes, mirroring the shape the Rust side already has (`cargo fmt --check` and clippy as
 # separate CI jobs): the formatter decides layout, the linter decides everything else.
+#
+# `ruff` is the one tool in this file that neither a bare checkout nor the Rust toolchain brings:
+# CI installs its own pinned copy (`astral-sh/ruff-action`) and `nix develop` has it in the
+# devShell, so a plain shell is the one setup nothing covers, and the bare "ruff: command not
+# found" it used to fail with named no way out.
 lint-python:
+	@command -v ruff >/dev/null 2>&1 || { \
+		echo "make lint-python needs \`ruff\` on PATH, which CI installs for itself." >&2; \
+		echo "Install it for every repository under your user, at the version ci.yml pins:" >&2; \
+		echo "    uv tool install ruff@$(RUFF_VERSION)" >&2; \
+		echo "(or work inside \`nix develop\`, whose devShell already has it)" >&2; \
+		exit 1; \
+	}
 	ruff check $(PYTHON_DIRS)
 	ruff format --check $(PYTHON_DIRS)
+
+# The ruff version .github/workflows/ci.yml pins its `astral-sh/ruff-action` steps to. Only the
+# message above reads it; nothing here installs or enforces a version, because the lint that
+# decides a push is CI's copy and not this machine's - which is exactly why the message has to name
+# CI's version and not just "ruff". A hand-written copy of a number that lives in another file, so
+# `test_the_ruff_version_named_outside_ci_matches_the_one_ci_pins` (research/tests/) fails the build
+# if this and CONTRIBUTING.md stop agreeing with ci.yml. The command list in ci_local.py is read out
+# of ci.yml rather than copied for the same reason; a version behind an action's `with:` has no
+# such reader.
+RUFF_VERSION := 0.16.4
 
 PYTHON_DIRS := research scripts assets
 

@@ -21,7 +21,7 @@
 //! `assert_matches_human_painting_within_limit` both ask "is codediff right?", and both answer it
 //! against data whose own internal consistency nothing checks - a painting that ends a highlight
 //! in the middle of a run of spaces, or paints an opening brace and not its closing one, grades
-//! codediff against a claim its author would not defend if it were pointed out. These fifteen
+//! codediff against a claim its author would not defend if it were pointed out. These seventeen
 //! invariants are that missing half: they can fail only because the hand-authored data disagrees
 //! with itself.
 //!
@@ -52,6 +52,10 @@
 //!   tokens.
 //! * [`match_but_not_identical_entries_differ`] - a `MatchButNotIdentical` entry's two subtrees do
 //!   not read byte-identically with every descendant paired inside.
+//! * [`identifier_updates_are_painted_by_preset`] - a renamed identifier is painted at its own
+//!   preset's granularity: `Minimal` marks the differing words, `Full` marks it entire.
+//! * [`boolean_flips_are_one_edit`] - a boolean the mapping pairs is not painted `Delete` on one
+//!   side and `Insert` on the other.
 //!
 //! Invariants 4 and 5 were added on 2026-09-08 and wired in the same day, at **zero violations
 //! across all 249 painted fixtures** - so unlike the first three they arrived with no clamped
@@ -80,6 +84,12 @@
 //! rejected, delimiter agreement *within a painting* (a `}` legitimately moves while its `{` stays
 //! put) and "a matched pair lands in one painting entry" (the ordinary `Delete`+`Insert`
 //! chunking of a rename, 99 fixtures).
+//!
+//! **All seventeen are intra-fixture.** Each asks whether one fixture's mapping and paintings
+//! agree with each other; none compares two fixtures, so a pair whose paintings answer the same
+//! question differently is invisible to all of them. `cross_fixture_convention_census`
+//! (`tests/exploratory.rs`) is that other axis, and
+//! `research/data/quality/convention_violations_2026_09_18.md` is what it found.
 //!
 //! **Per fixture, not corpus-wide.** These are wired in as a third `invariants()` test in each
 //! `src/test/fixtures/**` file, next to that fixture's `mapping()` and `painting()`, so a fixture
@@ -126,7 +136,7 @@ pub struct ViolationSite {
 /// 10, 11 and 12), so carrying it out is bookkeeping rather than a second analysis.
 #[derive(Debug, Clone)]
 pub struct GroundTruthViolation {
-    /// Which of the fifteen rules, numbered as the module doc lists them.
+    /// Which of the seventeen rules, numbered as the module doc lists them.
     pub invariant: u8,
     /// The painting this is about, or `None` for the three rules that read only the tree mapping.
     pub painting: Option<String>,
@@ -1646,7 +1656,7 @@ fn site_rows(rows: &[Vec<usize>; 2]) -> String {
 /// does the same for a removal. So a leaf's status is the nearest entry on the path from it to the
 /// root - its own, or an ancestor's - read for what it implies about the leaf.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum LeafStatus<'tree> {
+pub(crate) enum LeafStatus<'tree> {
     /// Paired with a leaf that reads the same: the leaf's own `Identical` entry, or the leaf at
     /// the same offset under an `Identical` ancestor - well defined because such subtrees read
     /// token-for-token the same (invariant 14).
@@ -1662,7 +1672,7 @@ enum LeafStatus<'tree> {
 }
 
 /// The two trees indexed for the leaf-level invariants, built once per fixture.
-struct TreeContext<'tree> {
+pub(crate) struct TreeContext<'tree> {
     caches: Caches,
     /// The mapping's multi-map groups, for [`group_leaves_status_open`]: a leaf whose group could
     /// leave it over is `Undecided`, not `Removed`.
@@ -1670,11 +1680,11 @@ struct TreeContext<'tree> {
     /// Node id to node, per side - how a partner id from [`Caches`] becomes a node again.
     ids: [std::collections::HashMap<usize, Node<'tree>>; 2],
     /// Every leaf per side, in source order.
-    leaves: [Vec<Node<'tree>>; 2],
+    pub(crate) leaves: [Vec<Node<'tree>>; 2],
 }
 
 impl<'tree> TreeContext<'tree> {
-    fn build(
+    pub(crate) fn build(
         mapping: &super::HumanMapping,
         before_root: Node<'tree>,
         after_root: Node<'tree>,
@@ -1690,7 +1700,7 @@ impl<'tree> TreeContext<'tree> {
         }
     }
 
-    fn status(&self, leaf: Node<'tree>, side: usize) -> LeafStatus<'tree> {
+    pub(crate) fn status(&self, leaf: Node<'tree>, side: usize) -> LeafStatus<'tree> {
         if group_leaves_status_open(leaf, side, &self.groups, &self.caches) {
             return LeafStatus::Undecided;
         }
@@ -1783,7 +1793,7 @@ fn index_tree<'tree>(
 
 /// A leaf with something visible in it. Zero-width and whitespace-only leaves (Python's `indent`
 /// and `newline`, and the like) carry nothing a painting could colour.
-fn is_visible_leaf(leaf: Node, contents: &str) -> bool {
+pub(crate) fn is_visible_leaf(leaf: Node, contents: &str) -> bool {
     contents
         .get(leaf.byte_range())
         .is_some_and(|text| !text.trim().is_empty())

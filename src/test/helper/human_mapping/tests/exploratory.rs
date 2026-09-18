@@ -19,8 +19,9 @@
 // Hand-run instruments, not checks. Every fn here is `#[test] #[ignore]`: it prints or dumps an
 // analysis rather than asserting anything, so `cargo test` compiles them and runs none of them.
 //
-// Two write a live artifact and are wired into a Make target or a plan - `painting_failure_census`
-// (`make update-painting-attribution`) and `mismatch_census`. The other four take a fixture name
+// Three write a live artifact and are wired into a Make target or a plan -
+// `painting_failure_census` (`make update-painting-attribution`), `mismatch_census` and
+// `cross_fixture_convention_census`. The other five take a fixture name
 // or a list through an env var and answer a question about that fixture, which is what makes them
 // worth keeping: a corpus-wide census answers its question once and belongs in
 // `research/data/quality/` as a write-up, while "why does *this* fixture disagree" comes up every
@@ -229,33 +230,79 @@ fn invariant_violations() -> Result<()> {
     Ok(())
 }
 
-/// EXPLORATORY: the painting round's worklist - every run of bytes where codediff's rendering
-/// disagrees with the hand-painted ground truth, classified by what it is, and **attributed** to
-/// the node matcher or to the renderer.
+/// EXPLORATORY: the mismatches of one fixture, spelled out - the per-fixture counterpart of
+/// [`mismatch_census`].
 ///
-/// Three label vectors per side per preset:
+/// The census answers "what shapes are there, corpus-wide" and writes a CSV to group by. This
+/// answers the question that follows it: the census says this fixture disagrees twice on `||`
+/// under `binary_expression`, so *which* `||`, reading what, next to what. It prints the mismatch
+/// message unmodified - `compute_mismatches_*` already writes the human's operation, both paths
+/// and the partner codediff chose - and adds the one thing the message cannot carry, the node's
+/// own bytes and where they are, since a mismatch on a `,` is unreadable without them.
 ///
-/// * `real` - `diff_code`'s own mapping, rendered. What a reader actually sees.
-/// * `ideal` - the fixture's *human tree mapping* pushed through the same `TextDiff` (via
-///   [`as_ast_diff_for_mapping`]). What the renderer would paint if node matching were perfect.
-/// * `painted` - the human painting the preset is answerable to.
+/// Invisible mismatches are printed too, under their own heading: the goals are stated in visible
+/// nodes, but when a visible one looks arbitrary its explanation is often an invisible sibling.
 ///
-/// `ideal` vs `painted` is the residue **no matcher improvement can remove**: a rendering rule
-/// disagreeing with a human about a mapping the two agree on. That is what a painting-only round
-/// can fix. `real` vs `ideal` is matcher-attributable, and `real` vs `painted` is the number
-/// `painting_disagreement_report` prints.
-///
-/// One caveat on the `ideal` column: `as_ast_diff_for_mapping` leaves `ASTMappingReason::default()`
-/// on every entry, so the two reason-tagged escapes from `Move` (`known_pure_reindent` via
-/// `NestedConditionCollapse`/`WrapGrowth`, `known_pure_relocation` via `HeritageClauseGrowth`)
-/// cannot fire there. It over-attributes `Move` to the renderer, never under-attributes.
-///
-/// Counted by **runs and fixtures first, bytes last**: a stray `}` is one byte and the corpus's
-/// largest fixture is twelve thousand, so the byte-weighted ranking
-/// `painting_disagreement_report` sorts by hides exactly the small repeated mistake this round is
-/// about.
-///
-/// `cargo test --release --lib --features test-fixtures painting_failure_census --
+/// `FIXTURE=name cargo test --release --lib --features test-fixtures mismatch_detail_for_fixture
+/// -- --ignored --nocapture`
+#[test]
+#[ignore]
+fn mismatch_detail_for_fixture() -> Result<()> {
+    let name = std::env::var("FIXTURE").unwrap_or_else(|_| "rust-add-if".to_string());
+    let (before, after) = &*crate::test::helper::handmade_test_code_pair(&name)?;
+    let config = crate::diff::HeuristicConfig::default();
+    let found = compute_visible_mismatches_for_with_config(&name, before, after, &config)?;
+
+    /// The node's own bytes and start position, or `-` when the id is not in that side's tree.
+    fn locate(code: &crate::code::Code, node_id: usize) -> String {
+        let Some(tree) = code.ast.as_ref() else {
+            return "-".to_string();
+        };
+        let mut stack = vec![tree.root_node()];
+        while let Some(node) = stack.pop() {
+            if node.id() == node_id {
+                let point = node.start_position();
+                let text = code.contents.get(node.byte_range()).unwrap_or("");
+                return format!("{}:{} {:?}", point.row + 1, point.column + 1, text);
+            }
+            let mut cursor = node.walk();
+            for child in node.children(&mut cursor) {
+                stack.push(child);
+            }
+        }
+        "-".to_string()
+    }
+
+    // The message names the partner codediff chose by *kind* only ("but it mapped to ||"), which
+    // is exactly the word that repeats in the cases worth reading. Its position is what settles
+    // which `||` that was, so it is looked up here rather than inferred from the message.
+    let diff = crate::diff::diff_code_with_config(before, after, &config);
+    let diff_ast = diff.ast.as_ref();
+
+    for (heading, mismatches) in [("visible", &found.visible), ("invisible", &found.invisible)] {
+        eprintln!("\n=== {} {heading} ===", mismatches.len());
+        for mismatch in mismatches.iter() {
+            let (side, code, partner_code) = match mismatch.side {
+                Side::Before => ("before", before, after),
+                Side::After => ("after", after, before),
+            };
+            let partner = diff_ast
+                .and_then(|diff_ast| match mismatch.side {
+                    Side::Before => diff_ast.before_node_map.get(&mismatch.node_id),
+                    Side::After => diff_ast.after_node_map.get(&mismatch.node_id),
+                })
+                .map(|&partner_id| locate(partner_code, partner_id))
+                .unwrap_or_else(|| "0 (unmapped)".to_string());
+            eprintln!(
+                "{side} {}  -> codediff chose {partner}",
+                locate(code, mismatch.node_id)
+            );
+            eprintln!("    {}", mismatch.message);
+        }
+    }
+    Ok(())
+}
+
 /// **Every mismatch in the corpus, classified - the matching-side counterpart of
 /// [`painting_failure_census`].**
 ///
@@ -270,6 +317,8 @@ fn invariant_violations() -> Result<()> {
 /// produced instead), all parsed back out of the mismatch message - the message is generated text,
 /// not free-form, so the parse is against a format this file's own `compute_mismatches_*` writes.
 /// `kind`/`parent_kind`/`named` come from the node id the mismatch already carries.
+///
+/// `cargo test --release --lib --features test-fixtures mismatch_census -- --ignored --nocapture`
 #[test]
 #[ignore]
 // The CSV half needs the `csv` crate, which is only linked under `test-fixtures` - the same gate
@@ -497,6 +546,338 @@ fn mismatch_census() -> Result<()> {
     Ok(())
 }
 
+/// **Where two fixtures' paintings answer the same question differently.**
+///
+/// Every rule in [`crate::test::helper::human_mapping::invariants`] is *intra*-fixture: it asks
+/// whether one fixture's mapping and paintings agree with each other. None of them compares two
+/// fixtures, so a pair whose paintings imply opposite conventions for the same shape is invisible
+/// to all seventeen - and a corpus that disagrees with itself across fixtures grades a renderer
+/// against a coin flip, however self-consistent each fixture is on its own.
+///
+/// The population is the one place the two fixtures can be made comparable: a **leaf the human's
+/// own tree mapping pairs with a leaf that reads the same** ([`LeafStatus::Same`]). No matcher is
+/// involved and no judgement about what the change *is* - the human has already said this text
+/// survived. All that is left is where it ended up, which is geometry, and whether the painting
+/// colours it, which is the convention. Two fixtures that answer differently for the same geometry
+/// are the finding.
+///
+/// Three booleans describe the geometry, and they are deliberately facts about the *file* rather
+/// than about any rule in `diff::text` - a class defined by the renderer's own predicates could
+/// only ever re-discover the renderer:
+///
+/// * `row_moved` - the leaf is on a different row index than its partner.
+/// * `column_moved` - it starts at a different column.
+/// * `row_edited` - its whole row reads differently on the two sides. False means the row is
+///   byte-identical and whatever moved the leaf happened elsewhere in the file.
+///
+/// A fourth fact separates the two things `row_moved` alone conflates - a leaf pushed down by an
+/// insertion somewhere above it, and a leaf that genuinely relocated. `drift_matches_neighbours`
+/// asks whether the leaf's row delta is the one its immediate neighbours also carry: text that
+/// insertions above it pushed down moves by the same amount as everything around it, and a block
+/// that moved does not. The same neighbour evidence [`crate::diff::solve_orphaned_leaves`] and
+/// `solve_leaf_neighbour_agreement` both key on, asked of rows.
+///
+/// The verdict is `clean` (no byte of the leaf is painted), `painted` (all of them are, and under
+/// which label), or `partial`. `partial` is reported and never counted as either: a leaf half
+/// inside a larger painted region is the painting's chunking talking, not its verdict on this
+/// leaf.
+///
+/// Scoped to visible leaves, because a painting cannot colour whitespace it does not reach, and to
+/// the two named presets, because `Minimal` and `Full` are *specified* to disagree - a split
+/// between them is the design, and only a split *within* one of them is a contradiction.
+///
+/// **The CSV holds the exceptions, not the population.** One row per leaf whose verdict is not
+/// `clean`, carrying its class's own `clean` count for that fixture and preset as the denominator
+/// beside it. The population is 3.3 million leaves and 261MB of it; the exceptions are four
+/// thousand, they are what anyone acts on, and each one arrives with the number it is an exception
+/// to.
+///
+/// `cargo test --release --lib --features test-fixtures cross_fixture_convention_census --
+/// --ignored --nocapture`
+#[test]
+#[ignore]
+// The CSV half needs the `csv` crate, which is only linked under `test-fixtures` - the same gate
+// `mismatch_census` above carries, for the same reason.
+#[cfg(feature = "test-fixtures")]
+fn cross_fixture_convention_census() -> Result<()> {
+    use crate::test::helper::human_mapping::invariants::painted_labels;
+    use crate::test::helper::human_mapping::invariants::{
+        LeafStatus, TreeContext, is_visible_leaf,
+    };
+    use std::collections::BTreeMap;
+
+    /// The row `offset` falls on, as text - `None` past the end.
+    fn row_of(contents: &str, row: usize) -> Option<&str> {
+        contents.split('\n').nth(row)
+    }
+
+    let diffs_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("src")
+        .join("test")
+        .join("data")
+        .join("diffs");
+    let mut names: Vec<String> = Vec::new();
+    for dataset in crate::test::helper::DIFF_DATASETS {
+        let dir = diffs_dir.join(dataset);
+        if !dir.is_dir() {
+            continue;
+        }
+        for entry in fs::read_dir(&dir)?.filter_map(|entry| entry.ok()) {
+            if entry.path().is_dir() {
+                names.push(entry.file_name().to_string_lossy().into_owned());
+            }
+        }
+    }
+    names.sort();
+
+    /// One leaf whose painting verdict is not `clean`.
+    struct Exception {
+        fixture: String,
+        preset: String,
+        side: &'static str,
+        class: String,
+        verdict: String,
+        kind: String,
+        /// 1-based, so it reads like a file's own gutter.
+        row: usize,
+        drift: usize,
+        drift_matches_neighbours: bool,
+    }
+
+    // Held back until the end so each row can carry its own class's `clean` count for that fixture
+    // and preset - the denominator is what makes an exception readable, and it is not known until
+    // the class has been walked.
+    let mut exceptions: Vec<Exception> = Vec::new();
+    // (preset, class) -> fixture -> (clean, painted, partial)
+    let mut tally: BTreeMap<(String, String), BTreeMap<String, [usize; 3]>> = BTreeMap::new();
+
+    for name in &names {
+        let Ok(pair) = crate::test::helper::handmade_test_code_pair(name) else {
+            continue;
+        };
+        let (before, after) = &*pair;
+        let Ok(mapping) = load(name) else { continue };
+        let (Some(before_tree), Some(after_tree)) = (before.ast.as_ref(), after.ast.as_ref())
+        else {
+            continue;
+        };
+        let context = TreeContext::build(&mapping, before_tree.root_node(), after_tree.root_node());
+
+        // Every `Same` leaf's row delta, per side, in document order - the neighbourhood
+        // `drift_matches_neighbours` reads. Built once per fixture rather than per painting.
+        let drifts: [Vec<(usize, i64)>; 2] = std::array::from_fn(|side| {
+            context.leaves[side]
+                .iter()
+                .filter_map(|&leaf| match context.status(leaf, side) {
+                    LeafStatus::Same(partner) => Some((
+                        leaf.id(),
+                        partner.start_position().row as i64 - leaf.start_position().row as i64,
+                    )),
+                    _ => None,
+                })
+                .collect()
+        });
+
+        for named in &mapping.text_mappings {
+            let preset = if super::invariants::designates_minimal(&named.name) {
+                "Minimal"
+            } else if super::invariants::designates_full(&named.name) {
+                "Full"
+            } else {
+                continue;
+            };
+            let Ok(labels) = painted_labels(named, before, after) else {
+                continue;
+            };
+
+            for side in 0..2 {
+                let (contents, partner_contents) = if side == 0 {
+                    (&before.contents, &after.contents)
+                } else {
+                    (&after.contents, &before.contents)
+                };
+                for &leaf in &context.leaves[side] {
+                    if !is_visible_leaf(leaf, contents) {
+                        continue;
+                    }
+                    let LeafStatus::Same(partner) = context.status(leaf, side) else {
+                        continue;
+                    };
+
+                    let row_moved = leaf.start_position().row != partner.start_position().row;
+                    let column_moved =
+                        leaf.start_position().column != partner.start_position().column;
+                    let row_edited = row_of(contents, leaf.start_position().row)
+                        != row_of(partner_contents, partner.start_position().row);
+                    let class = format!(
+                        "{}{}{}",
+                        if row_moved { "row" } else { "-" },
+                        if column_moved { "+col" } else { "+-" },
+                        if row_edited { "+edited" } else { "+same" },
+                    );
+
+                    // The drift its neighbours carry. A leaf with no `Same` neighbour on either
+                    // side has nothing to agree with and reports `false`, which keeps the column
+                    // meaning "verified to move with its surroundings" rather than "not known to
+                    // disagree".
+                    let drift =
+                        partner.start_position().row as i64 - leaf.start_position().row as i64;
+                    let index = drifts[side].iter().position(|&(id, _)| id == leaf.id());
+                    let drift_matches_neighbours = index.is_some_and(|index| {
+                        let neighbours = index
+                            .checked_sub(1)
+                            .and_then(|before| drifts[side].get(before))
+                            .into_iter()
+                            .chain(drifts[side].get(index + 1));
+                        let mut any = false;
+                        for &(_, neighbour) in neighbours {
+                            if neighbour != drift {
+                                return false;
+                            }
+                            any = true;
+                        }
+                        any
+                    });
+
+                    let painted = &labels[side][leaf.byte_range()];
+                    let verdict = if painted.iter().all(Option::is_none) {
+                        "clean".to_string()
+                    } else if let Some(label) = painted.first().copied().flatten()
+                        && painted.iter().all(|slot| *slot == Some(label))
+                    {
+                        format!("painted:{label:?}")
+                    } else {
+                        "partial".to_string()
+                    };
+                    let bucket = tally
+                        .entry((preset.to_string(), class.clone()))
+                        .or_default()
+                        .entry(name.clone())
+                        .or_default();
+                    bucket[match verdict.as_str() {
+                        "clean" => 0,
+                        "partial" => 2,
+                        _ => 1,
+                    }] += 1;
+
+                    if verdict != "clean" {
+                        exceptions.push(Exception {
+                            fixture: name.clone(),
+                            preset: preset.to_string(),
+                            side: if side == 0 { "before" } else { "after" },
+                            class,
+                            verdict,
+                            kind: leaf.kind().to_string(),
+                            row: leaf.start_position().row + 1,
+                            drift: drift.unsigned_abs() as usize,
+                            drift_matches_neighbours,
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    let csv_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("research")
+        .join("data")
+        .join("quality")
+        .join("convention_census.csv");
+    let mut writer = csv::Writer::from_path(&csv_path)?;
+    writer.write_record([
+        "fixture",
+        "preset",
+        "side",
+        "class",
+        "verdict",
+        "kind",
+        "row",
+        "row_drift",
+        "drift_matches_neighbours",
+        "clean_in_class",
+    ])?;
+    for exception in &exceptions {
+        let clean = tally
+            .get(&(exception.preset.clone(), exception.class.clone()))
+            .and_then(|per| per.get(&exception.fixture))
+            .map(|counts| counts[0])
+            .unwrap_or(0);
+        writer.write_record([
+            &exception.fixture,
+            &exception.preset,
+            &exception.side.to_string(),
+            &exception.class,
+            &exception.verdict,
+            &exception.kind,
+            &exception.row.to_string(),
+            &exception.drift.to_string(),
+            &exception.drift_matches_neighbours.to_string(),
+            &clean.to_string(),
+        ])?;
+    }
+    writer.flush()?;
+    eprintln!(
+        "{} exception(s) of {} leaves -> {}",
+        exceptions.len(),
+        tally
+            .values()
+            .flat_map(|per| per.values())
+            .map(|counts| counts.iter().sum::<usize>())
+            .sum::<usize>(),
+        csv_path.display()
+    );
+
+    // A fixture "says clean" for a class when every one of its leaves in that class is unpainted,
+    // and "says painted" when every one is painted. A fixture that does both is itself the
+    // contradiction and is counted apart - no cross-fixture comparison is needed to condemn it.
+    eprintln!(
+        "\n{:<9} {:<18} {:>6} {:>8} {:>6} {:>9}",
+        "preset", "class", "clean", "painted", "both", "leaves"
+    );
+    for ((preset, class), per_fixture) in &tally {
+        let (mut clean, mut painted, mut both) = (0usize, 0usize, 0usize);
+        let mut leaves = 0usize;
+        for counts in per_fixture.values() {
+            leaves += counts[0] + counts[1] + counts[2];
+            match (counts[0] > 0, counts[1] > 0) {
+                (true, false) => clean += 1,
+                (false, true) => painted += 1,
+                (true, true) => both += 1,
+                (false, false) => {}
+            }
+        }
+        eprintln!("{preset:<9} {class:<18} {clean:>6} {painted:>8} {both:>6} {leaves:>9}");
+    }
+    Ok(())
+}
+
+/// EXPLORATORY: the painting round's worklist - every run of bytes where codediff's rendering
+/// disagrees with the hand-painted ground truth, classified by what it is, and **attributed** to
+/// the node matcher or to the renderer.
+///
+/// Three label vectors per side per preset:
+///
+/// * `real` - `diff_code`'s own mapping, rendered. What a reader actually sees.
+/// * `ideal` - the fixture's *human tree mapping* pushed through the same `TextDiff` (via
+///   [`as_ast_diff_for_mapping`]). What the renderer would paint if node matching were perfect.
+/// * `painted` - the human painting the preset is answerable to.
+///
+/// `ideal` vs `painted` is the residue **no matcher improvement can remove**: a rendering rule
+/// disagreeing with a human about a mapping the two agree on. That is what a painting-only round
+/// can fix. `real` vs `ideal` is matcher-attributable, and `real` vs `painted` is the number
+/// `painting_disagreement_report` prints.
+///
+/// One caveat on the `ideal` column: `as_ast_diff_for_mapping` leaves `ASTMappingReason::default()`
+/// on every entry, so the two reason-tagged escapes from `Move` (`known_pure_reindent` via
+/// `NestedConditionCollapse`/`WrapGrowth`, `known_pure_relocation` via `HeritageClauseGrowth`)
+/// cannot fire there. It over-attributes `Move` to the renderer, never under-attributes.
+///
+/// Counted by **runs and fixtures first, bytes last**: a stray `}` is one byte and the corpus's
+/// largest fixture is twelve thousand, so the byte-weighted ranking
+/// `painting_disagreement_report` sorts by hides exactly the small repeated mistake this round is
+/// about.
+///
+/// `cargo test --release --lib --features test-fixtures painting_failure_census --
 /// --ignored --nocapture`
 #[test]
 #[ignore]
@@ -890,7 +1271,13 @@ fn painting_failure_census() -> Result<()> {
                                 sample: format!(
                                     "{name} {preset} side={side} row={} {:?}",
                                     contents[side][..start].matches('\n').count() + 1,
-                                    if text.len() > 40 { &text[..40] } else { text }
+                                    // Cut back to a character boundary, not to byte 40:
+                                    // `xml-libreoffice-unicode`'s runs are CJK, where every
+                                    // character is three bytes and byte 40 lands inside one.
+                                    &text[..(0..=40.min(text.len()))
+                                        .rev()
+                                        .find(|&at| text.is_char_boundary(at))
+                                        .unwrap_or(0)]
                                 ),
                             },
                         ));

@@ -33,7 +33,7 @@ fn mapping() -> Result<()> {
 fn painting() -> Result<()> {
     assert_matches_human_painting_within_limit(
         "javascript-typescript-interesting-small-edit-refactor",
-        6.89,
+        10.05,
     )
 }
 

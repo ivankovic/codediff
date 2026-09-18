@@ -32,7 +32,7 @@ fn mapping() -> Result<()> {
 fn painting() -> Result<()> {
     assert_matches_human_painting_within_limit(
         "php-wordpress-wordpress-one-line-file-insert-and-update",
-        63.59,
+        13.93,
     )
 }
 

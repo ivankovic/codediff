@@ -2468,3 +2468,109 @@ fn a_renamed_identifier_stays_an_update_even_though_one_side_is_empty() {
         "a rename is not a deletion of the dropped prefix: {ops:?}"
     );
 }
+
+/// A row carrying **two** edits, one on each side of an untouched node
+/// (`cpp-add-const-correctness`, and the shape a one-line file repeats along a single row). The
+/// prefix/suffix split in `node_untouched_on_its_row` answers for one edit per row and no more,
+/// so the parameter's type - which neither edit touches - fell in neither affix and painted
+/// `Move`. `node_uniquely_placed_on_its_row` reads it: the text is the same on both sides and
+/// occurs once on each row, at the node's own columns, so nothing has to be guessed about where
+/// it went.
+///
+/// A preset split, like the two gates above: `FULL` keeps painting the displaced type.
+#[test]
+fn paint_displaced_moves_gates_a_node_between_two_edits_on_its_own_row() {
+    let before = Code::from_string(
+        "void printVector(std::vector<int> vec) {\n}\n",
+        &crate::code::Language::CPP,
+    );
+    let after = Code::from_string(
+        "void printVector(const std::vector<int>& vec) {\n}\n",
+        &crate::code::Language::CPP,
+    );
+    let ast = crate::diff::diff_code(&before, &after);
+    let node_cache = crate::diff::NodeCache::build(&before, &after);
+
+    let type_is_identical = |options| {
+        TextDiff::from_with_options(
+            &before,
+            &after,
+            ast.ast.as_ref().unwrap(),
+            &node_cache,
+            options,
+        )
+        .all(0)
+        .iter()
+        .any(|r| {
+            r.operation == TextOperation::Identical
+                && r.source.start_row == 0
+                && r.source.start_column == 17
+        })
+    };
+
+    assert!(
+        type_is_identical(RenderOptions::MINIMAL),
+        "the type neither edit touched must not paint Move under MINIMAL"
+    );
+    assert!(
+        !type_is_identical(RenderOptions::FULL),
+        "FULL still paints a displaced node, the same split paint_displaced_moves already makes"
+    );
+}
+
+/// The counter-example that keeps the reading above honest, and the one this module's
+/// `shifted_by_an_edit_beside_it` comment already named: a row *rewritten* around its surviving
+/// fragment. `function fetchData(callback: ...): void {` becoming
+/// `async function fetchData(): Promise<string> {` leaves `function fetchData(` intact and unique
+/// on both rows - uniqueness alone would call it untouched - but nothing else on the row
+/// survived, and `typescript-async-await`'s own painting calls the surviving fragments moved.
+/// `row_was_edited_rather_than_rewritten` is what declines it: there is no common suffix.
+#[test]
+fn a_row_rewritten_around_its_one_surviving_fragment_still_paints_move() {
+    let before = Code::from_string(
+        "function fetchData(callback: (data: string) => void): void {\n    return;\n}\n",
+        &crate::code::Language::TypeScript,
+    );
+    let after = Code::from_string(
+        "async function fetchData(): Promise<string> {\n    return;\n}\n",
+        &crate::code::Language::TypeScript,
+    );
+    let ast = crate::diff::diff_code(&before, &after);
+    let node_cache = crate::diff::NodeCache::build(&before, &after);
+
+    assert!(
+        !TextDiff::from_with_options(
+            &before,
+            &after,
+            ast.ast.as_ref().unwrap(),
+            &node_cache,
+            RenderOptions::MINIMAL,
+        )
+        .all(0)
+        .iter()
+        .any(|r| {
+            r.operation == TextOperation::Identical
+                && r.source.start_row == 0
+                && r.source.start_column == 0
+        }),
+        "a fragment of a rewritten row is relocated, not displaced"
+    );
+}
+
+/// Uniqueness is the whole guard, so a repeated text must decline rather than pick. Two `count`
+/// identifiers on one row, one of which the edit removes: "it stayed" and "it is the other one"
+/// are both consistent with the bytes, and this pass has no way to tell them apart.
+#[test]
+fn a_node_whose_text_repeats_on_its_row_is_not_read_as_displaced() {
+    let source_row: Vec<char> = "let a = count + count + one;".chars().collect();
+    let destination_row: Vec<char> = "let a = count + two + count + one;".chars().collect();
+    // The first `count`, at its own columns on both sides.
+    let s = text_range_on(0, 8, 13);
+    let d = text_range_on(0, 8, 13);
+    assert!(!node_uniquely_placed_on_its_row(
+        &source_row,
+        &destination_row,
+        &s,
+        &d
+    ));
+}

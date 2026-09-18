@@ -32,7 +32,7 @@ fn mapping() -> Result<()> {
 fn painting() -> Result<()> {
     assert_matches_human_painting_within_limit(
         "go-gin-gonic-gin-replace-replaced-with-replaceall",
-        2.7,
+        0.6,
     )
 }
 

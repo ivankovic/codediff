@@ -18,6 +18,8 @@
 """Unit tests for the pure functions the report scripts are built from. Run with `make
 test-python` from the repository root (or `uv run pytest` from research/)."""
 
+import re
+
 import _common
 import apted_only_report
 import benchmark_other_report
@@ -26,6 +28,7 @@ import coverage_report
 import edit_shape_stats
 import numpy as np
 import pytest
+import yaml
 
 # --- _common -----------------------------------------------------------------------------------
 
@@ -202,3 +205,39 @@ def test_area_of_picks_the_most_specific_prefix():
 )
 def test_badge_color_follows_the_shields_thresholds(percent, color):
     assert coverage_report.badge_color(percent) == color
+
+
+# --- the ruff pin, which four files have to agree on ---------------------------------------------
+
+
+def ruff_pin_in_ci() -> str:
+    """The version every `astral-sh/ruff-action` step in ci.yml is pinned to."""
+    workflow = yaml.safe_load(ci_local.WORKFLOW.read_text())
+    versions = {
+        step["with"]["version"]
+        for job in workflow["jobs"].values()
+        for step in job.get("steps", [])
+        if step.get("uses", "").startswith("astral-sh/ruff-action")
+    }
+    assert len(versions) == 1, f"ci.yml pins ruff to more than one version: {sorted(versions)}"
+    return str(versions.pop())
+
+
+def test_the_ruff_version_named_outside_ci_matches_the_one_ci_pins():
+    """`ruff` is installed per-run by CI and by hand everywhere else, so the version CI gates on
+    is the only one that decides a push - and the two places that tell a human which to install
+    (the root Makefile's `lint-python` failure message and CONTRIBUTING.md) are hand-written copies
+    of it. A local ruff of a different version disagrees with the gate, which is exactly the drift
+    `scripts/ci_local.py` avoids for the *commands* by reading them out of ci.yml. The version has
+    no such reader, so it gets this check instead."""
+    pin = ruff_pin_in_ci()
+    root = ci_local.REPO_ROOT
+
+    makefile = (root / "Makefile").read_text()
+    assert f"RUFF_VERSION := {pin}" in makefile, (
+        f"the root Makefile's RUFF_VERSION is not ci.yml's pin ({pin})"
+    )
+
+    contributing = (root / "CONTRIBUTING.md").read_text()
+    named = set(re.findall(r"ruff@([0-9]+(?:\.[0-9]+)*)", contributing))
+    assert named == {pin}, f"CONTRIBUTING.md names ruff@{named or '(none)'}, ci.yml pins {pin}"

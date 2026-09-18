@@ -28,6 +28,13 @@ pull request.
 No Rust check errors are allowed. Run `cargo clippy` frequently. CI also enforces `cargo clippy`,
 across all three Cargo feature configs (see "CI" below).
 
+The Python under `research/`, `scripts/` and `assets/` has the same two halves, as `ruff format`
+and `ruff check` - run both with `make lint-python`. `ruff` is the one tool neither a bare checkout
+nor the Rust toolchain brings: install it once for every repository under your user with
+`uv tool install ruff@0.16.4`, matching the version `.github/workflows/ci.yml` pins, or work inside
+`nix develop`, whose devShell already has it. The rule set is pinned in the root `ruff.toml` rather
+than left on ruff's defaults, for the reason that file gives.
+
 ### Comments describe how the code *is*
 
 A comment explains what the code does and why it is that way. It does not narrate what the code
@@ -224,6 +231,9 @@ documented there.
 * `coverage` - line coverage of the suite over this repository's own code, via `cargo-llvm-cov`
   driving nextest (`cargo install cargo-llvm-cov`, plus `rustup component add llvm-tools-preview`).
   See "Coverage" above for what it reports and why it is not a gate.
+* `lint-python` - `ruff check` then `ruff format --check` over `research`, `scripts` and `assets`,
+  the same three directories CI's python job covers. Requires `ruff`
+  (`uv tool install ruff@0.16.4`, one-time - see "Code quality" above).
 * `build` - the `test` target above + `cargo build --release --features stats` (the `stats` feature
   builds the dataset-analysis binaries in `src/bin/`).
 * `install` - `cargo install --path . --force`, so `codediff` on `PATH` matches this checkout.

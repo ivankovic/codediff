@@ -1,5 +1,147 @@
 # Diff Module Notes
 
+## 2026-09-18: rename width, measured against the human mapping and not taken
+
+Measured the way the round asked for: the tree side of every number here is the human's *own*
+mapping pushed through this renderer (`painting_failure_census`'s `ideal` column, and
+`renderer_bytes` in `painting_attribution.csv`), so no matcher error is in them. **Nothing
+shipped**, and the reason is worth more than the numbers.
+
+`intra_node_update_ranges` cuts a changed node at the raw common prefix and suffix. Two things the
+corpus says about that, both recorded in `research/data/quality/text_painting_findings.md` and both
+already implemented on the *ground-truth* side in `invariants.rs`:
+
+* **Which end is taken first.** Taking the suffix first places an ambiguous run as far left as it
+  will go, which is where the corpus paints it. Applied to every node: **+55 `MINIMAL`, +60 `FULL`,
+  8 fixtures better against 25 worse** - and every regression a comment. Applied only to names
+  (`is_content_node` already draws that line): **-5 and -5**, 5 better against 2. Real, and too
+  small to be worth a behaviour change on its own.
+* **Widening the affixes to whole words**, so the changed middle never begins inside a word
+  (`calculateArea` and `area` share `rea`). `is_content_node` is the wrong gate for it: it also
+  admits a URL in an `href`, a version string, a CJK run of XML prose, a C macro's continuation
+  line, none of which have words - first cut cost **+1,816 `MINIMAL` / +1,352 `FULL`**. Gated
+  further to ASCII identifier-shaped text, and setting aside the 32 fixtures on the ground-truth
+  fixing list: **`FULL` -119 over 18 fixtures against 6, `MINIMAL` +1 over 15 against 12.**
+
+**Why that last one was reverted rather than shipped.** It breaks
+`ranges_decomposes_a_small_change_inside_a_long_identifier`, which pins the opposite convention in
+as many words - "not one `Update` spanning the whole identifier, which is the bug this feature
+fixes" - and ten fixtures' painting clamps with it. That test and invariant 16's `FULL` half ("a
+`Full` painting marks a renamed identifier entire on both sides") are two recorded decisions
+pointing opposite ways, and 30 of the corpus's 63 invariant violations are that very rule being
+broken across nine fixtures. A rename-width change measured against a corpus whose rename paintings
+are known inconsistent is measuring the inconsistency. **Settle the convention first** - it is item
+2 of `research/data/quality/ground_truth_violations_2026_09_18.md` - and this lever becomes
+answerable rather than a coin toss worth 178 bytes.
+
+One real defect did come out of it, and is fixed: `painting_failure_census` truncated a sample run
+with `&text[..40]`, a byte offset with no character-boundary check, which panicked the moment a
+run boundary moved on `xml-libreoffice-unicode` (CJK, three bytes a character). Latent since the
+census was written; only an unrelated experiment shifted a boundary onto it.
+
+## 2026-09-17: painting, and the two experiments it took
+
+The census below calls the five 100%-renderer-owned fixtures "the cheapest painting wins on the
+board". Ranked by share of their own bytes they are; as a lead they were wrong, and saying so is
+the point of this entry.
+
+**Experiment 1, failed: `paint_displaced_moves`'s two call sites do not want separate gates.**
+`java-defects4j-mockito-19-finalmockcandidatefilter` is the largest pure-renderer disagreement
+(1618 bytes, 46% of the file) and its shape is clean - an added import shifts a whole method body
+down one row at identical columns, and the ground truth paints none of it. `MINIMAL` already reads
+that, through `displaced_beside_an_edit_on_its_first_row`; `FULL` does not, because
+`paint_displaced_moves` gates that disjunct and the single-row one together. The hypothesis was
+that the multi-row half is a clean win for `FULL` too and only the single-row half cost it the 8
+regressions its option's doc comment records. It is not: ungating the multi-row half for `FULL`
+costs **+3,256 bytes, 56 fixtures improved and 32 regressed**, and the two biggest pure-renderer
+fixtures move in opposite directions - mockito-19 1618 -> 54 while `rust-next-font-imports-
+generator` goes 1459 -> **6607**. The existing gate stands; do not re-derive this.
+
+That opposite movement is *not* evidence that the two ground truths contradict each other, and an
+earlier revision of this entry said it was. Reading `rust-next-font-imports-generator`'s own runs
+disproves it: its painting is dominated by an `if let` chain collapse the human paints `Move`
+wholesale, with whitespace runs either side, and nothing in it has mockito-19's shape (unchanged
+content displaced one row at identical columns). The aggregate moved for a different reason than
+the one the hypothesis named, and the byte totals alone could not tell them apart. What the
+experiment establishes is the gate, not a claim about the corpus's conventions.
+
+**Experiment 2, shipped: a row carries more than one edit.** `node_untouched_on_its_row` splits
+each row at a single point - common prefix, common suffix - so it recognises a row carrying one
+edit and no more. Rows carry several. `void printVector(std::vector<int> vec)` becoming
+`void printVector(const std::vector<int>& vec)` edits both sides of the parameter's type, and a
+one-line file (`php-wordpress-wordpress-one-line-file-insert-and-update`, whose whole array is one
+row) inserts in several places at once. The node between two such edits is untouched by either and
+lies in neither affix, so it painted `Move` against a ground truth painting only what was inserted.
+
+`node_uniquely_placed_on_its_row` reads it, and guesses nothing: the node's text must be the same
+on both sides and occur **exactly once** on each row, at the node's own columns - if it occurs
+twice, "it stayed" and "it swapped with its twin" are both consistent with the bytes and the rule
+declines. Two structural guards were each added because the corpus produced a counter-example, not
+in anticipation:
+
+* **Same row index.** Uniqueness places a node *within* a row; it cannot say the two rows are the
+  same row. `java-defects4j-chart-25-statisticalbarrenderer` splits a statement in two, its call
+  lands three rows down, unique on both - and the ground truth paints that `Move`, because it is
+  one. Without this guard: 51 improved / 14 regressed. With it: 29 / 5.
+* **Edited, not rewritten.** The row's changes must be bounded on both sides by material that did
+  not change, and the head must be more than the indentation every row shares.
+  `typescript-async-await` rewrites `function fetchData(callback: ...): void {` into
+  `async function fetchData(): Promise<string> {`, leaving `function fetchData(` intact and unique
+  while nothing else on the row survives. With it: **27 / 2**.
+
+Gated to `MINIMAL` on `paint_displaced_moves`, which is the axis it belongs on and which the
+measurement confirmed rather than assumed: ungated it cost `FULL` +1,039 bytes over 24 regressions.
+
+**Result:** `MINIMAL` whole-corpus painting disagreement **17,767 -> 16,110 bytes** (-9.3%), 27
+fixtures improved, 2 regressed, `FULL` byte-identical. The two regressions are one shape - a row
+whose *middle* was rewritten between a surviving head and tail
+(`javascript-add-event-listener`'s `button.onclick = handleClick;` becoming
+`button.addEventListener('click', handleClick);`, and
+`javascript-typescript-interesting-small-edit-refactor`). Separating them needs a *share*-of-the-row
+threshold rather than another structural fact, which is a sweep and not a rule: 52 bytes against
+1,709, and not worth it.
+
+**Still true, and still the ranking:** 86.7% of the corpus's painting disagreement is renderer-
+owned, so a perfect matcher removes almost none of it. What this round changes is which end to
+attack it from - the *share*-of-own-bytes ranking put `css-wordpress`/`swift` one-liners on top,
+and every one of those turned out to be a preset-convention disagreement rather than a bug. The
+shape that paid was invisible in that ranking and spread across 27 fixtures.
+
+## 2026-09-17: the chain-growth tie, settled
+
+First item taken off the census below, and the cheapest one there: **an arbitrary tie-break, not a
+search failure.** When a left-nested chain grows at its outer end - `a || b || c` becoming
+`a || b || c || d`, `x.f()` becoming `x.f().g()` - every existing operator token keeps its text and
+its column, and one new token of the same text joins them. Every such token costs the same under
+`cost::operation_cost`, so pairing them by nesting depth and pairing them by position are the same
+price, and the residual search reports whichever it reached first. It reports depth, which pairs
+the old outermost token with the *new* one and calls the old one deleted. Every human solution in
+the corpus reads it by position: the `||` between the same two operands is the same `||`.
+
+`solve_leaf_neighbour_agreement` (phase 8b) settles it, on the same evidence
+`solve_orphaned_leaves` already uses and with no new signal: a matched leaf whose two neighbours
+are themselves matched, to nodes adjacent-but-one under one parent, belongs to the node between
+them - if that node is free and reads the same. Nothing is chosen, because between two given nodes
+there is only one position; nothing is paid, because both pairings are `Identical` at cost 0. It is
+an equal-cost re-report, never a trade.
+
+**Result:** zero-visible 947 -> **952 of 1134** (83.5% -> 84.0%, gap to goal 1 74 -> 69). Ten
+fixtures improved and none regressed; five went to zero and dropped their clamps for
+`assert_matches_human_mapping`. Visible mismatches 5509 -> 5483 over 182 fixtures (was 187), 51 now
+within 3 of zero (was 55). Runtime unmoved: p50 -4%, p99 flat, total -2%.
+
+Two of the pass's own mappings disagree with a human (3 visible rows, tagged
+`LeafBetweenMatchedNeighbours`), both inside regions already wholly mis-paired for other reasons -
+`lua-neovim-neovim-if-flips-two-branches` swaps two whole if-branches and
+`java-defects4j-jacksondatabind-25-simpleabstracttyperesolver` replaces a whole invocation. Those
+rows carried another pass's tag before and are not a guard hole; fix the region, not the leaf.
+
+**What this does not touch.** The same slide one level up - the `binary_expression` itself, not
+its operator - is still mis-paired wherever it is annotated. The two remaining *invisible*
+mismatches of `lua-teeworlds-teeworlds-add-or-expression-to-existing-if` are exactly that, and the
+pass is deliberately leaf-only: extending it to interior nodes is a separate, less safe question,
+because an interior node's neighbours constrain it far more weakly than a token's do.
+
 ## 2026-09-17: re-measured at 1130 solved fixtures, and one ranking reversal
 
 The ranked plan below was drawn on **468** solved fixtures (2026-08-20). The corpus is now **1130**,

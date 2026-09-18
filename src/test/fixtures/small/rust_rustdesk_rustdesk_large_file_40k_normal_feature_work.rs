@@ -27,8 +27,8 @@ fn mapping() -> Result<()> {
     // residual.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "rust-rustdesk-rustdesk-large-file-40k-normal-feature-work",
-        42,
-        30,
+        40,
+        28,
     )
 }
 

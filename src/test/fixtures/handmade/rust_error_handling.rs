@@ -60,7 +60,7 @@ fn painting() -> Result<()> {
     // Byte counts, not just percentages, because the clamp is a 2dp ceiling of the true fraction
     // and 43/698 is 6.16046% - a first pass recorded 6.16 from the displayed 6.160% and failed on
     // the very run that set it.
-    assert_matches_human_painting_within_limit("rust-error-handling", 6.17)
+    assert_matches_human_painting_within_limit("rust-error-handling", 4.88)
 }
 
 #[test]

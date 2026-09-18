@@ -23,17 +23,12 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // Recorded as found, not examined.
-    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
-        "java-defects4j-jsoup-86-comment",
-        2,
-        2,
-    )
+    test::helper::human_mapping::assert_matches_human_mapping("java-defects4j-jsoup-86-comment")
 }
 
 #[test]
 fn painting() -> Result<()> {
-    assert_matches_human_painting_within_limit("java-defects4j-jsoup-86-comment", 0.29)
+    assert_matches_human_painting_within_limit("java-defects4j-jsoup-86-comment", 0.22)
 }
 
 #[test]

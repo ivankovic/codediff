@@ -295,7 +295,6 @@ fn intra_node_update_ranges(
     let prefix_len = common_prefix_byte_len(source.text, destination.text);
     let suffix_len =
         common_suffix_byte_len(&source.text[prefix_len..], &destination.text[prefix_len..]);
-
     if whole_pair_updates || (prefix_len == 0 && suffix_len == 0) {
         return vec![advance_and_build_range_with_source(
             last_non_move_range,
@@ -756,7 +755,13 @@ impl RangeWalk<'_> {
         // regressed; `FULL` net worse).
         let shifted_by_an_edit_beside_it = s.end_row == s.start_row
             && (s.start_row == d.start_row || !self.options.paint_displaced_moves)
-            && node_untouched_on_its_row(&self.source.contents, &self.destination.contents, &s, &d);
+            && node_untouched_on_its_row(
+                &self.source.contents,
+                &self.destination.contents,
+                &s,
+                &d,
+                !self.options.paint_displaced_moves,
+            );
         let column_shift_is_meaningful = s.start_column != d.start_column
             && !shifted_within_its_own_line
             && !shifted_by_an_edit_beside_it;
@@ -978,6 +983,10 @@ fn node_untouched_on_its_row(
     destination: &str,
     s: &TextRange,
     d: &TextRange,
+    // [`RenderOptions::paint_displaced_moves`], inverted - see the
+    // `node_uniquely_placed_on_its_row` call below for why that second reading is on this axis and
+    // not unconditional.
+    read_rows_carrying_several_edits: bool,
 ) -> bool {
     let row = |text: &str, row: usize| -> Vec<char> {
         text.split('\n')
@@ -1003,7 +1012,116 @@ fn node_untouched_on_its_row(
     let in_prefix = s.end_column <= prefix && d.end_column <= prefix;
     let in_suffix = s.start_column + suffix >= source_row.len()
         && d.start_column + suffix >= destination_row.len();
-    in_prefix || in_suffix
+    in_prefix
+        || in_suffix
+        // Only for a node that is still on the row it started on. Uniqueness says where the node
+        // sits *within* each row; it cannot say the two rows are the same row, and when they are
+        // not, "the edits are beside it" is not what happened. `java-defects4j-chart-25-
+        // statisticalbarrenderer` is the counter-example: a statement is split in two, its call
+        // lands three rows down, the call's text is unique on both rows, and the ground truth
+        // paints that `Move` because it is one. The prefix/suffix tests above carry their own
+        // answer to this - a node inside a common affix has most of the row agreeing around it -
+        // so the requirement belongs here rather than on all three.
+        || (read_rows_carrying_several_edits
+            && s.start_row == d.start_row
+            && row_was_edited_rather_than_rewritten(&source_row, &destination_row, prefix, suffix)
+            && node_uniquely_placed_on_its_row(&source_row, &destination_row, s, d))
+}
+
+/// True if the two rows still read as one row that was edited, rather than one row replaced by
+/// another: everything they changed is bounded on both sides by material that did not change, and
+/// the material in front is more than the indentation every row of a file shares anyway.
+///
+/// Without this, uniqueness alone re-admits the case the prefix/suffix tests were written to
+/// exclude and this module's `shifted_by_an_edit_beside_it` comment already names:
+/// `function fetchData(callback: (data: string) => void): void {` becoming
+/// `async function fetchData(): Promise<string> {` leaves `function fetchData(` intact and unique
+/// on both rows, but nothing else on that row survived, and `typescript-async-await`'s ground
+/// truth paints the surviving fragments moved - correctly, because on a row with nothing left to
+/// be beside, "an edit beside it" is not a description of anything.
+///
+/// **What it still admits**, measured rather than argued: a row whose *middle* was rewritten
+/// between a surviving head and tail passes this, because the head and the tail are real.
+/// `button.onclick = handleClick;` becoming `button.addEventListener('click', handleClick);`
+/// shares `button.` and `;` while replacing everything between them, and
+/// `javascript-add-event-listener`'s ground truth paints the displaced `handleClick` moved;
+/// `javascript-typescript-interesting-small-edit-refactor` is the same shape. They are the only
+/// two fixtures this reading costs, 52 bytes against the 1,709 it removes, and separating them
+/// needs a *share*-of-the-row threshold rather than another structural fact - which is a sweep,
+/// not a rule, and is not worth 52 bytes.
+fn row_was_edited_rather_than_rewritten(
+    source_row: &[char],
+    destination_row: &[char],
+    prefix: usize,
+    suffix: usize,
+) -> bool {
+    let indentation = |row: &[char]| row.iter().take_while(|c| c.is_whitespace()).count();
+    suffix > 0 && prefix > indentation(source_row).max(indentation(destination_row))
+}
+
+/// The longest row this will search. A single prefix/suffix split above is linear whatever the
+/// row's length; the scan below is quadratic in it, and the corpus has rows that make that
+/// matter: `css-shadcn-ui-ui-completely-broken-treesitter-parsing` parses into a handful of rows
+/// tens of thousands of characters wide. A row that long is a minified or broken file rather than
+/// code anyone reads a diff of, so it keeps the cheap test and declines this one.
+const MAX_ROW_FOR_UNIQUENESS_SCAN: usize = 2_000;
+
+/// True if the node reads the same on both sides and its text occurs **exactly once** on each of
+/// the two rows - at the node's own columns.
+///
+/// The prefix/suffix test above splits each row at one point, so it recognises a row carrying one
+/// edit and no more. Rows carry more than one: `void printVector(std::vector<int> vec)` becoming
+/// `void printVector(const std::vector<int>& vec)` edits both sides of the parameter's type
+/// (`cpp-add-const-correctness`), and a one-line file inserts in several places at once
+/// (`php-wordpress-wordpress-one-line-file-insert-and-update`, whose whole array is one row). The
+/// node between two such edits is untouched by either, but lies in neither the common prefix nor
+/// the common suffix, so it painted `Move` against a ground truth that paints only what was
+/// inserted.
+///
+/// Uniqueness is what makes this a reading rather than a guess, and it is the same standard
+/// [`crate::diff::solve_orphaned_leaves`] holds itself to: if the node's text appears twice on the
+/// row, then "it stayed where it was" and "it swapped with its twin" are both consistent with the
+/// bytes, nothing here can tell them apart, and this declines. One occurrence on each side, each
+/// at the node's own columns, admits only the first reading.
+///
+/// Strictly additive: a node inside a common affix is recognised by the test above whether or not
+/// its text repeats, so nothing that passed before fails now. A `)` on a row full of them keeps
+/// being judged by position, as it always was.
+fn node_uniquely_placed_on_its_row(
+    source_row: &[char],
+    destination_row: &[char],
+    s: &TextRange,
+    d: &TextRange,
+) -> bool {
+    if source_row.len() > MAX_ROW_FOR_UNIQUENESS_SCAN
+        || destination_row.len() > MAX_ROW_FOR_UNIQUENESS_SCAN
+    {
+        return false;
+    }
+    let (Some(text), Some(other)) = (
+        source_row.get(s.start_column..s.end_column),
+        destination_row.get(d.start_column..d.end_column),
+    ) else {
+        return false;
+    };
+    // A node with no text of its own on this row says nothing about where it sits.
+    if text.is_empty() || text != other {
+        return false;
+    }
+    fn only_occurrence_of(row: &[char], text: &[char]) -> Option<usize> {
+        let mut found = None;
+        for (at, window) in row.windows(text.len()).enumerate() {
+            if window == text {
+                if found.is_some() {
+                    return None;
+                }
+                found = Some(at);
+            }
+        }
+        found
+    }
+    only_occurrence_of(source_row, text) == Some(s.start_column)
+        && only_occurrence_of(destination_row, text) == Some(d.start_column)
 }
 
 /// True if the node's own text on its first row is unchanged - the row's tail from the node's

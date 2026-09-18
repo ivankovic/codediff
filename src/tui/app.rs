@@ -703,18 +703,15 @@ impl App {
                 Action::DiffComputed {
                     generation,
                     outcome,
-                } => {
-                    if *generation == self.diff_generation {
-                        match outcome {
-                            DiffOutcome::Ready(data) => {
-                                self.action_tx.send(Action::DiffReady(data.clone()))?;
-                            }
-                            DiffOutcome::Failed(message) => {
-                                self.action_tx.send(Action::DiffFailed(message.clone()))?;
-                            }
-                        }
+                } => match outcome {
+                    DiffOutcome::Ready(data) if *generation == self.diff_generation => {
+                        self.action_tx.send(Action::DiffReady(data.clone()))?;
                     }
-                }
+                    DiffOutcome::Failed(message) if *generation == self.diff_generation => {
+                        self.action_tx.send(Action::DiffFailed(message.clone()))?;
+                    }
+                    _ => {}
+                },
                 Action::DiffReady(data) => self.handle_diff_ready(data),
                 Action::DiffFailed(message) => {
                     error!("diff failed: {message}");

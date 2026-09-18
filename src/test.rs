@@ -222,7 +222,7 @@ mod tests {
         );
         assert_eq!(
             limits.get("c-sched-ext-scx-many-many-moves-some-deletes-some-adds"),
-            Some(&(17, 17)),
+            Some(&(10, 10)),
             "the clamped call shape reads its two numbers"
         );
         assert_eq!(

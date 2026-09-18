@@ -32,7 +32,7 @@ fn mapping() -> Result<()> {
 fn painting() -> Result<()> {
     assert_matches_human_painting_within_limit(
         "javascript-microsoft-typescript-small-change-3",
-        7.05,
+        1.76,
     )
 }
 

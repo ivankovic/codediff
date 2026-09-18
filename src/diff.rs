@@ -27,6 +27,7 @@ pub mod solve_heritage_clause_growth;
 pub mod solve_identical_diagnostic_statements;
 pub mod solve_large_flat_subtrees;
 pub mod solve_leading_siblings;
+pub mod solve_leaf_neighbour_agreement;
 pub mod solve_moved_subtrees;
 pub mod solve_mutual_ancestors;
 pub mod solve_nested_condition_collapse;
@@ -227,6 +228,7 @@ impl Diff {
         //      again                             - final whole-file residual resolution
         //   7  solve_moved_subtrees               - unanchored cross-tree move fallback
         //   8  solve_mutual_ancestors             - mutual-ancestor recovery
+        //   8b solve_leaf_neighbour_agreement     - cost-free re-point of a mis-tied leaf
         //   9  solve_wrap_growth                  - new-wrapper-parent-chain re-tag
         //   10 solve_unresolved_nodes             - terminal completeness sweep (delete/insert)
 
@@ -483,6 +485,15 @@ impl<'code> PendingDiff<'code> {
             solve_mutual_ancestors::solve(&ctx, &mut ast_diff);
         }
 
+        // Phase 8b: settle the tie the residual search left arbitrary - a leaf paired with a
+        // same-text twin of the node its own two matched neighbours sit either side of. Runs here
+        // because it reads neighbours and nothing else: every pass that can still *add* a
+        // neighbouring match has run, and the only two below it re-tag (phase 9) or record an
+        // absence (phase 10), so no later pass can make a leaf's neighbourhood look different than
+        // it does now. Before phase 9 rather than after, so `solve_wrap_growth` re-tags the
+        // corrected pairing rather than one this pass is about to move out from under it.
+        solve_leaf_neighbour_agreement::solve(&ctx, &mut ast_diff);
+
         // Phase 9: wrap growth (`try { EXISTING } catch (...) { NEW }`, an existing `if`/`else` becoming an
         // `else if` branch, a module-top-level statement run gaining a brand-new enclosing
         // construct, ...) - the same re-tag idea as `solve_heritage_clause_growth`, for content
@@ -628,6 +639,22 @@ impl ASTDiff {
     pub fn remove_delete_mapping(&mut self, before_id: usize) {
         self.mapping.remove(&(before_id, 0));
         self.before_node_map.remove(&before_id);
+    }
+
+    /**
+     * Removes a real `(before_id, after_id)` pair, leaving both nodes undecided.
+     *
+     * The counterpart of `remove_delete_mapping`/`remove_insert_mapping` for a pairing rather than
+     * a null mapping, and it has the fix-up those two were defined to avoid: both reverse entries
+     * are dropped, so neither node is left pointing at a pair that no longer exists. Neither node
+     * is given a delete or an insert in its place - phase 10's `solve_unresolved_nodes` is the one
+     * place that decides what an undecided node is, and a caller that wants something else must
+     * say so by adding it.
+     */
+    pub fn remove_match_mapping(&mut self, before_id: usize, after_id: usize) {
+        self.mapping.remove(&(before_id, after_id));
+        self.before_node_map.remove(&before_id);
+        self.after_node_map.remove(&after_id);
     }
 
     /// Removes a `(0, after_id)` insert mapping - see `remove_delete_mapping`.
@@ -906,6 +933,13 @@ pub enum ASTMappingReason {
     /// inspired by XYDiff - see `TODO.md`'s 2026-08-17 literature survey). See
     /// `solve_unique_type_matching`.
     UniqueTypeMatching,
+    /// A leaf was paired with a same-text twin of the node its own two matched neighbours sit
+    /// either side of - the arbitrary half of a tie the residual search was indifferent to, most
+    /// often a left-nested chain (`a || b || c`, `x.f().g()`) that grew at its outer end and slid
+    /// every one of its operator tokens a level deeper. Re-pointed to the node between those two
+    /// partners, which costs exactly what the pairing it replaces cost. See
+    /// `solve_leaf_neighbour_agreement`.
+    LeafBetweenMatchedNeighbours,
     /// No pass in the pipeline reached a decision about this node at all, so the terminal
     /// completeness sweep recorded the delete/insert its absence already implied. Not a matching
     /// verdict - it pairs nothing - just the guarantee that the finished mapping covers every node
@@ -976,6 +1010,7 @@ impl ASTMappingReason {
             ASTMappingReason::HeritageClauseGrowth => "HeritageGrowth",
             ASTMappingReason::WrapGrowth => "WrapGrowth",
             ASTMappingReason::OrphanedLeafUnderMatchedParent => "OrphanLeaf",
+            ASTMappingReason::LeafBetweenMatchedNeighbours => "NeighbourLeaf",
         }
     }
 }

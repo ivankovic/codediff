@@ -27,8 +27,8 @@ fn mapping() -> Result<()> {
     // residual.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "rust-rustdesk-rustdesk-actual-logic-change-in-io-loop-medium-sized-file",
-        76,
-        48,
+        74,
+        46,
     )
 }
 

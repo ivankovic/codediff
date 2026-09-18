@@ -26,14 +26,14 @@ fn mapping() -> Result<()> {
     // Recorded as found, not examined.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "java-defects4j-cli-12-gnuparser",
-        7,
         5,
+        3,
     )
 }
 
 #[test]
 fn painting() -> Result<()> {
-    assert_matches_human_painting_within_limit("java-defects4j-cli-12-gnuparser", 3.29)
+    assert_matches_human_painting_within_limit("java-defects4j-cli-12-gnuparser", 2.58)
 }
 
 #[test]
