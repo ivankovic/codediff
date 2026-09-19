@@ -269,6 +269,16 @@ The full test dataset holds the git commit history of about 7,400 open-source gi
 as available on the main branch. This list of repositories comes from the Gentoo Linux
 distribution. Find it in `list_of_repositories.csv`.
 
+Measured once in full, on 2026-09-19: every modified code file in the most recent 50 commits of
+each of those repositories, 442,530 readable before/after pairs in 25 languages, diffed with no
+size cap under a 120-second budget and a 6 GB memory cap per process. **442,322 completed
+(99.95%), with no panics.** The largest completed pair holds 14.2 million AST nodes across both
+sides. 96 pairs ran past the budget and 112 past the memory cap; the latter are twenty generated
+or embedded files - tree-sitter parser tables, codegen, minified bundles, a PNG as a C array - plus
+one commit of a 40,000-line single-header C++ library. Given 24 GB, eleven of those files
+complete. The run, its harness and every pair that did not complete are documented in
+`research/data/performance/PROVENANCE.md`.
+
 A smaller list of 100 repositories, the "small" dataset, is available in the same directory. Use
 it for faster iteration when you debug.
 
@@ -284,7 +294,10 @@ build: **p50 7.6ms, p90 78.7ms, p99 347ms**, slowest 1,355ms. **100ms is the 92.
 Two things that number is not. It is not the full dataset the *Robust* goal above names: a diff of
 every commit in 7,400 repositories is not something this project runs per change, and the fixture
 corpus is the proxy it uses instead. And the proxy is a pessimistic one, because it is grown
-deliberately toward hard cases — a corpus of ordinary commits would sit far below these figures.
+deliberately toward hard cases. The one full-corpus run above says how pessimistic: over 442,322
+real file modifications the median is 12.2ms and the 99th percentile 2.1s, so the first goal holds
+on real commits with room to spare and the second does not, on the roughly 1% of files that are
+generated tables and bundles rather than code anyone edits by hand.
 
 In code, I accept less readable, more complex code, if that code is faster.
 

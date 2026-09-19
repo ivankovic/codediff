@@ -1990,3 +1990,52 @@ fn ren_charges_for_text_a_node_owns_directly() {
     // And an ordinary internal node, owning nothing, is unaffected.
     assert_eq!(cost_model.ren(&internal_node(0), &internal_node(0)), 0);
 }
+
+#[test]
+fn apted_whole_tree_hands_an_oversized_pair_to_the_kernel_instead_of_decomposing_it() {
+    // 120 one-return functions a side, one of them changed: about a thousand nodes a side,
+    // a million cells, past `APTED_MAX_CELLS`. Functions rather than bare statements, so the
+    // root is not a flat container and the only way to avoid the kernel is the gate.
+    let source = |changed: usize| -> String {
+        (0..120)
+            .map(|i| {
+                if i == changed {
+                    "def changed():\n    return -1\n".to_string()
+                } else {
+                    format!("def f{i}():\n    return {i}\n")
+                }
+            })
+            .collect()
+    };
+    let before = Code::from_string(&source(usize::MAX), &Language::Python);
+    let after = Code::from_string(&source(60), &Language::Python);
+    let node_cache = NodeCache::build(&before, &after);
+    let nodes = |code: &Code| code.ast.as_ref().unwrap().root_node().descendant_count();
+    let cells = nodes(&before) * nodes(&after);
+    assert!(
+        cells > APTED_MAX_CELLS,
+        "the pair must be oversized for this test to mean anything"
+    );
+
+    let reasons = |algorithm: Algorithm| {
+        let mut diff = ASTDiff::default();
+        for_roots(&before, &after, &node_cache, algorithm, "test", &mut diff);
+        let reasons: std::collections::HashSet<_> =
+            diff.mapping.values().map(|m| m.reason).collect();
+        (diff.mapping.len(), reasons)
+    };
+    let (gated_len, gated) = reasons(Algorithm::Apted);
+    let (whole_len, whole) = reasons(Algorithm::AptedWholeTree);
+    assert!(gated_len > 0 && whole_len > 0);
+    // The gate decomposes the pair and settles the children as a flat sequence; the whole-tree
+    // run never leaves the kernel.
+    assert!(
+        gated.contains(&ASTMappingReason::FlatSequenceDiff),
+        "{gated:?}"
+    );
+    assert_eq!(
+        whole,
+        [ASTMappingReason::APTED("test")].into_iter().collect(),
+        "{whole:?}"
+    );
+}

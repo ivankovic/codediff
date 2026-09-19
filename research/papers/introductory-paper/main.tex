@@ -111,7 +111,9 @@ perfectly, and plain line-based \texttt{diff} renders \UnixDiffPerfectPct{}\%.
 
 Finally, as a tool contribution, we present \textsc{CodeDiff}, which combines existing
 state-of-the-art algorithms. It maps \NodeAccuracyPct{}\% of AST nodes correctly and, on the
-same basis as those ten configurations, renders \CodeDiffPerfectPct{}\% of changes perfectly.
+same basis as those ten configurations, renders \CodeDiffPerfectPct{}\% of changes perfectly. It
+completes \RobustnessFullCompletedPct{}\% of the \RobustnessFullAttempted{} file modifications
+in the corpus's recent history without a panic.
 \end{abstract}
 
 \maketitle
@@ -990,7 +992,22 @@ the same way.
 \textsc{CodeDiff} completes every one: \RobustnessTimedOut{} timeouts and \RobustnessPanicked{}
 panics across \RobustnessLanguages{} languages. The largest fixture holds \RobustnessMaxNodes{}
 AST nodes per side, the slowest takes \RobustnessSlowestMs{}\,ms, and peak heap use is
-\RobustnessPeakMemoryMb{}\,MB.
+\RobustnessPeakMemoryMb{}\,MB. The same measurement over the whole Full corpus reaches the files
+the fixture corpus does not. Every modified code file in the corpus's recent history
+(Section~\ref{sec:edit-shape}), \RobustnessFullAttempted{} pairs across
+\RobustnessFullLanguages{} languages, was diffed with no node cap under a
+\RobustnessFullTimeoutSeconds{}-second budget and a \RobustnessFullMemoryCapGb{}\,GB memory cap
+per process. \textsc{CodeDiff} completes \RobustnessFullCompletedPct{}\% of them with
+\RobustnessFullPanicked{} panics, at a median of \RobustnessFullPFiftyMs{}\,ms and a 99th
+percentile of \RobustnessFullPNinetyNineMs{}\,ms; the largest completed pair holds
+\RobustnessFullMaxCompletedNodes{} AST nodes across its two sides, fifteen times the corpus
+maximum the Robust target was set from. The remainder is \RobustnessFullTimedOut{} pairs past
+the budget and \RobustnessFullKilled{} past the memory cap. The killed pairs are commits of
+\RobustnessFullKilledFiles{} distinct files, all but one of them generated parser tables,
+minified bundles or embedded binary data; the exception is one commit of a 40,000-line
+single-header C++ library. Given \RobustnessFullBigMemoryCapGb{}\,GB and a five-minute budget, one
+commit of each memory-killed file was tried again: \RobustnessFullKilledFilesCompletedUnderBigCap{}
+completed, one needed more memory still, and the rest ran past even that budget.
 
 \textbf{Speed.} Over the \CodeDiffFixtures{} fixtures, \textsc{CodeDiff}'s median wall-clock time
 is \SpeedCodeDiffPFifty{}\,ms, its 90th percentile \SpeedCodeDiffPNinety{}\,ms and its 99th
@@ -1003,8 +1020,10 @@ right, and it is the only AST-aware curve that reaches 100\% before the budget l
 \TimingRepeats{}, \SpeedCodeDiffMax{}\,ms on the largest fixture in the corpus, is past the
 \SpeedTargetMs{}\,ms target; the target is stated over real-world commits and the corpus was
 selected for hard changes, but the miss is real, and the other configurations miss the same
-fixture by one to two orders of magnitude. The Robust ceiling of \AstMax{} nodes is stated, not
-exercised: no fixture reaches it (Section~\ref{sec:threats}). And \textsc{CodeDiff} is timed
+fixture by one to two orders of magnitude. The Robust ceiling of \AstMax{} nodes is exercised
+only by the whole-corpus run, and what fails there fails on memory before time: the files past
+the ceiling are generated tables whose diffs need more than the cap, and the fixture corpus holds
+none of them (Section~\ref{sec:threats}). And \textsc{CodeDiff} is timed
 in-process while every other configuration is timed as a whole process, so its curve pays no
 process start-up; Section~\ref{sec:threats} bounds that asymmetry.
 
@@ -1055,9 +1074,13 @@ changes have been painted is an artifact of the order the annotators worked in. 
 shorter changes than the corpus as a whole, so RA3.2's rate may move in either direction as
 painting reaches larger changes.
 
-Finally, the robustness evaluation covers the fixture corpus, whose largest file holds
-\RobustnessMaxNodes{} AST nodes, well short of the Robust target's \AstMax{}; the target's
-ceiling is stated, not exercised. The empirical-study
+Finally, the fixture corpus's largest file holds \RobustnessMaxNodes{} AST nodes, well short of
+the Robust target's \AstMax{}; the target is exercised only by the whole-corpus run of
+Section~\ref{sec:codediff}, whose budget and memory cap were applied with eight processes
+sharing the machine, so a pair near either limit may have crossed it for want of a core rather
+than of an algorithm. Re-running the timeouts on a quiet machine moved two of them into the
+completed set and no more, and the memory kills recur across every commit of the same files,
+so neither limit looks like an artefact of the sharing. The empirical-study
 numbers of Section~\ref{sec:dataset} do cover the full \NumRepos{}-repository list, but the
 \NumFixtures{} solved changes are drawn from it by the sampling of
 Section~\ref{sec:diff-shape} rather than being representative of it by construction.

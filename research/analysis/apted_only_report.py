@@ -175,6 +175,13 @@ LANGUAGE_CATEGORY = {
 
 CATEGORY_ORDER = [CODE, SCRIPTING, CONFIG_DATA]
 
+# RQ1's population: every pair the whole-tree computation was actually attempted on. "ok"
+# finished inside the budget; "timed_out" was killed at it; "out_of_memory" (2026-09-19) died
+# allocating the kernel's delta matrix, which for a file of a few hundred thousand nodes is
+# hundreds of gigabytes - a non-completion as surely as a timeout. "parse_failed", "worker_error"
+# and "failed_to_read" never reach the timing question and are reported, not counted.
+ATTEMPTED_STATUSES = ("ok", "timed_out", "out_of_memory")
+
 
 def verify_matches_rust(path: Path = RUST_BUCKETS_PATH) -> None:
     """Fails if this file's `LOC_BUCKETS` has drifted from the Rust constant it mirrors.
@@ -463,14 +470,12 @@ def main() -> None:
         status_counts[r["status"]] = status_counts.get(r["status"], 0) + 1
     print("Status counts:", status_counts)
 
-    # RQ1's denominator: pairs APTED was actually attempted on. "parse_failed" (tree-sitter
-    # couldn't parse one side at all) never reaches the timing question this RQ asks, so it's
-    # excluded from the percentage and reported separately, not folded in as a failure of APTED.
-    attempted = [r for r in rows if r["status"] in ("ok", "timed_out")]
+    # RQ1's denominator - see ATTEMPTED_STATUSES for what is and is not a pair attempted.
+    attempted = [r for r in rows if r["status"] in ATTEMPTED_STATUSES]
     excluded = len(rows) - len(attempted)
     if excluded:
         print(
-            f"Excluded {excluded} row(s) with status outside {{ok, timed_out}} (e.g. parse_failed) from the percentage below."
+            f"Excluded {excluded} row(s) with status outside {set(ATTEMPTED_STATUSES)} (e.g. parse_failed) from the percentage below."
         )
 
     # Keyed by the larger of the two sides, matching `stats::sampling::loc_bucket` - not by

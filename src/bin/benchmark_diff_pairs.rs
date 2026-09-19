@@ -167,12 +167,22 @@ fn read_pairs_csv(path: &Path) -> Result<Vec<SampledPair>> {
     Ok(pairs)
 }
 
+/// At most this many repositories open at once. An open `Repository` holds file descriptors for
+/// every packfile it has touched, and a whole-corpus run (research/measure/overnight_benchmarks.sh)
+/// walks thousands of repositories per process: on 2026-09-19 an unbounded cache ran a shard out
+/// of descriptors after a few thousand, and every pair after that was recorded as unreadable.
+/// The pair lists are grouped by repository, so a handful is all the reuse there is.
+const OPEN_REPOS_MAX: usize = 8;
+
 fn open_repo<'a>(
     repos: &'a mut HashMap<String, Repository>,
     repo_root: &Path,
     name: &str,
 ) -> Result<&'a Repository> {
     if !repos.contains_key(name) {
+        if repos.len() >= OPEN_REPOS_MAX {
+            repos.clear();
+        }
         repos.insert(name.to_string(), Repository::open(repo_root.join(name))?);
     }
     Ok(repos.get(name).unwrap())
@@ -308,16 +318,23 @@ fn measure_codes(mut row: Row, before_code: Code, after_code: Code, budget: Budg
     {
         let before_arc = Arc::clone(&before_arc);
         let after_arc = Arc::clone(&after_arc);
-        std::thread::spawn(move || {
-            let start = Instant::now();
-            // diff_code is under active development; one bad real-world input panicking must
-            // not abort the whole run, so the call is isolated and recorded as its own row.
-            let result =
-                panic::catch_unwind(AssertUnwindSafe(|| diff_code(&before_arc, &after_arc)));
-            let elapsed_ms = start.elapsed().as_secs_f64() * 1000.0;
-            let (peak_memory_bytes, total_allocated_bytes) = take_thread_allocation_stats();
-            let _ = tx.send((result, elapsed_ms, peak_memory_bytes, total_allocated_bytes));
-        });
+        // The product's own stack ceiling (`tui::app::DIFF_COMPUTE_STACK_SIZE`), not the 2MB
+        // default: a stack overflow aborts the process, `catch_unwind` cannot see it, and on the
+        // default stack this harness aborted on inputs the product handles - which would have
+        // been reported as robustness failures of the diff rather than of the harness.
+        std::thread::Builder::new()
+            .stack_size(codediff::tui::app::DIFF_COMPUTE_STACK_SIZE)
+            .spawn(move || {
+                let start = Instant::now();
+                // diff_code is under active development; one bad real-world input panicking must
+                // not abort the whole run, so the call is isolated and recorded as its own row.
+                let result =
+                    panic::catch_unwind(AssertUnwindSafe(|| diff_code(&before_arc, &after_arc)));
+                let elapsed_ms = start.elapsed().as_secs_f64() * 1000.0;
+                let (peak_memory_bytes, total_allocated_bytes) = take_thread_allocation_stats();
+                let _ = tx.send((result, elapsed_ms, peak_memory_bytes, total_allocated_bytes));
+            })
+            .expect("spawning the diff thread");
     }
 
     let (result, first_elapsed_ms, peak_memory_bytes, total_allocated_bytes) =
@@ -534,6 +551,31 @@ fn main() -> Result<()> {
                         "Failed to measure {} {}: {:?}",
                         pair.repository, pair.path, e
                     );
+                    // A row all the same, so the output names every pair it was handed: a
+                    // resumable driver (research/measure/overnight_benchmarks.sh) decides what is
+                    // still to do, and which pair a killed attempt died on, by which pairs have
+                    // no row yet. Before 2026-09-19 an unreadable pair left none and was blamed
+                    // for the next pair's death.
+                    write_row(
+                        &mut writer,
+                        &Row {
+                            language: pair.language.clone(),
+                            size_bucket: pair.size_bucket.clone(),
+                            repository: pair.repository.clone(),
+                            commit: pair.commit.clone(),
+                            path: pair.path.clone(),
+                            bytes_before: 0,
+                            bytes_after: 0,
+                            ast_nodes_before: 0,
+                            ast_nodes_after: 0,
+                            status: "failed_to_read",
+                            elapsed_ms: None,
+                            peak_memory_bytes: None,
+                            total_allocated_bytes: None,
+                            mapping_operations: None,
+                        },
+                    )?;
+                    writer.flush()?;
                 }
             }
             print_progress(

@@ -1,0 +1,34 @@
+{
+  "pairs": 444199,
+  "languages": 25,
+  "status_counts": {
+    "ok": 442322,
+    "failed_to_read": 1669,
+    "timed_out": 96,
+    "killed": 112
+  },
+  "killed_by": {
+    "memory cap (SIGKILL)": 112
+  },
+  "killed_distinct_files": 20,
+  "killed_files_completed_under_big_cap": 11,
+  "killed_files_completed_under_big_cap_max_peak_bytes": 1808269440,
+  "largest_pair_combined_nodes": 20058018,
+  "largest_pair": "tree-sitter-tree-sitter-c-sharp 39d2097226 src/parser.c",
+  "completed": {
+    "count": 442322,
+    "max_combined_nodes": 14184996,
+    "elapsed_ms": {
+      "p50": 12.219984,
+      "p99": 2094.6760950000003,
+      "p999": 20036.3194,
+      "max": 164398.58981
+    },
+    "peak_memory_bytes": {
+      "p50": 883840,
+      "p99": 35107927,
+      "max": 1874854016
+    },
+    "slowest_pair": "tree-sitter-tree-sitter-typescript 71fe641846 typescript/src/parser.c"
+  }
+}

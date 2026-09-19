@@ -139,6 +139,13 @@ fn blob_content(repo: &Repository, treeish: &str, path: &str) -> Result<Vec<u8>>
 /// Runs `apted_only_worker` on `before_text`/`after_text`, killing it if it has not exited after
 /// `timeout`. Returns `(status, elapsed_ms)` - `elapsed_ms` is the worker's own self-reported
 /// timing, `None` unless status is "ok".
+///
+/// A worker that dies because the kernel's delta matrix (one cell per node pair, so hundreds of
+/// gigabytes for a file of a few hundred thousand nodes) cannot be allocated is "out_of_memory",
+/// told apart from "worker_error" by Rust's own abort message on its stderr. It is as much a
+/// non-completion as a timeout - whole-tree edit distance on that pair does not fit the machine,
+/// let alone the second - and `apted_only_report.py` counts it in RQ1's denominator, where
+/// "worker_error" is excluded as a harness fault.
 fn run_worker(
     worker_bin: &Path,
     before_text: &str,
@@ -160,7 +167,7 @@ fn run_worker(
         .arg("--lang-path")
         .arg(lang_path)
         .stdout(Stdio::piped())
-        .stderr(Stdio::null())
+        .stderr(Stdio::piped())
         .spawn()
         .with_context(|| format!("spawning worker {worker_bin:?}"))?;
 
@@ -182,7 +189,15 @@ fn run_worker(
     };
 
     if !status.success() {
-        return Ok(("worker_error", None));
+        let mut stderr = String::new();
+        if let Some(mut err) = child.stderr.take() {
+            let _ = err.read_to_string(&mut stderr);
+        }
+        return Ok(if stderr.contains("memory allocation of") {
+            ("out_of_memory", None)
+        } else {
+            ("worker_error", None)
+        });
     }
 
     let mut stdout = String::new();
@@ -377,7 +392,7 @@ fn main() -> Result<()> {
         }
 
         println!(
-            "[{}/{}] {}@{} {} (ok={} timed_out={} worker_error={} parse_failed={} failed_to_read={})",
+            "[{}/{}] {}@{} {} (ok={} timed_out={} out_of_memory={} worker_error={} parse_failed={} failed_to_read={})",
             i + 1,
             pairs.len(),
             pair.repository,
@@ -385,6 +400,7 @@ fn main() -> Result<()> {
             pair.path,
             status_counts.get("ok").unwrap_or(&0),
             status_counts.get("timed_out").unwrap_or(&0),
+            status_counts.get("out_of_memory").unwrap_or(&0),
             status_counts.get("worker_error").unwrap_or(&0),
             status_counts.get("parse_failed").unwrap_or(&0),
             failed,
@@ -393,11 +409,12 @@ fn main() -> Result<()> {
     }
 
     println!(
-        "Measured {} pairs into {:?}: ok={} timed_out={} worker_error={} parse_failed={} failed_to_read={}",
+        "Measured {} pairs into {:?}: ok={} timed_out={} out_of_memory={} worker_error={} parse_failed={} failed_to_read={}",
         pairs.len(),
         args.output,
         status_counts.get("ok").unwrap_or(&0),
         status_counts.get("timed_out").unwrap_or(&0),
+        status_counts.get("out_of_memory").unwrap_or(&0),
         status_counts.get("worker_error").unwrap_or(&0),
         status_counts.get("parse_failed").unwrap_or(&0),
         failed,

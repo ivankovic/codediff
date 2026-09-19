@@ -293,6 +293,16 @@ pub enum Algorithm {
     #[cfg(test)]
     ZhangShasha,
     Apted,
+    /// APTED on the whole pair, with every one of `resolve_forest`'s shortcuts off: no
+    /// byte-identical emit, no flat-container Myers pass, no thin-wrapper decomposition, no
+    /// [`APTED_MAX_CELLS`] gate. The two roots go to the kernel as they are, however many cells
+    /// that costs. Not for the product - those shortcuts exist because that computation is what
+    /// does not fit an interactive budget - but for `apted_only_worker`, whose whole point is to
+    /// measure exactly that computation (the paper's RQ2). Introduced 2026-09-19, when
+    /// re-measuring RQ2 through `Apted` turned 44% of the old timeouts into sub-millisecond
+    /// completions: the 2026-09-02 cell gate, and before it the flat-container pass, were being
+    /// reported as properties of tree edit distance.
+    AptedWholeTree,
 }
 
 // Each parameter is genuinely distinct context (both root-id lists, both metadata sets, the
@@ -338,7 +348,11 @@ pub(crate) fn resolve_forest(
     // the cost model treats any two same-kind internal nodes as freely renameable regardless of
     // content - this is always safe: it only ever matches the exact pair it was asked to
     // resolve, never an arbitrary interior node.
-    if before_root_ids.len() == 1 && after_root_ids.len() == 1 {
+    // Every shortcut below is the engine's, not tree edit distance's: byte-identical subtrees,
+    // flat containers settled by Myers over their children, thin wrappers around one, and the
+    // cell gate. `AptedWholeTree` takes none of them, by definition of what it measures.
+    let whole_tree = algorithm == Algorithm::AptedWholeTree;
+    if !whole_tree && before_root_ids.len() == 1 && after_root_ids.len() == 1 {
         let b = before_root_ids[0];
         let a = after_root_ids[0];
         let hashes_match = before_meta
@@ -383,7 +397,8 @@ pub(crate) fn resolve_forest(
     let before_idx = PostorderIndexer::build(before_meta, &before_root_ids, &diff.before_node_map);
     let after_idx = PostorderIndexer::build(after_meta, &after_root_ids, &diff.after_node_map);
 
-    if before_root_ids.len() == 1
+    if !whole_tree
+        && before_root_ids.len() == 1
         && after_root_ids.len() == 1
         && before_idx.size * after_idx.size > APTED_MAX_CELLS
     {
@@ -431,7 +446,7 @@ pub(crate) fn resolve_forest(
             cost_model,
             Some(&containment),
         ),
-        Algorithm::Apted => compute_delta(
+        Algorithm::Apted | Algorithm::AptedWholeTree => compute_delta(
             &before_idx,
             &after_idx,
             before_meta,

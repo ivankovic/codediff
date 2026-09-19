@@ -277,12 +277,15 @@ def test_rq1_series_keeps_timed_out_pairs_in_the_denominator(tmp_path):
     csv_path = tmp_path / "g.csv"
     csv_path.write_text(
         "language,status,elapsed_ms\n"
-        "Rust,ok,10\nRust,ok,20\nRust,timed_out,\nRust,timed_out,\n"
+        "Rust,ok,10\nRust,ok,20\nRust,timed_out,\nRust,timed_out,\nRust,out_of_memory,\n"
+        "Rust,parse_failed,\nRust,worker_error,\n"
         "YAML,ok,5\n"
     )
     series = distributions_report.rq1_series([csv_path])
     times, total = series[apted_only_report.CODE]
-    assert list(times) == [10.0, 20.0] and total == 4
+    # Out of memory is a pair attempted and not completed; a parse or harness failure never
+    # reached the question and is left out, as in apted_only_report.
+    assert list(times) == [10.0, 20.0] and total == 5
     assert series[apted_only_report.CONFIG_DATA][1] == 1
 
 
@@ -298,3 +301,31 @@ def test_distribution_rows_are_the_whole_population_as_value_counts():
     assert by[("files_per_commit", 2)] == 1 and by[("files_per_commit", 1)] == 1
     churn = {v: c for (m, v), c in by.items() if m == "churn_permille"}
     assert sum(churn.values()) == 3 and 30 in churn and 100 in churn
+
+
+# ── list_code_edits ─────────────────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.parametrize(
+    ("numstat_path", "old", "new"),
+    [
+        ("src/main.rs", "src/main.rs", "src/main.rs"),
+        ("static/{Dockerfile-10 => Dockerfile-11}", "static/Dockerfile-10", "static/Dockerfile-11"),
+        ("src/gui/{a.ml => b.ml}", "src/gui/a.ml", "src/gui/b.ml"),
+        ("{old => new}/lib/x.py", "old/lib/x.py", "new/lib/x.py"),
+        ("a/{b => c}/d/{e => f}.go", "a/b/d/e.go", "a/c/d/f.go"),
+        ("before.rs => after.rs", "before.rs", "after.rs"),
+        # A move into a new directory component: the left side of the group is empty, and git's
+        # path has no doubled slash where it was.
+        (
+            "Thirdparty/ffmpeg/{ => ffmpeg}/ffmpeg-6.0/x.h",
+            "Thirdparty/ffmpeg/ffmpeg-6.0/x.h",
+            "Thirdparty/ffmpeg/ffmpeg/ffmpeg-6.0/x.h",
+        ),
+        ("src/{old => }/mod.rs", "src/old/mod.rs", "src/mod.rs"),
+    ],
+)
+def test_rename_sides_recovers_both_paths_of_a_numstat_rename(numstat_path, old, new):
+    import list_code_edits
+
+    assert list_code_edits.rename_sides(numstat_path) == (old, new)

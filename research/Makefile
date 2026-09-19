@@ -234,6 +234,17 @@ measure-robustness-fixtures: build
 		--output data/performance/robustness_fixtures.csv \
 		--max-combined-nodes 1000000000 --timeout-secs 120 --iterations 5
 
+# The paper's robustness run over the WHOLE Full corpus (every modified code file in its recent
+# history, no node cap), not the fixture corpus above. Hours of eight-core time and a memory-capped
+# systemd unit rather than a make recipe, because an unconfined run took the machine down on
+# 2026-09-19; this target only starts it. See measure/overnight_benchmarks.sh's header for the
+# knobs, measure/r48_retry_killed.sh for the pass that follows, and data/performance/PROVENANCE.md.
+measure-robustness-full:
+	systemd-run --user --unit codediff-overnight --collect -p WorkingDirectory=$(CURDIR) \
+		--setenv=PATH="$$PATH" --setenv=HOME="$$HOME" --setenv=SKIP_R22=1 \
+		./measure/overnight_benchmarks.sh
+	@echo "started as codediff-overnight; follow with: journalctl --user -u codediff-overnight -f"
+
 measure-code-pair-diffs:
 	uv run ./analysis/code_pair_diff_stats.py data/samples/sampled_code_pairs_$(LANGUAGE).csv \
 		--repo-root $(REPOSITORIES_DIR) \

@@ -17,9 +17,13 @@
  */
 
 //! Single-pair worker for `apted_only_benchmark`: computes exactly one whole-tree tree-edit-
-//! distance between two files via `apted::for_roots(..., Algorithm::Apted, ...)` - CodeDiff's own
-//! bounded APTED implementation, with none of the 7-phase pipeline's pre-matching heuristics run
-//! first (no hash descent, no bottom-up expansion, nothing). This is deliberately the most
+//! distance between two files via `apted::for_roots(..., Algorithm::AptedWholeTree, ...)` -
+//! CodeDiff's own APTED implementation, with none of the 7-phase pipeline's pre-matching
+//! heuristics run first (no hash descent, no bottom-up expansion, nothing) and with the engine's
+//! own shortcuts off too: `Algorithm::Apted` settles a many-child root by Myers over its
+//! children and, since 2026-09-02, decomposes any single pair over `APTED_MAX_CELLS` instead of
+//! running the kernel on it - the product's answer to this measurement, not the measurement.
+//! This is deliberately the most
 //! favorable case for whole-tree tree-edit-distance: real commits touch a small fraction of a
 //! file (see `research/papers/introductory-paper/main.tex`'s Phase 1 discussion), so running APTED
 //! directly on the full trees, unaided, is what "just run a generic tree-diff algorithm" means in
@@ -86,7 +90,7 @@ fn main() -> Result<()> {
         &before,
         &after,
         &node_cache,
-        Algorithm::Apted,
+        Algorithm::AptedWholeTree,
         "apted_only",
         &mut diff,
     );

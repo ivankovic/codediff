@@ -72,6 +72,7 @@ Usage (from research/):  uv run ./analysis/paper_variables.py
 import collections
 import csv
 import glob
+import json
 import os
 import re
 import statistics
@@ -824,6 +825,60 @@ def robustness_fixtures(research_dir):
     }
 
 
+def robustness_full(research_dir):
+    """Section 8's Robust target exercised on the whole Full corpus rather than on the fixture
+    corpus: every modified code file in the corpus's recent history (the same population
+    `edit_shape.csv` summarises) pushed through `diff_code` with no node cap, a 120-second
+    budget and a 6 GB memory cap per process, then every non-completion re-measured on a quiet
+    machine and one commit of each memory-killed file re-measured under a 24 GB cap. DERIVED
+    from `data/performance/robustness_full_summary.json`, which
+    `analysis/robustness_merge.py --summary-json` writes from the run's merged CSV (hundreds of
+    thousands of rows, not committed; `robustness_full_exceptions.csv` next to it holds every
+    pair that did not complete).
+
+    source: `measure/overnight_benchmarks.sh` then `measure/r48_retry_killed.sh`, 2026-09-19,
+            on the MACHINE block's hardware; see data/performance/PROVENANCE.md.
+    """
+    path = os.path.join(research_dir, "data", "performance", "robustness_full_summary.json")
+    if not os.path.exists(path):
+        return {}
+    with open(path) as f:
+        summary = json.load(f)
+    counts = summary["status_counts"]
+    completed = summary["completed"]
+    pairs = summary["pairs"]
+    ok = counts.get("ok", 0)
+    # The rate is over the pairs the diff was actually attempted on: a pair whose blob could not
+    # be read (a file with no grammar, or invalid UTF-8) never reached it.
+    attempted = pairs - counts.get("failed_to_read", 0)
+    return {
+        "RobustnessFullPairs": latex_number(pairs),
+        "RobustnessFullAttempted": latex_number(attempted),
+        "RobustnessFullLanguages": summary["languages"],
+        "RobustnessFullCompleted": latex_number(ok),
+        "RobustnessFullCompletedPct": f"{ok / attempted * 100:.2f}" if attempted else "0",
+        "RobustnessFullUnreadable": latex_number(counts.get("failed_to_read", 0)),
+        "RobustnessFullTimedOut": latex_number(counts.get("timed_out", 0)),
+        "RobustnessFullPanicked": latex_number(counts.get("panicked", 0)),
+        "RobustnessFullKilled": latex_number(counts.get("killed", 0)),
+        "RobustnessFullKilledFiles": summary["killed_distinct_files"],
+        "RobustnessFullKilledFilesCompletedUnderBigCap": summary[
+            "killed_files_completed_under_big_cap"
+        ],
+        "RobustnessFullLargestPairNodes": latex_number(summary["largest_pair_combined_nodes"]),
+        "RobustnessFullMaxCompletedNodes": latex_number(completed["max_combined_nodes"]),
+        "RobustnessFullPFiftyMs": f"{completed['elapsed_ms']['p50']:.1f}",
+        "RobustnessFullPNinetyNineMs": latex_number(round(completed["elapsed_ms"]["p99"])),
+        "RobustnessFullMaxMs": latex_number(round(completed["elapsed_ms"]["max"])),
+        "RobustnessFullPeakMemoryMb": latex_number(
+            round(completed["peak_memory_bytes"]["max"] / 1e6)
+        ),
+        "RobustnessFullMemoryCapGb": 6,
+        "RobustnessFullBigMemoryCapGb": 24,
+        "RobustnessFullTimeoutSeconds": 120,
+    }
+
+
 def astdiff_oracle(research_dir):
     """Section 7's external check: CodeDiff's node mapping scored against an oracle nobody on this
     project wrote. DERIVED from `data/comparison/astdiff_oracle_defects4j.csv`.
@@ -978,6 +1033,7 @@ def build(
     cost,
     concentration,
     robustness,
+    robustness_full_values,
     oracle,
     oracle_human,
 ):
@@ -1112,6 +1168,18 @@ def build(
         "% corpus - see `robustness_fixtures`). Refresh with `make measure-robustness-fixtures`.",
     ]
     out += [command(name, value) for name, value in robustness.items()]
+
+    out += [
+        "",
+        "% Section 8, Robustness on the whole Full corpus: every modified code file in the",
+        "% corpus's recent history, no node cap, a 120 s budget and a 6 GB cap per process, with",
+        "% every non-completion re-measured on a quiet machine and one commit of each",
+        "% memory-killed file re-measured under 24 GB (DERIVED from",
+        "% data/performance/robustness_full_summary.json - see `robustness_full`). Refresh with",
+        "% measure/overnight_benchmarks.sh then measure/r48_retry_killed.sh; see",
+        "% data/performance/PROVENANCE.md.",
+    ]
+    out += [command(name, value) for name, value in robustness_full_values.items()]
 
     out += [
         "",
@@ -1329,6 +1397,14 @@ def main():
             "Robustness* macros will be absent. Run `make measure-robustness-fixtures`."
         )
 
+    full = robustness_full(research_dir)
+    if not full:
+        print(
+            "WARNING: no whole-corpus robustness summary found "
+            "(data/performance/robustness_full_summary.json) - the RobustnessFull* macros will be "
+            "absent. See data/performance/PROVENANCE.md for the run that produces it."
+        )
+
     lines = build(
         empirical,
         rq1,
@@ -1341,6 +1417,7 @@ def main():
         cost,
         concentration,
         robustness,
+        full,
         oracle,
         oracle_human,
     )

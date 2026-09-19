@@ -1669,7 +1669,11 @@ pub(crate) fn compute_diff(before: &Path, after: &Path) -> Result<(DiffSessionDa
 /// process unconditionally - unlike a panic, it can't be caught by the `catch_unwind` already
 /// wrapping the TUI's `spawn_blocking` closure - so raising the ceiling here is the only fix, and
 /// doing it in this one choke point covers all three entry points at once.
-const DIFF_COMPUTE_STACK_SIZE: usize = 256 * 1024 * 1024;
+///
+/// Public since 2026-09-19 so `benchmark_diff_pairs` can give its own diff thread the same
+/// ceiling: with the default 2MB it aborted on a 1,525-line ffmpeg codebook header that the
+/// product diffs without incident, and reported the abort as a robustness failure.
+pub const DIFF_COMPUTE_STACK_SIZE: usize = 256 * 1024 * 1024;
 
 /// The real diff computation every production caller uses, with
 /// [`RenderOptions::whole_pair_updates`]/[`RenderOptions::paint_reindent_only_moves`] threaded

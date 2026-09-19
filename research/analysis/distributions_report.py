@@ -62,7 +62,14 @@ from _common import (
     SURFACE,
     read_rows,
 )
-from apted_only_report import CATEGORY_ORDER, CODE, CONFIG_DATA, LANGUAGE_CATEGORY, SCRIPTING
+from apted_only_report import (
+    ATTEMPTED_STATUSES,
+    CATEGORY_ORDER,
+    CODE,
+    CONFIG_DATA,
+    LANGUAGE_CATEGORY,
+    SCRIPTING,
+)
 from benchmark_other_report import COLORS, DISPLAY_NAMES, ordered, speed_sample
 
 # One colour per artifact category, shared with apted_only_report's bar chart so the two agree.
@@ -208,12 +215,15 @@ def plot_corpus_shape(file_sizes: Path, edit_sizes: Path, out: Path) -> None:
 
 def rq1_series(paths: list[Path]) -> dict[str, tuple[np.ndarray, int]]:
     """Per category: sorted completion times of the pairs that finished, and the total number of
-    pairs attempted (finished or timed out). Timeouts have no elapsed time; they are the gap
-    between the curve's height at the budget and 100%."""
+    pairs attempted (`ATTEMPTED_STATUSES`, the same population `apted_only_report` rates over).
+    A timeout or an out-of-memory abort has no elapsed time; they are the gap between the curve's
+    height at the budget and 100%."""
     done: dict[str, list[float]] = collections.defaultdict(list)
     total: collections.Counter = collections.Counter()
     for p in paths:
         for r in read_rows(p):
+            if r["status"] not in ATTEMPTED_STATUSES:
+                continue
             cat = LANGUAGE_CATEGORY[r["language"]]
             total[cat] += 1
             if r["status"] == "ok":
