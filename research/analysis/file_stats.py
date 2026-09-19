@@ -237,6 +237,7 @@ def write_paper_variables(
     loc_percentiles,
     ast_percentiles,
     correlation,
+    too_large_to_parse,
     output_path="plots/variables_empirical.tex",
 ):
     """
@@ -279,6 +280,13 @@ def write_paper_variables(
         f"\\newcommand{{\\NumFilesMillions}}{{{file_count / 1_000_000:.2f}}}",
         f"\\newcommand{{\\NumLanguages}}{{{language_count}}}",
         f"\\newcommand{{\\CorrelationR}}{{{correlation:.4f}}}",
+        # The parser's own size limit (src/stats.rs) and how many code files sit above it. Those
+        # files are counted in bytes and lines but carry no node count, so every AST-node figure in
+        # the empirical block, its maximum included, is over the files at or below the limit -
+        # which the paper has to say where it compares that maximum with the whole-corpus
+        # robustness run, whose largest pairs are exactly the files above it (2026-09-19).
+        "\\newcommand{\\ParseLimitMiB}{1}",
+        f"\\newcommand{{\\CodeFilesTooLargeToParse}}{{{latex_number(too_large_to_parse)}}}",
     ]
     for prefix, percentiles in [
         ("Bytes", bytes_percentiles),
@@ -555,4 +563,5 @@ if __name__ == "__main__":
         loc_percentiles,
         ast_percentiles,
         correlation,
+        int(code_df.filter(pl.col("too_large_to_parse") == 1).height),
     )

@@ -72,6 +72,13 @@ which is where the finding is.
   16 ran past 300 s, and `mednaffe/src/resources.c` needed more than 24 GB.
 * **Panics: none.** The harness's own aborts (below) were the harness.
 
+The node counts here are not on the same footing as Table 1's. The corpus statistics
+(`src/stats.rs`) parse a file only up to 1 MiB, so Table 1's maximum of 905,004 AST nodes is over
+files at or below that limit; the 4,014 code files above it (the largest 101 MB) are counted in
+bytes and lines but carry no node count. This run diffs those files too: 170 completed pairs have a
+side above 905,004 nodes, the largest 7,092,498 (`tree-sitter-julia/src/parser.c`), and the
+memory-killed ones are larger still. The Robust target's ceiling was set from the parsed subset.
+
 `peak_memory_bytes` is the diff thread's own heap as counted by the harness's allocator, not the
 process's resident set; the killed pairs show that the two differ by an order of magnitude on the
 largest inputs, so quote it for the completed pairs only (p99 35 MB, max 1.9 GB).

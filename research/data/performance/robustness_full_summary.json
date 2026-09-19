@@ -18,6 +18,8 @@
   "completed": {
     "count": 442322,
     "max_combined_nodes": 14184996,
+    "max_side_nodes": 7092498,
+    "max_side_pair": "tree-sitter-tree-sitter-julia 113776ffb8 src/parser.c",
     "elapsed_ms": {
       "p50": 12.219984,
       "p99": 2094.6760950000003,

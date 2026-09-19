@@ -867,6 +867,7 @@ def robustness_full(research_dir):
         ],
         "RobustnessFullLargestPairNodes": latex_number(summary["largest_pair_combined_nodes"]),
         "RobustnessFullMaxCompletedNodes": latex_number(completed["max_combined_nodes"]),
+        "RobustnessFullMaxSideNodes": latex_number(completed["max_side_nodes"]),
         "RobustnessFullPFiftyMs": f"{completed['elapsed_ms']['p50']:.1f}",
         "RobustnessFullPNinetyNineMs": latex_number(round(completed["elapsed_ms"]["p99"])),
         "RobustnessFullMaxMs": latex_number(round(completed["elapsed_ms"]["max"])),

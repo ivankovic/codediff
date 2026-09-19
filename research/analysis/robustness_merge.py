@@ -110,6 +110,7 @@ def summarise(merged: Path) -> dict:
     elapsed: list = []
     peak: list = []
     nodes_ok: list = []
+    max_side = (0, None)
     with open(merged, newline="") as f:
         for r in csv.DictReader(f):
             counts[r["status"]] += 1
@@ -121,6 +122,9 @@ def summarise(merged: Path) -> dict:
             if nodes > biggest[0]:
                 biggest = (nodes, f"{r['repository']} {r['commit'][:10]} {r['path']}")
             if r["status"] == "ok":
+                side = max(int(r["ast_nodes_before"] or 0), int(r["ast_nodes_after"] or 0))
+                if side > max_side[0]:
+                    max_side = (side, f"{r['repository']} {r['commit'][:10]} {r['path']}")
                 ms = float(r["elapsed_ms"] or 0)
                 elapsed.append(ms)
                 peak.append(int(r["peak_memory_bytes"] or 0))
@@ -151,6 +155,8 @@ def summarise(merged: Path) -> dict:
         "completed": {
             "count": len(elapsed),
             "max_combined_nodes": nodes_ok[-1] if nodes_ok else 0,
+            "max_side_nodes": max_side[0],
+            "max_side_pair": max_side[1],
             "elapsed_ms": {
                 "p50": percentile(elapsed, 50),
                 "p99": percentile(elapsed, 99),
