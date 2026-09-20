@@ -196,13 +196,21 @@ mod java_defects4j_gson_5_iso8601utils;
 #[cfg(test)]
 mod java_defects4j_gson_6_jsonadapterannotationtypeadapterfactory;
 #[cfg(test)]
+mod java_defects4j_jacksoncore_11_bytequadscanonicalizer;
+#[cfg(test)]
 mod java_defects4j_jacksoncore_13_jsongeneratorimpl;
+#[cfg(test)]
+mod java_defects4j_jacksoncore_26_nonblockingjsonparser;
 #[cfg(test)]
 mod java_defects4j_jacksondatabind_105_jdkdeserializers;
 #[cfg(test)]
 mod java_defects4j_jacksondatabind_111_atomicreferencedeserializer;
 #[cfg(test)]
+mod java_defects4j_jacksondatabind_15_javatype;
+#[cfg(test)]
 mod java_defects4j_jacksondatabind_16_annotationmap;
+#[cfg(test)]
+mod java_defects4j_jacksondatabind_1_beanpropertywriter;
 #[cfg(test)]
 mod java_defects4j_jacksondatabind_25_simpleabstracttyperesolver;
 #[cfg(test)]
@@ -212,11 +220,19 @@ mod java_defects4j_jacksondatabind_39_nullifyingdeserializer;
 #[cfg(test)]
 mod java_defects4j_jacksondatabind_49_writableobjectid;
 #[cfg(test)]
+mod java_defects4j_jacksondatabind_59_typefactory;
+#[cfg(test)]
 mod java_defects4j_jacksondatabind_79_objectidinfo;
 #[cfg(test)]
 mod java_defects4j_jacksondatabind_94_subtypevalidator;
 #[cfg(test)]
+mod java_defects4j_jacksondatabind_99_referencetype;
+#[cfg(test)]
 mod java_defects4j_jsoup_16_documenttype;
+#[cfg(test)]
+mod java_defects4j_jsoup_24_tokeniserstate;
+#[cfg(test)]
+mod java_defects4j_jsoup_2_parser;
 #[cfg(test)]
 mod java_defects4j_jsoup_40_documenttype;
 #[cfg(test)]
