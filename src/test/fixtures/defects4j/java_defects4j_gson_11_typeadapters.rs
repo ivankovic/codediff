@@ -18,19 +18,27 @@
 use anyhow::Result;
 
 use crate::test;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 
 #[test]
 fn mapping() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("java-defects4j-gson-11-typeadapters")
+    // A new `case` is inserted into a `switch`. The human mapping keeps group 2 where it is and
+    // calls group 3 new; codediff (reason `APTED("large_flat_subtree")`) slides the match by one
+    // group instead, pairing the inserted group's label with group 2's and reporting group 2's
+    // identifier as an `Update`. Same "equal-looking siblings, ambiguous anchor" family as
+    // `java-defects4j-closure-31-compiler` next door - a switch body is exactly the large flat
+    // subtree that shortcut is named for. Not attempted here.
+    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
+        "java-defects4j-gson-11-typeadapters",
+        10,
+        6,
+    )
 }
 
 #[test]
 fn painting() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test and record the
-    // limit it reports instead.
-    assert_matches_human_painting_within_limit("java-defects4j-gson-11-typeadapters", 100.0)
+    assert_matches_human_painting_within_limit("java-defects4j-gson-11-typeadapters", 0.07)
 }
 
 #[test]

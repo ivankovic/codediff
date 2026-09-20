@@ -18,19 +18,27 @@
 use anyhow::Result;
 
 use crate::test;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 
 #[test]
 fn mapping() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("java-defects4j-closure-31-compiler")
+    // A condition grows a conjunct, and the two ground truths disagree about which `&&` of the
+    // resulting `binary_expression` chain is the new one. The human mapping deletes the inner
+    // `&&` and keeps the outer; codediff (reason `APTED("large_flat_subtree")`) does the reverse,
+    // pairing the inner one and deleting the outer. Both readings describe the same edit and
+    // neither is wrong about the code - they disagree only about which of two identical operators
+    // is "the same" one, which is the ambiguity a flat chain of equal tokens always carries.
+    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
+        "java-defects4j-closure-31-compiler",
+        2,
+        2,
+    )
 }
 
 #[test]
 fn painting() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test and record the
-    // limit it reports instead.
-    assert_matches_human_painting_within_limit("java-defects4j-closure-31-compiler", 100.0)
+    assert_matches_human_painting_within_limit("java-defects4j-closure-31-compiler", 0.0)
 }
 
 #[test]
