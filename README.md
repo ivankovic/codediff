@@ -8,22 +8,25 @@
 
 Fast, robust, syntax-aware code diffing.
 
-![A screenshot showing codediff diffing a Python refactoring. It correctly identifies assignment
-operator as changed, instead of anchoring on the text as unix diff would](/readme-screenshot.png)
+![An animation of one Python refactoring painted two ways. A vertical bar sweeps left to right and
+back across a two-pane diff. On one side of the bar, GNU diff marks whole lines as deleted and
+inserted; on the other, codediff paints only the parts that changed - `sum(numbers)` and
+`len(numbers)` rather than the whole assignment, and `numbers` shown as moved rather than
+rewritten.](/assets/diff-vs-codediff.gif)
+
+Two hand-rolled loops become `sum`, `len`, `max` and `min`, and the bar sweeps between the two
+readings of that one change. `diff` can only mark whole lines, so it calls the assignments deleted
+and reinserted; codediff leaves `total = ` alone and paints what the right-hand side became,
+matching `numbers` in `max(numbers)` to the `numbers[0]` it came from.
 
 **[Try it in the browser](https://ivankovic.github.io/codediff/showcase/)**: twenty real changes in
 codediff's own viewer, each shown as Unix `diff` marks it and as codediff maps it, one click apart.
 
-The same idea in one image - two hand-rolled loops becoming `sum`, `len`, `max` and `min`, with a
-bar sweeping between the two readings of it. `diff` can only mark whole lines, so it calls the
-assignments deleted and reinserted; codediff leaves `total = ` alone and paints what the
-right-hand side became, matching `numbers` in `max(numbers)` to the `numbers[0]` it came from:
+The same change in the terminal UI, which is what `codediff` opens with when you give it no
+arguments:
 
-![An animation of the same Python refactoring painted two ways. A vertical bar sweeps left to right
-and back across a two-pane diff. On one side of the bar, GNU diff marks whole lines as deleted and
-inserted; on the other, codediff paints only the parts that changed - `sum(numbers)` and
-`len(numbers)` rather than the whole assignment, and `numbers` shown as moved rather than
-rewritten.](/assets/diff-vs-codediff.gif)
+![A screenshot of codediff's two-panel terminal UI showing the same Python refactoring, with the
+changed right-hand sides highlighted rather than whole lines](/readme-screenshot.png)
 
 # Installation
 
