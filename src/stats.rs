@@ -111,16 +111,20 @@ pub struct DiffStats {
 }
 
 /**
-* Count the nodes in a TreeSitter tree.
+* Count the nodes in a TreeSitter tree, the root included.
+*
+* Iterative, like [`visit_for_kind_stats`]: a tree nested thousands of levels deep - a minified
+* bundle, a data literal - overflowed a 256 MB thread stack in the recursive version on
+* 2026-09-19, and tree-sitter itself parses such trees without recursing.
 */
 pub fn count_nodes(root: Node) -> usize {
-    let mut count = 1;
-    let mut cursor = root.walk();
-
-    for child in root.children(&mut cursor) {
-        count += count_nodes(child);
+    let mut count = 0;
+    let mut stack = vec![root];
+    while let Some(node) = stack.pop() {
+        count += 1;
+        let mut cursor = node.walk();
+        stack.extend(node.children(&mut cursor));
     }
-
     count
 }
 
@@ -136,23 +140,37 @@ pub fn compute_kind_stats(root: Node) -> (std::collections::HashMap<String, Kind
     (stats, total_nodes)
 }
 
-/// Returns the subtree size (including `node` itself) so the caller can bucket it.
+/// Returns the subtree size (including `root` itself) so the caller can bucket it.
+///
+/// Post-order without recursion: every node is listed in pre-order with the index of its parent,
+/// then the list is walked backwards, which reaches every node after all of its descendants and
+/// lets each subtree size be added to its parent's. See [`count_nodes`] for why.
 fn visit_for_kind_stats(
-    node: Node,
+    root: Node,
     stats: &mut std::collections::HashMap<String, KindStats>,
 ) -> usize {
-    let mut size = 1;
-    let mut cursor = node.walk();
-    for child in node.children(&mut cursor) {
-        size += visit_for_kind_stats(child, stats);
+    let mut order: Vec<(Node, Option<usize>)> = Vec::new();
+    let mut stack: Vec<(Node, Option<usize>)> = vec![(root, None)];
+    while let Some((node, parent)) = stack.pop() {
+        let index = order.len();
+        order.push((node, parent));
+        let mut cursor = node.walk();
+        stack.extend(node.children(&mut cursor).map(|child| (child, Some(index))));
     }
 
-    let entry = stats.entry(node.kind().to_string()).or_default();
-    entry.count += 1;
-    let bucket = size.ilog2();
-    *entry.subtree_size_histogram.entry(bucket).or_insert(0) += 1;
-
-    size
+    let mut sizes = vec![1usize; order.len()];
+    for i in (0..order.len()).rev() {
+        let (node, parent) = order[i];
+        let size = sizes[i];
+        let entry = stats.entry(node.kind().to_string()).or_default();
+        entry.count += 1;
+        let bucket = size.ilog2();
+        *entry.subtree_size_histogram.entry(bucket).or_insert(0) += 1;
+        if let Some(parent) = parent {
+            sizes[parent] += size;
+        }
+    }
+    sizes[0]
 }
 
 /**
@@ -185,6 +203,11 @@ pub fn is_generated(code: &str) -> bool {
 /**
 * Expand existing statistics by parsing the code and processing the AST.
 */
+/// How long one file may take to parse before the statistics give up on it; see the note at the
+/// call site. Sixty seconds is two orders of magnitude above what the largest well-formed file in
+/// the corpus needs.
+const PARSE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(60);
+
 pub fn expand_from_code(stats: &mut CodeStats, parser: &mut TSParser) -> Result<()> {
     match &stats.code.metadata.tip {
         Some(tip) => {
@@ -207,10 +230,13 @@ pub fn expand_from_code(stats: &mut CodeStats, parser: &mut TSParser) -> Result<
     }
     stats.bytes = stats.code.contents.len() as u64;
 
-    if stats.code.contents.len() > 1024 * 1024 {
-        stats.too_large_to_parse = true;
-        return Ok(());
-    }
+    // No size cap. Until 2026-09-19 a file over 1 MiB was recorded with `too_large_to_parse` and
+    // no node count - a guard from the initial commit with no measured reason behind it - which
+    // left the corpus's 4,014 largest code files (19.9 GB of source, up to 101 MB each) out of
+    // every AST-node figure, including the maximum the paper's Robust target was set from. The
+    // diff itself parses those files (the whole-corpus robustness run diffed them), so the
+    // statistics parse them too. The flag stays in the schema, always false, so a database from
+    // before the change still loads.
 
     if let Some(language) = &stats.code.metadata.language {
         match language::to_treesitter(language) {
@@ -224,13 +250,35 @@ pub fn expand_from_code(stats: &mut CodeStats, parser: &mut TSParser) -> Result<
 
                 stats.lines_of_code = stats.code.contents.matches('\n').count() as u64;
 
-                match parser.parse(&stats.code.contents, None) {
+                // Bounded: a file that is not the language its extension says - a `.h` holding
+                // nothing but a comma-separated byte array to be `#include`d into an initializer
+                // - keeps tree-sitter in error recovery for its whole length, which is its one
+                // super-linear path, and on 2026-09-19 five such files of 2-4 MB held seven
+                // workers for over an hour each. Past the budget the file counts as failed to
+                // parse, which for the statistics it is.
+                let contents = stats.code.contents.as_bytes();
+                let started = std::time::Instant::now();
+                let mut give_up = |_: &tree_sitter::ParseState| started.elapsed() > PARSE_TIMEOUT;
+                let options = tree_sitter::ParseOptions::new().progress_callback(&mut give_up);
+                let parsed = parser.parse_with_options(
+                    &mut |offset, _| &contents[offset.min(contents.len())..],
+                    None,
+                    Some(options),
+                );
+                match parsed {
                     Some(tree) => {
                         let (kind_stats, total_nodes) = compute_kind_stats(tree.root_node());
                         stats.ast_nodes = total_nodes;
                         stats.kind_stats = kind_stats;
                     }
-                    None => stats.failed_to_parse = true,
+                    None => {
+                        stats.failed_to_parse = true;
+                        eprintln!(
+                            "Parse gave up after {}s: {:?}",
+                            PARSE_TIMEOUT.as_secs(),
+                            stats.code.metadata.path
+                        );
+                    }
                 }
             }
             None => {
@@ -310,6 +358,21 @@ mod tests {
 };"
         ));
         assert!(!is_generated(""));
+    }
+
+    #[test]
+    fn deeply_nested_trees_are_walked_without_recursion() {
+        // 50,000 nested JSON arrays: tree-sitter parses it, and a walk that recursed once per
+        // level would overflow a test thread's stack long before the bottom.
+        let depth = 50_000;
+        let source = format!("{}{}", "[".repeat(depth), "]".repeat(depth));
+        let code = crate::code::Code::from_string(&source, &crate::code::Language::JSON);
+        let root = code.ast.as_ref().expect("json parses").root_node();
+        let counted = count_nodes(root);
+        let (kinds, total) = compute_kind_stats(root);
+        assert_eq!(counted, total);
+        assert!(total >= 2 * depth, "{total} nodes for {depth} levels");
+        assert_eq!(kinds.values().map(|k| k.count).sum::<u64>(), total as u64);
     }
 
     #[test]

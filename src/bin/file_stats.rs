@@ -53,6 +53,13 @@ struct Args {
     /// already-committed data) once this is exceeded.
     #[arg(long, default_value_t = 100)]
     max_db_size_gb: u64,
+
+    /// Only (re)process files of at least this many bytes. The database is upserted by path, so
+    /// this re-measures a size class in place without walking the parse over the other seven
+    /// million files: added 2026-09-19 to bring the 4,014 code files above the 1 MiB cap that
+    /// `stats::for_path` had until then into the statistics, `--min-bytes 1048576`.
+    #[arg(long, default_value_t = 0)]
+    min_bytes: u64,
 }
 
 fn main() {
@@ -77,6 +84,7 @@ fn main() {
         queue_capacity,
         args.batch_size,
         max_db_bytes,
+        args.min_bytes,
     ) {
         eprintln!("Failed to compute file stats: {:?}", e)
     }
@@ -102,6 +110,7 @@ fn file_stats(
     queue_capacity: usize,
     batch_size: usize,
     max_db_bytes: u64,
+    min_bytes: u64,
 ) -> Result<()> {
     let (path_tx, path_rx) = bounded::<PathBuf>(queue_capacity);
     let (stats_tx, stats_rx) = bounded::<(PathBuf, CodeStats)>(queue_capacity);
@@ -129,8 +138,27 @@ fn file_stats(
 
     let project_path_owned = project_path.to_owned();
 
-    let path_producer =
-        thread::spawn(move || filesystem::all_files_from_path(&project_path_owned, path_tx));
+    // With `--min-bytes`, a filter stage between the walker and the workers drops everything
+    // smaller before it is ever read; the walker itself is unchanged.
+    let path_producer = if min_bytes == 0 {
+        thread::spawn(move || filesystem::all_files_from_path(&project_path_owned, path_tx))
+    } else {
+        let (raw_tx, raw_rx) = bounded::<PathBuf>(queue_capacity);
+        let walker =
+            thread::spawn(move || filesystem::all_files_from_path(&project_path_owned, raw_tx));
+        thread::spawn(move || {
+            for path in raw_rx {
+                let large = std::fs::metadata(&path)
+                    .map(|m| m.len() >= min_bytes)
+                    .unwrap_or(false);
+                if large && path_tx.send(path).is_err() {
+                    break;
+                }
+            }
+            drop(path_tx);
+            walker.join().unwrap_or(Ok(()))
+        })
+    };
 
     // The writer commits in small batches and never retains more than `batch_size` files' worth
     // of stats at once. This is the key difference from the earlier design, which accumulated a
@@ -421,9 +449,58 @@ mod tests {
         let db_file = NamedTempFile::new()?;
         let db_path = db_file.path();
 
-        file_stats(&repo_path, db_path, 2, 1000, 500, 100 * 1024 * 1024 * 1024)?;
+        file_stats(
+            &repo_path,
+            db_path,
+            2,
+            1000,
+            500,
+            100 * 1024 * 1024 * 1024,
+            0,
+        )?;
 
         verify_database_contents(db_path)?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn min_bytes_filters_before_anything_is_read() -> Result<()> {
+        let repo_path = helper::handmade_git_repository()?;
+
+        let db_file = NamedTempFile::new()?;
+        let db_path = db_file.path();
+
+        // A threshold above every file in the repository: the walk runs, nothing is measured.
+        file_stats(
+            &repo_path,
+            db_path,
+            2,
+            1000,
+            500,
+            100 * 1024 * 1024 * 1024,
+            u64::MAX,
+        )?;
+        let conn = Connection::open(db_path)?;
+        let none: i64 = conn.query_row("SELECT COUNT(*) FROM files", [], |r| r.get(0))?;
+        assert_eq!(none, 0);
+
+        // A threshold of one byte keeps every non-empty file, which is what the full run has.
+        file_stats(
+            &repo_path,
+            db_path,
+            2,
+            1000,
+            500,
+            100 * 1024 * 1024 * 1024,
+            1,
+        )?;
+        let some: i64 = conn.query_row("SELECT COUNT(*) FROM files", [], |r| r.get(0))?;
+        let empty: i64 = conn.query_row("SELECT COUNT(*) FROM files WHERE bytes = 0", [], |r| {
+            r.get(0)
+        })?;
+        assert!(some > 0);
+        assert_eq!(empty, 0, "an empty file is below a one-byte threshold");
 
         Ok(())
     }
@@ -437,7 +514,7 @@ mod tests {
 
         // Force multiple small batches (and a final partial batch) instead of one batch covering
         // the whole run, to make sure batching boundaries don't drop or duplicate files.
-        file_stats(&repo_path, db_path, 2, 1000, 1, 100 * 1024 * 1024 * 1024)?;
+        file_stats(&repo_path, db_path, 2, 1000, 1, 100 * 1024 * 1024 * 1024, 0)?;
 
         verify_database_contents(db_path)?;
 
@@ -453,7 +530,7 @@ mod tests {
 
         // A 1-byte cap is exceeded as soon as the first batch is committed, so the run must stop
         // after writing at least one file rather than erroring out or hanging.
-        file_stats(&repo_path, db_path, 2, 1000, 1, 1)?;
+        file_stats(&repo_path, db_path, 2, 1000, 1, 1, 0)?;
 
         let conn = Connection::open(db_path)?;
         let count: i64 = conn.query_row("SELECT COUNT(*) FROM files", [], |r| r.get(0))?;
@@ -472,8 +549,24 @@ mod tests {
         let db_file = NamedTempFile::new()?;
         let db_path = db_file.path();
 
-        file_stats(&repo_path, db_path, 2, 1000, 500, 100 * 1024 * 1024 * 1024)?;
-        file_stats(&repo_path, db_path, 2, 1000, 500, 100 * 1024 * 1024 * 1024)?;
+        file_stats(
+            &repo_path,
+            db_path,
+            2,
+            1000,
+            500,
+            100 * 1024 * 1024 * 1024,
+            0,
+        )?;
+        file_stats(
+            &repo_path,
+            db_path,
+            2,
+            1000,
+            500,
+            100 * 1024 * 1024 * 1024,
+            0,
+        )?;
 
         let conn = Connection::open(db_path)?;
         let files_count: i64 = conn.query_row("SELECT COUNT(*) FROM files", [], |r| r.get(0))?;

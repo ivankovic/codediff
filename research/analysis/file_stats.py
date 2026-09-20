@@ -237,7 +237,6 @@ def write_paper_variables(
     loc_percentiles,
     ast_percentiles,
     correlation,
-    too_large_to_parse,
     output_path="plots/variables_empirical.tex",
 ):
     """
@@ -266,7 +265,8 @@ def write_paper_variables(
         language_count: number of distinct languages among code files
         bytes_percentiles / loc_percentiles / ast_percentiles: dicts from
             `compute_percentiles_and_plot` (keys "p50"/"p90"/"p99"/"p999"/"p9999"/"max")
-        correlation: Pearson r between bytes and ast_nodes, code files only
+        correlation: (Pearson r between bytes and ast_nodes over every non-empty code file,
+            the same within the 99th percentile of both) - see the note at the computation
         output_path: where to write the generated .tex file
     """
     lines = [
@@ -279,14 +279,8 @@ def write_paper_variables(
         f"\\newcommand{{\\NumFiles}}{{{latex_number(file_count)}}}",
         f"\\newcommand{{\\NumFilesMillions}}{{{file_count / 1_000_000:.2f}}}",
         f"\\newcommand{{\\NumLanguages}}{{{language_count}}}",
-        f"\\newcommand{{\\CorrelationR}}{{{correlation:.4f}}}",
-        # The parser's own size limit (src/stats.rs) and how many code files sit above it. Those
-        # files are counted in bytes and lines but carry no node count, so every AST-node figure in
-        # the empirical block, its maximum included, is over the files at or below the limit -
-        # which the paper has to say where it compares that maximum with the whole-corpus
-        # robustness run, whose largest pairs are exactly the files above it (2026-09-19).
-        "\\newcommand{\\ParseLimitMiB}{1}",
-        f"\\newcommand{{\\CodeFilesTooLargeToParse}}{{{latex_number(too_large_to_parse)}}}",
+        f"\\newcommand{{\\CorrelationR}}{{{correlation[0]:.4f}}}",
+        f"\\newcommand{{\\CorrelationRTrimmed}}{{{correlation[1]:.4f}}}",
     ]
     for prefix, percentiles in [
         ("Bytes", bytes_percentiles),
@@ -467,11 +461,21 @@ def compute_code_only_stats(df):
     correlation = non_empty_code.select(pl.corr("ast_nodes", "bytes")).item()
     print("Pearson correlation between bytes and ast_nodes: ", correlation)
 
-    sample = non_empty_code.filter(
+    # The same population the fit below is drawn from: files at or below the 99th percentile of
+    # both size measures. Reported alongside the untrimmed r since 2026-09-20, when the files
+    # above 1 MiB joined the statistics (see data/corpus_stats/PROVENANCE.md) and pulled the
+    # untrimmed Pearson from 0.90 to 0.47 - Pearson over a heavy-tailed population is decided by
+    # its few largest points, which here are generated data tables whose bytes per node run from
+    # three to thirteen - while the trimmed one stayed above 0.9 and the bytes/5 rule the paper
+    # states held to the decimal.
+    trimmed = non_empty_code.filter(
         (pl.col("bytes") <= bytes_percentiles["p99"])
         & (pl.col("ast_nodes") <= ast_percentiles["p99"])
     )
-    sample = sample.sample(fraction=0.02, seed=4859)
+    correlation_trimmed = trimmed.select(pl.corr("ast_nodes", "bytes")).item()
+    print("Pearson correlation within the 99th percentile of both: ", correlation_trimmed)
+
+    sample = trimmed.sample(fraction=0.02, seed=4859)
 
     # Use the sample data for polyfit to avoid empty arrays
     if len(sample) > 0:
@@ -500,7 +504,13 @@ def compute_code_only_stats(df):
         df, ["bytes", "ast_nodes", "lines_of_code"], "data/corpus_stats/code_percentiles.csv"
     )
 
-    return language_count, bytes_percentiles, loc_percentiles, ast_percentiles, correlation
+    return (
+        language_count,
+        bytes_percentiles,
+        loc_percentiles,
+        ast_percentiles,
+        (correlation, correlation_trimmed),
+    )
 
 
 def export_size_distribution(
@@ -563,5 +573,4 @@ if __name__ == "__main__":
         loc_percentiles,
         ast_percentiles,
         correlation,
-        int(code_df.filter(pl.col("too_large_to_parse") == 1).height),
     )

@@ -272,9 +272,10 @@ distribution. Find it in `list_of_repositories.csv`.
 Measured once in full, on 2026-09-19: every modified code file in the most recent 50 commits of
 each of those repositories, 442,530 readable before/after pairs in 25 languages, diffed with no
 size cap under a 120-second budget and a 6 GB memory cap per process. **442,322 completed
-(99.95%), with no panics.** The largest completed pair holds 7.1 million AST nodes on each side,
-eight times the largest file the corpus statistics parse - those stop at 1 MiB, and the 0.1% of
-code files above that limit are where the biggest diffs live. 96 pairs ran past the budget and 112 past the memory cap; the latter are twenty generated
+(99.95%), with no panics.** The largest completed pair holds 7.1 million AST nodes on each side;
+the corpus's largest file has 23.6 million, and the files of that order the run met - all
+generated tables - needed more memory than the cap. So the goal is not met at the very top, and
+the paper says so. 96 pairs ran past the budget and 112 past the memory cap; the latter are twenty generated
 or embedded files - tree-sitter parser tables, codegen, minified bundles, a PNG as a C array - plus
 one commit of a 40,000-line single-header C++ library. Given 24 GB, eleven of those files
 complete. The run, its harness and every pair that did not complete are documented in

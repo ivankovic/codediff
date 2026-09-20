@@ -336,11 +336,11 @@ Restricted to code files, the top row of Figure~\ref{fig:corpus-shape} shows the
 bytes, lines of code and AST nodes per file. The median code file has \LocPFifty{} lines and
 \AstPFifty{} AST nodes, the 99th percentile \LocPNinetyNine{} lines and \AstPNinetyNine{} nodes,
 and the largest \LocMax{} lines and \AstMax{} nodes: three orders of magnitude between the
-typical file and the tail a tool still has to handle. The node counts are over files of at most
-\ParseLimitMiB{}\,MiB, the limit the corpus statistics parse under; the \CodeFilesTooLargeToParse{}
-code files above it are counted in bytes and lines but carry no node count, so \AstMax{} is the
-largest parsed file, not the largest file, and Section~\ref{sec:codediff} meets the ones above the
-limit.
+typical file and the tail a tool still has to handle. Files are parsed whatever their size,
+except those the statistics flag as generated from a header comment, which are skipped; the
+largest files that reach the parser are generated data that carry no such comment---voice-model
+parameters, benchmark inputs, parser tables---and every file of that order is one,
+which Section~\ref{sec:codediff} returns to.
 
 \begin{figure}
   \centering
@@ -355,15 +355,19 @@ limit.
   \caption{The shape of the corpus, every distribution drawn the same way: the share of the
   population at or below the value on the axis, with the median, 90th and 99th percentiles marked
   on each curve and the maximum in the corner. Top: size of every code file in the corpus, in
-  lines, bytes and AST nodes; the flat start of the lines and nodes curves is the empty and
-  unparseable files, which are counted. Bottom: size of every code-file modification in the
+  lines, bytes and AST nodes; the flat start of the nodes curve is the files the statistics
+  give no node count, which are counted: those they flag as generated and do not parse, those in
+  a language without a grammar, and empty ones. Bottom: size of every code-file modification in the
   corpus's recent history, in lines changed per file, lines changed per commit, and the share of
   the file an edit rewrites. The horizontal axes are logarithmic except the last.}
   \label{fig:corpus-shape}
 \end{figure*}
 
-Byte size and AST node count have a strong correlation, Pearson $r = \CorrelationR{}$, which simplifies to
-$|\text{AST}| \approx \text{bytes} / 5$ for quick estimates.
+Byte size and AST node count are strongly correlated for files within the 99th percentile of
+both, Pearson $r = \CorrelationRTrimmed{}$, which simplifies to $|\text{AST}| \approx \text{bytes} /
+5$ for quick estimates. Over every file $r$ is \CorrelationR{}: the largest one percent are the
+generated tables above, each with a byte-per-node ratio of its own, and a correlation over a
+heavy-tailed population follows its largest points.
 
 \subsection{Shape of real-world file edits}
 \label{sec:edit-shape}
@@ -906,7 +910,7 @@ ten configurations.
       & Accuracy is reported on visible nodes and on rendered lines, not on the node count alone \\
     No established tool renders more than \GumTreePerfectPct{}\% of changes perfectly (RA4.1)
       & The bar the evaluation has to clear, on the same basis \\
-    Files the corpus statistics parse reach \AstMax{} nodes (Section~\ref{sec:dataset})
+    Files reach \AstMax{} nodes (Section~\ref{sec:dataset})
       & The Robust target below \\
     \bottomrule
   \end{tabular}
@@ -1004,11 +1008,8 @@ the fixture corpus does not. Every modified code file in the corpus's recent his
 per process. \textsc{CodeDiff} completes \RobustnessFullCompletedPct{}\% of them with
 \RobustnessFullPanicked{} panics, at a median of \RobustnessFullPFiftyMs{}\,ms and a 99th
 percentile of \RobustnessFullPNinetyNineMs{}\,ms; the largest completed pair holds
-\RobustnessFullMaxSideNodes{} AST nodes on each side, nearly eight times the \AstMax{} the Robust
-target was set from. That target came from the files the corpus statistics parse, which stop at
-\ParseLimitMiB{}\,MiB (Section~\ref{sec:dataset}); the \CodeFilesTooLargeToParse{} code files
-above that limit are where these pairs come from, and the run is the first to measure them. The
-remainder is \RobustnessFullTimedOut{} pairs past
+\RobustnessFullMaxSideNodes{} AST nodes on each side, against the \AstMax{} of the largest file
+in the corpus that the Robust target names. The remainder is \RobustnessFullTimedOut{} pairs past
 the budget and \RobustnessFullKilled{} past the memory cap. The killed pairs are commits of
 \RobustnessFullKilledFiles{} distinct files, all but one of them generated parser tables,
 minified bundles or embedded binary data; the exception is one commit of a 40,000-line
@@ -1027,10 +1028,11 @@ right, and it is the only AST-aware curve that reaches 100\% before the budget l
 \TimingRepeats{}, \SpeedCodeDiffMax{}\,ms on the largest fixture in the corpus, is past the
 \SpeedTargetMs{}\,ms target; the target is stated over real-world commits and the corpus was
 selected for hard changes, but the miss is real, and the other configurations miss the same
-fixture by one to two orders of magnitude. The Robust ceiling of \AstMax{} nodes was set from
-the parsed subset of the corpus and is passed only by the whole-corpus run, where the files
-beyond it are generated tables: most complete, and what fails, fails on memory before time
-(Section~\ref{sec:threats}). And \textsc{CodeDiff} is timed
+fixture by one to two orders of magnitude. The Robust target is not met at its ceiling: the
+corpus holds files of up to \AstMax{} nodes, the largest pair the whole-corpus run diffed to
+completion has \RobustnessFullMaxSideNodes{} a side, and the larger ones it met, all generated
+tables, needed more memory than the cap rather than more time (Section~\ref{sec:threats}). And
+\textsc{CodeDiff} is timed
 in-process while every other configuration is timed as a whole process, so its curve pays no
 process start-up; Section~\ref{sec:threats} bounds that asymmetry.
 
@@ -1082,9 +1084,8 @@ shorter changes than the corpus as a whole, so RA3.2's rate may move in either d
 painting reaches larger changes.
 
 Finally, the fixture corpus's largest file holds \RobustnessMaxNodes{} AST nodes, well short of
-the Robust target's \AstMax{}, and that target itself was set from the files the corpus
-statistics parse, which the largest files in the corpus are not (Section~\ref{sec:dataset}). The
-target is exercised only by the whole-corpus run of Section~\ref{sec:codediff}, whose budget and memory cap were applied with eight processes
+the Robust target's \AstMax{}. The target is exercised only by the whole-corpus run of
+Section~\ref{sec:codediff}, whose budget and memory cap were applied with eight processes
 sharing the machine, so a pair near either limit may have crossed it for want of a core rather
 than of an algorithm. Re-running the timeouts on a quiet machine moved two of them into the
 completed set and no more, and the memory kills recur across every commit of the same files,

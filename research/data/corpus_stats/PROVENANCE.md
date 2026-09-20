@@ -153,3 +153,43 @@ run `make reclassify-tips MODE=full RECLASSIFY_FLAGS=--write` and then `make fil
 against this run's `stats.sqlite`, and record it here. Rows reclassified that way carry no
 size/AST numbers (they were never read), so `code_percentiles.csv` is unaffected by them until the
 corpus is re-walked.
+
+## The files above 1 MiB, 2026-09-20
+
+Until 2026-09-19 `stats::expand_from_code` did not parse a file over 1 MiB (`too_large_to_parse`,
+no node count), a guard from the initial commit with no measured reason. The 4,014 code files above
+that size (19.9 GB of source, the largest 101 MB) were therefore counted in bytes and lines but
+absent from every AST-node figure - including the 905,004-node maximum the paper's Robust target
+was set from, which the whole-corpus robustness run then exceeded by a factor of eight on pairs
+it completed. The cap was removed and those files measured in place:
+
+| | |
+|---|---|
+| Command | `file_stats --path /var/tmp/research/full/repositories --db /var/tmp/research/full/stats.sqlite --min-bytes 1048576`, as a systemd unit capped at 48 GB |
+| `--min-bytes` | new: re-processes one size class and upserts by path, so the other seven million rows are untouched |
+| Wall clock | 2026-09-20 00:27 end; 1h12m CPU across 7 workers, 22 GB memory peak |
+| Outcome | 3,474 parsed, 9 gave up at the 60 s parse budget, 531 flagged generated (skipped, as always); `too_large_to_parse` is now 0 everywhere and stays in the schema |
+| New maximum | 23,584,040 nodes, `MycroftAI-mimic1/lang/vid_gb_ap/vid_gb_ap_cg_12_params.c` (83 MB of voice-model parameters) |
+
+Two harness faults surfaced and were fixed on the way. The first attempt aborted on a stack
+overflow after 774 files: `count_nodes` and `visit_for_kind_stats` recursed once per tree level,
+and a file nested thousands deep beat even the 256 MB worker stack; both walks are iterative now,
+with a 50,000-level test. The second attempt then had all seven workers stuck for over an hour on
+five 2-4 MB `.h` files holding nothing but a comma-separated byte array to be `#include`d into an
+initializer - not C at top level, so tree-sitter stays in error recovery for the whole file, its
+one super-linear path. A 60-second per-file parse budget (tree-sitter's progress callback) now
+records such a file as `failed_to_parse`; the 9 above are those.
+
+What moved in `variables_empirical.tex`: `\AstMax` 905,004 -> 23,584,040, `\AstPNinetyNine`
+23,948 -> 25,674, and `\CorrelationR` 0.8986 -> 0.4702. The last is Pearson over a population
+that now has a heavy tail: the files above 1 MiB are generated data whose bytes per node run from
+three to thirteen, and Pearson follows its largest points. Within the 99th percentile of both size
+measures - the population the bytes/5 fit is drawn from - r is 0.9133 (`\CorrelationRTrimmed`,
+new), and the median bytes per node is 4.8 either way; the paper reports both and says why.
+
+Note what a zero node count means in this database, since 311,112 code files (8.0%) carry one:
+177,991 are flagged `automatically_generated` from a header comment and never parsed (a rule older
+than this run), 128,288 are in a language the classifier knows but codediff has no grammar for,
+4,824 are empty, 9 gave up. The largest files in the corpus are generated too, but carry no such
+comment and so are parsed; that is why the corpus-shape figure's nodes curve starts flat and its
+maximum is a data table.
