@@ -1152,6 +1152,88 @@ fn visible_diff_options_sorts_by_the_selected_column_with_a_name_tiebreak() {
     );
 }
 
+/// `Size` ranks cases by their changed-line count the way `Unmarked` ranks them by work left:
+/// ascending puts the smallest diffs first and unknown ones last, and `f` narrows to the diffs
+/// that have any changed lines, or to the empty ones that are broken fixtures.
+#[test]
+fn visible_diff_options_sorts_and_filters_by_diff_size() {
+    let options = vec![
+        ("charlie".to_string(), "handmade"),
+        ("alpha".to_string(), "handmade"),
+        ("bravo".to_string(), "handmade"),
+        ("delta".to_string(), "handmade"),
+    ];
+    let sizes = std::collections::HashMap::from([
+        ("charlie".to_string(), 40),
+        ("alpha".to_string(), 3),
+        ("bravo".to_string(), 0),
+    ]);
+    let data = DiffPickerData {
+        sizes: Some(&sizes),
+        ..DiffPickerData::default()
+    };
+
+    let mut view = sort_view(DiffColumn::Size);
+    assert_eq!(
+        visible_diff_options(&options, &view, data),
+        vec!["bravo", "alpha", "charlie", "delta"],
+        "smallest diff first, unknown last"
+    );
+    view.sort = view.sort.toggled(DiffColumn::Size);
+    assert_eq!(
+        visible_diff_options(&options, &view, data),
+        vec!["delta", "charlie", "alpha", "bravo"],
+        "largest first when flipped, unknown to the front"
+    );
+
+    let mut filtered = DiffPickerView::default();
+    filtered.filters.size = FlagFilter::Yes;
+    assert_eq!(
+        visible_diff_options(&options, &filtered, data),
+        vec!["alpha", "charlie", "delta"],
+        "'has changed lines' drops the empty diff and keeps the unknown"
+    );
+    filtered.filters.size = FlagFilter::No;
+    assert_eq!(
+        visible_diff_options(&options, &filtered, data),
+        vec!["bravo", "delta"],
+        "'empty diffs only' keeps the empty diff and the unknown"
+    );
+    assert_eq!(
+        filtered.filters.labels(),
+        vec!["empty diffs only"],
+        "the title bar names the filter"
+    );
+}
+
+/// The `o` picker's `Size` reads a case directory with the same measure as the `O` picker's, so
+/// the two never disagree about how big a change is.
+#[test]
+fn changed_line_count_reads_a_case_directory_like_a_sample() {
+    let dir = tempfile::tempdir().unwrap();
+    fs::write(
+        dir.path().join("before.rs.test"),
+        "fn a() {}\nfn b() {}\nfn c() {}\n",
+    )
+    .unwrap();
+    fs::write(
+        dir.path().join("after.rs.test"),
+        "fn a() {}\nfn B() {}\nfn c() {}\nfn d() {}\n",
+    )
+    .unwrap();
+    assert_eq!(
+        changed_line_count(dir.path()),
+        Some(3),
+        "one line replaced (2) and one added (1)"
+    );
+    let empty = tempfile::tempdir().unwrap();
+    assert_eq!(
+        changed_line_count(empty.path()),
+        None,
+        "no pair to read is unknown, not empty"
+    );
+}
+
 /// The `Name` filter is a case-insensitive substring over the case name, and is the one filter
 /// that needs no corpus scan at all.
 #[test]
@@ -4754,23 +4836,15 @@ fn open_diff_picker_h_and_l_move_the_column_cursor_and_clamp_at_the_ends() {
         "the cursor column persists on App too, so the next o reopens on it"
     );
 
-    // Seven presses from the far left overshoots the seven-column table by one.
+    // Eight presses from the far left overshoots the eight-column table by one.
     let app = press_in_diff_picker(
         options.clone(),
         DiffPickerView::default(),
-        &[
-            KeyCode::Char('l'),
-            KeyCode::Char('l'),
-            KeyCode::Char('l'),
-            KeyCode::Char('l'),
-            KeyCode::Char('l'),
-            KeyCode::Char('l'),
-            KeyCode::Char('l'),
-        ],
+        &[KeyCode::Char('l'); DiffColumn::ALL.len()],
     );
     assert_eq!(
         picker_view(&app).column,
-        DiffColumn::Invariant,
+        DiffColumn::Size,
         "l must clamp at the last column, not wrap round to Name"
     );
 

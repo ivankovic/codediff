@@ -140,7 +140,7 @@
 *   o              open a different test case: a table of every directory under
 *                  src/test/data/diffs/{handmade,small,full,stratified}/, one row per case and one
 *                  column per thing worth triaging on - Name, Dataset, Cmpl, Unmarked, Paint,
-*                  Disagree, Invariant (see `DiffColumn`). j/k move between rows, Enter opens,
+*                  Disagree, Invariant, Size (see `DiffColumn`). j/k move between rows, Enter opens,
 *                  Esc cancels.
 *                  h/l move a cursor between *columns* (the current one is highlighted in the
 *                  header), and the two keys that act on it are the same for every column:
@@ -152,15 +152,16 @@
 *                         empty clears, Esc cancels - while it is open every key is text, not a
 *                         command), the dataset cycle on Dataset (all -> handmade -> small -> full
 *                         -> stratified -> all, see DIFF_DATASETS), and an off -> yes -> no cycle
-*                         on each of the other five (e.g. Paint: all, painted only, unpainted
-*                         only). Filters on different columns combine as an AND: every active one
+*                         on each of the other six (e.g. Paint: all, painted only, unpainted
+*                         only; Size: all, has changed lines, empty diffs only). Filters on different columns combine as an AND: every active one
 *                         must match for a row to show. A row whose value for a column isn't known
 *                         - the scan behind it hasn't been run, or the case failed to load - stays
 *                         visible under either direction of that column's filter (see
 *                         `FlagFilter::keeps`).
-*                  Cmpl/Unmarked, Paint, Disagree and Invariant each need a corpus-wide scan that
-*                  only runs when `s` or `f` is first pressed on them, and it blocks - roughly 12s
-*                  for Cmpl/Unmarked and 7s for Disagree over 513 fixtures on a 4-core machine (see
+*                  Cmpl/Unmarked, Paint, Disagree, Invariant and Size each need a corpus-wide scan
+*                  that only runs when `s` or `f` is first pressed on them, and it blocks - roughly
+*                  12s for Cmpl/Unmarked and 7s for Disagree over 513 fixtures on a 4-core machine,
+*                  one external `diff` per case for Size (see
 *                  `scan_corpus`, which runs them across threads; h/l alone never triggers one),
 *                  so those columns read `?` until then. Cursor column, sort and
 *                  every filter persist across closing and reopening this picker (they live on
@@ -399,15 +400,16 @@ e              on a diff, enter/edit its description.md (written on Enter, empty
                  works regardless of status; carried into the generated test stub
                  if present when later promoted)
 o              open a different test case (src/test/data/diffs/) as a table:
-                 Name, Dataset, Cmpl, Unmarked, Paint, Disagree, Invariant. j/k
-                 pick a row, h/l pick a column, s sorts by that column (again to
+                 Name, Dataset, Cmpl, Unmarked, Paint, Disagree, Invariant, Size.
+                 j/k pick a row, h/l pick a column, s sorts by that column (again to
                  reverse), f filters on it -- substring on Name, dataset cycle on
                  Dataset, off/yes/no on the rest. Filters AND across columns.
                  Invariant counts the ground-truth invariants this case's own
-                 mapping breaks, the number its invariants() test asserts on.
-                 The scans behind Cmpl/Unmarked, Paint, Disagree and Invariant
-                 run on the first s or f on that column (Cmpl/Unmarked blocks for
-                 ~12s and Disagree ~7s on the full corpus); until then those
+                 mapping breaks, the number its invariants() test asserts on;
+                 Size is the diff's changed lines, as in the O picker.
+                 The scans behind Cmpl/Unmarked, Paint, Disagree, Invariant and
+                 Size run on the first s or f on that column (Cmpl/Unmarked blocks
+                 for ~12s and Disagree ~7s on the full corpus); until then those
                  columns read ?, and a ? row survives either filter direction.
                  Cursor, sort and filters persist across o
 O              open a sampled candidate (src/test/data/samples/) as a table:
@@ -622,6 +624,11 @@ fn visible_diff_options(
                 .invariant
                 .keeps(data.invariants_of(name).map(|count| count > 0))
         })
+        .filter(|(name, _)| {
+            filters
+                .size
+                .keeps(data.size_of(name).map(|lines| lines > 0))
+        })
         .map(|(name, _)| name.as_str())
         .collect();
 
@@ -651,6 +658,7 @@ fn visible_diff_options(
             DiffColumn::Invariant => {
                 sort_rank(data.invariants_of(a)).cmp(&sort_rank(data.invariants_of(b)))
             }
+            DiffColumn::Size => sort_rank(data.size_of(a)).cmp(&sort_rank(data.size_of(b))),
         };
         let primary = if view.sort.descending {
             primary.reverse()
@@ -862,6 +870,11 @@ fn ensure_diff_column_data(app: &mut App, column: DiffColumn) {
         DiffColumn::Invariant => {
             if app.diff_invariants.is_none() {
                 app.diff_invariants = Some(compute_diff_invariants());
+            }
+        }
+        DiffColumn::Size => {
+            if app.diff_sizes.is_none() {
+                app.diff_sizes = Some(compute_diff_sizes());
             }
         }
         // Both are read straight off `list_available_cases`' own output - nothing to scan.
@@ -1425,18 +1438,43 @@ fn raw_before_after(dir: &Path) -> Option<(String, String)> {
 /// with. `0` (not an error) if the sample's files can't be read or `diff` can't be run, so a
 /// missing/malformed sample just sorts as if it were empty rather than breaking the picker.
 fn sample_diff_line_count(name: &str) -> usize {
-    let Some((before, after)) = raw_before_after(&samples_root().join(name)) else {
-        return 0;
-    };
-    let Ok(diff) = run_unix_diff(before.as_bytes(), after.as_bytes()) else {
-        return 0;
-    };
+    changed_line_count(&samples_root().join(name)).unwrap_or(0)
+}
+
+/// The changed-line count of the before/after pair in `dir` - `sample_diff_line_count`'s
+/// measure, shared with the `o` picker's `Size` column (`diff_case_size`), which reads a case
+/// directory instead of a sample's. `None` when the pair cannot be read or `diff` cannot run;
+/// the two callers decide what that means for them.
+fn changed_line_count(dir: &Path) -> Option<usize> {
+    let (before, after) = raw_before_after(dir)?;
+    let diff = run_unix_diff(before.as_bytes(), after.as_bytes()).ok()?;
+    Some(count_changed_lines(&diff))
+}
+
+/// `+`/`-` lines of a unified diff, excluding its `+++`/`---` header.
+fn count_changed_lines(diff: &str) -> usize {
     diff.lines()
         .filter(|line| {
             (line.starts_with('+') && !line.starts_with("+++"))
                 || (line.starts_with('-') && !line.starts_with("---"))
         })
         .count()
+}
+
+/// Changed lines in `name`'s unified diff, for the `o` picker's `Size` column - `None` for a
+/// case whose directory or files cannot be read, carried through to the picker as `?` rather
+/// than as an empty diff, the same fail-open rule every other column keeps.
+fn diff_case_size(name: &str) -> Option<usize> {
+    changed_line_count(&diffs_case_dir(name)?)
+}
+
+/// Builds `App::diff_sizes` for the whole corpus, for the `o` picker's `Size` column: one
+/// external `diff` per case, in parallel like the other scans, a few seconds over the corpus.
+fn compute_diff_sizes() -> std::collections::HashMap<String, usize> {
+    let Ok(names) = list_available_case_names() else {
+        return std::collections::HashMap::new();
+    };
+    scan_corpus(&names, diff_case_size)
 }
 
 /// One column of the `o` picker's table, left to right - the unit `h`/`l` move the cursor
@@ -1459,12 +1497,17 @@ enum DiffColumn {
     Paint,
     Disagree,
     Invariant,
+    /// Changed lines in the unified `diff` of the case's before/after files - the same measure,
+    /// taken the same way, as the `O` picker's `Size` (`sample_diff_line_count`), so the two
+    /// pickers rank a change by one number. Added 2026-09-20 so a session can start from the
+    /// smallest unsolved diffs, or hunt the largest.
+    Size,
 }
 
 impl DiffColumn {
     /// Left-to-right order, shared by the header row, the cursor movement below, and the width
     /// list in `render_open_diff_picker` - so a column can only ever be added in one place.
-    const ALL: [DiffColumn; 7] = [
+    const ALL: [DiffColumn; 8] = [
         DiffColumn::Name,
         DiffColumn::Dataset,
         DiffColumn::Cmpl,
@@ -1472,6 +1515,7 @@ impl DiffColumn {
         DiffColumn::Paint,
         DiffColumn::Disagree,
         DiffColumn::Invariant,
+        DiffColumn::Size,
     ];
 
     fn index(self) -> usize {
@@ -1500,6 +1544,7 @@ impl DiffColumn {
             DiffColumn::Paint => "Paint",
             DiffColumn::Disagree => "Disagree",
             DiffColumn::Invariant => "Invariant",
+            DiffColumn::Size => "Size",
         }
     }
 
@@ -1512,6 +1557,9 @@ impl DiffColumn {
             DiffColumn::Paint => Some(("painted only", "unpainted only")),
             DiffColumn::Disagree => Some(("disagreements only", "agreeing only")),
             DiffColumn::Invariant => Some(("breaks invariants", "invariants hold")),
+            // The same yes/no the `O` picker's `Size` has: a case whose two sides differ by no
+            // line at all is a broken fixture, and this is how to find the ones to delete.
+            DiffColumn::Size => Some(("has changed lines", "empty diffs only")),
             DiffColumn::Name | DiffColumn::Dataset => None,
         }
     }
@@ -1571,6 +1619,7 @@ struct DiffFilters {
     paint: FlagFilter,
     disagree: FlagFilter,
     invariant: FlagFilter,
+    size: FlagFilter,
 }
 
 impl DiffFilters {
@@ -1581,6 +1630,7 @@ impl DiffFilters {
             DiffColumn::Paint => Some(&mut self.paint),
             DiffColumn::Disagree => Some(&mut self.disagree),
             DiffColumn::Invariant => Some(&mut self.invariant),
+            DiffColumn::Size => Some(&mut self.size),
             DiffColumn::Name | DiffColumn::Dataset => None,
         }
     }
@@ -1592,6 +1642,7 @@ impl DiffFilters {
             DiffColumn::Paint => self.paint,
             DiffColumn::Disagree => self.disagree,
             DiffColumn::Invariant => self.invariant,
+            DiffColumn::Size => self.size,
             DiffColumn::Name | DiffColumn::Dataset => FlagFilter::Off,
         }
     }
@@ -1698,6 +1749,7 @@ struct DiffPickerData<'a> {
     text_painted: Option<&'a HashMap<String, bool>>,
     disagreement: Option<&'a HashMap<String, usize>>,
     invariants: Option<&'a HashMap<String, usize>>,
+    sizes: Option<&'a HashMap<String, usize>>,
 }
 
 impl<'a> DiffPickerData<'a> {
@@ -1707,7 +1759,14 @@ impl<'a> DiffPickerData<'a> {
             text_painted: app.diff_text_painted.as_ref(),
             disagreement: app.diff_disagreement.as_ref(),
             invariants: app.diff_invariants.as_ref(),
+            sizes: app.diff_sizes.as_ref(),
         }
+    }
+
+    /// Changed lines in `name`'s unified diff - `None` before the scan has run and for a case
+    /// whose files could not be read, the same "not known" every other column draws.
+    fn size_of(&self, name: &str) -> Option<usize> {
+        self.sizes.and_then(|map| map.get(name)).copied()
     }
 
     fn unmarked_of(&self, name: &str) -> Option<usize> {

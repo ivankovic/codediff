@@ -1558,6 +1558,10 @@ pub(crate) fn render_open_diff_picker(
                 Some(count) => count.to_string(),
                 None => "?".to_string(),
             };
+            let size_cell = match data.size_of(name) {
+                Some(lines) => lines.to_string(),
+                None => "?".to_string(),
+            };
             Row::new(vec![
                 Cell::from(if noted {
                     format!("* {name}")
@@ -1570,6 +1574,7 @@ pub(crate) fn render_open_diff_picker(
                 Cell::from(painted_mark),
                 Cell::from(disagree_cell),
                 Cell::from(invariant_cell),
+                Cell::from(size_cell),
             ])
             .style(style)
         })
@@ -1636,6 +1641,7 @@ pub(crate) fn render_open_diff_picker(
             Constraint::Length(7),
             Constraint::Length(10),
             Constraint::Length(11),
+            Constraint::Length(7),
         ],
     )
     .header(header)
