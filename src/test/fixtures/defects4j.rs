@@ -138,7 +138,17 @@ mod java_defects4j_cli_5_util;
 #[cfg(test)]
 mod java_defects4j_closure_103_controlflowanalysis;
 #[cfg(test)]
+mod java_defects4j_closure_107_commandlinerunner;
+#[cfg(test)]
+mod java_defects4j_closure_119_globalnamespace;
+#[cfg(test)]
+mod java_defects4j_closure_133_jsdocinfoparser;
+#[cfg(test)]
+mod java_defects4j_closure_135_devirtualizeprototypemethods;
+#[cfg(test)]
 mod java_defects4j_closure_147_checkglobalthis;
+#[cfg(test)]
+mod java_defects4j_closure_149_commandlinerunner;
 #[cfg(test)]
 mod java_defects4j_closure_165_recordtypebuilder;
 #[cfg(test)]
@@ -146,11 +156,21 @@ mod java_defects4j_closure_1_removeunusedvars;
 #[cfg(test)]
 mod java_defects4j_closure_28_inlinecostestimator;
 #[cfg(test)]
+mod java_defects4j_closure_31_compiler;
+#[cfg(test)]
+mod java_defects4j_closure_77_codegenerator;
+#[cfg(test)]
+mod java_defects4j_closure_79_varcheck;
+#[cfg(test)]
 mod java_defects4j_closure_80_nodeutil;
 #[cfg(test)]
 mod java_defects4j_codec_1_soundexutils;
 #[cfg(test)]
 mod java_defects4j_codec_8_base64inputstream;
+#[cfg(test)]
+mod java_defects4j_compress_1_cpioarchiveoutputstream;
+#[cfg(test)]
+mod java_defects4j_compress_25_ziparchiveinputstream;
 #[cfg(test)]
 mod java_defects4j_compress_33_deflatecompressorinputstream;
 #[cfg(test)]
@@ -158,9 +178,21 @@ mod java_defects4j_compress_42_unixstat;
 #[cfg(test)]
 mod java_defects4j_compress_44_checksumcalculatinginputstream;
 #[cfg(test)]
+mod java_defects4j_compress_4_changesetperformer;
+#[cfg(test)]
+mod java_defects4j_compress_4_cpioarchiveoutputstream;
+#[cfg(test)]
+mod java_defects4j_compress_4_tararchiveoutputstream;
+#[cfg(test)]
+mod java_defects4j_compress_4_ziparchiveoutputstream;
+#[cfg(test)]
 mod java_defects4j_csv_1_extendedbufferedreader;
 #[cfg(test)]
 mod java_defects4j_csv_2_csvrecord;
+#[cfg(test)]
+mod java_defects4j_gson_11_typeadapters;
+#[cfg(test)]
+mod java_defects4j_gson_5_iso8601utils;
 #[cfg(test)]
 mod java_defects4j_gson_6_jsonadapterannotationtypeadapterfactory;
 #[cfg(test)]
