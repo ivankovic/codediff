@@ -183,6 +183,20 @@ buys, though: it would sit in the same secret store as the key it protects.
 A repository secret is enough. `pages.yml` reads it in its `build` job, which has no environment,
 so an environment secret would need that job attached to one first.
 
+**Check that the secret is not empty**, because nothing else will tell you:
+
+```sh
+gpg --armor --export-secret-keys '<KEYID>' | wc -c   # thousands of bytes, never 0
+```
+
+`gh secret set` accepts empty stdin without complaint, so an export that produced nothing — a
+mistyped key id, a `<KEYID>` placeholder pasted literally, a pinentry with no terminal to prompt
+on — stores a secret that exists, lists under `gh secret list` with a timestamp, and expands to
+the empty string in the workflow. That is how this failed the first time it ran, and the run log
+is no help: Actions prints a non-empty secret as `***` and an empty one as nothing at all, which
+looks identical to a secret the job cannot read. `pages.yml` now rejects a value that is not an
+armoured private key block, so the next occurrence says so by name.
+
 The private key exists only in that secret. **Back it up somewhere you control**: losing it means
 generating a new one, and every user who added the old key gets a signature failure on their next
 `apt update` until they re-fetch `codediff-archive-keyring.gpg`. That is also what makes rotation

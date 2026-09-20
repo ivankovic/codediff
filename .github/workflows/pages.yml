@@ -77,13 +77,29 @@ jobs:
             # never meant to hold would be noise. On this repository it is an error: an apt
             # repository that quietly stops being published breaks `apt update` for everyone who
             # already added it.
+            #
+            # "or empty", not just "unset", because the two are indistinguishable here and the
+            # empty one is the trap: `gh secret set` accepts empty stdin without complaint, so an
+            # export that produced nothing - a mistyped key id, a pinentry that could not prompt -
+            # stores a secret that exists, lists fine, and expands to nothing. That is exactly how
+            # this failed the first time it ran.
             if [ "$GITHUB_REPOSITORY" = "ivankovic/codediff" ]; then
-              echo "::error::APT_GPG_PRIVATE_KEY is not set - the apt repository cannot be signed"
+              echo "::error::APT_GPG_PRIVATE_KEY is unset or empty - the apt repository cannot be signed"
               exit 1
             fi
-            echo "::warning::APT_GPG_PRIVATE_KEY is not set - skipping the apt repository"
+            echo "::warning::APT_GPG_PRIVATE_KEY is unset or empty - skipping the apt repository"
             exit 0
           fi
+
+          # Shape check before the script gets it, so a truncated or wrongly-pasted secret is named
+          # for what it is rather than surfacing as gpg's rather opaque "no secret key" later.
+          case "$APT_GPG_PRIVATE_KEY" in
+            *"BEGIN PGP PRIVATE KEY BLOCK"*) ;;
+            *)
+              echo "::error::APT_GPG_PRIVATE_KEY does not look like an armoured private key" >&2
+              echo "::error::expected the output of: gpg --armor --export-secret-keys <KEYID>"
+              exit 1 ;;
+          esac
 
           # apt-ftparchive lives in apt-utils, which the runner image happens to carry today.
           # Checking rather than assuming costs nothing and does not spend an `apt-get update` on
