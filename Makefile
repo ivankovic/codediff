@@ -47,7 +47,7 @@ OUT_DIR ?= research/data/ablation
 
 .PHONY: coverage test test-mapping-site-js test-python build install install-hooks benchmark-quality \
 	diff-inventory lint-python ci benchmark-ablation check-quality update-quality-baseline \
-	check-painting-attribution update-painting-attribution \
+	check-painting-attribution update-painting-attribution diff-gif \
 	deploy-checks deploy-crates deploy-github deploy benchmark-speed \
 	benchmark-speed-update-baseline
 
@@ -155,6 +155,30 @@ benchmark-quality:
 # checked in so the inventory is readable without running anything, not because it is authored.
 diff-inventory:
 	cargo run --release --features $(FEATURES) --bin diff_inventory
+
+# Records assets/diff-vs-codediff.gif: the README's animation of what a syntax-aware diff buys you,
+# on the showcase's "Replace two loops with built-ins" case. A bar sweeps across the viewer and
+# back, swapping GNU `diff`'s whole-line marks for codediff's mapping on the same unmoved code.
+#
+# Three steps, and each is somebody else's source of truth: `generate_showcase` bakes the case both
+# ways (it already does, for the Pages showcase - this target adds no new notion of "as diff marks
+# it"), `scripts/diff_gif_segments.js` runs the browser viewer's own model.js over each bake to get
+# the coloured runs, and `scripts/record_diff_gif.py` draws them. Nothing here decides what to
+# paint, which is the point: a second painter would drift from the product it advertises.
+#
+# The GIF is committed, unlike everything `generate_showcase` produces, because a README image has
+# to resolve in a plain checkout and on crates.io. Re-run this after anything that changes how the
+# viewer paints, and commit the result.
+#
+# Needs `web` on top of `test-fixtures` (the showcase generator serialises web payloads), Node for
+# the extractor, and research/'s uv environment for Pillow.
+DIFF_GIF_CASE ?= python-refactoring
+DIFF_GIF_OUT ?= assets/diff-vs-codediff.gif
+diff-gif:
+	@tmp=$$(mktemp -d) && trap 'rm -rf "$$tmp"' EXIT; \
+	cargo run --release --features test-fixtures,web --bin generate_showcase -- --out "$$tmp" >/dev/null && \
+	cd research && uv run python ../scripts/record_diff_gif.py \
+		--showcase "$$tmp" --case $(DIFF_GIF_CASE) --out ../$(DIFF_GIF_OUT)
 
 # Lints every Python file in the repository: the analysis scripts under research/, the CI mirror
 # and coverage report under scripts/, and the bdiff driver under assets/. One target so that this,

@@ -14,6 +14,17 @@ operator as changed, instead of anchoring on the text as unix diff would](/readm
 **[Try it in the browser](https://ivankovic.github.io/codediff/showcase/)**: twenty real changes in
 codediff's own viewer, each shown as Unix `diff` marks it and as codediff maps it, one click apart.
 
+The same idea in one image - two hand-rolled loops becoming `sum`, `len`, `max` and `min`, with a
+bar sweeping between the two readings of it. `diff` can only mark whole lines, so it calls the
+assignments deleted and reinserted; codediff leaves `total = ` alone and paints what the
+right-hand side became, matching `numbers` in `max(numbers)` to the `numbers[0]` it came from:
+
+![An animation of the same Python refactoring painted two ways. A vertical bar sweeps left to right
+and back across a two-pane diff. On one side of the bar, GNU diff marks whole lines as deleted and
+inserted; on the other, codediff paints only the parts that changed - `sum(numbers)` and
+`len(numbers)` rather than the whole assignment, and `numbers` shown as moved rather than
+rewritten.](/assets/diff-vs-codediff.gif)
+
 # Installation
 
 ```
