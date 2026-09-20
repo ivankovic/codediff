@@ -5752,6 +5752,75 @@ fn action_match_to_end_stops_at_a_kind_mismatch_but_keeps_prior_matches() {
     assert_eq!(app.after.cursor_id, after_id);
 }
 
+/// `f` on a change that only adds lines: the mismatch is the after tree carrying something extra,
+/// so the After panel takes the focus and the sweep stops instead of raising a modal.
+#[test]
+fn action_match_to_end_focuses_after_when_the_diff_only_adds() {
+    let before_source = "fn main() {\n    a();\n}\n";
+    let after_source = "fn main() {\n    a();\n    b();\n}\n";
+    let before_tree = parse_rust(before_source);
+    let after_tree = parse_rust(after_source);
+    let before_root = before_tree.root_node();
+    let after_root = after_tree.root_node();
+
+    let mut app = App::new(
+        "test".to_string(),
+        CaseOrigin::Diffs,
+        before_root.id(),
+        after_root.id(),
+        HumanMapping::default(),
+    );
+    // Starts on the side the assertion must not be able to get for free.
+    app.focus = Focus::Before;
+    let before_flat = FlatIndex::new(flatten_visible(before_root, &app.before.collapsed, None));
+    let after_flat = FlatIndex::new(flatten_visible(after_root, &app.after.collapsed, None));
+    let no_hashes = rustc_hash::FxHashMap::default();
+
+    let outcome = action_match_to_end(
+        &mut app,
+        &before_flat,
+        &after_flat,
+        before_root,
+        after_root,
+        before_source.as_bytes(),
+        after_source.as_bytes(),
+        &no_hashes,
+        &no_hashes,
+    )
+    .unwrap();
+
+    match outcome {
+        ActionOutcome::Done(msg) => assert!(
+            msg.contains("After panel"),
+            "the status line should say where the focus went, got: {msg}"
+        ),
+        ActionOutcome::NeedsModal(modal) => {
+            panic!("a diff that only adds should not need a modal, got {modal:?}")
+        }
+    }
+    assert_eq!(app.focus, Focus::After);
+    assert!(
+        !app.mapping.entries.is_empty(),
+        "the common prefix should still have been matched"
+    );
+}
+
+/// The unit behind both: only-adds and only-removes each name a side, and anything else - a mixed
+/// diff, an empty one - names none, which is what keeps the modal for the cases that need it.
+#[test]
+fn one_sided_diff_names_a_side_only_when_the_diff_has_one() {
+    let adds = "--- before\n+++ after\n@@ -1 +1,2 @@\n a();\n+b();\n";
+    let removes = "--- before\n+++ after\n@@ -1,2 +1 @@\n a();\n-b();\n";
+    let mixed = "--- before\n+++ after\n@@ -1 +1 @@\n-a();\n+b();\n";
+    assert_eq!(one_sided_diff(adds), Some(Side::After));
+    assert_eq!(one_sided_diff(removes), Some(Side::Before));
+    assert_eq!(one_sided_diff(mixed), None);
+    assert_eq!(one_sided_diff(""), None);
+    // The `---`/`+++` header starts with the characters being counted and is not a change: a diff
+    // of nothing but a header names no side.
+    assert_eq!(one_sided_diff("--- before\n+++ after\n"), None);
+}
+
 fn collect_subtree_ids(node: Node, out: &mut Vec<usize>) {
     out.push(node.id());
     let mut cursor = node.walk();
@@ -5767,6 +5836,11 @@ fn action_match_to_end_does_not_pair_a_trailing_statement_against_the_wrong_node
     // prefix is consumed the After cursor lands on the block's closing `}` while the Before
     // cursor is still sitting on `c();` -- a kind mismatch, so the sweep must stop there rather
     // than inventing a match for `c();`.
+    //
+    // This diff only removes lines, so the stop is the focus-moving one rather than the modal
+    // (`one_sided_diff`): the Before panel is where `c();` is and where the next mark goes. What
+    // the test is really guarding either way is the line below it - that nothing paired `c();`
+    // with the `}` it happened to be sitting opposite.
     let before_source = "fn main() {\n    a();\n    b();\n    c();\n}\n";
     let after_source = "fn main() {\n    a();\n    b();\n}\n";
     let before_tree = parse_rust(before_source);
@@ -5791,6 +5865,8 @@ fn action_match_to_end_does_not_pair_a_trailing_statement_against_the_wrong_node
         after_root.id(),
         HumanMapping::default(),
     );
+    // Starts on the far side, so the focus assertion below cannot pass by default.
+    app.focus = Focus::After;
     let before_flat = FlatIndex::new(flatten_visible(before_root, &app.before.collapsed, None));
     let after_flat = FlatIndex::new(flatten_visible(after_root, &app.after.collapsed, None));
     let no_hashes = rustc_hash::FxHashMap::default();
@@ -5813,19 +5889,16 @@ fn action_match_to_end_does_not_pair_a_trailing_statement_against_the_wrong_node
         "the shared a(); b(); prefix should have been matched"
     );
     match outcome {
-        ActionOutcome::NeedsModal(modal) => match *modal {
-            Modal::ConfirmKindMismatch {
-                before_kind,
-                after_kind,
-                ..
-            } => assert_ne!(before_kind, after_kind),
-            other => panic!("expected ConfirmKindMismatch, got {other:?}"),
-        },
-        ActionOutcome::Done(msg) => panic!(
-            "expected the sweep to stop on a kind mismatch once `c();` has nothing left to pair \
-             with, action completed instead: {msg}"
+        ActionOutcome::Done(msg) => assert!(
+            msg.contains("Before panel"),
+            "the sweep should stop and say where the focus went, got: {msg}"
+        ),
+        ActionOutcome::NeedsModal(modal) => panic!(
+            "a diff that only removes should hand the Before panel the focus rather than ask, \
+             got {modal:?}"
         ),
     }
+    assert_eq!(app.focus, Focus::Before);
 
     let caches = rebuild_caches(&app.mapping.entries, before_root, after_root);
     for id in untouchable_ids {

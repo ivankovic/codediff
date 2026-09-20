@@ -1461,6 +1461,39 @@ fn count_changed_lines(diff: &str) -> usize {
         .count()
 }
 
+/// Which side a unified diff lies entirely on: `After` when it only ever adds lines, `Before` when
+/// it only ever removes them, and `None` when it does both - or neither.
+///
+/// `f` (`action_match_to_end`) uses this to decide whether a kind mismatch it walks into needs
+/// asking about. In a change that only adds, the before file survives into the after one intact,
+/// so two nodes of different kinds at the same point in a lockstep walk means the *after* tree is
+/// carrying something the before tree has no counterpart for - and the mirror of that for a change
+/// that only removes. Which panel wants the next mark is then already decided by the shape of the
+/// diff, and a modal asking about it is a keystroke spent on a question with one answer.
+///
+/// Header lines are skipped on the same rule [`count_changed_lines`] uses, and for the same reason:
+/// `---`/`+++` start with the characters this is counting and are not changes.
+fn one_sided_diff(diff: &str) -> Option<Side> {
+    let mut adds = false;
+    let mut removes = false;
+    for line in diff.lines() {
+        if line.starts_with("+++") || line.starts_with("---") {
+            continue;
+        }
+        if line.starts_with('+') {
+            adds = true;
+        } else if line.starts_with('-') {
+            removes = true;
+        }
+    }
+    match (adds, removes) {
+        (true, false) => Some(Side::After),
+        (false, true) => Some(Side::Before),
+        // Both, or a pair that does not differ at all: nothing here to infer a side from.
+        _ => None,
+    }
+}
+
 /// Changed lines in `name`'s unified diff, for the `o` picker's `Size` column - `None` for a
 /// case whose directory or files cannot be read, carried through to the picker as `?` rather
 /// than as an empty diff, the same fail-open rule every other column keeps.

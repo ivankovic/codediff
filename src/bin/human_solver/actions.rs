@@ -597,6 +597,42 @@ pub(crate) fn action_match_to_end(
         if before_node.kind() != after_node.kind() {
             app.before.cursor_id = before_node.id();
             app.after.cursor_id = after_node.id();
+            // A one-sided diff already answers the question the modal would ask - see
+            // [`one_sided_diff`]. Hand the panel that owns the discrepancy the focus and stop
+            // there, so the next keystroke lands on the node that needs marking instead of on a
+            // `y`/`n` prompt. A mixed diff still asks, because then it genuinely is a question.
+            //
+            // Stopping rather than marking is deliberate: which node is inserted is the shape of
+            // the diff talking, but *what* to record for it is the ground truth's author talking,
+            // and this walk has already written enough entries without being asked twice.
+            if let Some(side) = run_unix_diff(before_src, after_src)
+                .ok()
+                .as_deref()
+                .and_then(one_sided_diff)
+            {
+                app.focus = match side {
+                    Side::Before => Focus::Before,
+                    Side::After => Focus::After,
+                };
+                let panel = match side {
+                    Side::Before => "Before",
+                    Side::After => "After",
+                };
+                let reason = match side {
+                    Side::Before => "the diff only removes",
+                    Side::After => "the diff only adds",
+                };
+                return Ok(ActionOutcome::Done(format!(
+                    "{} - kinds differ ({} vs {}); {reason}, so the {panel} panel has the focus",
+                    if matched == 0 {
+                        "Nothing matched".to_string()
+                    } else {
+                        format!("Matched {matched} pair(s)")
+                    },
+                    before_node.kind(),
+                    after_node.kind(),
+                )));
+            }
             return Ok(kind_mismatch_modal(before_node, after_node, false));
         }
 
