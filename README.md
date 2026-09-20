@@ -26,9 +26,33 @@ The first `cargo install` takes a few minutes, because of this and the `lto = "f
 profile.
 
 Pre-built binaries for Linux, macOS (Intel and Apple Silicon), and Windows are attached to every
-[GitHub release](https://github.com/ivankovic/codediff/releases/latest), along with an unofficial
-`.deb` for Debian and Ubuntu, a `codediff-completions-and-man.tar.gz` holding the man page and
-shell completions, and a `SHA256SUMS.txt` covering all of them.
+[GitHub release](https://github.com/ivankovic/codediff/releases/latest), along with unofficial
+`.deb` packages for Debian and Ubuntu, a `codediff-completions-and-man.tar.gz` holding the man page
+and shell completions, and a `SHA256SUMS.txt` covering all of them.
+
+## Debian and Ubuntu
+
+Those `.deb` packages are also served as a signed apt repository, so `apt upgrade` picks up new
+versions like any other package. amd64 and arm64:
+
+```sh
+sudo install -d -m 0755 /etc/apt/keyrings
+curl -fsSL https://ivankovic.github.io/codediff/apt/codediff-archive-keyring.gpg \
+  | sudo tee /etc/apt/keyrings/codediff-archive-keyring.gpg > /dev/null
+echo "deb [signed-by=/etc/apt/keyrings/codediff-archive-keyring.gpg] \
+https://ivankovic.github.io/codediff/apt stable main" \
+  | sudo tee /etc/apt/sources.list.d/codediff.list > /dev/null
+sudo apt update && sudo apt install codediff
+```
+
+The repository is **unofficial** - it is built and signed by this project, not by Debian or
+Ubuntu, and nothing in it has been through either distribution's review. `signed-by` is what keeps
+that scoped: the key above can vouch for `codediff` and for nothing else on your system. Read
+[`packaging/README.md`](packaging/README.md) for how the packages are built and why a package in
+the Debian archive proper is not a reachable goal.
+
+It carries the last five releases, so `apt install codediff=<version>` can still reach a previous
+one. Older versions stay attached to their own GitHub release.
 
 On NixOS, or anywhere with Nix installed, no installation step is needed at all:
 

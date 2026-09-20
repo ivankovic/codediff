@@ -1,4 +1,4 @@
-name: Publish human mapping site and showcase
+name: Publish human mapping site, showcase and apt repository
 
 # Builds and deploys the read-only human_mapping.json viewer (generate_mapping_site) to GitHub
 # Pages on every push to main - both halves of that file: the node mapping, as two annotated ASTs
@@ -7,6 +7,12 @@ name: Publish human mapping site and showcase
 # HTML/CSS/JS is built fresh from src/test/data/diffs/ each run. Requires Pages to be enabled once
 # in this repo's Settings -> Pages, with source set to "GitHub Actions" (a one-time manual step,
 # not something a workflow file can do on its own).
+#
+# It also publishes the signed apt repository under /apt, rebuilt from the .deb assets of recent
+# GitHub releases. That is here rather than in release.yml because Pages has exactly one
+# deployment for the whole site: a second workflow deploying an apt tree of its own would replace
+# the viewer, and vice versa. The release workflow's `apt` job dispatches this one once its
+# packages are attached, which is what makes a new version appear to `apt update`.
 
 on:
   push:
@@ -45,12 +51,72 @@ jobs:
       - name: Generate showcase
         run: cargo run --release --features test-fixtures,web --bin generate_showcase -- --out site/showcase
 
+      # Last of the three, and that ordering is load-bearing: `generate_mapping_site` wipes and
+      # recreates `site`, so an apt tree built before it would simply be deleted.
+      #
+      # Built from the .deb assets of recent releases, never from this checkout. What users
+      # install through apt has to be the exact package the release workflow attached and
+      # SHA256SUMS.txt covers - a rebuild from `main` would be a different binary under the same
+      # version number. Nothing here is committed either: the tree is a pure function of the
+      # releases that exist, so any run can reconstruct it from scratch.
+      - name: Build the apt repository
+        env:
+          GH_TOKEN: ${{ github.token }}
+          APT_GPG_PRIVATE_KEY: ${{ secrets.APT_GPG_PRIVATE_KEY }}
+          APT_GPG_PASSPHRASE: ${{ secrets.APT_GPG_PASSPHRASE }}
+          # GitHub Pages has a soft limit of 1 GB per site, and each release contributes two .debs
+          # of roughly 15 MB, so the pool keeps a window rather than every release ever published.
+          # Five is enough to downgrade out of a bad release; anything older stays downloadable
+          # from its own GitHub release page.
+          KEEP_RELEASES: 5
+        run: |
+          set -euo pipefail
+
+          if [ -z "$APT_GPG_PRIVATE_KEY" ]; then
+            # A fork cannot read the secret, and failing its Pages build over a signing key it was
+            # never meant to hold would be noise. On this repository it is an error: an apt
+            # repository that quietly stops being published breaks `apt update` for everyone who
+            # already added it.
+            if [ "$GITHUB_REPOSITORY" = "ivankovic/codediff" ]; then
+              echo "::error::APT_GPG_PRIVATE_KEY is not set - the apt repository cannot be signed"
+              exit 1
+            fi
+            echo "::warning::APT_GPG_PRIVATE_KEY is not set - skipping the apt repository"
+            exit 0
+          fi
+
+          # apt-ftparchive lives in apt-utils, which the runner image happens to carry today.
+          # Checking rather than assuming costs nothing and does not spend an `apt-get update` on
+          # every run.
+          command -v apt-ftparchive >/dev/null || {
+            sudo apt-get update -qq && sudo apt-get install -y -qq apt-utils
+          }
+
+          # Drafts and pre-releases are excluded on purpose: a suite named `stable` must not hand
+          # people a package from a release that was never announced as one.
+          mkdir -p apt-debs
+          tags="$(gh release list --repo "$GITHUB_REPOSITORY" --limit "$KEEP_RELEASES" \
+                    --exclude-drafts --exclude-pre-releases --json tagName -q '.[].tagName')"
+          for tag in $tags; do
+            if gh release download "$tag" --repo "$GITHUB_REPOSITORY" \
+                 --pattern '*.deb' --dir "apt-debs/$tag" 2>/dev/null; then
+              echo "$tag: $(find "apt-debs/$tag" -name '*.deb' | wc -l) .deb asset(s)"
+            else
+              # Expected for any release cut before the .deb job existed, and for one whose
+              # packages are still uploading. Not fatal - the pool just skips that version.
+              echo "$tag: no .deb assets"
+            fi
+          done
+
+          scripts/build_apt_repo.sh --debs apt-debs --out site/apt
+
       - uses: actions/configure-pages@v6
 
-      # v4 dropped dotfiles from the artifact. `generate_mapping_site` wipes and recreates its
-      # output directory holding only index.html, fixtures/ and assets/ - no dotfiles, and Pages
-      # deployed from an Actions artifact never runs Jekyll, so no .nojekyll is needed either. If
-      # the generator ever starts emitting one, this action will silently drop it.
+      # v4 dropped dotfiles from the artifact. Nothing in `site` is one: `generate_mapping_site`
+      # wipes and recreates its output directory holding only index.html, fixtures/ and assets/,
+      # the showcase and the apt tree add plain directories, and Pages deployed from an Actions
+      # artifact never runs Jekyll, so no .nojekyll is needed either. If any of the three ever
+      # starts emitting a dotfile, this action will silently drop it.
       - uses: actions/upload-pages-artifact@v5
         with:
           path: site

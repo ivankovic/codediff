@@ -10,7 +10,7 @@ extension, which is a separate repository rather than a recipe here.
 | --- | --- | --- |
 | Arch (AUR) | `aur/PKGBUILD` | ready to submit |
 | Gentoo | `gentoo/dev-util/codediff/` | ready for an overlay |
-| Debian/Ubuntu | `[package.metadata.deb]` in `../Cargo.toml` | built by CI, attached to each release |
+| Debian/Ubuntu | `[package.metadata.deb]` in `../Cargo.toml` | **published** — signed apt repository at [ivankovic.github.io/codediff/apt](https://ivankovic.github.io/codediff/apt) |
 | Nix / NixOS | `nix/package.nix`, `../flake.nix` | works today via `nix run` |
 | VS Code | [`vscode.md`](vscode.md) | **published** — v0.0.1 on the Marketplace and Open VSX, built from [codediff-vscode](https://github.com/ivankovic/codediff-vscode) |
 
@@ -103,11 +103,12 @@ The `LICENSE` variable enumerates the vendored crates' licenses alongside the pa
 
 ## Debian
 
-The `.deb` is built with [`cargo-deb`](https://github.com/kornelski/cargo-deb) and attached to each
-GitHub release. It is **unofficial**, and the distinction matters: a package in the Debian archive
-proper would require every one of the 293 dependency crates — 24 tree-sitter grammars among them —
-to be packaged as `librust-*-dev` first. Almost none are. That path is not reachable, so this is a
-`cargo-deb` artifact, not a route into Debian.
+The `.deb` is built with [`cargo-deb`](https://github.com/kornelski/cargo-deb), attached to each
+GitHub release for amd64 and arm64, and served from an apt repository on GitHub Pages. It is
+**unofficial**, and the distinction matters: a package in the Debian archive proper would require
+every one of the 293 dependency crates — 24 tree-sitter grammars among them — to be packaged as
+`librust-*-dev` first. Almost none are. That path is not reachable, so this is a `cargo-deb`
+artifact served from our own repository, not a route into Debian.
 
 To build one locally:
 
@@ -124,6 +125,68 @@ cargo deb --no-build
 
 The generation step is not optional: `cargo-deb` copies assets from disk and cannot run the binary
 itself, so those four files must exist before it runs.
+
+**Both architectures are built natively**, on `ubuntu-latest` and `ubuntu-24.04-arm`, unlike the
+plain binaries in the same workflow, which reach aarch64 by cross-compiling. Two steps here cannot
+cross: `depends = "$auto"` resolves the built ELF's needs against the packages installed on the
+build machine, and the man page and completions come from *running* the binary. Cross-building the
+arm64 `.deb` on an x86-64 host would stamp the host's libc version onto an arm64 package.
+
+### The apt repository
+
+`scripts/build_apt_repo.sh` turns a directory of `.deb` files into a signed, static apt tree —
+pool, per-architecture `Packages`, a `Release` signed both inline (`InRelease`) and detached
+(`Release.gpg`), and the public key dearmoured for `signed-by`. The Pages workflow calls it; it
+takes no repository state and can be run against any directory of packages:
+
+```sh
+export APT_GPG_PRIVATE_KEY="$(gpg --armor --export-secret-keys <KEYID>)"
+scripts/build_apt_repo.sh --debs path/to/debs --out /tmp/apt
+```
+
+**Nothing about the repository is committed.** The pool is rebuilt on every Pages run from the
+`.deb` assets of the last five releases, so the published tree is a pure function of the releases
+that exist. Losing it costs one workflow run. Five is a `KEEP_RELEASES` in `pages.yml`, set
+against the 1 GB soft limit on a Pages site rather than for any packaging reason.
+
+The two halves are wired together in an order that matters:
+
+1. A `v*` tag runs `release.yml`. The `deb` matrix builds and uploads both architectures.
+2. Its `apt` job — `needs: deb`, so strictly after those uploads — dispatches `pages.yml`.
+3. `pages.yml` downloads every recent release's `.deb`, rebuilds the tree, signs it, and deploys
+   it alongside the mapping site.
+
+Step 2 exists because the obvious alternative does not work: a `release: published` trigger fires
+when `softprops/action-gh-release` creates the release from whichever matrix job finishes first,
+which is long before the packages are attached. And the apt tree is deployed by `pages.yml` rather
+than by `release.yml` because Pages has a single deployment for the whole site — two workflows
+deploying separately would each erase the other.
+
+### The signing key
+
+One-time setup, and the only manual step in any of this. The key signs nothing but this
+repository's `Release` file, so it wants no expiry — an expired key breaks `apt update` for every
+user on a date nobody is watching, which is what the trailing `never` is for:
+
+```sh
+gpg --batch --pinentry-mode loopback --passphrase '' \
+    --quick-gen-key 'CodeDiff apt repository <marko@ivankovic.me>' rsa4096 sign never
+gpg --armor --export-secret-keys '<KEYID>' | gh secret set APT_GPG_PRIVATE_KEY
+```
+
+`--pinentry-mode loopback --passphrase ''` is not optional shorthand: `--batch` on its own makes
+gpg reach for a pinentry it has no terminal for and fail with `Inappropriate ioctl for device`.
+Drop all three flags to be prompted for a passphrase instead, and store it as a second secret,
+`APT_GPG_PASSPHRASE` — the script signs without one when it is unset. Note what that passphrase
+buys, though: it would sit in the same secret store as the key it protects.
+
+A repository secret is enough. `pages.yml` reads it in its `build` job, which has no environment,
+so an environment secret would need that job attached to one first.
+
+The private key exists only in that secret. **Back it up somewhere you control**: losing it means
+generating a new one, and every user who added the old key gets a signature failure on their next
+`apt update` until they re-fetch `codediff-archive-keyring.gpg`. That is also what makes rotation
+expensive, so rotate on evidence, not on a schedule.
 
 ## Nix
 
@@ -143,3 +206,7 @@ and `cargoLock.lockFile` for a `cargoHash`, since nixpkgs does not carry the loc
 4. `make deploy` — publishes to crates.io, tags, and triggers the release workflow.
 5. Read the new `SHA256SUMS.txt` off the release and fill in `sha256sums` / the Gentoo `Manifest`.
 6. Push the updated recipes to the AUR and the overlay.
+7. Check that the apt repository picked the release up — `curl -s
+   https://ivankovic.github.io/codediff/apt/dists/stable/main/binary-amd64/Packages | grep ^Version`
+   should name the new version. It refreshes itself (step 2 above), so this is a check, not a task;
+   if it is stale, re-run the Pages workflow.

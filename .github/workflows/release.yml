@@ -123,16 +123,32 @@ jobs:
   # An *unofficial* .deb, built with cargo-deb from the [package.metadata.deb] block in Cargo.toml.
   # It is not, and cannot readily become, a package in the Debian archive: that would require all
   # 293 dependency crates (24 tree-sitter grammars among them) to exist as `librust-*-dev` first.
-  # See packaging/README.md.
+  # See packaging/README.md. These are also what the apt repository on GitHub Pages is built from
+  # - it pools the .deb assets of the last few releases, so every one of these is a file users
+  # install through `apt`, not only a download link.
   deb:
-    name: deb (amd64)
-    runs-on: ubuntu-latest
+    name: deb (${{ matrix.arch }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            os: ubuntu-latest
+          - arch: arm64
+            # A native arm64 runner, deliberately unlike the `build` job above, which reaches
+            # aarch64 by cross-compiling. Two things in this job cannot cross: `depends = "$auto"`
+            # resolves the built ELF's needs against the packages installed on the build machine,
+            # which on an x86-64 host would either fail or stamp the host's libc version onto an
+            # arm64 package, and the man page and completions are produced by *running* the
+            # binary. Both are native operations, so the runner is the cheaper answer.
+            os: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
-          key: release-deb
+          key: release-deb-${{ matrix.arch }}
 
       - name: Install cargo-deb
         run: cargo install cargo-deb --locked
@@ -150,23 +166,57 @@ jobs:
           ./target/release/codediff util completions fish > target/dist/codediff.fish
 
       - name: Package
-        run: cargo deb --no-build --output codediff_amd64.deb
+        run: cargo deb --no-build --output codediff_${{ matrix.arch }}.deb
 
       # Catches an asset path in Cargo.toml going stale: `cargo deb` would happily produce a
       # package missing the man page, and nobody would notice until someone ran `man codediff`.
+      # The Architecture check is the arm64 counterpart of the `build` job's `file` assertion: a
+      # package whose control field disagrees with its contents is one apt will happily offer to
+      # the wrong machines.
       - name: Verify contents
         run: |
-          dpkg-deb --contents codediff_amd64.deb
+          dpkg-deb --contents codediff_${{ matrix.arch }}.deb
           for path in usr/bin/codediff usr/share/man/man1/codediff.1 \
                       usr/share/bash-completion/completions/codediff; do
-            dpkg-deb --contents codediff_amd64.deb | grep -q " ./$path" \
+            dpkg-deb --contents codediff_${{ matrix.arch }}.deb | grep -q " ./$path" \
               || { echo "::error::missing $path in .deb"; exit 1; }
           done
+          got="$(dpkg-deb -f codediff_${{ matrix.arch }}.deb Architecture)"
+          [ "$got" = "${{ matrix.arch }}" ] \
+            || { echo "::error::.deb declares Architecture $got, expected ${{ matrix.arch }}"; exit 1; }
 
       - name: Upload to release
         uses: softprops/action-gh-release@v2
         with:
-          files: codediff_amd64.deb
+          files: codediff_${{ matrix.arch }}.deb
+
+  # Rebuild the apt repository that GitHub Pages serves, now that this run's .debs are attached to
+  # the release. It has to be triggered from here rather than by a `release: published` event:
+  # softprops/action-gh-release creates the release from whichever matrix job finishes first, long
+  # before the `deb` jobs above have uploaded anything, so that event would publish a repository
+  # missing the very packages the tag was cut for.
+  #
+  # Pages has one deployment for the whole site, so this dispatches the workflow that builds the
+  # site rather than deploying an apt tree of its own - a second deployment would simply overwrite
+  # the first. See .github/workflows/pages.yml.
+  apt:
+    name: refresh apt repository
+    needs: deb
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      # On `main`, not on the tag: the site generator and the Pages workflow itself are taken from
+      # the default branch, while the packages come from the release assets rather than from any
+      # checkout. Dispatching a tag ref would run whatever pages.yml looked like at that tag.
+      #
+      # A workflow_dispatch sent with GITHUB_TOKEN does start a run - it and repository_dispatch
+      # are the two documented exceptions to the rule that token-triggered events do not cascade.
+      - name: Trigger the Pages workflow
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run pages.yml --repo "$GITHUB_REPOSITORY" --ref main
 
   # One SHA256SUMS.txt over every artifact. This is what makes the packaging recipes maintainable:
   # a PKGBUILD's `sha256sums=()`, an ebuild's Manifest and a Nix `hash =` all need a checksum
