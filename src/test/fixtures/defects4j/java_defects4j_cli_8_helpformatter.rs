@@ -18,19 +18,31 @@
 use anyhow::Result;
 
 use crate::test;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 
 #[test]
 fn mapping() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("java-defects4j-cli-8-helpformatter")
+    // `findWrapPos(text, width, nextLineTabStop)` becomes `findWrapPos(text, width, 0)`. The
+    // human mapping pairs the third argument across the kind change (`identifier` against
+    // `decimal_integer_literal`) because `text` and `width` are untouched and nothing else is
+    // left for the `0` to be; codediff deletes the identifier and inserts the literal instead
+    // (reason `APTED("large_flat_subtree")`).
+    //
+    // Invariant 18 does not require this pairing and cannot: an `argument_list` in
+    // tree-sitter-java declares no fields at all, so the third argument has no named slot to
+    // persist. Position here is fixed by elimination rather than by a field, which is a wider
+    // rule than the one that shipped - see the census's "what follows from this".
+    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
+        "java-defects4j-cli-8-helpformatter",
+        1,
+        1,
+    )
 }
 
 #[test]
 fn painting() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test and record the
-    // limit it reports instead.
-    assert_matches_human_painting_within_limit("java-defects4j-cli-8-helpformatter", 100.0)
+    assert_matches_human_painting_within_limit("java-defects4j-cli-8-helpformatter", 0.0)
 }
 
 #[test]

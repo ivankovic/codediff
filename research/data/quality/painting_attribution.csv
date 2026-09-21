@@ -19,8 +19,8 @@ c-genymobile-scrcpy-add-a-define-2,full,796,0,0,0,1,0
 c-genymobile-scrcpy-add-a-define-2,minimal,796,0,0,0,1,0
 c-genymobile-scrcpy-add-to-import-path-and-move-imports-around,full,1020,55,38,42,2,0
 c-genymobile-scrcpy-add-to-import-path-and-move-imports-around,minimal,1020,44,18,41,2,0
-c-genymobile-scrcpy-big-change,full,1415,572,100,510,2,0
-c-genymobile-scrcpy-big-change,minimal,1415,410,7,409,2,0
+c-genymobile-scrcpy-big-change,full,1415,572,100,510,2,1
+c-genymobile-scrcpy-big-change,minimal,1415,410,7,409,2,1
 c-genymobile-scrcpy-rename-and-add-a-define,full,672,22,22,0,2,0
 c-genymobile-scrcpy-rename-and-add-a-define,minimal,672,4,4,0,2,0
 c-genymobile-scrcpy-rename-defines,full,595,232,232,0,2,0
@@ -515,10 +515,16 @@ java-defects4j-cli-34-optionbuilder,full,20474,0,0,0,1,0
 java-defects4j-cli-34-optionbuilder,minimal,20474,0,0,0,1,0
 java-defects4j-cli-35-options,full,19277,0,0,0,2,0
 java-defects4j-cli-35-options,minimal,19277,0,0,0,2,0
+java-defects4j-cli-40-typehandler,full,16323,24,26,26,2,0
+java-defects4j-cli-40-typehandler,minimal,16323,0,2,2,2,0
 java-defects4j-cli-5-util,full,4314,0,0,0,2,0
 java-defects4j-cli-5-util,minimal,4314,0,0,0,2,0
+java-defects4j-cli-8-helpformatter,full,58958,0,16,16,1,0
+java-defects4j-cli-8-helpformatter,minimal,58958,0,16,16,1,0
 java-defects4j-closure-1-removeunusedvars,full,69630,0,0,0,2,0
 java-defects4j-closure-1-removeunusedvars,minimal,69630,0,0,0,2,0
+java-defects4j-closure-10-nodeutil,full,190790,26,26,0,2,0
+java-defects4j-closure-10-nodeutil,minimal,190790,2,2,0,2,0
 java-defects4j-closure-103-controlflowanalysis,full,66141,53,0,53,2,0
 java-defects4j-closure-103-controlflowanalysis,minimal,66141,40,0,40,2,0
 java-defects4j-closure-107-commandlinerunner,full,74211,0,0,0,2,0
@@ -611,6 +617,8 @@ java-defects4j-jacksondatabind-99-referencetype,full,17846,0,0,0,2,0
 java-defects4j-jacksondatabind-99-referencetype,minimal,17846,0,0,0,2,0
 java-defects4j-jsoup-16-documenttype,full,2596,107,86,21,2,0
 java-defects4j-jsoup-16-documenttype,minimal,2596,25,4,21,2,0
+java-defects4j-jsoup-17-treebuilderstate,full,136194,0,14,14,1,0
+java-defects4j-jsoup-17-treebuilderstate,minimal,136194,0,14,14,1,0
 java-defects4j-jsoup-2-parser,full,19676,0,0,0,2,0
 java-defects4j-jsoup-2-parser,minimal,19676,0,0,0,2,0
 java-defects4j-jsoup-24-tokeniserstate,full,122293,0,0,0,2,0

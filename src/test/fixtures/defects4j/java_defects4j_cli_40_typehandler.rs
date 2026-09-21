@@ -18,19 +18,27 @@
 use anyhow::Result;
 
 use crate::test;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 
 #[test]
 fn mapping() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("java-defects4j-cli-40-typehandler")
+    // A `return` becomes a `throw` in the deepest arm of a nine-deep `if` chain. The human
+    // mapping removes the whole `return_statement` and inserts the whole `throw_statement`;
+    // codediff keeps the `;` the two have in common and pairs it across. Two mismatches, one per
+    // statement, and both are that same semicolon seen from each side. Whether a shared delimiter
+    // survives a statement being replaced is the kind of question invariant 18 deliberately does
+    // not answer for a construct substitution - see the 2026-09-21 kind-mismatch census.
+    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
+        "java-defects4j-cli-40-typehandler",
+        2,
+        2,
+    )
 }
 
 #[test]
 fn painting() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test and record the
-    // limit it reports instead.
-    assert_matches_human_painting_within_limit("java-defects4j-cli-40-typehandler", 100.0)
+    assert_matches_human_painting_within_limit("java-defects4j-cli-40-typehandler", 0.15)
 }
 
 #[test]
