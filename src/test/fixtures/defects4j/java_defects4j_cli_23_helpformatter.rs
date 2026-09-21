@@ -18,19 +18,26 @@
 use anyhow::Result;
 
 use crate::test;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 
 #[test]
 fn mapping() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("java-defects4j-cli-23-helpformatter")
+    // A `throw` in one `if` arm becomes an expression statement in another. The mapping removes
+    // and inserts both statements whole; codediff keeps what the two have in common and pairs it
+    // across - the `;`, and the name that is a `type_identifier` on one side and an `identifier`
+    // on the other. Four of the five are that reuse, the fifth an `if_statement` codediff matches
+    // where the mapping does not (reason `APTED("large_flat_subtree")`).
+    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
+        "java-defects4j-cli-23-helpformatter",
+        5,
+        4,
+    )
 }
 
 #[test]
 fn painting() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test and record the
-    // limit it reports instead.
-    assert_matches_human_painting_within_limit("java-defects4j-cli-23-helpformatter", 100.0)
+    assert_matches_human_painting_within_limit("java-defects4j-cli-23-helpformatter", 0.12)
 }
 
 #[test]

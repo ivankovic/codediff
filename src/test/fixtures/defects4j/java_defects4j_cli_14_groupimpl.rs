@@ -19,7 +19,7 @@ use anyhow::Result;
 
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants_with_known_violations;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 
 #[test]
 fn mapping() -> Result<()> {
@@ -41,8 +41,5 @@ fn painting() -> Result<()> {
 
 #[test]
 fn invariants() -> Result<()> {
-    // Invariant 10 under both presets, one leaf pair - the `;` on before row 262 / after row 258 -
-    // painted gone on one side and new on the other while the tree mapping calls the text the same.
-    // Recorded as found, waiting on a repair of the painting.
-    assert_ground_truth_invariants_with_known_violations("java-defects4j-cli-14-groupimpl", 2)
+    assert_ground_truth_invariants("java-defects4j-cli-14-groupimpl")
 }

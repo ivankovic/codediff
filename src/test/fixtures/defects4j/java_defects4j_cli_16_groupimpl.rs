@@ -19,7 +19,7 @@ use anyhow::Result;
 
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants_with_known_violations;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 
 #[test]
 fn mapping() -> Result<()> {
@@ -33,8 +33,5 @@ fn painting() -> Result<()> {
 
 #[test]
 fn invariants() -> Result<()> {
-    // Invariant 4, after row 92 paints every visible character Insert but leaves the line's own
-    // 12-byte indent unpainted (" option.setParent(this);"). Recorded as found; one painted range
-    // needs extending to the start of the line's content.
-    assert_ground_truth_invariants_with_known_violations("java-defects4j-cli-16-groupimpl", 1)
+    assert_ground_truth_invariants("java-defects4j-cli-16-groupimpl")
 }

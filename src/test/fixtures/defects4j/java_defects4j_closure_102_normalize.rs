@@ -18,19 +18,19 @@
 use anyhow::Result;
 
 use crate::test;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 
 #[test]
 fn mapping() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("java-defects4j-closure-102-normalize")
+    test::helper::human_mapping::assert_matches_human_mapping(
+        "java-defects4j-closure-102-normalize",
+    )
 }
 
 #[test]
 fn painting() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test and record the
-    // limit it reports instead.
-    assert_matches_human_painting_within_limit("java-defects4j-closure-102-normalize", 100.0)
+    assert_matches_human_painting_within_limit("java-defects4j-closure-102-normalize", 0.03)
 }
 
 #[test]

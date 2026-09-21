@@ -17,31 +17,28 @@
  */
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants_with_known_violations;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping(
+    // Repairing the invariant-18 violation put this mismatch here: the mapping now pairs
+    // `type: undefined` with `type: GREENBONE_SENSOR_SCANNER_TYPE` across `pair.value`, and
+    // codediff deletes the `undefined` instead (reason `APTED("greedy_anchor_block")`). One
+    // mismatch, and it is the whole of the change.
+    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "tsx-greenbone-gsa-add-import-and-use-it",
-    )
-}
-
-#[test]
-fn invariants() -> Result<()> {
-    // 2026-09-21, invariant 18, one: `type: undefined,` becomes
-    // `type: GREENBONE_SENSOR_SCANNER_TYPE,` inside an object literal whose other keys are
-    // unchanged (`pair.value`, row 264 -> 267). The `pair` is matched and `.value` holds one
-    // child on each side, so this key's value changed; the mapping deletes and inserts instead.
-    assert_ground_truth_invariants_with_known_violations(
-        "tsx-greenbone-gsa-add-import-and-use-it",
+        1,
         1,
     )
 }
 
 #[test]
+fn invariants() -> Result<()> {
+    assert_ground_truth_invariants("tsx-greenbone-gsa-add-import-and-use-it")
+}
+
+#[test]
 fn painting() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test and record the
-    // limit it reports instead.
-    assert_matches_human_painting_within_limit("tsx-greenbone-gsa-add-import-and-use-it", 100.0)
+    assert_matches_human_painting_within_limit("tsx-greenbone-gsa-add-import-and-use-it", 0.76)
 }

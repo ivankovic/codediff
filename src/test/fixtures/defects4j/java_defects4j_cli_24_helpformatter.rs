@@ -19,18 +19,24 @@ use anyhow::Result;
 
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants_with_known_violations;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 
 #[test]
 fn mapping() -> Result<()> {
-    // A `throw_statement` is replaced by an `expression_statement`: the human deletes one and
-    // inserts the other, while codediff re-uses the `;` and reads the old `type_identifier` against
-    // the new `identifier`. Four re-used leaves, two on each side - the scaffolding-reuse family
-    // again.
+    // A `throw new ...` becomes an assignment. The mapping removes and inserts both statements
+    // whole; codediff pairs the class name across the replacement, matching the
+    // `type_identifier` of the old `object_creation_expression` to the `identifier` of the new
+    // assignment (reason `APTED("large_flat_subtree")`). Two mismatches, one per side of that one
+    // reused name.
+    //
+    // 2026-09-21, 4,4 -> 2,2: the ground-truth repair that cleared this fixture's invariant-1
+    // violation also halved the disagreement, so the old limit sat above the measurement. Caught
+    // by `the_quality_baseline_accuracy_columns_are_a_projection_of_the_stub_limits`, which is
+    // what keeps a clamp from outliving what it measured.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "java-defects4j-cli-24-helpformatter",
-        4,
-        4,
+        2,
+        2,
     )
 }
 
@@ -41,8 +47,5 @@ fn painting() -> Result<()> {
 
 #[test]
 fn invariants() -> Result<()> {
-    // Invariant 1 under both presets, before row 825's last painted run ends on a space rather than
-    // on a visible character (the `+` continuation of the `IllegalStateException` message).
-    // Recorded as found; one painted range needs its trailing space trimmed.
-    assert_ground_truth_invariants_with_known_violations("java-defects4j-cli-24-helpformatter", 2)
+    assert_ground_truth_invariants("java-defects4j-cli-24-helpformatter")
 }

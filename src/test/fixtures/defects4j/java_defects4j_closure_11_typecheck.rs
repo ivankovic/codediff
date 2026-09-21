@@ -18,19 +18,24 @@
 use anyhow::Result;
 
 use crate::test;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 
 #[test]
 fn mapping() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("java-defects4j-closure-11-typecheck")
+    // An `else` token: the mapping removes it, codediff pairs it with the `else` of a different
+    // `if`. Two mismatches, one from each side of that single token
+    // (reason `APTED("large_flat_subtree")`).
+    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
+        "java-defects4j-closure-11-typecheck",
+        2,
+        2,
+    )
 }
 
 #[test]
 fn painting() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test and record the
-    // limit it reports instead.
-    assert_matches_human_painting_within_limit("java-defects4j-closure-11-typecheck", 100.0)
+    assert_matches_human_painting_within_limit("java-defects4j-closure-11-typecheck", 0.0)
 }
 
 #[test]

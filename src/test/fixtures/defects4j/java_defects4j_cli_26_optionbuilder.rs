@@ -18,19 +18,25 @@
 use anyhow::Result;
 
 use crate::test;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 
 #[test]
 fn mapping() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("java-defects4j-cli-26-optionbuilder")
+    // A local variable declaration is inserted and another removed; the mapping treats them as
+    // separate statements while codediff reuses the old one's parts for the new - its
+    // `type_identifier`, `identifier`, `=` and `;` - and pairs a `line_comment` across as well.
+    // Seven mismatches, all of that one substitution, all `APTED("large_flat_subtree")`.
+    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
+        "java-defects4j-cli-26-optionbuilder",
+        7,
+        7,
+    )
 }
 
 #[test]
 fn painting() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test and record the
-    // limit it reports instead.
-    assert_matches_human_painting_within_limit("java-defects4j-cli-26-optionbuilder", 100.0)
+    assert_matches_human_painting_within_limit("java-defects4j-cli-26-optionbuilder", 0.86)
 }
 
 #[test]

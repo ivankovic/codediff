@@ -19,32 +19,34 @@ use anyhow::Result;
 
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants_with_known_violations;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 
 #[test]
 fn mapping() -> Result<()> {
     // First baseline, not a regression: this fixture was promoted with its human mapping already
     // written, so the stub's generated 0/0 never reflected a measurement.
+    //
+    // 2026-09-21, 102/69 -> 103/70: repairing the invariant-18 violation added a mismatch rather
+    // than removing one. The mapping now pairs `0` with `keyboard` across
+    // `assignment_expression.right`, which is the reading the invariant argued for, and codediff
+    // still deletes the `0` (reason `APTED("qualified_name")`). The ground truth got better and
+    // the measured distance to codediff grew, which is what a clamp is for.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "c-genymobile-scrcpy-big-change",
-        102,
-        69,
+        103,
+        70,
     )
 }
 
 #[test]
 fn painting() -> Result<()> {
-    assert_matches_human_painting_within_limit("c-genymobile-scrcpy-big-change", 40.44)
+    // 2026-09-21, 40.44 -> 41.07: the same mapping repair that moved the mapping clamp. Pairing
+    // `0` with `keyboard` changes what codediff's rendering is compared against, so the painting
+    // number moves with the tree mapping rather than independently of it.
+    assert_matches_human_painting_within_limit("c-genymobile-scrcpy-big-change", 41.07)
 }
 
 #[test]
 fn invariants() -> Result<()> {
-    // 2026-09-21, invariant 18, one: `devices->count = 0;` becomes
-    // `devices->keyboard = keyboard;` and the mapping deletes the `0` while inserting the
-    // `keyboard` (`assignment_expression.right`, row 7 -> 12), although it matches everything
-    // else in that statement - the assignment, the `devices->...` field expression, the `=`, and
-    // `count` -> `keyboard` as an `Update`. That last one is the tell: a same-kind rename to an
-    // unrelated name was recorded as a match, while the cross-kind `0` -> `keyboard` in the same
-    // statement was not, which is the schema's doing rather than the author's judgement.
-    assert_ground_truth_invariants_with_known_violations("c-genymobile-scrcpy-big-change", 1)
+    assert_ground_truth_invariants("c-genymobile-scrcpy-big-change")
 }

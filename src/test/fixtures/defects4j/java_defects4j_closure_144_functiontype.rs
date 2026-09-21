@@ -18,19 +18,28 @@
 use anyhow::Result;
 
 use crate::test;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 
 #[test]
 fn mapping() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("java-defects4j-closure-144-functiontype")
+    // `new FunctionType(registry, null, null, ...)` becomes
+    // `new FunctionType(registry, null, source, ...)`. The mapping pairs the third argument across
+    // the kind change (`null_literal` against `identifier`); codediff deletes it and inserts the
+    // identifier instead (reason `APTED("large_flat_subtree")`). The third instance of this shape
+    // after `cli-8-helpformatter` and `jsoup-17-treebuilderstate`: an argument changing lexical
+    // class inside an `argument_list`, which tree-sitter-java gives no fields, so invariant 18
+    // reaches it only through the elimination clause.
+    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
+        "java-defects4j-closure-144-functiontype",
+        1,
+        1,
+    )
 }
 
 #[test]
 fn painting() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test and record the
-    // limit it reports instead.
-    assert_matches_human_painting_within_limit("java-defects4j-closure-144-functiontype", 100.0)
+    assert_matches_human_painting_within_limit("java-defects4j-closure-144-functiontype", 0.02)
 }
 
 #[test]
