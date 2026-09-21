@@ -788,6 +788,16 @@ fn preset_name(options: crate::diff::text::RenderOptions) -> Option<&'static str
 /// answer - so both presets are held to it, which is exactly the property a single painting
 /// claims. That is why the name matters less than the count: `Only one solution` is the
 /// conventional name for the single case, but any single painting means the same thing.
+/// Whether `name` designates the `Minimal` preset - see [`designates_preset`].
+fn designates_minimal(name: &str) -> bool {
+    designates_preset(name, "Minimal")
+}
+
+/// Whether `name` designates the `Full` preset - see [`designates_preset`].
+fn designates_full(name: &str) -> bool {
+    designates_preset(name, "Full")
+}
+
 pub fn paintings_for_mode(
     mapping: &HumanMapping,
     options: crate::diff::text::RenderOptions,
@@ -808,6 +818,24 @@ pub fn paintings_for_mode(
                 .filter(|named| designates_preset(&named.name, wanted))
                 .collect();
             if candidates.is_empty() {
+                // **No painting names a preset: they are alternatives, and the fixture has no
+                // unique solution.** Some edits are ambiguous on an axis that has nothing to do
+                // with Minimal/Full - which of two equally good moves to prefer, say - and both
+                // readings are correct under *either* preset. Such a fixture answers every preset
+                // with all of its paintings, exactly as a lone painting answers both, and
+                // `compare_painting_with_diff` already scores several candidates as alternatives
+                // rather than as a conjunction: agreeing with any one of them is agreement.
+                //
+                // Only when *nothing* names a preset. A fixture holding `Minimal` beside `Ful`
+                // still fails for `Full`, which is the typo this check was written for - see
+                // `paintings_with_labels` on the six fixtures that were once misnamed this way.
+                if mapping
+                    .text_mappings
+                    .iter()
+                    .all(|named| !designates_minimal(&named.name) && !designates_full(&named.name))
+                {
+                    return Ok(mapping.text_mappings.iter().collect());
+                }
                 let have: Vec<&str> = mapping
                     .text_mappings
                     .iter()
@@ -816,8 +844,8 @@ pub fn paintings_for_mode(
                 bail!(
                     "no '{wanted}' painting to hold {options:?} to - this fixture has {have:?}. A \
                      fixture with several paintings needs one named for each preset (optionally \
-                     several per preset, as '{wanted} (something)'), or a single painting if its \
-                     rendering is unambiguous"
+                     several per preset, as '{wanted} (something)'), or paintings that name no \
+                     preset at all, which are read as alternatives for every preset"
                 );
             }
             Ok(candidates)
