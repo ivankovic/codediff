@@ -498,26 +498,6 @@
       ]
     },
     {
-      "operation": "insert",
-      "after_path": [
-        "function_definition:1",
-        "compound_statement:1",
-        "expression_statement:1",
-        "assignment_expression:1",
-        "identifier:1"
-      ]
-    },
-    {
-      "operation": "delete",
-      "before_path": [
-        "function_definition:1",
-        "compound_statement:1",
-        "expression_statement:1",
-        "assignment_expression:1",
-        "number_literal:1"
-      ]
-    },
-    {
       "operation": "identical",
       "before_path": [
         "function_definition:1",
@@ -561,6 +541,23 @@
       "operation": "insert_with_children",
       "after_path": [
         "function_definition:2"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "function_definition:1",
+        "compound_statement:1",
+        "expression_statement:1",
+        "assignment_expression:1",
+        "number_literal:1"
+      ],
+      "after_path": [
+        "function_definition:1",
+        "compound_statement:1",
+        "expression_statement:1",
+        "assignment_expression:1",
+        "identifier:1"
       ]
     }
   ],
@@ -626,28 +623,6 @@
               "start_column": 52,
               "end_row": 9,
               "end_column": 53
-            }
-          ]
-        },
-        {
-          "operation": "Insert",
-          "after": [
-            {
-              "start_row": 11,
-              "start_column": 24,
-              "end_row": 11,
-              "end_column": 32
-            }
-          ]
-        },
-        {
-          "operation": "Delete",
-          "before": [
-            {
-              "start_row": 6,
-              "start_column": 21,
-              "end_row": 6,
-              "end_column": 22
             }
           ]
         },
@@ -978,6 +953,25 @@
               "end_column": 1
             }
           ]
+        },
+        {
+          "operation": "Match",
+          "before": [
+            {
+              "start_row": 6,
+              "start_column": 21,
+              "end_row": 6,
+              "end_column": 22
+            }
+          ],
+          "after": [
+            {
+              "start_row": 11,
+              "start_column": 24,
+              "end_row": 11,
+              "end_column": 32
+            }
+          ]
         }
       ]
     },
@@ -1042,28 +1036,6 @@
               "start_column": 52,
               "end_row": 9,
               "end_column": 53
-            }
-          ]
-        },
-        {
-          "operation": "Insert",
-          "after": [
-            {
-              "start_row": 11,
-              "start_column": 24,
-              "end_row": 11,
-              "end_column": 32
-            }
-          ]
-        },
-        {
-          "operation": "Delete",
-          "before": [
-            {
-              "start_row": 6,
-              "start_column": 21,
-              "end_row": 6,
-              "end_column": 22
             }
           ]
         },
@@ -1756,6 +1728,44 @@
               "start_column": 20,
               "end_row": 9,
               "end_column": 52
+            }
+          ]
+        },
+        {
+          "operation": "Match",
+          "before": [
+            {
+              "start_row": 6,
+              "start_column": 21,
+              "end_row": 6,
+              "end_column": 22
+            }
+          ],
+          "after": [
+            {
+              "start_row": 11,
+              "start_column": 24,
+              "end_row": 11,
+              "end_column": 32
+            }
+          ]
+        },
+        {
+          "operation": "Match",
+          "before": [
+            {
+              "start_row": 6,
+              "start_column": 22,
+              "end_row": 6,
+              "end_column": 23
+            }
+          ],
+          "after": [
+            {
+              "start_row": 11,
+              "start_column": 32,
+              "end_row": 11,
+              "end_column": 33
             }
           ]
         }
