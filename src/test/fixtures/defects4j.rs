@@ -142,11 +142,17 @@ mod java_defects4j_cli_34_optionbuilder;
 #[cfg(test)]
 mod java_defects4j_cli_35_options;
 #[cfg(test)]
+mod java_defects4j_cli_40_typehandler;
+#[cfg(test)]
 mod java_defects4j_cli_5_util;
+#[cfg(test)]
+mod java_defects4j_cli_8_helpformatter;
 #[cfg(test)]
 mod java_defects4j_closure_103_controlflowanalysis;
 #[cfg(test)]
 mod java_defects4j_closure_107_commandlinerunner;
+#[cfg(test)]
+mod java_defects4j_closure_10_nodeutil;
 #[cfg(test)]
 mod java_defects4j_closure_119_globalnamespace;
 #[cfg(test)]
@@ -237,6 +243,8 @@ mod java_defects4j_jacksondatabind_94_subtypevalidator;
 mod java_defects4j_jacksondatabind_99_referencetype;
 #[cfg(test)]
 mod java_defects4j_jsoup_16_documenttype;
+#[cfg(test)]
+mod java_defects4j_jsoup_17_treebuilderstate;
 #[cfg(test)]
 mod java_defects4j_jsoup_24_tokeniserstate;
 #[cfg(test)]
