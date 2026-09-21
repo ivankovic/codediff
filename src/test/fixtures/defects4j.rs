@@ -120,13 +120,21 @@ mod java_defects4j_cli_22_posixparser;
 #[cfg(test)]
 mod java_defects4j_cli_24_helpformatter;
 #[cfg(test)]
+mod java_defects4j_cli_25_helpformatter;
+#[cfg(test)]
 mod java_defects4j_cli_27_optiongroup;
+#[cfg(test)]
+mod java_defects4j_cli_28_parser;
 #[cfg(test)]
 mod java_defects4j_cli_29_util;
 #[cfg(test)]
 mod java_defects4j_cli_2_posixparser;
 #[cfg(test)]
 mod java_defects4j_cli_31_helpformatter;
+#[cfg(test)]
+mod java_defects4j_cli_31_option;
+#[cfg(test)]
+mod java_defects4j_cli_31_optionbuilder;
 #[cfg(test)]
 mod java_defects4j_cli_34_option;
 #[cfg(test)]
@@ -232,13 +240,31 @@ mod java_defects4j_jsoup_16_documenttype;
 #[cfg(test)]
 mod java_defects4j_jsoup_24_tokeniserstate;
 #[cfg(test)]
+mod java_defects4j_jsoup_26_cleaner;
+#[cfg(test)]
 mod java_defects4j_jsoup_2_parser;
+#[cfg(test)]
+mod java_defects4j_jsoup_31_token;
+#[cfg(test)]
+mod java_defects4j_jsoup_31_tokeniserstate;
+#[cfg(test)]
+mod java_defects4j_jsoup_33_htmltreebuilder;
+#[cfg(test)]
+mod java_defects4j_jsoup_35_htmltreebuilderstate;
+#[cfg(test)]
+mod java_defects4j_jsoup_39_datautil;
 #[cfg(test)]
 mod java_defects4j_jsoup_40_documenttype;
 #[cfg(test)]
 mod java_defects4j_jsoup_52_xmldeclaration;
 #[cfg(test)]
+mod java_defects4j_jsoup_54_w3cdom;
+#[cfg(test)]
+mod java_defects4j_jsoup_55_tokeniserstate;
+#[cfg(test)]
 mod java_defects4j_jsoup_56_documenttype;
+#[cfg(test)]
+mod java_defects4j_jsoup_76_htmltreebuilderstate;
 #[cfg(test)]
 mod java_defects4j_jsoup_79_leafnode;
 #[cfg(test)]
@@ -247,6 +273,10 @@ mod java_defects4j_jsoup_86_comment;
 mod java_defects4j_jsoup_91_uncheckedioexception;
 #[cfg(test)]
 mod java_defects4j_jsoup_92_parsesettings;
+#[cfg(test)]
+mod java_defects4j_jsoup_92_xmltreebuilder;
+#[cfg(test)]
+mod java_defects4j_jsoup_93_formelement;
 #[cfg(test)]
 mod java_defects4j_jxpath_15_unioncontext;
 #[cfg(test)]
@@ -270,13 +300,21 @@ mod java_defects4j_lang_19_numericentityunescaper;
 #[cfg(test)]
 mod java_defects4j_lang_28_numericentityunescaper;
 #[cfg(test)]
+mod java_defects4j_lang_38_fastdateformat;
+#[cfg(test)]
+mod java_defects4j_lang_43_extendedmessageformat;
+#[cfg(test)]
 mod java_defects4j_lang_4_lookuptranslator;
+#[cfg(test)]
+mod java_defects4j_lang_51_booleanutils;
 #[cfg(test)]
 mod java_defects4j_lang_64_valuedenum;
 #[cfg(test)]
 mod java_defects4j_lang_6_charsequencetranslator;
 #[cfg(test)]
 mod java_defects4j_math_103_normaldistributionimpl;
+#[cfg(test)]
+mod java_defects4j_math_10_dscompiler;
 #[cfg(test)]
 mod java_defects4j_math_14_weight;
 #[cfg(test)]
@@ -287,6 +325,8 @@ mod java_defects4j_math_22_uniformrealdistribution;
 mod java_defects4j_math_35_elitisticlistpopulation;
 #[cfg(test)]
 mod java_defects4j_math_6_baseoptimizer;
+#[cfg(test)]
+mod java_defects4j_math_6_cmaesoptimizer;
 #[cfg(test)]
 mod java_defects4j_math_70_bisectionsolver;
 #[cfg(test)]
@@ -327,5 +367,7 @@ mod java_defects4j_mockito_37_answersvalidator;
 mod java_defects4j_mockito_38_argumentmatchingtool;
 #[cfg(test)]
 mod java_defects4j_mockito_5_verificationovertimeimpl;
+#[cfg(test)]
+mod java_defects4j_mockito_7_genericmetadatasupport;
 #[cfg(test)]
 mod java_defects4j_mockito_9_callsrealmethods;
