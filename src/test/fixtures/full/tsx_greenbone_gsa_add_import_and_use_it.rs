@@ -16,7 +16,7 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 use crate::test;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants_with_known_violations;
 use anyhow::Result;
 
 #[test]
@@ -28,5 +28,12 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn invariants() -> Result<()> {
-    assert_ground_truth_invariants("tsx-greenbone-gsa-add-import-and-use-it")
+    // 2026-09-21, invariant 18, one: `type: undefined,` becomes
+    // `type: GREENBONE_SENSOR_SCANNER_TYPE,` inside an object literal whose other keys are
+    // unchanged (`pair.value`, row 264 -> 267). The `pair` is matched and `.value` holds one
+    // child on each side, so this key's value changed; the mapping deletes and inserts instead.
+    assert_ground_truth_invariants_with_known_violations(
+        "tsx-greenbone-gsa-add-import-and-use-it",
+        1,
+    )
 }

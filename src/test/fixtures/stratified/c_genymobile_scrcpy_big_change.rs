@@ -19,7 +19,7 @@ use anyhow::Result;
 
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants_with_known_violations;
 
 #[test]
 fn mapping() -> Result<()> {
@@ -39,5 +39,12 @@ fn painting() -> Result<()> {
 
 #[test]
 fn invariants() -> Result<()> {
-    assert_ground_truth_invariants("c-genymobile-scrcpy-big-change")
+    // 2026-09-21, invariant 18, one: `devices->count = 0;` becomes
+    // `devices->keyboard = keyboard;` and the mapping deletes the `0` while inserting the
+    // `keyboard` (`assignment_expression.right`, row 7 -> 12), although it matches everything
+    // else in that statement - the assignment, the `devices->...` field expression, the `=`, and
+    // `count` -> `keyboard` as an `Update`. That last one is the tell: a same-kind rename to an
+    // unrelated name was recorded as a match, while the cross-kind `0` -> `keyboard` in the same
+    // statement was not, which is the schema's doing rather than the author's judgement.
+    assert_ground_truth_invariants_with_known_violations("c-genymobile-scrcpy-big-change", 1)
 }

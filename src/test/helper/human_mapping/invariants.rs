@@ -56,6 +56,8 @@
 //!   preset's granularity: `Minimal` marks the differing words, `Full` marks it entire.
 //! * [`boolean_flips_are_one_edit`] - a boolean the mapping pairs is not painted `Delete` on one
 //!   side and `Insert` on the other.
+//! * [`single_valued_fields_hold_a_pair`] - a matched pair's single-valued named field holds a
+//!   matched pair, never a delete beside an insert.
 //!
 //! Invariants 4 and 5 were added on 2026-09-08 and wired in the same day, at **zero violations
 //! across all 249 painted fixtures** - so unlike the first three they arrived with no clamped
@@ -85,7 +87,23 @@
 //! put) and "a matched pair lands in one painting entry" (the ordinary `Delete`+`Insert`
 //! chunking of a rename, 99 fixtures).
 //!
-//! **All seventeen are intra-fixture.** Each asks whether one fixture's mapping and paintings
+//! Invariant 18 arrived on 2026-09-21 with **five violations**, all of them cross-kind and none
+//! of them same-kind - see `research/data/quality/kind_mismatch_census_2026_09_21.md`. It is the
+//! one rule here derived from a census of what the corpus *declines* to match rather than what it
+//! records, and the asymmetry is the finding: where the two nodes share a kind the author could
+//! write `Update` and did, and where they did not the schema had nothing to offer and the solver
+//! asked a `y`/`n` question, so the author wrote delete+insert instead.
+//! `c-genymobile-scrcpy-big-change` shows both halves inside one statement - `count` -> `keyboard`
+//! recorded as an `Update` (same kind) while `0` -> `keyboard` in the same assignment was recorded
+//! as delete+insert (different kinds).
+//!
+//! It fires only where the position is unarguable: both nodes childless and named, their parents
+//! a matched pair, and the slot a *named* field holding exactly *one* child on both sides. Each
+//! of those was added to kill an observed false positive - an empty `arguments` node passing a
+//! "no named children" test, two unrelated comments in corresponding positions (comments carry no
+//! field), and a shell flag paired against a subcommand because a command's arguments are a list.
+//!
+//! **All eighteen are intra-fixture.** Each asks whether one fixture's mapping and paintings
 //! agree with each other; none compares two fixtures, so a pair whose paintings answer the same
 //! question differently is invisible to all of them. `cross_fixture_convention_census`
 //! (`tests/exploratory.rs`) is that other axis, and
@@ -347,6 +365,7 @@ pub fn ground_truth_invariant_violations_for(
         violations.extend(match_but_not_identical_entries_differ(
             &context, before, after,
         ));
+        violations.extend(single_valued_fields_hold_a_pair(&context, before, after));
     }
     // Invariants 4 and 5 read only the paintings `FULL` answers to, so they take their own pass
     // over `paintings_with_labels` rather than the `paintings` list above - which holds every
@@ -2187,6 +2206,127 @@ fn identical_entries_are_token_identical(
                 ViolationSite {
                     side: 1,
                     span: span_of_node(*after_node),
+                },
+            ],
+        ));
+    }
+    violations
+}
+
+/// Which field of `parent` holds `node`, or `None` when the grammar gives it no field.
+fn field_of<'tree>(parent: Node<'tree>, node: Node<'tree>) -> Option<String> {
+    let mut cursor = parent.walk();
+    let children: Vec<Node<'tree>> = parent.children(&mut cursor).collect();
+    children
+        .iter()
+        .position(|child| child.id() == node.id())
+        .and_then(|i| parent.field_name_for_child(i as u32))
+        .map(str::to_string)
+}
+
+/// How many of `parent`'s children carry `field`. One means the slot is unambiguous; more means
+/// the field is a list, and a position within a list is not an identity.
+fn field_arity(parent: Node, field: &str) -> usize {
+    let mut cursor = parent.walk();
+    let count = parent.children(&mut cursor).count();
+    (0..count)
+        .filter(|i| parent.field_name_for_child(*i as u32) == Some(field))
+        .count()
+}
+
+/// Invariant 18: a single-valued named field of a matched pair holds a matched pair, never a
+/// delete beside an insert.
+///
+/// When two nodes are matched, their shared structure is matched with them: a named field is a
+/// role the grammar says persists, and if that role holds exactly one child on each side then the
+/// child on the left *is* the child on the right, whatever the two are called. Recording the pair
+/// as a deletion plus an insertion says the role was vacated and refilled, which the parent match
+/// has already denied.
+///
+/// The three conditions are each load-bearing, and each was added to kill a real false positive
+/// (see the module doc): a *childless* node, because an empty container has no named children
+/// either and pairing an identifier against `()` is meaningless; a *named* field, because a node
+/// the grammar gives no field to has no persisting role and two adjacent comments can be entirely
+/// unrelated; and an arity of *one*, because a command's arguments all share a field and a removed
+/// flag beside an added subcommand is not a pair.
+///
+/// `LeafStatus::Undecided` is not a violation: the mapping has not spoken, and no invariant here
+/// asserts anything about silence.
+fn single_valued_fields_hold_a_pair(
+    context: &TreeContext,
+    before: &Code,
+    after: &Code,
+) -> Vec<GroundTruthViolation> {
+    let mut violations = Vec::new();
+    for before_leaf in &context.leaves[0] {
+        if !before_leaf.is_named() || context.status(*before_leaf, 0) != LeafStatus::Removed {
+            continue;
+        }
+        let Some(before_parent) = before_leaf.parent() else {
+            continue;
+        };
+        let Some(after_parent) = context
+            .caches
+            .before_match
+            .get(&before_parent.id())
+            .and_then(|id| context.ids[1].get(id))
+        else {
+            continue;
+        };
+        let Some(field) = field_of(before_parent, *before_leaf) else {
+            continue;
+        };
+        if field_arity(before_parent, &field) != 1 || field_arity(*after_parent, &field) != 1 {
+            continue;
+        }
+        let Some(after_leaf) = after_parent.child_by_field_name(field.as_str()) else {
+            continue;
+        };
+        if !after_leaf.is_named()
+            || after_leaf.child_count() != 0
+            || context.status(after_leaf, 1) != LeafStatus::Removed
+        {
+            continue;
+        }
+        // Equal kinds are out of scope, and that is the rule's whole premise rather than a
+        // convenience. This exists because `Update` is defined as "same kind, different text", so
+        // a cross-kind pair has nowhere in the schema to go and the solver asked a `y`/`n`
+        // question the author answered by writing delete+insert. Where the kinds *do* match,
+        // `Update` was one keystroke away and its absence is a decision, not an obstacle -
+        // `lua-corsixth-corsixth-refactor-if-expressions` declines to call the `field` of
+        // `humanoid.humanoid_class` the same element as the `field` of `class.is`, both plain
+        // identifiers, and is entitled to.
+        if before_leaf.kind() == after_leaf.kind() {
+            continue;
+        }
+        violations.push(GroundTruthViolation::new(
+            18,
+            None,
+            format!(
+                "{}.{field} holds {} `{}` on before row {} and {} `{}` on after row {}, but the \
+                 mapping \
+                 deletes one and inserts the other - the parents are matched and the field holds \
+                 one child on each side, so the two are the same element",
+                before_parent.kind(),
+                before_leaf.kind(),
+                before_leaf
+                    .utf8_text(before.contents.as_bytes())
+                    .unwrap_or("<unreadable>"),
+                row_of(&before.contents, before_leaf.start_byte()),
+                after_leaf.kind(),
+                after_leaf
+                    .utf8_text(after.contents.as_bytes())
+                    .unwrap_or("<unreadable>"),
+                row_of(&after.contents, after_leaf.start_byte()),
+            ),
+            vec![
+                ViolationSite {
+                    side: 0,
+                    span: span_of_node(*before_leaf),
+                },
+                ViolationSite {
+                    side: 1,
+                    span: span_of_node(after_leaf),
                 },
             ],
         ));

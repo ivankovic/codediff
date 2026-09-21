@@ -48,5 +48,13 @@ fn painting() -> Result<()> {
 fn invariants() -> Result<()> {
     // Invariant 16: the Minimal/Full split for a renamed identifier is not painted this way yet
     // (`IntBox` against `Box`, four times over). Recorded as found.
-    assert_ground_truth_invariants_with_known_violations("cpp-add-templates", 6)
+    //
+    // 2026-09-21, invariant 18, three more: `class IntBox` becomes
+    // `template<typename T> class Box`, and `int` becomes `T` in the field's type
+    // (`field_declaration.type`, row 4 -> 5), the constructor parameter's type
+    // (`parameter_declaration.type`, row 6 -> 7) and the method's return type
+    // (`function_definition.type`, row 7 -> 8). Each parent is matched and each `.type` field
+    // holds one child on both sides, so the type of that declaration changed rather than the
+    // declaration being replaced - but the mapping deletes `int` and inserts `T`.
+    assert_ground_truth_invariants_with_known_violations("cpp-add-templates", 9)
 }
