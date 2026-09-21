@@ -93,6 +93,15 @@ struct Args {
     /// pushed painters toward delete+insert.
     #[arg(long)]
     kind_invariant_cost: bool,
+
+    /// Measure the *elimination* extension to invariant 18 before building it: a positional child
+    /// with no field name is still unambiguous when both parents hold the same number of children
+    /// and every other child is pairwise matched in order, because nothing else is left for it to
+    /// correspond to. `argument_list` in tree-sitter-java declares no fields at all, so
+    /// `findWrapPos(text, width, nextLineTabStop)` -> `findWrapPos(text, width, 0)` is invisible
+    /// to the field-based rule even though `text` and `width` pin the third position exactly.
+    #[arg(long)]
+    elimination_cost: bool,
 }
 
 /// Tally of `HumanOperation` counts for one fixture (or the whole corpus). A plain struct, not a
@@ -1021,6 +1030,120 @@ fn kind_invariant_cost_of(
     Some(cost)
 }
 
+/// One pair the elimination extension would newly require, for judging rather than counting.
+struct EliminationHit {
+    fixture: String,
+    parent: String,
+    before_kind: String,
+    after_kind: String,
+    before_text: String,
+    after_text: String,
+    same_kind: bool,
+    /// True when the mapping already pairs these two. Such a row is not a violation - it is the
+    /// extension's own validation, showing the elimination test recognises a position the ground
+    /// truth has already resolved the same way.
+    already_matched: bool,
+}
+
+/// Pairs that invariant 18 misses because the slot has no field name, but where position is fixed
+/// by elimination: equal child counts, and every sibling pairwise matched in order.
+fn elimination_hits_of(
+    name: &str,
+    before: &codediff::code::Code,
+    after: &codediff::code::Code,
+) -> Vec<EliminationHit> {
+    let mut out = Vec::new();
+    let Ok(mapping) = human_mapping::load(name) else {
+        return out;
+    };
+    let (Some(before_root), Some(after_root)) = (
+        before.ast.as_ref().map(|a| a.root_node()),
+        after.ast.as_ref().map(|a| a.root_node()),
+    ) else {
+        return out;
+    };
+    let caches = human_mapping::rebuild_caches_for_mapping(&mapping, before_root, after_root);
+    let mut before_nodes = Vec::new();
+    collect_nodes(before_root, &mut before_nodes);
+    let after_by_id: HashMap<usize, tree_sitter::Node> = {
+        let mut v = Vec::new();
+        collect_nodes(after_root, &mut v);
+        v.into_iter().map(|n| (n.id(), n)).collect()
+    };
+
+    for parent in &before_nodes {
+        let Some(after_parent) = caches
+            .before_match
+            .get(&parent.id())
+            .and_then(|id| after_by_id.get(id))
+        else {
+            continue;
+        };
+        let mut bc = parent.walk();
+        let before_children: Vec<_> = parent.children(&mut bc).collect();
+        let mut ac = after_parent.walk();
+        let after_children: Vec<_> = after_parent.children(&mut ac).collect();
+        // Equal length is what makes elimination possible at all.
+        if before_children.len() != after_children.len() || before_children.is_empty() {
+            continue;
+        }
+        // Exactly one position unresolved, every other position pairwise matched in order.
+        let mut candidate = None;
+        let mut ok = true;
+        for (b, a) in before_children.iter().zip(after_children.iter()) {
+            let paired = caches.before_match.get(&b.id()) == Some(&a.id());
+            // A same-kind pair in place is an ordinary match and says nothing either way.
+            if paired && b.kind() == a.kind() {
+                continue;
+            }
+            let b_removed = matches!(
+                human_mapping::status_before(*b, &caches),
+                human_mapping::NodeStatus::Marked { .. }
+            );
+            let a_removed = matches!(
+                human_mapping::status_after(*a, &caches),
+                human_mapping::NodeStatus::Marked { .. }
+            );
+            // Either the position is unresolved on both sides (what the extension would newly
+            // require), or the corpus already paired it across a kind change (what validates the
+            // test recognises such a position at all).
+            let interesting = (b_removed && a_removed) || paired;
+            if interesting && b.is_named() && a.is_named() && is_lexeme(*b) && is_lexeme(*a) {
+                if candidate.is_some() {
+                    ok = false;
+                    break;
+                }
+                candidate = Some((*b, *a, paired));
+            } else {
+                ok = false;
+                break;
+            }
+        }
+        let (Some((b, a, already_matched)), true) = (candidate, ok) else {
+            continue;
+        };
+        if b.kind() == a.kind() && already_matched {
+            // Same kind and already paired: an ordinary `Update`, nothing to learn from.
+            continue;
+        }
+        // Already covered by the field-based rule.
+        if field_of(b).is_some() && field_of(b) == field_of(a) {
+            continue;
+        }
+        out.push(EliminationHit {
+            fixture: name.to_string(),
+            parent: parent.kind().to_string(),
+            before_kind: b.kind().to_string(),
+            after_kind: a.kind().to_string(),
+            before_text: cell_text(b, &before.contents),
+            after_text: cell_text(a, &after.contents),
+            same_kind: b.kind() == a.kind(),
+            already_matched,
+        });
+    }
+    out
+}
+
 fn write_kind_mismatches(rows: &[KindMismatch], path: &std::path::Path) -> Result<()> {
     use std::io::Write;
     if let Some(parent) = path.parent() {
@@ -1067,6 +1190,52 @@ fn main() -> Result<()> {
     let code_pairs = helper::handmade_test_code_pairs()?;
     let mut names: Vec<String> = code_pairs.keys().cloned().collect();
     names.sort();
+
+    if args.elimination_cost {
+        let mut hits = Vec::new();
+        for name in &names {
+            let (before, after) = code_pairs
+                .get(name)
+                .expect("name came from code_pairs.keys()");
+            hits.extend(elimination_hits_of(name, before, after));
+        }
+        let (would_require, validation): (Vec<_>, Vec<_>) =
+            hits.iter().partition(|h| !h.already_matched);
+        let cross = would_require.iter().filter(|h| !h.same_kind).count();
+        let fixtures: std::collections::HashSet<&str> =
+            hits.iter().map(|h| h.fixture.as_str()).collect();
+        println!("=== Elimination extension to invariant 18 ===");
+        println!(
+            "{} pair(s) the extension would newly REQUIRE: {} cross-kind, {} same-kind, across {} fixture(s)",
+            would_require.len(),
+            cross,
+            would_require.len() - cross,
+            fixtures.len()
+        );
+        println!(
+            "{} pair(s) already matched this way - the test recognising what the corpus resolved",
+            validation.len()
+        );
+        println!();
+        for h in hits
+            .iter()
+            .filter(|h| !h.already_matched)
+            .chain(hits.iter().filter(|h| h.already_matched))
+        {
+            println!(
+                "  [{}{}] {}  {} `{}` -> {} `{}`   [{}]",
+                if h.already_matched { "ok " } else { "REQ" },
+                if h.same_kind { " SAME" } else { " cross" },
+                h.parent,
+                h.before_kind,
+                h.before_text,
+                h.after_kind,
+                h.after_text,
+                h.fixture
+            );
+        }
+        return Ok(());
+    }
 
     if args.kind_invariant_cost {
         let (mut r1s, mut r1d, mut r2s, mut r2d) = (0usize, 0usize, 0usize, 0usize);

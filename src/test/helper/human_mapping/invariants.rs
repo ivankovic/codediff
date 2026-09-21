@@ -2234,7 +2234,60 @@ fn field_arity(parent: Node, field: &str) -> usize {
         .count()
 }
 
-/// Invariant 18: a single-valued named field of a matched pair holds a matched pair, never a
+/// The after-side node that occupies the same unambiguous position as `before_leaf`, or `None`
+/// when the position is not unambiguous.
+///
+/// Two ways a position can be pinned, and a grammar offers only one of them at a time:
+///
+/// * **By name** - the node sits in a *named* field that holds exactly one child on both sides.
+///   A named field is a role the grammar says persists.
+/// * **By elimination** - the two parents hold the same number of children and every *other*
+///   position is already paired, so nothing else is left for this one to be. Needed because a
+///   grammar may name no fields at all for the very lists where position is obvious:
+///   `argument_list` in tree-sitter-java declares `"fields": {}`, which puts
+///   `findWrapPos(text, width, nextLineTabStop)` -> `findWrapPos(text, width, 0)` out of the
+///   field rule's reach even though `text` and `width` pin the third argument exactly.
+fn pinned_counterpart<'tree>(
+    context: &TreeContext<'tree>,
+    before_leaf: Node<'tree>,
+    before_parent: Node<'tree>,
+    after_parent: Node<'tree>,
+) -> Option<Node<'tree>> {
+    if let Some(field) = field_of(before_parent, before_leaf)
+        && field_arity(before_parent, &field) == 1
+        && field_arity(after_parent, &field) == 1
+        && let Some(after_leaf) = after_parent.child_by_field_name(field.as_str())
+    {
+        return Some(after_leaf);
+    }
+
+    let mut before_cursor = before_parent.walk();
+    let before_children: Vec<Node<'tree>> = before_parent.children(&mut before_cursor).collect();
+    let mut after_cursor = after_parent.walk();
+    let after_children: Vec<Node<'tree>> = after_parent.children(&mut after_cursor).collect();
+    if before_children.len() != after_children.len() {
+        return None;
+    }
+    let index = before_children
+        .iter()
+        .position(|child| child.id() == before_leaf.id())?;
+    // Every other position paired, in order. One unpaired position is pinned; two are a guess.
+    for (i, (b, a)) in before_children
+        .iter()
+        .zip(after_children.iter())
+        .enumerate()
+    {
+        if i == index {
+            continue;
+        }
+        if context.caches.before_match.get(&b.id()) != Some(&a.id()) {
+            return None;
+        }
+    }
+    Some(after_children[index])
+}
+
+/// Invariant 18: an unambiguous position of a matched pair holds a matched pair, never a
 /// delete beside an insert.
 ///
 /// When two nodes are matched, their shared structure is matched with them: a named field is a
@@ -2273,13 +2326,9 @@ fn single_valued_fields_hold_a_pair(
         else {
             continue;
         };
-        let Some(field) = field_of(before_parent, *before_leaf) else {
-            continue;
-        };
-        if field_arity(before_parent, &field) != 1 || field_arity(*after_parent, &field) != 1 {
-            continue;
-        }
-        let Some(after_leaf) = after_parent.child_by_field_name(field.as_str()) else {
+        let Some(after_leaf) =
+            pinned_counterpart(context, *before_leaf, before_parent, *after_parent)
+        else {
             continue;
         };
         if !after_leaf.is_named()
@@ -2303,11 +2352,13 @@ fn single_valued_fields_hold_a_pair(
             18,
             None,
             format!(
-                "{}.{field} holds {} `{}` on before row {} and {} `{}` on after row {}, but the \
-                 mapping \
-                 deletes one and inserts the other - the parents are matched and the field holds \
-                 one child on each side, so the two are the same element",
-                before_parent.kind(),
+                "{} holds {} `{}` on before row {} and {} `{}` on after row {}, but the mapping \
+                 deletes one and inserts the other - the parents are matched and nothing else can \
+                 occupy that position, so the two are the same element",
+                field_of(before_parent, *before_leaf).map_or_else(
+                    || before_parent.kind().to_string(),
+                    |field| format!("{}.{field}", before_parent.kind()),
+                ),
                 before_leaf.kind(),
                 before_leaf
                     .utf8_text(before.contents.as_bytes())
