@@ -118,6 +118,8 @@ mod java_defects4j_cli_21_writeablecommandlineimpl;
 #[cfg(test)]
 mod java_defects4j_cli_22_posixparser;
 #[cfg(test)]
+mod java_defects4j_cli_23_helpformatter;
+#[cfg(test)]
 mod java_defects4j_cli_24_helpformatter;
 #[cfg(test)]
 mod java_defects4j_cli_25_helpformatter;
@@ -148,29 +150,69 @@ mod java_defects4j_cli_5_util;
 #[cfg(test)]
 mod java_defects4j_cli_8_helpformatter;
 #[cfg(test)]
+mod java_defects4j_closure_102_normalize;
+#[cfg(test)]
 mod java_defects4j_closure_103_controlflowanalysis;
+#[cfg(test)]
+mod java_defects4j_closure_104_uniontype;
+#[cfg(test)]
+mod java_defects4j_closure_106_jsdocinfobuilder;
 #[cfg(test)]
 mod java_defects4j_closure_107_commandlinerunner;
 #[cfg(test)]
 mod java_defects4j_closure_10_nodeutil;
 #[cfg(test)]
+mod java_defects4j_closure_113_processclosureprimitives;
+#[cfg(test)]
+mod java_defects4j_closure_114_nameanalyzer;
+#[cfg(test)]
 mod java_defects4j_closure_119_globalnamespace;
+#[cfg(test)]
+mod java_defects4j_closure_11_typecheck;
+#[cfg(test)]
+mod java_defects4j_closure_123_codegenerator;
+#[cfg(test)]
+mod java_defects4j_closure_124_exploitassigns;
+#[cfg(test)]
+mod java_defects4j_closure_125_typecheck;
+#[cfg(test)]
+mod java_defects4j_closure_130_collapseproperties;
 #[cfg(test)]
 mod java_defects4j_closure_133_jsdocinfoparser;
 #[cfg(test)]
 mod java_defects4j_closure_135_devirtualizeprototypemethods;
 #[cfg(test)]
+mod java_defects4j_closure_137_normalize;
+#[cfg(test)]
+mod java_defects4j_closure_138_closurereverseabstractinterpreter;
+#[cfg(test)]
+mod java_defects4j_closure_13_peepholeoptimizationspass;
+#[cfg(test)]
+mod java_defects4j_closure_144_functiontype;
+#[cfg(test)]
 mod java_defects4j_closure_147_checkglobalthis;
 #[cfg(test)]
 mod java_defects4j_closure_149_commandlinerunner;
 #[cfg(test)]
+mod java_defects4j_closure_14_controlflowanalysis;
+#[cfg(test)]
 mod java_defects4j_closure_165_recordtypebuilder;
+#[cfg(test)]
+mod java_defects4j_closure_168_typedscopecreator;
+#[cfg(test)]
+mod java_defects4j_closure_18_compiler;
+#[cfg(test)]
+mod java_defects4j_closure_19_chainablereverseabstractinterpreter;
 #[cfg(test)]
 mod java_defects4j_closure_1_removeunusedvars;
 #[cfg(test)]
 mod java_defects4j_closure_28_inlinecostestimator;
 #[cfg(test)]
+mod java_defects4j_closure_30_flowsensitiveinlinevariables;
+#[cfg(test)]
 mod java_defects4j_closure_31_compiler;
+#[cfg(test)]
+mod java_defects4j_closure_34_codeprinter;
 #[cfg(test)]
 mod java_defects4j_closure_77_codegenerator;
 #[cfg(test)]
