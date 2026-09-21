@@ -71,6 +71,28 @@ struct Args {
     /// Entries shown in each "top changed node kinds" table.
     #[arg(long, default_value_t = 15)]
     top_kinds: usize,
+
+    /// Dump every *paired* entry whose two nodes have different kinds, as CSV, and stop.
+    ///
+    /// The corpus-wide answer to "when did a human match two nodes the grammar calls different
+    /// things?". `match_but_not_identical` is the only operation that can carry such a pair
+    /// (`Identical` and `Update` both require equal kinds by definition), so this is the whole
+    /// population of cross-kind matches in the ground truth. Node *text* is included because the
+    /// kinds alone do not separate the cases: `identifier` -> `number_literal` reads very
+    /// differently when it is `count` -> `0` than when it is `count` -> `42`.
+    #[arg(long, value_name = "PATH", num_args = 0..=1)]
+    kind_mismatches: Option<Option<PathBuf>>,
+
+    /// Count what R1/R2a would cost if they became *invariants* - i.e. if a leaf recorded as
+    /// Delete beside a leaf recorded as Insert were forbidden where the rules say the pair must be
+    /// a match. Reports candidate violations, and stops.
+    ///
+    /// The existing census counts pairs a human *did* match across kinds. This counts the
+    /// opposite: pairs a human declined to match, that the rules say must be matched. Together
+    /// they bound the question the census could not answer, because the solver's own friction
+    /// pushed painters toward delete+insert.
+    #[arg(long)]
+    kind_invariant_cost: bool,
 }
 
 /// Tally of `HumanOperation` counts for one fixture (or the whole corpus). A plain struct, not a
@@ -629,12 +651,544 @@ fn write_csv(stats: &[FixtureStats], path: &std::path::Path) -> Result<()> {
     Ok(())
 }
 
+/// One paired entry whose two nodes have different kinds - a row of `--kind-mismatches`.
+struct KindMismatch {
+    fixture: String,
+    language: String,
+    before_kind: String,
+    after_kind: String,
+    before_text: String,
+    after_text: String,
+    before_parent: String,
+    after_parent: String,
+    before_named: bool,
+    after_named: bool,
+    /// No *named* children. The census's central discriminator: a leaf is one lexeme in a slot, so
+    /// a cross-kind leaf pair asserts only "this position's token changed", which is what `Update`
+    /// means. A composite pair asserts that two different structures correspond, which is a
+    /// judgement. Anonymous children are ignored on purpose - `(`/`)` under an `arguments` node do
+    /// not make it a composite in this sense.
+    before_leaf: bool,
+    after_leaf: bool,
+    /// Whether the two nodes' parents are themselves a matched pair in this mapping. When they are
+    /// not, the two nodes are not in the same slot and the pair is a level shift, however
+    /// compatible their kinds look.
+    parents_matched: bool,
+    depth: usize,
+}
+
+/// Named children only - see [`KindMismatch::before_leaf`].
+fn is_leaf(node: tree_sitter::Node) -> bool {
+    node.named_child_count() == 0
+}
+
+/// A node's text, flattened to one line and capped: these go into a CSV cell, and a matched pair
+/// can be a whole subtree. The cap is generous enough to read a statement and short enough that a
+/// 75k-node fixture cannot produce a multi-megabyte row.
+fn cell_text(node: tree_sitter::Node, src: &str) -> String {
+    let raw = node.utf8_text(src.as_bytes()).unwrap_or("<unreadable>");
+    let flat: String = raw
+        .chars()
+        .map(|c| if c.is_whitespace() { ' ' } else { c })
+        .collect();
+    let collapsed = flat.split_whitespace().collect::<Vec<_>>().join(" ");
+    if collapsed.chars().count() > 80 {
+        collapsed.chars().take(77).collect::<String>() + "..."
+    } else {
+        collapsed
+    }
+}
+
+/// Every cross-kind paired entry in one fixture. Resolution failures are reported and skipped
+/// rather than fatal: a path that no longer resolves is a stale mapping, which is its own problem
+/// and not one this report should die on.
+fn kind_mismatches_of(
+    name: &str,
+    before: &codediff::code::Code,
+    after: &codediff::code::Code,
+) -> Vec<KindMismatch> {
+    let Ok(mapping) = human_mapping::load(name) else {
+        return Vec::new();
+    };
+    let (Some(before_root), Some(after_root)) = (
+        before.ast.as_ref().map(|a| a.root_node()),
+        after.ast.as_ref().map(|a| a.root_node()),
+    ) else {
+        return Vec::new();
+    };
+    let language = before
+        .metadata
+        .language
+        .or(after.metadata.language)
+        .unwrap_or_default();
+    let mut before_cache = PathCache::default();
+    let mut after_cache = PathCache::default();
+    let mut out = Vec::new();
+
+    // The mapping's *resolved* correspondence, not its literal entry list. A node under an
+    // `Identical`/`*WithChildren` entry is matched without an entry of its own, so asking whether
+    // the two parents' paths appear as an entry answers "no" for every implicitly matched parent -
+    // which is most of them. `rebuild_caches_for_mapping` is what every other consumer of a mapping
+    // uses for exactly this reason.
+    let caches = human_mapping::rebuild_caches_for_mapping(&mapping, before_root, after_root);
+
+    for entry in &mapping.entries {
+        // Only the paired operations have two nodes to disagree about.
+        if !matches!(
+            entry.operation,
+            HumanOperation::Identical
+                | HumanOperation::Update
+                | HumanOperation::MatchButNotIdentical
+        ) {
+            continue;
+        }
+        let (Some(bp), Some(ap)) = (entry.before_path.as_ref(), entry.after_path.as_ref()) else {
+            continue;
+        };
+        if bp.is_empty() || ap.is_empty() {
+            continue;
+        }
+        let b_refs: Vec<&str> = bp.iter().map(String::as_str).collect();
+        let a_refs: Vec<&str> = ap.iter().map(String::as_str).collect();
+        let (Ok(b), Ok(a)) = (
+            before_cache.resolve(before_root, &b_refs),
+            after_cache.resolve(after_root, &a_refs),
+        ) else {
+            eprintln!("warning: {name}: could not resolve {bp:?} <-> {ap:?}");
+            continue;
+        };
+        if b.kind() == a.kind() {
+            continue;
+        }
+        out.push(KindMismatch {
+            fixture: name.to_string(),
+            language: format!("{language:?}"),
+            before_kind: b.kind().to_string(),
+            after_kind: a.kind().to_string(),
+            before_text: cell_text(b, &before.contents),
+            after_text: cell_text(a, &after.contents),
+            before_parent: b.parent().map_or("<root>".into(), |p| p.kind().to_string()),
+            after_parent: a.parent().map_or("<root>".into(), |p| p.kind().to_string()),
+            // Anonymous nodes are the ones whose *kind is their text*, so a text change shows up
+            // here as a kind change. Recorded because it separates two very different populations.
+            before_named: b.is_named(),
+            after_named: a.is_named(),
+            before_leaf: is_leaf(b),
+            after_leaf: is_leaf(a),
+            parents_matched: match (b.parent(), a.parent()) {
+                (Some(pb), Some(pa)) => caches.before_match.get(&pb.id()) == Some(&pa.id()),
+                // Both at the root: the roots always correspond.
+                (None, None) => true,
+                _ => false,
+            },
+            depth: bp.len(),
+        });
+    }
+    out
+}
+
+/// What R1/R2a would flag in one fixture if they were invariants.
+///
+/// **R1** - a corresponding parent pair where the before parent has exactly one removed named leaf
+/// child and the after parent has exactly one inserted named leaf child. Exactly one on each side
+/// is the whole point: with two candidates on either side the pairing is ambiguous and no
+/// invariant can demand a *particular* match, so those are not counted. This is the strict
+/// reading, and therefore a lower bound.
+///
+/// **R2a** - a removed leaf and an inserted leaf with identical text, where that text is carried by
+/// exactly one removed leaf and exactly one inserted leaf in the whole fixture. Same uniqueness
+/// requirement, same reason.
+///
+/// Kind equality is *not* required by either: the invariant is "this must be a match, not a
+/// delete plus an insert", which is a claim about the pair regardless of what the grammar calls
+/// them. The split is reported so the two populations can be told apart.
+struct InvariantCost {
+    r1_same_kind: usize,
+    r1_diff_kind: usize,
+    r2a_same_kind: usize,
+    r2a_diff_kind: usize,
+    /// `(rule, before_kind, after_kind, before_text, after_text, field)` for each candidate, so the count
+    /// can be judged rather than trusted: a count alone cannot say whether a candidate is a match
+    /// the painter was pushed away from or one they correctly refused.
+    #[allow(clippy::type_complexity)]
+    samples: Vec<(
+        &'static str,
+        String,
+        String,
+        String,
+        String,
+        String,
+        usize,
+        usize,
+    )>,
+}
+
+fn collect_nodes<'a>(root: tree_sitter::Node<'a>, out: &mut Vec<tree_sitter::Node<'a>>) {
+    out.push(root);
+    let mut cursor = root.walk();
+    for child in root.children(&mut cursor) {
+        collect_nodes(child, out);
+    }
+}
+
+/// A true lexeme: **no children at all**, not merely no named ones.
+///
+/// Stricter than [`is_leaf`] on purpose. An empty container passes the named-children test while
+/// being a container - `()` as an `arguments` node has two anonymous children and no named ones -
+/// and pairing an `identifier` against an empty argument list is exactly the false positive this
+/// rules out. An invariant may under-fire; it may not over-fire.
+fn is_lexeme(node: tree_sitter::Node) -> bool {
+    node.child_count() == 0
+}
+
+/// How many of `parent`'s children carry `field`. One means the slot is unambiguous; more means
+/// the field is a list (a command's arguments, a call's parameters) and position within that list
+/// is not identity - a removed flag and an added subcommand are both "an argument".
+fn field_arity(parent: tree_sitter::Node, field: &str) -> usize {
+    let mut cursor = parent.walk();
+    let children: Vec<_> = parent.children(&mut cursor).collect();
+    (0..children.len())
+        .filter(|i| parent.field_name_for_child(*i as u32) == Some(field))
+        .count()
+}
+
+/// Which field of its parent a node occupies, or `None` when the grammar gives it no field.
+///
+/// The "same slot" half of R1. Without it, a `binary_expression` losing its left operand and
+/// gaining a right one would pair the two, which is a different position and therefore a different
+/// element.
+fn field_of(node: tree_sitter::Node) -> Option<String> {
+    let parent = node.parent()?;
+    let mut cursor = parent.walk();
+    for (i, child) in parent.children(&mut cursor).enumerate() {
+        if child.id() == node.id() {
+            return parent.field_name_for_child(i as u32).map(str::to_string);
+        }
+    }
+    None
+}
+
+fn kind_invariant_cost_of(
+    name: &str,
+    before: &codediff::code::Code,
+    after: &codediff::code::Code,
+) -> Option<InvariantCost> {
+    let mapping = human_mapping::load(name).ok()?;
+    let before_root = before.ast.as_ref()?.root_node();
+    let after_root = after.ast.as_ref()?.root_node();
+    let caches = human_mapping::rebuild_caches_for_mapping(&mapping, before_root, after_root);
+
+    let mut before_nodes = Vec::new();
+    let mut after_nodes = Vec::new();
+    collect_nodes(before_root, &mut before_nodes);
+    collect_nodes(after_root, &mut after_nodes);
+
+    let removed_leaf = |n: &tree_sitter::Node| {
+        n.is_named()
+            && is_lexeme(*n)
+            && matches!(
+                human_mapping::status_before(*n, &caches),
+                human_mapping::NodeStatus::Marked { .. }
+            )
+    };
+    let inserted_leaf = |n: &tree_sitter::Node| {
+        n.is_named()
+            && is_lexeme(*n)
+            && matches!(
+                human_mapping::status_after(*n, &caches),
+                human_mapping::NodeStatus::Marked { .. }
+            )
+    };
+
+    // ---- R1: one removed leaf under a parent whose counterpart holds one inserted leaf ----
+    let mut removed_by_parent: HashMap<usize, Vec<tree_sitter::Node>> = HashMap::new();
+    for n in before_nodes.iter().filter(|n| removed_leaf(n)) {
+        if let Some(p) = n.parent() {
+            removed_by_parent.entry(p.id()).or_default().push(*n);
+        }
+    }
+    let mut inserted_by_parent: HashMap<usize, Vec<tree_sitter::Node>> = HashMap::new();
+    for n in after_nodes.iter().filter(|n| inserted_leaf(n)) {
+        if let Some(p) = n.parent() {
+            inserted_by_parent.entry(p.id()).or_default().push(*n);
+        }
+    }
+
+    let mut cost = InvariantCost {
+        r1_same_kind: 0,
+        r1_diff_kind: 0,
+        r2a_same_kind: 0,
+        r2a_diff_kind: 0,
+        samples: Vec::new(),
+    };
+    let mut r1_pairs: std::collections::HashSet<(usize, usize)> = std::collections::HashSet::new();
+    for (pb_id, removed) in &removed_by_parent {
+        if removed.len() != 1 {
+            continue;
+        }
+        let Some(pa_id) = caches.before_match.get(pb_id) else {
+            continue;
+        };
+        let Some(inserted) = inserted_by_parent.get(pa_id) else {
+            continue;
+        };
+        if inserted.len() != 1 {
+            continue;
+        }
+        let (b, a) = (removed[0], inserted[0]);
+        // Same slot, not merely the same parent pair - see `field_of`. The slot must also be a
+        // *named field*: a named field is a role the grammar says persists (`type`, `value`,
+        // `name`), so "the thing in this role changed" is a claim about one element. A node the
+        // grammar gives no field to has no such role, and positional correspondence there proves
+        // nothing - two adjacent comments, or two shell words, can be entirely unrelated and a
+        // human is right to call that a delete plus an insert.
+        let (fb, fa) = (field_of(b), field_of(a));
+        let (Some(fb_name), Some(fa_name)) = (fb.as_ref(), fa.as_ref()) else {
+            continue;
+        };
+        if fb_name != fa_name {
+            continue;
+        }
+        // ...and the field must hold exactly one child on each side - see `field_arity`.
+        let (Some(pb), Some(pa)) = (b.parent(), a.parent()) else {
+            continue;
+        };
+        if field_arity(pb, fb_name) != 1 || field_arity(pa, fa_name) != 1 {
+            continue;
+        }
+        r1_pairs.insert((b.id(), a.id()));
+        cost.samples.push((
+            "R1",
+            b.kind().to_string(),
+            a.kind().to_string(),
+            cell_text(b, &before.contents),
+            cell_text(a, &after.contents),
+            format!("{}.{}", pb.kind(), fb_name),
+            b.start_position().row + 1,
+            a.start_position().row + 1,
+        ));
+        if b.kind() == a.kind() {
+            cost.r1_same_kind += 1;
+        } else {
+            cost.r1_diff_kind += 1;
+        }
+    }
+
+    // ---- R2a: a lexeme carried by exactly one removed leaf and exactly one inserted leaf ----
+    let mut removed_by_text: HashMap<&str, Vec<tree_sitter::Node>> = HashMap::new();
+    for n in before_nodes.iter().filter(|n| removed_leaf(n)) {
+        if let Ok(t) = n.utf8_text(before.contents.as_bytes()) {
+            removed_by_text.entry(t).or_default().push(*n);
+        }
+    }
+    let mut inserted_by_text: HashMap<&str, Vec<tree_sitter::Node>> = HashMap::new();
+    for n in after_nodes.iter().filter(|n| inserted_leaf(n)) {
+        if let Ok(t) = n.utf8_text(after.contents.as_bytes()) {
+            inserted_by_text.entry(t).or_default().push(*n);
+        }
+    }
+    for (text, removed) in &removed_by_text {
+        if removed.len() != 1 {
+            continue;
+        }
+        let Some(inserted) = inserted_by_text.get(text) else {
+            continue;
+        };
+        if inserted.len() != 1 {
+            continue;
+        }
+        let (b, a) = (removed[0], inserted[0]);
+        // Already counted by R1: the rules overlap, and a pair is one violation either way.
+        if r1_pairs.contains(&(b.id(), a.id())) {
+            continue;
+        }
+        cost.samples.push((
+            "R2a",
+            b.kind().to_string(),
+            a.kind().to_string(),
+            cell_text(b, &before.contents),
+            cell_text(a, &after.contents),
+            String::new(),
+            b.start_position().row + 1,
+            a.start_position().row + 1,
+        ));
+        if b.kind() == a.kind() {
+            cost.r2a_same_kind += 1;
+        } else {
+            cost.r2a_diff_kind += 1;
+        }
+    }
+    Some(cost)
+}
+
+fn write_kind_mismatches(rows: &[KindMismatch], path: &std::path::Path) -> Result<()> {
+    use std::io::Write;
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    let mut f = std::io::BufWriter::new(std::fs::File::create(path)?);
+    writeln!(
+        f,
+        "fixture,language,before_kind,after_kind,before_named,after_named,before_leaf,after_leaf,parents_matched,before_parent,after_parent,depth,before_text,after_text"
+    )?;
+    // Every field is quoted, not just the text ones. An anonymous node's kind *is* its source
+    // text, so `before_kind` can legitimately be `,` or `"` - which silently shears the columns of
+    // any row carrying one. Found the hard way: the first run of this report produced rows whose
+    // `before_named` column held a quote character.
+    for r in rows {
+        let cells = [
+            r.fixture.as_str(),
+            r.language.as_str(),
+            r.before_kind.as_str(),
+            r.after_kind.as_str(),
+            if r.before_named { "true" } else { "false" },
+            if r.after_named { "true" } else { "false" },
+            if r.before_leaf { "true" } else { "false" },
+            if r.after_leaf { "true" } else { "false" },
+            if r.parents_matched { "true" } else { "false" },
+            r.before_parent.as_str(),
+            r.after_parent.as_str(),
+            &r.depth.to_string(),
+            r.before_text.as_str(),
+            r.after_text.as_str(),
+        ];
+        let line: Vec<String> = cells
+            .iter()
+            .map(|c| format!("\"{}\"", c.replace('"', "\"\"")))
+            .collect();
+        writeln!(f, "{}", line.join(","))?;
+    }
+    Ok(())
+}
+
 fn main() -> Result<()> {
     let args = Args::parse();
 
     let code_pairs = helper::handmade_test_code_pairs()?;
     let mut names: Vec<String> = code_pairs.keys().cloned().collect();
     names.sort();
+
+    if args.kind_invariant_cost {
+        let (mut r1s, mut r1d, mut r2s, mut r2d) = (0usize, 0usize, 0usize, 0usize);
+        let mut fixtures_hit = 0usize;
+        let mut worst: Vec<(usize, String)> = Vec::new();
+        #[allow(clippy::type_complexity)]
+        let mut all_samples: Vec<(
+            String,
+            String,
+            String,
+            String,
+            String,
+            String,
+            String,
+            String,
+            String,
+        )> = Vec::new();
+        for name in &names {
+            let (before, after) = code_pairs
+                .get(name)
+                .expect("name came from code_pairs.keys()");
+            let Some(c) = kind_invariant_cost_of(name, before, after) else {
+                continue;
+            };
+            let total = c.r1_same_kind + c.r1_diff_kind + c.r2a_same_kind + c.r2a_diff_kind;
+            if total > 0 {
+                fixtures_hit += 1;
+                worst.push((total, name.clone()));
+            }
+            for (rule, bk, ak, bt, at, field, br, ar) in &c.samples {
+                all_samples.push((
+                    name.clone(),
+                    (*rule).to_string(),
+                    bk.clone(),
+                    ak.clone(),
+                    bt.clone(),
+                    at.clone(),
+                    field.clone(),
+                    br.to_string(),
+                    ar.to_string(),
+                ));
+            }
+            r1s += c.r1_same_kind;
+            r1d += c.r1_diff_kind;
+            r2s += c.r2a_same_kind;
+            r2d += c.r2a_diff_kind;
+        }
+        worst.sort_by_key(|entry| std::cmp::Reverse(entry.0));
+        {
+            use std::io::Write;
+            let path =
+                std::path::Path::new("./research/data/quality/kind_invariant_candidates.csv");
+            if let Some(parent) = path.parent() {
+                std::fs::create_dir_all(parent)?;
+            }
+            let mut f = std::io::BufWriter::new(std::fs::File::create(path)?);
+            writeln!(
+                f,
+                "rule,fixture,before_kind,after_kind,before_text,after_text,slot,before_row,after_row"
+            )?;
+            for (fixture, rule, bk, ak, bt, at, slot, br, ar) in &all_samples {
+                let cells = [
+                    rule.as_str(),
+                    fixture.as_str(),
+                    bk.as_str(),
+                    ak.as_str(),
+                    bt.as_str(),
+                    at.as_str(),
+                    slot.as_str(),
+                    br.as_str(),
+                    ar.as_str(),
+                ];
+                let line: Vec<String> = cells
+                    .iter()
+                    .map(|c| format!("\"{}\"", c.replace('"', "\"\"")))
+                    .collect();
+                writeln!(f, "{}", line.join(","))?;
+            }
+            println!("candidates written to {}", path.display());
+        }
+        println!("=== If R1 and R2a were invariants ===");
+        println!("R1  (leaf deleted + leaf inserted under corresponding parents, unambiguous)");
+        println!(
+            "      same kind: {r1s}    different kind: {r1d}    total: {}",
+            r1s + r1d
+        );
+        println!("R2a (identical lexeme, unique on both sides, not already counted by R1)");
+        println!(
+            "      same kind: {r2s}    different kind: {r2d}    total: {}",
+            r2s + r2d
+        );
+        println!("TOTAL candidate violations: {}", r1s + r1d + r2s + r2d);
+        println!("Fixtures affected: {fixtures_hit} of {}", names.len());
+        println!("\nWorst fixtures:");
+        for (n, name) in worst.iter().take(15) {
+            println!("   {n:>5}  {name}");
+        }
+        return Ok(());
+    }
+
+    if let Some(target) = args.kind_mismatches.clone() {
+        let path =
+            target.unwrap_or_else(|| PathBuf::from("./research/data/quality/kind_mismatches.csv"));
+        let mut rows = Vec::new();
+        for name in &names {
+            let (before, after) = code_pairs
+                .get(name)
+                .expect("name came from code_pairs.keys()");
+            rows.extend(kind_mismatches_of(name, before, after));
+        }
+        write_kind_mismatches(&rows, &path)?;
+        println!(
+            "{} cross-kind paired entries across {} fixtures -> {}",
+            rows.len(),
+            rows.iter()
+                .map(|r| r.fixture.as_str())
+                .collect::<std::collections::HashSet<_>>()
+                .len(),
+            path.display()
+        );
+        return Ok(());
+    }
 
     let current_mismatches = load_current_mismatches(std::path::Path::new(
         "./research/data/quality/optimal_solutions_benchmark.csv",
