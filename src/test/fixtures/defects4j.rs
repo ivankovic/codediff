@@ -124,6 +124,8 @@ mod java_defects4j_cli_24_helpformatter;
 #[cfg(test)]
 mod java_defects4j_cli_25_helpformatter;
 #[cfg(test)]
+mod java_defects4j_cli_26_optionbuilder;
+#[cfg(test)]
 mod java_defects4j_cli_27_optiongroup;
 #[cfg(test)]
 mod java_defects4j_cli_28_parser;
@@ -213,6 +215,8 @@ mod java_defects4j_closure_30_flowsensitiveinlinevariables;
 mod java_defects4j_closure_31_compiler;
 #[cfg(test)]
 mod java_defects4j_closure_34_codeprinter;
+#[cfg(test)]
+mod java_defects4j_closure_37_nodetraversal;
 #[cfg(test)]
 mod java_defects4j_closure_77_codegenerator;
 #[cfg(test)]
