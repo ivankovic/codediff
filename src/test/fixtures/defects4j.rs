@@ -218,6 +218,8 @@ mod java_defects4j_closure_34_codeprinter;
 #[cfg(test)]
 mod java_defects4j_closure_37_nodetraversal;
 #[cfg(test)]
+mod java_defects4j_closure_38_codeconsumer;
+#[cfg(test)]
 mod java_defects4j_closure_77_codegenerator;
 #[cfg(test)]
 mod java_defects4j_closure_79_varcheck;
@@ -231,6 +233,8 @@ mod java_defects4j_codec_8_base64inputstream;
 mod java_defects4j_compress_1_cpioarchiveoutputstream;
 #[cfg(test)]
 mod java_defects4j_compress_25_ziparchiveinputstream;
+#[cfg(test)]
+mod java_defects4j_compress_26_ioutils;
 #[cfg(test)]
 mod java_defects4j_compress_33_deflatecompressorinputstream;
 #[cfg(test)]
