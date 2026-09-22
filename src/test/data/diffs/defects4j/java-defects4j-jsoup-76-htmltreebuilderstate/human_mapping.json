@@ -735260,5 +735260,39 @@
         "}:1"
       ]
     }
+  ],
+  "text_mappings": [
+    {
+      "name": "Minimal",
+      "entries": [
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 381,
+              "start_column": 24,
+              "end_row": 382,
+              "end_column": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Full",
+      "entries": [
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 381,
+              "start_column": 0,
+              "end_row": 382,
+              "end_column": 0
+            }
+          ]
+        }
+      ]
+    }
   ]
 }

@@ -18,24 +18,22 @@
 use anyhow::Result;
 
 use crate::test;
-use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
 use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
+use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
 
 #[test]
 fn mapping() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping(
-        "java-defects4j-jsoup-76-htmltreebuilderstate",
-    )
-}
-
-#[test]
-fn invariants() -> Result<()> {
-    assert_ground_truth_invariants("java-defects4j-jsoup-76-htmltreebuilderstate")
+    test::helper::human_mapping::assert_matches_human_mapping("java-defects4j-compress-29-cpioarchiveinputstream")
 }
 
 #[test]
 fn painting() -> Result<()> {
     // Not measured yet: 100.0 passes unconditionally. Run this test and record the
     // limit it reports instead.
-    assert_matches_human_painting_within_limit("java-defects4j-jsoup-76-htmltreebuilderstate", 100.0)
+    assert_matches_human_painting_within_limit("java-defects4j-compress-29-cpioarchiveinputstream", 100.0)
+}
+
+#[test]
+fn invariants() -> Result<()> {
+    assert_ground_truth_invariants("java-defects4j-compress-29-cpioarchiveinputstream")
 }

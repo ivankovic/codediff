@@ -242,25 +242,85 @@ mod java_defects4j_closure_71_checkaccesscontrols;
 #[cfg(test)]
 mod java_defects4j_closure_72_functiontoblockmutator;
 #[cfg(test)]
+mod java_defects4j_closure_72_renamelabels;
+#[cfg(test)]
+mod java_defects4j_closure_73_codegenerator;
+#[cfg(test)]
 mod java_defects4j_closure_77_codegenerator;
+#[cfg(test)]
+mod java_defects4j_closure_78_peepholefoldconstants;
+#[cfg(test)]
+mod java_defects4j_closure_79_normalize;
 #[cfg(test)]
 mod java_defects4j_closure_79_varcheck;
 #[cfg(test)]
 mod java_defects4j_closure_80_nodeutil;
 #[cfg(test)]
+mod java_defects4j_closure_86_nodeutil;
+#[cfg(test)]
+mod java_defects4j_closure_89_globalnamespace;
+#[cfg(test)]
+mod java_defects4j_closure_90_functiontypebuilder;
+#[cfg(test)]
+mod java_defects4j_closure_92_processclosureprimitives;
+#[cfg(test)]
+mod java_defects4j_codec_10_caverphone;
+#[cfg(test)]
+mod java_defects4j_codec_16_base32;
+#[cfg(test)]
+mod java_defects4j_codec_17_stringutils;
+#[cfg(test)]
+mod java_defects4j_codec_1_caverphone;
+#[cfg(test)]
+mod java_defects4j_codec_1_metaphone;
+#[cfg(test)]
 mod java_defects4j_codec_1_soundexutils;
+#[cfg(test)]
+mod java_defects4j_codec_2_base64;
+#[cfg(test)]
+mod java_defects4j_codec_3_doublemetaphone;
+#[cfg(test)]
+mod java_defects4j_codec_4_base64;
+#[cfg(test)]
+mod java_defects4j_codec_7_base64;
 #[cfg(test)]
 mod java_defects4j_codec_8_base64inputstream;
 #[cfg(test)]
+mod java_defects4j_codec_9_base64;
+#[cfg(test)]
+mod java_defects4j_collections_26_multikey;
+#[cfg(test)]
+mod java_defects4j_compress_11_archivestreamfactory;
+#[cfg(test)]
+mod java_defects4j_compress_19_zip64extendedinformationextrafield;
+#[cfg(test)]
 mod java_defects4j_compress_1_cpioarchiveoutputstream;
+#[cfg(test)]
+mod java_defects4j_compress_23_coders;
 #[cfg(test)]
 mod java_defects4j_compress_25_ziparchiveinputstream;
 #[cfg(test)]
 mod java_defects4j_compress_26_ioutils;
 #[cfg(test)]
+mod java_defects4j_compress_29_cpioarchiveinputstream;
+#[cfg(test)]
+mod java_defects4j_compress_29_cpioarchiveoutputstream;
+#[cfg(test)]
+mod java_defects4j_compress_29_dumparchiveinputstream;
+#[cfg(test)]
+mod java_defects4j_compress_29_tararchiveinputstream;
+#[cfg(test)]
+mod java_defects4j_compress_29_tararchiveoutputstream;
+#[cfg(test)]
+mod java_defects4j_compress_29_ziparchiveinputstream;
+#[cfg(test)]
 mod java_defects4j_compress_33_deflatecompressorinputstream;
 #[cfg(test)]
+mod java_defects4j_compress_38_tararchiveentry;
+#[cfg(test)]
 mod java_defects4j_compress_42_unixstat;
+#[cfg(test)]
+mod java_defects4j_compress_42_ziparchiveentry;
 #[cfg(test)]
 mod java_defects4j_compress_44_checksumcalculatinginputstream;
 #[cfg(test)]
@@ -387,6 +447,8 @@ mod java_defects4j_lang_43_extendedmessageformat;
 mod java_defects4j_lang_4_lookuptranslator;
 #[cfg(test)]
 mod java_defects4j_lang_51_booleanutils;
+#[cfg(test)]
+mod java_defects4j_lang_54_localeutils;
 #[cfg(test)]
 mod java_defects4j_lang_64_valuedenum;
 #[cfg(test)]

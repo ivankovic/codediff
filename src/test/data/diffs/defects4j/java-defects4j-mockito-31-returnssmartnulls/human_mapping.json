@@ -10536,6 +10536,191 @@
       ],
       "operation": "match_but_not_identical",
       "with_children": false
+    },
+    {
+      "before_paths": [
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "class_declaration:1",
+          "class_body:1",
+          "method_declaration:2",
+          "block:1",
+          "return_statement:1",
+          "binary_expression:1",
+          "string_literal:1"
+        ]
+      ],
+      "after_paths": [
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "class_declaration:1",
+          "class_body:1",
+          "method_declaration:2",
+          "block:1",
+          "return_statement:1",
+          "binary_expression:1",
+          "binary_expression:1",
+          "binary_expression:1",
+          "string_literal:1"
+        ],
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "class_declaration:1",
+          "class_body:1",
+          "method_declaration:2",
+          "block:1",
+          "return_statement:1",
+          "binary_expression:1",
+          "string_literal:1"
+        ]
+      ],
+      "operation": "match_but_not_identical",
+      "with_children": false,
+      "pairing": "all_to_all"
+    },
+    {
+      "before_paths": [
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "class_declaration:1",
+          "class_body:1",
+          "method_declaration:2",
+          "block:1",
+          "return_statement:1",
+          "binary_expression:1",
+          "string_literal:1",
+          "\":1"
+        ]
+      ],
+      "after_paths": [
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "class_declaration:1",
+          "class_body:1",
+          "method_declaration:2",
+          "block:1",
+          "return_statement:1",
+          "binary_expression:1",
+          "binary_expression:1",
+          "binary_expression:1",
+          "string_literal:1",
+          "\":1"
+        ],
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "class_declaration:1",
+          "class_body:1",
+          "method_declaration:2",
+          "block:1",
+          "return_statement:1",
+          "binary_expression:1",
+          "string_literal:1",
+          "\":1"
+        ]
+      ],
+      "operation": "identical",
+      "with_children": false,
+      "pairing": "all_to_all"
+    },
+    {
+      "before_paths": [
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "class_declaration:1",
+          "class_body:1",
+          "method_declaration:2",
+          "block:1",
+          "return_statement:1",
+          "binary_expression:1",
+          "string_literal:1",
+          "string_fragment:1"
+        ]
+      ],
+      "after_paths": [
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "class_declaration:1",
+          "class_body:1",
+          "method_declaration:2",
+          "block:1",
+          "return_statement:1",
+          "binary_expression:1",
+          "binary_expression:1",
+          "binary_expression:1",
+          "string_literal:1",
+          "string_fragment:1"
+        ],
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "class_declaration:1",
+          "class_body:1",
+          "method_declaration:2",
+          "block:1",
+          "return_statement:1",
+          "binary_expression:1",
+          "string_literal:1",
+          "string_fragment:1"
+        ]
+      ],
+      "operation": "match_but_not_identical",
+      "with_children": false,
+      "pairing": "all_to_all"
+    },
+    {
+      "before_paths": [
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "class_declaration:1",
+          "class_body:1",
+          "method_declaration:2",
+          "block:1",
+          "return_statement:1",
+          "binary_expression:1",
+          "string_literal:1",
+          "\":2"
+        ]
+      ],
+      "after_paths": [
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "class_declaration:1",
+          "class_body:1",
+          "method_declaration:2",
+          "block:1",
+          "return_statement:1",
+          "binary_expression:1",
+          "binary_expression:1",
+          "binary_expression:1",
+          "string_literal:1",
+          "\":2"
+        ],
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "class_declaration:1",
+          "class_body:1",
+          "method_declaration:2",
+          "block:1",
+          "return_statement:1",
+          "binary_expression:1",
+          "string_literal:1",
+          "\":2"
+        ]
+      ],
+      "operation": "identical",
+      "with_children": false,
+      "pairing": "all_to_all"
     }
   ],
   "text_mappings": [

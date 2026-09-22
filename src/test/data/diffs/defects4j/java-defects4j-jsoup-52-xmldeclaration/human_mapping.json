@@ -4693,6 +4693,886 @@
       ]
     }
   ],
+  "groups": [
+    {
+      "before_paths": [
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "method_declaration:4",
+          "block:1",
+          "expression_statement:1"
+        ]
+      ],
+      "after_paths": [
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "method_declaration:4",
+          "block:1",
+          "expression_statement:1"
+        ],
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "method_declaration:4",
+          "block:1",
+          "expression_statement:3"
+        ]
+      ],
+      "operation": "match_but_not_identical",
+      "with_children": false,
+      "pairing": "all_to_all"
+    },
+    {
+      "before_paths": [
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "method_declaration:4",
+          "block:1",
+          "expression_statement:1",
+          "method_invocation:1",
+          "method_invocation:1",
+          "method_invocation:1",
+          "argument_list:1"
+        ]
+      ],
+      "after_paths": [
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "method_declaration:4",
+          "block:1",
+          "expression_statement:1",
+          "method_invocation:1",
+          "method_invocation:1",
+          "argument_list:1"
+        ],
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "method_declaration:4",
+          "block:1",
+          "expression_statement:3",
+          "method_invocation:1",
+          "method_invocation:1",
+          "argument_list:1"
+        ]
+      ],
+      "operation": "identical",
+      "with_children": false,
+      "pairing": "all_to_all"
+    },
+    {
+      "before_paths": [
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "method_declaration:4",
+          "block:1",
+          "expression_statement:1",
+          "method_invocation:1",
+          "method_invocation:1",
+          "method_invocation:1",
+          "argument_list:1",
+          "(:1"
+        ]
+      ],
+      "after_paths": [
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "method_declaration:4",
+          "block:1",
+          "expression_statement:1",
+          "method_invocation:1",
+          "method_invocation:1",
+          "argument_list:1",
+          "(:1"
+        ],
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "method_declaration:4",
+          "block:1",
+          "expression_statement:3",
+          "method_invocation:1",
+          "method_invocation:1",
+          "argument_list:1",
+          "(:1"
+        ]
+      ],
+      "operation": "identical",
+      "with_children": false,
+      "pairing": "all_to_all"
+    },
+    {
+      "before_paths": [
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "method_declaration:4",
+          "block:1",
+          "expression_statement:1",
+          "method_invocation:1",
+          "method_invocation:1",
+          "method_invocation:1",
+          "argument_list:1",
+          "ternary_expression:1"
+        ]
+      ],
+      "after_paths": [
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "method_declaration:4",
+          "block:1",
+          "expression_statement:1",
+          "method_invocation:1",
+          "method_invocation:1",
+          "argument_list:1",
+          "ternary_expression:1"
+        ],
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "method_declaration:4",
+          "block:1",
+          "expression_statement:3",
+          "method_invocation:1",
+          "method_invocation:1",
+          "argument_list:1",
+          "ternary_expression:1"
+        ]
+      ],
+      "operation": "identical",
+      "with_children": false,
+      "pairing": "all_to_all"
+    },
+    {
+      "before_paths": [
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "method_declaration:4",
+          "block:1",
+          "expression_statement:1",
+          "method_invocation:1",
+          "method_invocation:1",
+          "method_invocation:1",
+          "argument_list:1",
+          "ternary_expression:1",
+          "identifier:1"
+        ]
+      ],
+      "after_paths": [
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "method_declaration:4",
+          "block:1",
+          "expression_statement:1",
+          "method_invocation:1",
+          "method_invocation:1",
+          "argument_list:1",
+          "ternary_expression:1",
+          "identifier:1"
+        ],
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "method_declaration:4",
+          "block:1",
+          "expression_statement:3",
+          "method_invocation:1",
+          "method_invocation:1",
+          "argument_list:1",
+          "ternary_expression:1",
+          "identifier:1"
+        ]
+      ],
+      "operation": "identical",
+      "with_children": false,
+      "pairing": "all_to_all"
+    },
+    {
+      "before_paths": [
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "method_declaration:4",
+          "block:1",
+          "expression_statement:1",
+          "method_invocation:1",
+          "method_invocation:1",
+          "method_invocation:1",
+          "argument_list:1",
+          "ternary_expression:1",
+          "?:1"
+        ]
+      ],
+      "after_paths": [
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "method_declaration:4",
+          "block:1",
+          "expression_statement:1",
+          "method_invocation:1",
+          "method_invocation:1",
+          "argument_list:1",
+          "ternary_expression:1",
+          "?:1"
+        ],
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "method_declaration:4",
+          "block:1",
+          "expression_statement:3",
+          "method_invocation:1",
+          "method_invocation:1",
+          "argument_list:1",
+          "ternary_expression:1",
+          "?:1"
+        ]
+      ],
+      "operation": "identical",
+      "with_children": false,
+      "pairing": "all_to_all"
+    },
+    {
+      "before_paths": [
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "method_declaration:4",
+          "block:1",
+          "expression_statement:1",
+          "method_invocation:1",
+          "method_invocation:1",
+          "method_invocation:1",
+          "argument_list:1",
+          "ternary_expression:1",
+          "string_literal:1"
+        ]
+      ],
+      "after_paths": [
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "method_declaration:4",
+          "block:1",
+          "expression_statement:1",
+          "method_invocation:1",
+          "method_invocation:1",
+          "argument_list:1",
+          "ternary_expression:1",
+          "string_literal:1"
+        ],
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "method_declaration:4",
+          "block:1",
+          "expression_statement:3",
+          "method_invocation:1",
+          "method_invocation:1",
+          "argument_list:1",
+          "ternary_expression:1",
+          "string_literal:1"
+        ]
+      ],
+      "operation": "identical",
+      "with_children": false,
+      "pairing": "all_to_all"
+    },
+    {
+      "before_paths": [
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "method_declaration:4",
+          "block:1",
+          "expression_statement:1",
+          "method_invocation:1",
+          "method_invocation:1",
+          "method_invocation:1",
+          "argument_list:1",
+          "ternary_expression:1",
+          "string_literal:1",
+          "\":1"
+        ]
+      ],
+      "after_paths": [
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "method_declaration:4",
+          "block:1",
+          "expression_statement:1",
+          "method_invocation:1",
+          "method_invocation:1",
+          "argument_list:1",
+          "ternary_expression:1",
+          "string_literal:1",
+          "\":1"
+        ],
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "method_declaration:4",
+          "block:1",
+          "expression_statement:3",
+          "method_invocation:1",
+          "method_invocation:1",
+          "argument_list:1",
+          "ternary_expression:1",
+          "string_literal:1",
+          "\":1"
+        ]
+      ],
+      "operation": "identical",
+      "with_children": false,
+      "pairing": "all_to_all"
+    },
+    {
+      "before_paths": [
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "method_declaration:4",
+          "block:1",
+          "expression_statement:1",
+          "method_invocation:1",
+          "method_invocation:1",
+          "method_invocation:1",
+          "argument_list:1",
+          "ternary_expression:1",
+          "string_literal:1",
+          "string_fragment:1"
+        ]
+      ],
+      "after_paths": [
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "method_declaration:4",
+          "block:1",
+          "expression_statement:1",
+          "method_invocation:1",
+          "method_invocation:1",
+          "argument_list:1",
+          "ternary_expression:1",
+          "string_literal:1",
+          "string_fragment:1"
+        ],
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "method_declaration:4",
+          "block:1",
+          "expression_statement:3",
+          "method_invocation:1",
+          "method_invocation:1",
+          "argument_list:1",
+          "ternary_expression:1",
+          "string_literal:1",
+          "string_fragment:1"
+        ]
+      ],
+      "operation": "identical",
+      "with_children": false,
+      "pairing": "all_to_all"
+    },
+    {
+      "before_paths": [
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "method_declaration:4",
+          "block:1",
+          "expression_statement:1",
+          "method_invocation:1",
+          "method_invocation:1",
+          "method_invocation:1",
+          "argument_list:1",
+          "ternary_expression:1",
+          "string_literal:1",
+          "\":2"
+        ]
+      ],
+      "after_paths": [
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "method_declaration:4",
+          "block:1",
+          "expression_statement:1",
+          "method_invocation:1",
+          "method_invocation:1",
+          "argument_list:1",
+          "ternary_expression:1",
+          "string_literal:1",
+          "\":2"
+        ],
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "method_declaration:4",
+          "block:1",
+          "expression_statement:3",
+          "method_invocation:1",
+          "method_invocation:1",
+          "argument_list:1",
+          "ternary_expression:1",
+          "string_literal:1",
+          "\":2"
+        ]
+      ],
+      "operation": "identical",
+      "with_children": false,
+      "pairing": "all_to_all"
+    },
+    {
+      "before_paths": [
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "method_declaration:4",
+          "block:1",
+          "expression_statement:1",
+          "method_invocation:1",
+          "method_invocation:1",
+          "method_invocation:1",
+          "argument_list:1",
+          "ternary_expression:1",
+          "::1"
+        ]
+      ],
+      "after_paths": [
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "method_declaration:4",
+          "block:1",
+          "expression_statement:1",
+          "method_invocation:1",
+          "method_invocation:1",
+          "argument_list:1",
+          "ternary_expression:1",
+          "::1"
+        ],
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "method_declaration:4",
+          "block:1",
+          "expression_statement:3",
+          "method_invocation:1",
+          "method_invocation:1",
+          "argument_list:1",
+          "ternary_expression:1",
+          "::1"
+        ]
+      ],
+      "operation": "identical",
+      "with_children": false,
+      "pairing": "all_to_all"
+    },
+    {
+      "before_paths": [
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "method_declaration:4",
+          "block:1",
+          "expression_statement:1",
+          "method_invocation:1",
+          "method_invocation:1",
+          "method_invocation:1",
+          "argument_list:1",
+          "ternary_expression:1",
+          "string_literal:2"
+        ]
+      ],
+      "after_paths": [
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "method_declaration:4",
+          "block:1",
+          "expression_statement:1",
+          "method_invocation:1",
+          "method_invocation:1",
+          "argument_list:1",
+          "ternary_expression:1",
+          "string_literal:2"
+        ],
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "method_declaration:4",
+          "block:1",
+          "expression_statement:3",
+          "method_invocation:1",
+          "method_invocation:1",
+          "argument_list:1",
+          "ternary_expression:1",
+          "string_literal:2"
+        ]
+      ],
+      "operation": "identical",
+      "with_children": false,
+      "pairing": "all_to_all"
+    },
+    {
+      "before_paths": [
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "method_declaration:4",
+          "block:1",
+          "expression_statement:1",
+          "method_invocation:1",
+          "method_invocation:1",
+          "method_invocation:1",
+          "argument_list:1",
+          "ternary_expression:1",
+          "string_literal:2",
+          "\":1"
+        ]
+      ],
+      "after_paths": [
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "method_declaration:4",
+          "block:1",
+          "expression_statement:1",
+          "method_invocation:1",
+          "method_invocation:1",
+          "argument_list:1",
+          "ternary_expression:1",
+          "string_literal:2",
+          "\":1"
+        ],
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "method_declaration:4",
+          "block:1",
+          "expression_statement:3",
+          "method_invocation:1",
+          "method_invocation:1",
+          "argument_list:1",
+          "ternary_expression:1",
+          "string_literal:2",
+          "\":1"
+        ]
+      ],
+      "operation": "identical",
+      "with_children": false,
+      "pairing": "all_to_all"
+    },
+    {
+      "before_paths": [
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "method_declaration:4",
+          "block:1",
+          "expression_statement:1",
+          "method_invocation:1",
+          "method_invocation:1",
+          "method_invocation:1",
+          "argument_list:1",
+          "ternary_expression:1",
+          "string_literal:2",
+          "string_fragment:1"
+        ]
+      ],
+      "after_paths": [
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "method_declaration:4",
+          "block:1",
+          "expression_statement:1",
+          "method_invocation:1",
+          "method_invocation:1",
+          "argument_list:1",
+          "ternary_expression:1",
+          "string_literal:2",
+          "string_fragment:1"
+        ],
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "method_declaration:4",
+          "block:1",
+          "expression_statement:3",
+          "method_invocation:1",
+          "method_invocation:1",
+          "argument_list:1",
+          "ternary_expression:1",
+          "string_literal:2",
+          "string_fragment:1"
+        ]
+      ],
+      "operation": "identical",
+      "with_children": false,
+      "pairing": "all_to_all"
+    },
+    {
+      "before_paths": [
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "method_declaration:4",
+          "block:1",
+          "expression_statement:1",
+          "method_invocation:1",
+          "method_invocation:1",
+          "method_invocation:1",
+          "argument_list:1",
+          "ternary_expression:1",
+          "string_literal:2",
+          "\":2"
+        ]
+      ],
+      "after_paths": [
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "method_declaration:4",
+          "block:1",
+          "expression_statement:1",
+          "method_invocation:1",
+          "method_invocation:1",
+          "argument_list:1",
+          "ternary_expression:1",
+          "string_literal:2",
+          "\":2"
+        ],
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "method_declaration:4",
+          "block:1",
+          "expression_statement:3",
+          "method_invocation:1",
+          "method_invocation:1",
+          "argument_list:1",
+          "ternary_expression:1",
+          "string_literal:2",
+          "\":2"
+        ]
+      ],
+      "operation": "identical",
+      "with_children": false,
+      "pairing": "all_to_all"
+    },
+    {
+      "before_paths": [
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "method_declaration:4",
+          "block:1",
+          "expression_statement:1",
+          "method_invocation:1",
+          "method_invocation:1",
+          "method_invocation:1",
+          "argument_list:1",
+          "):1"
+        ]
+      ],
+      "after_paths": [
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "method_declaration:4",
+          "block:1",
+          "expression_statement:1",
+          "method_invocation:1",
+          "method_invocation:1",
+          "argument_list:1",
+          "):1"
+        ],
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "method_declaration:4",
+          "block:1",
+          "expression_statement:3",
+          "method_invocation:1",
+          "method_invocation:1",
+          "argument_list:1",
+          "):1"
+        ]
+      ],
+      "operation": "identical",
+      "with_children": false,
+      "pairing": "all_to_all"
+    },
+    {
+      "before_paths": [
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "method_declaration:4",
+          "block:1",
+          "expression_statement:1",
+          "method_invocation:1",
+          "method_invocation:1",
+          "method_invocation:1",
+          "identifier:1"
+        ]
+      ],
+      "after_paths": [
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "method_declaration:4",
+          "block:1",
+          "expression_statement:1",
+          "method_invocation:1",
+          "method_invocation:1",
+          "identifier:1"
+        ],
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "method_declaration:4",
+          "block:1",
+          "expression_statement:3",
+          "method_invocation:1",
+          "method_invocation:1",
+          "identifier:2"
+        ]
+      ],
+      "operation": "identical",
+      "with_children": false,
+      "pairing": "all_to_all"
+    },
+    {
+      "before_paths": [
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "method_declaration:4",
+          "block:1",
+          "expression_statement:1",
+          ";:1"
+        ]
+      ],
+      "after_paths": [
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "method_declaration:4",
+          "block:1",
+          "expression_statement:1",
+          ";:1"
+        ],
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "method_declaration:4",
+          "block:1",
+          "expression_statement:3",
+          ";:1"
+        ]
+      ],
+      "operation": "identical",
+      "with_children": false,
+      "pairing": "all_to_all"
+    },
+    {
+      "before_paths": [
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "method_declaration:4",
+          "block:1",
+          "expression_statement:1",
+          "method_invocation:1",
+          "method_invocation:1",
+          "method_invocation:1",
+          "method_invocation:1",
+          "identifier:1"
+        ]
+      ],
+      "after_paths": [
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "method_declaration:4",
+          "block:1",
+          "expression_statement:1",
+          "method_invocation:1",
+          "method_invocation:1",
+          "method_invocation:1",
+          "identifier:1"
+        ],
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "method_declaration:4",
+          "block:1",
+          "expression_statement:3",
+          "method_invocation:1",
+          "method_invocation:1",
+          "identifier:1"
+        ]
+      ],
+      "operation": "identical",
+      "with_children": false,
+      "pairing": "all_to_all"
+    },
+    {
+      "before_paths": [
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "method_declaration:4",
+          "block:1",
+          "expression_statement:1",
+          "method_invocation:1",
+          "method_invocation:1",
+          "method_invocation:1",
+          ".:1"
+        ]
+      ],
+      "after_paths": [
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "method_declaration:4",
+          "block:1",
+          "expression_statement:1",
+          "method_invocation:1",
+          "method_invocation:1",
+          ".:1"
+        ],
+        [
+          "class_declaration:1",
+          "class_body:1",
+          "method_declaration:4",
+          "block:1",
+          "expression_statement:3",
+          "method_invocation:1",
+          "method_invocation:1",
+          ".:1"
+        ]
+      ],
+      "operation": "identical",
+      "with_children": false,
+      "pairing": "all_to_all"
+    }
+  ],
   "text_mappings": [
     {
       "name": "Minimal",
