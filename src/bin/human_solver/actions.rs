@@ -354,6 +354,193 @@ pub(crate) fn group_pairing_name(pairing: GroupPairing) -> &'static str {
     }
 }
 
+/// Same precondition `action_match`/`action_match_subtree` enforce for a single pair: a member
+/// sitting under an ancestor already marked deleted/inserted-with-children can't also be committed
+/// into a group without producing a self-contradictory mapping.
+fn ensure_members_not_under_removed_ancestor(
+    before_root: Node,
+    after_root: Node,
+    before_ids: &std::collections::BTreeSet<usize>,
+    after_ids: &std::collections::BTreeSet<usize>,
+    caches: &Caches,
+) -> Result<()> {
+    for &id in before_ids {
+        if let Some(node) = find_node_anywhere(before_root, id)
+            && is_inherited_removed(node, &caches.before_removed)
+        {
+            bail!(
+                "Before node '{}' is covered by an ancestor's delete-with-children mark; clear that first (u on the ancestor)",
+                node.kind()
+            );
+        }
+    }
+    for &id in after_ids {
+        if let Some(node) = find_node_anywhere(after_root, id)
+            && is_inherited_removed(node, &caches.after_removed)
+        {
+            bail!(
+                "After node '{}' is covered by an ancestor's insert-with-children mark; clear that first (u on the ancestor)",
+                node.kind()
+            );
+        }
+    }
+    Ok(())
+}
+
+/// The member sets `M` commits for an all-to-all selection: the selected roots themselves, then,
+/// position by position, every descendant of theirs - the first child of every root as one set,
+/// the second child as another, and so on down to the leaves - so that every node of every
+/// subtree ends up in exactly one all-to-all group with its counterparts at the same position.
+///
+/// That only means something when the subtrees have one shape. Every member of a set must agree
+/// with the others on kind and on child count; the first position that does not is reported with
+/// both offending nodes, and nothing is returned, so the caller commits all of it or none of it.
+/// A human who wants the roots grouped despite differing shapes underneath has `m`, which commits
+/// the roots alone.
+pub(crate) fn all_to_all_subtree_groups<'t>(
+    before: Vec<Node<'t>>,
+    after: Vec<Node<'t>>,
+    before_src: &[u8],
+    after_src: &[u8],
+) -> Result<Vec<(Vec<Node<'t>>, Vec<Node<'t>>)>> {
+    let mut groups = Vec::new();
+    collect_all_to_all_subtree_groups(before, after, before_src, after_src, &mut groups)?;
+    Ok(groups)
+}
+
+fn collect_all_to_all_subtree_groups<'t>(
+    before: Vec<Node<'t>>,
+    after: Vec<Node<'t>>,
+    before_src: &[u8],
+    after_src: &[u8],
+    groups: &mut Vec<(Vec<Node<'t>>, Vec<Node<'t>>)>,
+) -> Result<()> {
+    // The first before node is the shape every other member is read against - an arbitrary choice
+    // among equals, which only decides which of two divergent nodes a message calls the expected
+    // one.
+    let reference = before[0];
+    let members = before
+        .iter()
+        .map(|node| (Side::Before, *node))
+        .chain(after.iter().map(|node| (Side::After, *node)));
+    for (side, node) in members {
+        let (src, side_name) = match side {
+            Side::Before => (before_src, "Before"),
+            Side::After => (after_src, "After"),
+        };
+        if node.kind() != reference.kind() {
+            bail!(
+                "Subtrees diverge: Before {} vs {side_name} {} - kinds differ; nothing committed (m commits the roots alone)",
+                node_label(reference, before_src),
+                node_label(node, src)
+            );
+        }
+        if node.child_count() != reference.child_count() {
+            bail!(
+                "Subtrees diverge: Before {} has {} child(ren) but {side_name} {} has {}; nothing committed (m commits the roots alone)",
+                node_label(reference, before_src),
+                reference.child_count(),
+                node_label(node, src),
+                node.child_count()
+            );
+        }
+    }
+
+    let child_count = reference.child_count();
+    groups.push((before.clone(), after.clone()));
+    for index in 0..child_count {
+        let child = |node: &Node<'t>| {
+            node.child(index)
+                .expect("every member has child_count children")
+        };
+        collect_all_to_all_subtree_groups(
+            before.iter().map(child).collect(),
+            after.iter().map(child).collect(),
+            before_src,
+            after_src,
+            groups,
+        )?;
+    }
+    Ok(())
+}
+
+/// The nodes `ids` names, in the deterministic, parse-stable order `commit_multi_map_group` also
+/// sorts by - not the arena-id order iterating a `BTreeSet<usize>` would give.
+fn selected_nodes<'t>(
+    root: Node<'t>,
+    ids: &std::collections::BTreeSet<usize>,
+) -> Result<Vec<Node<'t>>> {
+    let mut nodes = ids
+        .iter()
+        .map(|&id| {
+            find_node_anywhere(root, id)
+                .context("A selected node could no longer be found in the tree")
+        })
+        .collect::<Result<Vec<Node>>>()?;
+    nodes.sort_by_key(|node| node.start_byte());
+    Ok(nodes)
+}
+
+/// What `M` does for an all-to-all selection: commits [`all_to_all_subtree_groups`]' member sets,
+/// one group each, every one `AllToAll` and none `with_children` - a descendant's own group is
+/// the claim about that descendant, so there is nothing left for closure to assert. Each group's
+/// operation is inferred separately ([`multi_map_group_operation`]), so identical tokens under
+/// differing parents still come out `Identical`. A divergence anywhere commits nothing, since the
+/// walk returns the whole list or an error.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn action_commit_all_to_all_subtrees(
+    mapping: &mut HumanMapping,
+    before_root: Node,
+    after_root: Node,
+    before_ids: &std::collections::BTreeSet<usize>,
+    after_ids: &std::collections::BTreeSet<usize>,
+    before_hash: &rustc_hash::FxHashMap<usize, u64>,
+    after_hash: &rustc_hash::FxHashMap<usize, u64>,
+    caches: &Caches,
+    before_src: &[u8],
+    after_src: &[u8],
+) -> Result<String> {
+    if before_ids.is_empty() || after_ids.is_empty() {
+        bail!(
+            "Multi-map group needs at least one selected node on both sides (x to select, c to clear)"
+        );
+    }
+    ensure_members_not_under_removed_ancestor(
+        before_root,
+        after_root,
+        before_ids,
+        after_ids,
+        caches,
+    )?;
+
+    let before_roots = selected_nodes(before_root, before_ids)?;
+    let after_roots = selected_nodes(after_root, after_ids)?;
+    let root_kind = before_roots[0].kind().to_string();
+
+    let groups = all_to_all_subtree_groups(before_roots, after_roots, before_src, after_src)?;
+    let count = groups.len();
+    for (before, after) in groups {
+        let before_set: std::collections::BTreeSet<usize> = before.iter().map(Node::id).collect();
+        let after_set: std::collections::BTreeSet<usize> = after.iter().map(Node::id).collect();
+        let operation = multi_map_group_operation(&before_set, &after_set, before_hash, after_hash);
+        commit_multi_map_group(
+            mapping,
+            before_root,
+            after_root,
+            &before_set,
+            &after_set,
+            operation,
+            false,
+            GroupPairing::AllToAll,
+        )?;
+    }
+    Ok(format!(
+        "Committed {count} all-to-all groups: every node of {} before and {} after '{root_kind}' subtree(s), position by position",
+        before_ids.len(),
+        after_ids.len()
+    ))
+}
+
 /// What `m`/`M` does when the multi-map selection (`App::before_multi_select`/`after_multi_select`)
 /// is non-empty: infers the group's operation (see [`multi_map_group_operation`]), then either
 /// commits it directly (every selected node shares one AST kind) or raises
@@ -377,29 +564,13 @@ pub(crate) fn action_commit_multi_map_group(
         );
     }
 
-    // Same precondition `action_match`/`action_match_subtree` enforce for a single pair: a member
-    // sitting under an ancestor already marked deleted/inserted-with-children can't also be
-    // committed into a group without producing a self-contradictory mapping.
-    for &id in before_ids {
-        if let Some(node) = find_node_anywhere(before_root, id)
-            && is_inherited_removed(node, &caches.before_removed)
-        {
-            bail!(
-                "Before node '{}' is covered by an ancestor's delete-with-children mark; clear that first (u on the ancestor)",
-                node.kind()
-            );
-        }
-    }
-    for &id in after_ids {
-        if let Some(node) = find_node_anywhere(after_root, id)
-            && is_inherited_removed(node, &caches.after_removed)
-        {
-            bail!(
-                "After node '{}' is covered by an ancestor's insert-with-children mark; clear that first (u on the ancestor)",
-                node.kind()
-            );
-        }
-    }
+    ensure_members_not_under_removed_ancestor(
+        before_root,
+        after_root,
+        before_ids,
+        after_ids,
+        caches,
+    )?;
 
     let operation = multi_map_group_operation(before_ids, after_ids, before_hash, after_hash);
 

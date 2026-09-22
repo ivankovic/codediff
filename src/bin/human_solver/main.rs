@@ -295,7 +295,12 @@ g / G          jump to first / last visible node
 m / M          match cursor nodes (M also recurses into matching children);
                  with a pending multi-map selection (see x), commits it as a
                  group instead (M asserts the matched subtree closes over
-                 itself, without auto-filling descendants the way plain M does)
+                 itself, without auto-filling descendants the way plain M does;
+                 for an all-to-all selection (see X), M instead walks the
+                 selected subtrees in lockstep and commits one all-to-all group
+                 per position, every node down to the leaves - the subtrees
+                 must agree on kind and child count everywhere, or nothing is
+                 committed and the first divergence is reported)
 f              repeat m until end of file or a kind mismatch needs your input
 d / D          mark Before node deleted / deleted with subtree
 i / I          mark After node inserted / inserted with subtree

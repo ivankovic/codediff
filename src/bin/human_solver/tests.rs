@@ -7519,9 +7519,11 @@ fn handle_key_m_with_an_all_to_all_selection_commits_it_and_resets_the_pairing()
         before_source,
         after_source,
     );
+    // `m`, not `M`: on an all-to-all selection `M` walks the whole subtrees instead (see
+    // `action_commit_all_to_all_subtrees`), so `m` is what commits the selected roots alone.
     press(
         &mut app,
-        KeyCode::Char('M'),
+        KeyCode::Char('m'),
         &before_tree,
         &after_tree,
         before_source,
@@ -7531,7 +7533,7 @@ fn handle_key_m_with_an_all_to_all_selection_commits_it_and_resets_the_pairing()
     assert_eq!(app.mapping.groups.len(), 1, "{:?}", app.mapping.groups);
     let group = &app.mapping.groups[0];
     assert_eq!(group.pairing, GroupPairing::AllToAll);
-    assert!(group.with_children, "M asks for closure, as for any group");
+    assert!(!group.with_children);
     // No content hashes were supplied, so nothing can be proven identical - same inference as
     // for any group (`multi_map_group_operation`).
     assert_eq!(group.operation, HumanOperation::MatchButNotIdentical);
@@ -7663,6 +7665,237 @@ fn action_unmark_names_the_kind_of_group_it_removes() {
         "{msg}"
     );
     assert!(app.mapping.groups.is_empty());
+}
+
+/// An app with every `foo();`-shaped statement of both sides pending, flipped to all-to-all -
+/// the state `M`'s lockstep walk starts from.
+fn app_with_all_to_all_selection(before_root: Node, after_root: Node) -> App {
+    let mut app = App::new(
+        "test".to_string(),
+        CaseOrigin::Diffs,
+        before_root.id(),
+        after_root.id(),
+        HumanMapping::default(),
+    );
+    app.before_multi_select = block_statements(before_root)
+        .iter()
+        .map(|n| n.id())
+        .collect();
+    app.after_multi_select = block_statements(after_root)
+        .iter()
+        .map(|n| n.id())
+        .collect();
+    app.multi_select_pairing = GroupPairing::AllToAll;
+    app
+}
+
+#[test]
+fn all_to_all_subtree_groups_returns_one_member_set_per_position() {
+    let source = "fn main() {\n    foo();\n    foo();\n}\n";
+    let tree = parse_rust(source);
+    let root = tree.root_node();
+    let statements = block_statements(root);
+    assert_eq!(statements.len(), 2);
+
+    let groups = all_to_all_subtree_groups(
+        vec![statements[0]],
+        vec![statements[1]],
+        source.as_bytes(),
+        source.as_bytes(),
+    )
+    .unwrap();
+
+    // `foo();` is seven nodes: the statement, the call, its identifier, the arguments and their
+    // two parens, and the semicolon - one group each, every one 1:1 here.
+    assert_eq!(groups.len(), 7, "{groups:?}");
+    let kinds: Vec<&str> = groups.iter().map(|(before, _)| before[0].kind()).collect();
+    assert_eq!(
+        kinds,
+        vec![
+            "expression_statement",
+            "call_expression",
+            "identifier",
+            "arguments",
+            "(",
+            ")",
+            ";"
+        ]
+    );
+    for (before, after) in &groups {
+        assert_eq!(before.len(), 1);
+        assert_eq!(after.len(), 1);
+        assert_eq!(before[0].kind(), after[0].kind());
+        assert_ne!(before[0].id(), after[0].id(), "distinct nodes, same shape");
+    }
+}
+
+#[test]
+fn all_to_all_subtree_groups_keeps_every_member_of_an_n_to_m_selection_together() {
+    let before_source = "fn main() {\n    foo();\n    foo();\n    foo();\n}\n";
+    let after_source = "fn main() {\n    foo();\n    foo();\n}\n";
+    let before_tree = parse_rust(before_source);
+    let after_tree = parse_rust(after_source);
+
+    let groups = all_to_all_subtree_groups(
+        block_statements(before_tree.root_node()),
+        block_statements(after_tree.root_node()),
+        before_source.as_bytes(),
+        after_source.as_bytes(),
+    )
+    .unwrap();
+
+    assert_eq!(groups.len(), 7);
+    for (before, after) in &groups {
+        assert_eq!(
+            (before.len(), after.len()),
+            (3, 2),
+            "every position keeps the selection's own shape"
+        );
+    }
+}
+
+#[test]
+fn all_to_all_subtree_groups_reports_a_kind_divergence_and_returns_nothing() {
+    let before_source = "fn main() {\n    foo();\n}\n";
+    let after_source = "fn main() {\n    x = 1;\n}\n";
+    let before_tree = parse_rust(before_source);
+    let after_tree = parse_rust(after_source);
+
+    let error = all_to_all_subtree_groups(
+        block_statements(before_tree.root_node()),
+        block_statements(after_tree.root_node()),
+        before_source.as_bytes(),
+        after_source.as_bytes(),
+    )
+    .unwrap_err()
+    .to_string();
+
+    // Both sides' statements are `expression_statement`, so the divergence is one level down.
+    assert!(
+        error.contains("kinds differ")
+            && error.contains("call_expression")
+            && error.contains("assignment_expression"),
+        "{error}"
+    );
+    assert!(error.contains("nothing committed"), "{error}");
+}
+
+#[test]
+fn all_to_all_subtree_groups_reports_a_child_count_divergence() {
+    let before_source = "fn main() {\n    foo();\n}\n";
+    let after_source = "fn main() {\n    foo(1);\n}\n";
+    let before_tree = parse_rust(before_source);
+    let after_tree = parse_rust(after_source);
+
+    let error = all_to_all_subtree_groups(
+        block_statements(before_tree.root_node()),
+        block_statements(after_tree.root_node()),
+        before_source.as_bytes(),
+        after_source.as_bytes(),
+    )
+    .unwrap_err()
+    .to_string();
+
+    assert!(
+        error.contains("arguments") && error.contains("child(ren)"),
+        "{error}"
+    );
+}
+
+#[test]
+fn handle_key_capital_m_on_an_all_to_all_selection_commits_every_position() {
+    let before_source = "fn main() {\n    foo();\n    foo();\n    foo();\n}\n";
+    let after_source = "fn main() {\n    foo();\n    foo();\n}\n";
+    let before_tree = parse_rust(before_source);
+    let after_tree = parse_rust(after_source);
+    let mut app = app_with_all_to_all_selection(before_tree.root_node(), after_tree.root_node());
+
+    press(
+        &mut app,
+        KeyCode::Char('M'),
+        &before_tree,
+        &after_tree,
+        before_source,
+        after_source,
+    );
+
+    assert_eq!(app.mapping.groups.len(), 7, "{:?}", app.mapping.groups);
+    for group in &app.mapping.groups {
+        assert_eq!(group.pairing, GroupPairing::AllToAll);
+        assert_eq!((group.before_paths.len(), group.after_paths.len()), (3, 2));
+        // A descendant's own group is the claim about it, so closure asserts nothing more.
+        assert!(!group.with_children);
+    }
+    assert!(app.mapping.entries.is_empty(), "{:?}", app.mapping.entries);
+    assert!(app.dirty);
+    assert!(app.before_multi_select.is_empty() && app.after_multi_select.is_empty());
+    assert_eq!(app.multi_select_pairing, GroupPairing::AnyOneToOne);
+    assert!(
+        app.status
+            .clone()
+            .unwrap_or_default()
+            .starts_with("Committed 7 all-to-all groups:"),
+        "{:?}",
+        app.status
+    );
+}
+
+#[test]
+fn handle_key_lowercase_m_on_an_all_to_all_selection_still_commits_only_the_roots() {
+    let before_source = "fn main() {\n    foo();\n    foo();\n    foo();\n}\n";
+    let after_source = "fn main() {\n    foo();\n    foo();\n}\n";
+    let before_tree = parse_rust(before_source);
+    let after_tree = parse_rust(after_source);
+    let mut app = app_with_all_to_all_selection(before_tree.root_node(), after_tree.root_node());
+
+    press(
+        &mut app,
+        KeyCode::Char('m'),
+        &before_tree,
+        &after_tree,
+        before_source,
+        after_source,
+    );
+
+    assert_eq!(app.mapping.groups.len(), 1, "{:?}", app.mapping.groups);
+    assert_eq!(app.mapping.groups[0].pairing, GroupPairing::AllToAll);
+}
+
+#[test]
+fn handle_key_capital_m_commits_nothing_when_the_subtrees_diverge() {
+    let before_source = "fn main() {\n    foo();\n}\n";
+    let after_source = "fn main() {\n    foo(1);\n}\n";
+    let before_tree = parse_rust(before_source);
+    let after_tree = parse_rust(after_source);
+    let mut app = app_with_all_to_all_selection(before_tree.root_node(), after_tree.root_node());
+
+    press(
+        &mut app,
+        KeyCode::Char('M'),
+        &before_tree,
+        &after_tree,
+        before_source,
+        after_source,
+    );
+
+    assert!(
+        app.mapping.groups.is_empty(),
+        "not even the roots: {:?}",
+        app.mapping.groups
+    );
+    assert!(!app.dirty, "a refused commit leaves nothing to save");
+    assert!(app.modal.is_none(), "the walk reports, it does not ask");
+    let status = app.status.clone().unwrap_or_default();
+    assert!(status.starts_with("Error: Subtrees diverge:"), "{status}");
+    assert!(
+        !app.before_multi_select.is_empty(),
+        "the selection survives, so it can be fixed and retried"
+    );
+    assert_eq!(
+        app.multi_select_pairing,
+        GroupPairing::AllToAll,
+        "including its pairing"
+    );
 }
 
 #[test]

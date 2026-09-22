@@ -674,6 +674,23 @@ pub(crate) fn handle_key(
                     &mut app.before.collapsed,
                     &mut app.after.collapsed,
                 )
+            } else if app.multi_select_pairing == GroupPairing::AllToAll {
+                // `M` on an all-to-all selection means the whole subtrees, not just the roots -
+                // see `action_commit_all_to_all_subtrees`. It never raises the mixed-kinds modal:
+                // the walk it runs is stricter than that check, and reports a divergence itself.
+                action_commit_all_to_all_subtrees(
+                    &mut app.mapping,
+                    before_root,
+                    after_root,
+                    &app.before_multi_select,
+                    &app.after_multi_select,
+                    before_hash,
+                    after_hash,
+                    caches,
+                    before_src,
+                    after_src,
+                )
+                .map(ActionOutcome::Done)
             } else {
                 action_commit_multi_map_group(
                     &mut app.mapping,
