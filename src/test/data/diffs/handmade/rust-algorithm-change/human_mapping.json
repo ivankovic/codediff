@@ -3696,6 +3696,11 @@
         "line_comment:1",
         "//:1"
       ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [],
+      "after_path": []
     }
   ],
   "groups": [
@@ -3785,6 +3790,111 @@
       ],
       "operation": "match_but_not_identical",
       "with_children": false
+    },
+    {
+      "before_paths": [
+        [
+          "function_item:1",
+          "block:1",
+          "expression_statement:1",
+          "for_expression:1",
+          "for:1"
+        ],
+        [
+          "function_item:1",
+          "block:1",
+          "expression_statement:1",
+          "for_expression:1",
+          "block:1",
+          "expression_statement:1",
+          "for_expression:1",
+          "for:1"
+        ]
+      ],
+      "after_paths": [
+        [
+          "function_item:1",
+          "block:1",
+          "expression_statement:1",
+          "for_expression:1",
+          "for:1"
+        ]
+      ],
+      "operation": "identical",
+      "with_children": false,
+      "pairing": "all_to_all"
+    },
+    {
+      "before_paths": [
+        [
+          "function_item:1",
+          "block:1",
+          "expression_statement:1",
+          "for_expression:1",
+          "block:1",
+          "{:1"
+        ],
+        [
+          "function_item:1",
+          "block:1",
+          "expression_statement:1",
+          "for_expression:1",
+          "block:1",
+          "expression_statement:1",
+          "for_expression:1",
+          "block:1",
+          "{:1"
+        ]
+      ],
+      "after_paths": [
+        [
+          "function_item:1",
+          "block:1",
+          "expression_statement:1",
+          "for_expression:1",
+          "block:1",
+          "{:1"
+        ]
+      ],
+      "operation": "identical",
+      "with_children": false,
+      "pairing": "all_to_all"
+    },
+    {
+      "before_paths": [
+        [
+          "function_item:1",
+          "block:1",
+          "expression_statement:1",
+          "for_expression:1",
+          "block:1",
+          "expression_statement:1",
+          "for_expression:1",
+          "block:1",
+          "}:1"
+        ],
+        [
+          "function_item:1",
+          "block:1",
+          "expression_statement:1",
+          "for_expression:1",
+          "block:1",
+          "}:1"
+        ]
+      ],
+      "after_paths": [
+        [
+          "function_item:1",
+          "block:1",
+          "expression_statement:1",
+          "for_expression:1",
+          "block:1",
+          "}:1"
+        ]
+      ],
+      "operation": "identical",
+      "with_children": false,
+      "pairing": "all_to_all"
     }
   ],
   "text_mappings": [

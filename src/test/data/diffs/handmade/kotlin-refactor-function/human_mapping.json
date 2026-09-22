@@ -2285,6 +2285,283 @@
         "function_declaration:1",
         "::1"
       ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "class_declaration:1",
+        "primary_constructor:1",
+        "class_parameters:1",
+        "class_parameter:1",
+        "val:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "class_declaration:1",
+        "primary_constructor:1",
+        "class_parameters:1",
+        "class_parameter:2",
+        "val:1"
+      ]
+    }
+  ],
+  "groups": [
+    {
+      "before_paths": [
+        [
+          "function_declaration:1",
+          "function_value_parameters:1",
+          "parameter:1",
+          "identifier:1"
+        ],
+        [
+          "function_declaration:2",
+          "function_value_parameters:1",
+          "parameter:1",
+          "identifier:1"
+        ]
+      ],
+      "after_paths": [
+        [
+          "class_declaration:1",
+          "primary_constructor:1",
+          "class_parameters:1",
+          "class_parameter:1",
+          "identifier:1"
+        ]
+      ],
+      "operation": "identical",
+      "with_children": false,
+      "pairing": "all_to_all"
+    },
+    {
+      "before_paths": [
+        [
+          "function_declaration:1",
+          "function_value_parameters:1",
+          "parameter:1",
+          "::1"
+        ],
+        [
+          "function_declaration:2",
+          "function_value_parameters:1",
+          "parameter:1",
+          "::1"
+        ]
+      ],
+      "after_paths": [
+        [
+          "class_declaration:1",
+          "primary_constructor:1",
+          "class_parameters:1",
+          "class_parameter:1",
+          "::1"
+        ]
+      ],
+      "operation": "identical",
+      "with_children": false,
+      "pairing": "all_to_all"
+    },
+    {
+      "before_paths": [
+        [
+          "function_declaration:1",
+          "function_value_parameters:1",
+          "parameter:1",
+          "user_type:1"
+        ],
+        [
+          "function_declaration:2",
+          "function_value_parameters:1",
+          "parameter:1",
+          "user_type:1"
+        ]
+      ],
+      "after_paths": [
+        [
+          "class_declaration:1",
+          "primary_constructor:1",
+          "class_parameters:1",
+          "class_parameter:1",
+          "user_type:1"
+        ]
+      ],
+      "operation": "identical",
+      "with_children": false,
+      "pairing": "all_to_all"
+    },
+    {
+      "before_paths": [
+        [
+          "function_declaration:1",
+          "function_value_parameters:1",
+          "parameter:1",
+          "user_type:1",
+          "identifier:1"
+        ],
+        [
+          "function_declaration:2",
+          "function_value_parameters:1",
+          "parameter:1",
+          "user_type:1",
+          "identifier:1"
+        ]
+      ],
+      "after_paths": [
+        [
+          "class_declaration:1",
+          "primary_constructor:1",
+          "class_parameters:1",
+          "class_parameter:1",
+          "user_type:1",
+          "identifier:1"
+        ]
+      ],
+      "operation": "identical",
+      "with_children": false,
+      "pairing": "all_to_all"
+    },
+    {
+      "before_paths": [
+        [
+          "function_declaration:1",
+          "function_value_parameters:1",
+          ",:1"
+        ],
+        [
+          "function_declaration:2",
+          "function_value_parameters:1",
+          ",:1"
+        ]
+      ],
+      "after_paths": [
+        [
+          "class_declaration:1",
+          "primary_constructor:1",
+          "class_parameters:1",
+          ",:1"
+        ]
+      ],
+      "operation": "identical",
+      "with_children": false,
+      "pairing": "all_to_all"
+    },
+    {
+      "before_paths": [
+        [
+          "function_declaration:1",
+          "function_value_parameters:1",
+          "parameter:2",
+          "identifier:1"
+        ],
+        [
+          "function_declaration:2",
+          "function_value_parameters:1",
+          "parameter:2",
+          "identifier:1"
+        ]
+      ],
+      "after_paths": [
+        [
+          "class_declaration:1",
+          "primary_constructor:1",
+          "class_parameters:1",
+          "class_parameter:2",
+          "identifier:1"
+        ]
+      ],
+      "operation": "identical",
+      "with_children": false,
+      "pairing": "all_to_all"
+    },
+    {
+      "before_paths": [
+        [
+          "function_declaration:1",
+          "function_value_parameters:1",
+          "parameter:2",
+          "::1"
+        ],
+        [
+          "function_declaration:2",
+          "function_value_parameters:1",
+          "parameter:2",
+          "::1"
+        ]
+      ],
+      "after_paths": [
+        [
+          "class_declaration:1",
+          "primary_constructor:1",
+          "class_parameters:1",
+          "class_parameter:2",
+          "::1"
+        ]
+      ],
+      "operation": "identical",
+      "with_children": false,
+      "pairing": "all_to_all"
+    },
+    {
+      "before_paths": [
+        [
+          "function_declaration:1",
+          "function_value_parameters:1",
+          "parameter:2",
+          "user_type:1"
+        ],
+        [
+          "function_declaration:2",
+          "function_value_parameters:1",
+          "parameter:2",
+          "user_type:1"
+        ]
+      ],
+      "after_paths": [
+        [
+          "class_declaration:1",
+          "primary_constructor:1",
+          "class_parameters:1",
+          "class_parameter:2",
+          "user_type:1"
+        ]
+      ],
+      "operation": "identical",
+      "with_children": false,
+      "pairing": "all_to_all"
+    },
+    {
+      "before_paths": [
+        [
+          "function_declaration:1",
+          "function_value_parameters:1",
+          "parameter:2",
+          "user_type:1",
+          "identifier:1"
+        ],
+        [
+          "function_declaration:2",
+          "function_value_parameters:1",
+          "parameter:2",
+          "user_type:1",
+          "identifier:1"
+        ]
+      ],
+      "after_paths": [
+        [
+          "class_declaration:1",
+          "primary_constructor:1",
+          "class_parameters:1",
+          "class_parameter:2",
+          "user_type:1",
+          "identifier:1"
+        ]
+      ],
+      "operation": "identical",
+      "with_children": false,
+      "pairing": "all_to_all"
     }
   ],
   "text_mappings": [
