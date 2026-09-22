@@ -21,7 +21,7 @@
 //! `assert_matches_human_painting_within_limit` both ask "is codediff right?", and both answer it
 //! against data whose own internal consistency nothing checks - a painting that ends a highlight
 //! in the middle of a run of spaces, or paints an opening brace and not its closing one, grades
-//! codediff against a claim its author would not defend if it were pointed out. These seventeen
+//! codediff against a claim its author would not defend if it were pointed out. These nineteen
 //! invariants are that missing half: they can fail only because the hand-authored data disagrees
 //! with itself.
 //!
@@ -58,6 +58,8 @@
 //!   side and `Insert` on the other.
 //! * [`single_valued_fields_hold_a_pair`] - a matched pair's single-valued named field holds a
 //!   matched pair, never a delete beside an insert.
+//! * [`operators_are_painted_whole`] - every byte of an operator such as `<=` or `!=` carries the
+//!   same highlighting.
 //!
 //! Invariants 4 and 5 were added on 2026-09-08 and wired in the same day, at **zero violations
 //! across all 249 painted fixtures** - so unlike the first three they arrived with no clamped
@@ -103,7 +105,15 @@
 //! "no named children" test, two unrelated comments in corresponding positions (comments carry no
 //! field), and a shell flag paired against a subcommand because a command's arguments are a list.
 //!
-//! **All eighteen are intra-fixture.** Each asks whether one fixture's mapping and paintings
+//! Invariant 19 arrived on 2026-09-22 with **four violations in two fixtures**, both repaired the
+//! same day to the whole operator, which is the rule. `java-defects4j-jacksondatabind-16-annotationmap`
+//! painted `!=` against `==` one character wide, where
+//! `java-defects4j-chart-1-abstractcategoryitemrenderer` painted the same edit whole;
+//! `html-mozilla-pdf-add-closing-tags` painted only the `/` of a self-closing `/>`, now a `Match`
+//! of `>` against `/>` as its tree mapping already had it. Unlike the others it is also a rule of
+//! the renderer, which reads the same operator list.
+//!
+//! **All nineteen are intra-fixture.** Each asks whether one fixture's mapping and paintings
 //! agree with each other; none compares two fixtures, so a pair whose paintings answer the same
 //! question differently is invisible to all of them. `cross_fixture_convention_census`
 //! (`tests/exploratory.rs`) is that other axis, and
@@ -124,7 +134,7 @@ use super::{
     paintings_for_mode, rebuild_caches_for_mapping, status_after, status_before,
 };
 use crate::code::Code;
-use crate::diff::text::RenderOptions;
+use crate::diff::text::{OPERATORS, RenderOptions};
 
 /// One painting projected to per-byte labels, `[before, after]` - `None` where nothing paints that
 /// byte. Named because every check here passes it around and `clippy::type_complexity` is right
@@ -154,7 +164,7 @@ pub struct ViolationSite {
 /// 10, 11 and 12), so carrying it out is bookkeeping rather than a second analysis.
 #[derive(Debug, Clone)]
 pub struct GroundTruthViolation {
-    /// Which of the seventeen rules, numbered as the module doc lists them.
+    /// Which of the nineteen rules, numbered as the module doc lists them.
     pub invariant: u8,
     /// The painting this is about, or `None` for the three rules that read only the tree mapping.
     pub painting: Option<String>,
@@ -353,6 +363,9 @@ pub fn ground_truth_invariant_violations_for(
         }
         for (name, labels) in &paintings {
             violations.extend(identifier_updates_are_painted_by_preset(
+                name, labels, &context, before, after,
+            ));
+            violations.extend(operators_are_painted_whole(
                 name, labels, &context, before, after,
             ));
         }
@@ -2897,6 +2910,61 @@ fn boolean_flips_are_one_edit(
                 },
             ],
         ));
+    }
+    violations
+}
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+// Invariant 19: an operator is painted whole
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+
+/// **Invariant 19.** Every byte of an operator carries the same highlighting - in every painting,
+/// on both sides.
+///
+/// An operator is one symbol to a reader, however many characters spell it. `<=` becoming `<` is
+/// a different comparison, not a `<` that survived and an `=` that left; `==` becoming `!=` is a
+/// negated test, not an `=` that was kept. Painting part of an operator claims the rest is
+/// unchanged, and the corpus disagreed with itself about exactly this before the rule existed:
+/// `java-defects4j-chart-1-abstractcategoryitemrenderer` painted `!=` against `==` whole, and
+/// `java-defects4j-jacksondatabind-16-annotationmap` painted the same edit one character wide.
+///
+/// Checked on every painting a fixture carries - `Full`, `Minimal` and `Only one solution` alike:
+/// the presets may disagree about *whether* an operator is painted, never about painting part of
+/// one.
+///
+/// Reads the painting alone, so a leaf is judged whatever the mapping says about it. The list is
+/// the renderer's own ([`OPERATORS`]), which follows the same rule; only its multi-character
+/// operators can break it.
+fn operators_are_painted_whole(
+    painting: &str,
+    painted: &PaintedLabels,
+    context: &TreeContext,
+    before: &Code,
+    after: &Code,
+) -> Vec<GroundTruthViolation> {
+    let mut violations = Vec::new();
+    for (side, code) in [(0usize, before), (1usize, after)] {
+        for leaf in &context.leaves[side] {
+            let Some(text) = code.contents.get(leaf.byte_range()) else {
+                continue;
+            };
+            if !OPERATORS.contains(&text) || whole_leaf_label(&painted[side], *leaf).is_some() {
+                continue;
+            }
+            violations.push(GroundTruthViolation::new(
+                19,
+                Some(painting),
+                format!(
+                    "painting '{painting}' paints only part of the operator `{text}` on {} row {}",
+                    side_name(side),
+                    row_of(&code.contents, leaf.start_byte()),
+                ),
+                vec![ViolationSite {
+                    side,
+                    span: span_of_node(*leaf),
+                }],
+            ));
+        }
     }
     violations
 }

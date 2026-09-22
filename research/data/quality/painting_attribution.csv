@@ -115,8 +115,8 @@ cpp-add-templates,full,493,28,28,0,2,1
 cpp-add-templates,minimal,493,18,18,0,2,1
 cpp-electron-electron-add-imports,full,1347,0,0,0,1,0
 cpp-electron-electron-add-imports,minimal,1347,0,0,0,1,0
-cpp-fix-segfault,full,781,2,2,0,1,0
-cpp-fix-segfault,minimal,781,2,2,0,1,0
+cpp-fix-segfault,full,781,0,0,0,1,0
+cpp-fix-segfault,minimal,781,0,0,0,1,0
 cpp-godot-small-bugfix,full,41354,85,83,49,2,0
 cpp-godot-small-bugfix,minimal,41354,228,213,33,2,0
 cpp-godotengine-godot-add-include,full,5771,0,0,0,1,0
@@ -379,8 +379,8 @@ html-mozilla-firefox-firefox-path,full,1996,0,0,0,1,0
 html-mozilla-firefox-firefox-path,minimal,1996,0,0,0,1,0
 html-mozilla-firefox-firefox-test-span,full,739,20,16,9,2,1
 html-mozilla-firefox-firefox-test-span,minimal,739,8,4,9,2,1
-html-mozilla-pdf-add-closing-tags,full,482,2,2,0,1,0
-html-mozilla-pdf-add-closing-tags,minimal,482,2,2,0,1,0
+html-mozilla-pdf-add-closing-tags,full,482,0,0,0,1,0
+html-mozilla-pdf-add-closing-tags,minimal,482,0,0,0,1,0
 html-prettier-prettier-not-pure-html-includes-yaml-as-well,full,181,75,75,0,2,0
 html-prettier-prettier-not-pure-html-includes-yaml-as-well,minimal,181,71,71,0,2,0
 html-twbs-bootstrap-not-html-template-extract-two-vars,full,659,159,198,139,2,0
@@ -393,8 +393,8 @@ java-add-interface,full,602,2,2,0,2,0
 java-add-interface,minimal,602,0,0,0,2,0
 java-add-logging,full,750,0,0,0,2,0
 java-add-logging,minimal,750,0,0,0,2,0
-java-defects4j-chart-1-abstractcategoryitemrenderer,full,151608,2,2,0,1,0
-java-defects4j-chart-1-abstractcategoryitemrenderer,minimal,151608,2,2,0,1,0
+java-defects4j-chart-1-abstractcategoryitemrenderer,full,151608,0,0,0,1,0
+java-defects4j-chart-1-abstractcategoryitemrenderer,minimal,151608,0,0,0,1,0
 java-defects4j-chart-10-standardtooltiptagfragmentgenerator,full,4821,0,0,0,2,0
 java-defects4j-chart-10-standardtooltiptagfragmentgenerator,minimal,4821,0,0,0,2,0
 java-defects4j-chart-11-shapeutilities,full,39702,0,0,0,1,0
@@ -483,8 +483,8 @@ java-defects4j-cli-19-posixparser,full,20456,82,86,102,2,0
 java-defects4j-cli-19-posixparser,minimal,20456,54,54,18,2,0
 java-defects4j-cli-2-posixparser,full,21043,8,0,8,2,0
 java-defects4j-cli-2-posixparser,minimal,21043,8,0,8,2,0
-java-defects4j-cli-20-posixparser,full,20598,405,92,432,2,0
-java-defects4j-cli-20-posixparser,minimal,20598,135,81,164,2,0
+java-defects4j-cli-20-posixparser,full,20598,405,90,432,2,0
+java-defects4j-cli-20-posixparser,minimal,20598,135,79,164,2,0
 java-defects4j-cli-21-groupimpl,full,35050,0,0,0,2,0
 java-defects4j-cli-21-groupimpl,minimal,35050,0,0,0,2,0
 java-defects4j-cli-21-writeablecommandline,full,7828,0,0,0,2,0
@@ -601,8 +601,8 @@ java-defects4j-closure-52-codegenerator,full,75330,0,0,0,1,0
 java-defects4j-closure-52-codegenerator,minimal,75330,0,0,0,1,0
 java-defects4j-closure-57-closurecodingconvention,full,25488,0,0,0,1,0
 java-defects4j-closure-57-closurecodingconvention,minimal,25488,0,0,0,1,0
-java-defects4j-closure-62-lightweightmessageformatter,full,10565,2,2,0,1,0
-java-defects4j-closure-62-lightweightmessageformatter,minimal,10565,2,2,0,1,0
+java-defects4j-closure-62-lightweightmessageformatter,full,10565,0,0,0,1,0
+java-defects4j-closure-62-lightweightmessageformatter,minimal,10565,0,0,0,1,0
 java-defects4j-closure-65-codegenerator,full,75306,8,8,0,2,0
 java-defects4j-closure-65-codegenerator,minimal,75306,0,0,0,2,0
 java-defects4j-closure-66-typecheck,full,133905,18,3,20,2,0
@@ -823,8 +823,8 @@ java-defects4j-mockito-7-genericmetadatasupport,full,50872,0,0,0,2,0
 java-defects4j-mockito-7-genericmetadatasupport,minimal,50872,0,0,0,2,0
 java-defects4j-mockito-9-callsrealmethods,full,3701,0,0,0,2,0
 java-defects4j-mockito-9-callsrealmethods,minimal,3701,0,0,0,2,0
-java-fix-array-index,full,523,2,2,0,1,0
-java-fix-array-index,minimal,523,2,2,0,1,0
+java-fix-array-index,full,523,0,0,0,1,0
+java-fix-array-index,minimal,523,0,0,0,1,0
 java-genymobile-scrcpy-add-enum-value,full,387,0,0,0,2,0
 java-genymobile-scrcpy-add-enum-value,minimal,387,0,0,0,2,0
 java-genymobile-scrcpy-add-func,full,621,0,0,0,2,0
@@ -1225,8 +1225,8 @@ rust-rustdesk-rustdesk-add-one-token,full,116912,0,0,0,2,0
 rust-rustdesk-rustdesk-add-one-token,minimal,116912,0,0,0,2,0
 rust-rustdesk-rustdesk-move-list-item-with-insert,full,108072,80,80,0,2,0
 rust-rustdesk-rustdesk-move-list-item-with-insert,minimal,108072,76,76,0,2,0
-rust-small-addition-with-reuse-of-binary-expressions,full,326831,181,135,86,2,0
-rust-small-addition-with-reuse-of-binary-expressions,minimal,326831,140,132,52,2,0
+rust-small-addition-with-reuse-of-binary-expressions,full,326831,181,133,86,2,0
+rust-small-addition-with-reuse-of-binary-expressions,minimal,326831,140,130,52,2,0
 rust-sniffnet-protocol,full,2861,4,4,0,2,0
 rust-sniffnet-protocol,minimal,2861,0,0,0,2,0
 rust-tauri-api-build-1,full,3538,0,0,0,2,0
@@ -1469,8 +1469,8 @@ vimscript-neovim-neovim-only-delete,full,1853,1,1,0,2,0
 vimscript-neovim-neovim-only-delete,minimal,1853,0,0,0,2,0
 vimscript-neovim-neovim-small-change,full,968,0,0,0,2,0
 vimscript-neovim-neovim-small-change,minimal,968,0,0,0,2,0
-vimscript-neovim-neovim-small-change-2,full,678,37,37,0,2,0
-vimscript-neovim-neovim-small-change-2,minimal,678,3,3,0,2,0
+vimscript-neovim-neovim-small-change-2,full,678,35,35,0,2,0
+vimscript-neovim-neovim-small-change-2,minimal,678,1,1,0,2,0
 xml-genymobile-scrcpy-remove-package-attribute,full,207,21,0,21,1,0
 xml-genymobile-scrcpy-remove-package-attribute,minimal,207,21,0,21,1,0
 xml-godotengine-godot-update-element-value,full,77893,258,258,0,2,0

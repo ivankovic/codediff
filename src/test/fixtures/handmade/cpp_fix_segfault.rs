@@ -27,7 +27,7 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    assert_matches_human_painting_within_limit("cpp-fix-segfault", 2.83)
+    assert_matches_human_painting_within_limit("cpp-fix-segfault", 0.0)
 }
 
 #[test]

@@ -27,7 +27,7 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    assert_matches_human_painting_within_limit("java-fix-array-index", 7.28)
+    assert_matches_human_painting_within_limit("java-fix-array-index", 0.0)
 }
 
 #[test]

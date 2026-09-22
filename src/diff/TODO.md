@@ -1,5 +1,47 @@
 # Diff Module Notes
 
+## 2026-09-22: operators are painted whole - a rule of the corpus and of the renderer
+
+Taken from the 105 fixture/preset pairs that miss zero mismatched bytes by 1 to 3 bytes (the
+README's per-fixture goals reward exactly these). Four of them were one shape: an operator the
+affix split in `intra_node_update_ranges` cut in two - `<=` against `<` rendered as an unchanged
+`<` and a changed `=`, where every painting marks the operator whole. The leaf reaches the
+renderer as `MatchButNotIdentical`, so it goes through `own_content_update_ranges`, not
+`update_ranges`; a gate on the latter alone moved nothing on these fixtures.
+
+**Now a stated rule** (invariant 19, `operators_are_painted_whole`): every byte of an operator in
+`text::OPERATORS` carries the same highlighting, under `Full` and `Minimal` alike. The renderer
+reads the same list and never splits a multi-character one (`splits_an_operator`). The list
+includes `/>` and `.=`. Measured over the 760 painted fixtures against the committed
+`painting_attribution.csv`: **zero-byte fixtures `FULL` 480 -> 485, `MINIMAL` 524 -> 529**, 6
+better and 0 worse under each - `cpp-fix-segfault`, `java-fix-array-index`,
+`java-defects4j-closure-62-lightweightmessageformatter`,
+`java-defects4j-chart-1-abstractcategoryitemrenderer`, `html-mozilla-pdf-add-closing-tags` to zero,
+and `vimscript-neovim-neovim-small-change-2` down by two (its `.=`; an inserted space remains). The
+invariant fired on two fixtures, both repainted to the whole operator:
+`java-defects4j-jacksondatabind-16-annotationmap` painted `!=`/`==` one character wide while chart-1
+painted the same edit whole, and `html-mozilla-pdf-add-closing-tags` painted only the `/` of `/>`
+(now a `Match` of `>` against `/>`, which its tree mapping already said).
+
+Two gates were measured on the way and not kept, recorded so nobody re-derives them:
+
+* **Any all-punctuation token, whole**: `FULL` +3 / `MINIMAL` +3 zero-byte, measured before the two
+  repaints, with `html-mozilla-pdf-add-closing-tags` 2 -> 6 bytes and jacksondatabind-16 0 -> 2
+  against the paintings as they then were. A list says which tokens are one symbol instead of
+  inferring it from their characters.
+* **Only when one operator extends the other at its end** (`<` / `<=`): +3 / +3, no `FULL`
+  regression, but it cannot reach `!=` / `==`, which is why chart-1 needed the ground truth
+  settled rather than a cleverer gate.
+
+**Also measured, not shipped: `MINIMAL` keeping structural punctuation.** The single largest cheap
+family under `MINIMAL` is a standalone inserted `,` or deleted `{`/`}` that the preset drops and
+the `Minimal` painting marks (36 fixtures paint them, 7 do not). Turning
+`structural_punctuation` on for `MINIMAL` wholesale: zero-byte 524 -> **541**, within-1% 670 ->
+671, but bytes 16,490 -> 16,526 with **43 better against 36 worse** (34 / 31 setting aside the
+flagged ground truths). The worst regression is `php-wordpress-wordpress-one-line-file-insert-and-
+update`, 8 -> 40 bytes. Too noisy as a blanket switch; the next thing to try is keeping only
+`Insert`/`Delete` punctuation, leaving `Move`/`Update` punctuation dropped.
+
 ## 2026-09-18: rename width, measured against the human mapping and not taken
 
 Measured the way the round asked for: the tree side of every number here is the human's *own*

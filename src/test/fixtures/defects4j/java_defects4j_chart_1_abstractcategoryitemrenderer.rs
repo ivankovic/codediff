@@ -32,7 +32,7 @@ fn mapping() -> Result<()> {
 fn painting() -> Result<()> {
     assert_matches_human_painting_within_limit(
         "java-defects4j-chart-1-abstractcategoryitemrenderer",
-        0.02,
+        0.0,
     )
 }
 

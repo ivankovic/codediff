@@ -258,8 +258,8 @@ brackets, separators and leading whitespace, and `--minimal`, which drops them):
 
 | preset | zero mismatched bytes | at most 1% mismatched | mismatched bytes, whole corpus |
 |---|---|---|---|
-| `--full` | **480 (63.2%)** | **634 (83.4%)** | 27,989 of 24.5M (0.11%) |
-| `--minimal` | **524 (68.9%)** | **670 (88.2%)** | 16,490 of 24.5M (0.07%) |
+| `--full` | **485 (63.8%)** | **634 (83.4%)** | 27,977 of 24.5M (0.11%) |
+| `--minimal` | **529 (69.6%)** | **670 (88.2%)** | 16,478 of 24.5M (0.07%) |
 
 The whole-corpus rate is far below 1% because most of each file is unchanged and nobody gets that
 wrong; the per-test-case numbers are the ones that count, since a reader meets the mistakes one
