@@ -87323,5 +87323,74 @@
         "call_expression:1"
       ]
     }
+  ],
+  "groups": [
+    {
+      "before_paths": [
+        [
+          "lexical_declaration:3",
+          "variable_declarator:1",
+          "arrow_function:1",
+          "statement_block:1",
+          "return_statement:1",
+          "parenthesized_expression:1",
+          "jsx_element:1",
+          "jsx_opening_element:1",
+          "jsx_attribute:5",
+          "jsx_expression:1",
+          "jsx_element:1",
+          "jsx_element:2",
+          "jsx_opening_element:1",
+          "jsx_attribute:6",
+          "jsx_expression:1",
+          "ternary_expression:1",
+          "::1"
+        ]
+      ],
+      "after_paths": [
+        [
+          "lexical_declaration:3",
+          "variable_declarator:1",
+          "arrow_function:1",
+          "statement_block:1",
+          "return_statement:1",
+          "parenthesized_expression:1",
+          "jsx_element:1",
+          "jsx_opening_element:1",
+          "jsx_attribute:5",
+          "jsx_expression:1",
+          "jsx_element:1",
+          "jsx_element:2",
+          "jsx_opening_element:1",
+          "jsx_attribute:6",
+          "jsx_expression:1",
+          "ternary_expression:1",
+          "::1"
+        ],
+        [
+          "lexical_declaration:3",
+          "variable_declarator:1",
+          "arrow_function:1",
+          "statement_block:1",
+          "return_statement:1",
+          "parenthesized_expression:1",
+          "jsx_element:1",
+          "jsx_opening_element:1",
+          "jsx_attribute:5",
+          "jsx_expression:1",
+          "jsx_element:1",
+          "jsx_element:2",
+          "jsx_opening_element:1",
+          "jsx_attribute:6",
+          "jsx_expression:1",
+          "ternary_expression:1",
+          "ternary_expression:1",
+          "::1"
+        ]
+      ],
+      "operation": "identical",
+      "with_children": false,
+      "pairing": "all_to_all"
+    }
   ]
 }

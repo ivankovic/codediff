@@ -1,1 +1,1 @@
-Requires N:1 (a simpler form of N:M mapping).
+Requires a complex N->1 mapping.

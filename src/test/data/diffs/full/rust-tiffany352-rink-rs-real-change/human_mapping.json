@@ -58415,6 +58415,43 @@
         "use_list:1",
         "}:1"
       ]
+    },
+    {
+      "operation": "delete",
+      "before_path": [
+        "use_declaration:17",
+        "scoped_use_list:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "use_declaration:12",
+        "scoped_identifier:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "use_declaration:12",
+        "scoped_identifier:1",
+        "scoped_identifier:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "use_declaration:14",
+        "scoped_identifier:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "use_declaration:14",
+        "scoped_identifier:1",
+        "scoped_identifier:1"
+      ]
     }
   ],
   "groups": [
@@ -58439,6 +58476,118 @@
       ],
       "operation": "match_but_not_identical",
       "with_children": false
+    },
+    {
+      "before_paths": [
+        [
+          "use_declaration:17"
+        ]
+      ],
+      "after_paths": [
+        [
+          "use_declaration:12"
+        ],
+        [
+          "use_declaration:14"
+        ]
+      ],
+      "operation": "match_but_not_identical",
+      "with_children": false,
+      "pairing": "all_to_all"
+    },
+    {
+      "before_paths": [
+        [
+          "use_declaration:17",
+          "use:1"
+        ]
+      ],
+      "after_paths": [
+        [
+          "use_declaration:12",
+          "use:1"
+        ],
+        [
+          "use_declaration:14",
+          "use:1"
+        ]
+      ],
+      "operation": "identical",
+      "with_children": false,
+      "pairing": "all_to_all"
+    },
+    {
+      "before_paths": [
+        [
+          "use_declaration:17",
+          "scoped_use_list:1",
+          "identifier:1"
+        ]
+      ],
+      "after_paths": [
+        [
+          "use_declaration:12",
+          "scoped_identifier:1",
+          "scoped_identifier:1",
+          "identifier:1"
+        ],
+        [
+          "use_declaration:14",
+          "scoped_identifier:1",
+          "scoped_identifier:1",
+          "identifier:1"
+        ]
+      ],
+      "operation": "identical",
+      "with_children": false,
+      "pairing": "all_to_all"
+    },
+    {
+      "before_paths": [
+        [
+          "use_declaration:17",
+          "scoped_use_list:1",
+          ":::1"
+        ]
+      ],
+      "after_paths": [
+        [
+          "use_declaration:12",
+          "scoped_identifier:1",
+          "scoped_identifier:1",
+          ":::1"
+        ],
+        [
+          "use_declaration:14",
+          "scoped_identifier:1",
+          "scoped_identifier:1",
+          ":::1"
+        ]
+      ],
+      "operation": "identical",
+      "with_children": false,
+      "pairing": "all_to_all"
+    },
+    {
+      "before_paths": [
+        [
+          "use_declaration:17",
+          ";:1"
+        ]
+      ],
+      "after_paths": [
+        [
+          "use_declaration:12",
+          ";:1"
+        ],
+        [
+          "use_declaration:14",
+          ";:1"
+        ]
+      ],
+      "operation": "identical",
+      "with_children": false,
+      "pairing": "all_to_all"
     }
   ]
 }

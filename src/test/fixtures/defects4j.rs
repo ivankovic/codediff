@@ -146,6 +146,8 @@ mod java_defects4j_cli_34_optionbuilder;
 #[cfg(test)]
 mod java_defects4j_cli_35_options;
 #[cfg(test)]
+mod java_defects4j_cli_3_typehandler;
+#[cfg(test)]
 mod java_defects4j_cli_40_typehandler;
 #[cfg(test)]
 mod java_defects4j_cli_5_util;
@@ -219,6 +221,26 @@ mod java_defects4j_closure_34_codeprinter;
 mod java_defects4j_closure_37_nodetraversal;
 #[cfg(test)]
 mod java_defects4j_closure_38_codeconsumer;
+#[cfg(test)]
+mod java_defects4j_closure_44_codeconsumer;
+#[cfg(test)]
+mod java_defects4j_closure_52_codegenerator;
+#[cfg(test)]
+mod java_defects4j_closure_57_closurecodingconvention;
+#[cfg(test)]
+mod java_defects4j_closure_62_lightweightmessageformatter;
+#[cfg(test)]
+mod java_defects4j_closure_65_codegenerator;
+#[cfg(test)]
+mod java_defects4j_closure_66_typecheck;
+#[cfg(test)]
+mod java_defects4j_closure_67_analyzeprototypeproperties;
+#[cfg(test)]
+mod java_defects4j_closure_70_typedscopecreator;
+#[cfg(test)]
+mod java_defects4j_closure_71_checkaccesscontrols;
+#[cfg(test)]
+mod java_defects4j_closure_72_functiontoblockmutator;
 #[cfg(test)]
 mod java_defects4j_closure_77_codegenerator;
 #[cfg(test)]

@@ -198885,6 +198885,383 @@
       ],
       "operation": "match_but_not_identical",
       "with_children": false
+    },
+    {
+      "before_paths": [
+        [
+          "function_declaration:12",
+          "block:1",
+          "for_statement:1",
+          "for_generic_clause:1",
+          "expression_list:1",
+          "function_call:1",
+          "arguments:1",
+          "dot_index_expression:1"
+        ]
+      ],
+      "after_paths": [
+        [
+          "function_declaration:12",
+          "block:1",
+          "for_statement:1",
+          "for_generic_clause:1",
+          "expression_list:1",
+          "function_call:1",
+          "arguments:1",
+          "dot_index_expression:1"
+        ],
+        [
+          "function_declaration:12",
+          "block:1",
+          "for_statement:1",
+          "block:1",
+          "variable_declaration:1",
+          "assignment_statement:1",
+          "expression_list:1",
+          "bracket_index_expression:1",
+          "dot_index_expression:1"
+        ]
+      ],
+      "operation": "match_but_not_identical",
+      "with_children": false,
+      "pairing": "all_to_all"
+    },
+    {
+      "before_paths": [
+        [
+          "function_declaration:12",
+          "block:1",
+          "for_statement:1",
+          "for_generic_clause:1",
+          "expression_list:1",
+          "function_call:1",
+          "arguments:1",
+          "dot_index_expression:1",
+          "dot_index_expression:1"
+        ]
+      ],
+      "after_paths": [
+        [
+          "function_declaration:12",
+          "block:1",
+          "for_statement:1",
+          "for_generic_clause:1",
+          "expression_list:1",
+          "function_call:1",
+          "arguments:1",
+          "dot_index_expression:1",
+          "dot_index_expression:1"
+        ],
+        [
+          "function_declaration:12",
+          "block:1",
+          "for_statement:1",
+          "block:1",
+          "variable_declaration:1",
+          "assignment_statement:1",
+          "expression_list:1",
+          "bracket_index_expression:1",
+          "dot_index_expression:1",
+          "dot_index_expression:1"
+        ]
+      ],
+      "operation": "identical",
+      "with_children": false,
+      "pairing": "all_to_all"
+    },
+    {
+      "before_paths": [
+        [
+          "function_declaration:12",
+          "block:1",
+          "for_statement:1",
+          "for_generic_clause:1",
+          "expression_list:1",
+          "function_call:1",
+          "arguments:1",
+          "dot_index_expression:1",
+          "dot_index_expression:1",
+          "identifier:1"
+        ]
+      ],
+      "after_paths": [
+        [
+          "function_declaration:12",
+          "block:1",
+          "for_statement:1",
+          "for_generic_clause:1",
+          "expression_list:1",
+          "function_call:1",
+          "arguments:1",
+          "dot_index_expression:1",
+          "dot_index_expression:1",
+          "identifier:1"
+        ],
+        [
+          "function_declaration:12",
+          "block:1",
+          "for_statement:1",
+          "block:1",
+          "variable_declaration:1",
+          "assignment_statement:1",
+          "expression_list:1",
+          "bracket_index_expression:1",
+          "dot_index_expression:1",
+          "dot_index_expression:1",
+          "identifier:1"
+        ]
+      ],
+      "operation": "identical",
+      "with_children": false,
+      "pairing": "all_to_all"
+    },
+    {
+      "before_paths": [
+        [
+          "function_declaration:12",
+          "block:1",
+          "for_statement:1",
+          "for_generic_clause:1",
+          "expression_list:1",
+          "function_call:1",
+          "arguments:1",
+          "dot_index_expression:1",
+          "dot_index_expression:1",
+          ".:1"
+        ]
+      ],
+      "after_paths": [
+        [
+          "function_declaration:12",
+          "block:1",
+          "for_statement:1",
+          "for_generic_clause:1",
+          "expression_list:1",
+          "function_call:1",
+          "arguments:1",
+          "dot_index_expression:1",
+          "dot_index_expression:1",
+          ".:1"
+        ],
+        [
+          "function_declaration:12",
+          "block:1",
+          "for_statement:1",
+          "block:1",
+          "variable_declaration:1",
+          "assignment_statement:1",
+          "expression_list:1",
+          "bracket_index_expression:1",
+          "dot_index_expression:1",
+          "dot_index_expression:1",
+          ".:1"
+        ]
+      ],
+      "operation": "identical",
+      "with_children": false,
+      "pairing": "all_to_all"
+    },
+    {
+      "before_paths": [
+        [
+          "function_declaration:12",
+          "block:1",
+          "for_statement:1",
+          "for_generic_clause:1",
+          "expression_list:1",
+          "function_call:1",
+          "arguments:1",
+          "dot_index_expression:1",
+          "dot_index_expression:1",
+          "identifier:2"
+        ]
+      ],
+      "after_paths": [
+        [
+          "function_declaration:12",
+          "block:1",
+          "for_statement:1",
+          "for_generic_clause:1",
+          "expression_list:1",
+          "function_call:1",
+          "arguments:1",
+          "dot_index_expression:1",
+          "dot_index_expression:1",
+          "identifier:2"
+        ],
+        [
+          "function_declaration:12",
+          "block:1",
+          "for_statement:1",
+          "block:1",
+          "variable_declaration:1",
+          "assignment_statement:1",
+          "expression_list:1",
+          "bracket_index_expression:1",
+          "dot_index_expression:1",
+          "dot_index_expression:1",
+          "identifier:2"
+        ]
+      ],
+      "operation": "identical",
+      "with_children": false,
+      "pairing": "all_to_all"
+    },
+    {
+      "before_paths": [
+        [
+          "function_declaration:12",
+          "block:1",
+          "for_statement:1",
+          "for_generic_clause:1",
+          "expression_list:1",
+          "function_call:1",
+          "arguments:1",
+          "dot_index_expression:1",
+          ".:1"
+        ]
+      ],
+      "after_paths": [
+        [
+          "function_declaration:12",
+          "block:1",
+          "for_statement:1",
+          "for_generic_clause:1",
+          "expression_list:1",
+          "function_call:1",
+          "arguments:1",
+          "dot_index_expression:1",
+          ".:1"
+        ],
+        [
+          "function_declaration:12",
+          "block:1",
+          "for_statement:1",
+          "block:1",
+          "variable_declaration:1",
+          "assignment_statement:1",
+          "expression_list:1",
+          "bracket_index_expression:1",
+          "dot_index_expression:1",
+          ".:1"
+        ]
+      ],
+      "operation": "identical",
+      "with_children": false,
+      "pairing": "all_to_all"
+    },
+    {
+      "before_paths": [
+        [
+          "function_declaration:22",
+          "block:1",
+          "variable_declaration:1",
+          "assignment_statement:1",
+          "expression_list:1",
+          "binary_expression:1",
+          "bracket_index_expression:1",
+          "[:1"
+        ]
+      ],
+      "after_paths": [
+        [
+          "function_declaration:22",
+          "block:1",
+          "if_statement:1",
+          "bracket_index_expression:1",
+          "[:1"
+        ],
+        [
+          "function_declaration:22",
+          "block:1",
+          "variable_declaration:2",
+          "assignment_statement:1",
+          "expression_list:1",
+          "bracket_index_expression:1",
+          "[:1"
+        ]
+      ],
+      "operation": "identical",
+      "with_children": false,
+      "pairing": "all_to_all"
+    },
+    {
+      "before_paths": [
+        [
+          "function_declaration:22",
+          "block:1",
+          "variable_declaration:1",
+          "assignment_statement:1",
+          "expression_list:1",
+          "binary_expression:1",
+          "bracket_index_expression:1",
+          "]:1"
+        ]
+      ],
+      "after_paths": [
+        [
+          "function_declaration:22",
+          "block:1",
+          "if_statement:1",
+          "bracket_index_expression:1",
+          "]:1"
+        ],
+        [
+          "function_declaration:22",
+          "block:1",
+          "variable_declaration:2",
+          "assignment_statement:1",
+          "expression_list:1",
+          "bracket_index_expression:1",
+          "]:1"
+        ]
+      ],
+      "operation": "identical",
+      "with_children": false,
+      "pairing": "all_to_all"
+    },
+    {
+      "before_paths": [
+        [
+          "function_declaration:22",
+          "block:1",
+          "variable_declaration:2",
+          "assignment_statement:1",
+          "expression_list:1",
+          "function_call:1",
+          "arguments:1",
+          "bracket_index_expression:1",
+          "identifier:1"
+        ],
+        [
+          "function_declaration:22",
+          "block:1",
+          "variable_declaration:2",
+          "assignment_statement:1",
+          "expression_list:1",
+          "function_call:1",
+          "arguments:1",
+          "bracket_index_expression:2",
+          "identifier:1"
+        ]
+      ],
+      "after_paths": [
+        [
+          "function_declaration:22",
+          "block:1",
+          "variable_declaration:3",
+          "assignment_statement:1",
+          "expression_list:1",
+          "function_call:1",
+          "arguments:1",
+          "function_call:1",
+          "arguments:1",
+          "identifier:1"
+        ]
+      ],
+      "operation": "identical",
+      "with_children": false,
+      "pairing": "all_to_all"
     }
   ]
 }

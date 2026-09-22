@@ -1523,6 +1523,306 @@
       "operation": "match_but_not_identical",
       "before_path": [],
       "after_path": []
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "import_statement:1",
+        "type:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_statement:1",
+        "import_clause:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "import_statement:1",
+        "import_clause:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "delete",
+      "before_path": [
+        "import_statement:1",
+        "import_clause:1",
+        ",:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_statement:1",
+        "import_clause:1",
+        "named_imports:1"
+      ],
+      "after_path": [
+        "import_statement:2",
+        "import_clause:1",
+        "named_imports:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_statement:1",
+        "import_clause:1",
+        "named_imports:1",
+        "{:1"
+      ],
+      "after_path": [
+        "import_statement:2",
+        "import_clause:1",
+        "named_imports:1",
+        "{:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_statement:1",
+        "import_clause:1",
+        "named_imports:1",
+        "import_specifier:1"
+      ],
+      "after_path": [
+        "import_statement:2",
+        "import_clause:1",
+        "named_imports:1",
+        "import_specifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_statement:1",
+        "import_clause:1",
+        "named_imports:1",
+        "import_specifier:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "import_statement:2",
+        "import_clause:1",
+        "named_imports:1",
+        "import_specifier:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "import_statement:1",
+        "import_clause:1",
+        "named_imports:1",
+        "}:1"
+      ],
+      "after_path": [
+        "import_statement:2",
+        "import_clause:1",
+        "named_imports:1",
+        "}:1"
+      ]
+    }
+  ],
+  "groups": [
+    {
+      "before_paths": [
+        [
+          "import_statement:1"
+        ]
+      ],
+      "after_paths": [
+        [
+          "import_statement:1"
+        ],
+        [
+          "import_statement:2"
+        ]
+      ],
+      "operation": "match_but_not_identical",
+      "with_children": false,
+      "pairing": "all_to_all"
+    },
+    {
+      "before_paths": [
+        [
+          "import_statement:1",
+          "import:1"
+        ]
+      ],
+      "after_paths": [
+        [
+          "import_statement:1",
+          "import:1"
+        ],
+        [
+          "import_statement:2",
+          "import:1"
+        ]
+      ],
+      "operation": "identical",
+      "with_children": false,
+      "pairing": "all_to_all"
+    },
+    {
+      "before_paths": [
+        [
+          "import_statement:1",
+          "import_clause:1"
+        ]
+      ],
+      "after_paths": [
+        [
+          "import_statement:1",
+          "import_clause:1"
+        ],
+        [
+          "import_statement:2",
+          "import_clause:1"
+        ]
+      ],
+      "operation": "match_but_not_identical",
+      "with_children": false,
+      "pairing": "all_to_all"
+    },
+    {
+      "before_paths": [
+        [
+          "import_statement:1",
+          "from:1"
+        ]
+      ],
+      "after_paths": [
+        [
+          "import_statement:1",
+          "from:1"
+        ],
+        [
+          "import_statement:2",
+          "from:1"
+        ]
+      ],
+      "operation": "identical",
+      "with_children": false,
+      "pairing": "all_to_all"
+    },
+    {
+      "before_paths": [
+        [
+          "import_statement:1",
+          "string:1"
+        ]
+      ],
+      "after_paths": [
+        [
+          "import_statement:1",
+          "string:1"
+        ],
+        [
+          "import_statement:2",
+          "string:1"
+        ]
+      ],
+      "operation": "identical",
+      "with_children": false,
+      "pairing": "all_to_all"
+    },
+    {
+      "before_paths": [
+        [
+          "import_statement:1",
+          "string:1",
+          "\":1"
+        ]
+      ],
+      "after_paths": [
+        [
+          "import_statement:1",
+          "string:1",
+          "\":1"
+        ],
+        [
+          "import_statement:2",
+          "string:1",
+          "\":1"
+        ]
+      ],
+      "operation": "identical",
+      "with_children": false,
+      "pairing": "all_to_all"
+    },
+    {
+      "before_paths": [
+        [
+          "import_statement:1",
+          "string:1",
+          "string_fragment:1"
+        ]
+      ],
+      "after_paths": [
+        [
+          "import_statement:1",
+          "string:1",
+          "string_fragment:1"
+        ],
+        [
+          "import_statement:2",
+          "string:1",
+          "string_fragment:1"
+        ]
+      ],
+      "operation": "identical",
+      "with_children": false,
+      "pairing": "all_to_all"
+    },
+    {
+      "before_paths": [
+        [
+          "import_statement:1",
+          "string:1",
+          "\":2"
+        ]
+      ],
+      "after_paths": [
+        [
+          "import_statement:1",
+          "string:1",
+          "\":2"
+        ],
+        [
+          "import_statement:2",
+          "string:1",
+          "\":2"
+        ]
+      ],
+      "operation": "identical",
+      "with_children": false,
+      "pairing": "all_to_all"
+    },
+    {
+      "before_paths": [
+        [
+          "import_statement:1",
+          ";:1"
+        ]
+      ],
+      "after_paths": [
+        [
+          "import_statement:1",
+          ";:1"
+        ],
+        [
+          "import_statement:2",
+          ";:1"
+        ]
+      ],
+      "operation": "identical",
+      "with_children": false,
+      "pairing": "all_to_all"
     }
   ],
   "text_mappings": [
