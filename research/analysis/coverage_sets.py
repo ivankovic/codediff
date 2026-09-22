@@ -41,6 +41,7 @@ Examples:
   uv run ./analysis/coverage_sets.py cover '::mapping$'
   uv run ./analysis/coverage_sets.py unique '::mapping$' --show 5
   uv run ./analysis/coverage_sets.py signatures '::mapping$'
+  uv run ./analysis/coverage_sets.py similarity '::mapping$' --out similarity.png
 """
 
 from __future__ import annotations
@@ -319,6 +320,74 @@ def cmd_signatures(coverage: Coverage, args) -> None:
         )
 
 
+def similarity_matrix(coverage: Coverage, sets: dict[str, int], order: str):
+    """Pairwise Jaccard similarity of the selected sets, and the row order to draw it in.
+
+    Jaccard is |A and B| / |A or B|: 1 for identical footprints, 0 for disjoint ones, and blind to
+    how large the two are, so a small and a large test that share everything the small one does
+    still read as different.
+
+    `order="cluster"` is the leaf order of an average-linkage clustering on 1 - Jaccard, which
+    puts every cluster on a contiguous run of rows, so a family of similar tests shows up as a dark
+    block on the diagonal. `order="name"` is plain name order, where the same families are
+    scattered.
+    """
+    names = sorted(sets)
+    width = (len(coverage.lines) + 7) // 8
+    rows = np.stack(
+        [
+            np.unpackbits(
+                np.frombuffer(sets[name].to_bytes(width, "little"), dtype=np.uint8),
+                bitorder="little",
+            )[: len(coverage.lines)]
+            for name in names
+        ]
+    ).astype(np.float32)
+    rows = rows[:, rows.any(axis=0)]
+    shared = rows @ rows.T
+    size = rows.sum(axis=1)
+    jaccard = shared / np.maximum(size[:, None] + size[None, :] - shared, 1)
+    np.fill_diagonal(jaccard, 1.0)
+
+    if order == "cluster":
+        from scipy.cluster.hierarchy import leaves_list, linkage
+        from scipy.spatial.distance import squareform
+
+        distance = 1.0 - jaccard
+        np.fill_diagonal(distance, 0.0)
+        permutation = leaves_list(linkage(squareform(distance, checks=False), "average"))
+    else:
+        permutation = np.arange(len(names))
+    ordered = [(names[i], int(size[i])) for i in permutation]
+    return ordered, jaccard[np.ix_(permutation, permutation)]
+
+
+def cmd_similarity(coverage: Coverage, args) -> None:
+    """One pixel per pair: similarity 0 is white, 1 is black, linear grey in between. Written as
+    an 8-bit RGB array, so each pixel is exactly round(255 * (1 - similarity)) - no colormap, no
+    interpolation, no resampling. The TSV beside it names the test on each row (and column)."""
+    import matplotlib.image
+
+    sets = coverage.select(args.select)
+    if len(sets) < 2:
+        sys.exit("a similarity matrix needs at least two sets")
+    ordered, jaccard = similarity_matrix(coverage, sets, args.order)
+    grey = np.rint(255.0 * (1.0 - jaccard)).astype(np.uint8)
+    matplotlib.image.imsave(args.out, np.repeat(grey[:, :, None], 3, axis=2))
+
+    index = Path(args.out).with_suffix(".tsv")
+    with open(index, "w") as handle:
+        handle.write("row\ttest\tlines\n")
+        for row, (name, lines) in enumerate(ordered):
+            handle.write(f"{row}\t{name}\t{lines}\n")
+    off = jaccard[np.triu_indices(len(ordered), 1)]
+    print(
+        f"{len(ordered)}x{len(ordered)} pixels, {args.order} order; similarity min "
+        f"{off.min():.3f}, median {np.median(off):.3f}, max {off.max():.3f}"
+    )
+    print(f"wrote {args.out} and {index}")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description=__doc__.split("\n\n")[0],
@@ -347,6 +416,11 @@ def main() -> int:
     p.add_argument("select", nargs="?")
     p.add_argument("--top", type=int, default=15)
 
+    p = sub.add_parser("similarity", help="pairwise Jaccard similarity, one pixel per pair (PNG)")
+    p.add_argument("select", nargs="?")
+    p.add_argument("--out", required=True, help="the PNG to write; a .tsv beside it names the rows")
+    p.add_argument("--order", default="cluster", choices=["cluster", "name"])
+
     args = parser.parse_args()
     coverage = Coverage(args.data, args.area, args.group)
     {
@@ -355,6 +429,7 @@ def main() -> int:
         "cover": cmd_cover,
         "unique": cmd_unique,
         "signatures": cmd_signatures,
+        "similarity": cmd_similarity,
     }[args.command](coverage, args)
     return 0
 
