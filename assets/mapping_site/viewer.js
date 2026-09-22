@@ -13,6 +13,12 @@
   // no-build-step convention as index.js/index.test.js next door. Everything below the DOM guard
   // that follows is only reachable in a browser and is not covered by that test.
 
+  // `data-match` holds one id, or several separated by spaces for a member of an all-to-all
+  // group. Empty or missing means no counterpart.
+  function splitMatchIds(value) {
+    return (value || "").split(/\s+/).filter(Boolean);
+  }
+
   function otherSide(side) {
     return side === "before" ? "after" : "before";
   }
@@ -71,7 +77,7 @@
   // Exposed for viewer.test.js (plain Node, no DOM) - a no-op in the browser, where `module` is
   // undefined and this branch never runs.
   if (typeof module !== "undefined") {
-    module.exports = { otherSide, nodePath, nextMatchIndex, pickRendering };
+    module.exports = { otherSide, nodePath, nextMatchIndex, pickRendering, splitMatchIds };
   }
 
   // Everything below this line drives the real page and needs a DOM - never runs under Node.
@@ -94,7 +100,7 @@
 
   let focusedSide = "before";
   const selected = { before: null, after: null };
-  let counterpartEl = null;
+  let counterpartEls = [];
   let searchQuery = { before: "", after: "" };
 
   function visibleNodes(side) {
@@ -110,10 +116,16 @@
   }
 
   function clearCounterpartHighlight() {
-    if (counterpartEl) {
-      counterpartEl.classList.remove("counterpart");
-      counterpartEl = null;
-    }
+    counterpartEls.forEach((el) => el.classList.remove("counterpart"));
+    counterpartEls = [];
+  }
+
+  // The elements a node's `data-match` names, in order. One for a plain pair; every counterpart
+  // for a member of an all-to-all group (see `render_node` in generate_mapping_site.rs).
+  function matchedElements(el) {
+    return splitMatchIds(el.dataset.match)
+      .map((id) => document.getElementById(id))
+      .filter(Boolean);
   }
 
   function select(side, el, opts) {
@@ -134,16 +146,10 @@
     }
 
     clearCounterpartHighlight();
-    const matchId = el.dataset.match;
-    if (matchId) {
-      const match = document.getElementById(matchId);
-      if (match) {
-        match.classList.add("counterpart");
-        counterpartEl = match;
-        if (opts.scrollCounterpart) {
-          match.scrollIntoView({ block: "center" });
-        }
-      }
+    counterpartEls = matchedElements(el);
+    counterpartEls.forEach((match) => match.classList.add("counterpart"));
+    if (opts.scrollCounterpart && counterpartEls.length > 0) {
+      counterpartEls[0].scrollIntoView({ block: "center" });
     }
 
     updateIssueLink(side, el);
@@ -236,13 +242,18 @@
 
   function alignOtherPanel() {
     const el = selected[focusedSide];
-    if (!el || !el.dataset.match) {
+    const matches = el ? matchedElements(el) : [];
+    if (matches.length === 0) {
       setStatus("No mapped counterpart for this node (deleted/inserted)");
       return;
     }
     const other = otherSide(focusedSide);
-    const match = document.getElementById(el.dataset.match);
-    if (match) select(other, match, { setFocus: false, scrollCounterpart: false });
+    select(other, matches[0], { setFocus: false, scrollCounterpart: false });
+    if (matches.length > 1) {
+      setStatus(
+        "Aligned to the first of " + matches.length + " counterparts (all-to-all group); all are highlighted"
+      );
+    }
   }
 
   function runSearch(side, query) {

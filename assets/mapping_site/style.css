@@ -287,6 +287,28 @@ body.hide-identical .node:not(.status-deleted, .status-inserted, .changed):not(
   opacity: 0.75;
 }
 
+/* A multi-map group member's badge - see `render_node`'s `group_badge` in
+   generate_mapping_site.rs. `.group-any`: one of several valid pairings is shown, so it stays
+   muted. `.group-all`: every counterpart is real and `data-match` lists them all, so it takes the
+   matched color to say so. Never bold and never struck through, whatever the node's own status. */
+.group-badge {
+  display: inline-block;
+  font-size: 0.7em;
+  font-weight: 400;
+  line-height: 1.3;
+  padding: 0 0.4em;
+  border-radius: 0.7em;
+  border: 1px solid var(--muted);
+  color: var(--muted);
+  text-decoration: none;
+  vertical-align: middle;
+}
+
+.group-badge.group-all {
+  border-color: var(--matched);
+  color: var(--matched);
+}
+
 .node.selected > summary,
 .node.leaf.selected {
   background: var(--selected-bg) !important;

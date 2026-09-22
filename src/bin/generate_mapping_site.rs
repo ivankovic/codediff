@@ -38,10 +38,11 @@ use tree_sitter::Node;
 use codediff::code::{Code, Language};
 use codediff::diff::NodeCache;
 use codediff::diff::text::{RangeMatch, TextDiff, TextOperation};
+use codediff::diff::text_range::TextRange;
 use codediff::test::helper;
 use codediff::test::helper::human_mapping::{
-    self, Caches, GroupPairing, HumanOperation, HumanTextVerdict, MarkKind, NodeStatus,
-    is_identical_after, is_identical_before, is_moved_after, is_moved_before,
+    self, Caches, GroupPairing, HumanMapping, HumanOperation, HumanTextVerdict, MarkKind,
+    NodeStatus, is_identical_after, is_identical_before, is_moved_after, is_moved_before,
     match_operation_after, match_operation_before, rebuild_caches_for_mapping, status_after,
     status_before, unmarked_node_count,
 };
@@ -254,6 +255,7 @@ fn render_fixture_page(
         .root_node();
 
     let caches = rebuild_caches_for_mapping(mapping, before_root, after_root);
+    let groups = resolve_groups(mapping, before_root, after_root);
     // Most fixtures' human_mapping.json only annotates a few hundred nodes out of many thousands
     // (see human_mapping_cost's own doc comment) - the rest is untouched code the human considered
     // unchanged - but a few fixtures (e.g. auto-generated files matched near-exhaustively) instead
@@ -281,6 +283,7 @@ fn render_fixture_page(
         before.contents.as_bytes(),
         'b',
         &caches,
+        &groups,
         &before_quiet_sizes,
         true,
     );
@@ -289,6 +292,7 @@ fn render_fixture_page(
         after.contents.as_bytes(),
         'a',
         &caches,
+        &groups,
         &after_quiet_sizes,
         true,
     );
@@ -330,6 +334,8 @@ fn render_fixture_page(
                 before_ranges.clone(),
                 &after_ranges,
                 row_counts[0],
+                &groups,
+                0,
             ),
             PanelRanges::from_tree(
                 "a",
@@ -337,6 +343,8 @@ fn render_fixture_page(
                 after_ranges.clone(),
                 &before_ranges,
                 row_counts[1],
+                &groups,
+                1,
             ),
         ],
     )];
@@ -448,7 +456,7 @@ fn render_fixture_page(
     if all_to_all > 0 {
         let plural = if all_to_all == 1 { "" } else { "s" };
         groups_notice.push_str(&format!(
-            r#"<p class="notice">This mapping has {all_to_all} all-to-all group{plural}: every node on one side corresponds to every node on the other, and none is deleted or inserted. The code view can only draw pairs, so it shows the surplus paired with one of its counterparts.</p>"#
+            r#"<p class="notice">This mapping has {all_to_all} all-to-all group{plural}: every node on one side corresponds to every node on the other, and none is deleted or inserted. Each member carries an <span class="group-badge group-all">all N:M</span> badge; selecting one highlights all of its counterparts, in the tree and in the code view alike.</p>"#
         ));
     }
 
@@ -513,6 +521,8 @@ fn render_fixture_page(
 <li><span class="status-matched op-moved">&#9679;</span> moved, unchanged</li>
 <li><span class="status-deleted">&#9679;</span> deleted</li>
 <li><span class="status-inserted">&#9679;</span> inserted</li>
+<li><span class="group-badge group-any">any 3:2</span> multi-map group: any pairing of the 3 with the 2 is valid, one is shown</li>
+<li><span class="group-badge group-all">all 3:1</span> all-to-all group: each of the 3 corresponds to the 1</li>
 </ul>
 <ul class="legend code-legend">
 <li><span class="cd cd-inserted-swatch cd-insert"></span> inserted</li>
@@ -602,6 +612,107 @@ const SEARCH_PROMPT_HTML: &str = r#"<div id="search-prompt" class="hidden" role=
 /// hitting the placeholder wall constantly.
 const OMIT_THRESHOLD: usize = 20;
 
+/// A multi-map group with its members resolved to this parse's nodes - for the two things a page
+/// draws per member that [`Caches`] cannot supply: the badge naming the group's kind and shape,
+/// and, for an all-to-all group, the *full* set of counterparts, where the caches only hold the
+/// one pair the one-to-one projection happened to pick.
+struct ResolvedGroup<'tree> {
+    pairing: GroupPairing,
+    before: Vec<Node<'tree>>,
+    after: Vec<Node<'tree>>,
+}
+
+impl ResolvedGroup<'_> {
+    /// "N:M", the shape a badge shows.
+    fn shape(&self) -> String {
+        format!("{}:{}", self.before.len(), self.after.len())
+    }
+}
+
+/// Every group of `mapping`, in file order, so the indices in `Caches::before_group`/`after_group`
+/// address this list directly. A member path that no longer resolves (a stale or hand-edited
+/// mapping) is left out of its group rather than failing the page - the same posture
+/// `rebuild_caches_for_mapping` takes.
+fn resolve_groups<'tree>(
+    mapping: &HumanMapping,
+    before_root: Node<'tree>,
+    after_root: Node<'tree>,
+) -> Vec<ResolvedGroup<'tree>> {
+    let mut before_cache = helper::PathCache::new();
+    let mut after_cache = helper::PathCache::new();
+    mapping
+        .groups
+        .iter()
+        .map(|group| ResolvedGroup {
+            pairing: group.pairing,
+            before: group
+                .before_paths
+                .iter()
+                .filter_map(|path| {
+                    before_cache
+                        .resolve(before_root, &human_mapping::path_refs(path))
+                        .ok()
+                })
+                .collect(),
+            after: group
+                .after_paths
+                .iter()
+                .filter_map(|path| {
+                    after_cache
+                        .resolve(after_root, &human_mapping::path_refs(path))
+                        .ok()
+                })
+                .collect(),
+        })
+        .collect()
+}
+
+/// The text a node covers, in the row/byte-column space the code panels paint in.
+fn node_extent(node: Node) -> TextRange {
+    let (start, end) = (node.start_position(), node.end_position());
+    TextRange::new(start.row, start.column, end.row, end.column)
+}
+
+/// Whether the painted range `inner` lies within the union of the node extents `extents`.
+///
+/// The union, not any one extent, because `TextDiff` merges adjacent ranges of one operation:
+/// two identical statements on consecutive lines come back as a single range, which no single
+/// member contains but the group as a whole does. Coverage is checked at the two ends exactly and
+/// row by row in between, so a range that also sweeps in a line belonging to no member (a stranger
+/// sitting between two copies) is left alone.
+///
+/// A range that runs to the end of a line is written as the *next* row at column 0 (see
+/// `TextRange`), which a node ending on that line never is - a statement's extent stops at its
+/// `;`. Such a range still ends inside the node: the only text between the two ends is the line's
+/// trailing whitespace and newline, which `paint_row_len` keeps unpainted anyway.
+fn extents_cover(extents: &[TextRange], inner: &TextRange) -> bool {
+    if inner.is_empty() {
+        return false;
+    }
+    let start = (inner.start_row, inner.start_column);
+    // The last position the range covers; a row-boundary end folds back onto the row it closes,
+    // past any column a node can end on.
+    let last = if inner.end_column == 0 {
+        (inner.end_row - 1, usize::MAX)
+    } else {
+        (inner.end_row, inner.end_column - 1)
+    };
+    let inside = |(row, column): (usize, usize)| {
+        extents.iter().any(|extent| {
+            (extent.start_row, extent.start_column) <= (row, column)
+                && (row < extent.end_row
+                    || (row == extent.end_row
+                        && (column < extent.end_column || column == usize::MAX)))
+        })
+    };
+    let row_covered = |row: usize| {
+        extents
+            .iter()
+            .any(|extent| extent.start_row <= row && row <= extent.end_row)
+    };
+    inside(start) && inside(last) && (start.0 + 1..last.0).all(row_covered)
+}
+
 /// Recursively renders `node` and its subtree. `side` is `'b'` (before) or `'a'` (after) - used
 /// both as the id-namespace prefix (so before/after tree-sitter node ids, which can collide in
 /// value between the two independently-parsed trees, never collide in the DOM) and to pick which
@@ -622,6 +733,7 @@ fn render_node(
     src: &[u8],
     side: char,
     caches: &Caches,
+    groups: &[ResolvedGroup],
     quiet_sizes: &HashMap<usize, usize>,
     force_open: bool,
 ) -> String {
@@ -687,10 +799,55 @@ fn render_node(
 
     let other_side = if side == 'b' { 'a' } else { 'b' };
     let id_attr = format!("{side}-{}", node.id());
-    let match_attr = matched_other_id
+    let mut match_attr = matched_other_id
         .map(|&other_id| format!(" data-match=\"{other_side}-{other_id}\""))
         .unwrap_or_default();
     let kind_attr = escape_html_attr(node.kind());
+
+    // A group member says so on the node itself, rather than only in the page's notice: which kind
+    // of group, and its shape. For an all-to-all member, `data-match` names *every* counterpart -
+    // `caches` only knows the one the one-to-one projection paired it with, and the group says
+    // all of them are real - so `viewer.js` highlights them all and aligns to the first.
+    let group = match side {
+        'b' => caches.before_group.get(&node.id()),
+        _ => caches.after_group.get(&node.id()),
+    }
+    .and_then(|index| groups.get(*index));
+    let (group_class, group_badge) = match group {
+        Some(group) => {
+            let shape = group.shape();
+            let (before, after) = (group.before.len(), group.after.len());
+            match group.pairing {
+                GroupPairing::AllToAll => {
+                    let theirs = if side == 'b' {
+                        &group.after
+                    } else {
+                        &group.before
+                    };
+                    let ids: Vec<String> = theirs
+                        .iter()
+                        .map(|n| format!("{other_side}-{}", n.id()))
+                        .collect();
+                    if !ids.is_empty() {
+                        match_attr = format!(" data-match=\"{}\"", ids.join(" "));
+                    }
+                    (
+                        " group-all",
+                        format!(
+                            r#" <span class="group-badge group-all" title="all-to-all group: each of the {before} before nodes corresponds to each of the {after} after nodes">all {shape}</span>"#
+                        ),
+                    )
+                }
+                GroupPairing::AnyOneToOne => (
+                    " group-any",
+                    format!(
+                        r#" <span class="group-badge group-any" title="multi-map group: any pairing of the {before} before nodes with the {after} after nodes is valid; the one shown is arbitrary">any {shape}</span>"#
+                    ),
+                ),
+            }
+        }
+        None => ("", String::new()),
+    };
 
     let quiet_size = quiet_sizes.get(&node.id()).copied();
 
@@ -705,20 +862,28 @@ fn render_node(
         // treats a `Matched` node as quiet (and thus placeholder-eligible) when it's identical -
         // but `operation_class` can still be `op-moved` here (a whole subtree relocated intact).
         return format!(
-            r#"<div class="node leaf status-{status_class}{changed_class}{operation_class} placeholder" id="{id_attr}"{match_attr} data-kind="{kind_attr}" tabindex="0">{kind_label} (+{size} nodes collapsed)</div>"#
+            r#"<div class="node leaf status-{status_class}{changed_class}{operation_class}{group_class} placeholder" id="{id_attr}"{match_attr} data-kind="{kind_attr}" tabindex="0">{kind_label} (+{size} nodes collapsed){group_badge}</div>"#
         );
     }
 
     if node.child_count() == 0 {
         let label = escape_html_text(&leaf_label(node, src));
         format!(
-            r#"<div class="node leaf status-{status_class}{changed_class}{operation_class}" id="{id_attr}"{match_attr} data-kind="{kind_attr}" tabindex="0">{label}</div>"#
+            r#"<div class="node leaf status-{status_class}{changed_class}{operation_class}{group_class}" id="{id_attr}"{match_attr} data-kind="{kind_attr}" tabindex="0">{label}{group_badge}</div>"#
         )
     } else {
         let mut children = String::new();
         let mut cursor = node.walk();
         for child in node.children(&mut cursor) {
-            children.push_str(&render_node(child, src, side, caches, quiet_sizes, false));
+            children.push_str(&render_node(
+                child,
+                src,
+                side,
+                caches,
+                groups,
+                quiet_sizes,
+                false,
+            ));
         }
         let kind_label = escape_html_text(node.kind());
         let open_attr = if force_open || quiet_size.is_none() {
@@ -727,7 +892,7 @@ fn render_node(
             ""
         };
         format!(
-            r#"<details class="node status-{status_class}{changed_class}{operation_class}" id="{id_attr}"{match_attr} data-kind="{kind_attr}"{open_attr}><summary tabindex="0">{kind_label}</summary>{children}</details>"#
+            r#"<details class="node status-{status_class}{changed_class}{operation_class}{group_class}" id="{id_attr}"{match_attr} data-kind="{kind_attr}"{open_attr}><summary tabindex="0">{kind_label}{group_badge}</summary>{children}</details>"#
         )
     }
 }
@@ -954,6 +1119,61 @@ fn code_counterparts(
         .collect()
 }
 
+/// Gives every range inside an all-to-all group's members one shared id per side, and points it
+/// at the other side's shared id - exactly what [`painting_panels`] does for an N:M painted match,
+/// and for the same reason: the group asserts the correspondence whole, so clicking any one
+/// member should reveal every counterpart, not the one the one-to-one projection
+/// (`representative_entries`) happened to pair it with.
+///
+/// A member's `Identical` range is promoted to `Move` so that it is painted at all. The code view
+/// never highlights identical text, which is right for an ordinary match and wrong here: three
+/// verbatim copies of a statement becoming two is *the* edit such a group records, and an
+/// unpainted panel would show none of it. The painting panel makes the same choice - an N:M
+/// `Match` of identical spans renders as a move whether or not anything moved. Only all-to-all
+/// members are promoted; the rest of the panel stays exactly what `TextDiff` said.
+///
+/// A range belongs to a group when it is `Identical`, `Move` or `Update` and lies within a
+/// member's extent. The operation filter keeps a descendant the mapping deletes or inserts
+/// *inside* a member (possible when the group is not `with_children`) out of the correspondence,
+/// since that descendant is not part of what the group asserts. Carets never qualify - they have
+/// no source text.
+#[allow(clippy::too_many_arguments)]
+fn share_all_to_all_ids(
+    ranges: &mut [RangeMatch],
+    ids: &mut [String],
+    counterparts: &mut HashMap<usize, String>,
+    side: &str,
+    other_side: &str,
+    groups: &[ResolvedGroup],
+    side_index: usize,
+) {
+    for (group_index, group) in groups.iter().enumerate() {
+        if group.pairing != GroupPairing::AllToAll {
+            continue;
+        }
+        let members = if side_index == 0 {
+            &group.before
+        } else {
+            &group.after
+        };
+        let extents: Vec<TextRange> = members.iter().map(|node| node_extent(*node)).collect();
+        for (index, range_match) in ranges.iter_mut().enumerate() {
+            let linked = matches!(
+                range_match.operation,
+                TextOperation::Identical | TextOperation::Move | TextOperation::Update
+            );
+            if !linked || !extents_cover(&extents, &range_match.source) {
+                continue;
+            }
+            if range_match.operation == TextOperation::Identical {
+                range_match.operation = TextOperation::Move;
+            }
+            ids[index] = format!("{side}G{group_index}");
+            counterparts.insert(index, format!("{other_side}G{group_index}"));
+        }
+    }
+}
+
 /// One side of one code rendering: the ranges to paint onto that side's source text, the DOM ids
 /// they carry, what each points at on the other side, and the carets standing in for text this
 /// side doesn't have.
@@ -982,17 +1202,33 @@ struct PanelRanges {
 
 impl PanelRanges {
     /// One side of the tree mapping's own rendering, the panel this page has always drawn.
+    ///
+    /// `side_index` is 0 for before and 1 for after: which member list of each group this side's
+    /// ranges are checked against - see [`share_all_to_all_ids`].
     fn from_tree(
         side: &str,
         other_side: &str,
         ranges: Vec<RangeMatch>,
         other: &[RangeMatch],
         row_count: usize,
+        groups: &[ResolvedGroup],
+        side_index: usize,
     ) -> Self {
-        let ids = positional_ids(side, ranges.len());
+        let mut ranges = ranges;
+        let mut ids = positional_ids(side, ranges.len());
         let other_ids = positional_ids(other_side, other.len());
+        let mut counterparts = code_counterparts(&ranges, other, other_side, &other_ids);
+        share_all_to_all_ids(
+            &mut ranges,
+            &mut ids,
+            &mut counterparts,
+            side,
+            other_side,
+            groups,
+            side_index,
+        );
         PanelRanges {
-            counterparts: code_counterparts(&ranges, other, other_side, &other_ids),
+            counterparts,
             markers: code_markers(other, row_count, side, &other_ids),
             ops: codediff::diff::text::line_operations(&ranges, row_count),
             side: side.to_string(),
@@ -1536,6 +1772,8 @@ mod tests {
                     before_ranges.clone(),
                     &after_ranges,
                     row_counts[0],
+                    &[],
+                    0,
                 ),
                 PanelRanges::from_tree(
                     "a",
@@ -1543,6 +1781,8 @@ mod tests {
                     after_ranges.clone(),
                     &before_ranges,
                     row_counts[1],
+                    &[],
+                    1,
                 ),
             ]];
             for (index, named) in mapping.text_mappings.iter().enumerate() {
@@ -1611,7 +1851,7 @@ mod tests {
                 operation: TextOperation::Identical,
             },
         ];
-        let panel = PanelRanges::from_tree("b", "a", ranges, &[], 1);
+        let panel = PanelRanges::from_tree("b", "a", ranges, &[], 1, &[], 0);
         let html = render_code_row("let foo = 1;", 0, &TextOperation::Update, &panel, &[]);
 
         assert!(
@@ -1633,7 +1873,7 @@ mod tests {
             destination: codediff::diff::text_range::TextRange::new(0, 0, 1, 3),
             operation: TextOperation::Move,
         }];
-        let panel = PanelRanges::from_tree("b", "a", ranges, &[], 1);
+        let panel = PanelRanges::from_tree("b", "a", ranges, &[], 1, &[], 0);
         let html = render_code_row("foo   ", 0, &TextOperation::Move, &panel, &[]);
 
         assert!(
@@ -1659,7 +1899,7 @@ mod tests {
             destination: TextRange::new(0, 4, 0, 4),
             operation: TextOperation::Delete,
         }];
-        let panel = PanelRanges::from_tree("a", "b", Vec::new(), &before, 20);
+        let panel = PanelRanges::from_tree("a", "b", Vec::new(), &before, 20, &[], 1);
         assert_eq!(
             panel.markers.len(),
             1,
@@ -1728,6 +1968,8 @@ mod tests {
                 operation: TextOperation::Delete,
             }],
             30,
+            &[],
+            1,
         );
         assert_eq!(
             panel.anchor_rows(),
@@ -1765,6 +2007,8 @@ mod tests {
                 operation: TextOperation::Delete,
             }],
             30,
+            &[],
+            1,
         );
         let painting = PanelRanges {
             side: "a0".to_string(),
@@ -1925,7 +2169,7 @@ mod tests {
     #[test]
     fn each_rendering_gets_its_own_dom_id_prefix() {
         let source = "foo\n";
-        let tree = PanelRanges::from_tree("b", "a", Vec::new(), &[], 2);
+        let tree = PanelRanges::from_tree("b", "a", Vec::new(), &[], 2, &[], 0);
         let named = painting(vec![HumanTextEntry {
             operation: HumanTextOperation::Delete,
             before: vec![span(0, 0, 0, 3)],
@@ -2220,7 +2464,15 @@ mod tests {
         let root = tree.root_node();
         let caches = Caches::default();
 
-        let html = render_node(root, source.as_bytes(), 'b', &caches, &HashMap::new(), true);
+        let html = render_node(
+            root,
+            source.as_bytes(),
+            'b',
+            &caches,
+            &[],
+            &HashMap::new(),
+            true,
+        );
 
         assert!(
             html.starts_with(r#"<details class="node status-unmarked" id="b-"#),
@@ -2266,6 +2518,7 @@ mod tests {
             source.as_bytes(),
             'b',
             &caches,
+            &[],
             &HashMap::new(),
             true,
         );
@@ -2318,6 +2571,7 @@ mod tests {
                 source.as_bytes(),
                 'b',
                 &caches,
+                &[],
                 &HashMap::new(),
                 true,
             );
@@ -2386,6 +2640,7 @@ mod tests {
             source_a.as_bytes(),
             'b',
             &caches,
+            &[],
             &HashMap::new(),
             true,
         );
@@ -2397,6 +2652,287 @@ mod tests {
         assert!(
             !before_html.contains("changed"),
             "a moved-but-identical match is still content-identical, not changed: {before_html}"
+        );
+    }
+
+    /// Every `expression_statement` reading `foo();`, anywhere in the tree, in source order - the
+    /// members every all-to-all test here groups. Filtered by text because an `if` at statement
+    /// level is an `expression_statement` too, and a test that nests a copy inside one must not
+    /// sweep the `if` into the group.
+    fn foo_statements<'t>(root: Node<'t>, src: &[u8]) -> Vec<Node<'t>> {
+        let mut found = Vec::new();
+        let mut stack = vec![root];
+        while let Some(node) = stack.pop() {
+            if node.kind() == "expression_statement"
+                && node.utf8_text(src).unwrap_or("").starts_with("foo")
+            {
+                found.push(node);
+            }
+            let mut cursor = node.walk();
+            for child in node.children(&mut cursor) {
+                stack.push(child);
+            }
+        }
+        found.sort_by_key(|n| n.start_byte());
+        found
+    }
+
+    /// One `foo();` before, two after, grouped all-to-all (the shape of a duplicated statement).
+    fn duplicated_statement_mapping(
+        before_root: Node,
+        before_source: &str,
+        after_root: Node,
+        after_source: &str,
+    ) -> HumanMapping {
+        HumanMapping {
+            groups: vec![human_mapping::MultiMapGroup {
+                before_paths: foo_statements(before_root, before_source.as_bytes())
+                    .iter()
+                    .map(|n| helper::path_for_node(*n))
+                    .collect(),
+                after_paths: foo_statements(after_root, after_source.as_bytes())
+                    .iter()
+                    .map(|n| helper::path_for_node(*n))
+                    .collect(),
+                operation: HumanOperation::Identical,
+                with_children: true,
+                pairing: GroupPairing::AllToAll,
+            }],
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn render_node_names_every_counterpart_of_an_all_to_all_member_and_badges_it() {
+        let before_source = "fn main() {\n    foo();\n}\n";
+        let after_source = "fn main() {\n    foo();\n    foo();\n}\n";
+        let before_tree = parse_rust(before_source);
+        let after_tree = parse_rust(after_source);
+        let before_root = before_tree.root_node();
+        let after_root = after_tree.root_node();
+        let mapping =
+            duplicated_statement_mapping(before_root, before_source, after_root, after_source);
+        let caches = rebuild_caches_for_mapping(&mapping, before_root, after_root);
+        let groups = resolve_groups(&mapping, before_root, after_root);
+        assert_eq!((groups[0].before.len(), groups[0].after.len()), (1, 2));
+
+        let before_html = render_node(
+            before_root,
+            before_source.as_bytes(),
+            'b',
+            &caches,
+            &groups,
+            &HashMap::new(),
+            true,
+        );
+        let after_statements = foo_statements(after_root, after_source.as_bytes());
+        // Both copies, not just the one the projection paired the original with.
+        let expected_match = format!(
+            r#"data-match="a-{} a-{}""#,
+            after_statements[0].id(),
+            after_statements[1].id()
+        );
+        assert!(
+            before_html.contains(&expected_match),
+            "expected {expected_match} in {before_html}"
+        );
+        assert!(
+            before_html.contains(r#" group-all" id="b-"#),
+            "the member carries the group class: {before_html}"
+        );
+        assert!(
+            before_html.contains(r#"<span class="group-badge group-all" title="all-to-all group: each of the 1 before nodes corresponds to each of the 2 after nodes">all 1:2</span>"#),
+            "{before_html}"
+        );
+
+        let after_html = render_node(
+            after_root,
+            after_source.as_bytes(),
+            'a',
+            &caches,
+            &groups,
+            &HashMap::new(),
+            true,
+        );
+        let original = foo_statements(before_root, before_source.as_bytes())[0];
+        // Each copy is matched (neither is the "leftover"), and both point back at the original.
+        assert_eq!(
+            after_html
+                .matches(&format!(r#"data-match="b-{}""#, original.id()))
+                .count(),
+            2,
+            "{after_html}"
+        );
+        assert!(!after_html.contains("status-inserted"), "{after_html}");
+    }
+
+    #[test]
+    fn render_node_badges_an_any_one_to_one_member_without_changing_its_match() {
+        let before_source = "fn main() {\n    foo();\n}\n";
+        let after_source = "fn main() {\n    foo();\n    foo();\n}\n";
+        let before_tree = parse_rust(before_source);
+        let after_tree = parse_rust(after_source);
+        let before_root = before_tree.root_node();
+        let after_root = after_tree.root_node();
+        let mut mapping =
+            duplicated_statement_mapping(before_root, before_source, after_root, after_source);
+        mapping.groups[0].pairing = GroupPairing::AnyOneToOne;
+        let caches = rebuild_caches_for_mapping(&mapping, before_root, after_root);
+        let groups = resolve_groups(&mapping, before_root, after_root);
+
+        let before_html = render_node(
+            before_root,
+            before_source.as_bytes(),
+            'b',
+            &caches,
+            &groups,
+            &HashMap::new(),
+            true,
+        );
+        assert!(before_html.contains(">any 1:2</span>"), "{before_html}");
+        assert!(before_html.contains("group-any"), "{before_html}");
+        // Still exactly one counterpart: the projection's pick, as before.
+        let matches = before_html.matches("data-match=\"a-").count();
+        assert_eq!(matches, 1, "{before_html}");
+    }
+
+    #[test]
+    fn extents_cover_reads_a_range_against_the_union_of_a_groups_members() {
+        // Statements on rows 3 and 4 (columns 8..14), and one on row 7.
+        let members = [
+            TextRange::new(3, 8, 3, 14),
+            TextRange::new(4, 8, 4, 14),
+            TextRange::new(7, 8, 7, 14),
+        ];
+        let covered = |range: TextRange| extents_cover(&members, &range);
+        assert!(covered(TextRange::new(3, 8, 3, 14)), "one member exactly");
+        assert!(covered(TextRange::new(3, 9, 3, 12)), "inside one member");
+        assert!(
+            covered(TextRange::new(3, 8, 4, 0)),
+            "to the end of the member's line"
+        );
+        assert!(
+            covered(TextRange::new(3, 8, 5, 0)),
+            "two adjacent members merged"
+        );
+        assert!(
+            !covered(TextRange::new(3, 7, 3, 14)),
+            "starts before a member"
+        );
+        assert!(
+            !covered(TextRange::new(3, 8, 6, 0)),
+            "runs onto a line no member owns"
+        );
+        assert!(
+            !covered(TextRange::new(4, 8, 8, 0)),
+            "sweeps a stranger's row between members"
+        );
+        assert!(
+            !covered(TextRange::new(5, 0, 6, 0)),
+            "a row between members"
+        );
+        assert!(!covered(TextRange::new(3, 8, 3, 8)), "empty");
+    }
+
+    #[test]
+    fn share_all_to_all_ids_gives_a_groups_moved_and_updated_spans_one_id_per_side() {
+        let before_source = "fn main() {\n    foo();\n}\n";
+        let after_source = "fn main() {\n    foo();\n    foo();\n}\n";
+        let before_tree = parse_rust(before_source);
+        let after_tree = parse_rust(after_source);
+        let before_root = before_tree.root_node();
+        let after_root = after_tree.root_node();
+        let mapping =
+            duplicated_statement_mapping(before_root, before_source, after_root, after_source);
+        let groups = resolve_groups(&mapping, before_root, after_root);
+        let statements = foo_statements(after_root, after_source.as_bytes());
+        let extent = |n: Node| node_extent(n);
+
+        let range = |source: TextRange, operation: TextOperation| RangeMatch {
+            source,
+            destination: TextRange::zero(),
+            operation,
+        };
+        let mut ranges = vec![
+            // The second copy, verbatim and in place: identical text, which is promoted to a
+            // move so the copy is painted at all.
+            range(extent(statements[1]), TextOperation::Identical),
+            // A leaf inside the first copy, updated: inside a member.
+            range(TextRange::new(1, 4, 1, 7), TextOperation::Update),
+            // An insertion inside a member is not part of the correspondence.
+            range(TextRange::new(1, 7, 1, 9), TextOperation::Insert),
+            // A move outside every member.
+            range(TextRange::new(0, 0, 0, 2), TextOperation::Move),
+            // Identical text outside every member stays unpainted.
+            range(TextRange::new(0, 3, 0, 7), TextOperation::Identical),
+        ];
+        let mut ids = positional_ids("a", ranges.len());
+        let mut counterparts = HashMap::new();
+        share_all_to_all_ids(
+            &mut ranges,
+            &mut ids,
+            &mut counterparts,
+            "a",
+            "b",
+            &groups,
+            1,
+        );
+
+        assert_eq!(ids, vec!["aG0", "aG0", "a2", "a3", "a4"]);
+        assert_eq!(ranges[0].operation, TextOperation::Move);
+        assert_eq!(ranges[1].operation, TextOperation::Update);
+        assert_eq!(ranges[4].operation, TextOperation::Identical);
+        assert_eq!(counterparts.get(&0).map(String::as_str), Some("bG0"));
+        assert_eq!(counterparts.get(&1).map(String::as_str), Some("bG0"));
+        assert!(!counterparts.contains_key(&2));
+        assert!(!counterparts.contains_key(&3));
+        assert!(!counterparts.contains_key(&4));
+    }
+
+    #[test]
+    fn a_page_with_an_all_to_all_group_links_the_copies_to_the_original_in_the_code_view() {
+        // A verbatim copy in the same column: `TextDiff` calls both copies identical, and the
+        // page still paints and links them, since the copy *is* the edit.
+        let before_source = "fn main() {\n    foo();\n}\n";
+        let after_source = "fn main() {\n    foo();\n    foo();\n}\n";
+        let before = Code::from_string(before_source, &Language::Rust);
+        let after = Code::from_string(after_source, &Language::Rust);
+        let before_root = before.ast.as_ref().unwrap().root_node();
+        let after_root = after.ast.as_ref().unwrap().root_node();
+        let mapping =
+            duplicated_statement_mapping(before_root, before_source, after_root, after_source);
+
+        let mut warnings = Vec::new();
+        let page = render_fixture_page(
+            "rust-duplicated",
+            &before,
+            &after,
+            &mapping,
+            None,
+            None,
+            &mut warnings,
+        )
+        .unwrap();
+        assert!(warnings.is_empty(), "{warnings:?}");
+        assert!(page.html.contains("1 all-to-all group:"), "{}", page.html);
+        assert!(page.html.contains(">all 1:2</span>"), "{}", page.html);
+        // Both copies and the original are painted as the group, not as positional ids, so any
+        // span of it reveals the whole other side.
+        assert_eq!(
+            page.html
+                .matches(r#"class="cd cd-move" data-range="aG0" data-counterpart="bG0""#)
+                .count(),
+            2,
+            "{}",
+            page.html
+        );
+        assert_eq!(
+            page.html
+                .matches(r#"class="cd cd-move" data-range="bG0" data-counterpart="aG0""#)
+                .count(),
+            1,
+            "{}",
+            page.html
         );
     }
 
@@ -2423,6 +2959,7 @@ mod tests {
             source.as_bytes(),
             'b',
             &caches,
+            &[],
             &HashMap::new(),
             true,
         );
@@ -2556,6 +3093,7 @@ mod tests {
             source.as_bytes(),
             'b',
             &caches,
+            &[],
             &quiet_sizes,
             true, // force_open: the root itself must stay open/rendered despite being fully unmarked
         );
@@ -2586,7 +3124,15 @@ mod tests {
             "fixture assumption broken: function_item is only {function_item_size} nodes"
         );
 
-        let html = render_node(root, source.as_bytes(), 'b', &caches, &quiet_sizes, true);
+        let html = render_node(
+            root,
+            source.as_bytes(),
+            'b',
+            &caches,
+            &[],
+            &quiet_sizes,
+            true,
+        );
 
         assert!(
             html.contains(&format!("+{function_item_size} nodes collapsed")),
@@ -2645,6 +3191,7 @@ mod tests {
             source.as_bytes(),
             'b',
             &caches,
+            &[],
             &quiet_sizes,
             true,
         );
@@ -2711,6 +3258,7 @@ mod tests {
             source.as_bytes(),
             'b',
             &caches,
+            &[],
             &quiet_sizes,
             true,
         );

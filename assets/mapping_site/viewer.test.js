@@ -10,7 +10,7 @@
 "use strict";
 
 const assert = require("assert");
-const { otherSide, nodePath, nextMatchIndex, pickRendering } = require("./viewer.js");
+const { otherSide, nodePath, nextMatchIndex, pickRendering, splitMatchIds } = require("./viewer.js");
 
 // ── A stand-in for the elements generate_mapping_site.rs's `render_node` emits ────────────────
 //
@@ -143,5 +143,15 @@ const summary = () => el("summary", undefined);
   assert.strictEqual(otherSide("before"), "after");
   assert.strictEqual(otherSide("after"), "before");
 }
+
+
+// ── splitMatchIds ─────────────────────────────────────────────────────────────────────────────
+//
+// `data-match` is one id for a plain pair and a space-separated list for an all-to-all group
+// member; the viewer must treat both the same way, and a missing attribute as "no counterpart".
+assert.deepStrictEqual(splitMatchIds("a-12"), ["a-12"]);
+assert.deepStrictEqual(splitMatchIds("a-12 a-40 a-41"), ["a-12", "a-40", "a-41"]);
+assert.deepStrictEqual(splitMatchIds(undefined), []);
+assert.deepStrictEqual(splitMatchIds(""), []);
 
 console.log("viewer.test.js: all assertions passed");
