@@ -26,6 +26,12 @@ tmp/
 # git (unlike e.g. research/data/results/*_baseline_*.csv, which are deliberately-named point-in-time
 # snapshots kept for historical comparison).
 **/research/data/ablation/*
+# measure/per_test_coverage.py's output: one bitset per test over lines.tsv, meaningful only
+# against the exact instrumented binary that measured it, and regenerated in about ten minutes by
+# `make measure-per-test-coverage` - scratch for the same reason ablation/ is. PROVENANCE.md stays
+# tracked so a reader knows what the last run measured and how to redo it.
+**/research/data/coverage/per_test/*
+!**/research/data/coverage/per_test/PROVENANCE.md
 
 # pdflatex/bibtex build byproducts for research/papers/* - regenerated on every build, not part of
 # the versioned record (unlike the checked-in main.tex/main.bbl/main.pdf in the same directory).

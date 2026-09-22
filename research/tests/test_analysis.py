@@ -18,6 +18,7 @@
 """Unit tests for the pure functions the report scripts are built from. Run with `make
 test-python` from the repository root (or `uv run pytest` from research/)."""
 
+import json
 import re
 
 import _common
@@ -25,8 +26,10 @@ import apted_only_report
 import benchmark_other_report
 import ci_local
 import coverage_report
+import coverage_sets
 import edit_shape_stats
 import numpy as np
+import per_test_coverage
 import pytest
 import yaml
 
@@ -408,3 +411,94 @@ def test_rename_sides_recovers_both_paths_of_a_numstat_rename(numstat_path, old,
     import list_code_edits
 
     assert list_code_edits.rename_sides(numstat_path) == (old, new)
+
+
+# --- measure/per_test_coverage.py + analysis/coverage_sets.py ---------------------------------------
+
+
+def test_per_test_coverage_classifies_module_roots_with_their_modules():
+    """Every "engine" number the set tool prints rests on this: `src/diff.rs` is the engine's own
+    root, and missing it would drop 581 lines of the engine from every set."""
+    assert per_test_coverage.area_of("src/diff.rs") == "engine"
+    assert per_test_coverage.area_of("src/diff/apted/engine.rs") == "engine"
+    assert per_test_coverage.area_of("src/code.rs") == "engine"
+    assert per_test_coverage.area_of("src/test/helper/human_mapping.rs") == "harness"
+    assert per_test_coverage.area_of("src/test.rs") == "harness"
+    assert per_test_coverage.area_of("src/tui/app.rs") == "other"
+    assert per_test_coverage.area_of("src/differ.rs") == "other", "a prefix, not a module"
+
+
+def test_coverage_sets_groups_a_fixtures_tests_but_leaves_other_tests_alone():
+    assert (
+        coverage_sets.fixture_of("test::fixtures::handmade::rust_add_if::mapping")
+        == "test::fixtures::handmade::rust_add_if"
+    )
+    assert coverage_sets.fixture_of("diff::tests::test_compute_metadata") == (
+        "diff::tests::test_compute_metadata"
+    )
+
+
+def write_per_test_data(root, lines, tests):
+    """A per_test directory by hand: `lines` is [(area, file, line)], `tests` is
+    {name: [covered line positions]} - the same shape measure/per_test_coverage.py writes."""
+    (root / "bits").mkdir()
+    with open(root / "lines.tsv", "w") as handle:
+        handle.write("index\tarea\tfile\tline\n")
+        for index, (area, file, line) in enumerate(lines):
+            handle.write(f"{index}\t{area}\t{file}\t{line}\n")
+    width = (len(lines) + 7) // 8
+    with open(root / "records.jsonl", "w") as handle:
+        for number, (name, positions) in enumerate(tests.items()):
+            bits = 0
+            covered = {}
+            for position in positions:
+                bits |= 1 << position
+                area = lines[position][0]
+                covered[area] = covered.get(area, 0) + 1
+            (root / "bits" / f"k{number}").write_bytes(bits.to_bytes(width, "little"))
+            record = {"name": name, "status": "ok", "bits": f"k{number}", "covered": covered}
+            handle.write(json.dumps(record) + "\n")
+
+
+LINES = [
+    ("engine", "src/diff.rs", 1),
+    ("engine", "src/diff.rs", 2),
+    ("engine", "src/diff.rs", 3),
+    ("harness", "src/test.rs", 1),
+    ("engine", "src/code.rs", 7),
+]
+
+
+def test_coverage_sets_masks_to_the_area_and_combines_sets(tmp_path):
+    write_per_test_data(
+        tmp_path,
+        LINES,
+        {
+            "test::fixtures::small::a::mapping": [0, 1, 3],
+            "test::fixtures::small::a::painting": [1, 2],
+            "test::fixtures::small::b::mapping": [1, 4],
+        },
+    )
+    coverage = coverage_sets.Coverage(tmp_path, "engine", "test")
+    sets = coverage.select(None)
+    # Line 3 is the harness: masked out of every set before any operation.
+    assert sets["test::fixtures::small::a::mapping"] == 0b00011
+    assert coverage_sets.union(sets.values()) == 0b10111
+    assert coverage_sets.intersection(sets.values()) == 0b00010
+
+    reach = coverage.reach_counts(sets.values())
+    assert list(reach) == [1, 3, 1, 0, 1]
+    assert coverage.bits_where(reach == 1) == 0b10101
+    assert coverage.describe(0b00111, 0) == ["src/diff.rs:1-3"]
+
+    fixtures = coverage_sets.Coverage(tmp_path, "engine", "fixture").select(None)
+    assert fixtures == {"test::fixtures::small::a": 0b00111, "test::fixtures::small::b": 0b10010}
+
+
+def test_coverage_sets_refuses_bits_that_do_not_match_their_record(tmp_path):
+    """A bits file from another run read against this lines.tsv would silently answer every
+    question wrongly; the per-area counts the run recorded are what catch it."""
+    write_per_test_data(tmp_path, LINES, {"t::one": [0, 1]})
+    (tmp_path / "bits" / "k0").write_bytes((0b111).to_bytes(1, "little"))
+    with pytest.raises(SystemExit):
+        coverage_sets.Coverage(tmp_path, "engine", "test")

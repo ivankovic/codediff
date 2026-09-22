@@ -347,6 +347,30 @@ ambiguity-report:
 rendering-report:
 	uv run ./analysis/rendering_report.py
 
+# Line coverage of every test in the library's test binary, each measured alone, so the results
+# can be combined with set operations (analysis/coverage_sets.py). Builds an instrumented release
+# test binary in a target directory of its own - so neither `make coverage`'s nor the release
+# build's artifacts are touched - then starts measure/per_test_coverage.py as a systemd unit, each
+# test in its own memory-capped scope; see that script for why. About ten minutes on eight cores.
+#
+#   journalctl --user -fu codediff-per-test-coverage     follow it
+#   systemctl --user stop codediff-per-test-coverage codediff-per-test-coverage.slice
+#
+# Resumable: run it again to continue. To re-measure from scratch - after the engine changes, say -
+# delete data/coverage/per_test/ first, since the bits only mean anything against the binary that
+# wrote them. PROVENANCE.md there records which commit that was.
+PER_TEST_COVERAGE_TARGET := $(abspath ../target/percov)
+measure-per-test-coverage:
+	cd .. && eval "$$(cargo llvm-cov show-env --export-prefix)" \
+		&& CARGO_TARGET_DIR=$(PER_TEST_COVERAGE_TARGET) cargo test --release --lib --no-run \
+		--message-format=json 2>/dev/null \
+		| python3 -c 'import sys, json; print(next(m["executable"] for m in map(json.loads, sys.stdin) if m.get("reason") == "compiler-artifact" and m.get("profile", {}).get("test") and m.get("executable")))' \
+		> $(PER_TEST_COVERAGE_TARGET)/test-binary.txt
+	mkdir -p data/coverage/per_test
+	systemd-run --user --unit codediff-per-test-coverage --collect --same-dir \
+		--setenv=PATH="$$PATH" ./measure/per_test_coverage.py \
+		--binary "$$(cat $(PER_TEST_COVERAGE_TARGET)/test-binary.txt)" --out data/coverage/per_test
+
 # ── Tool comparison (benchmark_other) ───────────────────────────────────────────────────────────
 
 # Runs the timing benchmark's own analysis/plotting step over whatever
