@@ -190,6 +190,69 @@ def test_matrix_combinations_is_the_cartesian_product_of_the_list_axes():
     assert ci_local.matrix_combinations({}) == [{}]
 
 
+def test_matrix_combinations_expands_a_standalone_include_one_entry_per_job():
+    """Each entry is its own job. The rule that an include entry merges where it "agrees with
+    every axis value" is vacuously true when there are no axes, so without this case all the
+    entries fold into one and `${{ matrix.x }}` expands to the last one's values."""
+    job = {
+        "strategy": {
+            "matrix": {
+                "include": [
+                    {"features": "", "shard": 1},
+                    {"features": "stats", "shard": 3},
+                ]
+            }
+        }
+    }
+    assert ci_local.matrix_combinations(job) == [
+        {"features": "", "shard": 1},
+        {"features": "stats", "shard": 3},
+    ]
+
+
+def test_matrix_combinations_merges_an_include_into_the_combinations_it_agrees_with():
+    job = {
+        "strategy": {
+            "matrix": {
+                "features": ["", "stats"],
+                "include": [{"features": "stats", "shard": 3}],
+            }
+        }
+    }
+    assert ci_local.matrix_combinations(job) == [
+        {"features": ""},
+        {"features": "stats", "shard": 3},
+    ]
+
+
+def test_matrix_combinations_adds_an_include_that_matches_no_combination():
+    job = {
+        "strategy": {
+            "matrix": {
+                "features": ["", "stats"],
+                "include": [{"features": "web", "shard": 4}],
+            }
+        }
+    }
+    assert ci_local.matrix_combinations(job)[-1] == {"features": "web", "shard": 4}
+
+
+def test_matrix_combinations_applies_a_keyless_include_to_every_combination():
+    job = {"strategy": {"matrix": {"features": ["", "stats"], "include": [{"shard": 9}]}}}
+    assert ci_local.matrix_combinations(job) == [
+        {"features": "", "shard": 9},
+        {"features": "stats", "shard": 9},
+    ]
+
+
+def test_matrix_combinations_refuses_exclude_rather_than_ignoring_it():
+    """Silently dropping `exclude` would run combinations CI does not - the same class of
+    mistake as a silently unexpanded `include`."""
+    job = {"strategy": {"matrix": {"features": ["", "stats"], "exclude": [{"features": ""}]}}}
+    with pytest.raises(RuntimeError):
+        ci_local.matrix_combinations(job)
+
+
 # --- scripts/coverage_report.py ----------------------------------------------------------------
 
 

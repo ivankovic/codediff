@@ -167,7 +167,15 @@ jobs:
         # "" = default features (tui only). test-fixtures, stats and web are each their own
         # compilation unit - see Cargo.toml's [features] - so each needs its own build+test pass,
         # not just a single default-feature run.
-        features: ["", "test-fixtures", "stats", "web"]
+        #
+        # `shard` pairs each of those with one quarter of the fixture corpus - see the two Test
+        # steps below for why. Written as `include:` so the two stay paired; a second list axis
+        # would give sixteen jobs.
+        include:
+          - { features: "", shard: 1 }
+          - { features: "test-fixtures", shard: 2 }
+          - { features: "stats", shard: 3 }
+          - { features: "web", shard: 4 }
     steps:
       - uses: actions/checkout@v7
 
@@ -189,5 +197,28 @@ jobs:
       # build, peak RSS 10.66GB under `cargo test --release` vs 5.37GB under `cargo nextest run
       # --release`, at comparable wall-clock - the difference between a CI runner OOMing on this
       # suite and not.
-      - name: Test
+      # Split in two because the 3209 `src/test/fixtures/` tests are byte-identical in all four
+      # feature sets - nothing they touch is feature-gated - so running them once per set was the
+      # same work four times over, and 76.7% of the suite's CPU time (702s of 915s, measured
+      # 2026-09-22). The first step runs what genuinely differs between the sets, including the
+      # meta-tests that only exist under `test-fixtures`/`stats`; the second runs one quarter of
+      # the corpus, so the four jobs together still run every fixture test exactly once. This is
+      # redistribution, not selection: nothing is skipped.
+      #
+      # `--partition` is deterministic by test name, so a fixture always lands in the same shard
+      # and a CI failure reproduces locally either with the same `--partition` flag or by naming
+      # the test directly.
+      #
+      # `test()` matches the test name *without* the crate prefix, so the anchor is
+      # `^test::fixtures::` and not `^codediff::test::fixtures::`. Getting that wrong matches
+      # nothing, which does not fail: the first step would simply run the whole suite and the
+      # second none of it, and CI would stay green while doing exactly the work this split
+      # exists to avoid. Check `cargo nextest list -E '<expr>'` counts 3209 before editing these.
+      - name: Test (what this feature set changes)
         run: cargo nextest run --release --features "${{ matrix.features }}"
+          -E 'not test(/^test::fixtures::/)'
+
+      - name: Test (one quarter of the fixture corpus)
+        run: cargo nextest run --release --features "${{ matrix.features }}"
+          -E 'test(/^test::fixtures::/)'
+          --partition count:${{ matrix.shard }}/4

@@ -191,14 +191,54 @@ def expand(text: str, matrix: dict[str, Any], env: dict[str, str]) -> str:
 
 
 def matrix_combinations(job: dict[str, Any]) -> list[dict[str, Any]]:
-    """Every `strategy.matrix` combination for one job - `[{}]` when it has no matrix."""
+    """Every `strategy.matrix` combination for one job - `[{}]` when it has no matrix.
+
+    Implements GitHub's `include:` rule as well as the plain axes, because getting this wrong is
+    silent rather than loud: an unexpanded `include` leaves `${{ matrix.x }}` with nothing to
+    substitute, and a job that runs with the wrong flags still reports success. The rule is:
+
+    * the axes (the list-valued keys) give a cartesian product, as before;
+    * each `include` entry is then merged into every combination it does not contradict - it may
+      add keys, never overwrite an axis value that is already set;
+    * an entry that contradicts every combination, or a matrix with no axes at all, becomes a
+      combination of its own.
+
+    `exclude:` is deliberately absent: no workflow here uses it, and a stub that quietly ignored
+    it would be the same class of silent mis-expansion this function exists to avoid.
+    """
     matrix = (job.get("strategy") or {}).get("matrix") or {}
-    axes = {key: value for key, value in matrix.items() if isinstance(value, list)}
+    if "exclude" in matrix:
+        raise RuntimeError(
+            "scripts/ci_local.py does not implement `strategy.matrix.exclude`."
+            " Teach matrix_combinations() about it rather than running a matrix CI does not."
+        )
+
+    axes = {
+        key: value for key, value in matrix.items() if key != "include" and isinstance(value, list)
+    }
+    includes = matrix.get("include") or []
+
+    # No axes: every include entry is a combination in its own right. Kept separate from the
+    # merge below because "agrees with every axis value already chosen" is vacuously true when
+    # there are no axes, which would fold all the entries into one.
     if not axes:
-        return [{}]
+        return [dict(entry) for entry in includes] or [{}]
+
     combinations: list[dict[str, Any]] = [{}]
     for key, values in axes.items():
         combinations = [{**base, key: value} for base in combinations for value in values]
+
+    for entry in includes:
+        applied = False
+        for combination in combinations:
+            # An include entry applies where it agrees with every axis value already chosen; it
+            # may add keys, never overwrite one the axes set.
+            if all(combination[key] == value for key, value in entry.items() if key in axes):
+                combination.update({key: value for key, value in entry.items() if key not in axes})
+                applied = True
+        if not applied:
+            combinations.append(dict(entry))
+
     return combinations
 
 
