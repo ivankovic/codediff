@@ -40,10 +40,16 @@ fn mapping() -> Result<()> {
     // fixture by one node. Confirms rather than contradicts the comment above: this fixture wants
     // strictly *less* matching than `java_add_exception_handling`'s analogous shape, and remains
     // deliberately unattempted.
+    //
+    // 47/33 became 74/54 when the ground truth gained nine all-to-all 2:1 groups (see
+    // `MultiMapGroup::pairing`): the two functions' identical `width: Double, height: Double`
+    // parameter lists become the one primary constructor's, token by token. One before member of
+    // each is unavoidably unmatched by a one-to-one output; the rest is the same `fast_fallback`
+    // reparent gap as above, now graded on tokens it previously said nothing about.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "kotlin-refactor-function",
-        47,
-        33,
+        74,
+        54,
     )
 }
 

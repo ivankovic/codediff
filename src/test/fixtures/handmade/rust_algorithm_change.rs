@@ -44,10 +44,14 @@ fn mapping() -> Result<()> {
     //    the gap grew. Left as a known, accepted gap rather than a broad "bridge removed nesting"
     //    heuristic, which risks regressing the rest of the corpus the same way past attempts at
     //    similar generalizations have (see `TODO.md`).
+    // 3. Two nested `for` loops become one: the `for`, `{` and `}` of both before loops are
+    //    all-to-all 2:1 groups (see `MultiMapGroup::pairing`) with the single after loop's. One
+    //    before member of each is unavoidably unmatched by a one-to-one output (three of the
+    //    five group mismatches); the other two are the same nesting-bridging gap as 2.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "rust-algorithm-change",
-        42,
-        28,
+        47,
+        33,
     )
 }
 
