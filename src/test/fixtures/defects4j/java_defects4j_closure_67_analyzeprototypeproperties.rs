@@ -18,19 +18,28 @@
 use anyhow::Result;
 
 use crate::test;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 
 #[test]
 fn mapping() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("java-defects4j-closure-67-analyzeprototypeproperties")
+    // Two of the three are one any-one-to-one 3:3 group of `binary_expression`s where codediff
+    // realizes only two of the three pairs it could - an under-match, not an N:M floor, since a
+    // one-to-one output can satisfy a 3:3 group exactly. The third is an inserted
+    // `parenthesized_expression`. All three are invisible (they carry no text of their own).
+    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
+        "java-defects4j-closure-67-analyzeprototypeproperties",
+        3,
+        0,
+    )
 }
 
 #[test]
 fn painting() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test and record the
-    // limit it reports instead.
-    assert_matches_human_painting_within_limit("java-defects4j-closure-67-analyzeprototypeproperties", 100.0)
+    assert_matches_human_painting_within_limit(
+        "java-defects4j-closure-67-analyzeprototypeproperties",
+        0.0,
+    )
 }
 
 #[test]

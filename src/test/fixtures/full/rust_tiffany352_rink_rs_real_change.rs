@@ -29,8 +29,10 @@ fn mapping() -> Result<()> {
     // there if this one is picked up. Any counts above describe the older, larger residual.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "rust-tiffany352-rink-rs-real-change",
-        20,
-        16,
+        // 20/16 became 35/28 when the ground truth gained all-to-all groups: fifteen of the
+        // mismatches are group members a one-to-one output cannot reach, the N:M floor.
+        35,
+        28,
     )
 }
 

@@ -29,8 +29,10 @@ fn mapping() -> Result<()> {
     // catch - the baseline records the measurement, so the stub has to record it too.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "lua-neovim-neovim-logic-change-with-some-code-re-use",
-        7,
-        7,
+        // 7/7 became 16/14 when the ground truth gained all-to-all groups: nine of the
+        // mismatches are group members a one-to-one output cannot reach, the N:M floor.
+        16,
+        14,
     )
 }
 

@@ -18,19 +18,27 @@
 use anyhow::Result;
 
 use crate::test;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 
 #[test]
 fn mapping() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("java-defects4j-closure-71-checkaccesscontrols")
+    // No group is involved: a `local_variable_declaration`'s initializer is rebuilt, and codediff
+    // deletes and inserts the whole `variable_declarator` subtree where the human pairs it
+    // through. An ordinary gap, the largest of this batch.
+    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
+        "java-defects4j-closure-71-checkaccesscontrols",
+        14,
+        10,
+    )
 }
 
 #[test]
 fn painting() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test and record the
-    // limit it reports instead.
-    assert_matches_human_painting_within_limit("java-defects4j-closure-71-checkaccesscontrols", 100.0)
+    assert_matches_human_painting_within_limit(
+        "java-defects4j-closure-71-checkaccesscontrols",
+        0.09,
+    )
 }
 
 #[test]

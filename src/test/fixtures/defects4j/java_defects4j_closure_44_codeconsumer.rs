@@ -18,19 +18,23 @@
 use anyhow::Result;
 
 use crate::test;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 
 #[test]
 fn mapping() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("java-defects4j-closure-44-codeconsumer")
+    // No group is involved: the human pairs an `if` body's `block` (and its closing brace) with
+    // the one the edit keeps, codediff pairs it with the other arm's. A two-node ordinary gap.
+    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
+        "java-defects4j-closure-44-codeconsumer",
+        2,
+        1,
+    )
 }
 
 #[test]
 fn painting() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test and record the
-    // limit it reports instead.
-    assert_matches_human_painting_within_limit("java-defects4j-closure-44-codeconsumer", 100.0)
+    assert_matches_human_painting_within_limit("java-defects4j-closure-44-codeconsumer", 0.16)
 }
 
 #[test]

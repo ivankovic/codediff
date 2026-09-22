@@ -30,8 +30,10 @@ fn mapping() -> Result<()> {
     // come down with N:M support, not with a better matcher.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "tsx-apache-superset-error-handling-change",
-        6,
-        4,
+        // 6/4 became 7/5 when the ground truth gained an all-to-all group: one of the mismatches
+        // is a group member a one-to-one output cannot reach, the N:M floor.
+        7,
+        5,
     )
 }
 

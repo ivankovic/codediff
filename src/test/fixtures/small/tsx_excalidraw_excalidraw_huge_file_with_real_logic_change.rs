@@ -33,8 +33,12 @@ fn mapping() -> Result<()> {
     // catch - the baseline records the measurement, so the stub has to record it too.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "tsx-excalidraw-excalidraw-huge-file-with-real-logic-change",
-        228,
-        154,
+        // 228/154 became 245/169 when the ground truth gained all-to-all groups. Fifteen of the
+        // twenty-six group mismatches are all-to-all members a one-to-one output cannot reach,
+        // the N:M floor; the remaining eleven are this fixture's pre-existing any-one-to-one
+        // groups, whose realized pairings moved with the surrounding matching.
+        245,
+        169,
     )
 }
 

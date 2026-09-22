@@ -18,19 +18,27 @@
 use anyhow::Result;
 
 use crate::test;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 
 #[test]
 fn mapping() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("java-defects4j-cli-3-typehandler")
+    // One `return` statement becomes two, recorded as all-to-all 1:2 groups over the statement
+    // and each of its descendants (see `MultiMapGroup::pairing`). Eight of the fourteen are those
+    // groups' second after member, which a one-to-one output cannot reach - the N:M floor. The
+    // other six are a genuine gap: the before `method_invocation` chain is deleted whole and the
+    // new nested `if`/`return` inserted whole, rather than matched through the added nesting -
+    // the same `qualified_name` nesting-bridging gap `rust-algorithm-change` documents.
+    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
+        "java-defects4j-cli-3-typehandler",
+        14,
+        11,
+    )
 }
 
 #[test]
 fn painting() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test and record the
-    // limit it reports instead.
-    assert_matches_human_painting_within_limit("java-defects4j-cli-3-typehandler", 100.0)
+    assert_matches_human_painting_within_limit("java-defects4j-cli-3-typehandler", 0.71)
 }
 
 #[test]
