@@ -199,6 +199,22 @@ def test_area_of_picks_the_most_specific_prefix():
     assert coverage_report.area_of("benches/diff_code_benchmark.rs") == "other"
 
 
+def test_area_of_puts_a_module_root_with_its_own_module():
+    """`src/diff.rs` is the engine's root, not an unclassified file - it used to land in `other`,
+    where no row printed it and no product total counted it."""
+    for module in ("diff", "code", "tui", "stats", "test"):
+        directory = coverage_report.area_of(f"src/{module}/whatever.rs")
+        assert coverage_report.area_of(f"src/{module}.rs") == directory, module
+
+
+def test_area_of_gives_top_level_files_their_own_area_not_other():
+    """A file directly in `src/` that is nobody's module root is product code with a row of its
+    own; `other` stays the signal that something needs adding to AREAS."""
+    for path in ("src/main.rs", "src/review.rs", "src/git_configure.rs", "src/lib.rs"):
+        assert coverage_report.area_of(path) == coverage_report.TOP_LEVEL, path
+    assert coverage_report.area_of("tools/helper.rs") == "other"
+
+
 @pytest.mark.parametrize(
     ("percent", "color"),
     [(95.0, "brightgreen"), (90.0, "brightgreen"), (85.0, "green"), (72.0, "yellowgreen")],

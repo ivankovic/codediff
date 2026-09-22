@@ -52,9 +52,11 @@ OUT_DIR ?= research/data/ablation
 	benchmark-speed-update-baseline
 
 # `cargo-llvm-cov` drives `cargo nextest` directly, so this runs exactly the suite `make test`
-# does, under the same feature set CI's widest job uses. Around ten minutes and 6GB peak: it
-# rebuilds the whole workspace with instrumentation, which is why it is not wired into anything
-# that runs often.
+# does - `--all-features`, not `--features $(FEATURES)`. Those were the same thing until `test`
+# moved to all features; `stats` (the FEATURES default) does not pull in `web`, so `src/web/` was
+# compiled out of the measurement entirely and 53 of its tests never ran. Around ten minutes and
+# 6GB peak: it rebuilds the whole workspace with instrumentation, which is why it is not wired
+# into anything that runs often.
 #
 # Writes a browsable report to target/llvm-cov/html/index.html and prints a per-area summary -
 # see scripts/coverage_report.py for why per-area rather than llvm-cov's own per-file table.
@@ -63,7 +65,9 @@ coverage:
 	# invocations can accumulate into one report. Without this the numbers only ever climb, since
 	# each run adds to whatever the last one left behind.
 	cargo llvm-cov clean --workspace
-	cargo llvm-cov nextest --no-report --release --features $(FEATURES)
+	# `--no-fail-fast`: nextest otherwise stops at the first failure, which on a ten-minute
+	# instrumented run means throwing the run away to learn about one test.
+	cargo llvm-cov nextest --no-report --release --all-features --no-fail-fast
 	cargo llvm-cov report --release --html
 	cargo llvm-cov report --release --json --summary-only \
 	  | python3 scripts/coverage_report.py --badge research/data/coverage/badge.json

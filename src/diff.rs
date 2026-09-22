@@ -1083,6 +1083,12 @@ mod tests {
     /// to be stable, and would flake on ordinary machine jitter. `large_residual()` - a cheap
     /// node-count check, not a timing measurement - still runs unconditionally above, so a debug
     /// build keeps the half of this guard that doesn't depend on wall-clock time.
+    ///
+    /// It is skipped under coverage instrumentation for the same reason, which `cfg` cannot see:
+    /// `cargo llvm-cov` builds in release and then counts every region at runtime, which took
+    /// this fixture from under 5s to 12.4s and failed the whole ten-minute `make coverage` run at
+    /// test 512 of 4428. A bound that tolerated instrumentation would be far too loose to catch
+    /// the regression it exists for.
     #[test]
     fn rust_completely_unrelated_main_files_resolves_fast() -> Result<()> {
         let (before, after) =
@@ -1101,10 +1107,16 @@ mod tests {
 
         assert!(diff.ast.is_some());
         #[cfg(not(debug_assertions))]
-        assert!(
-            elapsed < std::time::Duration::from_secs(5),
-            "expected the terminal fallback to keep this fast, took {elapsed:?}"
-        );
+        {
+            // Both are set by `cargo llvm-cov`: the first for the instrumented binary to write
+            // its profile to, the second by the tool itself. Either means "not a timing run".
+            let instrumented = std::env::var_os("LLVM_PROFILE_FILE").is_some()
+                || std::env::var_os("CARGO_LLVM_COV").is_some();
+            assert!(
+                instrumented || elapsed < std::time::Duration::from_secs(5),
+                "expected the terminal fallback to keep this fast, took {elapsed:?}"
+            );
+        }
         #[cfg(debug_assertions)]
         let _ = elapsed;
         Ok(())

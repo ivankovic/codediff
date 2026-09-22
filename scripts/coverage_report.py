@@ -16,28 +16,48 @@ and one showing only the 79% would describe the sampler harnesses rather than th
 
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 
 # Longest prefix wins, so `src/bin/human_solver/` can be split out of `src/bin/` if that is ever
 # wanted. Order here is display order.
+#
+# Each module is two prefixes, the directory *and* the module file beside it: `src/diff/` is the
+# engine's submodules and `src/diff.rs` is the engine's own root, 581 lines of it. Matching only
+# the directory sent every one of those roots - diff, code, test, stats, tui - to `other`, and
+# `other` was printed by no row and counted by no total but EVERYTHING. 2670 lines fell in,
+# 1276 of them module roots and the rest the top-level files below; fixed 2026-09-22, which is
+# most of why the product figure moved from 91.3% to 92.8% without the tests changing.
 AREAS = [
-    ("src/diff/", "diff/ - the engine"),
-    ("src/code/", "code/ - parsing, metadata"),
-    ("src/tui/", "tui/ - viewer, headless"),
-    ("src/stats/", "stats/ - sampling, git"),
-    ("src/test/", "test/ - fixture helpers"),
-    ("src/bin/", "bin/ - dev tools"),
+    (("src/diff/", "src/diff.rs"), "diff/ - the engine"),
+    (("src/code/", "src/code.rs"), "code/ - parsing, metadata"),
+    (("src/tui/", "src/tui.rs"), "tui/ - viewer, headless"),
+    (("src/stats/", "src/stats.rs"), "stats/ - sampling, git"),
+    (("src/web/", "src/web.rs"), "web/ - server, session"),
+    (("src/test/", "src/test.rs"), "test/ - fixture helpers"),
+    (("src/bin/",), "bin/ - dev tools"),
 ]
+
+# Files sitting directly in `src/` that are nobody's module root: `main.rs`, `web_main.rs`,
+# `review.rs`, the git/jj integrations. Product code, so it belongs in the product total, but it
+# is not part of any module above and reads better as its own line than folded into one.
+TOP_LEVEL = "src/ - entry points, integrations"
 
 
 def area_of(path: str) -> str:
     best = ""
-    label = "other"
-    for prefix, name in AREAS:
-        if prefix in path and len(prefix) > len(best):
-            best, label = prefix, name
-    return label
+    label = ""
+    for prefixes, name in AREAS:
+        for prefix in prefixes:
+            if prefix in path and len(prefix) > len(best):
+                best, label = prefix, name
+    if label:
+        return label
+    # `src/<something>.rs` with nothing between: a top-level file, not an unclassified one.
+    if re.search(r"(^|/)src/[^/]+\.rs$", path):
+        return TOP_LEVEL
+    return "other"
 
 
 def badge_color(percent: float) -> str:
@@ -102,7 +122,11 @@ def main() -> int:
 
     print("Line coverage by area")
     product = [0, 0]
-    for _, label in AREAS:
+    # `other` is `area_of`'s fallback and is deliberately printed last rather than skipped: a
+    # source directory nobody added to AREAS used to vanish from every row while still counting
+    # toward EVERYTHING, which is exactly how `src/web/` stayed invisible. A row that reads
+    # "other" is a prompt to add the prefix above.
+    for label in [name for _, name in AREAS] + [TOP_LEVEL, "other"]:
         if label not in totals:
             continue
         covered, count = totals[label]

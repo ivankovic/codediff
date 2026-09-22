@@ -89,28 +89,45 @@ appropriate, and always before a release.
 ### Coverage
 
 `make coverage` reports which of this repository's own lines the suite executes. `cargo-llvm-cov`
-drives `cargo nextest` directly, so it measures exactly the suite `make test` runs rather than a
-second, differently-built one. It writes a browsable report to `target/llvm-cov/html/index.html`
-and prints a per-area table, because a single number over 675 files describes nothing:
+drives `cargo nextest` directly under `--all-features`, so it measures exactly the suite `make
+test` runs rather than a second, differently-built one. It writes a browsable report to
+`target/llvm-cov/html/index.html` and prints a per-area table, because a single number over 675
+files describes nothing:
 
 | area | lines | |
 | --- | --- | --- |
-| `src/diff/` - the engine | 10761/11118 | 96.8% |
-| `src/test/` - fixture helpers | 6845/7329 | 93.4% |
-| `src/code/` - parsing, metadata | 899/984 | 91.4% |
-| `src/stats/` - sampling, git | 410/477 | 86.0% |
-| `src/tui/` - viewer, headless | 5513/6846 | 80.5% |
-| `src/bin/` - dev tools | 8066/14205 | 56.8% |
-| **product (everything but `src/bin/`)** | **24428/26754** | **91.3%** |
-| everything | 33957/42936 | 79.1% |
+| `src/diff/` - the engine | 12033/12387 | 97.1% |
+| `src/test/` - fixture helpers | 17910/18537 | 96.6% |
+| `src/code/` - parsing, metadata | 1483/1575 | 94.2% |
+| `src/web/` - server, session | 1322/1475 | 89.6% |
+| `src/stats/` - sampling, git | 560/658 | 85.1% |
+| `src/tui/` - viewer, headless | 6383/7697 | 82.9% |
+| `src/` - entry points, integrations | 895/1394 | 64.2% |
+| `src/bin/` - dev tools | 9776/17439 | 56.1% |
+| **product (everything but `src/bin/`)** | **40586/43723** | **92.8%** |
+| everything | 50362/61162 | 82.3% |
 
-Measured 2026-09-04 over 1718 tests. The engine and the dev tools are deliberately held to
+Measured 2026-09-22 over 4428 tests. The engine and the dev tools are deliberately held to
 different standards: `src/bin/` is samplers, benchmark harnesses and `human_solver`, several of
 which exist to be run once and read.
 
-**Not a CI gate.** It costs about ten minutes and 5.7GB peak, since it rebuilds the workspace with
-instrumentation - and a threshold mostly teaches people to write tests that touch lines. At 96.8%
+**Do not read this table against the one before it (2026-09-04, 1718 tests, 91.3% product).** Two
+things changed besides the code. `--features stats` used to be the feature set, and it does not
+pull in `web`, so `src/web/` was compiled out of the measurement entirely - its 1475 lines and 53
+tests appear here for the first time. And every module *root* (`src/diff.rs`, `src/code.rs`,
+`src/test.rs`, `src/stats.rs`, `src/tui.rs`) matched no area prefix and fell into a bucket that
+no row printed and no product total counted, along with the genuinely top-level files - 2670
+lines, now split between their own modules and the `src/` row above. The product figure moving
+from 91.3% to 92.8% is mostly that correction, not new tests.
+
+**Not a CI gate.** It costs about ten minutes and 6GB peak, since it rebuilds the workspace with
+instrumentation - and a threshold mostly teaches people to write tests that touch lines. At 97.1%
 the engine would never be what tripped a floor; only the dev tools would.
+
+One test knows it is being measured: `rust_completely_unrelated_main_files_resolves_fast` asserts
+a five-second wall-clock bound, which instrumentation blows through (12.4s measured), so it skips
+that half of itself when `LLVM_PROFILE_FILE` or `CARGO_LLVM_COV` is set. It is the only
+wall-clock assertion in the library suite; add the same guard if another appears.
 
 The README badge reads `research/data/coverage/badge.json`, which `make coverage` rewrites.
 It is therefore only as current as the last run somebody committed - re-run and commit it when
