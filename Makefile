@@ -71,8 +71,27 @@ coverage:
 	@echo "Browsable report: target/llvm-cov/html/index.html"
 	@echo "README badge: commit research/data/coverage/badge.json to publish this number"
 
+# Every test in the repository, in one pass: the three JS/Python suites above, then the whole Rust
+# suite under `--all-features`.
+#
+# `--all-features`, not the default set and not `--features $(FEATURES)`. Four of this crate's
+# features gate their own tests (see Cargo.toml's [features]), and the default set is `tui` alone,
+# so a bare `cargo nextest run` silently skips 460 of them - every human_solver test, every
+# generate_mapping_site test, the analyzer's. Measured 2026-09-22: default 3968 tests,
+# test-fixtures 4339, stats 4375, web 4014, all-features 4428. That last number is a strict
+# superset of the union of the other four (4421), the extra 7 being tests that need two features
+# at once, e.g. generate_showcase's (test-fixtures + web).
+#
+# **This is not a substitute for `make ci`.** CI builds and tests each feature *separately*
+# (ci.yml's matrix: "", test-fixtures, stats, web) precisely to prove each one compiles on its
+# own, which one --all-features pass cannot show. CI also runs the clippy matrix and the two
+# baseline gates (check-quality, check-painting-attribution), neither of which is a test. Use this
+# to run everything quickly; use `make ci` before pushing.
+#
+# Release, deliberately: the fixture corpus is 3209 of these tests and runs real diffs. Under the
+# default debug profile that is minutes of overflow-checked APTED rather than ~90 seconds.
 test: test-mapping-site-js test-web-js test-python
-	cargo nextest run --release
+	cargo nextest run --release --all-features
 
 # The pure functions under research/analysis/ and scripts/ (CSV readers, LaTeX number format, LOC
 # buckets, CI-matrix expansion, ...) - see research/tests/. Runs in research/'s own uv
