@@ -1,5 +1,38 @@
 # Diff Module Notes
 
+## 2026-09-22: unpainted indentation under `FULL` - measured, nothing shipped
+
+Hypothesis: the first line of an added block is painted without its indentation, which `FULL`
+disagrees with. Measured over every `FULL` disagreement run in the 275 fixtures that miss zero
+(`painting_disagreement_detail`, one run per fixture): 50 runs of whitespace that is a line's
+indentation, left unpainted by us and painted `Insert`/`Delete` by the human, over ~35 fixtures.
+Only 2 fixtures fail on it alone (`c-freeciv-add-parameter-to-function`,
+`vimscript-neovim-neovim-insert-only-3`), 11 more have it as half or more of their bytes. It is
+**not** a first-row effect: 25 runs sit on a block's first row, 25 on a later one.
+
+Split by what the painting says about the line's own content, it is two shapes:
+
+* **The content survived, the indentation did not** (32 runs, 27 fixtures, 297 bytes): a line
+  split or reindented around matched content. `c-freeciv-add-parameter-to-function` inserts a
+  parameter before `struct player *pplayer,`, which drops to a new line; the painting marks the
+  moved parameter `Move` and the newline plus indentation that now precedes it `Insert`.
+  `python-added-if-block{,-small}` wrap an existing `print` in an `if`: old indentation `Move`,
+  new deeper indentation `Insert`. No range of ours covers that whitespace at all - it is gap text
+  between a `Move` and its neighbour - so no leading-whitespace rule can reach it.
+* **The line really is new or gone** (18 runs, 15 fixtures, 149 bytes): the hypothesis's shape.
+  `extend_leading_whitespace` would paint it, but `narrow_one_range` vetoes any row carrying
+  matched content, and these rows do - `xml-nextcloud-android-add-one-element`'s inserted
+  `<string>` has its attribute value matched elsewhere.
+
+Two loosenings of that veto, `FULL` only, against the committed baseline:
+
+* **Moved content does not veto**: 6 better, 2 worse, zero-byte count unchanged (485).
+* **No veto at all**: **14 better, 14 worse**, zero-byte 485 -> 484 (`java-defects4j-closure-67-
+  analyzeprototypeproperties` 0 -> 10). The veto is right far more often than not.
+
+If this is taken further it is the first shape, and it needs a rule for gap whitespace beside a
+reflowed `Move`, not a change to the leading-whitespace option.
+
 ## 2026-09-22: operators are painted whole - a rule of the corpus and of the renderer
 
 Taken from the 105 fixture/preset pairs that miss zero mismatched bytes by 1 to 3 bytes (the
