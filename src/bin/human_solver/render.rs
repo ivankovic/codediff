@@ -141,6 +141,7 @@ pub(crate) fn render_panel(
     show_reason: bool,
     total_unmarked: usize,
     multi_selected: &std::collections::BTreeSet<usize>,
+    groups: &[MultiMapGroup],
 ) {
     let inner_height = area.height.saturating_sub(2) as usize;
     panel.viewport_height = inner_height;
@@ -162,12 +163,17 @@ pub(crate) fn render_panel(
         // A "g" suffix marks a node whose match/delete/insert outcome came from a `MultiMapGroup`
         // rather than a plain entry - `caches.before_group`/`after_group` cover every group
         // member (matched *and* leftover), not just whichever pair `representative_entries`
-        // realized, so this is accurate for both.
-        let in_group = match side {
-            Side::Before => caches.before_group.contains_key(&node.id()),
-            Side::After => caches.after_group.contains_key(&node.id()),
+        // realized, so this is accurate for both. "G" is the all-to-all kind, where every
+        // member is matched and the status glyph is the whole truth rather than one reading.
+        let group_index = match side {
+            Side::Before => caches.before_group.get(&node.id()),
+            Side::After => caches.after_group.get(&node.id()),
         };
-        let group_marker = if in_group { "g" } else { "" };
+        let group_marker = match group_index.and_then(|index| groups.get(*index)) {
+            Some(group) if group.pairing == GroupPairing::AllToAll => "G",
+            Some(_) => "g",
+            None => "",
+        };
         let (algo_glyph, disagrees) = algo_diff
             .map(|diff_ast| {
                 let algo_status = algo_status(side, node, diff_ast);
@@ -384,6 +390,7 @@ pub(crate) fn draw_ui(
             app.show_reason,
             total_unmarked,
             multi_selected,
+            &app.mapping.groups,
         );
     } else {
         let panels = Layout::default()
@@ -405,6 +412,7 @@ pub(crate) fn draw_ui(
             app.show_reason,
             before_unmarked,
             &app.before_multi_select,
+            &app.mapping.groups,
         );
         render_panel(
             frame,
@@ -420,11 +428,12 @@ pub(crate) fn draw_ui(
             app.show_reason,
             after_unmarked,
             &app.after_multi_select,
+            &app.mapping.groups,
         );
     }
 
     let footer = format!(
-        "{}{}{}\nm/M match[+children]  x select for multi-map  c clear selection  f match to EOF  d/D delete[+children]  i/I insert[+children]  a/A align (human/codediff)  p run codediff  r toggle reason  n/N next/prev mismatch  t text view  T unix diff  H hide solved  u unmark  h/l ←/→ collapse/expand  j/k ↑/↓ move  g/G top/bottom  Tab switch  s save  ? help  q quit",
+        "{}{}{}\nm/M match[+children]  x select for multi-map  X flip all-to-all  c clear selection  f match to EOF  d/D delete[+children]  i/I insert[+children]  a/A align (human/codediff)  p run codediff  r toggle reason  n/N next/prev mismatch  t text view  T unix diff  H hide solved  u unmark  h/l ←/→ collapse/expand  j/k ↑/↓ move  g/G top/bottom  Tab switch  s save  ? help  q quit",
         app.status.clone().unwrap_or_default(),
         if app.dirty { "  [UNSAVED]" } else { "" },
         if caches.unresolved > 0 {
@@ -552,16 +561,18 @@ pub(crate) fn render_modal(
             after_ids,
             operation,
             with_children,
+            pairing,
             kinds,
         } => render_text_modal(
             frame,
             area,
             "Multi-map group has mixed node kinds!",
             &format!(
-                "{} Before node(s), {} After node(s), kinds: {}\nWill be recorded as {:?}{}.\n\nAre you sure you want to add this group? (y/n)",
+                "{} Before node(s), {} After node(s), kinds: {}\nWill be recorded as an {} group, {:?}{}.\n\nAre you sure you want to add this group? (y/n)",
                 before_ids.len(),
                 after_ids.len(),
                 kinds.join(", "),
+                group_pairing_name(*pairing),
                 operation,
                 if *with_children { " with children" } else { "" }
             ),

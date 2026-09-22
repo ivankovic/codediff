@@ -264,6 +264,7 @@ pub(crate) fn multi_map_group_operation(
 /// `after_multi_select`) as a new [`MultiMapGroup`], clearing out any prior plain entry or group
 /// that touched one of these nodes first (the group-level equivalent of [`apply_match_entry`]'s own
 /// "replace whatever was there" behavior for a single pair).
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn commit_multi_map_group(
     mapping: &mut HumanMapping,
     before_root: Node,
@@ -272,6 +273,7 @@ pub(crate) fn commit_multi_map_group(
     after_ids: &std::collections::BTreeSet<usize>,
     operation: HumanOperation,
     with_children: bool,
+    pairing: GroupPairing,
 ) -> Result<String> {
     let mut before_nodes = before_ids
         .iter()
@@ -330,15 +332,26 @@ pub(crate) fn commit_multi_map_group(
         after_paths: after_nodes.into_iter().map(path_for_node).collect(),
         operation,
         with_children,
+        pairing,
     });
 
     Ok(format!(
-        "Committed multi-map group: {} before, {} after node(s), {:?}{}",
+        "Committed {} group: {} before, {} after node(s), {:?}{}",
+        group_pairing_name(pairing),
         before_count,
         after_count,
         operation,
         if with_children { " with children" } else { "" }
     ))
+}
+
+/// How a group is named in a status line or a modal: "multi-map" is the original kind, and
+/// keeps its name, so the many existing messages and habits around it stay true.
+pub(crate) fn group_pairing_name(pairing: GroupPairing) -> &'static str {
+    match pairing {
+        GroupPairing::AnyOneToOne => "multi-map",
+        GroupPairing::AllToAll => "all-to-all",
+    }
 }
 
 /// What `m`/`M` does when the multi-map selection (`App::before_multi_select`/`after_multi_select`)
@@ -356,6 +369,7 @@ pub(crate) fn action_commit_multi_map_group(
     after_hash: &rustc_hash::FxHashMap<usize, u64>,
     caches: &Caches,
     with_children: bool,
+    pairing: GroupPairing,
 ) -> Result<ActionOutcome> {
     if before_ids.is_empty() || after_ids.is_empty() {
         bail!(
@@ -409,6 +423,7 @@ pub(crate) fn action_commit_multi_map_group(
                 after_ids: after_ids.iter().copied().collect(),
                 operation,
                 with_children,
+                pairing,
                 kinds,
             },
         )));
@@ -422,6 +437,7 @@ pub(crate) fn action_commit_multi_map_group(
         after_ids,
         operation,
         with_children,
+        pairing,
     )?;
     Ok(ActionOutcome::Done(msg))
 }
@@ -1193,7 +1209,8 @@ pub(crate) fn action_unmark(
     {
         let removed_group = mapping.groups.remove(group_idx);
         return Ok(format!(
-            "Removed multi-map group ({} before, {} after node(s))",
+            "Removed {} group ({} before, {} after node(s))",
+            group_pairing_name(removed_group.pairing),
             removed_group.before_paths.len(),
             removed_group.after_paths.len()
         ));

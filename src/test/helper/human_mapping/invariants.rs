@@ -1568,6 +1568,9 @@ pub(crate) fn delimiter_pairs<'tree>(
 /// [`representative_entries`](super::representative_entries) makes to have something concrete to
 /// hand a caller, not something the human wrote down.
 ///
+/// An [`AllToAll`](super::GroupPairing::AllToAll) group leaves nothing open: every member is
+/// matched under its one reading, so "matched" is a claim the human made, whatever N and M are.
+///
 /// Nothing propagates to descendants, because a delimiter pair cannot straddle two members: both
 /// halves are direct children of one parent, so a member that contains one half contains the
 /// other.
@@ -1585,6 +1588,9 @@ fn group_leaves_status_open(
     let Some(group) = index.and_then(|index| groups.get(*index)) else {
         return false;
     };
+    if group.pairing == super::GroupPairing::AllToAll {
+        return false;
+    }
     let (mine, theirs) = if side == 0 {
         (group.before_paths.len(), group.after_paths.len())
     } else {
@@ -3712,6 +3718,7 @@ mod tests {
                     .collect(),
                 operation: HumanOperation::Identical,
                 with_children: false,
+                pairing: super::super::GroupPairing::AnyOneToOne,
             });
         }
         assert_eq!(groups[0].before_paths.len(), 1);
@@ -3729,6 +3736,82 @@ mod tests {
         assert!(
             violations(&mapping, &before, &after).is_empty(),
             "a member the group could leave over states nothing to contradict"
+        );
+    }
+
+    #[test]
+    fn an_all_to_all_group_member_is_a_claim_under_every_reading() {
+        // One statement duplicated: an any-one-to-one group would leave one copy over, and its
+        // leaves undecided. An all-to-all group says both copies correspond to the original, so
+        // a leaf inside either copy has a twin - and the rest of the rules find nothing to
+        // object to in the duplicate pairs the projection hands them.
+        let before = rust("fn f() { g(); }\n");
+        let after = rust("fn f() { g(); g(); }\n");
+        let before_root = before.ast.as_ref().unwrap().root_node();
+        let after_root = after.ast.as_ref().unwrap().root_node();
+        fn statements<'t>(root: Node<'t>) -> Vec<Node<'t>> {
+            let body = root
+                .child(0)
+                .and_then(|f| f.child_by_field_name("body"))
+                .expect("fn f has a body");
+            let mut cursor = body.walk();
+            body.named_children(&mut cursor).collect()
+        }
+        let before_statements = statements(before_root);
+        let after_statements = statements(after_root);
+        assert_eq!((before_statements.len(), after_statements.len()), (1, 2));
+
+        let group = |pairing| super::super::MultiMapGroup {
+            before_paths: before_statements
+                .iter()
+                .map(|n| path_for_node(*n))
+                .collect(),
+            after_paths: after_statements.iter().map(|n| path_for_node(*n)).collect(),
+            operation: HumanOperation::Identical,
+            with_children: true,
+            pairing,
+        };
+        fn leaf_of<'t>(statement: Node<'t>) -> Node<'t> {
+            let mut node = statement;
+            while let Some(first) = node.child(0) {
+                node = first;
+            }
+            node
+        }
+
+        let open = HumanMapping {
+            groups: vec![group(super::super::GroupPairing::AnyOneToOne)],
+            ..Default::default()
+        };
+        let context = TreeContext::build(&open, before_root, after_root);
+        let undecided = (0..2)
+            .filter(|i| {
+                matches!(
+                    context.status(leaf_of(after_statements[*i]), 1),
+                    LeafStatus::Undecided
+                )
+            })
+            .count();
+        assert_eq!(
+            undecided, 1,
+            "one copy is the leftover the group leaves open"
+        );
+
+        let all = HumanMapping {
+            groups: vec![group(super::super::GroupPairing::AllToAll)],
+            ..Default::default()
+        };
+        let context = TreeContext::build(&all, before_root, after_root);
+        for statement in &after_statements {
+            assert!(
+                matches!(context.status(leaf_of(*statement), 1), LeafStatus::Same(_)),
+                "every copy's leaf has a twin in the original"
+            );
+        }
+        assert!(
+            violations(&all, &before, &after).is_empty(),
+            "{:#?}",
+            violations(&all, &before, &after)
         );
     }
 
@@ -3753,6 +3836,7 @@ mod tests {
                 after_paths: vec![path_for_node(after_open[0])],
                 operation: HumanOperation::Identical,
                 with_children: false,
+                pairing: super::super::GroupPairing::AnyOneToOne,
             }],
             ..Default::default()
         };

@@ -182,8 +182,7 @@ pub(crate) fn run_event_loop(
                     // case's solution name into it, which would silently start a second, near-
                     // duplicate painting under a name that means nothing here.
                     app.text_solution = starting_solution(&app.mapping);
-                    app.before_multi_select.clear();
-                    app.after_multi_select.clear();
+                    app.clear_multi_select();
                     app.status = Some(format!("Opened '{}'", app.name));
                 }
                 Err(err) => {
@@ -211,8 +210,7 @@ pub(crate) fn run_event_loop(
                     // case's solution name into it, which would silently start a second, near-
                     // duplicate painting under a name that means nothing here.
                     app.text_solution = starting_solution(&app.mapping);
-                    app.before_multi_select.clear();
-                    app.after_multi_select.clear();
+                    app.clear_multi_select();
                     app.status = Some(format!(
                         "Opened sample '{}' (press s to promote it into a test case)",
                         app.name
@@ -254,8 +252,7 @@ pub(crate) fn run_event_loop(
                     // case's solution name into it, which would silently start a second, near-
                     // duplicate painting under a name that means nothing here.
                     app.text_solution = starting_solution(&app.mapping);
-                    app.before_multi_select.clear();
-                    app.after_multi_select.clear();
+                    app.clear_multi_select();
                 }
                 Err(err) => {
                     app.status = Some(format!(
@@ -288,6 +285,20 @@ pub(crate) fn run_event_loop(
 /// rare enough that the full-rebuild cost isn't worth the extra classification surface)
 /// are NOT included here, even though some of their branches don't actually need a rebuild either
 /// -- see `handle_key` for the exact effect of every key this list omits.
+/// The footer line for a pending multi-map selection, after `x` or `X` changes it: the counts,
+/// the pairing it will be committed with, and how to commit or clear it.
+pub(crate) fn multi_select_status(app: &App) -> String {
+    let pairing = match app.multi_select_pairing {
+        GroupPairing::AnyOneToOne => "any one-to-one pairing",
+        GroupPairing::AllToAll => "ALL-TO-ALL",
+    };
+    format!(
+        "Multi-map selection: {} before, {} after node(s), {pairing} (m/M to commit as a group, X to flip pairing, c to clear)",
+        app.before_multi_select.len(),
+        app.after_multi_select.len()
+    )
+}
+
 pub(crate) fn is_navigation_or_display_key(code: KeyCode) -> bool {
     matches!(
         code,
@@ -302,6 +313,7 @@ pub(crate) fn is_navigation_or_display_key(code: KeyCode) -> bool {
             | KeyCode::Char('g')
             | KeyCode::Char('G')
             | KeyCode::Char('x')
+            | KeyCode::Char('X')
             | KeyCode::Char('c')
             | KeyCode::Char('p')
             | KeyCode::Char('n')
@@ -604,14 +616,14 @@ pub(crate) fn handle_key(
                     after_hash,
                     caches,
                     false,
+                    app.multi_select_pairing,
                 )
             };
             match outcome {
                 Ok(ActionOutcome::Done(msg)) => {
                     app.dirty = true;
                     app.status = Some(msg);
-                    app.before_multi_select.clear();
-                    app.after_multi_select.clear();
+                    app.clear_multi_select();
                     advance_both_to_next_unmarked(
                         app,
                         before_flat,
@@ -673,14 +685,14 @@ pub(crate) fn handle_key(
                     after_hash,
                     caches,
                     true,
+                    app.multi_select_pairing,
                 )
             };
             match outcome {
                 Ok(ActionOutcome::Done(msg)) => {
                     app.dirty = true;
                     app.status = Some(msg);
-                    app.before_multi_select.clear();
-                    app.after_multi_select.clear();
+                    app.clear_multi_select();
                     advance_both_to_next_unmarked(
                         app,
                         before_flat,
@@ -777,16 +789,19 @@ pub(crate) fn handle_key(
             if !selected.remove(&cursor_id) {
                 selected.insert(cursor_id);
             }
-            app.status = Some(format!(
-                "Multi-map selection: {} before, {} after node(s) (m/M to commit as a group, c to clear)",
-                app.before_multi_select.len(),
-                app.after_multi_select.len()
-            ));
+            app.status = Some(multi_select_status(app));
+            None
+        }
+        KeyCode::Char('X') => {
+            app.multi_select_pairing = match app.multi_select_pairing {
+                GroupPairing::AnyOneToOne => GroupPairing::AllToAll,
+                GroupPairing::AllToAll => GroupPairing::AnyOneToOne,
+            };
+            app.status = Some(multi_select_status(app));
             None
         }
         KeyCode::Char('c') => {
-            app.before_multi_select.clear();
-            app.after_multi_select.clear();
+            app.clear_multi_select();
             app.status = Some("Cleared multi-map selection".to_string());
             None
         }
@@ -1220,6 +1235,7 @@ pub(crate) fn handle_modal_key(
             after_ids,
             operation,
             with_children,
+            pairing,
             kinds,
         } => match code {
             KeyCode::Char('y') | KeyCode::Char('Y') => {
@@ -1240,6 +1256,7 @@ pub(crate) fn handle_modal_key(
                         &after_set,
                         operation,
                         with_children,
+                        pairing,
                     ) {
                         Ok(msg) => {
                             app.dirty = true;
@@ -1248,13 +1265,11 @@ pub(crate) fn handle_modal_key(
                         Err(err) => format!("Error: {:#}", err),
                     },
                 );
-                app.before_multi_select.clear();
-                app.after_multi_select.clear();
+                app.clear_multi_select();
             }
             KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
                 app.status = Some("Cancelled: multi-map group has mixed node kinds".to_string());
-                app.before_multi_select.clear();
-                app.after_multi_select.clear();
+                app.clear_multi_select();
             }
             _ => {
                 app.modal = Some(Modal::ConfirmMultiMapGroup {
@@ -1262,6 +1277,7 @@ pub(crate) fn handle_modal_key(
                     after_ids,
                     operation,
                     with_children,
+                    pairing,
                     kinds,
                 });
             }

@@ -41,7 +41,7 @@ use codediff::code::Language;
 use codediff::diff::NodeCache;
 use codediff::test::helper;
 use codediff::test::helper::PathCache;
-use codediff::test::helper::human_mapping::{self, HumanOperation};
+use codediff::test::helper::human_mapping::{self, GroupPairing, HumanOperation};
 use std::collections::HashMap;
 use std::path::PathBuf;
 
@@ -328,6 +328,10 @@ struct FixtureStats {
     paired_entries: usize,
     group_count: usize,
     group_with_children: usize,
+    /// Groups whose members all correspond to each other (`GroupPairing::AllToAll`) - an N:M
+    /// correspondence the one-to-one algorithm cannot express yet, as opposed to the ambiguity
+    /// the other groups record.
+    group_all_to_all: usize,
     group_sizes: Vec<(usize, usize)>,
     delete_kinds: HashMap<String, usize>,
     insert_kinds: HashMap<String, usize>,
@@ -426,6 +430,7 @@ fn analyze_fixture(
         paired_entries: 0,
         group_count: 0,
         group_with_children: 0,
+        group_all_to_all: 0,
         group_sizes: Vec::new(),
         delete_kinds: HashMap::new(),
         insert_kinds: HashMap::new(),
@@ -521,6 +526,9 @@ fn analyze_fixture(
         if group.with_children {
             stats.group_with_children += 1;
         }
+        if group.pairing == GroupPairing::AllToAll {
+            stats.group_all_to_all += 1;
+        }
         stats
             .group_sizes
             .push((group.before_paths.len(), group.after_paths.len()));
@@ -614,6 +622,7 @@ fn write_csv(stats: &[FixtureStats], path: &std::path::Path) -> Result<()> {
         "reorder_signals",
         "group_count",
         "group_with_children",
+        "group_all_to_all",
         "current_mismatches",
     ])?;
     for s in stats {
@@ -651,6 +660,7 @@ fn write_csv(stats: &[FixtureStats], path: &std::path::Path) -> Result<()> {
             s.reorder_signals.to_string(),
             s.group_count.to_string(),
             s.group_with_children.to_string(),
+            s.group_all_to_all.to_string(),
             s.current_mismatches
                 .map(|m| m.to_string())
                 .unwrap_or_default(),
@@ -1446,6 +1456,7 @@ fn main() -> Result<()> {
     let mut total_paired_entries = 0usize;
     let mut total_groups = 0usize;
     let mut total_group_with_children = 0usize;
+    let mut total_group_all_to_all = 0usize;
     let mut total_implicit_identical = 0usize;
     let mut all_group_sizes: Vec<(usize, usize)> = Vec::new();
     let mut delete_kinds: HashMap<String, usize> = HashMap::new();
@@ -1458,6 +1469,7 @@ fn main() -> Result<()> {
         total_paired_entries += s.paired_entries;
         total_groups += s.group_count;
         total_group_with_children += s.group_with_children;
+        total_group_all_to_all += s.group_all_to_all;
         total_implicit_identical += s.implicit_identical_nodes;
         all_group_sizes.extend(&s.group_sizes);
         for (kind, count) in &s.delete_kinds {
@@ -1646,6 +1658,10 @@ fn main() -> Result<()> {
         println!(
             "with_children: {total_group_with_children}/{total_groups} ({:.1}%)",
             100.0 * total_group_with_children as f64 / total_groups as f64
+        );
+        println!(
+            "all-to-all (an N:M correspondence, not ambiguity): {total_group_all_to_all}/{total_groups} ({:.1}%)",
+            100.0 * total_group_all_to_all as f64 / total_groups as f64
         );
         let sizes: Vec<usize> = all_group_sizes.iter().map(|(b, a)| (*b).max(*a)).collect();
         print_size_distribution("max(before_paths, after_paths)", sizes);

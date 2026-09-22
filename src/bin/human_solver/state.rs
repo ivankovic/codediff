@@ -1832,8 +1832,7 @@ pub(crate) fn action_reset_case(app: &mut App) -> String {
     // and `text_solution` would name a painting that no longer exists.
     app.tree_text_spans = None;
     app.text_solution = starting_solution(&app.mapping);
-    app.before_multi_select.clear();
-    app.after_multi_select.clear();
+    app.clear_multi_select();
     app.dirty = true;
 
     format!(
@@ -1882,6 +1881,9 @@ pub(crate) enum Modal {
         after_ids: Vec<usize>,
         operation: HumanOperation,
         with_children: bool,
+        /// Carried through so the confirmation names what it is about to record, and commits
+        /// exactly what the selection asked for.
+        pairing: GroupPairing,
         kinds: Vec<String>,
     },
     /// Raised by `o`: pick a test case (a directory under src/test/data/diffs/) to open. Each
@@ -2195,6 +2197,10 @@ pub(crate) struct App {
     /// trees could otherwise collide with an unrelated node in the new ones.
     pub(crate) before_multi_select: std::collections::BTreeSet<usize>,
     pub(crate) after_multi_select: std::collections::BTreeSet<usize>,
+    /// How the pending selection's members correspond once committed - flipped by `X`, reset to
+    /// the default whenever the selection is cleared, so every new selection starts as the plain
+    /// "any one-to-one pairing" kind and all-to-all is always a deliberate extra keystroke.
+    pub(crate) multi_select_pairing: GroupPairing,
 }
 
 impl App {
@@ -2241,6 +2247,15 @@ impl App {
             last_search: None,
             before_multi_select: std::collections::BTreeSet::new(),
             after_multi_select: std::collections::BTreeSet::new(),
+            multi_select_pairing: GroupPairing::default(),
         }
+    }
+
+    /// Drops the pending multi-map selection on both sides, and its pairing with it - the one
+    /// way the selection is ever cleared, so no path can leave an `X` behind for the next one.
+    pub(crate) fn clear_multi_select(&mut self) {
+        self.before_multi_select.clear();
+        self.after_multi_select.clear();
+        self.multi_select_pairing = GroupPairing::default();
     }
 }

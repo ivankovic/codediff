@@ -93,12 +93,60 @@ pub struct HumanMappingEntry {
     pub after_path: Option<Vec<String>>,
 }
 
-/// A set of `before_paths` nodes that may map to `after_paths` nodes in *any* consistent pairing
-/// -- used when there's genuine, human-confirmed ambiguity about which specific node should pair
-/// with which (e.g. several interchangeable/near-duplicate statements). Any pairing codediff's
-/// own diff produces counts as correct, as long as it uses `min(before_paths.len(),
-/// after_paths.len())` pairs and leaves the rest of the larger side deleted/inserted -- see
-/// [`check_group_entry`] for the actual validation, and [`representative_entries`] for the one
+/// How the members of a [`MultiMapGroup`] correspond to each other - the one thing a group of N
+/// before nodes and M after nodes leaves to be said once "these belong together" is settled.
+///
+/// Two answers exist because two different situations produce a set of nodes rather than a pair:
+///
+/// * Several *interchangeable* nodes, where each before node is really one after node but nobody
+///   can say which - three identical `foo()` calls become two. That is [`Self::AnyOneToOne`]:
+///   some one-to-one pairing is the truth, and any of them is as good as any other.
+/// * One piece of code that *became* several, or several that became one - a statement split in
+///   two, two conditions merged into one, a function body duplicated three times. That is
+///   [`Self::AllToAll`]: there is no hidden one-to-one truth to find, because every before node
+///   genuinely corresponds to every after node, and none of them is gone or new.
+///
+/// The second is what a painting's N:M `Match` ([`HumanTextEntry`]) already says about text. This
+/// is its counterpart for the tree.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum GroupPairing {
+    /// Some one-to-one pairing of `min(N, M)` pairs is correct, and any of them counts. The rest
+    /// of the larger side is deleted/inserted. The original meaning of a group, and the default,
+    /// so a file written before the distinction existed reads and re-saves unchanged.
+    #[default]
+    AnyOneToOne,
+    /// Every before member corresponds to every after member. No member is deleted or inserted,
+    /// whatever N and M are: a 1:3 group says one node became three, not that two are new.
+    AllToAll,
+}
+
+impl GroupPairing {
+    /// For `skip_serializing_if`: the default is left out of the file, so only a group that says
+    /// something new carries the key.
+    pub fn is_any_one_to_one(&self) -> bool {
+        *self == Self::AnyOneToOne
+    }
+}
+
+/// A set of `before_paths` nodes that correspond to a set of `after_paths` nodes as a whole, in
+/// one of the two senses [`GroupPairing`] names.
+///
+/// With [`GroupPairing::AnyOneToOne`] - the original and default meaning - the group records
+/// genuine, human-confirmed ambiguity about which specific node pairs with which (e.g. several
+/// interchangeable/near-duplicate statements). Any pairing codediff's own diff produces counts as
+/// correct, as long as it uses `min(before_paths.len(), after_paths.len())` pairs and leaves the
+/// rest of the larger side deleted/inserted.
+///
+/// With [`GroupPairing::AllToAll`] the group records an N:M correspondence with nothing left over:
+/// every before member is matched, every after member is matched, and each to all of the others.
+/// codediff's diff, which today only expresses one-to-one pairs, is graded on the part of that it
+/// *can* express - every member must be matched inside the group, and a member it deletes or
+/// inserts is a mismatch. An N:M group with N ≠ M therefore costs the current algorithm at least
+/// `|N - M|` mismatches, deliberately: that count is the distance between what the ground truth
+/// says and what the algorithm can say, and closing it is the algorithm's job, not the grader's.
+///
+/// See [`check_group_entry`] for the actual validation, and [`representative_entries`] for the one
 /// concrete pairing used for *display*/cost purposes (never for validation).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MultiMapGroup {
@@ -111,15 +159,24 @@ pub struct MultiMapGroup {
     /// produces) is expected to have chosen. Deliberately excludes `Update`/`Delete`/`Insert`/
     /// `DeleteWithChildren`/`InsertWithChildren`: `Update` means "same kind, no children,
     /// different text" for one fixed pair, which doesn't have a coherent meaning across an
-    /// ambiguous N-to-M group, and the other four aren't matches at all (a group's own leftover
-    /// members are how deletion/insertion is expressed -- see [`with_children`](Self::with_children)).
+    /// ambiguous N-to-M group, and the other four aren't matches at all (an `AnyOneToOne` group's
+    /// own leftover members are how deletion/insertion is expressed -- see
+    /// [`with_children`](Self::with_children) -- and an `AllToAll` group has none).
     pub operation: HumanOperation,
     /// Whether a matched pair's entire subtree must also close within itself (every descendant of
     /// one side maps to a descendant of the other, and vice versa -- see
     /// [`check_subtree_maps_within`]), and a leftover (unmatched) member's entire subtree must be
     /// deleted/inserted rather than just its own top node -- the group's equivalent of `M` vs `m`
     /// / of `*WithChildren` vs the bare operation for a plain [`HumanMappingEntry`].
+    ///
+    /// For an `AllToAll` group the closure is over the *union*: every descendant of any before
+    /// member maps inside some after member's subtree, and vice versa. Which member it lands in is
+    /// not constrained, for the same reason the members themselves are not paired off.
     pub with_children: bool,
+    /// How the members correspond - see [`GroupPairing`]. Absent from the file when it is the
+    /// default, so every group written before the field existed stays byte-for-byte the same.
+    #[serde(default, skip_serializing_if = "GroupPairing::is_any_one_to_one")]
+    pub pairing: GroupPairing,
 }
 
 /// The full set of human decisions for one before/after test case.
@@ -1743,6 +1800,12 @@ pub fn human_mapping_cost(
     // of the corpus's 55 `match_but_not_identical` groups, zero resolve to a gap-owning kind. If a
     // group over XML `AttValue`s (or CSS values, or comments - see `ASTNodeMetadata::owned_text_
     // hash`) ever appears, revisit this rather than assuming the cost is still well-defined.
+    //
+    // An `AllToAll` group's surplus members arrive here as extra pairs (see
+    // `representative_entries`), each charged as a match rather than as a whole-subtree
+    // delete/insert. That is the cheaper reading, and the right one: the group says the surplus
+    // is not gone. What an N:M correspondence *should* cost under a unit model is a question for
+    // the algorithm work, not settled here.
     let entries = representative_entries(mapping, before_root, after_root)?;
 
     let mut total = 0u64;
@@ -1926,6 +1989,14 @@ pub fn as_ast_diff_for_mapping(
 * per the group's own `operation`; any leftover on the larger side becomes
 * `Delete`/`DeleteWithChildren` or `Insert`/`InsertWithChildren` per `with_children`.
 *
+* An [`GroupPairing::AllToAll`] group has no leftovers, so its surplus members are paired too -
+* each with the last member of the shorter side - rather than deleted/inserted. That puts one
+* node in several entries, which a plain mapping never does; it is the closest a list of pairs
+* can come to "one became three", and every consumer of this list (a [`Caches`] status, an
+* `ASTDiff` walked node by node, a cost total) reads pairs one at a time and copes. Deleting
+* the surplus instead would be a plain lie about the ground truth, visible as a false
+* disagreement with any painting of the same edit.
+*
 * This is explicitly *a* valid solution, not *the* solution: a [`MultiMapGroup`] exists precisely
 * because many pairings are equally correct, and this function has to pick just one to produce
 * something concrete. It's used only where a single concrete example is good enough -
@@ -1981,6 +2052,24 @@ pub fn representative_entries(
                 before_path: Some(path_for_node(before_nodes[i])),
                 after_path: Some(path_for_node(after_nodes[i])),
             });
+        }
+        if group.pairing == GroupPairing::AllToAll && paired > 0 {
+            // Nothing is left over: the surplus pairs with the last member of the shorter side.
+            for &b in &before_nodes[paired..] {
+                entries.push(HumanMappingEntry {
+                    operation: group.operation,
+                    before_path: Some(path_for_node(b)),
+                    after_path: Some(path_for_node(after_nodes[paired - 1])),
+                });
+            }
+            for &a in &after_nodes[paired..] {
+                entries.push(HumanMappingEntry {
+                    operation: group.operation,
+                    before_path: Some(path_for_node(before_nodes[paired - 1])),
+                    after_path: Some(path_for_node(a)),
+                });
+            }
+            continue;
         }
         let delete_op = if group.with_children {
             HumanOperation::DeleteWithChildren
@@ -2190,6 +2279,15 @@ fn check_entry<'b, 'a>(
 * 5. If `with_children`: every matched pair's whole subtree must close within itself
 *    ([`check_subtree_maps_within`]), and every leftover member's whole subtree must be
 *    deleted/inserted ([`check_subtree_maps_to_zero`]) - not just its own top node.
+*
+* An [`GroupPairing::AllToAll`] group is graded on the same walk with two differences. Deleted
+* and inserted are *not* valid fates - step 1 and step 2 report every member that ended up
+* mapped to 0, since the group says none of them is gone or new - and step 3 has nothing to
+* count, because there is no expected number of one-to-one pairs. Step 5's closure is over the
+* union of the members' subtrees on the other side (see [`MultiMapGroup::with_children`]),
+* and step 5's leftover half never applies. codediff's one-to-one output cannot satisfy an
+* N:M group with N ≠ M, so such a group always reports at least `|N - M|` mismatches today;
+* that is the algorithm's distance from the ground truth, reported rather than hidden.
 */
 fn check_group_entry<'b, 'a>(
     group: &MultiMapGroup,
@@ -2230,8 +2328,14 @@ fn check_group_entry<'b, 'a>(
         .or_else(|| after_nodes.first().map(|n| (n.id(), Side::After)))
         .unwrap_or((0, Side::Before));
 
+    let all_to_all = group.pairing == GroupPairing::AllToAll;
     let context = format!(
-        "multi-map group ({} before <-> {} after, {:?}{})",
+        "{} group ({} before <-> {} after, {:?}{})",
+        if all_to_all {
+            "all-to-all"
+        } else {
+            "multi-map"
+        },
         before_nodes.len(),
         after_nodes.len(),
         group.operation,
@@ -2282,12 +2386,22 @@ fn check_group_entry<'b, 'a>(
 
     let after_ids: std::collections::HashSet<usize> = after_nodes.iter().map(Node::id).collect();
 
+    // What a member mapped to 0 is, in words: a valid fate for an `AnyOneToOne` leftover, a
+    // mismatch for an `AllToAll` member.
+    let or_removed = |removed: &str| -> String {
+        if all_to_all {
+            String::new()
+        } else {
+            format!(" or be {removed}")
+        }
+    };
+
     let mut matched_pairs: Vec<(Node<'b>, Node<'a>)> = Vec::new();
     let mut leftover_before: Vec<Node<'b>> = Vec::new();
     for &b in &before_nodes {
         let actual = diff_ast.before_node_map.get(&b.id()).copied();
         match actual {
-            Some(0) => leftover_before.push(b),
+            Some(0) if !all_to_all => leftover_before.push(b),
             Some(a_id) if after_ids.contains(&a_id) => {
                 let a = *after_nodes
                     .iter()
@@ -2302,8 +2416,9 @@ fn check_group_entry<'b, 'a>(
                 };
                 mismatches.push(Mismatch {
                     message: format!(
-                        "{context}: before node '{}' was expected to match within the group or be deleted, but it mapped to {}{}",
+                        "{context}: before node '{}' was expected to match within the group{}, but it mapped to {}{}",
                         b.kind(),
+                        or_removed("deleted"),
                         mapped_kind,
                         actual_mapping_info(diff_ast, b.id(), other)
                     ),
@@ -2323,7 +2438,7 @@ fn check_group_entry<'b, 'a>(
         }
         let actual = diff_ast.after_node_map.get(&a.id()).copied();
         match actual {
-            Some(0) => leftover_after.push(a),
+            Some(0) if !all_to_all => leftover_after.push(a),
             other => {
                 let mapped_kind = match other {
                     Some(mapped_id) => node_kind_for_id(before_root, mapped_id),
@@ -2331,8 +2446,9 @@ fn check_group_entry<'b, 'a>(
                 };
                 mismatches.push(Mismatch {
                     message: format!(
-                        "{context}: after node '{}' was expected to match within the group or be inserted, but it mapped to {}{}",
+                        "{context}: after node '{}' was expected to match within the group{}, but it mapped to {}{}",
                         a.kind(),
+                        or_removed("inserted"),
                         mapped_kind,
                         actual_mapping_info_after(diff_ast, a.id(), other)
                     ),
@@ -2343,8 +2459,10 @@ fn check_group_entry<'b, 'a>(
         }
     }
 
+    // An all-to-all group has no expected pair count: each member's own fate was checked above,
+    // and a one-to-one output has no number of pairs that would be "right" for N ≠ M.
     let expected_matched = before_nodes.len().min(after_nodes.len());
-    if matched_pairs.len() != expected_matched {
+    if !all_to_all && matched_pairs.len() != expected_matched {
         mismatches.push(Mismatch {
             message: format!(
                 "{context}: expected exactly {expected_matched} pair(s) matched within the group, but codediff matched {}",
@@ -2380,7 +2498,36 @@ fn check_group_entry<'b, 'a>(
         }
     }
 
-    if group.with_children {
+    if group.with_children && all_to_all {
+        // Closure over the union: a descendant of any before member may land in any after member's
+        // subtree, and vice versa, since the members themselves are not paired off.
+        let before_union: std::collections::HashSet<usize> =
+            before_nodes.iter().flat_map(|n| subtree_ids(*n)).collect();
+        let after_union: std::collections::HashSet<usize> =
+            after_nodes.iter().flat_map(|n| subtree_ids(*n)).collect();
+        for &b in &before_nodes {
+            check_subtree_closed_within(
+                b,
+                &diff_ast.before_node_map,
+                &after_union,
+                after_root,
+                &context,
+                mismatches,
+                Side::Before,
+            );
+        }
+        for &a in &after_nodes {
+            check_subtree_closed_within(
+                a,
+                &diff_ast.after_node_map,
+                &before_union,
+                before_root,
+                &context,
+                mismatches,
+                Side::After,
+            );
+        }
+    } else if group.with_children {
         for &(b, a) in &matched_pairs {
             check_subtree_maps_within(
                 b,
@@ -3863,6 +4010,7 @@ mod tests {
                 after_paths: vec![vec!["b:1".to_string()]],
                 operation: HumanOperation::Identical,
                 with_children: true,
+                pairing: GroupPairing::AnyOneToOne,
             }],
             text_mappings: vec![],
         };
@@ -4252,6 +4400,276 @@ mod tests {
     }
 
     #[test]
+    fn an_all_to_all_group_round_trips_and_a_default_pairing_leaves_the_file_unchanged()
+    -> Result<()> {
+        let group = |pairing| MultiMapGroup {
+            before_paths: vec![vec!["expression_statement:1".to_string()]],
+            after_paths: vec![
+                vec!["expression_statement:1".to_string()],
+                vec!["expression_statement:2".to_string()],
+            ],
+            operation: HumanOperation::Identical,
+            with_children: true,
+            pairing,
+        };
+
+        let plain = serde_json::to_string(&group(GroupPairing::AnyOneToOne))?;
+        assert!(
+            !plain.contains("pairing"),
+            "the default pairing must not appear in the file, so every existing group re-saves unchanged: {plain}"
+        );
+
+        let all = serde_json::to_string(&group(GroupPairing::AllToAll))?;
+        assert!(all.contains(r#""pairing":"all_to_all""#), "{all}");
+        let round_tripped: MultiMapGroup = serde_json::from_str(&all)?;
+        assert_eq!(round_tripped.pairing, GroupPairing::AllToAll);
+
+        // A group written before the field existed.
+        let legacy: MultiMapGroup = serde_json::from_str(
+            r#"{"before_paths":[["a:1"]],"after_paths":[["a:1"]],"operation":"identical","with_children":false}"#,
+        )?;
+        assert_eq!(legacy.pairing, GroupPairing::AnyOneToOne);
+        Ok(())
+    }
+
+    /// One `foo();` before, three after: the shape of a body duplicated, where an all-to-all
+    /// group says every copy corresponds to the original and none is new.
+    fn one_foo_becoming_three() -> (crate::code::Code, crate::code::Code) {
+        (
+            crate::code::Code::from_string("fn main() {\n    foo();\n}\n", &Language::Rust),
+            crate::code::Code::from_string(
+                "fn main() {\n    foo();\n    foo();\n    foo();\n}\n",
+                &Language::Rust,
+            ),
+        )
+    }
+
+    fn all_to_all_over_statements(
+        before_root: Node,
+        after_root: Node,
+        with_children: bool,
+    ) -> MultiMapGroup {
+        MultiMapGroup {
+            before_paths: function_body_statements(before_root)
+                .iter()
+                .map(|n| path_for_node(*n))
+                .collect(),
+            after_paths: function_body_statements(after_root)
+                .iter()
+                .map(|n| path_for_node(*n))
+                .collect(),
+            operation: HumanOperation::Identical,
+            with_children,
+            pairing: GroupPairing::AllToAll,
+        }
+    }
+
+    #[test]
+    fn representative_entries_pairs_every_member_of_an_all_to_all_group() -> Result<()> {
+        let (before, after) = one_foo_becoming_three();
+        let before_root = before.ast.as_ref().unwrap().root_node();
+        let after_root = after.ast.as_ref().unwrap().root_node();
+        let mapping = HumanMapping {
+            groups: vec![all_to_all_over_statements(before_root, after_root, false)],
+            ..Default::default()
+        };
+
+        let entries = representative_entries(&mapping, before_root, after_root)?;
+        assert_eq!(entries.len(), 3, "{entries:?}");
+        assert!(
+            entries
+                .iter()
+                .all(|e| e.operation == HumanOperation::Identical),
+            "no member of an all-to-all group is inserted: {entries:?}"
+        );
+        let before_path = path_for_node(function_body_statements(before_root)[0]);
+        assert!(
+            entries
+                .iter()
+                .all(|e| e.before_path.as_ref() == Some(&before_path)),
+            "every copy pairs with the one original: {entries:?}"
+        );
+
+        let caches = rebuild_caches_for_mapping(&mapping, before_root, after_root);
+        for statement in function_body_statements(after_root) {
+            assert_eq!(status_after(statement, &caches), NodeStatus::Matched);
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn check_group_entry_reports_each_all_to_all_member_a_one_to_one_diff_leaves_out() -> Result<()>
+    {
+        // codediff can only pair the one original with one copy; the other two come out inserted,
+        // and that is exactly what the group must report - once per copy, nothing else.
+        let (before, after) = one_foo_becoming_three();
+        let before_root = before.ast.as_ref().unwrap().root_node();
+        let after_root = after.ast.as_ref().unwrap().root_node();
+        let group = all_to_all_over_statements(before_root, after_root, false);
+
+        let diff = crate::diff::diff_code(&before, &after);
+        let diff_ast = diff.ast.context("Diff has no AST")?;
+
+        let mut mismatches = Vec::new();
+        check_group_entry(
+            &group,
+            before_root,
+            after_root,
+            &diff_ast,
+            &mut mismatches,
+            &mut PathCache::new(),
+            &mut PathCache::new(),
+        )?;
+
+        assert_eq!(mismatches.len(), 2, "{mismatches:?}");
+        for mismatch in &mismatches {
+            assert_eq!(mismatch.side, Side::After);
+            assert!(
+                mismatch
+                    .message
+                    .starts_with("all-to-all group (1 before <-> 3 after")
+                    && mismatch
+                        .message
+                        .contains("expected to match within the group, but"),
+                "{}",
+                mismatch.message
+            );
+            assert!(
+                !mismatch.message.contains("or be inserted"),
+                "inserted is not a valid fate for an all-to-all member: {}",
+                mismatch.message
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn check_group_entry_accepts_a_one_to_one_diff_that_pairs_every_all_to_all_member() -> Result<()>
+    {
+        // Two before, two after: the one-to-one output can cover every member, so nothing is
+        // reported - and, unlike an any-one-to-one group, there is no pair count to get wrong.
+        let before = crate::code::Code::from_string(
+            "fn main() {\n    foo();\n    foo();\n}\n",
+            &Language::Rust,
+        );
+        let after = crate::code::Code::from_string(
+            "fn main() {\n    foo();\n    foo();\n}\n",
+            &Language::Rust,
+        );
+        let before_root = before.ast.as_ref().unwrap().root_node();
+        let after_root = after.ast.as_ref().unwrap().root_node();
+        let group = all_to_all_over_statements(before_root, after_root, true);
+
+        let diff = crate::diff::diff_code(&before, &after);
+        let diff_ast = diff.ast.context("Diff has no AST")?;
+
+        let mut mismatches = Vec::new();
+        check_group_entry(
+            &group,
+            before_root,
+            after_root,
+            &diff_ast,
+            &mut mismatches,
+            &mut PathCache::new(),
+            &mut PathCache::new(),
+        )?;
+        assert!(mismatches.is_empty(), "{mismatches:?}");
+        Ok(())
+    }
+
+    #[test]
+    fn check_group_entry_closes_an_all_to_all_group_over_the_union_of_its_members() -> Result<()> {
+        // The same hand-rolled diff, graded as each kind of group: each statement pairs with its
+        // counterpart, but the two `;` tokens are swapped across the pair. Per-pair closure
+        // rejects that; closure over the union accepts it, because an all-to-all group does not
+        // say which member a descendant belongs with.
+        let before = crate::code::Code::from_string(
+            "fn main() {\n    foo();\n    bar();\n}\n",
+            &Language::Rust,
+        );
+        let after = crate::code::Code::from_string(
+            "fn main() {\n    foo();\n    bar();\n}\n",
+            &Language::Rust,
+        );
+        let before_root = before.ast.as_ref().unwrap().root_node();
+        let after_root = after.ast.as_ref().unwrap().root_node();
+        let before_statements = function_body_statements(before_root);
+        let after_statements = function_body_statements(after_root);
+        fn semicolon<'t>(statement: Node<'t>) -> Node<'t> {
+            let mut cursor = statement.walk();
+            statement
+                .children(&mut cursor)
+                .find(|c| c.kind() == ";")
+                .expect("an expression statement ends in ;")
+        }
+
+        let mut diff = ASTDiff::default();
+        map_identical_subtrees(&mut diff, before_root, after_root);
+        for (mine, theirs) in [(0, 1), (1, 0)] {
+            diff.add_mapping(
+                semicolon(before_statements[mine]).id(),
+                semicolon(after_statements[theirs]).id(),
+                ASTMapping::identical(ASTMappingReason::default()),
+            );
+        }
+
+        let mut group = MultiMapGroup {
+            before_paths: before_statements
+                .iter()
+                .map(|n| path_for_node(*n))
+                .collect(),
+            after_paths: after_statements.iter().map(|n| path_for_node(*n)).collect(),
+            operation: HumanOperation::MatchButNotIdentical,
+            with_children: true,
+            pairing: GroupPairing::AllToAll,
+        };
+
+        let mismatches_for = |group: &MultiMapGroup, diff: &ASTDiff| -> Result<Vec<Mismatch>> {
+            let mut mismatches = Vec::new();
+            check_group_entry(
+                group,
+                before_root,
+                after_root,
+                diff,
+                &mut mismatches,
+                &mut PathCache::new(),
+                &mut PathCache::new(),
+            )?;
+            Ok(mismatches)
+        };
+
+        assert!(
+            mismatches_for(&group, &diff)?.is_empty(),
+            "a descendant landing in the other member is inside the union"
+        );
+        group.pairing = GroupPairing::AnyOneToOne;
+        assert!(
+            !mismatches_for(&group, &diff)?.is_empty(),
+            "the same diff leaks across a per-pair closure"
+        );
+
+        // And a descendant leaving the union is still caught.
+        group.pairing = GroupPairing::AllToAll;
+        diff.add_mapping(
+            semicolon(before_statements[0]).id(),
+            0,
+            ASTMapping {
+                cost: 0,
+                operation: ASTMappingOperation::Delete,
+                reason: ASTMappingReason::default(),
+            },
+        );
+        let leaked = mismatches_for(&group, &diff)?;
+        assert!(
+            leaked
+                .iter()
+                .any(|m| m.message.contains("descendant node ';'")),
+            "{leaked:?}"
+        );
+        Ok(())
+    }
+
+    #[test]
     fn check_group_entry_passes_for_a_real_diff_that_matches_duplicates_within_the_group()
     -> Result<()> {
         // The motivating case: three identical foo() calls before, two after - codediff (the
@@ -4288,6 +4706,7 @@ mod tests {
             after_paths: after_foos.iter().map(|n| path_for_node(*n)).collect(),
             operation: HumanOperation::Identical,
             with_children: true,
+            pairing: GroupPairing::AnyOneToOne,
         };
 
         let diff = crate::diff::diff_code(&before, &after);
@@ -4330,6 +4749,7 @@ mod tests {
             after_paths: after_foos.iter().map(|n| path_for_node(*n)).collect(),
             operation: HumanOperation::Identical,
             with_children: false,
+            pairing: GroupPairing::AnyOneToOne,
         };
 
         let mut diff = ASTDiff::default();
@@ -4401,6 +4821,7 @@ mod tests {
             after_paths: vec![path_for_node(after_foo)],
             operation: HumanOperation::Identical,
             with_children: false,
+            pairing: GroupPairing::AnyOneToOne,
         };
 
         let mut diff = ASTDiff::default();
@@ -4475,6 +4896,7 @@ mod tests {
             after_paths: vec![path_for_node(block_after)],
             operation: HumanOperation::Identical,
             with_children: true,
+            pairing: GroupPairing::AnyOneToOne,
         };
 
         let mut mismatches = Vec::new();
@@ -4536,6 +4958,7 @@ mod tests {
             after_paths: vec![path_for_node(g0)],
             operation: HumanOperation::Identical,
             with_children: true,
+            pairing: GroupPairing::AnyOneToOne,
         };
 
         let mut mismatches = Vec::new();
@@ -4580,6 +5003,7 @@ mod tests {
                 after_paths: after_foos.iter().map(|n| path_for_node(*n)).collect(),
                 operation: HumanOperation::Identical,
                 with_children: false,
+                pairing: GroupPairing::AnyOneToOne,
             }],
             text_mappings: vec![],
         };
@@ -4616,6 +5040,7 @@ mod tests {
                 after_paths: after_foos.iter().map(|n| path_for_node(*n)).collect(),
                 operation: HumanOperation::Identical,
                 with_children: true,
+                pairing: GroupPairing::AnyOneToOne,
             }],
             text_mappings: vec![],
         };
@@ -4656,6 +5081,7 @@ mod tests {
                 after_paths: after_foos.iter().map(|n| path_for_node(*n)).collect(),
                 operation: HumanOperation::Identical,
                 with_children: false,
+                pairing: GroupPairing::AnyOneToOne,
             }],
             text_mappings: vec![],
         };
@@ -4701,6 +5127,7 @@ mod tests {
                 after_paths: after_foos.iter().map(|n| path_for_node(*n)).collect(),
                 operation: HumanOperation::Identical,
                 with_children: true,
+                pairing: GroupPairing::AnyOneToOne,
             }],
             text_mappings: vec![],
         };
@@ -4766,6 +5193,7 @@ mod tests {
                 after_paths: after_foos.iter().map(|n| path_for_node(*n)).collect(),
                 operation: HumanOperation::Identical,
                 with_children: true,
+                pairing: GroupPairing::AnyOneToOne,
             }],
             text_mappings: vec![],
         };

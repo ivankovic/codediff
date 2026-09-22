@@ -40,10 +40,10 @@ use codediff::diff::NodeCache;
 use codediff::diff::text::{RangeMatch, TextDiff, TextOperation};
 use codediff::test::helper;
 use codediff::test::helper::human_mapping::{
-    self, Caches, HumanOperation, HumanTextVerdict, MarkKind, NodeStatus, is_identical_after,
-    is_identical_before, is_moved_after, is_moved_before, match_operation_after,
-    match_operation_before, rebuild_caches_for_mapping, status_after, status_before,
-    unmarked_node_count,
+    self, Caches, GroupPairing, HumanOperation, HumanTextVerdict, MarkKind, NodeStatus,
+    is_identical_after, is_identical_before, is_moved_after, is_moved_before,
+    match_operation_after, match_operation_before, rebuild_caches_for_mapping, status_after,
+    status_before, unmarked_node_count,
 };
 // Only used by this file's own test module (`rebuild_caches_for_mapping`, imported above, is the
 // one the non-test code path uses).
@@ -430,16 +430,27 @@ fn render_fixture_page(
     // `representative_entries` (via `as_ast_diff_for_mapping`) has to collapse each multi-map
     // group down to one concrete pairing to produce an `ASTDiff` at all - but a group exists
     // precisely because several pairings are equally correct. Say so, rather than letting a page
-    // that shows one of them imply it is the answer.
-    let groups_notice = if mapping.groups.is_empty() {
-        String::new()
-    } else {
-        let count = mapping.groups.len();
-        let plural = if count == 1 { "" } else { "s" };
-        format!(
-            r#"<p class="notice">This mapping has {count} multi-map group{plural}: several pairings are equally correct there. The code view shows one arbitrary valid pairing, not the only one.</p>"#
-        )
-    };
+    // that shows one of them imply it is the answer. An all-to-all group is collapsed the other
+    // way - an N:M correspondence shown as pairs - and gets its own sentence.
+    let any_one_to_one = mapping
+        .groups
+        .iter()
+        .filter(|group| group.pairing == GroupPairing::AnyOneToOne)
+        .count();
+    let all_to_all = mapping.groups.len() - any_one_to_one;
+    let mut groups_notice = String::new();
+    if any_one_to_one > 0 {
+        let plural = if any_one_to_one == 1 { "" } else { "s" };
+        groups_notice.push_str(&format!(
+            r#"<p class="notice">This mapping has {any_one_to_one} multi-map group{plural}: several pairings are equally correct there. The code view shows one arbitrary valid pairing, not the only one.</p>"#
+        ));
+    }
+    if all_to_all > 0 {
+        let plural = if all_to_all == 1 { "" } else { "s" };
+        groups_notice.push_str(&format!(
+            r#"<p class="notice">This mapping has {all_to_all} all-to-all group{plural}: every node on one side corresponds to every node on the other, and none is deleted or inserted. The code view can only draw pairs, so it shows the surplus paired with one of its counterparts.</p>"#
+        ));
+    }
 
     let language = before.metadata.language.unwrap_or_default();
     // `diffs_case_dir` resolves which `DIFF_DATASETS` folder this fixture actually lives under

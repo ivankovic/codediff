@@ -255,7 +255,7 @@ use codediff::code::{Code, Language};
 use codediff::diff::text::TextDiff;
 use codediff::diff::{ASTDiff, ASTMappingReason, NodeCache, diff_code};
 use codediff::test::helper::human_mapping::{
-    self, Caches, HumanMapping, HumanMappingEntry, HumanOperation, HumanTextEntry,
+    self, Caches, GroupPairing, HumanMapping, HumanMappingEntry, HumanOperation, HumanTextEntry,
     HumanTextMapping, HumanTextOperation, HumanTextSpan, HumanTextVerdict, MarkKind, MultiMapGroup,
     NamedTextMapping, NodeStatus, disagreement_is_move_only, is_inherited_removed, path_refs,
     rebuild_caches_for_mapping, status_after, status_before, text_mapping_disagreements,
@@ -306,6 +306,10 @@ x              toggle the focused cursor node in/out of a pending multi-map
                  commit them as a group where any Before node may pair with
                  any After node (leftovers on the larger side become
                  delete/insert); mixed kinds ask for confirmation first
+X              flip the pending selection to all-to-all and back: every
+                 Before node corresponds to every After node and nothing is
+                 left over (a statement split in two, two merged into one, a
+                 body duplicated). Shown as G instead of g once committed
 c              clear the pending multi-map selection
 a / A          align other panel to the human mapping / to codediff's mapping
 p              run codediff's own diff, show its verdict next to each node

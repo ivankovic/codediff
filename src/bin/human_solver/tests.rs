@@ -344,6 +344,7 @@ fn render_panel_only_scans_the_visible_window_not_the_whole_flat_list() {
                 false,
                 424242,
                 &std::collections::BTreeSet::new(),
+                &[],
             )
         })
         .unwrap();
@@ -6846,6 +6847,7 @@ fn commit_multi_map_group_replaces_any_prior_entry_touching_its_nodes() {
         &after_ids,
         HumanOperation::Identical,
         true,
+        GroupPairing::AnyOneToOne,
     )
     .unwrap();
 
@@ -6887,6 +6889,7 @@ fn commit_multi_map_group_replaces_a_prior_group_sharing_a_node() {
         &first_pair_after,
         HumanOperation::Identical,
         false,
+        GroupPairing::AnyOneToOne,
     )
     .unwrap();
     assert_eq!(mapping.groups.len(), 1);
@@ -6906,6 +6909,7 @@ fn commit_multi_map_group_replaces_a_prior_group_sharing_a_node() {
         &second_after,
         HumanOperation::Identical,
         false,
+        GroupPairing::AnyOneToOne,
     )
     .unwrap();
 
@@ -6940,6 +6944,7 @@ fn commit_multi_map_group_orders_paths_by_source_position_not_by_arena_id() {
         &ids,
         HumanOperation::Identical,
         false,
+        GroupPairing::AnyOneToOne,
     )
     .unwrap();
 
@@ -6991,6 +6996,7 @@ fn commit_multi_map_group_with_children_clears_a_pre_existing_descendant_entry()
         &after_ids,
         HumanOperation::Identical,
         true,
+        GroupPairing::AnyOneToOne,
     )
     .unwrap();
 
@@ -7042,6 +7048,7 @@ fn action_commit_multi_map_group_errors_when_a_member_is_under_a_deleted_with_ch
         &no_hashes,
         &caches,
         false,
+        GroupPairing::AnyOneToOne,
     );
     match result {
         Err(err) => assert!(
@@ -7081,6 +7088,7 @@ fn action_commit_multi_map_group_errors_when_one_side_is_empty() {
         &no_hashes,
         &Caches::default(),
         false,
+        GroupPairing::AnyOneToOne,
     );
     match result {
         Err(err) => assert!(
@@ -7130,6 +7138,7 @@ fn action_commit_multi_map_group_raises_a_modal_for_mixed_kinds() {
         &no_hashes,
         &Caches::default(),
         false,
+        GroupPairing::AnyOneToOne,
     )
     .unwrap();
 
@@ -7177,6 +7186,7 @@ fn action_commit_multi_map_group_commits_directly_when_kinds_match() {
         &no_hashes,
         &Caches::default(),
         true,
+        GroupPairing::AnyOneToOne,
     )
     .unwrap();
 
@@ -7214,6 +7224,7 @@ fn action_unmark_on_a_group_member_removes_the_whole_group() {
         &after_ids,
         HumanOperation::Identical,
         false,
+        GroupPairing::AnyOneToOne,
     )
     .unwrap();
     assert_eq!(mapping.groups.len(), 1);
@@ -7388,6 +7399,345 @@ fn handle_key_m_with_a_pending_selection_commits_a_multi_map_group() {
     assert!(!app.mapping.groups[0].with_children);
 }
 
+/// A three-statement before, two-statement after pair with every statement pending on both sides
+/// - the fixture the multi-map key tests share.
+fn app_with_every_statement_pending() -> (
+    App,
+    tree_sitter::Tree,
+    tree_sitter::Tree,
+    &'static str,
+    &'static str,
+) {
+    let before_source = "fn main() {\n    foo();\n    foo();\n    foo();\n}\n";
+    let after_source = "fn main() {\n    foo();\n    foo();\n}\n";
+    let before_tree = parse_rust(before_source);
+    let after_tree = parse_rust(after_source);
+    let before_root = before_tree.root_node();
+    let after_root = after_tree.root_node();
+    let mut app = App::new(
+        "test".to_string(),
+        CaseOrigin::Diffs,
+        before_root.id(),
+        after_root.id(),
+        HumanMapping::default(),
+    );
+    app.before_multi_select = block_statements(before_root)
+        .iter()
+        .map(|n| n.id())
+        .collect();
+    app.after_multi_select = block_statements(after_root)
+        .iter()
+        .map(|n| n.id())
+        .collect();
+    (app, before_tree, after_tree, before_source, after_source)
+}
+
+fn press(
+    app: &mut App,
+    code: KeyCode,
+    before_tree: &tree_sitter::Tree,
+    after_tree: &tree_sitter::Tree,
+    before_source: &str,
+    after_source: &str,
+) {
+    let before_root = before_tree.root_node();
+    let after_root = after_tree.root_node();
+    let before_flat = FlatIndex::new(flatten_visible(before_root, &app.before.collapsed, None));
+    let after_flat = FlatIndex::new(flatten_visible(after_root, &app.after.collapsed, None));
+    let caches = rebuild_caches_for_mapping(&app.mapping, before_root, after_root);
+    let no_hashes = rustc_hash::FxHashMap::default();
+    handle_key(
+        app,
+        code,
+        &before_flat,
+        &after_flat,
+        before_root,
+        after_root,
+        &caches,
+        before_source.as_bytes(),
+        after_source.as_bytes(),
+        &no_hashes,
+        &no_hashes,
+        &Code::from_string(before_source, &Language::Rust),
+        &Code::from_string(after_source, &Language::Rust),
+    );
+}
+
+#[test]
+fn handle_key_capital_x_flips_the_pending_selections_pairing_and_says_so() {
+    let (mut app, before_tree, after_tree, before_source, after_source) =
+        app_with_every_statement_pending();
+    assert_eq!(app.multi_select_pairing, GroupPairing::AnyOneToOne);
+
+    press(
+        &mut app,
+        KeyCode::Char('X'),
+        &before_tree,
+        &after_tree,
+        before_source,
+        after_source,
+    );
+    assert_eq!(app.multi_select_pairing, GroupPairing::AllToAll);
+    let status = app.status.clone().unwrap_or_default();
+    assert!(
+        status.contains("3 before, 2 after") && status.contains("ALL-TO-ALL"),
+        "{status}"
+    );
+    assert!(
+        !app.dirty,
+        "flipping the pairing changes nothing recorded yet"
+    );
+
+    press(
+        &mut app,
+        KeyCode::Char('X'),
+        &before_tree,
+        &after_tree,
+        before_source,
+        after_source,
+    );
+    assert_eq!(app.multi_select_pairing, GroupPairing::AnyOneToOne);
+    assert!(
+        app.status
+            .clone()
+            .unwrap_or_default()
+            .contains("any one-to-one pairing"),
+        "{:?}",
+        app.status
+    );
+}
+
+#[test]
+fn handle_key_m_with_an_all_to_all_selection_commits_it_and_resets_the_pairing() {
+    let (mut app, before_tree, after_tree, before_source, after_source) =
+        app_with_every_statement_pending();
+    press(
+        &mut app,
+        KeyCode::Char('X'),
+        &before_tree,
+        &after_tree,
+        before_source,
+        after_source,
+    );
+    press(
+        &mut app,
+        KeyCode::Char('M'),
+        &before_tree,
+        &after_tree,
+        before_source,
+        after_source,
+    );
+
+    assert_eq!(app.mapping.groups.len(), 1, "{:?}", app.mapping.groups);
+    let group = &app.mapping.groups[0];
+    assert_eq!(group.pairing, GroupPairing::AllToAll);
+    assert!(group.with_children, "M asks for closure, as for any group");
+    // No content hashes were supplied, so nothing can be proven identical - same inference as
+    // for any group (`multi_map_group_operation`).
+    assert_eq!(group.operation, HumanOperation::MatchButNotIdentical);
+    assert!(
+        app.status
+            .clone()
+            .unwrap_or_default()
+            .starts_with("Committed all-to-all group: 3 before, 2 after"),
+        "{:?}",
+        app.status
+    );
+    assert!(app.dirty);
+    assert!(app.before_multi_select.is_empty() && app.after_multi_select.is_empty());
+    assert_eq!(
+        app.multi_select_pairing,
+        GroupPairing::AnyOneToOne,
+        "the next selection starts plain; all-to-all is always a deliberate X"
+    );
+}
+
+#[test]
+fn handle_key_c_drops_the_pairing_with_the_selection() {
+    let (mut app, before_tree, after_tree, before_source, after_source) =
+        app_with_every_statement_pending();
+    press(
+        &mut app,
+        KeyCode::Char('X'),
+        &before_tree,
+        &after_tree,
+        before_source,
+        after_source,
+    );
+    press(
+        &mut app,
+        KeyCode::Char('c'),
+        &before_tree,
+        &after_tree,
+        before_source,
+        after_source,
+    );
+    assert!(app.before_multi_select.is_empty());
+    assert_eq!(app.multi_select_pairing, GroupPairing::AnyOneToOne);
+}
+
+#[test]
+fn confirming_a_mixed_kind_all_to_all_group_records_the_pairing_it_was_raised_with() {
+    let (mut app, before_tree, after_tree, before_source, after_source) =
+        app_with_every_statement_pending();
+    let before_root = before_tree.root_node();
+    let after_root = after_tree.root_node();
+    app.modal = Some(Modal::ConfirmMultiMapGroup {
+        before_ids: app.before_multi_select.iter().copied().collect(),
+        after_ids: app.after_multi_select.iter().copied().collect(),
+        operation: HumanOperation::MatchButNotIdentical,
+        with_children: false,
+        pairing: GroupPairing::AllToAll,
+        kinds: vec![
+            "expression_statement".to_string(),
+            "let_declaration".to_string(),
+        ],
+    });
+
+    let before_flat = FlatIndex::new(flatten_visible(before_root, &app.before.collapsed, None));
+    let after_flat = FlatIndex::new(flatten_visible(after_root, &app.after.collapsed, None));
+    let caches = rebuild_caches_for_mapping(&app.mapping, before_root, after_root);
+    handle_modal_key(
+        &mut app,
+        KeyCode::Char('y'),
+        &before_flat,
+        &after_flat,
+        Some(before_root),
+        Some(after_root),
+        &caches,
+        before_source.as_bytes(),
+        after_source.as_bytes(),
+        &Code::from_string(before_source, &Language::Rust),
+        &Code::from_string(after_source, &Language::Rust),
+    );
+
+    assert!(app.modal.is_none());
+    assert_eq!(app.mapping.groups.len(), 1, "{:?}", app.mapping.groups);
+    assert_eq!(app.mapping.groups[0].pairing, GroupPairing::AllToAll);
+    assert!(!app.mapping.groups[0].with_children);
+    assert_eq!(app.multi_select_pairing, GroupPairing::AnyOneToOne);
+}
+
+#[test]
+fn action_unmark_names_the_kind_of_group_it_removes() {
+    let (mut app, before_tree, after_tree, before_source, after_source) =
+        app_with_every_statement_pending();
+    let before_root = before_tree.root_node();
+    let after_root = after_tree.root_node();
+    press(
+        &mut app,
+        KeyCode::Char('X'),
+        &before_tree,
+        &after_tree,
+        before_source,
+        after_source,
+    );
+    press(
+        &mut app,
+        KeyCode::Char('m'),
+        &before_tree,
+        &after_tree,
+        before_source,
+        after_source,
+    );
+    assert_eq!(app.mapping.groups.len(), 1);
+
+    let caches = rebuild_caches_for_mapping(&app.mapping, before_root, after_root);
+    let before_flat = FlatIndex::new(flatten_visible(before_root, &app.before.collapsed, None));
+    let after_flat = FlatIndex::new(flatten_visible(after_root, &app.after.collapsed, None));
+    let member = block_statements(before_root)[2];
+    let msg = action_unmark(
+        &mut app.mapping,
+        Focus::Before,
+        &before_flat,
+        &after_flat,
+        member.id(),
+        after_root.id(),
+        before_root,
+        after_root,
+        &caches,
+    )
+    .unwrap();
+    assert!(
+        msg.starts_with("Removed all-to-all group (3 before, 2 after"),
+        "{msg}"
+    );
+    assert!(app.mapping.groups.is_empty());
+}
+
+#[test]
+fn render_panel_marks_an_all_to_all_member_with_a_capital_g() {
+    let (mut app, before_tree, after_tree, before_source, after_source) =
+        app_with_every_statement_pending();
+    let before_root = before_tree.root_node();
+    let after_root = after_tree.root_node();
+    press(
+        &mut app,
+        KeyCode::Char('X'),
+        &before_tree,
+        &after_tree,
+        before_source,
+        after_source,
+    );
+    press(
+        &mut app,
+        KeyCode::Char('m'),
+        &before_tree,
+        &after_tree,
+        before_source,
+        after_source,
+    );
+
+    let caches = rebuild_caches_for_mapping(&app.mapping, before_root, after_root);
+    let flat = FlatIndex::new(flatten_visible(
+        before_root,
+        &std::collections::HashSet::new(),
+        None,
+    ));
+    let mut panel = PanelState::new(before_root.id());
+    // Tall enough for every row of the fully expanded tree, so the third statement is on screen.
+    let backend = ratatui::backend::TestBackend::new(60, 40);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal
+        .draw(|f| {
+            render_panel(
+                f,
+                Rect::new(0, 0, 60, 40),
+                "Before",
+                &flat,
+                &mut panel,
+                &caches,
+                Side::Before,
+                before_source.as_bytes(),
+                true,
+                None,
+                false,
+                0,
+                &std::collections::BTreeSet::new(),
+                &app.mapping.groups,
+            );
+        })
+        .unwrap();
+
+    let content = terminal.backend().buffer().content();
+    // Every member is matched - including the third, which an any-one-to-one group would have
+    // left over - and each carries the all-to-all marker.
+    for statement in block_statements(before_root) {
+        assert_eq!(status_before(statement, &caches), NodeStatus::Matched);
+        let row = flat
+            .iter()
+            .position(|(n, _)| n.id() == statement.id())
+            .unwrap()
+            + 1;
+        let text: String = (0..60)
+            .map(|col| content[row * 60 + col].symbol())
+            .collect();
+        // Column 0 is the panel border; the row reads "<glyph><marker> <label>".
+        let marker = text.trim_start_matches('│').trim_start().chars().nth(1);
+        assert_eq!(marker, Some('G'), "{text:?}");
+    }
+}
+
 #[test]
 fn render_panel_marks_a_group_matched_node_and_a_pending_selection_distinctly() {
     let before_source = "fn main() {\n    foo();\n    foo();\n    foo();\n}\n";
@@ -7411,6 +7761,7 @@ fn render_panel_marks_a_group_matched_node_and_a_pending_selection_distinctly() 
         &after_ids,
         HumanOperation::Identical,
         false,
+        GroupPairing::AnyOneToOne,
     )
     .unwrap();
 
@@ -7448,6 +7799,7 @@ fn render_panel_marks_a_group_matched_node_and_a_pending_selection_distinctly() 
                 false,
                 0,
                 &pending,
+                &mapping.groups,
             );
         })
         .unwrap();
