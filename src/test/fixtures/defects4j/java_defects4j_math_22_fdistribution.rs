@@ -34,7 +34,7 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    assert_matches_human_painting_within_limit("java-defects4j-math-22-fdistribution", 0.06)
+    assert_matches_human_painting_within_limit("java-defects4j-math-22-fdistribution", 0.0)
 }
 
 #[test]

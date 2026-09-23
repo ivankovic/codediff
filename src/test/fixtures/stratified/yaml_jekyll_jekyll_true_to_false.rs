@@ -28,7 +28,7 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    assert_matches_human_painting_within_limit("yaml-jekyll-jekyll-true-to-false", 0.64)
+    assert_matches_human_painting_within_limit("yaml-jekyll-jekyll-true-to-false", 0.0)
 }
 
 #[test]

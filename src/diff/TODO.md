@@ -1,5 +1,17 @@
 # Diff Module Notes
 
+## 2026-09-23: booleans and access modifiers join the whole-token list
+
+`text::WHOLE_TOKENS` (was `OPERATORS`) adds `true`, `false`, `private` and `protected`, and
+invariant 19 is now `tokens_are_painted_whole`. The corpus already obeyed it - zero new
+violations - so this is a renderer fix only: `true`/`false` shares an `e` the affix split left
+unpainted. Over the 760 fixtures in the previous baseline, zero-byte **`FULL` 485 -> 490,
+`MINIMAL` 529 -> 534**, 5 better and 0 worse under each: `yaml-jekyll-jekyll-true-to-false`,
+`yaml-puppeteer-puppeteer-false-to-true`, `java-defects4j-closure-70-typedscopecreator`,
+`java-defects4j-math-22-fdistribution`, `java-defects4j-math-22-uniformrealdistribution`. The same
+run also took in 32 newly painted fixtures (792 in all), which is why the README's totals moved by
+more than five.
+
 ## 2026-09-22: unpainted indentation under `FULL` - measured, nothing shipped
 
 Hypothesis: the first line of an added block is painted without its indentation, which `FULL`

@@ -58,8 +58,8 @@
 //!   side and `Insert` on the other.
 //! * [`single_valued_fields_hold_a_pair`] - a matched pair's single-valued named field holds a
 //!   matched pair, never a delete beside an insert.
-//! * [`operators_are_painted_whole`] - every byte of an operator such as `<=` or `!=` carries the
-//!   same highlighting.
+//! * [`tokens_are_painted_whole`] - every byte of an operator such as `<=`, a boolean, or an access
+//!   modifier such as `private` carries the same highlighting.
 //!
 //! Invariants 4 and 5 were added on 2026-09-08 and wired in the same day, at **zero violations
 //! across all 249 painted fixtures** - so unlike the first three they arrived with no clamped
@@ -111,7 +111,9 @@
 //! `java-defects4j-chart-1-abstractcategoryitemrenderer` painted the same edit whole;
 //! `html-mozilla-pdf-add-closing-tags` painted only the `/` of a self-closing `/>`, now a `Match`
 //! of `>` against `/>` as its tree mapping already had it. Unlike the others it is also a rule of
-//! the renderer, which reads the same operator list.
+//! the renderer, which reads the same token list. On 2026-09-23 the list grew from operators to
+//! the booleans and the `private`/`protected` modifiers, at **zero** new violations: the corpus
+//! already paints those whole, and only the renderer was splitting them.
 //!
 //! **All nineteen are intra-fixture.** Each asks whether one fixture's mapping and paintings
 //! agree with each other; none compares two fixtures, so a pair whose paintings answer the same
@@ -134,7 +136,7 @@ use super::{
     paintings_for_mode, rebuild_caches_for_mapping, status_after, status_before,
 };
 use crate::code::Code;
-use crate::diff::text::{OPERATORS, RenderOptions};
+use crate::diff::text::{RenderOptions, WHOLE_TOKENS};
 
 /// One painting projected to per-byte labels, `[before, after]` - `None` where nothing paints that
 /// byte. Named because every check here passes it around and `clippy::type_complexity` is right
@@ -365,7 +367,7 @@ pub fn ground_truth_invariant_violations_for(
             violations.extend(identifier_updates_are_painted_by_preset(
                 name, labels, &context, before, after,
             ));
-            violations.extend(operators_are_painted_whole(
+            violations.extend(tokens_are_painted_whole(
                 name, labels, &context, before, after,
             ));
         }
@@ -2915,27 +2917,27 @@ fn boolean_flips_are_one_edit(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────
-// Invariant 19: an operator is painted whole
+// Invariant 19: an operator, a boolean or an access modifier is painted whole
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 
-/// **Invariant 19.** Every byte of an operator carries the same highlighting - in every painting,
-/// on both sides.
+/// **Invariant 19.** Every byte of a token in [`WHOLE_TOKENS`] carries the same highlighting - in
+/// every painting, on both sides.
 ///
-/// An operator is one symbol to a reader, however many characters spell it. `<=` becoming `<` is
+/// Each of these is one symbol to a reader, however many characters spell it. `<=` becoming `<` is
 /// a different comparison, not a `<` that survived and an `=` that left; `==` becoming `!=` is a
-/// negated test, not an `=` that was kept. Painting part of an operator claims the rest is
-/// unchanged, and the corpus disagreed with itself about exactly this before the rule existed:
+/// negated test, not an `=` that was kept; `true` becoming `false` keeps no `e`, and `private`
+/// becoming `protected` keeps no `pr`. Painting part of one claims the rest is unchanged, and the
+/// corpus disagreed with itself about exactly this before the rule existed:
 /// `java-defects4j-chart-1-abstractcategoryitemrenderer` painted `!=` against `==` whole, and
 /// `java-defects4j-jacksondatabind-16-annotationmap` painted the same edit one character wide.
 ///
 /// Checked on every painting a fixture carries - `Full`, `Minimal` and `Only one solution` alike:
-/// the presets may disagree about *whether* an operator is painted, never about painting part of
+/// the presets may disagree about *whether* one of these is painted, never about painting part of
 /// one.
 ///
 /// Reads the painting alone, so a leaf is judged whatever the mapping says about it. The list is
-/// the renderer's own ([`OPERATORS`]), which follows the same rule; only its multi-character
-/// operators can break it.
-fn operators_are_painted_whole(
+/// the renderer's own, which follows the same rule; only its multi-character tokens can break it.
+fn tokens_are_painted_whole(
     painting: &str,
     painted: &PaintedLabels,
     context: &TreeContext,
@@ -2948,14 +2950,14 @@ fn operators_are_painted_whole(
             let Some(text) = code.contents.get(leaf.byte_range()) else {
                 continue;
             };
-            if !OPERATORS.contains(&text) || whole_leaf_label(&painted[side], *leaf).is_some() {
+            if !WHOLE_TOKENS.contains(&text) || whole_leaf_label(&painted[side], *leaf).is_some() {
                 continue;
             }
             violations.push(GroundTruthViolation::new(
                 19,
                 Some(painting),
                 format!(
-                    "painting '{painting}' paints only part of the operator `{text}` on {} row {}",
+                    "painting '{painting}' paints only part of `{text}` on {} row {}",
                     side_name(side),
                     row_of(&code.contents, leaf.start_byte()),
                 ),

@@ -30,7 +30,7 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    assert_matches_human_painting_within_limit("yaml-puppeteer-puppeteer-false-to-true", 0.35)
+    assert_matches_human_painting_within_limit("yaml-puppeteer-puppeteer-false-to-true", 0.0)
 }
 
 #[test]

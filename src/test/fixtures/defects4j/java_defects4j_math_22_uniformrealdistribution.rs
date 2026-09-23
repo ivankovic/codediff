@@ -35,7 +35,7 @@ fn mapping() -> Result<()> {
 fn painting() -> Result<()> {
     assert_matches_human_painting_within_limit(
         "java-defects4j-math-22-uniformrealdistribution",
-        0.09,
+        0.0,
     )
 }
 

@@ -276,27 +276,51 @@ fn is_content_node(kind: &str) -> bool {
         || kind.contains("raw_text")
 }
 
-/// The operators a painting always marks whole: every byte of one carries the same highlighting.
+/// The tokens a painting always marks whole: every byte of one carries the same highlighting.
 /// Shared with the ground-truth invariant that states the same rule of the corpus
-/// (`operators_are_painted_whole`), so the two can never disagree about which tokens it covers.
+/// (`tokens_are_painted_whole`), so the two can never disagree about which tokens it covers.
 ///
-/// Holds under both presets: `MINIMAL` may leave an operator unpainted where `FULL` paints it, but
+/// Holds under both presets: `MINIMAL` may leave one of these unpainted where `FULL` paints it, but
 /// neither paints part of one. A list rather than a character class, so that what counts as one
-/// symbol is written down rather than inferred - it includes a tag's self-closing `/>` and an
-/// append-assignment `.=`, which is `=` grown at its front rather than its end.
-pub(crate) const OPERATORS: &[&str] = &[
-    "<", ">", "=", "==", "===", "!=", "!==", "<=", ">=", "+", "-", "++", "--", "+=", "-=", "*=",
-    ">>", "<<", "/>", ".=",
+/// symbol is written down rather than inferred. Operators first - including a tag's self-closing
+/// `/>` and an append-assignment `.=`, which is `=` grown at its front rather than its end - then
+/// the booleans and the access modifiers, where `true` against `false` shares an `e` and
+/// `private` against `protected` shares `pr` and `te`, none of which a reader sees as surviving.
+pub(crate) const WHOLE_TOKENS: &[&str] = &[
+    "<",
+    ">",
+    "=",
+    "==",
+    "===",
+    "!=",
+    "!==",
+    "<=",
+    ">=",
+    "+",
+    "-",
+    "++",
+    "--",
+    "+=",
+    "-=",
+    "*=",
+    ">>",
+    "<<",
+    "/>",
+    ".=",
+    "true",
+    "false",
+    "private",
+    "protected",
 ];
 
 /// Whether splitting `a` against `b` into a common prefix, a changed middle and a common suffix
-/// would cut through an operator. `<=` becoming `<` is a different comparison, not a `<` that
-/// stayed and an `=` that left, and `==` becoming `!=` is a negated test rather than a kept `=`;
-/// the corpus paints both whole. Only an operator longer than one character can be cut.
-fn splits_an_operator(a: &str, b: &str) -> bool {
+/// would cut through one of [`WHOLE_TOKENS`]. `<=` becoming `<` is a different comparison, not a
+/// `<` that stayed and an `=` that left, and `true` becoming `false` is a flipped value rather than
+/// a kept `e`; the corpus paints both whole. Only a token longer than one character can be cut.
+fn splits_a_whole_token(a: &str, b: &str) -> bool {
     [a, b]
         .iter()
-        .any(|text| text.len() > 1 && OPERATORS.contains(text))
+        .any(|text| text.len() > 1 && WHOLE_TOKENS.contains(text))
 }
 
 fn intra_node_update_ranges(
@@ -850,7 +874,7 @@ impl RangeWalk<'_> {
             },
             self.source_is_before,
             is_content_node(node.kind()),
-            self.options.whole_pair_updates || splits_an_operator(source_text, destination_text),
+            self.options.whole_pair_updates || splits_a_whole_token(source_text, destination_text),
         )
     }
 
@@ -885,7 +909,7 @@ impl RangeWalk<'_> {
                     self.source_is_before,
                     is_content_node(node.kind()),
                     self.options.whole_pair_updates
-                        || splits_an_operator(
+                        || splits_a_whole_token(
                             &self.source.contents[s_from..s_to],
                             &self.destination.contents[d_from..d_to],
                         ),

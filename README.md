@@ -251,20 +251,20 @@ ground-truth mappings in `src/test/data/diffs/`:
 * **90% of test cases with zero mismatched bytes.**
 * **99% of test cases with at most 1% of bytes mismatched.**
 
-Neither is met yet. 760 of the 2,001 fixtures carry a hand-painted ground truth - every byte of
+Neither is met yet. 792 of the 2,001 fixtures carry a hand-painted ground truth - every byte of
 both files labelled with what a human says happened to it - and CodeDiff's own highlighting is
 compared against it byte by byte, under each of its two highlighting presets (`--full`, which keeps
 brackets, separators and leading whitespace, and `--minimal`, which drops them):
 
 | preset | zero mismatched bytes | at most 1% mismatched | mismatched bytes, whole corpus |
 |---|---|---|---|
-| `--full` | **485 (63.8%)** | **634 (83.4%)** | 27,977 of 24.5M (0.11%) |
-| `--minimal` | **529 (69.6%)** | **670 (88.2%)** | 16,478 of 24.5M (0.07%) |
+| `--full` | **512 (64.6%)** | **666 (84.1%)** | 28,144 of 26.3M (0.11%) |
+| `--minimal` | **559 (70.6%)** | **702 (88.6%)** | 16,524 of 26.3M (0.06%) |
 
 The whole-corpus rate is far below 1% because most of each file is unchanged and nobody gets that
 wrong; the per-test-case numbers are the ones that count, since a reader meets the mistakes one
 diff at a time. Most of what is left is not in the matching: rendering the human's own node
-mapping still disagrees with the painting on 83% of the `--full` bytes and 89% of the `--minimal`
+mapping still disagrees with the painting on 82% of the `--full` bytes and 87% of the `--minimal`
 ones, so the highlighting rules own the gap more than the matcher does.
 
 `make update-painting-attribution` measures this and writes one row per fixture and preset to
