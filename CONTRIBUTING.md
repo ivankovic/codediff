@@ -1,8 +1,8 @@
 # Contributing
 
-Thank you for considering a contribution, human or AI-assisted (see the README's AI policy). This
-file gives practical information about how to work in this codebase. `AGENTS.md` adds more
-conventions for AI agents, mostly style rules for the TUI code.
+At this time, to keep the development speed high, contributions are not accepted.
+
+Thank you for considering a contribution, human or AI-assisted (see the README's AI policy).
 
 ## Technology
 
@@ -56,7 +56,7 @@ Two things this does **not** mean:
 * A test whose subject is a past bug keeps its subject - stated as the property it pins. "Esc
   closes the theme picker rather than quitting", not "Esc used to quit the whole app".
 
-`git log` and `git blame` hold the history, and they hold it accurately.
+`git log` and `git blame` hold the history.
 
 ## Testing
 
@@ -83,16 +83,12 @@ functions the report scripts are built from; the scripts' shared helpers live in
 These tests check real diffs against a human-verified ground truth. **These tests must run in
 under 5 seconds.**
 
-Semi-automated tests run on the small and full dataset. They take more time to run. Run them when
-appropriate, and always before a release.
-
 ### Coverage
 
-`make coverage` reports which of this repository's own lines the suite executes. `cargo-llvm-cov`
+`make coverage` reports which of this repository's lines the suite executes. `cargo-llvm-cov`
 drives `cargo nextest` directly under `--all-features`, so it measures exactly the suite `make
-test` runs rather than a second, differently-built one. It writes a browsable report to
-`target/llvm-cov/html/index.html` and prints a per-area table, because a single number over 675
-files describes nothing:
+test` runs. It writes a browsable report to `target/llvm-cov/html/index.html` and prints a
+per-area table:
 
 | area | lines | |
 | --- | --- | --- |
@@ -110,15 +106,6 @@ files describes nothing:
 Measured 2026-09-22 over 4428 tests. The engine and the dev tools are deliberately held to
 different standards: `src/bin/` is samplers, benchmark harnesses and `human_solver`, several of
 which exist to be run once and read.
-
-**Do not read this table against the one before it (2026-09-04, 1718 tests, 91.3% product).** Two
-things changed besides the code. `--features stats` used to be the feature set, and it does not
-pull in `web`, so `src/web/` was compiled out of the measurement entirely - its 1475 lines and 53
-tests appear here for the first time. And every module *root* (`src/diff.rs`, `src/code.rs`,
-`src/test.rs`, `src/stats.rs`, `src/tui.rs`) matched no area prefix and fell into a bucket that
-no row printed and no product total counted, along with the genuinely top-level files - 2670
-lines, now split between their own modules and the `src/` row above. The product figure moving
-from 91.3% to 92.8% is mostly that correction, not new tests.
 
 **Not a CI gate.** It costs about ten minutes and 6GB peak, since it rebuilds the workspace with
 instrumentation - and a threshold mostly teaches people to write tests that touch lines. At 97.1%
@@ -146,16 +133,30 @@ Install `jj` (`cargo install --root /var/tmp/tools jj-cli`, keeping it out of th
 cargo bin directory) if you touch `src/jj_configure.rs`. That module's claims about how jj invokes
 a diff tool - directory trees by default, file pairs with extensions preserved under
 `diff-invocation-mode = "file-by-file"` - were verified empirically against jj 0.44.0, and should
-be re-verified the same way rather than assumed: jj has renamed its config surface before.
+be re-verified the same way rather than assumed.
 
 ### Quality
 
-Run `cargo run --release --features test-fixtures --bin benchmark_optimal_solutions`, or `make
-benchmark-quality`. This command diffs every fixture in `src/test/data/diffs/` that has a
+Run `make benchmark-quality`. This command diffs every fixture in `src/test/data/diffs/` that has a
 human-verified ground truth mapping. It reports how many nodes each fixture gets wrong. Use this
 output to see whether a change made diffs better or worse.
 
-The targets (see the README's "Accurate" principle):
+The README's "Accurate" principle states the targets for what a reader sees - the painting, compared
+byte by byte against the hand-painted ground truth, under both `--full` and `--minimal`:
+
+* **90% of test cases with zero mismatched bytes.**
+* **99% of test cases with at most 1% of bytes mismatched.**
+
+`make update-painting-attribution` measures them, one row per fixture and preset in
+`research/data/quality/painting_attribution.csv`, and `make check-painting-attribution` fails CI if
+any fixture gets worse. Each row carries two numbers that answer different questions:
+`real_bytes` renders codediff's own mapping, which is what a reader sees, and `renderer_bytes`
+renders the *human* tree mapping, so it holds no matcher error at all - what is left there only a
+change to `diff::text` can fix. Steer painting work by the second. `painting_disagreement_detail`
+(`src/test/helper/human_mapping/tests/exploratory.rs`, `MAPPING=human` for the second column)
+prints the disagreeing runs of one fixture.
+
+The tree mapping behind the painting has targets of its own:
 
 * **90% of test cases with zero mismatched visible nodes.**
 * **99% of test cases with at most 1% of visible nodes mismatched.**
@@ -186,10 +187,6 @@ that costs speed has room to spend, and a change that costs an order of magnitud
 `make check-quality` compares it against the committed baseline on every push, warning rather than
 failing (wall-clock varies too much machine to machine to gate on).
 
-Separately, automated benchmarks measure the wall-clock time of the main diffing algorithm with the
-Rust criterion library, over every handmade test case from `src/test/helper.rs`
-(`make benchmark-speed`). Run these benchmarks frequently, to catch performance regressions.
-
 ## Code structure
 
 Follow Rust's standard project structure.
@@ -219,7 +216,6 @@ Some directories in the list below do not exist yet. Create them if the need ari
         |- bin/         <- Standalone developer tools: benchmarking, dataset sampling, and more
     |- /assets/web      <- The page codediff-web serves (embedded at build time): model.js is the
     |                      TUI's viewer logic ported to the browser, app.js the DOM wiring
-    |- /benches         <- Benchmarks
     |- /research        <- Datasets and analysis scripts used to guide design decisions
     |- README.md        <- High-level project summary. Must be readable to humans.
     |- CONTRIBUTING.md  <- This file
@@ -278,9 +274,9 @@ documented there.
   and cannot mirror.
 Three verbs, and which file a target lives in follows from them:
 
-* **`benchmark-`** measures **codediff**, and lives in the root Makefile. Exactly two, because
-  there are exactly two questions: is it right (`benchmark-quality`) and is it fast
-  (`benchmark-speed`). Production QA, and neither needs anything a bare checkout lacks.
+* **`benchmark-`** measures **codediff**, and lives in the root Makefile. `benchmark-quality`
+  answers both questions a change raises - is it right, and is it fast - in one run over the
+  fixture corpus. Production QA, and it needs nothing a bare checkout lacks.
 * **`check-`** gates. Runs in CI on every push and fails the build. `check-quality` gates on
   precisely what `benchmark-quality` measures - the pairing is the point.
 * **`measure-`** measures anything that is not codediff alone: other people's tools, or the cloned
@@ -288,12 +284,8 @@ Three verbs, and which file a target lives in follows from them:
   that moves when someone else ships a GumTree release is a study of the field, not product QA.
 
 * `benchmark-quality` - runs `benchmark_optimal_solutions`: mismatch count against the
-  human-authored ground truth, per fixture (see "Quality" above).
-* `benchmark-speed` / `benchmark-speed-update-baseline` - criterion wall-clock of `diff_code` over
-  every handmade test case from `src/test/helper.rs` (see "Speed" above). The first compares
-  against the saved baseline, the second saves a new one. Note the asymmetry with quality:
-  criterion keeps its baseline under `target/`, which is not checked in, so a speed baseline is
-  local to one working copy and nothing gates on it.
+  human-authored ground truth, per fixture, and the runtime distribution (see "Quality" and
+  "Speed" above).
 * `benchmark-ablation` - re-runs `benchmark-quality` with individual solver passes disabled, to see
   what each is worth. A one-off investigation rather than a routine measurement, which is why it is
   not folded into `benchmark-quality`.
@@ -305,11 +297,6 @@ Three verbs, and which file a target lives in follows from them:
   `fixtures` stubs, not from the run, so this cannot lower the accuracy bar. Raising a
   limit means editing that fixture's stub - the same file that holds the prose explaining why -
   and `quality_baseline.csv` is then a projection of those limits, pinned by a test.
-* `benchmark-speed` / `benchmark-speed-update-baseline` - a criterion wall-clock benchmark of
-  `diff_code`, over every handmade test case from `src/test/helper.rs` (see "Speed" above). The
-  first compares against the saved baseline, the second saves a new one. Note the asymmetry with
-  accuracy: criterion keeps its baseline under `target/`, which is not checked in, so a speed
-  baseline is local to one working copy and nothing gates on it.
 
 ### Release
 

@@ -140,8 +140,7 @@ done; the §4 typos are fixed except `symetric` (×3).
   predicates, and the 100 `nodes::is_comment`-style call sites read correctly as they are; a
   rename buys the file a better name at the cost of touching all of them. Revisit if the table
   grows another concern. Also left: `CodeViewer` vs `CodeViewerWidget`/`CodeViewerState`.
-  What remains of the review is section 6 (performance): profile with `make benchmark-speed`
-  (buildable again since section 1), then the metadata arena.
+  What remains of the review is section 6 (performance): profile, then the metadata arena.
 - **2026-09-06, section 6 (profile + first fixes)** - `perf` is locked down here
   (`perf_event_paranoid` 4), so the profile is callgrind on the product binary diffing the 75k-node
   Rust fixture, plus a per-step corpus timing. Findings: APTED's `spf_path` is 26% self (expected);
@@ -349,7 +348,7 @@ be checked against `make check-quality`; everything else is rendering, tooling o
 
 Current corpus latency (`research/data/quality/quality_baseline.csv`, 597 fixtures): p50 4.1ms,
 p90 106ms, p99 722ms, max 1667ms. Items 1-4 form one refactor; profile before starting it
-(`make benchmark-speed` after fixing the `[[bench]]` gating above).
+(`make benchmark-quality` prints the runtime distribution over the fixture corpus).
 
 1. **Every node stores its whole subtree text as an owned `String`** (`code.rs:283-287`,
    filled at `code/metadata.rs:189-193`), so metadata is O(bytes × depth) heap per side, and

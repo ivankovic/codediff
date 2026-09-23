@@ -262,7 +262,7 @@ def test_matrix_combinations_refuses_exclude_rather_than_ignoring_it():
 def test_area_of_picks_the_most_specific_prefix():
     assert coverage_report.area_of("src/diff/apted/engine.rs") != "other"
     assert coverage_report.area_of("src/bin/human_solver/main.rs") == "bin/ - dev tools"
-    assert coverage_report.area_of("benches/diff_code_benchmark.rs") == "other"
+    assert coverage_report.area_of("tests/benchmark_other_e2e.rs") == "other"
 
 
 def test_area_of_puts_a_module_root_with_its_own_module():

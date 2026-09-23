@@ -2,10 +2,10 @@
 #
 # **Three verbs, and the split between them is what this file's boundary is made of:**
 #
-#   benchmark-   measures codediff, and only codediff. There are exactly two, because there are
-#                exactly two questions - is it right (benchmark-quality) and is it fast
-#                (benchmark-speed). Production QA rather than a study, and neither needs anything
-#                a bare checkout lacks: both run against src/test/data/, which ships with the repo.
+#   benchmark-   measures codediff, and only codediff. benchmark-quality answers both questions a
+#                change raises - is it right, and is it fast - in one run. Production QA rather
+#                than a study, and it needs nothing a bare checkout lacks: it runs against
+#                src/test/data/, which ships with the repo.
 #   check-       gates. Runs in CI on every push and fails the build. Today that is check-quality
 #                alone, gating on precisely what benchmark-quality measures - the pairing is the
 #                point. Deliberately not in .githooks/pre-push - see that file for why a slow hook
@@ -48,8 +48,7 @@ OUT_DIR ?= research/data/ablation
 .PHONY: coverage test test-mapping-site-js test-python build install install-hooks benchmark-quality \
 	diff-inventory lint-python ci benchmark-ablation check-quality update-quality-baseline \
 	check-painting-attribution update-painting-attribution diff-gif \
-	deploy-checks deploy-crates deploy-github deploy benchmark-speed \
-	benchmark-speed-update-baseline
+	deploy-checks deploy-crates deploy-github deploy
 
 # `cargo-llvm-cov` drives `cargo nextest` directly, so this runs exactly the suite `make test`
 # does - `--all-features`, not `--features $(FEATURES)`. Those were the same thing until `test`
@@ -424,26 +423,3 @@ deploy-github: deploy-checks
 # with `-j`.
 deploy: deploy-crates deploy-github
 
-# Wall-clock `diff_code` over every handmade fixture, through criterion. Named for what it
-# measures rather than for how (it was `hermetic-benchmark`): the isolation is the method, and the
-# method is not what a reader is looking for when they want the speed number.
-#
-# **`--features test-fixtures` is load-bearing.** The bench reads the fixture corpus through
-# `codediff::test::helper`, which `lib.rs` gates behind `cfg(any(test, feature = "test-fixtures"))`
-# - and a `cargo bench` build is not `cfg(test)` for the library it links. Without the flag this
-# target failed to compile, which it had been doing silently: nothing runs `cargo bench` in CI, so
-# the only speed measurement this project has was unrunnable and nobody found out.
-#
-# **Its baseline does not survive `cargo clean`, and nothing gates on it.** criterion keeps
-# comparisons under target/criterion/, which is not checked in, so `benchmark-speed-update-baseline`
-# records a number only for this working copy. That is the opposite of how accuracy is handled -
-# `check-quality` compares against a committed baseline and fails CI - and it is why a speed
-# regression is currently something you notice rather than something that stops you. Two other
-# criterion benches (`hash_benchmark`, `optimal_iud_benchmark`) had no target at all and were
-# deleted rather than left invisible; if speed ever needs to gate, this is the target to build it
-# on.
-benchmark-speed:
-	cargo bench --features test-fixtures --bench diff_code_benchmark
-
-benchmark-speed-update-baseline:
-	cargo bench --features test-fixtures --bench diff_code_benchmark -- --save-baseline baseline
