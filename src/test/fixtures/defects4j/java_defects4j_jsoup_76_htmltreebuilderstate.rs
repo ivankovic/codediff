@@ -35,7 +35,5 @@ fn invariants() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test and record the
-    // limit it reports instead.
-    assert_matches_human_painting_within_limit("java-defects4j-jsoup-76-htmltreebuilderstate", 100.0)
+    assert_matches_human_painting_within_limit("java-defects4j-jsoup-76-htmltreebuilderstate", 0.0)
 }

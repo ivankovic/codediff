@@ -23,7 +23,9 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("java-defects4j-compress-29-tararchiveoutputstream")
+    test::helper::human_mapping::assert_matches_human_mapping(
+        "java-defects4j-compress-29-tararchiveoutputstream",
+    )
 }
 
 #[test]
@@ -33,7 +35,8 @@ fn invariants() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test and record the
-    // limit it reports instead.
-    assert_matches_human_painting_within_limit("java-defects4j-compress-29-tararchiveoutputstream", 100.0)
+    assert_matches_human_painting_within_limit(
+        "java-defects4j-compress-29-tararchiveoutputstream",
+        0.0,
+    )
 }

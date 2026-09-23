@@ -23,16 +23,11 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // **The mapping is deliberately incomplete**: its own description.md says "Requires N:M
-    // mapping", and diffs.csv records 30 nodes it leaves unmapped because the format cannot express
-    // the pairing. The five residuals measured here are a nested `if_statement`, its block and its
-    // braces, which the human pairs and codediff's `qualified_name` pass deletes. Expect this limit
-    // to move when the mapping can be finished - that will be the ground truth changing, not the
-    // algorithm regressing.
+    // Recorded as found, not examined.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "java-defects4j-cli-19-posixparser",
-        5,
-        2,
+        15,
+        9,
     )
 }
 

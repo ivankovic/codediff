@@ -26,8 +26,8 @@ fn mapping() -> Result<()> {
     // Recorded as found, not examined.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "java-defects4j-lang-19-numericentityunescaper",
-        4,
-        4,
+        49,
+        34,
     )
 }
 

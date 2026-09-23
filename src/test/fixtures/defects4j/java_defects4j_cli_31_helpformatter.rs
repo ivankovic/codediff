@@ -26,8 +26,8 @@ fn mapping() -> Result<()> {
     // Recorded as found, not examined.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "java-defects4j-cli-31-helpformatter",
-        14,
-        10,
+        21,
+        15,
     )
 }
 

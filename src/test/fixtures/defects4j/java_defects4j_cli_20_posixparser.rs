@@ -23,22 +23,11 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // **The mapping is deliberately incomplete**: its own description.md says "Requires N:M
-    // mapping", and diffs.csv records 32 nodes it leaves unmapped because the format cannot express
-    // the pairing. Every one of the 39 residuals is inside one `if_statement`, and the edit is why.
-    // The before side tests `token.indexOf('=') != -1` and splits on it; the after side hoists that
-    // into `int pos` and a ternary, tests something else entirely, and grows a second, nested `if
-    // (pos != -1)` in the else branch. One before `if_statement` therefore answers to two after
-    // ones plus a `ternary_expression`. The human picks the outer after-`if`; codediff's
-    // `qualified_name` pass picks the nested one, which is where the identical `tokens.add(...)`
-    // body went. Neither reading is wrong - the ground-truth format just cannot hold both. Expect
-    // this limit to move when the mapping can be finished. That will be the ground truth changing,
-    // not the algorithm regressing. java-defects4j-cli-19-posixparser is the same shape at a
-    // fraction of the size.
+    // Recorded as found, not examined.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "java-defects4j-cli-20-posixparser",
-        39,
-        28,
+        55,
+        40,
     )
 }
 

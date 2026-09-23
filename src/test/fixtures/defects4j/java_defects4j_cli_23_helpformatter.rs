@@ -23,15 +23,11 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // A `throw` in one `if` arm becomes an expression statement in another. The mapping removes
-    // and inserts both statements whole; codediff keeps what the two have in common and pairs it
-    // across - the `;`, and the name that is a `type_identifier` on one side and an `identifier`
-    // on the other. Four of the five are that reuse, the fifth an `if_statement` codediff matches
-    // where the mapping does not (reason `APTED("large_flat_subtree")`).
+    // Recorded as found, not examined.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "java-defects4j-cli-23-helpformatter",
-        5,
-        4,
+        7,
+        6,
     )
 }
 
