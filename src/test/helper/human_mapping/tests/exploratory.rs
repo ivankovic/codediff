@@ -130,7 +130,7 @@ fn painting_disagreement_detail() -> Result<()> {
         let mut human_ast = as_ast_diff_for_mapping(&mapping, before, after)?;
         for (key, pair) in human_ast.mapping.iter_mut() {
             if let Some(ours) = real.mapping.get(key) {
-                pair.reason = ours.reason.clone();
+                pair.reason = ours.reason;
             }
         }
         human_ast
@@ -161,7 +161,9 @@ fn painting_disagreement_detail() -> Result<()> {
     let chooser = if human { render(real) } else { ours.clone() };
 
     // The closest candidate, as the census scores it.
-    let mut best: Option<(usize, &NamedTextMapping, [Vec<Option<TextLabel>>; 2])> = None;
+    // Mismatched bytes, the painting, and its per-byte labels per side.
+    type Candidate<'a> = (usize, &'a NamedTextMapping, [Vec<Option<TextLabel>>; 2]);
+    let mut best: Option<Candidate> = None;
     for painting in paintings_for_mode(&mapping, options)? {
         let mut painted: [Vec<(HumanTextSpan, TextLabel)>; 2] = [Vec::new(), Vec::new()];
         for entry in &painting.mapping.entries {
@@ -1146,7 +1148,7 @@ fn painting_failure_census() -> Result<()> {
         // a verified fact about that pair, not a choice of the matcher's.
         for (key, human) in human_ast.mapping.iter_mut() {
             if let Some(real) = real_ast.mapping.get(key) {
-                human.reason = real.reason.clone();
+                human.reason = real.reason;
             }
         }
         let node_cache = crate::diff::NodeCache::build(before, after);

@@ -400,6 +400,26 @@ impl RenderOptions {
             _ => {}
         }
     }
+
+    /// Whether going from `previous` to these options changes which ranges the diff is built
+    /// with, so a viewer has to rebuild it rather than re-filter the ranges it already has.
+    ///
+    /// Stated by exclusion: [`Self::leading_whitespace`] and [`Self::structural_punctuation`] are
+    /// the only post-filters `ranges_for_options` applies, and every other field is read while
+    /// `TextDiff` is built. Listing the construction-time fields instead is how the TUI and the web
+    /// UI both came to miss `paint_displaced_moves` and `paint_resized_moves` - each field added
+    /// later had to be remembered in two places, and two were not, so toggling them in the `M`
+    /// panel re-filtered a diff built without them. A field added from now on rebuilds unless it
+    /// is added here as a post-filter, which is the safe way round: a needless rebuild costs time,
+    /// a missing one shows a stale diff.
+    pub fn needs_rebuild_from(&self, previous: &Self) -> bool {
+        let post_filters_only = Self {
+            leading_whitespace: previous.leading_whitespace,
+            structural_punctuation: previous.structural_punctuation,
+            ..*self
+        };
+        post_filters_only != *previous
+    }
 }
 
 impl Default for RenderOptions {

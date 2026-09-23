@@ -834,9 +834,7 @@ impl App {
     /// real `UI` - nothing here touches one.
     fn apply_render_options(&mut self, options: RenderOptions) -> Result<()> {
         let previous = self.diff_viewer.render_options();
-        let needs_reload = previous.whole_pair_updates != options.whole_pair_updates
-            || previous.paint_reindent_only_moves != options.paint_reindent_only_moves
-            || previous.whole_identifier_updates != options.whole_identifier_updates;
+        let needs_reload = options.needs_rebuild_from(&previous);
         self.diff_viewer.set_render_options(options);
         theme::save_render_options(options);
         if needs_reload
@@ -2240,6 +2238,30 @@ mod tests {
             ),
             "expected exactly one StartDiff reload, got {queued:?}"
         );
+        Ok(())
+    }
+
+    /// Every construction-time field reloads, not only `whole_pair_updates` - the two move options
+    /// were once left out and toggling them re-filtered a stale diff.
+    #[test]
+    fn apply_render_options_reloads_for_every_construction_time_field() -> Result<()> {
+        let construction_time = RenderOptions::default().options().len();
+        for index in 2..construction_time {
+            let mut app = App::new(4.0, 60.0)?;
+            app.before_path = Some(PathBuf::from("before.rs"));
+            app.after_path = Some(PathBuf::from("after.rs"));
+            let mut options = app.diff_viewer.render_options();
+            options.toggle(index);
+
+            app.apply_render_options(options)?;
+
+            let queued: Vec<_> = std::iter::from_fn(|| app.action_rx.try_recv().ok()).collect();
+            assert!(
+                matches!(queued.as_slice(), [Action::StartDiff(_, _)]),
+                "toggling option {index} ({}) should reload, got {queued:?}",
+                options.options()[index].0
+            );
+        }
         Ok(())
     }
 

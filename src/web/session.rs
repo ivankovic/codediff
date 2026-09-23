@@ -369,9 +369,7 @@ impl Session {
         let previous = self.render_options;
         self.render_options = options;
         theme::save_render_options(options);
-        let needs_recompute = previous.whole_pair_updates != options.whole_pair_updates
-            || previous.paint_reindent_only_moves != options.paint_reindent_only_moves
-            || previous.whole_identifier_updates != options.whole_identifier_updates;
+        let needs_recompute = options.needs_rebuild_from(&previous);
         if needs_recompute
             && let (Some(before), Some(after)) = (self.before.clone(), self.after.clone())
         {

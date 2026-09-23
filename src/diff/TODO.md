@@ -33,11 +33,12 @@ mockcandidatefilter`, `kotlin-refactor-function`, ...). Either width now passes;
 violations 33 -> 24, and three clamped fixtures (the two `ladybird` class renames and
 `kotlin-nextcloud-android-rename`) are clean.
 
-Noticed while wiring the field, not fixed: the TUI's `apply_render_options` and the web session's
-`set_render_options` reload the diff only when `whole_pair_updates`, `paint_reindent_only_moves` or
-(now) `whole_identifier_updates` change. `paint_displaced_moves` and `paint_resized_moves` are
-construction-time too, so toggling either in the `M` panel re-filters a diff that was built
-without it.
+Noticed while wiring the field, and fixed after it: the TUI's `apply_render_options` and the web
+session's `set_render_options` each kept their own list of construction-time fields, and both had
+missed `paint_displaced_moves` and `paint_resized_moves`, so toggling either in the `M` panel
+re-filtered a diff built without it. Both now ask `RenderOptions::needs_rebuild_from`, which names
+the two post-filters and treats every other field as construction-time - a field added later
+rebuilds unless someone says otherwise.
 
 ## 2026-09-23: the human-mapping painting benchmark borrows codediff's reasons
 

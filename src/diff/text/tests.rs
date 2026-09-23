@@ -306,6 +306,23 @@ fn minimal_and_full_disagree_on_paint_resized_moves() {
     const { assert!(RenderOptions::FULL.paint_resized_moves) };
 }
 
+/// The first two options are post-filters and never need a rebuild; every other one does.
+#[test]
+fn only_the_post_filters_skip_a_rebuild() {
+    let base = RenderOptions::FULL;
+    for index in 0..base.options().len() {
+        let mut toggled = base;
+        toggled.toggle(index);
+        assert_eq!(
+            toggled.needs_rebuild_from(&base),
+            index >= 2,
+            "option {index} ({})",
+            base.options()[index].0
+        );
+    }
+    assert!(!base.needs_rebuild_from(&base));
+}
+
 /// `whole_identifier_updates` is the fourth, and ground-truth invariant 16 is why.
 #[test]
 fn minimal_and_full_disagree_on_whole_identifier_updates() {
