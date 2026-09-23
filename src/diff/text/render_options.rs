@@ -290,6 +290,28 @@ pub struct RenderOptions {
     /// `TextDiff` is being built, so `ranges_for_options` cannot apply it afterwards.
     #[serde(default = "paint_resized_moves_default")]
     pub paint_resized_moves: bool,
+    /// Whether a renamed identifier is highlighted whole on both sides, or narrowed to the
+    /// characters that differ.
+    ///
+    /// **`MINIMAL` false, `FULL` true**, which is ground-truth invariant 16
+    /// (`identifier_updates_are_painted_by_preset`): `Minimal` marks the bytes that carry the
+    /// change and `Full` accounts for every byte whose role changed, and a renamed identifier has
+    /// both readings at once. `getOpt` becoming `getKey` is a different name under `FULL`, not a
+    /// `get` that survived. Measured over the 792 painted fixtures with the human mapping rendered:
+    /// `FULL` zero-byte fixtures 528 -> 544, 38 better and 1 worse.
+    ///
+    /// Narrower than [`Self::whole_pair_updates`], which paints *every* matched pair whole and costs
+    /// `FULL` 148 fixtures: comments, strings and prose keep their narrow reading here, because a
+    /// changed year in a copyright line is still one changed year. Only an identifier-shaped token
+    /// that is not content (see `is_content_node`) and not markup text qualifies.
+    ///
+    /// **Construction-time**, like [`Self::whole_pair_updates`]: it decides which ranges
+    /// `intra_node_update_ranges` builds, so the `M` panel reloads the diff when it changes.
+    ///
+    /// `#[serde(default)]`: a config written before this field existed gets the narrow reading it
+    /// always had.
+    #[serde(default)]
+    pub whole_identifier_updates: bool,
 }
 
 /// [`RenderOptions::paint_reindent_only_moves`]'s serde default - see that field's own doc
@@ -321,6 +343,7 @@ impl RenderOptions {
         paint_reindent_only_moves: false,
         paint_displaced_moves: false,
         paint_resized_moves: false,
+        whole_identifier_updates: false,
     };
     /// Every option on: the fullest reading of a diff, short of trailing whitespace, which no
     /// combination of options ever paints. `whole_pair_updates` stays off even here - see that
@@ -332,6 +355,7 @@ impl RenderOptions {
         paint_reindent_only_moves: true,
         paint_displaced_moves: true,
         paint_resized_moves: true,
+        whole_identifier_updates: true,
     };
 
     /// Every option, paired with its label and current value, in the order a settings UI should
@@ -343,7 +367,7 @@ impl RenderOptions {
     /// whether a settings UI can offer it. The `M` panel toggling this one now goes through a
     /// diff reload rather than `DiffViewer::set_render_options`'s plain re-filter (see
     /// `tui::app`'s `Action::RenderOptionsChanged` handler) precisely so it's safe to list here.
-    pub fn options(&self) -> [(&'static str, bool); 6] {
+    pub fn options(&self) -> [(&'static str, bool); 7] {
         [
             ("Leading whitespace", self.leading_whitespace),
             (
@@ -357,6 +381,7 @@ impl RenderOptions {
                 "Paint moves the two sides size differently",
                 self.paint_resized_moves,
             ),
+            ("Whole renamed identifiers", self.whole_identifier_updates),
         ]
     }
 
@@ -371,6 +396,7 @@ impl RenderOptions {
             3 => self.paint_reindent_only_moves = !self.paint_reindent_only_moves,
             4 => self.paint_displaced_moves = !self.paint_displaced_moves,
             5 => self.paint_resized_moves = !self.paint_resized_moves,
+            6 => self.whole_identifier_updates = !self.whole_identifier_updates,
             _ => {}
         }
     }

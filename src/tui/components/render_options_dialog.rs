@@ -167,6 +167,7 @@ mod tests {
                 paint_reindent_only_moves: false,
                 paint_displaced_moves: false,
                 paint_resized_moves: false,
+                whole_identifier_updates: false,
             }))
         );
     }
@@ -187,6 +188,7 @@ mod tests {
                 paint_reindent_only_moves: false,
                 paint_displaced_moves: false,
                 paint_resized_moves: false,
+                whole_identifier_updates: false,
             }))
         );
     }

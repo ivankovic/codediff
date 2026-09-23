@@ -158,13 +158,14 @@ pub struct ListingPayload {
 /// TUI's `M` panel shows. Pinned by a test against the struct's real serialization so a renamed
 /// or reordered field cannot leave the page toggling the wrong row.
 pub fn render_option_rows() -> Vec<RenderOptionRow> {
-    const KEYS: [&str; 6] = [
+    const KEYS: [&str; 7] = [
         "leading_whitespace",
         "structural_punctuation",
         "whole_pair_updates",
         "paint_reindent_only_moves",
         "paint_displaced_moves",
         "paint_resized_moves",
+        "whole_identifier_updates",
     ];
     KEYS.iter()
         .zip(RenderOptions::FULL.options())
@@ -369,7 +370,8 @@ impl Session {
         self.render_options = options;
         theme::save_render_options(options);
         let needs_recompute = previous.whole_pair_updates != options.whole_pair_updates
-            || previous.paint_reindent_only_moves != options.paint_reindent_only_moves;
+            || previous.paint_reindent_only_moves != options.paint_reindent_only_moves
+            || previous.whole_identifier_updates != options.whole_identifier_updates;
         if needs_recompute
             && let (Some(before), Some(after)) = (self.before.clone(), self.after.clone())
         {

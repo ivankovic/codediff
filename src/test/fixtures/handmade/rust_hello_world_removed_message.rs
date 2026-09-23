@@ -65,7 +65,7 @@ fn painting() -> Result<()> {
     // The mirror image of `rust-hello-world-added-message`, and it scores identically - which is
     // the useful part: the same edit read backwards costs the same, so nothing here is
     // direction-dependent.
-    assert_matches_human_painting_within_limit("rust-hello-world-removed-message", 0.69)
+    assert_matches_human_painting_within_limit("rust-hello-world-removed-message", 0.0)
 }
 
 #[test]

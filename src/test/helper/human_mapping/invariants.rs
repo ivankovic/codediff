@@ -53,7 +53,8 @@
 //! * [`match_but_not_identical_entries_differ`] - a `MatchButNotIdentical` entry's two subtrees do
 //!   not read byte-identically with every descendant paired inside.
 //! * [`identifier_updates_are_painted_by_preset`] - a renamed identifier is painted at its own
-//!   preset's granularity: `Minimal` marks the differing words, `Full` marks it entire.
+//!   preset's granularity: `Minimal` marks the differing words or characters, `Full` marks it
+//!   entire.
 //! * [`boolean_flips_are_one_edit`] - a boolean the mapping pairs is not painted `Delete` on one
 //!   side and `Insert` on the other.
 //! * [`single_valued_fields_hold_a_pair`] - a matched pair's single-valued named field holds a
@@ -2593,23 +2594,22 @@ fn raw_affix(text: &str, other: &str) -> (usize, usize) {
     (prefix, end.max(prefix))
 }
 
-/// Every span a `Minimal` painting may legitimately mark on this side of a rename.
+/// Every span a `Minimal` painting may legitimately mark on this side of a rename: the differing
+/// words, and the differing characters.
 ///
-/// One candidate when the identifier has a word boundary inside it: the widened span, because
-/// that is what the boundary is *for* - `getDeclaredConstructor` -> `getDeclaredConstructors` is
-/// read as the word `Constructors` changing, not as an `s` appearing.
-///
-/// **Two candidates when it has none.** `align` -> `halign` and `v` -> `value` are single words
-/// with nothing to orient on, and there the bare affix is as defensible as the whole token: a
-/// painter marking just the added `h` is saying something true, and so is one marking `halign`
-/// entire. Widening is a rule about where a highlight may be *cut*, and an identifier with no
-/// internal boundary offers no cut to prefer - so both readings pass rather than the corpus being
-/// told to pick one.
+/// The words are the widened span - `getDeclaredConstructor` -> `getDeclaredConstructors` read as
+/// the word `Constructors` changing - and the characters are the bare affix, the `s` that
+/// appeared. Both are readings a painter draws, and the corpus holds both:
+/// `java-defects4j-mockito-19-mockcandidatefilter` and `kotlin-refactor-function` mark whole
+/// words, while `java-defects4j-chart-7-timeperiodvalues` marks `in`/`ax` of
+/// `minMiddleIndex`/`maxMiddleIndex` - which is also the width the renderer paints under
+/// `MINIMAL`. Holding `Minimal` to the characters alone would condemn 13 fixtures that mark words;
+/// holding it to the words alone condemned the character readings, and misfired outright on an
+/// acronym - `PRIU64` -> `PRIu64` is a one-letter case fix, but the word splitter reads `PRIu64` as
+/// `PR` + `Iu64` and asked for `Iu64`. So either passes, and what the rule still rejects is a
+/// `Minimal` painting that marks the unchanged rest of the identifier.
 fn minimal_affix_candidates(text: &str, other: &str) -> Vec<(usize, usize)> {
     let widened = differing_affix(text, other);
-    if identifier_word_starts(text).len() > 2 {
-        return vec![widened];
-    }
     let (start, end) = raw_affix(text, other);
     let mut candidates = vec![widened];
     if (start, end) != widened {
@@ -2641,7 +2641,7 @@ fn is_identifier_leaf(leaf: Node, contents: &str) -> bool {
 }
 
 /// **Invariant 16.** When the tree mapping pairs two identifiers that differ, `Minimal` paints
-/// only the differing words and `Full` paints the whole identifier on both sides.
+/// only the differing words or characters and `Full` paints the whole identifier on both sides.
 ///
 /// The two presets are not degrees of care, they are two conventions (see
 /// `text_painting_findings.md`, rule 1), and this is the one edit where they are *obliged* to
@@ -3089,10 +3089,10 @@ mod tests {
         let candidates = minimal_affix_candidates("value", "v");
         assert!(candidates.contains(&(1, 5)));
         assert!(candidates.contains(&(0, 5)));
-        // With a boundary to orient on there is one reading, and it is the widened one.
+        // With a boundary to orient on, the word and the characters both pass.
         assert_eq!(
             minimal_affix_candidates("getDeclaredConstructors", "getDeclaredConstructor"),
-            vec![(11, 23)]
+            vec![(11, 23), (22, 23)]
         );
     }
 

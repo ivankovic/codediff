@@ -835,7 +835,8 @@ impl App {
     fn apply_render_options(&mut self, options: RenderOptions) -> Result<()> {
         let previous = self.diff_viewer.render_options();
         let needs_reload = previous.whole_pair_updates != options.whole_pair_updates
-            || previous.paint_reindent_only_moves != options.paint_reindent_only_moves;
+            || previous.paint_reindent_only_moves != options.paint_reindent_only_moves
+            || previous.whole_identifier_updates != options.whole_identifier_updates;
         self.diff_viewer.set_render_options(options);
         theme::save_render_options(options);
         if needs_reload
@@ -2257,6 +2258,7 @@ mod tests {
             paint_reindent_only_moves: true,
             paint_displaced_moves: true,
             paint_resized_moves: true,
+            whole_identifier_updates: true,
         })?;
 
         let queued: Vec<_> = std::iter::from_fn(|| app.action_rx.try_recv().ok()).collect();
@@ -2496,6 +2498,7 @@ mod tests {
             paint_reindent_only_moves: true,
             paint_displaced_moves: true,
             paint_resized_moves: true,
+            whole_identifier_updates: true,
         });
 
         let backend = ratatui::backend::TestBackend::new(120, 24);

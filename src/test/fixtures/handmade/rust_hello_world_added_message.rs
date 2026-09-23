@@ -65,7 +65,7 @@ fn painting() -> Result<()> {
     // Minimal is exact and Full is not, which is the expected direction: Full paints the structural
     // punctuation and whitespace Minimal drops, so it has strictly more bytes to be wrong about.
     // The clamp records the worse of the two.
-    assert_matches_human_painting_within_limit("rust-hello-world-added-message", 0.69)
+    assert_matches_human_painting_within_limit("rust-hello-world-added-message", 0.0)
 }
 
 #[test]

@@ -27,7 +27,7 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    assert_matches_human_painting_within_limit("kotlin-add-validation", 0.18)
+    assert_matches_human_painting_within_limit("kotlin-add-validation", 0.0)
 }
 
 #[test]

@@ -48,7 +48,7 @@ fn changed(row: usize, start: usize, end: usize) -> RangeMatch {
 #[test]
 fn neither_preset_turns_on_whole_pair_updates() {
     const { assert!(!RenderOptions::MINIMAL.whole_pair_updates) };
-    // EXPERIMENT const { assert!(!RenderOptions::FULL.whole_pair_updates) };
+    const { assert!(!RenderOptions::FULL.whole_pair_updates) };
 }
 
 /// Unlike `whole_pair_updates`, the two presets genuinely disagree on
@@ -304,6 +304,13 @@ fn reconcile_moves_keeps_two_overlapping_accounts_of_one_relocation() {
 fn minimal_and_full_disagree_on_paint_resized_moves() {
     const { assert!(!RenderOptions::MINIMAL.paint_resized_moves) };
     const { assert!(RenderOptions::FULL.paint_resized_moves) };
+}
+
+/// `whole_identifier_updates` is the fourth, and ground-truth invariant 16 is why.
+#[test]
+fn minimal_and_full_disagree_on_whole_identifier_updates() {
+    const { assert!(!RenderOptions::MINIMAL.whole_identifier_updates) };
+    const { assert!(RenderOptions::FULL.whole_identifier_updates) };
 }
 
 /// The exact tokens the painted corpus showed `Full` adding over `Minimal` - eight `(`, five
@@ -578,6 +585,7 @@ fn structural_punctuation_off_alone_still_keeps_leading_whitespace() {
         paint_reindent_only_moves: true,
         paint_displaced_moves: true,
         paint_resized_moves: true,
+        whole_identifier_updates: true,
     };
     let result = ranges_for_options(&ranges, source, options);
 
@@ -601,6 +609,7 @@ fn leading_whitespace_off_alone_still_keeps_a_range_containing_punctuation() {
         paint_reindent_only_moves: true,
         paint_displaced_moves: true,
         paint_resized_moves: true,
+        whole_identifier_updates: true,
     };
     let result = ranges_for_options(&ranges, source, options);
 
@@ -2199,10 +2208,10 @@ fn summarize_diff_with_comment_check_ignores_the_flag_when_false() {
     );
 }
 
-/// A single-character edit inside a 20-character identifier ("long_identifier_**n**ame" ->
-/// "long_identifier_**n**ome": common prefix "long_identifier_n", common suffix "me", one
-/// changed character in between) must produce exactly one narrow `Update` range - not one
-/// `Update` spanning the whole identifier, which is the bug this feature fixes.
+/// Under `MINIMAL`, a single-character edit inside a 20-character identifier
+/// ("long_identifier_**n**ame" -> "long_identifier_**n**ome": common prefix "long_identifier_n",
+/// common suffix "me", one changed character in between) produces exactly one narrow `Update`
+/// range. `FULL` paints the same rename whole - see the test below.
 #[test]
 fn ranges_decomposes_a_small_change_inside_a_long_identifier() {
     let (before, after, ast, node_cache) = diff_ast(
@@ -2215,7 +2224,7 @@ fn ranges_decomposes_a_small_change_inside_a_long_identifier() {
         &ast,
         &node_cache,
         true,
-        RenderOptions::FULL,
+        RenderOptions::MINIMAL,
     );
 
     let updates: Vec<_> = before_ranges
@@ -2243,7 +2252,7 @@ fn ranges_decomposes_a_small_change_inside_a_long_identifier() {
         &ast,
         &node_cache,
         false,
-        RenderOptions::FULL,
+        RenderOptions::MINIMAL,
     );
     let after_updates: Vec<_> = after_ranges
         .iter()
@@ -2254,6 +2263,65 @@ fn ranges_decomposes_a_small_change_inside_a_long_identifier() {
         after_updates[0].source.end_column - after_updates[0].source.start_column,
         1,
         "the after->before direction must independently find the same narrow width"
+    );
+}
+
+/// Under `FULL`, the rename from the test above is painted whole on both sides - ground-truth
+/// invariant 16's `Full` half, via [`RenderOptions::whole_identifier_updates`].
+#[test]
+fn full_paints_a_renamed_identifier_whole() {
+    let (before, after, ast, node_cache) = diff_ast(
+        "fn main() {\n    let long_identifier_name = 5;\n}",
+        "fn main() {\n    let long_identifier_nome = 5;\n}",
+    );
+    for (source, destination, source_is_before) in
+        [(&before, &after, true), (&after, &before, false)]
+    {
+        let updates: Vec<_> = ranges(
+            source,
+            destination,
+            &ast,
+            &node_cache,
+            source_is_before,
+            RenderOptions::FULL,
+        )
+        .into_iter()
+        .filter(|r| r.operation == TextOperation::Update)
+        .collect();
+        assert_eq!(updates.len(), 1, "expected one Update, got {updates:?}");
+        assert_eq!(
+            updates[0].source.end_column - updates[0].source.start_column,
+            "long_identifier_name".len(),
+            "FULL should paint the whole renamed identifier"
+        );
+    }
+}
+
+/// `whole_identifier_updates` is scoped to identifiers: a changed comment keeps its narrow reading
+/// under `FULL`, because painting every changed pair whole is what cost `FULL` 148 fixtures when
+/// `whole_pair_updates` was tried in its place.
+#[test]
+fn full_keeps_a_changed_comment_narrow() {
+    let (before, after, ast, node_cache) = diff_ast(
+        "// Copyright 2025 Example\nfn main() {}\n",
+        "// Copyright 2026 Example\nfn main() {}\n",
+    );
+    let updates: Vec<_> = ranges(
+        &before,
+        &after,
+        &ast,
+        &node_cache,
+        true,
+        RenderOptions::FULL,
+    )
+    .into_iter()
+    .filter(|r| r.operation == TextOperation::Update)
+    .collect();
+    assert_eq!(updates.len(), 1, "expected one Update, got {updates:?}");
+    assert!(
+        updates[0].source.end_column - updates[0].source.start_column <= 2,
+        "only the changed digit(s) of the year should be painted, got {:?}",
+        updates[0]
     );
 }
 
@@ -2387,7 +2455,9 @@ fn ranges_decomposition_survives_an_unrelated_earlier_insertion() {
          let long_identifier_nome = 5;\n}",
     );
 
-    let text_diff = TextDiff::from(&before, &after, &ast, &node_cache);
+    // `MINIMAL`: the narrow split is what this guards, and `FULL` paints the rename whole.
+    let text_diff =
+        TextDiff::from_with_options(&before, &after, &ast, &node_cache, RenderOptions::MINIMAL);
     let before_ranges = text_diff.all(0);
     let after_ranges = text_diff.all(1);
 

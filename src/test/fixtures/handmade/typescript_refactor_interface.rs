@@ -30,7 +30,7 @@ fn painting() -> Result<()> {
     // `solve_heritage_clause_growth` keeps a class or interface that gains a heritage clause from
     // painting its untouched body as Move, which is most of what this fixture would otherwise
     // disagree about.
-    assert_matches_human_painting_within_limit("typescript-refactor-interface", 2.24)
+    assert_matches_human_painting_within_limit("typescript-refactor-interface", 0.0)
 }
 
 #[test]

@@ -317,11 +317,20 @@ pub(crate) const WHOLE_TOKENS: &[&str] = &[
 /// would cut through one of [`WHOLE_TOKENS`]. `<=` becoming `<` is a different comparison, not a
 /// `<` that stayed and an `=` that left, and `true` becoming `false` is a flipped value rather than
 /// a kept `e`; the corpus paints both whole. Only a token longer than one character can be cut.
-/// EXPERIMENT
-fn is_identifier_text(text: &str) -> bool {
-    let mut chars = text.chars();
-    chars.next().is_some_and(|c| c.is_alphabetic() || c == '_' || c == '$')
-        && chars.all(|c| c.is_alphanumeric() || c == '_' || c == '$')
+/// Whether a changed node of `kind` reading `a` on one side and `b` on the other is a renamed
+/// identifier - the one shape [`RenderOptions::whole_identifier_updates`] paints whole. Both texts
+/// must be identifier-shaped, and the node must be neither content (`is_content_node`: a comment
+/// or string keeps its word-level reading) nor markup text: HTML's `text` node holding `office`
+/// is prose that happens to have no spaces, and its painting marks the changed letters only.
+fn is_renamed_identifier(kind: &str, a: &str, b: &str) -> bool {
+    let identifier = |text: &str| {
+        let mut chars = text.chars();
+        chars
+            .next()
+            .is_some_and(|c| c.is_alphabetic() || c == '_' || c == '$')
+            && chars.all(|c| c.is_alphanumeric() || c == '_' || c == '$')
+    };
+    !is_content_node(kind) && kind != "text" && identifier(a) && identifier(b)
 }
 
 fn splits_a_whole_token(a: &str, b: &str) -> bool {
@@ -883,10 +892,8 @@ impl RangeWalk<'_> {
             is_content_node(node.kind()),
             self.options.whole_pair_updates
                 || splits_a_whole_token(source_text, destination_text)
-                || (self.options.structural_punctuation // EXPERIMENT: FULL proxy
-                    && !is_content_node(node.kind())
-                    && is_identifier_text(source_text)
-                    && is_identifier_text(destination_text)),
+                || (self.options.whole_identifier_updates
+                    && is_renamed_identifier(node.kind(), source_text, destination_text)),
         )
     }
 
@@ -925,10 +932,12 @@ impl RangeWalk<'_> {
                             &self.source.contents[s_from..s_to],
                             &self.destination.contents[d_from..d_to],
                         )
-                        || (self.options.structural_punctuation // EXPERIMENT: FULL proxy
-                            && !is_content_node(node.kind())
-                            && is_identifier_text(&self.source.contents[s_from..s_to])
-                            && is_identifier_text(&self.destination.contents[d_from..d_to])),
+                        || (self.options.whole_identifier_updates
+                            && is_renamed_identifier(
+                                node.kind(),
+                                &self.source.contents[s_from..s_to],
+                                &self.destination.contents[d_from..d_to],
+                            )),
                 )
             }
             _ => vec![self.placed(node, TextOperation::Update)],

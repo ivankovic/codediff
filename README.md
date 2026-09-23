@@ -258,13 +258,13 @@ brackets, separators and leading whitespace, and `--minimal`, which drops them):
 
 | preset | zero mismatched bytes | at most 1% mismatched | mismatched bytes, whole corpus |
 |---|---|---|---|
-| `--full` | **512 (64.6%)** | **666 (84.1%)** | 28,144 of 26.3M (0.11%) |
+| `--full` | **528 (66.7%)** | **674 (85.1%)** | 27,094 of 26.3M (0.10%) |
 | `--minimal` | **559 (70.6%)** | **702 (88.6%)** | 16,524 of 26.3M (0.06%) |
 
 The whole-corpus rate is far below 1% because most of each file is unchanged and nobody gets that
 wrong; the per-test-case numbers are the ones that count, since a reader meets the mistakes one
 diff at a time. Most of what is left is not in the matching: rendering the human's own node
-mapping still disagrees with the painting on 82% of the `--full` bytes and 87% of the `--minimal`
+mapping still disagrees with the painting on 78% of the `--full` bytes and 70% of the `--minimal`
 ones, so the highlighting rules own the gap more than the matcher does.
 
 `make update-painting-attribution` measures this and writes one row per fixture and preset to

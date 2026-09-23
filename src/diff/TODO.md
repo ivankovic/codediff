@@ -1,5 +1,44 @@
 # Diff Module Notes
 
+## 2026-09-23: `FULL` paints a renamed identifier whole
+
+Invariant 16 has said so since it was written ("Today's renderer narrows before either preset is
+consulted, so `FULL` asks for more paint and gets *less*"); `RenderOptions::whole_identifier_updates`
+is the renderer catching up. Steered by the census's `renderer_bytes` column (human mapping
+rendered, so no matcher error in it), 792 painted fixtures, `FULL` only - `MINIMAL` is
+byte-identical:
+
+* **`whole_pair_updates` on for `FULL`**, every matched pair whole: zero-byte 528 -> **444**,
+  50 better and **148 worse**. Copyright years and comment edits want their narrow reading.
+* **Identifier-shaped, non-content tokens only**: 528 -> 533, 37 better, 12 worse. Eleven of the
+  twelve were single-painting fixtures - one `Only one solution` painting graded against both
+  presets, painted at the `Minimal` width, which invariant 16 skips for exactly that reason. The
+  twelfth was an HTML `text` node (`office`), prose with no spaces in it.
+* The eleven were given `Full` paintings (0944e576), and HTML `text` is excluded: **528 -> 544,
+  38 better and 0 worse**. On codediff's own mapping 512 -> 528, 37 better, and the one worse
+  (`java-defects4j-cli-20-posixparser`, 405 -> 410) is the matcher pairing identifiers the human
+  does not - its `renderer_bytes` did not move.
+
+`ranges_decomposes_a_small_change_inside_a_long_identifier` pinned the narrow width under `FULL`
+and now pins it under `MINIMAL`; `full_paints_a_renamed_identifier_whole` and
+`full_keeps_a_changed_comment_narrow` pin the two halves of the new behaviour.
+
+**Invariant 16's `Minimal` half now accepts either width.** The eleven fixtures' new `Minimal`
+paintings mark the differing *characters* (`in`/`ax` of `minMiddleIndex`/`maxMiddleIndex`), which
+is also what `MINIMAL` renders, and the rule demanded the differing *words* - and asked for `Iu64`
+on `PRIU64` -> `PRIu64`, a one-letter case fix, because the word splitter reads `PRIu64` as `PR` +
+`Iu64`. Characters-only was measured and rejected: 55 violations over 13 fixtures, among them six
+clean fixtures whose `Minimal` paintings mark whole words (`java-defects4j-mockito-19-
+mockcandidatefilter`, `kotlin-refactor-function`, ...). Either width now passes; invariant 16
+violations 33 -> 24, and three clamped fixtures (the two `ladybird` class renames and
+`kotlin-nextcloud-android-rename`) are clean.
+
+Noticed while wiring the field, not fixed: the TUI's `apply_render_options` and the web session's
+`set_render_options` reload the diff only when `whole_pair_updates`, `paint_reindent_only_moves` or
+(now) `whole_identifier_updates` change. `paint_displaced_moves` and `paint_resized_moves` are
+construction-time too, so toggling either in the `M` panel re-filters a diff that was built
+without it.
+
 ## 2026-09-23: the human-mapping painting benchmark borrows codediff's reasons
 
 `as_ast_diff_for_mapping` gives every human pair `ASTMappingReason::default()`, but

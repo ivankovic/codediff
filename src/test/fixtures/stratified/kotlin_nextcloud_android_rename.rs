@@ -19,7 +19,7 @@ use anyhow::Result;
 
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants_with_known_violations;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 
 #[test]
 fn mapping() -> Result<()> {
@@ -28,12 +28,10 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    assert_matches_human_painting_within_limit("kotlin-nextcloud-android-rename", 0.18)
+    assert_matches_human_painting_within_limit("kotlin-nextcloud-android-rename", 0.0)
 }
 
 #[test]
 fn invariants() -> Result<()> {
-    // Invariant 16: the Minimal/Full split for a renamed identifier is not painted this way yet
-    // (`PermanentFailure` against `NonRetryable`, which share nothing). Recorded as found.
-    assert_ground_truth_invariants_with_known_violations("kotlin-nextcloud-android-rename", 2)
+    assert_ground_truth_invariants("kotlin-nextcloud-android-rename")
 }

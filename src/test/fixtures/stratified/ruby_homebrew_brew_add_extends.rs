@@ -28,7 +28,7 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    assert_matches_human_painting_within_limit("ruby-homebrew-brew-add-extends", 0.08)
+    assert_matches_human_painting_within_limit("ruby-homebrew-brew-add-extends", 0.0)
 }
 
 #[test]

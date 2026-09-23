@@ -27,7 +27,7 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    assert_matches_human_painting_within_limit("java-add-logging", 0.41)
+    assert_matches_human_painting_within_limit("java-add-logging", 0.0)
 }
 
 #[test]

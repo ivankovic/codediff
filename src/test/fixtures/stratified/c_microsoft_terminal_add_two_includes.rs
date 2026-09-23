@@ -30,7 +30,7 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    assert_matches_human_painting_within_limit("c-microsoft-terminal-add-two-includes", 0.37)
+    assert_matches_human_painting_within_limit("c-microsoft-terminal-add-two-includes", 0.0)
 }
 
 #[test]

@@ -91,7 +91,7 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    assert_matches_human_painting_within_limit("rust-leetcode-1-bugfix", 1.57)
+    assert_matches_human_painting_within_limit("rust-leetcode-1-bugfix", 0.0)
 }
 
 #[test]

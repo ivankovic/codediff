@@ -141,7 +141,7 @@ fn mapping_details_reversed() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    assert_matches_human_painting_within_limit("rust-add-value-to-enum", 0.08)
+    assert_matches_human_painting_within_limit("rust-add-value-to-enum", 0.0)
 }
 
 #[test]

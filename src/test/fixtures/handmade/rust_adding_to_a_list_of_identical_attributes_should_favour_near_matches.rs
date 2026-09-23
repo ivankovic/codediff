@@ -39,7 +39,7 @@ fn mapping() -> Result<()> {
 fn painting() -> Result<()> {
     assert_matches_human_painting_within_limit(
         "rust-adding-to-a-list-of-identical-attributes-should-favour-near-matches",
-        0.02,
+        0.0,
     )
 }
 

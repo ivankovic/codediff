@@ -45,11 +45,11 @@ fn painting() -> Result<()> {
 
 #[test]
 fn invariants() -> Result<()> {
-    // Invariant 16: the Minimal/Full split for a renamed identifier is not painted this way yet
-    // (`c`/`constructor` and `getDeclaredConstructors`/`getDeclaredConstructor`). Recorded as
-    // found.
+    // Invariant 16, twice: `c` renamed `constructor` on before rows 24 and 25. The `Minimal`
+    // painting marks the whole `c`, where both readings the rule accepts treat `c` as the shared
+    // prefix and mark only `onstructor` on the after side.
     assert_ground_truth_invariants_with_known_violations(
         "java-defects4j-mockito-21-constructorinstantiator",
-        3,
+        2,
     )
 }

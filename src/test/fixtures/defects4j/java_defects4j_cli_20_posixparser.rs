@@ -38,7 +38,7 @@ fn painting() -> Result<()> {
     // they paint different halves of it. Full costs three times minimal, which is the usual
     // direction - it keeps the standalone brackets and the leading whitespace minimal drops - but
     // the multiple was not examined.
-    assert_matches_human_painting_within_limit("java-defects4j-cli-20-posixparser", 1.98)
+    assert_matches_human_painting_within_limit("java-defects4j-cli-20-posixparser", 2.00)
 }
 
 #[test]

@@ -34,7 +34,7 @@ fn painting() -> Result<()> {
     // minimal 0.111% -> 0.055%, full 0.055% -> 0.000%.
     assert_matches_human_painting_within_limit(
         "cpp-mozilla-firefox-firefox-update-file-comment",
-        0.07,
+        0.0,
     )
 }
 
