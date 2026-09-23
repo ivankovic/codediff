@@ -99,6 +99,11 @@ fn measure_stub_fixtures() -> Result<()> {
 /// mode are read from env vars so this can be pointed at any `painting_disagreement_report`
 /// offender without editing this function: `FIXTURE=<name> MODE=<minimal|full> cargo test --lib
 /// --features test-fixtures painting_disagreement_detail -- --ignored --nocapture`.
+///
+/// `MAPPING=human` renders the fixture's human tree mapping instead of codediff's, with
+/// codediff's reasons borrowed exactly as `painting_failure_census` does - the runs behind that
+/// census's `renderer_bytes` column, i.e. what only a rendering change can fix. Either way the
+/// comparison is against the closest of the preset's candidate paintings, as the census scores it.
 #[test]
 #[ignore]
 fn painting_disagreement_detail() -> Result<()> {
@@ -114,38 +119,89 @@ fn painting_disagreement_detail() -> Result<()> {
 
     let (before, after) = &*crate::test::helper::handmade_test_code_pair(&name)?;
     let mapping = load(&name)?;
-    let painting = paintings_for_mode(&mapping, options)?[0];
-
-    let mut painted: [Vec<(HumanTextSpan, TextLabel)>; 2] = [Vec::new(), Vec::new()];
-    for entry in &painting.mapping.entries {
-        let label = TextLabel::from_verdict(entry.verdict(&before.contents, &after.contents)?);
-        for span in &entry.before {
-            painted[0].push((*span, label));
-        }
-        for span in &entry.after {
-            painted[1].push((*span, label));
-        }
-    }
+    let human = std::env::var("MAPPING").is_ok_and(|m| m.eq_ignore_ascii_case("human"));
 
     let diff = crate::diff::diff_code(before, after);
-    let ast = diff
+    let real = diff
         .ast
         .as_ref()
         .with_context(|| format!("codediff produced no AST diff for '{name}'"))?;
+    let ast = if human {
+        let mut human_ast = as_ast_diff_for_mapping(&mapping, before, after)?;
+        for (key, pair) in human_ast.mapping.iter_mut() {
+            if let Some(ours) = real.mapping.get(key) {
+                pair.reason = ours.reason.clone();
+            }
+        }
+        human_ast
+    } else {
+        real.clone()
+    };
     let node_cache = crate::diff::NodeCache::build(before, after);
-    let text_diff =
-        crate::diff::text::TextDiff::from_with_options(before, after, ast, &node_cache, options);
+    let render = |ast: &ASTDiff| -> Vec<Vec<Option<TextLabel>>> {
+        let text_diff = crate::diff::text::TextDiff::from_with_options(
+            before,
+            after,
+            ast,
+            &node_cache,
+            options,
+        );
+        [(0usize, &before.contents), (1usize, &after.contents)]
+            .into_iter()
+            .map(|(side, contents)| {
+                let ranges =
+                    crate::diff::text::ranges_for_options(&text_diff.all(side), contents, options);
+                label_bytes_from_ranges(contents, &ranges)
+            })
+            .collect()
+    };
+    let ours = render(&ast);
+    // The candidate is chosen against codediff's own rendering even under `MAPPING=human`, as
+    // the census chooses it, so the two report runs against the same painting.
+    let chooser = if human { render(real) } else { ours.clone() };
+
+    // The closest candidate, as the census scores it.
+    let mut best: Option<(usize, &NamedTextMapping, [Vec<Option<TextLabel>>; 2])> = None;
+    for painting in paintings_for_mode(&mapping, options)? {
+        let mut painted: [Vec<(HumanTextSpan, TextLabel)>; 2] = [Vec::new(), Vec::new()];
+        for entry in &painting.mapping.entries {
+            let label = TextLabel::from_verdict(entry.verdict(&before.contents, &after.contents)?);
+            for span in &entry.before {
+                painted[0].push((*span, label));
+            }
+            for span in &entry.after {
+                painted[1].push((*span, label));
+            }
+        }
+        let theirs = [
+            label_bytes(&before.contents, &painted[0]),
+            label_bytes(&after.contents, &painted[1]),
+        ];
+        let mismatched: usize = (0..2)
+            .map(|side| {
+                chooser[side]
+                    .iter()
+                    .zip(&theirs[side])
+                    .filter(|(a, b)| a != b)
+                    .count()
+            })
+            .sum();
+        if best
+            .as_ref()
+            .is_none_or(|(least, _, _)| mismatched < *least)
+        {
+            best = Some((mismatched, painting, theirs));
+        }
+    }
+    let (_, painting, theirs) = best.context("a preset with no candidate paintings")?;
 
     eprintln!(
-        "fixture={name} mode={mode} (painting solution='{}')",
+        "fixture={name} mode={mode} mapping={} (painting solution='{}')",
+        if human { "human" } else { "codediff" },
         painting.name
     );
     for (side, contents) in [(0usize, &before.contents), (1usize, &after.contents)] {
-        let ours_ranges =
-            crate::diff::text::ranges_for_options(&text_diff.all(side), contents, options);
-        let ours = label_bytes_from_ranges(contents, &ours_ranges);
-        let theirs = label_bytes(contents, &painted[side]);
-
+        let (ours, theirs) = (&ours[side], &theirs[side]);
         let mut i = 0usize;
         while i < ours.len() {
             if ours[i] == theirs[i] {
@@ -1075,13 +1131,24 @@ fn painting_failure_census() -> Result<()> {
         let Some(real_ast) = real_diff.ast.as_ref() else {
             continue;
         };
-        let human_ast = match as_ast_diff_for_mapping(&mapping, before, after) {
+        let mut human_ast = match as_ast_diff_for_mapping(&mapping, before, after) {
             Ok(diff) => diff,
             Err(e) => {
                 errors.push(format!("{name}: human mapping -> ASTDiff: {e:#}"));
                 continue;
             }
         };
+        // The human format records no `ASTMappingReason`, but the renderer reads one:
+        // `identical_or_move` keeps a relocated node unpainted when the matcher verified the
+        // relocation is a pure reindent or heritage-clause shift. Untagged, every human pair loses
+        // those overrides, and the `ideal` column blames the renderer for `Move`s codediff's own
+        // output never paints. Every pair both mappings make borrows codediff's reason, which is
+        // a verified fact about that pair, not a choice of the matcher's.
+        for (key, human) in human_ast.mapping.iter_mut() {
+            if let Some(real) = real_ast.mapping.get(key) {
+                human.reason = real.reason.clone();
+            }
+        }
         let node_cache = crate::diff::NodeCache::build(before, after);
         let roots = [
             before.ast.as_ref().unwrap().root_node(),

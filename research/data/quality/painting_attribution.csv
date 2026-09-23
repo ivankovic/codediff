@@ -44,7 +44,7 @@ c-ladybirdbrowser-ladybird-move-to-a-different-class,minimal,1507,0,0,0,2,1
 c-ladybirdbrowser-ladybird-small-parse-errors,full,31576,8,4,4,2,0
 c-ladybirdbrowser-ladybird-small-parse-errors,minimal,31576,4,2,2,2,0
 c-linux-small-bugfix,full,199613,7,15,8,2,0
-c-linux-small-bugfix,minimal,199613,106,144,38,2,0
+c-linux-small-bugfix,minimal,199613,106,112,6,2,0
 c-microsoft-terminal-add-function,full,52410,0,0,0,2,0
 c-microsoft-terminal-add-function,minimal,52410,0,0,0,2,0
 c-microsoft-terminal-add-two-includes,full,278,0,0,0,1,0
@@ -328,7 +328,7 @@ go-jesseduffield-lazygit-add-a-func,minimal,579,0,0,0,1,0
 go-jesseduffield-lazygit-add-two-lines,full,3125,0,0,0,2,0
 go-jesseduffield-lazygit-add-two-lines,minimal,3125,0,0,0,2,0
 go-junegunn-fzf-real-small-change,full,433,3,3,0,2,0
-go-junegunn-fzf-real-small-change,minimal,433,2,18,16,2,0
+go-junegunn-fzf-real-small-change,minimal,433,2,2,0,2,0
 go-lazygit-switch-to-strings,full,1443,59,41,58,2,0
 go-lazygit-switch-to-strings,minimal,1443,37,28,48,2,0
 go-ollama-ollama-add-go-build-comment,full,338,0,0,0,1,0
@@ -452,7 +452,7 @@ java-defects4j-chart-9-timeseries,minimal,74736,2,3,5,4,0
 java-defects4j-cli-1-commandline,full,16954,647,130,545,4,1
 java-defects4j-cli-1-commandline,minimal,16954,522,40,504,4,1
 java-defects4j-cli-10-parser,full,26625,2,2,0,2,0
-java-defects4j-cli-10-parser,minimal,26625,0,56,56,2,0
+java-defects4j-cli-10-parser,minimal,26625,0,0,0,2,0
 java-defects4j-cli-11-helpformatter,full,60826,15,15,0,2,0
 java-defects4j-cli-11-helpformatter,minimal,60826,14,14,0,2,0
 java-defects4j-cli-12-gnuparser,full,7793,201,194,183,2,0
@@ -1252,7 +1252,7 @@ rust-leetcode-1-bugfix,minimal,1423,0,0,0,2,0
 rust-multi-map-duplicate-calls,full,105,58,58,10,2,0
 rust-multi-map-duplicate-calls,minimal,105,30,30,6,2,0
 rust-next-font-imports-generator,full,21155,1459,1459,0,2,0
-rust-next-font-imports-generator,minimal,21155,546,3207,2803,2,0
+rust-next-font-imports-generator,minimal,21155,546,546,0,2,0
 rust-no-change,full,2426,0,0,0,1,0
 rust-no-change,minimal,2426,0,0,0,1,0
 rust-protocolbuffers-protobuf-add-enum-variant,full,4137,0,0,0,2,0
@@ -1422,7 +1422,7 @@ tsx-greenbone-gsa-add-import-and-use-it,minimal,18410,80,42,38,2,0
 tsx-langflow-ai-langflow-add-type-to-import,full,471,0,0,0,1,0
 tsx-langflow-ai-langflow-add-type-to-import,minimal,471,0,0,0,1,0
 tsx-langflow-ai-langflow-insert-only,full,740,10,10,0,2,0
-tsx-langflow-ai-langflow-insert-only,minimal,740,2,76,74,2,0
+tsx-langflow-ai-langflow-insert-only,minimal,740,2,2,0,2,0
 tsx-langflow-ai-langflow-split-import,full,487,46,108,93,2,0
 tsx-langflow-ai-langflow-split-import,minimal,487,68,59,37,2,0
 tsx-langflow-ai-langflow-split-import-2,full,471,48,105,93,2,0
@@ -1507,7 +1507,7 @@ typescript-microsoft-typescript-expand-target-3,full,528,0,0,0,1,0
 typescript-microsoft-typescript-expand-target-3,minimal,528,0,0,0,1,0
 typescript-microsoft-typescript-extend-target-comment,full,412,0,0,0,1,0
 typescript-microsoft-typescript-extend-target-comment,minimal,412,0,0,0,1,0
-typescript-refactor-interface,full,950,0,716,716,2,0
+typescript-refactor-interface,full,950,0,0,0,2,0
 typescript-refactor-interface,minimal,950,0,0,0,2,0
 typescript-vercel-next-whitespace-only,full,152143,0,0,0,1,0
 typescript-vercel-next-whitespace-only,minimal,152143,0,0,0,1,0

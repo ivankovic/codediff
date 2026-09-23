@@ -1,5 +1,34 @@
 # Diff Module Notes
 
+## 2026-09-23: the human-mapping painting benchmark borrows codediff's reasons
+
+`as_ast_diff_for_mapping` gives every human pair `ASTMappingReason::default()`, but
+`identical_or_move` reads the reason: `NestedConditionCollapse`/`WrapGrowth` (`MINIMAL` only) and
+`HeritageClauseGrowth` (both presets) force a relocated node back to unpainted. The census's
+`renderer_bytes` column therefore paints those shapes `Move` where codediff's own output would not.
+(The doc comment on `as_ast_diff` still says nothing reads `reason`; it is out of date.)
+
+Measured by borrowing codediff's reason for every pair both mappings share, in the census only,
+over 792 painted fixtures. 91 fixtures share at least one pair carrying one of the three tags, but
+the tag only changes the rendering where the position heuristic would otherwise say `Move`:
+
+* `FULL` renderer column: zero-byte 527 -> 528, bytes 22,967 -> 22,251, 1 better, 0 worse -
+  `typescript-refactor-interface` 716 -> 0 (`HeritageClauseGrowth`).
+* `MINIMAL` renderer column: zero-byte 595 -> 596, bytes 14,353 -> 11,514, 5 better, 0 worse -
+  `rust-next-font-imports-generator` (flagged ground truth) 3,207 -> 546,
+  `tsx-langflow-ai-langflow-insert-only` 76 -> 2, `java-defects4j-cli-10-parser` 56 -> 0,
+  `c-linux-small-bugfix` 144 -> 112, `go-junegunn-fzf-real-small-change` 18 -> 2.
+
+So the skew is real but narrow: 6 fixture/preset pairs, about 3,500 bytes, two thirds of it one
+flagged fixture. It does not change the conclusion that the renderer owns most of the gap.
+
+**Kept in the census**: the `renderer_bytes` column is what the painting work is steered by, so
+it should grade the renderer on what the renderer actually does. A reason is a verified fact
+about a pair, not a matcher preference, so borrowing it for a pair both mappings make does not
+let the matcher's choices leak in. What it cannot cover is a human pair codediff did not make;
+the durable fix is still making the three overrides structural checks the renderer runs on any
+pair.
+
 ## 2026-09-23: booleans and access modifiers join the whole-token list
 
 `text::WHOLE_TOKENS` (was `OPERATORS`) adds `true`, `false`, `private` and `protected`, and

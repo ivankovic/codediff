@@ -2955,7 +2955,7 @@
   ],
   "text_mappings": [
     {
-      "name": "Only one solution",
+      "name": "Minimal",
       "entries": [
         {
           "operation": "Match",
@@ -2973,6 +2973,30 @@
               "start_column": 47,
               "end_row": 11,
               "end_column": 52
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Full",
+      "entries": [
+        {
+          "operation": "Match",
+          "before": [
+            {
+              "start_row": 11,
+              "start_column": 36,
+              "end_row": 11,
+              "end_column": 56
+            }
+          ],
+          "after": [
+            {
+              "start_row": 11,
+              "start_column": 36,
+              "end_row": 11,
+              "end_column": 57
             }
           ]
         }

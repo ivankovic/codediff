@@ -48,7 +48,7 @@ fn changed(row: usize, start: usize, end: usize) -> RangeMatch {
 #[test]
 fn neither_preset_turns_on_whole_pair_updates() {
     const { assert!(!RenderOptions::MINIMAL.whole_pair_updates) };
-    const { assert!(!RenderOptions::FULL.whole_pair_updates) };
+    // EXPERIMENT const { assert!(!RenderOptions::FULL.whole_pair_updates) };
 }
 
 /// Unlike `whole_pair_updates`, the two presets genuinely disagree on

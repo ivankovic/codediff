@@ -317,6 +317,13 @@ pub(crate) const WHOLE_TOKENS: &[&str] = &[
 /// would cut through one of [`WHOLE_TOKENS`]. `<=` becoming `<` is a different comparison, not a
 /// `<` that stayed and an `=` that left, and `true` becoming `false` is a flipped value rather than
 /// a kept `e`; the corpus paints both whole. Only a token longer than one character can be cut.
+/// EXPERIMENT
+fn is_identifier_text(text: &str) -> bool {
+    let mut chars = text.chars();
+    chars.next().is_some_and(|c| c.is_alphabetic() || c == '_' || c == '$')
+        && chars.all(|c| c.is_alphanumeric() || c == '_' || c == '$')
+}
+
 fn splits_a_whole_token(a: &str, b: &str) -> bool {
     [a, b]
         .iter()
@@ -874,7 +881,12 @@ impl RangeWalk<'_> {
             },
             self.source_is_before,
             is_content_node(node.kind()),
-            self.options.whole_pair_updates || splits_a_whole_token(source_text, destination_text),
+            self.options.whole_pair_updates
+                || splits_a_whole_token(source_text, destination_text)
+                || (self.options.structural_punctuation // EXPERIMENT: FULL proxy
+                    && !is_content_node(node.kind())
+                    && is_identifier_text(source_text)
+                    && is_identifier_text(destination_text)),
         )
     }
 
@@ -912,7 +924,11 @@ impl RangeWalk<'_> {
                         || splits_a_whole_token(
                             &self.source.contents[s_from..s_to],
                             &self.destination.contents[d_from..d_to],
-                        ),
+                        )
+                        || (self.options.structural_punctuation // EXPERIMENT: FULL proxy
+                            && !is_content_node(node.kind())
+                            && is_identifier_text(&self.source.contents[s_from..s_to])
+                            && is_identifier_text(&self.destination.contents[d_from..d_to])),
                 )
             }
             _ => vec![self.placed(node, TextOperation::Update)],

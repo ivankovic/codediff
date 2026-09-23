@@ -322198,7 +322198,7 @@
   ],
   "text_mappings": [
     {
-      "name": "Prefer left",
+      "name": "Minimal",
       "entries": [
         {
           "operation": "Delete",
@@ -322219,6 +322219,49 @@
               "start_column": 38,
               "end_row": 1946,
               "end_column": 45
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Full",
+      "entries": [
+        {
+          "operation": "Match",
+          "before": [
+            {
+              "start_row": 1577,
+              "start_column": 25,
+              "end_row": 1578,
+              "end_column": 0
+            }
+          ],
+          "after": [
+            {
+              "start_row": 1577,
+              "start_column": 25,
+              "end_row": 1578,
+              "end_column": 0
+            }
+          ]
+        },
+        {
+          "operation": "Match",
+          "before": [
+            {
+              "start_row": 1946,
+              "start_column": 35,
+              "end_row": 1946,
+              "end_column": 57
+            }
+          ],
+          "after": [
+            {
+              "start_row": 1946,
+              "start_column": 35,
+              "end_row": 1946,
+              "end_column": 50
             }
           ]
         }

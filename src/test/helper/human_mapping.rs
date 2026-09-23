@@ -1910,9 +1910,11 @@ pub fn human_mapping_cost_for(
 /// same `TextDiff`/`line_operations` path codediff's own diff goes through, so the two are
 /// comparable on equal footing.
 ///
-/// `cost`/`reason` on the resulting `ASTMapping`s are placeholders - nothing that consumes a
-/// synthetic diff built this way needs them, only `operation` and the node-id maps
-/// (`ASTDiff::mapping_for_node`, which `diff::text::ranges` walks, only reads `operation`).
+/// `cost`/`reason` on the resulting `ASTMapping`s are placeholders, because the human format
+/// records neither. `reason` is not inert, though: `diff::text`'s `identical_or_move` reads it to
+/// keep a verified pure reindent or heritage-clause shift unpainted, so a synthetic diff renders
+/// those as `Move`. `painting_failure_census` borrows codediff's reason for every pair the two
+/// mappings share before rendering.
 pub fn as_ast_diff(
     name: &str,
     before: &crate::code::Code,

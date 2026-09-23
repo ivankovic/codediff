@@ -12590,7 +12590,7 @@
   ],
   "text_mappings": [
     {
-      "name": "Only one solution",
+      "name": "Minimal",
       "entries": [
         {
           "operation": "Match",
@@ -12625,6 +12625,49 @@
             {
               "start_row": 99,
               "start_column": 33,
+              "end_row": 99,
+              "end_column": 36
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Full",
+      "entries": [
+        {
+          "operation": "Match",
+          "before": [
+            {
+              "start_row": 97,
+              "start_column": 55,
+              "end_row": 97,
+              "end_column": 61
+            }
+          ],
+          "after": [
+            {
+              "start_row": 97,
+              "start_column": 55,
+              "end_row": 97,
+              "end_column": 61
+            }
+          ]
+        },
+        {
+          "operation": "Match",
+          "before": [
+            {
+              "start_row": 99,
+              "start_column": 30,
+              "end_row": 99,
+              "end_column": 36
+            }
+          ],
+          "after": [
+            {
+              "start_row": 99,
+              "start_column": 30,
               "end_row": 99,
               "end_column": 36
             }
