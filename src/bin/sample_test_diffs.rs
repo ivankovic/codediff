@@ -234,7 +234,7 @@ fn main() -> Result<()> {
 
     let mut rng = match args.seed {
         Some(seed) => StdRng::seed_from_u64(seed),
-        None => StdRng::from_entropy(),
+        None => StdRng::from_rng(&mut rand::rng()),
     };
 
     let mut reservoirs: HashMap<CapacityKey, Reservoir<Row>> = HashMap::new();

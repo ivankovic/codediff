@@ -15,7 +15,7 @@
  *  You should have received a copy of the GNU Affero General Public License
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
-use rand::Rng;
+use rand::{Rng, RngExt};
 
 /// LOC buckets for stratified sampling, keyed by the larger of a pair's before/after line count.
 ///
@@ -66,7 +66,7 @@ impl<T> Reservoir<T> {
         if self.items.len() < capacity {
             self.items.push(item);
         } else {
-            let j = rng.gen_range(0..self.seen) as usize;
+            let j = rng.random_range(0..self.seen) as usize;
             if j < capacity {
                 self.items[j] = item;
             }

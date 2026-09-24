@@ -18,20 +18,23 @@ CRATES="
 	bit-set@0.8.0
 	bit-vec@0.8.0
 	bitflags@2.13.2
+	bumpalo@3.20.3
 	bytes@1.12.1
 	cassowary@0.3.0
 	castaway@0.2.4
 	cc@1.4.7
 	cfg-if@1.0.5
+	chacha20@0.10.2
 	clap@4.6.7
 	clap_builder@4.6.7
 	clap_complete@4.6.11
 	clap_derive@4.6.7
 	clap_lex@1.1.1
-	clap_mangen@0.2.33
+	clap_mangen@0.3.3
 	colorchoice@1.0.5
 	compact_str@0.7.1
 	confy@2.0.0
+	cpufeatures@0.3.1
 	crc32fast@1.5.2
 	crossbeam-channel@0.5.17
 	crossbeam-utils@0.8.23
@@ -40,7 +43,6 @@ CRATES="
 	csv-core@0.1.13
 	csv@1.4.0
 	deranged@0.5.8
-	displaydoc@0.2.7
 	either@1.18.0
 	equivalent@1.0.2
 	errno@0.3.14
@@ -53,7 +55,7 @@ CRATES="
 	flate2@1.1.10
 	fnv@1.0.7
 	foldhash@0.1.5
-	form_urlencoded@1.2.2
+	foldhash@0.2.0
 	futures-channel@0.3.34
 	futures-core@0.3.34
 	futures-executor@0.3.34
@@ -63,24 +65,15 @@ CRATES="
 	futures-task@0.3.34
 	futures-util@0.3.34
 	futures@0.3.34
-	getrandom@0.2.17
 	getrandom@0.4.3
-	git2@0.20.4
+	git2@0.21.0
 	hashbrown@0.15.5
+	hashbrown@0.16.1
 	hashbrown@0.17.1
-	hashlink@0.10.0
+	hashlink@0.12.2
 	heck@0.5.0
 	hermit-abi@0.5.3
 	home@0.5.12
-	icu_collections@2.3.0
-	icu_locale_core@2.3.0
-	icu_normalizer@2.3.0
-	icu_normalizer_data@2.3.0
-	icu_properties@2.3.0
-	icu_properties_data@2.3.0
-	icu_provider@2.3.1
-	idna@1.1.0
-	idna_adapter@1.2.2
 	indexmap@2.14.2
 	indoc@2.0.7
 	is_terminal_polyfill@1.70.2
@@ -88,15 +81,14 @@ CRATES="
 	itertools@0.13.0
 	itoa@1.0.18
 	jobserver@0.1.35
+	js-sys@0.3.105
 	lazy_static@1.5.0
 	libc@0.2.189
 	libgit2-sys@0.18.8+1.9.7
-	libsqlite3-sys@0.35.0
-	libssh2-sys@0.3.3
+	libsqlite3-sys@0.38.2
 	libz-sys@1.1.29
 	linked-hash-map@0.5.6
 	linux-raw-sys@0.12.1
-	litemap@0.8.3
 	lock_api@0.4.14
 	log@0.4.34
 	lru@0.12.5
@@ -113,32 +105,27 @@ CRATES="
 	once_cell_polyfill@1.70.2
 	onig@6.5.3
 	onig_sys@69.9.3
-	openssl-probe@0.1.6
-	openssl-sys@0.9.117
 	parking_lot@0.12.5
 	parking_lot_core@0.9.12
 	paste@1.0.15
-	percent-encoding@2.3.2
 	pin-project-lite@0.2.17
 	pkg-config@0.3.34
 	plist@1.10.1
-	potential_utf@0.1.6
 	powerfmt@0.2.0
-	ppv-lite86@0.2.21
 	proc-macro2@1.0.107
 	quick-xml@0.42.0
 	quote@1.0.47
 	r-efi@6.0.0
-	rand@0.8.8
-	rand_chacha@0.3.1
-	rand_core@0.6.4
+	rand@0.10.3
+	rand_core@0.10.1
 	ratatui@0.26.3
 	redox_syscall@0.5.18
 	regex-automata@0.4.18
 	regex-syntax@0.8.11
 	regex@1.13.1
 	roff@1.1.1
-	rusqlite@0.37.0
+	rsqlite-vfs@0.1.1
+	rusqlite@0.40.2
 	rustc-hash@2.1.3
 	rustix@1.1.5
 	rustversion@1.0.23
@@ -159,8 +146,8 @@ CRATES="
 	slab@0.4.12
 	smallvec@1.16.1
 	socket2@0.6.5
+	sqlite-wasm-rs@0.5.5
 	stability@0.2.1
-	stable_deref_trait@1.2.1
 	static_assertions@1.1.0
 	streaming-iterator@0.1.9
 	strsim@0.11.1
@@ -170,7 +157,6 @@ CRATES="
 	strum_macros@0.28.0
 	syn@2.0.119
 	syn@3.0.6
-	synstructure@0.14.0
 	syntect@5.3.0
 	tempfile@3.27.0
 	thiserror-impl@2.0.21
@@ -179,7 +165,6 @@ CRATES="
 	time-core@0.1.9
 	time-macros@0.2.32
 	time@0.3.55
-	tinystr@0.8.4
 	tokio-macros@2.7.2
 	tokio@1.53.1
 	toml@0.9.12+spec-1.1.0
@@ -222,13 +207,16 @@ CRATES="
 	unicode-segmentation@1.13.3
 	unicode-truncate@1.1.0
 	unicode-width@0.1.14
-	url@2.5.8
-	utf8_iter@1.0.4
+	unicode-width@0.2.2
 	utf8parse@0.2.2
 	valuable@0.1.1
 	vcpkg@0.2.15
 	walkdir@2.5.0
 	wasi@0.11.1+wasi-snapshot-preview1
+	wasm-bindgen-macro-support@0.2.128
+	wasm-bindgen-macro@0.2.128
+	wasm-bindgen-shared@0.2.128
+	wasm-bindgen@0.2.128
 	winapi-i686-pc-windows-gnu@0.4.0
 	winapi-util@0.1.11
 	winapi-x86_64-pc-windows-gnu@0.4.0
@@ -256,17 +244,7 @@ CRATES="
 	windows_x86_64_msvc@0.52.6
 	winnow@0.7.15
 	winnow@1.0.4
-	writeable@0.6.4
 	yaml-rust@0.4.5
-	yoke-derive@0.8.3
-	yoke@0.8.3
-	zerocopy-derive@0.8.58
-	zerocopy@0.8.58
-	zerofrom-derive@0.1.8
-	zerofrom@0.1.8
-	zerotrie@0.2.5
-	zerovec-derive@0.11.6
-	zerovec@0.11.8
 	zlib-rs@0.6.8
 	zmij@1.0.23
 "

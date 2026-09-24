@@ -437,25 +437,27 @@ fn export_stats_sqlite(path: &Path, stats: HashMap<(String, String), DiffStats>)
             )
             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18);
             "#,
+            // SQLite integers are i64, and rusqlite binds nothing wider; every count here is a
+            // file or line count, nowhere near the sign bit.
             params![
                 s.commit_id,
                 s.relative_file_path,
                 now,
                 s.git_reported_status,
                 language,
-                s.bytes_before,
-                s.bytes_after,
-                s.lines_before,
-                s.lines_after,
-                s.nodes_before,
-                s.nodes_after,
-                s.unix_diff_script_bytes,
-                s.lines_added,
-                s.lines_removed,
-                s.lines_changed,
-                s.nodes_added,
-                s.nodes_removed,
-                s.nodes_changed
+                s.bytes_before as i64,
+                s.bytes_after as i64,
+                s.lines_before as i64,
+                s.lines_after as i64,
+                s.nodes_before as i64,
+                s.nodes_after as i64,
+                s.unix_diff_script_bytes as i64,
+                s.lines_added as i64,
+                s.lines_removed as i64,
+                s.lines_changed as i64,
+                s.nodes_added as i64,
+                s.nodes_removed as i64,
+                s.nodes_changed as i64,
             ],
         )?;
     }

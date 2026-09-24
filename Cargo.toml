@@ -83,13 +83,13 @@ assets = [
 
 [dependencies]
 anyhow = "1.0.100"
-clap = { version = "4.5.51", features = ["derive"] }
+clap = { version = "4.6.6", features = ["derive"] }
 # `codediff util completions`/`util man`, only in src/main.rs, so gated by `tui` to keep a
 # `default-features = false` library consumer free of them.
 clap_complete = { version = "4.6.9", optional = true }
-# 0.2.x, not 0.3.x: clap_mangen 0.3 requires clap >= 4.6.6 and would silently raise this crate's
-# effective clap floor above the declared 4.5.51.
-clap_mangen = { version = "0.2.33", optional = true }
+# clap_mangen 0.3 requires clap >= 4.6.6, which is why clap's own floor above is 4.6.6 rather
+# than lower: the declared floor must be the effective one.
+clap_mangen = { version = "0.3.3", optional = true }
 # TUI-only, and src/bin/human_solver/'s debug UI - gated by `tui`.
 confy = { version = "2.0.0", optional = true }
 # Only used by src/stats/ (feature-gated) and the stats-gated src/bin/ tools that need concurrent
@@ -98,7 +98,7 @@ crossbeam-channel = { version = "0.5.15", optional = true }
 # Used by the stats-gated dev tools and the three test-fixture-only ones, so gated by
 # `test-fixtures`, which `stats` includes.
 csv = { version = "1.4.0", optional = true }
-git2 = { version = "0.20.3", optional = true }
+git2 = { version = "0.21", optional = true }
 # Only used by src/stats.rs itself - gated the same way as the rest of the stats-only deps.
 indoc = { version = "2.0.7", optional = true }
 # Only used by src/bin/file_stats.rs (stats-gated).
@@ -106,15 +106,15 @@ libc = { version = "0.2", optional = true }
 # Only used by src/bin/file_stats.rs and commit_stats.rs (both stats-gated).
 num_cpus = { version = "1.17.0", optional = true }
 # Only used by src/stats/sampling.rs (feature-gated) and the stats-gated sample_*.rs dev tools.
-rand = { version = "0.8", optional = true }
+rand = { version = "0.10", optional = true }
 # Only used by src/stats.rs and the fixture-loading helpers under src/test/ (`test-fixtures`);
 # also a dev-dependency below because those helpers compile under a plain `cargo test` too.
 regex = { version = "1.12.2", optional = true }
 # Terminal cell widths for `text_range::ScreenColumn`, needed outside the TUI too (headless). Already
 # in the lockfile via ratatui.
-unicode-width = "0.1.14"
+unicode-width = "0.2"
 # Bundled, C-compiled SQLite, only for the stats-gated commit_stats.rs and file_stats.rs.
-rusqlite = { version = "0.37.0", features = ["bundled"], optional = true }
+rusqlite = { version = "0.40", features = ["bundled"], optional = true }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0"
 # Only used by tests and the `test-fixtures` helpers - gated like regex above, for the same reason.

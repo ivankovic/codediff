@@ -50,7 +50,7 @@ pub fn find_license_files(repo: &Repository, tree: &Tree) -> Vec<LicenseFile> {
         if entry.kind() != Some(git2::ObjectType::Tree) {
             continue;
         }
-        let Some(name) = entry.name() else { continue };
+        let Ok(name) = entry.name() else { continue };
         if !LICENSE_DIRECTORY_NAMES.contains(&name.to_lowercase().as_str()) {
             continue;
         }
@@ -75,7 +75,7 @@ fn collect_license_files_in(
     found: &mut Vec<LicenseFile>,
 ) {
     for entry in tree.iter() {
-        let Some(name) = entry.name() else { continue };
+        let Ok(name) = entry.name() else { continue };
         let lower = name.to_lowercase();
         if !LICENSE_FILENAME_PREFIXES
             .iter()
@@ -155,7 +155,7 @@ fn classify_license(text: &str) -> &'static str {
 pub fn origin_remote_url(repo: &Repository) -> Option<String> {
     repo.find_remote("origin")
         .ok()
-        .and_then(|remote| remote.url().map(str::to_string))
+        .and_then(|remote| remote.url().ok().map(str::to_string))
 }
 
 /// A link to `path` in `repo_url` pinned to `commit`, so it survives upstream edits. Only the
