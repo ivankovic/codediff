@@ -3398,6 +3398,9 @@ mod tests {
             "fixture assumption broken: rust-add-if unexpectedly has groups already"
         );
         let resaved = serde_json::to_string_pretty(&mapping)?;
+        // A Windows checkout with git's default autocrlf reads the fixture back with CRLF; the
+        // serialization is what this test measures, not git's line-ending translation.
+        let original = original.replace("\r\n", "\n");
         assert_eq!(resaved.trim_end(), original.trim_end());
         Ok(())
     }
