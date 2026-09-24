@@ -1,5 +1,28 @@
 # Diff Module Notes
 
+## 2026-09-24: tree-sitter 0.26 and tree-sitter-scala 0.26 - tried, reverted, the ground truth is pinned to the parser
+
+Two dependency bumps were tried for v0.1.0 and backed out, not for a speed or accuracy cost but
+because the human mappings stopped resolving: every `human_mapping.json` addresses nodes by
+kind-and-ordinal path (`rule_set:1 > block:1 > rule_set:3`), so a parser that shapes the tree
+differently makes the fixture unreadable before anything is measured.
+
+* **tree-sitter runtime 0.25 -> 0.26** (grammars unchanged, CSS included at 0.25.0): error
+  recovery changed, so fixtures with `ERROR` nodes in their paths no longer resolve - the CSS
+  fixture tests failed from `css-fortawesome-font-awesome-upgrade-version-comment`,
+  `css-lassekongo83-zuki-themes-fails-to-parse`, `css-shadcn-ui-ui-completely-broken-treesitter-parsing`
+  and `css-mastodon-mastodon-add-two-lines` onward (`Path segment 'ERROR:3847' not found`). Only
+  CSS was run before reverting; other languages with parse-error fixtures are presumably affected
+  the same way. 0.27 is out on its own: it needs Rust 1.90, above the declared 1.88.
+* **tree-sitter-scala 0.24 -> 0.26** (runtime back on 0.25): 12 of the Scala fixtures' `mapping`
+  tests fail. Two shapes: `block_comment` no longer has a `/*` child (6 fixtures), and
+  `infix_expression` chains nest differently (the `case_clause > guard > infix_expression x4`
+  path). Lua 0.2 -> 0.5 and R 1.2 -> 1.3 changed nothing the fixtures address, and stayed.
+
+Taking either bump means re-solving the affected fixtures in `human_solver` first, then re-cutting
+`quality_baseline.csv` and `painting_attribution.csv`. Until then the runtime is held at 0.25 and
+Scala at 0.24 in Cargo.toml, on purpose.
+
 ## 2026-09-23: `FULL` paints a renamed identifier whole
 
 Invariant 16 has said so since it was written ("Today's renderer narrows before either preset is

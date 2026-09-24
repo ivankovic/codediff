@@ -49,6 +49,12 @@ on a fresh machine would have hit.
   the license and the README. Working notes, the research data and the fixture stubs' data are
   no longer in the crates.io tarball.
 - `cargo doc` on docs.rs covers the `web` feature as well as the default `tui`.
+- Dependencies: ratatui 0.30 and crossterm 0.29 (from 0.26 and 0.27), the Lua 0.5 and R 1.3
+  grammars, git2 0.21, rusqlite 0.40, rand 0.10, unicode-width 0.2, clap 4.6 and clap_mangen 0.3.
+  `cargo audit` now reports no vulnerability and no unsound crate; the two remaining notes are
+  syntect's unmaintained `bincode` and `yaml-rust`. The tree-sitter runtime stays on 0.25 and the
+  Scala grammar on 0.24: the hand-authored ground truth is pinned to the trees they produce, and
+  both newer versions change those (see `src/diff/TODO.md`).
 
 ### Added
 

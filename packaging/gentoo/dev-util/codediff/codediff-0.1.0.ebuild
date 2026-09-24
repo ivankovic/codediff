@@ -268,7 +268,7 @@ CRATES="
 	tree-sitter-json@0.24.8
 	tree-sitter-kotlin-ng@1.1.0
 	tree-sitter-language@0.1.7
-	tree-sitter-lua@0.2.0
+	tree-sitter-lua@0.5.0
 	tree-sitter-php@0.24.2
 	tree-sitter-python@0.25.0
 	tree-sitter-r@1.3.0
