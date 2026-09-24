@@ -186,7 +186,9 @@ jobs:
 
       - uses: taiki-e/install-action@nextest
 
-      - run: cargo nextest run --release -E 'not test(/^test::fixtures::/)'
+      # --no-fail-fast: a platform-specific failure is rarely alone, and one run that lists them
+      # all beats one push per failure.
+      - run: cargo nextest run --release --no-fail-fast -E 'not test(/^test::fixtures::/)'
 
   # Cargo.toml's `rust-version` is a promise to `cargo install` users on an older toolchain, and
   # only a build on exactly that toolchain keeps it: a dependency bump can raise the real floor

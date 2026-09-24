@@ -1648,9 +1648,11 @@ mod tests {
                 .starts_with(std::env::temp_dir()),
             "the index blob is materialized"
         );
+        // Canonicalize both sides: on Windows canonicalize() yields the verbatim `\\?\` form,
+        // while the review root comes from git with forward slashes.
         assert_eq!(
-            app.after_path.as_deref(),
-            Some(dir.path().canonicalize()?.join("a.rs").as_path()),
+            app.after_path.as_ref().unwrap().canonicalize()?,
+            dir.path().canonicalize()?.join("a.rs"),
             "the working tree side is the real file"
         );
         assert!(matches!(
