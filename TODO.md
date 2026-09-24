@@ -68,6 +68,33 @@ remains right-anchored, so the five collapsed fixtures each carry a small expect
 future attempt to flip it should re-measure against the *connector-restricted* rule, since the
 4-fix/12-break count that argued against flipping was taken before that restriction existed.
 
+## Re-measure the corpus with the current file-type classifier (deferred 2026-09-24)
+
+The 2026-09-24 review circles Figure 2's 30% Unknown bar: "Why is this still 30%? Didn't we
+improve the script?" The script was improved - `src/code/tip.rs`'s tables were expanded on
+2026-09-13 - but the `tip` column of `/var/tmp/research/full/stats.sqlite` is what `file_stats`
+stored on 2026-09-07, and the only run since (2026-09-20) re-processed the files above 1 MiB.
+The figure renders that column.
+
+`make reclassify-tips MODE=full` (dry run, 2026-09-24, 7,045,754 rows): Unknown 29.99% -> 6.16%,
+Code 3,890,994 -> 4,688,419, Data 12.93% -> 22.61%, Documentation 0.65% -> 2.17%, Configuration
+1.21% -> 2.50%; 1,732,406 rows move, 770,380 of them Unknown -> Code. Writing that back alone
+(`RECLASSIFY_FLAGS=--write`) fixes Figure 2 and breaks Figure 3: a file reclassified by path was
+never read, so 805,630 new Code rows would carry no bytes, lines or node count, and the code-file
+distributions (n = 3,890,994 today) would count files they never measured.
+
+The consistent fix is `make measure-file-stats MODE=full` - the checkouts are on disk (7,445
+repositories) - followed by `make introductory-paper-empirical MODE=full`, and a new entry in
+`research/data/corpus_stats/PROVENANCE.md`. Budget about three hours: the 2026-09-07 walk took
+2h38m per repository plus 0h30m for the report, and the 2026-09-20 pass over the files above
+1 MiB added a 60-second parse budget per file and peaked at 22 GB, so run it as a memory-capped
+systemd unit on an otherwise idle machine, the way that pass was run. Read PROVENANCE.md's "One
+file is excluded from the parse" before starting: the whole-root invocation aborts on one file,
+which is why the counting run went per repository. Every empirical macro in the paper moves with
+this run (`\NumFiles`, the Figure 3 percentiles, `\CorrelationR`), so refresh the paper's
+empirical block in the same commit. Deferred on the author's decision of 2026-09-24; until then
+`REVIEW-2026-09-24.md` carries the diagnosis and the paper keeps the 2026-09-07 figure.
+
 ## Time \textsc{CodeDiff} as a whole process, not in-process
 
 Written against Section 10's *Internal validity* paragraph, which admits the asymmetry and then

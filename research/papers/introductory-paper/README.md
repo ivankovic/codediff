@@ -99,6 +99,8 @@ The one measurement item, Figure 2's Unknown share, is answered at the foot of t
 the classifier improvement of 2026-09-13 was never written back into the corpus database's `tip`
 column (`make reclassify-tips RECLASSIFY_FLAGS=--write` does that; a file moved out of Unknown by
 path alone still has no size or node numbers until `measure-file-stats` re-walks the corpus).
+The re-walk was deferred on the author's decision the same day; the root `TODO.md` carries the
+job, so Figure 2 still shows the 2026-09-07 classification.
 
 ### Review pass of 2026-09-11
 
