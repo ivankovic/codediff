@@ -36,10 +36,10 @@
 #                    construction, and stage 2b still proves it. Never skip it when re-measuring an
 #                    existing sample, which is the decay case this script was written for.
 #
-# THE PROBLEM THIS FIXES (2026-08-20). The committed data/samples/sampled_code_pairs_*.csv named
-# (repository, commit, path) triples that no checkout on this machine could resolve: ~41% of pairs
-# failed to read, and the failures were concentrated in whole repositories rather than spread
-# evenly, so a re-measurement would have silently dropped entire projects from RQ1. The cause is
+# THE PROBLEM THIS FIXES. A committed data/samples/sampled_code_pairs_*.csv names
+# (repository, commit, path) triples, and a checkout can stop resolving them - concentrated in
+# whole repositories rather than spread evenly, so a re-measurement would silently drop entire
+# projects from RQ1. The cause is
 # that a sample holds pointers, not blobs, while the clones it points into are shallow and keep
 # being re-fetched. Deepening the corpus first, then sampling against what is actually on disk,
 # is what makes the sample resolvable; it does not make it permanent, so re-sample rather than
@@ -51,9 +51,8 @@ cd "$(dirname "$0")/.."
 LOG="${1:-/var/tmp/rq1_overnight_$(date +%Y%m%d_%H%M%S).log}"
 MODE=full
 DEPTH=50
-# Pairs per language, split over stats::sampling::LOC_BUCKETS' 7 buckets. Was a hardcoded 140 (20
-# per bucket) until 2026-09-18, when the paper review asked for 1000 per language - roughly 24,000
-# pairs over the corpus's 24 languages, against the 2,922 the committed RQ1 numbers are measured on.
+# Pairs per language, split over stats::sampling::LOC_BUCKETS' 7 buckets: 140 is 20 per bucket;
+# the paper's 1000 per language is roughly 24,000 pairs over the corpus's 24 languages.
 COUNT="${COUNT:-140}"
 SKIP_FETCH="${SKIP_FETCH:-0}"
 REPOS=/var/tmp/research/$MODE/repositories

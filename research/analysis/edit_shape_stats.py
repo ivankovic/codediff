@@ -118,7 +118,7 @@ def shallow_boundary_commits(repo):
     --numstat` therefore reports each of them as *creating* every file in its tree, because from
     git's point of view nothing precedes it. That is a property of how the corpus was cloned, not
     an edit anybody made, and it dwarfs the real edits: measured over a 60-repository sample of
-    this corpus on 2026-09-07, 90.9% of all numstat rows in a 50-commit walk came from these
+    this corpus, 90.9% of all numstat rows in a 50-commit walk came from these
     commits, which drove the modified-edit share to 7.2% against the 90.5% the (depth-1000)
     Curated corpus reports for the same 50-commit window.
 
@@ -345,11 +345,10 @@ class Accumulator:
                 "EditsChurnScored": latex_number(len(churn)),
                 "EditsChurnPFiftyPct": f"{percentile(churn, 50) * 100:.1f}",
                 "EditsChurnPNinetyPct": f"{percentile(churn, 90) * 100:.1f}",
-                # p99 and max were not recorded by the 2026-09-07 Full-list run (only the two
+                # p99 and max were not recorded by the Full-list run the paper cites (only the two
                 # percentiles above were), and that run's clones no longer exist on disk, so the
-                # paper's edit-size table leaves those two cells empty. Added 2026-09-11 on review
-                # so the next measurement fills them; churn is capped at 1.0 above, so the max can
-                # never exceed 100.
+                # paper's edit-size table leaves those two cells empty until the next measurement;
+                # churn is capped at 1.0 above, so the max can never exceed 100.
                 "EditsChurnPNinetyNinePct": f"{percentile(churn, 99) * 100:.1f}",
                 "EditsChurnMaxPct": f"{churn[-1] * 100:.1f}",
                 "EditsChurnUnderFivePct": share([c * 100 for c in churn], 5),
@@ -364,8 +363,7 @@ class Accumulator:
         The per-edit population is hundreds of thousands of integers, but the *distinct* values
         number a few thousand, so value->count is a small file where a per-edit CSV was not (see
         the class doc comment). Churn is a fraction in [0, 1] and is binned to 0.1 percentage
-        points. Added 2026-09-18 so the paper can draw the whole distribution rather than four
-        percentiles of it."""
+        points, so the paper can draw the whole distribution rather than four percentiles of it."""
         per_file = collections.Counter()
         for values in self.changed_by_language.values():
             per_file.update(values)

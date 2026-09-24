@@ -1,4 +1,22 @@
 #!/usr/bin/env python3
+#
+#  This file is part of the CodeDiff code diffing tool.
+#
+#  Copyright (C) 2026 Marko Ivankovic
+#
+#  This program is free software: you can redistribute it and/or modify
+#  it under the terms of the GNU Affero General Public License as published
+#  by the Free Software Foundation, either version 3 of the License, or
+#  (at your option) any later version.
+#
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+#  GNU Affero General Public License for more details.
+#
+#  You should have received a copy of the GNU Affero General Public License
+#  along with this program. If not, see <https://www.gnu.org/licenses/>.
+
 """Regenerate the Gentoo ebuild's ``CRATES`` block, and the Manifest's crate digests, from Cargo.lock.
 
 Lives here rather than beside the ebuild so ruff covers it: CI lints research/, scripts/ and
@@ -21,12 +39,11 @@ Rewrites the ``CRATES="..."`` block of every ebuild under packaging/gentoo/ in p
 exits non-zero instead of writing, for CI.
 
 **The Manifest is checked too, and that is a separate failure from the ebuild's.** Gentoo fetches
-each crate against the Manifest's digests, and until 2026-09-18 nothing compared it to anything:
-``--check`` passed on a Manifest whose ``CRATES`` list was current while **65 of its crate
-digests named older versions and one crate had no line at all**, because the two files had drifted
-apart over dependency bumps that only ever touched the ebuild. ``--check`` now also asserts that
-the set of ``name-version.crate`` DIST lines is exactly Cargo.lock's - the drift that actually
-happened, caught without needing a single byte of any crate.
+each crate against the Manifest's digests, and a Manifest whose ``CRATES`` list is current can
+still name **older versions in its crate digests, or lack a crate's line entirely**, because the
+two files drift apart over dependency bumps that only touch the ebuild. ``--check`` therefore also
+asserts that the set of ``name-version.crate`` DIST lines is exactly Cargo.lock's - that drift,
+caught without needing a single byte of any crate.
 
 It does not check the *digests*, because BLAKE2B and SHA512 cannot be derived from the sha256
 Cargo.lock records; that needs the files. ``--manifest`` rebuilds those lines from ``.crate`` files

@@ -1,4 +1,22 @@
 #!/usr/bin/env python3
+#
+#  This file is part of the CodeDiff code diffing tool.
+#
+#  Copyright (C) 2026 Marko Ivankovic
+#
+#  This program is free software: you can redistribute it and/or modify
+#  it under the terms of the GNU Affero General Public License as published
+#  by the Free Software Foundation, either version 3 of the License, or
+#  (at your option) any later version.
+#
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+#  GNU Affero General Public License for more details.
+#
+#  You should have received a copy of the GNU Affero General Public License
+#  along with this program. If not, see <https://www.gnu.org/licenses/>.
+
 """Turn `cargo llvm-cov --json --summary-only` into a per-area table.
 
 llvm-cov's own table is one row per file, 675 of them here, which buries the thing worth knowing:
@@ -25,10 +43,9 @@ from pathlib import Path
 #
 # Each module is two prefixes, the directory *and* the module file beside it: `src/diff/` is the
 # engine's submodules and `src/diff.rs` is the engine's own root, 581 lines of it. Matching only
-# the directory sent every one of those roots - diff, code, test, stats, tui - to `other`, and
-# `other` was printed by no row and counted by no total but EVERYTHING. 2670 lines fell in,
-# 1276 of them module roots and the rest the top-level files below; fixed 2026-09-22, which is
-# most of why the product figure moved from 91.3% to 92.8% without the tests changing.
+# the directory would send every one of those roots - diff, code, test, stats, tui - to `other`,
+# which no row prints and no total but EVERYTHING counts, and the product figure would silently
+# leave them out.
 AREAS = [
     (("src/diff/", "src/diff.rs"), "diff/ - the engine"),
     (("src/code/", "src/code.rs"), "code/ - parsing, metadata"),

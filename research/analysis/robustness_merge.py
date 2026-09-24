@@ -27,10 +27,10 @@ than once, and a killed record is kept only for a pair with no measured row - an
 status counts and the largest pair.
 
 Exit statuses mean different things and the summary keeps them apart: 137 is the cgroup memory
-cap (the pair needs more than SHARD_MEMORY_MAX), 134 is an abort inside the process (before
-2026-09-19 the harness's own 2MB diff-thread stack; since then a real one), 143 is SIGTERM (an
-operator restarting a shard, not a finding). `measure/r48_retry_killed.sh` re-measures the
-134s and the 143s and gives the 137s a bigger cap, one at a time, before this is final.
+cap (the pair needs more than SHARD_MEMORY_MAX), 134 is an abort inside the process, 143 is
+SIGTERM (an operator restarting a shard, not a finding). `measure/r48_retry_killed.sh`
+re-measures the 134s and the 143s and gives the 137s a bigger cap, one at a time, before this is
+final.
 """
 
 import argparse

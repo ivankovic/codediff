@@ -1,15 +1,31 @@
-/*  Throwaway diagnostic (2026-08-18): how much source text is owned by *internal* nodes - i.e.
- *  covered by no child node - across the whole corpus, per language and kind. Run with
- *  `cargo test --features test-fixtures -- --ignored gap_survey`.
+/*  This file is part of the CodeDiff code diffing tool.
+ *
+ *  Copyright (C) 2026 Marko Ivankovic
+ *
+ *  This program is free software: you can redistribute it and/or modify
+ *  it under the terms of the GNU Affero General Public License as published
+ *  by the Free Software Foundation, either version 3 of the License, or
+ *  (at your option) any later version.
+ *
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ *  GNU Affero General Public License for more details.
+ *
+ *  You should have received a copy of the GNU Affero General Public License
+ *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
+
+//! Diagnostic, not a test: how much source text is owned by *internal* nodes - covered by no
+//! child node - across the whole corpus, per language and kind. Run with
+//! `cargo test --features test-fixtures -- --ignored gap_survey`; the report lands in the
+//! temp directory.
 
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
     use std::collections::HashMap;
     use std::io::Write;
-
-    const REPORT: &str = "/tmp/claude-1000/-home-m-src-codediff/ca04cc2a-f0ca-46fc-b936-d5056dc2edd3/scratchpad/gap_survey.txt";
 
     #[test]
     #[ignore = "diagnostic"]
@@ -77,7 +93,9 @@ mod tests {
             ));
         }
 
-        std::fs::File::create(REPORT)?.write_all(out.as_bytes())?;
+        let report = std::env::temp_dir().join("gap_survey.txt");
+        std::fs::File::create(&report)?.write_all(out.as_bytes())?;
+        eprintln!("gap survey written to {}", report.display());
         Ok(())
     }
 

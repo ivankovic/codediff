@@ -64,8 +64,8 @@ def rename_sides(path):
         # No braces: the whole path was rewritten.
         old, new = old.split(" => ", 1)[0], new.split(" => ", 1)[1]
     # A component that is empty on one side (`a/{ => b}/c`, a move into or out of a directory)
-    # leaves a doubled slash behind; git's own path has none. Missed until 2026-09-19, when
-    # 5,789 of the first 47,719 R48 pairs failed to read for exactly this.
+    # leaves a doubled slash behind; git's own path has none, and a pair whose path keeps it
+    # fails to read.
     return _collapse(old.strip()), _collapse(new.strip())
 
 

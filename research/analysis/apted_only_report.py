@@ -17,10 +17,9 @@
 """RQ1 report: "What percentage of real-world source-code changes can a single, whole-tree
 tree-edit-distance computation complete within a one-second budget?"
 
-The paper renumbered this question to **RQ2** in the 2026-09-02 restructure. "RQ1" survives here
-in the script name, the `RqOne*` macro stems and these comments, deliberately: renaming the macros
-would touch every paper that already cites them. Nothing user-visible may say "RQ1" - a stale
-"RQ1" in a chart title shipped in the PDF for a week before it was caught (2026-09-09).
+The paper numbers this question **RQ2**. "RQ1" survives here in the script name, the `RqOne*`
+macro stems and these comments, deliberately: renaming the macros would touch every paper that
+already cites them. Nothing user-visible may say "RQ1".
 
 Reads apted_only_benchmark's per-pair CSV output(s) (language, size_bucket, repository, commit,
 path, loc_before, loc_after, loc_combined, bytes_before, bytes_after, ast_nodes_before,
@@ -33,8 +32,8 @@ kill, not this script) per bucket.
 The measured algorithm is CodeDiff's own APTED implementation (`apted::for_roots`,
 `Algorithm::Apted`), run directly on the whole before/after trees with none of CodeDiff's 7-phase
 pipeline's pre-matching heuristics applied first - not a generic/stock APTED implementation. This
-implementation includes CodeDiff's own containment-aware `compute_delta` optimization (2026-07-10,
-~35% faster than the naive version on this project's own benchmark suite), so if anything it is
+implementation includes CodeDiff's own containment-aware `compute_delta` optimization (~35% faster
+than the naive version on this project's own benchmark suite), so if anything it is
 faster than a textbook implementation would be. The percentages this script reports are therefore
 a lower bound on how often a whole-tree tree-edit-distance computation fails a one-second budget in
 practice, not an upper bound - a stock/unoptimized implementation would do no better.
@@ -54,9 +53,8 @@ Three caveats the numbers below carry, all worth reading before citing a headlin
    stratified sampling does not bias, only the relative sample *counts* per bucket - which is
    exactly why this report's primary evidence is the bucketed chart, not the aggregate number.
 
-   The corpus is drawn *and* reported under the same LOC strata as of the 2026-08-18 re-sample, so
-   per-bucket counts are close to even (roughly 1.5k-3.1k per bucket) rather than the 271-1450
-   spread left over from re-bucketing the older byte-size sample by LOC. Per-cell `n` is annotated
+   The corpus is drawn *and* reported under the same LOC strata, so per-bucket counts are close to
+   even (roughly 1.5k-3.1k per bucket). Per-cell `n` is annotated
    on the by-category chart; re-draw with `make sample-pairs-all` if a (bucket, category) cell is
    too thin to carry the claim being made from it.
 
@@ -176,7 +174,7 @@ LANGUAGE_CATEGORY = {
 CATEGORY_ORDER = [CODE, SCRIPTING, CONFIG_DATA]
 
 # RQ1's population: every pair the whole-tree computation was actually attempted on. "ok"
-# finished inside the budget; "timed_out" was killed at it; "out_of_memory" (2026-09-19) died
+# finished inside the budget; "timed_out" was killed at it; "out_of_memory" died
 # allocating the kernel's delta matrix, which for a file of a few hundred thousand nodes is
 # hundreds of gigabytes - a non-completion as surely as a timeout. "parse_failed", "worker_error"
 # and "failed_to_read" never reach the timing question and are reported, not counted.
@@ -354,9 +352,8 @@ def write_paper_fragment(
     # collapses.
     code_buckets = {label: p for label, n, _, p in results[CODE]["buckets"] if n > 0}
     lines.append(f"\\newcommand{{\\RqOneCodeTenToThirtyPct}}{{{pct(code_buckets['10-30'])}}}")
-    # The bucket between the two, added 2026-09-11 on review: RA2 used to jump from 11-30 straight
-    # to 101-300 while calling the latter "one bucket up", which it is not - 31-100 sits between
-    # them, and it is where the budget first starts to bite.
+    # The bucket between the two: 31-100 is not "one bucket up" from 11-30 but sits between it
+    # and 101-300, and it is where the budget first starts to bite.
     lines.append(f"\\newcommand{{\\RqOneCodeThirtyToHundredPct}}{{{pct(code_buckets['30-100'])}}}")
     lines.append(
         f"\\newcommand{{\\RqOneCodeHundredToThreeHundredPct}}{{{pct(code_buckets['100-300'])}}}"
@@ -421,7 +418,7 @@ def plot_by_category(results: dict, output_path: Path, total_n: int) -> None:
     ax.set_xlabel("Lines of code (larger of before / after)", fontsize=10.5, color=INK_PRIMARY)
     # No in-image title: papers/introductory-paper/main.tex captions this figure, and a title
     # repeating the caption wastes the figure's vertical space. It also stops the title going
-    # stale - it named "RQ1" for a week after the 2026-09-02 restructure renumbered it to RQ2.
+    # stale.
     ax.legend(frameon=False, fontsize=9, loc="upper right")
     ax.grid(axis="y", color=GRIDLINE, zorder=0)
     for spine in ("top", "right"):

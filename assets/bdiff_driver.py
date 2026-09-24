@@ -17,7 +17,7 @@
 """BDiff runner with two modes: one pair as JSON on stdout, or a timed batch over many pairs.
 
 BDiff ships a CLI (`python -m bdiff a b`) but it *discards* the return value of `bdiff.bdiff()` and
-prints nothing at all - confirmed live, 2026-08-23: exit code 0, empty stdout, empty stderr. The
+prints nothing at all: exit code 0, empty stdout, empty stderr. The
 edit script is only available from the library API, so this driver exists to expose it. Embedded
 into `benchmark_other` via `include_str!` and written to a temp file at run time, the same way
 `generate_mapping_site` embeds its own JavaScript, so there is no separate file to keep in sync
@@ -35,8 +35,8 @@ a silently perfect-looking score rather than an error. See data/comparison/PROVE
 `bdiff_driver.py --batch` reads line-delimited JSON requests `{"id", "before", "after"}` from
 stdin and writes one `{"id", "ms"}` response line per request, timing *only* the `bdiff.bdiff()`
 call. This mirrors research/drivers/gumtree-batch for the same reason it exists: importing bdiff
-pulls in numpy, scipy and rapidfuzz, which costs ~394 ms against a ~12 ms bare interpreter
-(measured 2026-08-23), so a per-invocation wall-clock number is ~97% import overhead and says
+pulls in numpy, scipy and rapidfuzz, which costs ~394 ms against a ~12 ms bare interpreter,
+so a per-invocation wall-clock number is ~97% import overhead and says
 almost nothing about the algorithm. `benchmark_other` reports both - `bdiff_ms` per process and
 `bdiff_warm_ms` from this batch - exactly as it already does for GumTree's cold and warm JVM.
 """

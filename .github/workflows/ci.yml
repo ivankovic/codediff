@@ -1,3 +1,20 @@
+# This file is part of the CodeDiff code diffing tool.
+#
+# Copyright (C) 2026 Marko Ivankovic
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as published
+# by the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
+
 name: CI
 
 on:
@@ -58,12 +75,10 @@ jobs:
 
       - run: cargo install cargo-audit --locked
 
-      # No --ignore flags, and it should stay that way. RUSTSEC-2026-0195/-0194 (quick-xml, via
-      # syntect -> plist) were ignored here until 2026-09-15 on the stated grounds that syntect
-      # pinned a vulnerable plist. It does not - syntect 5.3.0 asks for `plist ^1.3`, which permits
-      # 1.10.1, and that depends on quick-xml ^0.42, past the >=0.41 fix. What actually held the
-      # resolver back was this crate's own `rust-version`: plist 1.10.1 needs Rust 1.88, so the
-      # MSRV-aware resolver would not take it while we claimed 1.85. Raising the MSRV cleared both.
+      # No --ignore flags, and it should stay that way. An advisory that looks pinned by a
+      # dependency (RUSTSEC-2026-0195/-0194, quick-xml via syntect -> plist) is usually held back
+      # by this crate's own `rust-version` instead: the MSRV-aware resolver will not take a fixed
+      # release that needs a newer Rust than the one claimed here. Raise the MSRV, do not ignore.
       - run: cargo audit
 
   mapping-site-js:
@@ -85,11 +100,10 @@ jobs:
       - run: make test-web-js
       - run: make test-showcase-js
 
-  # The analysis scripts under research/ compute the numbers that go into the papers, and until
-  # 2026-08-27 nothing checked them at all while the Rust half had clippy -D warnings across three
-  # feature configs. The ruff version is pinned for the same reason the rule set is pinned in the
-  # root ruff.toml: an unpinned linter turns CI red on a day nobody touched the code. The three
-  # directories are the same three `make lint-python` covers.
+  # The analysis scripts under research/ compute the numbers that go into the papers, so they
+  # are linted as the Rust half is. The ruff version is pinned for the same reason the rule set
+  # is pinned in the root ruff.toml: an unpinned linter turns CI red on a day nobody touched the
+  # code. The three directories are the same three `make lint-python` covers.
   python-lint:
     name: ruff + pytest (research/, scripts/, assets/)
     runs-on: ubuntu-latest
@@ -269,8 +283,8 @@ jobs:
       # suite and not.
       # Split in two because the 3209 `src/test/fixtures/` tests are byte-identical in all four
       # feature sets - nothing they touch is feature-gated - so running them once per set was the
-      # same work four times over, and 76.7% of the suite's CPU time (702s of 915s, measured
-      # 2026-09-22). The first step runs what genuinely differs between the sets, including the
+      # same work four times over, and about three quarters of the suite's CPU time. The first
+      # step runs what genuinely differs between the sets, including the
       # meta-tests that only exist under `test-fixtures`/`stats`; the second runs one quarter of
       # the corpus, so the four jobs together still run every fixture test exactly once. This is
       # redistribution, not selection: nothing is skipped.

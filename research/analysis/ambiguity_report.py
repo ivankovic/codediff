@@ -80,7 +80,7 @@ DIFFS_ROOT = "src/test/data/diffs"
 # All four datasets get a row in Table 2. `small` and `full` are the finished passes and are what
 # the pooled `reviewed_*` rate is over; `stratified` and `defects4j` are printed beside them under
 # a footnote saying their pass is unfinished, so their rows - and the `any_*` rate over all four -
-# read as lower bounds. That is the standing rule for this paper as of 2026-09-16: write the table
+# read as lower bounds. That is the standing rule for this paper: write the table
 # as though every dataset were finished, and footnote the ones that are not, because the paper and
 # the annotation are being written in parallel.
 PER_LIST_DATASETS = (
@@ -179,7 +179,7 @@ def summarize(
     # with multi-mapping available, so a difference between them is a difference in the code, not
     # in when the files happened to be written.
     #
-    # `defects4j` is reported beside them from 2026-09-16 but is NOT in REVIEWED_LISTS below: its
+    # `defects4j` is reported beside them but is NOT in REVIEWED_LISTS below: its
     # ambiguity pass is not finished, so its row carries a footnote in the paper saying so and its
     # fixtures stay out of the pooled rate. Reporting the row and pooling it are separate
     # decisions, and only the second one would turn an annotation gap into a finding.
@@ -192,8 +192,8 @@ def summarize(
         }
 
     # The `stratified` dataset is still essentially un-annotated for ambiguity: 4 of 490 fixtures
-    # carry a multi-map group on disk as of 2026-09-12 (0 of 323 at the corpus state the paper
-    # reports), against 11.4% and 11.6% for `small` and `full`. At the pooled rate of the two
+    # carry a multi-map group on disk (0 of 323 at the corpus state the paper reports), against
+    # 11.4% and 11.6% for `small` and `full`. At the pooled rate of the two
     # finished lists we would expect ~56 of the 490, so this is a gap in the annotation, not a
     # property of those changes. Their mappings are solved; the ambiguity pass over them has not
     # been done. Pooling all three would therefore dilute a measured 11.5% by counting

@@ -18,11 +18,9 @@
 
 """Every size-or-time distribution the introductory paper reports, drawn in one idiom.
 
-Until 2026-09-18 the paper summarised its distributions four different ways: p50/p90/p99/max
-tables for file and edit sizes, a grouped bar chart for the whole-tree APTED budget, a violin for
-tool runtime, and percentile tables again for tool speed. A reviewer asked for one coherent way to
-read them. Every one of those is the same question - what share of the population sits at or
-below x - so every one is drawn here as an empirical cumulative distribution on a log axis, with
+File sizes, edit sizes, the whole-tree APTED budget and tool runtime all ask the same question -
+what share of the population sits at or below x - so every one is drawn here as an empirical
+cumulative distribution on a log axis, with
 the paper's own percentiles marked on the curve and, where a budget exists, the budget as a
 vertical line whose crossing is the number the paper quotes.
 

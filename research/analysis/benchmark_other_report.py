@@ -44,10 +44,10 @@ Also writes one table (not a plot - a handful of summary numbers per tool reads 
 than as a chart):
 
   - benchmark_other_variance.tex: per-fixture coefficient of variation (stddev/mean across that
-    fixture's repeats, as a %), median and p90 per tool - added 2026-07-26 (as a plot) after
-    `benchmark_other`'s own aggregate median/p90/max turned out to swing by roughly +-10% between
-    back-to-back single-shot runs on a loaded machine, making a single run's numbers untrustworthy
-    for judging a real speed change. Changed to a table 2026-07-31. Answers "how much should one
+    fixture's repeats, as a %), median and p90 per tool, because `benchmark_other`'s own
+    aggregate median/p90/max swings by roughly +-10% between back-to-back single-shot runs on a
+    loaded machine, making a single run's numbers untrustworthy for judging a real speed change.
+    Answers "how much should one
     run's number be trusted" as a companion to the runtime plot's "what does the distribution look
     like." A complete, ready-to-`\\input`-ed ACM `table` environment, so
     `research/papers/introductory-paper/main.tex` can include it directly and it never goes stale
@@ -56,11 +56,11 @@ than as a chart):
 And one LaTeX macro fragment:
 
   - variables_comparison.tex: the per-tool line-level agreement and wall-clock percentiles the
-    introductory paper's comparison and speed tables cite, as `\\newcommand`s. Added 2026-08-20;
-    before that these ~30 numbers were AUTHORED entries in `paper_variables.py`, i.e. transcribed
-    by hand from a console table, which is the exact failure mode the whole `variables.tex`
-    mechanism exists to prevent (see `file_stats.py::write_paper_variables`'s doc comment for the
-    slide-deck story). A fragment, not the file `main.tex` reads: `analysis/paper_variables.py`
+    introductory paper's comparison and speed tables cite, as `\\newcommand`s. Generated rather
+    than AUTHORED entries in `paper_variables.py`: ~30 numbers transcribed by hand from a console
+    table is the exact failure mode the whole `variables.tex` mechanism exists to prevent (see
+    `file_stats.py::write_paper_variables`'s doc comment for the slide-deck story). A fragment,
+    not the file `main.tex` reads: `analysis/paper_variables.py`
     merges it into the single `plots/variables.tex`, same contract as
     `apted_only_report.py::write_paper_fragment`.
 
@@ -107,20 +107,20 @@ BASELINE = "#c3c2b7"
 # function's own doc comment).
 #
 # `treesitter_parse` (black, INK_PRIMARY) and `unix_diff` (grey, INK_MUTED) reuse this file's own
-# chart-chrome tokens rather than a categorical color - a deliberate choice (2026-07-31): neither
+# chart-chrome tokens rather than a categorical color - a deliberate choice: neither
 # is "a tool being compared" the way codediff/gumtree/difftastic/diffsitter are, one's a reference
 # lower bound, the other the long-standing line-level baseline every other series is measured
 # against. codediff/gumtree/gumtree_warm's colors (blue/violet/red) are from the dataviz skill's
 # reference palette, originally validated colorblind-safe via validate_palette.js as part of a
 # larger fivesome that also included unix_diff/treesitter_parse's old categorical slots, before
-# those two moved to grey/black above. difftastic/diffsitter (gold/teal) were added 2026-07-31,
-# after that validation pass - the dataviz skill and validate_palette.js aren't available in this
+# those two moved to grey/black above. difftastic/diffsitter (gold/teal) were added after that
+# validation pass - the dataviz skill and validate_palette.js aren't available in this
 # environment, so these two were picked by hand as the two hue families the rest don't already
 # cover, mirroring how Okabe-Ito's colorblind-safe 8-palette adds sky-blue and yellow to a base 5
 # for the same reason. Re-validate the full current set before treating it as confirmed
 # colorblind-safe.
 #
-# The four git variants (added 2026-08-23) are one engine reached through one flag, so they share a
+# The four git variants are one engine reached through one flag, so they share a
 # single hue family (orange) at four lightnesses rather than taking four unrelated categorical
 # slots - the point a reader should take from the chart is "these are the same tool", and four
 # scattered hues would say the opposite. BDiff (green) is a genuinely separate text-based tool and
@@ -147,10 +147,8 @@ DISPLAY_ORDER = list(DISPLAY_NAMES)
 # The same series, spelled as papers/introductory-paper/main.tex spells them. [`DISPLAY_NAMES`]
 # feeds matplotlib, which cannot render LaTeX markup, so the two maps cannot be one: chart labels
 # stay plain and table cells carry \texttt{} on the things that are literally command names.
-# Before this split (2026-09-09) the paper showed the same ten series under three different naming
-# schemes across four tables - "UNIX diff (baseline)" here against "Unix \texttt{diff}" in the
-# authored tables, "GumTree (binary)" against "GumTree", "BDiff (per process)" against "BDiff
-# (cold, per-invocation)". Keep any new series in step with main.tex, not with DISPLAY_NAMES.
+# Without this map the same ten series appear under different names across tables. Keep any new
+# series in step with main.tex, not with DISPLAY_NAMES.
 LATEX_NAMES = {
     "treesitter_parse": r"tree-sitter parse (lower bound)",
     "unix_diff": r"Unix \texttt{diff}",
@@ -428,8 +426,8 @@ def bucket_counts(accuracy_rows, tool, metric="line"):
 def write_bucket_table(accuracy_rows, output_path, include_codediff):
     r"""Per-fixture agreement buckets as a generated LaTeX table, ``\input`` directly.
 
-    This replaced the bucketed-agreement histogram (2026-08-23), which could not show the result it
-    existed to show: with 10-point buckets every tool put the large majority of its fixtures into
+    A bucketed-agreement histogram could not show the result this exists to show: with 10-point
+    buckets every tool put the large majority of its fixtures into
     the single 90--100% bar, so the chart's whole dynamic range sat inside one column. These
     buckets zoom in where the data actually is, and what they expose is not a small difference -
     CodeDiff maps 418 of 486 fixtures with zero mismatched lines against Unix diff's 244, where the
@@ -447,7 +445,7 @@ def write_bucket_table(accuracy_rows, output_path, include_codediff):
         "% Auto-generated by research/analysis/benchmark_other_report.py. Do not edit by hand -",
         "% regenerate: make timing-report (from research/).",
         # `table*`, not `table`: six columns of "244 (50%)" cells overflow a single ACM
-        # column and collide with the neighbouring table (observed 2026-08-23).
+        # column and collide with the neighbouring table.
         r"\begin{table*}",
         (
             r"  \caption{Per-fixture agreement with the human mapping, bucketed. Every number is"
@@ -496,14 +494,13 @@ def write_node_bucket_table(accuracy_rows, output_path):
     algorithms report whole lines and nothing finer, so `benchmark_other.rs` records them as
     `line_only` and they have no node column to bucket. That is exactly what makes the node
     reading worth having beside the line one - it is the only place BDiff's `str_diff` character
-    offsets and Neovim's `DiffText` column runs are actually exercised, and both were scored
-    `line_only` here until 2026-08-24 despite emitting them all along.
+    offsets and Neovim's `DiffText` column runs are actually exercised.
 
     The node metric is a "did the tool consider this node's text changed" projection, one
     granularity below the line columns - *not* node-to-node mapping fidelity, which cannot be asked
     of a tool that parses its own tree. See `benchmark_other.rs`'s `--accuracy-csv` doc comment.
 
-    **The paper no longer \input{}s this file.** Since 2026-09-10 the line and node readings are
+    **The paper does not \input{} this file.** The line and node readings are
     one table (see [`write_combined_bucket_table`]), because two floats with identical column
     headers, one immediately after the other, read as a single table split by a page break rather
     than as two measurements. This is still written so the node numbers stay available on their own
@@ -560,23 +557,21 @@ def _bucket_rows(accuracy_rows, tools, metric, include_codediff):
 def write_combined_bucket_table(accuracy_rows, output_path, include_codediff):
     r"""The line and node readings as **one** table, which is what the paper \input{}s.
 
-    Merged 2026-09-10, on review. The two were separate floats with byte-identical column headers
-    (``Tool``, ``n``, and the four buckets) placed one after the other, and LaTeX floated them onto
-    the same page - so a reader met the same header twice and read the second table as a
-    continuation of the first rather than as a different granularity. Nothing about the numbers
-    changed here: the rows, subsets and buckets are exactly those the two tables carried, only
-    gathered under one caption with the granularity stated as a row group rather than in two
-    captions a reader has to hold side by side.
+    As two separate floats with byte-identical column headers (``Tool``, ``n``, and the four
+    buckets) placed one after the other, LaTeX floated them onto the same page - so a reader met
+    the same header twice and read the second table as a continuation of the first rather than as
+    a different granularity. The rows, subsets and buckets are exactly those the two tables
+    carried, only gathered under one caption with the granularity stated as a row group rather
+    than in two captions a reader has to hold side by side.
 
-    The asymmetry between the halves is deliberate and predates this merge. The line half omits
+    The asymmetry between the halves is deliberate. The line half omits
     \textsc{CodeDiff} (`include_codediff`), because Section 7 answers RQ4 over other people's
     tools and the paper's own tool is reported in its own section; the node half includes it,
     because the node reading is where a reader asking "and where does CodeDiff land" is actually
     looking. Passing `include_codediff=True` puts it in both.
 
-    **The node block was dropped on 2026-09-11, on review.** The reviewer asked what the
-    node-granularity rows were for, and the honest answer was "a second reading of the same tools
-    under a metric only half of them can be scored on". Line granularity is the single common
+    **No node block.** Node-granularity rows would be a second reading of the same tools under a
+    metric only half of them can be scored on. Line granularity is the single common
     ground all ten configurations share, and it is the basis Section 8 scores \textsc{CodeDiff}
     on too, so the table now carries the two line-level blocks only. The node numbers stay
     available in `write_node_bucket_table`'s own file for anything that wants them.
@@ -588,7 +583,7 @@ def write_combined_bucket_table(accuracy_rows, output_path, include_codediff):
         "% Auto-generated by research/analysis/benchmark_other_report.py. Do not edit by hand -",
         "% regenerate: make timing-report (from research/).",
         # `table*`, not `table`: six columns of "244 (50%)" cells overflow a single ACM
-        # column and collide with the neighbouring table (observed 2026-08-23).
+        # column and collide with the neighbouring table.
         r"\begin{table*}",
         (
             r"  \caption{Per-fixture line-level agreement with the human mapping, bucketed, for"
@@ -620,7 +615,7 @@ def write_combined_bucket_table(accuracy_rows, output_path, include_codediff):
 
 # The paper's four datasets, as the corpus directory names them and as the paper names them
 # (Section 3's Curated and Full repository lists, the stratified-by-size sample, and the Defects4J
-# bug fixes added on 2026-09-16). "All" is their union, which is the population every pooled
+# bug fixes). "All" is their union, which is the population every pooled
 # number in the paper is over.
 DATASET_LABELS = [
     ("small", "Curated"),
@@ -679,7 +674,7 @@ FIGURE_NAMES = {"gumtree": "GumTree", "bdiff": "BDiff", "unix_diff": "Unix diff"
 def plot_dataset_buckets(accuracy_rows, datasets, output_path):
     r"""One panel per dataset (Curated, Full, Stratified, Defects4J, All), one horizontal
     100%-stacked bar per external configuration, segments in BUCKETS order - the per-dataset
-    reading of the line-level table, added 2026-09-11 on review: the corpus is four
+    reading of the line-level table: the corpus is four
     differently-drawn samples (Section 3), and a pooled rate cannot show whether a tool's accuracy
     is a property of the tool or of which sample dominates the pool. Tools are ordered by their
     Perfect share over the whole corpus, so the panels share one y axis and a row means the same
@@ -808,7 +803,7 @@ def read_quality_rows(csv_path: Path) -> dict[str, dict] | None:
     from here rather than from benchmark_accuracy.csv: the latter's `codediff_node_mismatches` is
     the per-node "did you consider this changed" projection every sub-line tool is scored on,
     not mapping fidelity, and over the same 775 fixtures it totals 16,656 mismatches where the
-    mapping-fidelity figure is 7,012 (checked 2026-09-11). Two numbers both called "node
+    mapping-fidelity figure is 7,012. Two numbers both called "node
     mismatches" in one paper would be exactly the drift paper_variables.py exists to prevent."""
     if not csv_path.exists():
         return None
@@ -822,11 +817,11 @@ def write_codediff_dataset_table(accuracy_rows, datasets, output_path):
     reports \textsc{CodeDiff} on its own rather than against the other tools.
 
     The columns are the four buckets of `write_bucket_table`, on the same rows and the same
-    line-level basis, so a row here can be read directly against a row of that table. It used to
-    carry a pooled line rate and two node-accuracy columns instead; those answered a different
-    question from the table a reader was being asked to compare it with, and the comparison is the
-    point (2026-09-18, on review). The node and visible-node rates survive as per-dataset macros
-    written by `write_paper_fragment`, which is where the prose that cites them reads them from."""
+    line-level basis, so a row here can be read directly against a row of that table. A pooled
+    line rate or node-accuracy columns would answer a different question from the table a reader
+    is asked to compare it with, and the comparison is the point. The node and visible-node rates
+    are per-dataset macros written by `write_paper_fragment`, which is where the prose that cites
+    them reads them from."""
     backslash = "\\"
     row_end = backslash * 2
     lines = [
@@ -895,8 +890,7 @@ def plot_summary(rows, tools, output_path):
 
     Accuracy is deliberately not here: `write_bucket_table` reports it, and a bucket table strictly
     dominates a bar of the pooled rate - it shows the same ordering plus the distribution behind
-    it. This chart used to carry an accuracy panel too; it was dropped (2026-08-23) rather than
-    maintained as a second, weaker view of numbers the table already carries.
+    it. An accuracy panel here would be a second, weaker view of numbers the table already carries.
 
     Speed is the median, not the mean: the per-tool means in this corpus are dominated by a
     cold-cache tail on whichever tool runs first per fixture (`unix_diff` and `git_myers` show
@@ -1012,7 +1006,7 @@ def plot_runtime(rows: list[dict], tools: list[str], output_path: Path) -> None:
     fixture are correlated with each other, not 3 independent fixtures), so it stays the honest
     number to report as "n"."""
     # The parse-only reference violin and three of the four git algorithms are dropped from this
-    # figure (2026-09-09, author review). They were the two things making the chart hard to read:
+    # figure. They are the two things that make the chart hard to read:
     # the reference violin is not a competing tool yet invites comparison as though it were, and
     # the four git series are indistinguishable by construction - this paper's own result is that
     # the choice of line-diff algorithm does not move any metric here, so plotting all four spends
@@ -1036,9 +1030,8 @@ def plot_runtime(rows: list[dict], tools: list[str], output_path: Path) -> None:
 
     series_log = [np.log10(s) for s in series_ms]
 
-    # Per-item width bumped from 2 to 2.6 (2026-07-31): the longer display names ("TreeSitter parse
-    # (lower bound)", "UNIX diff (baseline)") need more horizontal room per x-tick than the old
-    # short ids did, or adjacent tick labels visually collide.
+    # 2.6 per item: the display names ("TreeSitter parse (lower bound)", "UNIX diff (baseline)")
+    # need that much horizontal room per x-tick, or adjacent tick labels visually collide.
     fig, ax = plt.subplots(figsize=(3 + 2.6 * len(labels), 5.5), facecolor=SURFACE)
     ax.set_facecolor(SURFACE)
 
@@ -1236,7 +1229,7 @@ def write_variance_table(rows: list[dict], tools: list[str], output_path: Path) 
 # Adding a tool here adds its macros to plots/variables_comparison.tex, and therefore to
 # plots/variables.tex. It does *not* add a row to any table in the paper - main.tex references
 # whichever macros its prose and tables actually use, and the generated-but-unreferenced ones are
-# harmless (see the `Shape*` block for the established precedent). Every tool added 2026-08-23
+# harmless (see the `Shape*` block for the established precedent). Every tool
 # covers the full corpus, so `common_subset` below is unchanged by their presence.
 PAPER_MACRO_STEMS = {
     "codediff": "CodeDiff",
@@ -1313,7 +1306,7 @@ def speed_percentiles(rows: list[dict], id_: str) -> tuple[float, float, float] 
     process spawn, no IO - while every external tool's timed region is its whole subprocess:
     temp-file write, spawn, that tool's own parse and diff, and parsing its output back. Reporting
     the two side by side compared different things and flattered codediff by its entire parse cost
-    (2026-09-02: p50 7.09 ms against diffsitter's 8.62, which became 10.07 once the parse it had
+    (p50 7.09 ms against diffsitter's 8.62, which became 10.07 once the parse it had
     already measured was included - reversing the ordering the paper stated).
 
     `treesitter_parse_ms` is measured per repeat by the same harness, so this needs no re-run: it
@@ -1414,8 +1407,8 @@ def write_paper_fragment(
             )
             lines.append(f"\\newcommand{{\\{stem}LineRate}}{{{100.0 * mismatches / total:.3f}}}")
             # The per-fixture "Perfect" share (zero mismatched lines), which is the reading the
-            # paper leads RA4.1 with since 2026-09-09 - the pooled line rate it used to quote is
-            # decided by a handful of very long fixtures, while this weights every change equally.
+            # paper leads RA4.1 with - a pooled line rate is decided by a handful of very long
+            # fixtures, while this weights every change equally.
             # Same source as Table~\\ref{tab:agreement-buckets}'s first column, so the two cannot
             # drift apart.
             buckets = bucket_counts(accuracy_rows, id_)
@@ -1425,7 +1418,7 @@ def write_paper_fragment(
                     f"\\newcommand{{\\{stem}PerfectPct}}{{{100.0 * counts[0] / scored:.0f}}}"
                 )
 
-        # Per-dataset readings (2026-09-11, on review): the Perfect share of every configuration
+        # Per-dataset readings: the Perfect share of every configuration
         # and CodeDiff's pooled line rate, split by the four datasets of Section 3. Same
         # sources as `plot_dataset_buckets` and `write_codediff_dataset_table`.
         datasets = fixture_datasets()
@@ -1498,7 +1491,7 @@ def write_paper_fragment(
         stem = PAPER_SPEED_STEMS[id_]
         for name, value in zip(("PFifty", "PNinety", "PNinetyNine"), percentiles):
             lines.append(f"\\newcommand{{\\Speed{stem}{name}}}{{{value:.1f}}}")
-        # The slowest single measurement, added 2026-09-18 on review: a percentile table says
+        # The slowest single measurement: a percentile table says
         # nothing about the tail a user can actually hit, and the paper states a target over
         # 99.99% of commits, which no p99 can speak to.
         sample = speed_sample(rows, id_)
@@ -1557,8 +1550,8 @@ if __name__ == "__main__":
     print(f"External tools found: {', '.join(tools)}")
 
     plots_dir = Path(args.plots_dir)
-    # The bucketed-agreement histogram was removed 2026-08-23 - see `write_bucket_table` for why
-    # it could not show the result it existed to show. `plot_runtime` stays: its data spans three
+    # No bucketed-agreement histogram - see `write_bucket_table` for why it could not show the
+    # result it exists to show. `plot_runtime` stays: its data spans three
     # orders of magnitude and it is the figure that exposes BDiff's and GumTree's cold/warm split.
     plot_summary(rows, tools, plots_dir / "benchmark_other_summary.png")
     plot_runtime(rows, tools, plots_dir / "benchmark_other_runtime.png")
@@ -1577,13 +1570,13 @@ if __name__ == "__main__":
             include_codediff=True,
         )
         write_node_bucket_table(accuracy_rows, plots_dir / "benchmark_other_buckets_node.tex")
-        # What the paper actually \input{}s since 2026-09-10 - see write_combined_bucket_table.
+        # What the paper actually \input{}s - see write_combined_bucket_table.
         write_combined_bucket_table(
             accuracy_rows,
             plots_dir / "benchmark_other_buckets_combined.tex",
             include_codediff=False,
         )
-        # Per-dataset readings, added 2026-09-11 on review - see plot_dataset_buckets.
+        # Per-dataset readings - see plot_dataset_buckets.
         datasets = fixture_datasets()
         plot_dataset_buckets(
             accuracy_rows, datasets, plots_dir / "benchmark_other_buckets_by_dataset.png"

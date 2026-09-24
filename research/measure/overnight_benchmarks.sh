@@ -17,7 +17,7 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program. If not, see <https://www.gnu.org/licenses/>.
 #
-# The two measurements the 2026-09-18 review left open, run back to back on an idle machine:
+# Two measurements, run back to back on an idle machine:
 #
 #   R22  RQ2 re-drawn at COUNT=1000 pairs per language and re-measured - the whole
 #        overnight_rq1_refresh.sh chain with SKIP_FETCH=1 (the corpus on disk is already at
@@ -37,9 +37,9 @@
 #   systemd-run --user --unit codediff-overnight --collect --same-dir \
 #     ./measure/overnight_benchmarks.sh [log-file]
 #
-# Why a unit: on 2026-09-19 one R48 shard hit a pair that needed more memory than the machine
-# has, the kernel's OOM killer took it, and systemd then stopped the whole scope the shell lived
-# in - the other seven shards, the orchestrator and the Claude Code session that had started it.
+# Why a unit: when an R48 shard hits a pair that needs more memory than the machine has, the
+# kernel's OOM killer takes it, and systemd then stops the whole scope the shell lives in - the
+# other shards, the orchestrator and the terminal session that started it.
 # A unit of its own is stopped alone. For the same reason every shard runs in its own transient
 # scope with a hard memory cap (SHARD_MEMORY_MAX) below, so a pathological pair kills that shard's
 # process and nothing else, and a killed shard resumes from its own output with the offending

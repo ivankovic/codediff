@@ -23,8 +23,8 @@
 # Three groups, from the killed records (which carry the exit status the attempt died with) and
 # the merged CSV:
 #
-#   134 / 143  SIGABRT / SIGTERM. Until 2026-09-19 08:10 the harness ran its diff thread on the
-#              default 2MB stack and aborted on files the product diffs on its 256MB one; a
+#   134 / 143  SIGABRT / SIGTERM. An abort is the harness's diff thread running on a smaller
+#              stack than the product's 256MB one and overflowing on files the product diffs; a
 #              SIGTERM is an operator restarting a shard. Neither is a finding about the pair.
 #              Re-measured under the ordinary cap.
 #   137        SIGKILL, the shard's memory cap. These cluster in a few generated files (parse

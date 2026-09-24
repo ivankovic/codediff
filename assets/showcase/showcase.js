@@ -1,3 +1,21 @@
+/*  This file is part of the CodeDiff code diffing tool.
+ *
+ *  Copyright (C) 2026 Marko Ivankovic
+ *
+ *  This program is free software: you can redistribute it and/or modify
+ *  it under the terms of the GNU Affero General Public License as published
+ *  by the Free Software Foundation, either version 3 of the License, or
+ *  (at your option) any later version.
+ *
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ *  GNU Affero General Public License for more details.
+ *
+ *  You should have received a copy of the GNU Affero General Public License
+ *  along with this program. If not, see <https://www.gnu.org/licenses/>.
+ */
+
 // The showcase's half of the page: a `fetch` shim that answers codediff-web's `/api/*` calls from
 // the JSON `generate_showcase` baked, and the strip of chrome above the viewer that picks a case
 // and flips between `diff`'s view and codediff's. app.js and model.js are the product's own files,

@@ -327,10 +327,10 @@ def compute_full_dataset_stats(df):
     print("Type counts:")
     print(tip_counts)
 
-    # A horizontal bar chart, not a pie. The pie this replaced (2026-09-09) failed three ways at
-    # the size the paper prints it: the two smallest categories' labels and their percentages
-    # overprinted into an illegible smear, the five wedges were separated by hue alone and so said
-    # nothing in a greyscale print, and a reader cannot rank five wedges by eye anyway. Bars are
+    # A horizontal bar chart, not a pie. A pie fails three ways at the size the paper prints it:
+    # the two smallest categories' labels and their percentages overprint into an illegible smear,
+    # the five wedges are separated by hue alone and so say nothing in a greyscale print, and a
+    # reader cannot rank five wedges by eye anyway. Bars are
     # sorted, individually labelled, and readable in black and white.
     categories = list(tip_counts["category"])
     counts = [int(c) for c in tip_counts["count"]]
@@ -462,7 +462,7 @@ def compute_code_only_stats(df):
     )
     # Node counts are over the code files that have one. A file in a language without a grammar,
     # one flagged as generated and never parsed, one that gave up at the parse budget, and an
-    # empty one all carry zero, and since the 2026-09-13 classifier the first group alone is a
+    # empty one all carry zero, and the first group alone is a
     # sixth of all code files: counting them would make the node median describe the classifier's
     # reach rather than the size of a parsed file. Lines and bytes stay over every code file.
     parsed = df.filter(pl.col("ast_nodes") > 0)
@@ -476,9 +476,9 @@ def compute_code_only_stats(df):
     print("Pearson correlation between bytes and ast_nodes: ", correlation)
 
     # The same population the fit below is drawn from: files at or below the 99th percentile of
-    # both size measures. Reported alongside the untrimmed r since 2026-09-20, when the files
-    # above 1 MiB joined the statistics (see data/corpus_stats/PROVENANCE.md) and pulled the
-    # untrimmed Pearson from 0.90 to 0.47 - Pearson over a heavy-tailed population is decided by
+    # both size measures. Reported alongside the untrimmed r because the files above 1 MiB (see
+    # data/corpus_stats/PROVENANCE.md) pull the untrimmed Pearson down to 0.47 - Pearson over a
+    # heavy-tailed population is decided by
     # its few largest points, which here are generated data tables whose bytes per node run from
     # three to thirteen - while the trimmed one stayed above 0.9 and the bytes/5 rule the paper
     # states held to the decimal.

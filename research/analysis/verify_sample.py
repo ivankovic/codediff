@@ -25,8 +25,8 @@ checkouts it is meant to be measured over, and reports the per-(language, bucket
 Why this is a gate and not a report. A sample CSV stores *pointers* - `(language, size_bucket,
 repository, commit, path)` - and the blobs are read back out of the checkouts at measurement time.
 That keeps the corpus small, but it means a sample is only valid while the history it points into
-still exists, and shallow clones that get re-fetched drop old commits continuously. On 2026-08-20
-the committed sample had decayed to ~41% unreadable, and because the losses were concentrated in
+still exists, and shallow clones that get re-fetched drop old commits continuously. A committed
+sample once decayed to ~41% unreadable, and because the losses were concentrated in
 whole repositories rather than spread evenly, the surviving pairs were not a random subset: two
 large projects had lost every sampled commit. A measurement over that sample would have looked
 perfectly healthy in its own output while silently answering a different question.

@@ -41,8 +41,8 @@ Two populations of numbers, deliberately kept visibly distinct in the output:
     write_paper_fragment` writes to `variables_rq1.tex` from `data/rq1/`;
   - the tool comparison (per-tool line-level agreement, wall-clock percentiles), which
     `benchmark_other_report.py::write_paper_fragment` writes to `variables_comparison.tex` from
-    `data/comparison/`. Promoted from AUTHORED on 2026-08-20: at ~30 hand-transcribed numbers it
-    was the largest authored group, and the one a data refresh touches every single time;
+    `data/comparison/`. Generated rather than authored because at ~30 numbers it is the group a
+    data refresh touches every single time;
   - RQ3 (how often the ground truth itself admits no unique mapping), which
     `ambiguity_report.py::write_paper_fragment` writes to `variables_ambiguity.tex` from the
     human-authored mapping files themselves;
@@ -58,8 +58,7 @@ Two populations of numbers, deliberately kept visibly distinct in the output:
   provenance attached, rather than scattered through `main.tex` with none - a real improvement,
   but not the same guarantee the generated blocks have. What remains authored is the corpus/
   node-accuracy totals, the ablation deltas and the design targets; the first two are each one
-  command away from their artifact, recorded per block. (The robustness run's status histogram
-  was authored too until 2026-09-11; it is now DERIVED, see `robustness_fixtures`.)
+  command away from their artifact, recorded per block.
 
 Every macro is emitted on every run, whether or not its source was available. A missing source
 emits a loud `\\textbf{??}` placeholder rather than omitting the macro: `main.tex` builds under
@@ -105,13 +104,11 @@ STRATIFIED_PER_CELL = 10
 # `defects4j` fixtures. The corpus directory also holds 62 `handmade` fixtures, hand-written
 # minimal examples of one change pattern each; the product benchmark scores them and this paper
 # does not, because no rate over cases written to exercise the matcher estimates anything about
-# real changes. That exclusion arrived on 2026-09-09 and took the paper's handmade-versus-sampled
-# comparison with it.
+# real changes.
 #
-# `defects4j` joined the reported set on 2026-09-16 and is what moved these four numbers most:
-# 113 solved Java compilation units, far longer than the corpus median, which is why NodesTotal
-# rose by more than half again while the fixture count rose by a third. Only solved fixtures
-# count - the other 883 Defects4J directories carry no human_mapping.json and are invisible here.
+# `defects4j` contributes 113 solved Java compilation units, far longer than the corpus median,
+# which is why it carries so much of NodesTotal. Only solved fixtures count - the other 883
+# Defects4J directories carry no human_mapping.json and are invisible here.
 #
 # In scope: 1056 fixture directories, all 1056 carrying a human_mapping.json.
 # `rust-completely-unrelated-main-files`, which is deliberately ground-truth-free (a
@@ -121,9 +118,7 @@ STRATIFIED_PER_CELL = 10
 # NumFixtures is the ground-truth-bearing count, 1056, which is the denominator of every per-tool
 # row, the ablation study, and the node accuracy below.
 #
-# Refreshed together, from one corpus state, on 2026-09-16 (previously 2026-09-09 / 775,
-# 2026-09-08 / 700, 2026-09-07 / 650 and, the same day, 627 and 615; before that 2026-09-05 / 597,
-# 2026-09-02 / 512 and 2026-08-20 / 468). These four move as a set and must be
+# Refreshed together, from one corpus state, on 2026-09-16. These four move as a set and must be
 # refreshed as a set: re-run the benchmark with --csv, re-run `analyze_human_mappings --csv` so the
 # scope artifact agrees with it, then recompute here. Order matters in one direction: human_mapping_analysis.csv carries a
 # `current_mismatches` column read back from optimal_solutions_benchmark.csv, so the benchmark runs
@@ -134,8 +129,8 @@ CORPUS = {
     "NodesMatched": 8_586_599,
     "NodesTotal": 8_594_027,
     # Distinct languages across the fixture corpus, from `analyze_human_mappings`' own "By
-    # language" census (24 as of 2026-09-16, unchanged by adding `defects4j`, which is Java only -
-    # a language the corpus already covered - and unchanged by dropping the handmade fixtures).
+    # language" census (24 as of 2026-09-16; `defects4j` is Java only, and the excluded handmade
+    # fixtures cover no language the sampled ones lack).
     # Not the same number as the empirical study's \NumLanguages, which counts languages in the
     # 100-repository measure-file-stats corpus.
     "NumFixtureLanguages": 24,
@@ -155,14 +150,9 @@ CORPUS_VISIBLE = {
 # source: `make ablation-study` from research/ (measure/ablation_study.sh), which writes one CSV
 #         per run to research/data/ablation/. The script prints the node-granularity table; both
 #         granularities below are totalled from those CSVs' `mismatches` and `visible_mismatches`
-#         columns, so unlike the pre-2026-08-20 values these are recomputable from artifacts.
+#         columns, so these are recomputable from artifacts.
 #
-# Measured 2026-08-20 against the 468-fixture ground-truth corpus. Every one of these four passes
-# is a *different* pass from the four the paper's table carried before this refresh: the earlier
-# set (import-node normalization, flow-control arm matching, bottom-up expansion, move-detection
-# recovery) was measured 2026-07-15, and three of those four have since been deleted from the
-# codebase outright. Do not compare the two tables row by row - only move-detection recovery is
-# the same pass in both.
+# Measured 2026-08-20 against the 468-fixture ground-truth corpus.
 #
 # The visible-node column is the newer, stricter reading: it counts only nodes that carry text of
 # their own and therefore reach the screen. Two passes that measurably help at full node
@@ -183,38 +173,22 @@ ABLATION_VISIBLE = {
     "AblationVisibleUniqueTypeMatching": "+0",
 }
 
-# NOTE: the per-tool COMPARISON and SPEED blocks that used to live here were promoted to GENERATED
-# on 2026-08-20 - `benchmark_other_report.py::write_paper_fragment` now writes them to
-# `plots/variables_comparison.tex` from `benchmark_accuracy.csv` (accuracy) and
-# `benchmark_other.csv` (timing), and they are merged in below exactly like the empirical and RQ1
-# blocks. That removes ~30 hand-transcribed numbers, which were the largest remaining AUTHORED
-# group and the one most likely to drift: they are the numbers a refresh touches every time.
-
-# NOTE: the ROBUSTNESS block that used to live here (a 2026-08-20 run over 925 sampled Rust pairs,
-# capped at 16,000 combined nodes, 377 of whose clones had already been rewritten out of history)
-# was replaced on 2026-09-11 by `robustness_fixtures` below, DERIVED from
-# data/performance/robustness_fixtures.csv - the same fixture corpus every other number in the
-# paper is reported on, with no node cap.
-
 # Design targets and fixed descriptive facts. Chosen, not measured - a refresh means a decision,
 # not a re-run - except GumTreeVersion, which is whichever build benchmark_other was run against.
 TARGETS = {
-    # Raised from 400 to 1000 on 2026-09-18, on review of the introductory paper. 400 was a number
-    # with no argument behind it; 1000 is the one the paper already cites Nielsen for in
-    # Section 5, so the design target and the budget RQ2 measures against are now the same number.
+    # 1000 is the number the paper cites Nielsen for in Section 5, so the design target and the
+    # budget RQ2 measures against are the same number.
     "SpeedTargetMs": "1000",
     "SpeedTargetPct": "99.99",
     # Clone depth the corpus under /var/tmp/research/full/ was fetched at, per commit from each
-    # branch tip (`make fetch MODE=full DEPTH=50`, 2026-08-20). Not a measurement - a parameter of
-    # how the corpus was built - but it belongs in the paper: it bounds how far back RQ1's commit
-    # sampling can reach. The paper previously claimed the repositories were cloned in full, which
-    # was never true of these checkouts.
+    # branch tip (`make fetch MODE=full DEPTH=50`). Not a measurement - a parameter of how the
+    # corpus was built - but it belongs in the paper: it bounds how far back RQ1's commit sampling
+    # can reach.
     "CorpusCloneDepth": "50",
-    # Was "seven" until 2026-08-20. The pipeline's phases are numbered 1-7 in the source, but two
-    # of those numbers are now vacant: the Dice-coefficient bottom-up expansion that occupied
-    # phases 3 and 5 was deleted from the codebase on 2026-08-16 after measuring net-negative.
-    # The paper renumbers the five that remain as 1-5 rather than exposing the source's historical
-    # gaps, so this word and the paper's phase headings must be changed together.
+    # The pipeline's phases are numbered 1-7 in the source, but two of those numbers are vacant
+    # (the bottom-up expansion that occupied phases 3 and 5 measured net-negative and is gone).
+    # The paper renumbers the five that remain as 1-5 rather than exposing the source's gaps, so
+    # this word and the paper's phase headings must be changed together.
     "NumPhasesWord": "five",
     "GumTreeVersion": "v4.0.0-beta8",
 }
@@ -315,10 +289,9 @@ EMPIRICAL_MACROS = [
 ]
 
 # Every macro the RQ1 fragment (apted_only_report.py's write_paper_fragment) is expected to
-# define. RqOneScriptingPairs/Pct are deliberately NOT listed: the pre-2026-08-18 measurement
-# corpus contains no scripting-category languages, so the fragment legitimately omits them until
-# the re-measurement against the re-sampled corpus lands - the paper's prose must not cite them
-# before then either.
+# define. RqOneScriptingPairs/Pct are deliberately NOT listed: the measured corpus contains no
+# scripting-category languages, so the fragment legitimately omits them until a re-measurement
+# against the re-sampled corpus lands - the paper's prose must not cite them before then either.
 RQ_ONE_MACROS = [
     "RqOnePairsAttempted",
     "RqOneCodePairs",
@@ -565,13 +538,12 @@ def frozen_fixture_scope(research_dir):
     """The fixture names the paper's per-fixture numbers are scored over: the `solution` column of
     `data/comparison/benchmark_accuracy.csv` intersected with `_common.PAPER_DATASETS`.
 
-    Added 2026-09-11. The corpus on disk keeps growing between paper refreshes (942 fixtures with
-    a human_mapping.json against NumFixtures=775 that day), and `optimal_solutions_benchmark.csv`
+    The corpus on disk keeps growing between paper refreshes, and `optimal_solutions_benchmark.csv`
     is re-run by the product benchmark independently of the paper, so a block derived from it
-    with only the dataset filter silently followed the corpus while every other block stayed at
-    the freeze - the cost block reported 889 scored fixtures in a paper whose corpus is 775. The
-    comparison CSV is only written by the paper's own refresh, so its solution list is the freeze.
-    Returns None when that CSV is absent, in which case callers fall back to the dataset filter.
+    with only the dataset filter would silently follow the corpus while every other block stays
+    at the freeze. The comparison CSV is only written by the paper's own refresh, so its
+    solution list is the freeze. Returns None when that CSV is absent, in which case callers
+    fall back to the dataset filter.
     """
     path = os.path.join(research_dir, "data", "comparison", "benchmark_accuracy.csv")
     if not os.path.exists(path):
@@ -776,7 +748,7 @@ def robustness_fixtures(research_dir):
             2026-09-11 on the MACHINE block's hardware.
 
     Scoped to the paper's frozen corpus, not to everything the run measured: the run walks every
-    `small`/`full`/`stratified`/`defects4j` fixture *directory* on disk, which since 2026-09-16
+    `small`/`full`/`stratified`/`defects4j` fixture *directory* on disk, which
     includes the 883 Defects4J units nobody has solved yet - robustness needs no ground truth, so
     the producer measures them, and this scope drops them again. The scope is
     the `solution` column of `data/comparison/benchmark_accuracy.csv`, the artifact the rest of
@@ -995,9 +967,7 @@ def astdiff_oracle_human(research_dir):
             # The two halves of `Disagreements`, separately. Section 8.1's argument turns on the
             # split rather than the total - a pair one account claims and the oracle does not
             # (`fp`) is an invention, a pair the oracle records and the account misses (`fn`) is an
-            # omission, and the two rows differ far more in the first than the second. Those four
-            # counts were bare literals in `main.tex` until 2026-09-16, the only measured numbers
-            # in the paper that were not macros, and by then all but one had gone stale.
+            # omission, and the two rows differ far more in the first than the second.
             f"{stem}FalsePositives": latex_number(fp),
             f"{stem}FalseNegatives": latex_number(fn),
             f"{stem}Mappings": latex_number(

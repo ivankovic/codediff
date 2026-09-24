@@ -71,10 +71,8 @@ gives at length: a rate whose denominator drifts from the rest of the paper's is
 with any of them.
 
 Scoped further to `_common.PAPER_DATASETS`, which excludes the hand-written `handmade` fixtures -
-see that constant's own comment for why. This report used to emit the handmade/sampled split as
-macros of its own and the paper quoted both halves; that comparison was removed on 2026-09-09,
-along with the population it compared against, so every rate here is now over changes sampled from
-real commits and nothing else.
+see that constant's own comment for why. Every rate here is over changes sampled from real
+commits and nothing else.
 
 Within that scope the painted set is still *not* a random sample - painting is manual and slow,
 and which fixtures have been painted is an annotation-order artifact - so the report keeps printing

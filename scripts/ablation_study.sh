@@ -54,9 +54,8 @@ fi
 # scored, which this script reports as a per-flag FAILED row rather than as the list being wrong.
 # Re-read the binary's flags, do not trust this array, whenever a pass is added or deleted.
 #
-# Gone since the 2026-07-15 study, and deliberately not listed: solver-import-nodes and
-# solver-bottom-up-expansion (phases 3/5, Dice-coefficient bottom-up expansion - removed from the
-# pipeline 2026-08-16) and solver-similar-flow-control (deleted 2026-08-14). All three had been
+# Deliberately not listed: solver-import-nodes, solver-bottom-up-expansion (Dice-coefficient
+# bottom-up expansion) and solver-similar-flow-control. All three had been
 # net-negative here and permanently off by default; the code behind them is deleted outright, so
 # there is nothing left to switch. solve_bottom_up_propagation below occupies the same conceptual
 # slot as the removed bottom-up expansion but is a different, strict mechanism - the two must not
@@ -72,7 +71,7 @@ FAILED=()
 
 # Pre-flight: every flag above must actually exist on the binary. Without this the study happily
 # produces a summary table in which a stale flag is indistinguishable from a pass that genuinely
-# crashed, which is how the 2026-07-30 run's numbers outlived the passes they described.
+# crashed, which is how a run's numbers can outlive the passes they describe.
 UNKNOWN=()
 BIN_HELP="$("$BIN" --help 2>&1)"
 for flag in "${FLAGS[@]}"; do

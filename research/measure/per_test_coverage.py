@@ -42,8 +42,8 @@ Resumable: a test already in records.jsonl is skipped, whatever its status, so a
 killed stays recorded as killed rather than being retried forever. Delete its line to retry it.
 
 Run it as its own systemd unit, with every test in its own memory-capped scope - see
-`research/measure/overnight_benchmarks.sh` for why (an OOM inside the shell's scope took down the
-whole session on 2026-09-19):
+`research/measure/overnight_benchmarks.sh` for why (an OOM inside the shell's scope takes down the
+whole session):
 
   systemd-run --user --unit codediff-per-test-coverage --collect --same-dir \\
     --setenv=PATH="$PATH" ./measure/per_test_coverage.py --binary <instrumented test binary> \\

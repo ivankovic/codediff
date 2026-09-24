@@ -1,3 +1,20 @@
+# This file is part of the CodeDiff code diffing tool.
+#
+# Copyright (C) 2026 Marko Ivankovic
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as published
+# by the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
+
 # Research-only targets: corpus acquisition, measurement, analysis, and paper builds.
 #
 # Split out of the repository-root Makefile so that one holds only product concerns (build, test,
@@ -132,10 +149,9 @@ sample-pairs: build
 # The languages the RQ1 corpus (data/samples/sampled_code_pairs_*.csv) covers, as
 # `<output-file-suffix>:<Language Debug name>` pairs - the two differ in case for most entries, and
 # the --language filter matches the Debug name exactly (see `Language` in src/code.rs).
-# `r:R` and `scala:Scala` were added 2026-08-21. They were missing while `sample_code_pairs`
-# happily sampled both, so 167 of the 3,089 pairs drawn on 2026-08-20 had no per-language CSV and
-# were never measured - a silent gap between what the corpus covers and what RQ1 reports on, not
-# an error anything surfaced. Keep this list in sync with the languages the sampler actually
+# A language missing here while `sample_code_pairs` samples it gets no per-language CSV and is
+# never measured - a silent gap between what the corpus covers and what RQ1 reports on, not an
+# error anything surfaces. Keep this list in sync with the languages the sampler actually
 # produces (check `sampled_code_pairs_all.csv`'s own `language` column, not this list).
 LANGUAGES := c:C cpp:CPP csharp:CSharp css:CSS go:Go html:HTML java:Java \
 	javascript:JavaScript json:JSON kotlin:Kotlin lua:LUA php:PHP python:Python \
@@ -223,11 +239,10 @@ measure-pairs: build
 # The paper's robustness run: every `small`/`full`/`stratified`/`defects4j` fixture directory (the datasets the
 # paper reports on) pushed through diff_code with no node cap, a per-fixture timeout, panic
 # isolation and the allocation counters, into one CSV with the same schema as measure-pairs.
-# Replaces the 2026-08-20 Rust-only sample (data/performance/robustness_rust.csv), whose clones
-# had 377 of 925 pairs already rewritten out of history by the time it ran and which capped the
-# tree at 16,000 combined nodes - so it neither covered the corpus the rest of the paper is
-# measured on nor exercised the large files the Robust target is about. Fixtures are read from the
-# checked-in corpus, so this needs no checkouts and no MODE. A few minutes; feeds
+# Over the fixture corpus rather than a sample of clones, so it covers the corpus the rest of
+# the paper is measured on, exercises the large files the Robust target is about, and needs no
+# checkouts and no MODE - a sample's clones rewrite pairs out of history between runs. A few
+# minutes; feeds
 # analysis/paper_variables.py's ROBUSTNESS block.
 measure-robustness-fixtures: build
 	$(BIN_DIR)/benchmark_diff_pairs --fixtures \
@@ -236,8 +251,8 @@ measure-robustness-fixtures: build
 
 # The paper's robustness run over the WHOLE Full corpus (every modified code file in its recent
 # history, no node cap), not the fixture corpus above. Hours of eight-core time and a memory-capped
-# systemd unit rather than a make recipe, because an unconfined run took the machine down on
-# 2026-09-19; this target only starts it. See measure/overnight_benchmarks.sh's header for the
+# systemd unit rather than a make recipe, because an unconfined run can take the machine down;
+# this target only starts it. See measure/overnight_benchmarks.sh's header for the
 # knobs, measure/r48_retry_killed.sh for the pass that follows, and data/performance/PROVENANCE.md.
 measure-robustness-full:
 	systemd-run --user --unit codediff-overnight --collect -p WorkingDirectory=$(CURDIR) \
@@ -331,8 +346,7 @@ measure-edit-shape:
 # paper's RQ3, and it mentions no diffing tool at all - unlike shapes-report above, nothing here
 # joins against codediff's own result. Reads the mapping JSON files directly, scoped to the fixture
 # set in data/quality/human_mapping_analysis.csv, so re-run `analyze_human_mappings --csv` first if
-# fixtures were added. One rate over every in-scope fixture: the annotation-era split this used to
-# report was removed on 2026-09-05, see the script's own doc comment.
+# fixtures were added. One rate over every in-scope fixture, see the script's own doc comment.
 ambiguity-report:
 	uv run ./analysis/ambiguity_report.py
 
@@ -421,7 +435,7 @@ distributions-report:
 # /var/tmp, matching where this project's other comparison tools live, and prints the BDIFF_PYTHON
 # export the benchmark targets need.
 #
-# Two things this target exists to encode, both discovered the hard way (2026-08-23):
+# Two things this target exists to encode:
 #
 #  * BDiff's pyproject.toml under-declares its dependencies - it lists numpy and scipy, but
 #    bdiff/bdiff.py also imports rapidfuzz. A plain `pip install .` produces a package that dies
@@ -519,27 +533,25 @@ paper-variables:
 # the variance table and `plots/variables_comparison.tex` from whatever
 # data/comparison/benchmark_other.csv and benchmark_accuracy.csv currently hold. A routine PDF
 # rebuild must not silently swap in charts measured on a different corpus than the prose was
-# written against - exactly that happened live on 2026-08-19, caught only because the regenerated
-# variance table's n column changed.
+# written against; the only thing that would catch it is a changed n column in the regenerated
+# variance table.
 #
-# The per-tool numbers stopped being hand-transcribed on 2026-08-20 (they are generated now), so
+# The per-tool numbers are generated, so
 # a refresh is `make measure-tools-accuracy` and then `make measure-tools-timing` - **in that
 # order**, because the second ends with `timing-report`, which reads both CSVs. What still has to
 # be re-read by a human afterwards is the *prose*: it makes ordering claims ("no AST-aware tool
-# beats plain diff", "fastest of the three at the median") that the macros cannot check. The
-# 2026-09-09 refresh reversed three of them. Together, never piecemeal.
+# beats plain diff", "fastest of the three at the median") that the macros cannot check, and a
+# refresh can reverse them. Together, never piecemeal.
 #
 # Also does not regenerate plots/tips.png, which needs the full repository-fetch pipeline
 # (`make full`). Needs a LaTeX toolchain with the acmart class and cm-super (see
 # papers/introductory-paper/README.md). `-g` forces a full latexmk run regardless of its own
 # up-to-date check: without it, latexmk can decide main.pdf is already current from main.tex's own
 # timestamp alone and skip the rebuild even though an \input-ed generated table just changed
-# underneath it (confirmed live, 2026-07-31 - main.pdf was silently one run stale until this flag
-# was added).
+# underneath it, leaving main.pdf silently one run stale.
 #
-# `build-pdf` falls back to a manual pdflatex+bibtex sequence when latexmk is not installed
-# (discovered live, 2026-08-19: latexmk absent on the primary dev machine while pdflatex worked
-# fine, silently breaking both paper targets). Three pdflatex passes is the standard fixed point
+# `build-pdf` falls back to a manual pdflatex+bibtex sequence when latexmk is not installed,
+# since a machine can have pdflatex without it. Three pdflatex passes is the standard fixed point
 # for cross-references + bibliography; byproducts are removed afterward, matching what
 # `latexmk -c` would leave.
 define build-pdf

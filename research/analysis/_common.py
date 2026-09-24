@@ -48,7 +48,7 @@ REPO_ROOT = RESEARCH_DIR.parent
 # report that reads `optimal_solutions_benchmark.csv` has to filter it here rather than assume
 # the producer did.
 #
-# `defects4j` joined the reported set on 2026-09-16. It is a real dataset like the other three and
+# `defects4j` is a real dataset like the other three and
 # is reported next to them and inside every pooled total, with one caveat that belongs to the data
 # rather than to this constant: only the solved subset is scored (a fixture with no
 # `human_mapping.json` is invisible to every report here anyway), and that subset is whatever
