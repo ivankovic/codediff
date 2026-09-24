@@ -299,7 +299,9 @@ def plot_time_budget(rq1_paths: list[Path], benchmark: Path, out: Path) -> None:
         if id_ == "treesitter_parse":
             style = {"linestyle": (0, (2, 2)), "linewidth": 1.2}
         elif id_ == "codediff":
-            style = {"linewidth": 2.4}
+            # Dash-dotted as well as heavier: the paper's own series has to be distinct from the
+            # nine solid ones in greyscale, where weight alone does not separate it.
+            style = {"linewidth": 2.4, "linestyle": (0, (6, 2, 1, 2))}
         else:
             style = {"linewidth": 1.4}
         ax2.step(

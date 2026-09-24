@@ -81,6 +81,25 @@ Compiles cleanly, 12 pages, builds with `latexmk -pdf -g main` (verified locally
 `texlive-publishers` installed). See the `TODO` comments in `main.tex` for the placeholder ACM
 conference/rights metadata and CCS concepts, still to fill in once a venue is chosen.
 
+### Review pass of 2026-09-24
+
+Resolved the author's handwritten review of the 2026-09-23 PDF, recorded mark by mark in
+`REVIEW-2026-09-24.md`. The structural change is a reversal: the four *properties* the
+introduction had derived since the second author's 2026-09-18 review (Expressible, Agreed, Timely,
+Faithful on screen; `REVIEW-2026-09-18-fraser.md`, F2/F4) are gone, and the four research-question
+groups are back as the introduction's list, restored from `0a51541d^`. Every section opener that
+named a property was struck on the same review and now names its question instead. Table 4 (what
+each result decided in CodeDiff's design) stays. Section 3.4 is retitled "Cross-validation with
+existing datasets" and no longer compares CodeDiff against the oracle - only the human annotation
+against it - so the `\OracleHumanCodeDiff*` macros are generated and unused. Section 8's Limits
+paragraph and the by-dataset accuracy sentence are gone; Table 5 keeps a one-sentence pointer.
+Figure 4 draws CodeDiff dash-dotted. 12 pages.
+
+The one measurement item, Figure 2's Unknown share, is answered at the foot of the review file:
+the classifier improvement of 2026-09-13 was never written back into the corpus database's `tip`
+column (`make reclassify-tips RECLASSIFY_FLAGS=--write` does that; a file moved out of Unknown by
+path alone still has no size or node numbers until `measure-file-stats` re-walks the corpus).
+
 ### Review pass of 2026-09-11
 
 Resolved the author's handwritten review of the 2026-09-10 PDF. Prose: the abstract now opens with
