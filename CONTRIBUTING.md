@@ -26,7 +26,7 @@ Format all code with `cargo fmt`, the standard Rust formatter. CI enforces this 
 pull request.
 
 No Rust check errors are allowed. Run `cargo clippy` frequently. CI also enforces `cargo clippy`,
-across all three Cargo feature configs (see "CI" below).
+across all four Cargo feature configs (see "CI" below).
 
 The Python under `research/`, `scripts/` and `assets/` has the same two halves, as `ruff format`
 and `ruff check` - run both with `make lint-python`. `ruff` is the one tool neither a bare checkout
@@ -303,25 +303,43 @@ Three verbs, and which file a target lives in follows from them:
 * `deploy` - publishes a release everywhere: `deploy-crates` then `deploy-github`, in that order
   (crates.io first, since a publish there can never be undone - only yanked - while a GitHub tag
   and Release are trivial to redo). Both refuse to run on a dirty working tree, on a `HEAD` that
-  does not match `origin/main`, or on a `check-quality` regression (`deploy-checks`, shared by
-  both - a plain `make deploy` only pays for it once).
+  does not match `origin/main`, on a packaging recipe that names a version other than
+  `Cargo.toml`'s (`check-versions`), or on a `check-quality` regression (`deploy-checks`, shared
+  by both - a plain `make deploy` only pays for it once). The step-by-step list, including what
+  can only be done after the tag exists, is the release checklist in `packaging/README.md`.
+* `check-versions` - `scripts/check_version_sync.py`: the AUR, Gentoo and Nix recipes repeat
+  `Cargo.toml`'s version by hand, and this fails if any of them disagree.
 * `deploy-crates` - publishes the current `Cargo.toml` version to crates.io (`cargo publish
   --locked`). Requires `cargo login` to already be configured locally (or `CARGO_REGISTRY_TOKEN`
   set).
 * `deploy-github` - tags the current commit `v<Cargo.toml version>` and pushes the tag. This push
-  triggers `.github/workflows/release.yml`, which builds and publishes the cross-platform
-  `codediff` binaries as a GitHub Release.
+  triggers `.github/workflows/release.yml`, which creates a draft GitHub Release whose notes are
+  the version's section of `CHANGELOG.md` (it fails if that section is missing or still says
+  `unreleased`), attaches the cross-platform `codediff` binaries, the `.deb`s, completions and
+  checksums, and publishes the release once every asset is there.
 
 ## CI
 
 Every push and pull request runs (see `.github/workflows/ci.yml`):
 
 * `cargo fmt --check`
-* `cargo clippy --tests -- -D warnings`, once each for the three Cargo feature configs (default,
-  `test-fixtures`, `stats` - see Cargo.toml's `[features]`)
-* `cargo build` + `cargo nextest run`, once each for the same three feature configs
+* `cargo clippy --tests -- -D warnings`, once each for the four Cargo feature configs (default,
+  `test-fixtures`, `stats`, `web` - see Cargo.toml's `[features]`)
+* `cargo build --release` + `cargo nextest run --release`, once each for the same four feature
+  configs; the fixture-corpus tests, which no feature changes, run once, split four ways across
+  those jobs
 * `cargo audit` (checks Cargo.lock against the RustSec advisory database)
-* The `human_mapping` site's own vanilla-JS tests (`assets/mapping_site/index.test.js`)
+* The vanilla-JS tests of the `human_mapping` site, the browser viewer and the showcase
+  (`make test-mapping-site-js`, `test-web-js`, `test-showcase-js`)
+* `ruff check` and `ruff format --check` over `research/`, `scripts/` and `assets/`, the Python
+  unit tests (`make test-python`), the Gentoo `CRATES`/Manifest sync check and `make
+  check-versions`
+* The quality gate (`make check-quality`) and the painting gate (`make
+  check-painting-attribution`) - see "Quality" above
+* The non-fixture suite on macOS and Windows, with default features - the operating systems the
+  release ships binaries for
+* `cargo check --locked` on the toolchain `Cargo.toml`'s `rust-version` names
+* `cargo package --locked` - the crate builds from its own tarball, as `cargo publish` will see it
 
 All of these checks must pass before a PR is done. Two things run them locally, before GitHub
 does - see "Makefile targets" above:

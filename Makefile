@@ -19,8 +19,8 @@ OUT_DIR ?= research/data/ablation
 
 .PHONY: coverage test test-mapping-site-js test-python build install install-hooks benchmark-quality \
 	diff-inventory lint-python ci benchmark-ablation check-quality update-quality-baseline \
-	check-painting-attribution update-painting-attribution diff-gif \
-	deploy-checks deploy-crates deploy-github deploy
+	check-painting-attribution update-painting-attribution diff-gif test-web-js test-showcase-js \
+	check-versions deploy-checks deploy-crates deploy-github deploy
 
 # Line coverage of the suite `make test` runs (`--all-features`), with a per-area summary (see
 # scripts/coverage_report.py). On demand, not a gate: a threshold teaches touching lines. Rebuilds
@@ -197,8 +197,14 @@ update-quality-baseline:
 	} > $(RUNTIME_BASELINE); \
 	echo "Updated $(QUALITY_BASELINE) and $(RUNTIME_BASELINE) (MS_PER_FIXTURE=$$ms)"
 
-# Shared preconditions for deploy-crates/deploy-github: clean tree, HEAD at origin/main, and
-# check-quality. A prerequisite rather than `$(MAKE)`, so `make deploy` runs it once.
+# Every packaging recipe names the version Cargo.toml does - see scripts/check_version_sync.py for
+# which files repeat it by hand. Part of deploy-checks and of CI's python job.
+check-versions:
+	python3 scripts/check_version_sync.py
+
+# Shared preconditions for deploy-crates/deploy-github: clean tree, HEAD at origin/main,
+# check-versions and check-quality. A prerequisite rather than `$(MAKE)`, so `make deploy` runs it
+# once.
 deploy-checks:
 	@if [ -n "$$(git status --porcelain)" ]; then \
 		echo "error: working tree is dirty - commit or stash before deploying" >&2; \
@@ -209,6 +215,7 @@ deploy-checks:
 		echo "error: HEAD does not match origin/main - push your commits first" >&2; \
 		exit 1; \
 	fi
+	$(MAKE) check-versions
 	$(MAKE) check-quality
 
 # Publishes to crates.io. `--locked` publishes exactly the resolution check-quality ran against.

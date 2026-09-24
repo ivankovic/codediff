@@ -258,7 +258,9 @@ pub fn run(before: &Path, after: &Path, render_options: RenderOptions) -> Result
     data.after_ranges =
         ranges_for_options(&data.after_ranges, &data.after_contents, render_options);
     let diff = build_diff(&data, large_residual);
-    println!("{}", serde_json::to_string_pretty(&diff)?);
+    let mut json = serde_json::to_string_pretty(&diff)?;
+    json.push('\n');
+    crate::tui::headless::write_stdout(&json)?;
     Ok(std::fs::read(before)? != std::fs::read(after)?)
 }
 

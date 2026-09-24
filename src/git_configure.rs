@@ -24,7 +24,7 @@ use std::process::Command;
 
 use anyhow::{Context, Result};
 
-use crate::configure_prompt::{ask_yes_no, read_line, resolve_codediff_path};
+use crate::configure_prompt::{ask_yes_no, read_line, resolve_codediff_path, shell_quote};
 
 /// Whether to write `git config` values with `--global` or to the current repository only.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -67,7 +67,7 @@ pub fn run() -> Result<()> {
         ensure_inside_git_repo()?;
     }
 
-    let difftool_cmd = format!("{codediff_path} \"$LOCAL\" \"$REMOTE\"");
+    let difftool_cmd = difftool_command(&codediff_path);
     let set_difftool = ask_yes_no(
         &format!(
             "{}Set codediff as the default `git difftool`? [Y/n] (`difftool.codediff.cmd` = \
@@ -110,6 +110,13 @@ pub fn run() -> Result<()> {
 
     println!("\nDone - configured {}.", scope.label());
     Ok(())
+}
+
+/// The `difftool.codediff.cmd` value. git runs it through `sh`, so the binary's path is quoted
+/// as a shell word (a path under "Program Files" or "Application Support" has a space in it) and
+/// `$LOCAL`/`$REMOTE` stay as the variables git expands.
+fn difftool_command(codediff_path: &str) -> String {
+    format!("{} \"$LOCAL\" \"$REMOTE\"", shell_quote(codediff_path))
 }
 
 /// `key`'s current value under `scope` as a line to show before the prompt that would overwrite it,
@@ -200,6 +207,18 @@ fn ask_scope() -> Result<Scope> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn difftool_command_quotes_a_path_with_spaces_and_keeps_gits_variables_bare() {
+        assert_eq!(
+            difftool_command("/usr/local/bin/codediff"),
+            "/usr/local/bin/codediff \"$LOCAL\" \"$REMOTE\""
+        );
+        assert_eq!(
+            difftool_command("/Applications/My Tools/codediff"),
+            "'/Applications/My Tools/codediff' \"$LOCAL\" \"$REMOTE\""
+        );
+    }
 
     #[test]
     fn scope_flag_is_always_explicit() {

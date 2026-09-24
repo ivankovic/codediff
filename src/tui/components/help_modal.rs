@@ -31,9 +31,9 @@ use crate::tui::actions::Action;
 use crate::tui::theme::OverlayTheme;
 
 /// The keybinding reference and About section, one source for both front ends: the TUI draws it
-/// in this modal and `web` serves it verbatim to the browser's `?` overlay. Keep it in sync with
-/// README.md's "Using the TUI". The color legend is not in here because it is theme-dependent;
-/// see `HelpModal::legend_lines`.
+/// in this modal and `web` serves it verbatim to the browser's `?` overlay. Every key
+/// `App::handle_events` and the components bind belongs in here. The color legend is not in here
+/// because it is theme-dependent; see `HelpModal::legend_lines`.
 pub const HELP_TEXT: &str = "\
 Navigation
   Tab              Switch the active panel (Before/After)
@@ -52,9 +52,11 @@ Navigation
   Ctrl-e/Ctrl-y    Scroll the view one line without moving the cursor
   Page Up/Down     Scroll by a page
   Home/End         Jump to the top/bottom of the file
+  Mouse            Wheel scrolls; a click places the cursor and focuses that panel
 
 Files and diffing
   o                Open a file selector for the active panel
+  1-9              On the empty start screen: reopen one of the recent file pairs
   r                Reload both files from disk and re-diff (keeps the cursor position)
   e                Open the focused panel's file in $VISUAL/$EDITOR at the cursor line
   G                Review git changes: a picker of the repository's unstaged files, staged
@@ -86,7 +88,9 @@ Appearance
 
 Other
   ?                Toggle this help
-  q or Esc         Quit (Esc closes an open dialog instead, while one is open)
+  q or Esc         Quit, from the viewer. In a dialog, Esc closes the dialog and q is
+                   an ordinary letter (a search for 'query' does not end the session)
+  Ctrl-Z           Suspend to the shell (Unix); `fg` comes back to the same view
 
 About
   codediff - fast, syntax-aware code diffing using tree-sitter ASTs
@@ -94,6 +98,7 @@ About
   License: GNU Affero General Public License v3 or later
            https://www.gnu.org/licenses/
   Repository: https://github.com/ivankovic/codediff
+  Bugs:       https://github.com/ivankovic/codediff/issues
 ";
 
 /// The `?` popup: a scrollable keybinding reference plus a color legend rendered from the live
@@ -233,7 +238,7 @@ mod tests {
     /// Sized past `HELP_TEXT`'s extent so the result does not depend on scrolling or wrapping.
     #[test]
     fn help_modal_renders_keybindings() {
-        let backend = TestBackend::new(120, 70);
+        let backend = TestBackend::new(120, 100);
         let mut terminal = Terminal::new(backend).unwrap();
         let mut modal = HelpModal::new(OverlayTheme::default());
 

@@ -54,19 +54,69 @@ pub fn ask_yes_no(prompt: &str, default: bool) -> Result<bool> {
     }
 }
 
+/// One answer. End of input (Ctrl-D) is an abort, not an empty answer: an empty answer means
+/// "take the default", and a wizard that wrote its defaults because the user tried to leave it
+/// would be acting on a choice nobody made. Both wizards write nothing until every question is
+/// answered, so the abort changes nothing.
 pub fn read_line(prompt: &str) -> Result<String> {
     print!("{prompt}");
     io::stdout().flush().context("failed to write prompt")?;
     let mut input = String::new();
-    io::stdin()
+    let bytes = io::stdin()
         .read_line(&mut input)
         .context("failed to read from stdin")?;
+    if bytes == 0 {
+        println!();
+        anyhow::bail!("input ended before the last question - nothing was changed");
+    }
     Ok(input.trim().to_string())
+}
+
+/// `value` as one POSIX shell word, for a config value the VCS hands to `sh`. Single quotes take
+/// every character literally except a single quote, which is closed, escaped and reopened. A value
+/// that needs no quoting is returned as is, so the common case stays readable in `git config -l`.
+pub fn shell_quote(value: &str) -> String {
+    let is_safe = |c: char| c.is_ascii_alphanumeric() || "-_./+:@%=".contains(c);
+    if !value.is_empty() && value.chars().all(is_safe) {
+        return value.to_string();
+    }
+    format!("'{}'", value.replace('\'', r"'\''"))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn shell_quote_leaves_a_plain_path_alone() {
+        assert_eq!(
+            shell_quote("/usr/local/bin/codediff"),
+            "/usr/local/bin/codediff"
+        );
+        assert_eq!(shell_quote("codediff"), "codediff");
+    }
+
+    #[test]
+    fn shell_quote_single_quotes_a_path_with_spaces_or_shell_syntax() {
+        assert_eq!(
+            shell_quote("/Applications/My Tools/codediff"),
+            "'/Applications/My Tools/codediff'"
+        );
+        assert_eq!(
+            shell_quote(r"C:\Program Files\codediff\codediff.exe"),
+            r"'C:\Program Files\codediff\codediff.exe'"
+        );
+        assert_eq!(shell_quote("$HOME/bin/codediff"), "'$HOME/bin/codediff'");
+        assert_eq!(shell_quote(""), "''");
+    }
+
+    #[test]
+    fn shell_quote_escapes_an_embedded_single_quote() {
+        assert_eq!(
+            shell_quote("/home/o'brien/codediff"),
+            r"'/home/o'\''brien/codediff'"
+        );
+    }
 
     #[test]
     fn resolve_codediff_path_never_returns_an_empty_string() {

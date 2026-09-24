@@ -1,6 +1,6 @@
 [package]
 name = "codediff"
-version = "0.0.14"
+version = "0.1.0"
 edition = "2024"
 rust-version = "1.88"
 description = "Fast, robust, syntax-aware code diffing using tree-sitter ASTs"
@@ -9,20 +9,41 @@ repository = "https://github.com/ivankovic/codediff"
 readme = "README.md"
 keywords = ["diff", "ast", "tree-sitter", "cli", "git"]
 categories = ["command-line-utilities", "development-tools", "text-processing"]
-exclude = [
-    "research/**",
-    # Checkout-only dev tools, not part of the published crate. `cargo install codediff --features
-    # stats` therefore fails with a confusing "no such bin target" error.
-    "src/bin/**",
-    "src/test/data/**",
-    # tests/benchmark_other_e2e.rs spawns the excluded bins, so shipping it would ship a test target
-    # that cannot compile.
-    "tests/**",
-    # Distribution recipes, not crate content. Excluded together: flake.nix imports
-    # packaging/nix/package.nix.
-    "packaging/**",
-    "flake.nix",
+# An allow-list, not an `exclude`: the checkout carries far more than the crate (the fixture
+# corpus, research/, packaging recipes, working notes), and a new file at the root would otherwise
+# ship by default. `src/test/*.rs` stays because `mod test` compiles under `cfg(test)`; its data
+# under `src/test/data/` does not, so `cargo install codediff --features test-fixtures` fails with
+# a "no such bin target" error rather than building the checkout-only dev tools. `assets/web/` is
+# `include_str!`-ed by src/web/server.rs; the two images are the README's.
+include = [
+    "/Cargo.toml",
+    "/LICENSE",
+    "/README.md",
+    "/readme-screenshot.png",
+    "/assets/diff-vs-codediff.gif",
+    "/assets/web/*.html",
+    "/assets/web/*.js",
+    "/assets/web/*.css",
+    "!/assets/web/*.test.js",
+    "/src/**/*.rs",
+    "!/src/bin/**",
+    "!/src/test/data/**",
 ]
+
+# docs.rs documents the viewers too: `web` implies `tui`, and neither adds a build dependency
+# docs.rs lacks. `stats` is left out (git2's OpenSSL/libssh2 build).
+[package.metadata.docs.rs]
+features = ["web"]
+
+# `cargo binstall codediff`: the release workflow's asset names, as release.yml packages them -
+# `codediff-<target>.tar.gz` with the binary at the archive root, `.zip` for Windows.
+[package.metadata.binstall]
+pkg-url = "{ repo }/releases/download/v{ version }/{ name }-{ target }{ archive-suffix }"
+pkg-fmt = "tgz"
+bin-dir = "{ bin }{ binary-ext }"
+
+[package.metadata.binstall.overrides.x86_64-pc-windows-msvc]
+pkg-fmt = "zip"
 
 # A CPU-bound tool gains from optimizing across crates (tree-sitter, the engine's modules), at the
 # cost of slower release builds.

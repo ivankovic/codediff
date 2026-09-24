@@ -11,7 +11,7 @@
   rustPlatform,
   installShellFiles,
   src ? ../..,
-  version ? "0.0.14",
+  version ? "0.1.0",
 }:
 
 rustPlatform.buildRustPackage {
@@ -38,7 +38,7 @@ rustPlatform.buildRustPackage {
   # --lib only. The fixture-corpus tests are upstream's accuracy benchmark: they need the
   # `test-fixtures` feature and substantial time and memory, which is not what a packaging sanity
   # check is for. (They are also absent entirely if `src` is ever pointed at the crates.io tarball,
-  # whose `exclude` list drops tests/ and src/test/data/.)
+  # whose `include` list carries neither tests/ nor src/test/data/.)
   cargoTestFlags = [ "--lib" ];
 
   postInstall = ''

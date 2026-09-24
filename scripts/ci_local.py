@@ -249,9 +249,19 @@ def label(job_id: str, matrix: dict[str, Any]) -> str:
     return f"{job_id} ({parts})"
 
 
+def runs_on_linux(job: dict[str, Any], matrix: dict[str, Any]) -> bool:
+    """Whether this combination's `runs-on` is an Ubuntu runner, the only kind this script stands in
+    for. A macOS or Windows job is skipped, not run under Linux and reported as that platform."""
+    runner = expand(str(job.get("runs-on", "ubuntu-latest")), matrix, {})
+    return runner.startswith("ubuntu")
+
+
 def run_job(job_id: str, job: dict[str, Any], matrix: dict[str, Any], env: dict[str, str]) -> bool:
     heading = label(job_id, matrix)
     print(f"\n\033[1m=== {heading} ===\033[0m", flush=True)
+    if not runs_on_linux(job, matrix):
+        print(f"  - skipped: runs on {job['runs-on']}, which this machine is not", flush=True)
+        return True
     started = time.monotonic()
 
     for step in job.get("steps") or []:

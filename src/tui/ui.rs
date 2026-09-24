@@ -26,7 +26,7 @@ use crossterm::{
     cursor,
     event::{
         DisableBracketedPaste, DisableMouseCapture, EnableBracketedPaste, EnableMouseCapture,
-        Event as CrosstermEvent, EventStream,
+        Event as CrosstermEvent, EventStream, KeyEventKind,
     },
     terminal::{EnterAlternateScreen, LeaveAlternateScreen},
 };
@@ -155,14 +155,61 @@ impl DerefMut for UI {
 }
 
 impl Drop for UI {
+    /// Best effort: a failure here has nowhere to go, and a panic inside `drop` during unwinding
+    /// aborts the process instead of letting the panic hook report the original problem.
     fn drop(&mut self) {
-        self.exit().unwrap();
+        let _ = self.exit();
     }
 }
 
-/// Drops the event kinds the app has no use for (focus, bracketed paste).
+/// Puts the terminal back the way the shell expects it, from any thread and without a `UI` in
+/// hand: raw mode off, mouse capture off, main screen, cursor shown. Every step is attempted even
+/// if an earlier one fails, and it is a no-op when raw mode is already off.
+pub fn restore_terminal() {
+    if !crossterm::terminal::is_raw_mode_enabled().unwrap_or(true) {
+        return;
+    }
+    let _ = crossterm::execute!(
+        stdout(),
+        DisableBracketedPaste,
+        DisableMouseCapture,
+        LeaveAlternateScreen,
+        cursor::Show
+    );
+    let _ = crossterm::terminal::disable_raw_mode();
+}
+
+/// Installs the panic hook the TUI runs under. Without it, a panic's message is printed into the
+/// alternate screen and vanishes when the terminal is restored, and the user is left with an exit
+/// code and no explanation. The hook restores the terminal first, then prints the panic and where
+/// to report it.
+///
+/// A panic on the diff-computation thread is the exception: the app catches it and shows it in the
+/// viewer's error banner, so the hook leaves the terminal alone and prints nothing there - text
+/// written to stderr underneath the live TUI stays on screen as garbage.
+pub fn install_panic_hook() {
+    let default_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        if std::thread::current().name() == Some(crate::tui::app::DIFF_THREAD_NAME) {
+            return;
+        }
+        restore_terminal();
+        default_hook(info);
+        eprintln!(
+            "\ncodediff {} crashed. Please report this, with the lines above and the two files \
+             being diffed if you can share them, at {}",
+            env!("CARGO_PKG_VERSION"),
+            crate::tui::ISSUE_TRACKER_URL
+        );
+    }));
+}
+
+/// Drops the event kinds the app has no use for: focus, bracketed paste, and key releases -
+/// Windows reports a release for every press (and a repeat while held), which would run every
+/// keybinding twice; the app acts on presses and repeats only.
 fn map_crossterm_event(event: CrosstermEvent) -> Option<Event> {
     match event {
+        CrosstermEvent::Key(key) if key.kind == KeyEventKind::Release => None,
         CrosstermEvent::Key(key) => Some(Event::Key(key)),
         CrosstermEvent::Mouse(mouse) => Some(Event::Mouse(mouse)),
         CrosstermEvent::Resize(w, h) => Some(Event::Resize(w, h)),
@@ -182,6 +229,33 @@ mod tests {
             map_crossterm_event(CrosstermEvent::Key(key)),
             Some(Event::Key(key))
         );
+    }
+
+    /// Windows reports a release for every press; acting on both would run each binding twice.
+    #[test]
+    fn drops_key_release_events_but_keeps_presses_and_repeats() {
+        let press = KeyEvent::new(KeyCode::Char('n'), KeyModifiers::NONE);
+        let mut repeat = press;
+        repeat.kind = KeyEventKind::Repeat;
+        let mut release = press;
+        release.kind = KeyEventKind::Release;
+
+        assert_eq!(
+            map_crossterm_event(CrosstermEvent::Key(press)),
+            Some(Event::Key(press))
+        );
+        assert_eq!(
+            map_crossterm_event(CrosstermEvent::Key(repeat)),
+            Some(Event::Key(repeat))
+        );
+        assert_eq!(map_crossterm_event(CrosstermEvent::Key(release)), None);
+    }
+
+    /// Outside raw mode there is nothing to restore, and a test process has no terminal to write
+    /// escape sequences to.
+    #[test]
+    fn restore_terminal_is_a_no_op_outside_raw_mode() {
+        restore_terminal();
     }
 
     #[test]

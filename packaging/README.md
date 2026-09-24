@@ -16,15 +16,17 @@ extension, which is a separate repository rather than a recipe here.
 
 ## The one thing you cannot skip: checksums
 
-Real for v0.0.14, and **every one of them has to be regenerated on the next version bump**:
+The tarball hashes belong to the **v0.0.14** tag: they hash GitHub's tag tarball, so they can only
+be regenerated after the next tag exists, and until then the recipes name the new version with the
+old hash and do not build. `make check-versions` checks the version strings, not the hashes.
 
-* `aur/PKGBUILD` carries the sha256 of the v0.0.14 tag tarball
-* `gentoo/dev-util/codediff/Manifest` carries 295 `DIST` lines - the tag tarball plus all 294
+* `aur/PKGBUILD` carries the sha256 of the tag tarball
+* `gentoo/dev-util/codediff/Manifest` carries 266 `DIST` lines - the tag tarball plus all 265
   vendored crates, each with its size, BLAKE2B and SHA512
 * Nix needs a `hash =` only if you switch `package.nix` to `fetchFromGitHub`; as long as `src` is
   a parameter and `cargoLock.lockFile` points at the in-tree lock, there is nothing to hash
 
-**The crate half is generated now, and CI checks it.** The Manifest's 294 crate digests drifted
+**The crate half is generated, and CI checks it.** The Manifest's crate digests drifted
 silently through every dependency bump between v0.0.13 and v0.0.14 - 65 of them named older
 versions and one crate had no line at all - because `generate_gentoo_crates.py --check` validated
 the ebuild's `CRATES` list and nothing looked at the Manifest. It checks both now, and
@@ -33,7 +35,7 @@ sha256 Cargo.lock already records before hashing it:
 
 ```sh
 python3 scripts/generate_gentoo_crates.py            # the ebuild's CRATES block
-python3 scripts/generate_gentoo_crates.py --manifest  # the Manifest's 294 crate digests
+python3 scripts/generate_gentoo_crates.py --manifest  # the Manifest's 265 crate digests
 ```
 
 The two *tarball* hashes are the part no script can do ahead of time, because they hash the GitHub
@@ -60,14 +62,15 @@ available, so: the tag tarball was fetched twice and both fetches hashed identic
 (`b9192d9c…`, 68,557,321 bytes), its BLAKE2B/SHA512 were cross-checked against `b2sum` and
 `sha512sum`, every crate file was verified against the sha256 `Cargo.lock` already records for it
 before being hashed, and `--check` confirmed both the ebuild's `CRATES` list and the Manifest's
-crate set against `Cargo.lock` afterwards (294 = 294, no drift).
+crate set against `Cargo.lock` afterwards (no drift).
 
 ## Decisions that apply to every recipe
 
-**Source is the GitHub tag, not the crates.io tarball.** `Cargo.toml`'s `exclude` list drops
-`tests/**`, `src/bin/**` and `src/test/data/**` from the published crate, so a package built from
-crates.io has no test suite to run in its check phase. The GitHub tag tarball has them — at the
-cost of also carrying `research/` and the fixture corpus in the download.
+**Source is the GitHub tag, not the crates.io tarball.** `Cargo.toml`'s `include` list ships only
+the source, the browser viewer's page, the license and the README - not `tests/**`, `src/bin/**`
+or `src/test/data/**` - so a package built from crates.io has no test suite to run in its check
+phase. The GitHub tag tarball has them — at the cost of also carrying `research/` and the fixture
+corpus in the download.
 
 **Tests are restricted to `--lib`.** The fixture-corpus tests are the accuracy benchmark: they
 need the `test-fixtures` feature and substantial time and memory. That is not what a packaging
@@ -88,7 +91,7 @@ release profile sets `lto = "fat"` with `codegen-units = 1`. Minutes, not second
 
 ## Gentoo
 
-`CRATES=` lists all 293 dependency crates and is **generated, not edited**:
+`CRATES=` lists all 265 dependency crates and is **generated, not edited**:
 
 ```sh
 python3 scripts/generate_gentoo_crates.py            # rewrite the block
@@ -106,7 +109,7 @@ The `LICENSE` variable enumerates the vendored crates' licenses alongside the pa
 The `.deb` is built with [`cargo-deb`](https://github.com/kornelski/cargo-deb), attached to each
 GitHub release for amd64 and arm64, and served from an apt repository on GitHub Pages. It is
 **unofficial**, and the distinction matters: a package in the Debian archive proper would require
-every one of the 293 dependency crates — 24 tree-sitter grammars among them — to be packaged as
+every one of the 265 dependency crates — 24 tree-sitter grammars among them — to be packaged as
 `librust-*-dev` first. Almost none are. That path is not reachable, so this is a `cargo-deb`
 artifact served from our own repository, not a route into Debian.
 
@@ -126,8 +129,10 @@ cargo deb --no-build
 The generation step is not optional: `cargo-deb` copies assets from disk and cannot run the binary
 itself, so those four files must exist before it runs.
 
-**Both architectures are built natively**, on `ubuntu-latest` and `ubuntu-24.04-arm`, unlike the
-plain binaries in the same workflow, which reach aarch64 by cross-compiling. Two steps here cannot
+**Both architectures are built natively**, on `ubuntu-22.04` and `ubuntu-22.04-arm`, unlike the
+plain binaries in the same workflow, which reach aarch64 by cross-compiling. 22.04 rather than the
+latest runner because `depends = "$auto"` writes the build machine's glibc version into the
+package as its floor: 2.35 admits Ubuntu 22.04 and Debian 12, 2.39 would not. Two steps here cannot
 cross: `depends = "$auto"` resolves the built ELF's needs against the packages installed on the
 build machine, and the man page and completions come from *running* the binary. Cross-building the
 arm64 `.deb` on an x86-64 host would stamp the host's libc version onto an arm64 package.
@@ -151,16 +156,17 @@ against the 1 GB soft limit on a Pages site rather than for any packaging reason
 
 The two halves are wired together in an order that matters:
 
-1. A `v*` tag runs `release.yml`. The `deb` matrix builds and uploads both architectures.
-2. Its `apt` job — `needs: deb`, so strictly after those uploads — dispatches `pages.yml`.
-3. `pages.yml` downloads every recent release's `.deb`, rebuilds the tree, signs it, and deploys
-   it alongside the mapping site.
+1. A `v*` tag runs `release.yml`, which creates the release as a draft and has the `deb` matrix
+   build and upload both architectures into it.
+2. Its `checksums` job, after every upload, publishes the draft; its `apt` job — `needs:
+   checksums`, so strictly after that — dispatches `pages.yml`.
+3. `pages.yml` downloads every recent non-draft release's `.deb`, rebuilds the tree, signs it, and
+   deploys it alongside the mapping site.
 
-Step 2 exists because the obvious alternative does not work: a `release: published` trigger fires
-when `softprops/action-gh-release` creates the release from whichever matrix job finishes first,
-which is long before the packages are attached. And the apt tree is deployed by `pages.yml` rather
-than by `release.yml` because Pages has a single deployment for the whole site — two workflows
-deploying separately would each erase the other.
+Step 2 exists because the obvious alternative does not work: a `release: published` trigger would
+fire before the packages are attached, and `pages.yml` skips drafts. And the apt tree is deployed
+by `pages.yml` rather than by `release.yml` because Pages has a single deployment for the whole
+site — two workflows deploying separately would each erase the other.
 
 ### The signing key
 
@@ -212,15 +218,31 @@ A nixpkgs submission would take `nix/package.nix` as-is but swap `src` for a `fe
 and `cargoLock.lockFile` for a `cargoHash`, since nixpkgs does not carry the lock file. The
 `maintainers` list is deliberately empty until somebody agrees to be on it.
 
+**`flake.lock` is not committed yet.** Without it `nix run github:ivankovic/codediff` resolves
+`nixos-unstable` afresh on every run, so two users on two days build against two nixpkgs.
+Generate and commit it on a machine with Nix (`nix flake lock`, then `nix flake update` on later
+releases), and re-run `nix build` against it before tagging; it is on the release checklist below
+until it exists.
+
 ## Release checklist
 
-1. Bump `version` in `Cargo.toml`.
-2. `python3 scripts/generate_gentoo_crates.py` and rename the ebuild to match the new version.
+1. Bump `version` in `Cargo.toml`, then `cargo update --workspace` so `Cargo.lock` follows.
+2. `python3 scripts/generate_gentoo_crates.py` (the ebuild's `CRATES` block) and `--manifest` (the
+   Manifest's crate digests, from the local cargo cache), and `git mv` the ebuild to the new
+   version.
 3. Update `pkgver` in `aur/PKGBUILD` and the fallback `version` in `nix/package.nix`.
-4. `make deploy` — publishes to crates.io, tags, and triggers the release workflow.
-5. Read the new `SHA256SUMS.txt` off the release and fill in `sha256sums` / the Gentoo `Manifest`.
-6. Push the updated recipes to the AUR and the overlay.
-7. Check that the apt repository picked the release up — `curl -s
+   `make check-versions` passes once all three agree with `Cargo.toml`; `deploy-checks` and CI
+   run it too.
+4. Give `CHANGELOG.md`'s section for the version its release date: `## [x.y.z] - YYYY-MM-DD`.
+   The release workflow takes the release notes from that section and fails on `unreleased`.
+5. If `flake.lock` is missing or stale, `nix flake lock` / `nix flake update` and commit it.
+6. `make deploy` — publishes to crates.io, tags, and triggers the release workflow, which creates
+   the release as a draft and publishes it once every asset is attached.
+7. Now that the tag tarball exists, regenerate the two tarball hashes with `updpkgsums` and
+   `ebuild ... manifest` (see "The one thing you cannot skip" above). **Not from
+   `SHA256SUMS.txt`**: that file covers the release assets, and the source tarball is not one.
+8. Push the updated recipes to the AUR and the overlay.
+9. Check that the apt repository picked the release up — `curl -s
    https://ivankovic.github.io/codediff/apt/dists/stable/main/binary-amd64/Packages | grep ^Version`
    should name the new version. It refreshes itself (step 2 above), so this is a check, not a task;
    if it is stale, re-run the Pages workflow.

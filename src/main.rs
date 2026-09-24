@@ -85,6 +85,32 @@ enum ColorChoice {
     Never,
 }
 
+/// How the diff is shown; see `should_run_headless` and `should_run_json`.
+#[derive(clap::ValueEnum, Clone, Copy, PartialEq, Eq, Debug, Default)]
+enum Mode {
+    /// The interactive viewer.
+    #[default]
+    Tui,
+    /// Plain text on stdout.
+    Headless,
+    /// One JSON object on stdout, for editor integrations.
+    Json,
+}
+
+/// The exit status of a failed run: what `--help` documents, and distinct from `--exit-code`'s 1.
+const EXIT_FAILURE: i32 = 2;
+
+/// A rate for the TUI's tick and render intervals: `Duration::from_secs_f64(1.0 / rate)` panics
+/// on zero, a negative or NaN, so those are rejected as arguments.
+fn parse_positive_rate(value: &str) -> Result<f64, String> {
+    let rate: f64 = value.parse().map_err(|e| format!("{e}"))?;
+    if rate.is_finite() && rate > 0.0 {
+        Ok(rate)
+    } else {
+        Err("must be a positive number".to_string())
+    }
+}
+
 #[derive(Parser)]
 #[command(
     // Explicit: without it clap's derive takes the nearest preceding doc comment (`Command`'s)
@@ -111,19 +137,14 @@ struct Args {
     /// the viewer starts empty.
     paths: Vec<PathBuf>,
 
-    /// Mode: tui, headless or json (case-insensitive). `headless` and `json` need BEFORE and
-    /// AFTER. `headless` is also chosen when stdout is not a terminal; `json` never is.
-    #[arg(long, default_value = "TUI")]
-    mode: String,
+    /// How to show the diff. `headless` and `json` need BEFORE and AFTER. `headless` is also
+    /// chosen when stdout is not a terminal; `json` never is.
+    #[arg(long, value_enum, ignore_case = true, default_value_t = Mode::Tui)]
+    mode: Mode,
 
     /// Shorthand for `--mode headless`. `--batch` is a synonym.
     #[arg(long, alias = "batch")]
     headless: bool,
-
-    // Deprecated no-op, hidden, kept so existing scripts don't break: every diff runs the same
-    // analysis, so there is no "exact" path to select. TODO: remove at the next minor release.
-    #[arg(long, hide = true)]
-    exact: bool,
 
     /// Paint only the ranges that carry meaning: drop standalone brackets/separators and trim
     /// leading whitespace (the TUI's `M` panel's "everything off" preset). Without this or
@@ -178,17 +199,19 @@ struct Args {
     #[arg(long, conflicts_with = "headless")]
     review: bool,
 
-    /// Tick rate
-    #[arg(long, value_name = "FLOAT", default_value_t = 4.0)]
+    /// The TUI's tick rate, in ticks per second.
+    // Hidden: a tuning knob for development, not a user-facing option.
+    #[arg(long, hide = true, value_name = "FLOAT", default_value_t = 4.0, value_parser = parse_positive_rate)]
     tui_tick_rate: f64,
 
-    /// Frame rate, frames per second, fps
-    #[arg(long, value_name = "FLOAT", default_value_t = 60.0)]
+    /// The TUI's frame rate, in frames per second.
+    #[arg(long, hide = true, value_name = "FLOAT", default_value_t = 60.0, value_parser = parse_positive_rate)]
     tui_frame_rate: f64,
 }
 
 async fn tui_main(args: &Args, before_after: Option<(PathBuf, PathBuf)>) -> Result<()> {
     tui::initialize_logging()?;
+    tui::ui::install_panic_hook();
 
     let mut app = tui::app::App::new(args.tui_tick_rate, args.tui_frame_rate)?;
     if let Some((before, after)) = before_after {
@@ -205,13 +228,24 @@ async fn tui_main(args: &Args, before_after: Option<(PathBuf, PathBuf)>) -> Resu
 /// Whether to print text instead of starting the TUI: when asked to, or whenever stdout is not a
 /// terminal, which is what makes `GIT_EXTERNAL_DIFF` under git's pager work with no configuration.
 fn should_run_headless(args: &Args, stdout_is_terminal: bool) -> bool {
-    args.headless || args.mode.eq_ignore_ascii_case("headless") || !stdout_is_terminal
+    args.headless || args.mode == Mode::Headless || !stdout_is_terminal
 }
 
 /// Whether to print a JSON diff object. Only `--mode json` selects it: a non-terminal stdout must
 /// keep getting headless text, or every pipe and git integration would change format.
 fn should_run_json(args: &Args) -> bool {
-    args.mode.eq_ignore_ascii_case("json")
+    args.mode == Mode::Json
+}
+
+/// The error for a text-mode run with no files, naming the reason text mode was chosen: a user
+/// who passed `--headless` on a terminal is told about the missing files, not about the terminal.
+fn headless_needs_files_message(args: &Args) -> &'static str {
+    if args.headless || args.mode == Mode::Headless {
+        "text mode needs BEFORE and AFTER - pass two files to diff"
+    } else {
+        "stdout is not a terminal and no files were given - pass BEFORE and AFTER to run in text \
+         mode, or run from a real terminal to use the interactive viewer"
+    }
 }
 
 /// The [`RenderOptions`](codediff::diff::text::RenderOptions) to paint with: a preset flag
@@ -239,8 +273,13 @@ fn use_color(choice: ColorChoice) -> bool {
     match choice {
         ColorChoice::Always => true,
         ColorChoice::Never => false,
-        ColorChoice::Auto => std::env::var_os("NO_COLOR").is_none(),
+        ColorChoice::Auto => !no_color_is_set(std::env::var_os("NO_COLOR")),
     }
+}
+
+/// no-color.org: the variable opts out when present *and non-empty*; `NO_COLOR=` is not an opt-out.
+fn no_color_is_set(value: Option<std::ffi::OsString>) -> bool {
+    value.is_some_and(|value| !value.is_empty())
 }
 
 /// The exit code of a completed non-interactive run (errors exit 2 at the call sites). The
@@ -285,9 +324,11 @@ fn run_binary(args: &Args, before: &std::path::Path, after: &std::path::Path) ->
     if should_run_json(args) {
         // Still a JSON object of the usual shape (flagged `binary`, no hunks): prose would break
         // every `--mode json` consumer.
-        println!("{}", tui::json_output::binary_diff_json(before, after)?);
+        let mut json = tui::json_output::binary_diff_json(before, after)?;
+        json.push('\n');
+        tui::headless::write_stdout(&json)?;
     } else {
-        print!("{}", binary_notice(&args.paths, before, after, differed));
+        tui::headless::write_stdout(&binary_notice(&args.paths, before, after, differed))?;
     }
     Ok(exit_code_for(
         differed,
@@ -314,94 +355,94 @@ fn run_util(action: &UtilAction) -> Result<()> {
     Ok(())
 }
 
+/// Whether `error` is the reader having closed stdout (`codediff a b | head`, a pager quit early).
+/// That is the ordinary end of a run, not a failure to report.
+fn is_broken_pipe(error: &anyhow::Error) -> bool {
+    error.chain().any(|cause| {
+        cause
+            .downcast_ref::<std::io::Error>()
+            .is_some_and(|io| io.kind() == std::io::ErrorKind::BrokenPipe)
+    })
+}
+
+/// Every failure exits [`EXIT_FAILURE`] with a `codediff: ...` line, whichever path raised it;
+/// clap's own usage errors already exit 2 on their own. The one exception is a broken pipe, which
+/// exits 0 without a word.
 #[tokio::main]
-async fn main() -> Result<()> {
+async fn main() {
+    let code = match run().await {
+        Ok(code) => code,
+        Err(error) if is_broken_pipe(&error) => 0,
+        Err(error) => {
+            eprintln!("codediff: {error:#}");
+            EXIT_FAILURE
+        }
+    };
+    std::process::exit(code);
+}
+
+/// The whole program; the `Ok` value is the exit status of a completed run.
+async fn run() -> Result<i32> {
     let args = Args::parse();
 
     if let Some(Command::Git {
         action: GitAction::Configure,
     }) = &args.command
     {
-        return git_configure::run();
+        return git_configure::run().map(|()| 0);
     }
 
     if let Some(Command::Jj {
         action: JjAction::Configure,
     }) = &args.command
     {
-        return jj_configure::run();
+        return jj_configure::run().map(|()| 0);
     }
 
     if let Some(Command::Util { action }) = &args.command {
-        return run_util(action);
+        return run_util(action).map(|()| 0);
     }
 
     let before_after = resolve_before_after(&args.paths)?;
     let invoked_as_git_external_diff = invoked_as_git_external_diff(&args.paths);
 
     if let Some((before, after)) = before_after.as_ref() {
-        // Not `?`: an unreadable file must exit 2 with "codediff: ..." like every other
-        // non-interactive failure, not 1 via `main`'s `Result`.
-        let either_is_binary = codediff::code::is_binary_file(before)
-            .and_then(|binary| Ok(binary || codediff::code::is_binary_file(after)?));
-        match either_is_binary
-            .and_then(|binary| binary.then(|| run_binary(&args, before, after)).transpose())
-        {
-            Ok(Some(code)) => std::process::exit(code),
-            Ok(None) => {}
-            Err(e) => {
-                eprintln!("codediff: {e:#}");
-                std::process::exit(2);
-            }
+        let either_is_binary =
+            codediff::code::is_binary_file(before)? || codediff::code::is_binary_file(after)?;
+        if either_is_binary {
+            return run_binary(&args, before, after);
         }
     }
 
     if should_run_json(&args) {
         let (before, after) = before_after
             .context("`--mode json` needs BEFORE and AFTER - pass two files to diff")?;
-        match tui::json_output::run(&before, &after, render_options(&args)) {
-            Ok(differed) => std::process::exit(exit_code_for(
-                differed,
-                args.exit_code,
-                invoked_as_git_external_diff,
-            )),
-            Err(e) => {
-                eprintln!("codediff: {e:#}");
-                std::process::exit(2);
-            }
-        }
+        let differed = tui::json_output::run(&before, &after, render_options(&args))?;
+        return Ok(exit_code_for(
+            differed,
+            args.exit_code,
+            invoked_as_git_external_diff,
+        ));
     }
 
     if should_run_headless(&args, std::io::stdout().is_terminal()) {
-        let (before, after) = before_after.context(
-            "stdout is not a terminal and no files were given - pass BEFORE and AFTER to run in \
-            text mode, or run from a real terminal to use the interactive viewer",
-        )?;
-        match tui::headless::run(
+        let (before, after) = before_after.context(headless_needs_files_message(&args))?;
+        let differed = tui::headless::run(
             &before,
             &after,
             use_color(args.color),
             args.context,
             render_options(&args),
-        ) {
-            Ok(differed) => std::process::exit(exit_code_for(
-                differed,
-                args.exit_code,
-                invoked_as_git_external_diff,
-            )),
-            Err(e) => {
-                eprintln!("codediff: {e:#}");
-                std::process::exit(2);
-            }
-        }
+        )?;
+        return Ok(exit_code_for(
+            differed,
+            args.exit_code,
+            invoked_as_git_external_diff,
+        ));
     }
 
-    if let Err(e) = tui_main(&args, before_after).await {
-        eprintln!("something went wrong");
-        return Err(e);
-    }
-
-    Ok(())
+    tui_main(&args, before_after).await?;
+    Ok(0)
 }
 
 #[cfg(test)]
@@ -495,13 +536,12 @@ mod tests {
         );
     }
 
-    fn args_with(mode: &str, headless: bool) -> Args {
+    fn args_with(mode: Mode, headless: bool) -> Args {
         Args {
             command: None,
             paths: Vec::new(),
-            mode: mode.to_string(),
+            mode,
             headless,
-            exact: false,
             minimal: false,
             full: false,
             whole_updates: false,
@@ -517,13 +557,13 @@ mod tests {
 
     #[test]
     fn whole_updates_flag_layers_onto_minimal_and_full_alike() {
-        let mut minimal = args_with("TUI", false);
+        let mut minimal = args_with(Mode::Tui, false);
         minimal.minimal = true;
         minimal.whole_updates = true;
         assert!(render_options(&minimal).whole_pair_updates);
         assert!(!render_options(&minimal).leading_whitespace);
 
-        let mut full = args_with("TUI", false);
+        let mut full = args_with(Mode::Tui, false);
         full.full = true;
         full.whole_updates = true;
         assert!(render_options(&full).whole_pair_updates);
@@ -532,19 +572,19 @@ mod tests {
 
     #[test]
     fn paint_reindent_moves_flag_layers_onto_minimal_and_full_alike() {
-        let mut minimal = args_with("TUI", false);
+        let mut minimal = args_with(Mode::Tui, false);
         minimal.minimal = true;
         minimal.paint_reindent_moves = true;
         assert!(render_options(&minimal).paint_reindent_only_moves);
         assert!(!render_options(&minimal).leading_whitespace);
 
-        let mut full = args_with("TUI", false);
+        let mut full = args_with(Mode::Tui, false);
         full.full = true;
         full.paint_reindent_moves = true;
         assert!(render_options(&full).paint_reindent_only_moves);
         assert!(render_options(&full).leading_whitespace);
 
-        let mut without_the_flag = args_with("TUI", false);
+        let mut without_the_flag = args_with(Mode::Tui, false);
         without_the_flag.minimal = true;
         assert!(
             !render_options(&without_the_flag).paint_reindent_only_moves,
@@ -578,6 +618,82 @@ mod tests {
                 .context,
             0
         );
+    }
+
+    /// A typo in `--mode` used to fall through to the TUI silently; the values are also what
+    /// shell completion offers.
+    #[test]
+    fn mode_accepts_its_three_values_case_insensitively_and_nothing_else() {
+        for (value, expected) in [
+            ("tui", Mode::Tui),
+            ("TUI", Mode::Tui),
+            ("headless", Mode::Headless),
+            ("Headless", Mode::Headless),
+            ("json", Mode::Json),
+            ("JSON", Mode::Json),
+        ] {
+            let args = Args::try_parse_from(["codediff", "--mode", value]).unwrap();
+            assert_eq!(args.mode, expected, "--mode {value}");
+        }
+        assert!(Args::try_parse_from(["codediff", "--mode", "bogus"]).is_err());
+        assert!(Args::try_parse_from(["codediff", "--exact"]).is_err());
+    }
+
+    /// `Duration::from_secs_f64(1.0 / rate)` panics on these; they are argument errors instead.
+    #[test]
+    fn tui_rates_reject_zero_negative_and_non_numbers() {
+        for value in ["0", "-1", "nan", "inf", "fast"] {
+            assert!(
+                Args::try_parse_from(["codediff", "--tui-tick-rate", value]).is_err(),
+                "--tui-tick-rate {value}"
+            );
+            assert!(
+                Args::try_parse_from(["codediff", "--tui-frame-rate", value]).is_err(),
+                "--tui-frame-rate {value}"
+            );
+        }
+        let args = Args::try_parse_from(["codediff", "--tui-tick-rate", "2.5"]).unwrap();
+        assert_eq!(args.tui_tick_rate, 2.5);
+    }
+
+    /// The rate flags are development knobs, hidden from `--help` and the man page.
+    #[test]
+    fn tui_rates_are_hidden_from_help() {
+        use clap::CommandFactory;
+
+        let help = Args::command().render_long_help().to_string();
+        assert!(!help.contains("--tui-tick-rate"), "{help}");
+        assert!(!help.contains("--tui-frame-rate"), "{help}");
+        assert!(help.contains("--mode"), "{help}");
+    }
+
+    /// no-color.org: only a non-empty value opts out.
+    #[test]
+    fn no_color_opts_out_only_when_set_and_non_empty() {
+        assert!(!no_color_is_set(None));
+        assert!(!no_color_is_set(Some("".into())));
+        assert!(no_color_is_set(Some("1".into())));
+    }
+
+    #[test]
+    fn the_no_files_message_names_the_missing_files_when_text_mode_was_asked_for() {
+        assert!(headless_needs_files_message(&args_with(Mode::Tui, true)).starts_with("text mode"));
+        assert!(
+            headless_needs_files_message(&args_with(Mode::Headless, false))
+                .starts_with("text mode")
+        );
+        assert!(
+            headless_needs_files_message(&args_with(Mode::Tui, false))
+                .starts_with("stdout is not a terminal")
+        );
+    }
+
+    #[test]
+    fn a_broken_pipe_anywhere_in_the_chain_is_recognized() {
+        let io = std::io::Error::from(std::io::ErrorKind::BrokenPipe);
+        assert!(is_broken_pipe(&anyhow::Error::from(io).context("writing")));
+        let other = std::io::Error::from(std::io::ErrorKind::NotFound);
+        assert!(!is_broken_pipe(&anyhow::Error::from(other)));
     }
 
     #[test]
@@ -727,17 +843,17 @@ mod tests {
 
     #[test]
     fn should_run_headless_when_stdout_is_not_a_terminal_even_without_any_flag() {
-        assert!(should_run_headless(&args_with("TUI", false), false));
+        assert!(should_run_headless(&args_with(Mode::Tui, false), false));
     }
 
     #[test]
     fn should_run_headless_is_false_on_a_real_terminal_with_no_flags() {
-        assert!(!should_run_headless(&args_with("TUI", false), true));
+        assert!(!should_run_headless(&args_with(Mode::Tui, false), true));
     }
 
     #[test]
     fn should_run_headless_honors_the_headless_flag_even_on_a_real_terminal() {
-        assert!(should_run_headless(&args_with("TUI", true), true));
+        assert!(should_run_headless(&args_with(Mode::Tui, true), true));
     }
 
     #[test]
@@ -751,20 +867,20 @@ mod tests {
 
     #[test]
     fn should_run_headless_honors_mode_headless_case_insensitively() {
-        assert!(should_run_headless(&args_with("Headless", false), true));
+        assert!(should_run_headless(&args_with(Mode::Headless, false), true));
     }
 
     #[test]
     fn should_run_json_honors_mode_json_case_insensitively() {
-        assert!(should_run_json(&args_with("Json", false)));
-        assert!(should_run_json(&args_with("json", false)));
-        assert!(!should_run_json(&args_with("TUI", false)));
-        assert!(!should_run_json(&args_with("Headless", false)));
+        assert!(should_run_json(&args_with(Mode::Json, false)));
+        assert!(should_run_json(&args_with(Mode::Json, false)));
+        assert!(!should_run_json(&args_with(Mode::Tui, false)));
+        assert!(!should_run_json(&args_with(Mode::Headless, false)));
     }
 
     #[test]
     fn should_run_json_is_false_on_a_non_terminal_stdout_unless_explicitly_asked_for() {
-        assert!(!should_run_json(&args_with("TUI", false)));
+        assert!(!should_run_json(&args_with(Mode::Tui, false)));
     }
 
     #[test]

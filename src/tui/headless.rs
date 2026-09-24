@@ -441,9 +441,20 @@ pub fn run(
              usual."
         );
     }
-    print!("{}", render_text_diff(&data, use_color, context));
+    write_stdout(&render_text_diff(&data, use_color, context))?;
     // Raw bytes: `data`'s contents went through `display_safe`, which maps tabs to spaces.
     Ok(std::fs::read(before)? != std::fs::read(after)?)
+}
+
+/// Writes non-interactive output to stdout as an `io::Result`, where `print!` would panic. The
+/// reader closing the pipe early (`codediff a b | head`, quitting the pager) is the ordinary end of
+/// a run, not a crash: it surfaces as `ErrorKind::BrokenPipe`, which `main` exits quietly on.
+pub fn write_stdout(text: &str) -> std::io::Result<()> {
+    use std::io::Write;
+
+    let mut stdout = std::io::stdout().lock();
+    stdout.write_all(text.as_bytes())?;
+    stdout.flush()
 }
 
 #[cfg(test)]

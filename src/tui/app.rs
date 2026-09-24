@@ -89,6 +89,13 @@ struct ReviewPosition {
 ///
 /// An exhaustive match on purpose: a new `AppScreen` missing from an exclusion list would make
 /// Esc quit the app instead of closing its dialog.
+/// `q` quits from the viewer and from the "Diffing…" wait, and nowhere else: every other screen
+/// is a dialog, and three of them (search, go-to-line, the file dialog's filter) take typed text,
+/// where a `q` is a letter. The dialogs close on Esc.
+fn q_should_quit(screen: AppScreen) -> bool {
+    matches!(screen, AppScreen::Viewer | AppScreen::Diffing)
+}
+
 fn esc_should_quit(screen: AppScreen) -> bool {
     match screen {
         AppScreen::Viewer => true,
@@ -292,7 +299,7 @@ impl App {
                 return Ok(());
             }
             match key.code {
-                KeyCode::Char('q') => {
+                KeyCode::Char('q') if q_should_quit(self.screen) => {
                     action_tx.send(Action::Quit)?;
                 }
                 KeyCode::Esc if esc_should_quit(self.screen) => {
@@ -1370,6 +1377,10 @@ pub(crate) fn compute_diff(before: &Path, after: &Path) -> Result<(DiffSessionDa
 /// where a panic could be caught. Public so tools diffing on their own threads use the same ceiling.
 pub const DIFF_COMPUTE_STACK_SIZE: usize = 256 * 1024 * 1024;
 
+/// The name of that thread, which the TUI's panic hook uses to tell a diff-computation panic
+/// (caught, shown in the error banner) from one that takes the app down.
+pub const DIFF_THREAD_NAME: &str = "codediff-diff";
+
 /// Parses, diffs and builds the display ranges, honouring `render_options`' construction-time
 /// options. The `bool` is `PendingDiff::large_residual`, always `false` for the plain-text
 /// fallback taken when either side has no grammar.
@@ -1384,6 +1395,7 @@ pub fn compute_diff_with_options(
     let before = before.to_path_buf();
     let after = after.to_path_buf();
     match std::thread::Builder::new()
+        .name(DIFF_THREAD_NAME.to_string())
         .stack_size(DIFF_COMPUTE_STACK_SIZE)
         .spawn(move || compute_diff_with_options_inner(&before, &after, render_options))
         .expect("failed to spawn diff-computation thread")
@@ -1498,6 +1510,7 @@ mod tests {
     }
 
     /// git hands over `/dev/null` for the missing side of an added or deleted file.
+    #[cfg(unix)]
     #[test]
     fn compute_diff_treats_dev_null_before_as_an_empty_file_in_the_afters_language() -> Result<()> {
         let after = tempfile::Builder::new()
@@ -1517,6 +1530,7 @@ mod tests {
         Ok(())
     }
 
+    #[cfg(unix)]
     #[test]
     fn compute_diff_treats_dev_null_after_as_an_empty_file_in_the_befores_language() -> Result<()> {
         let before = tempfile::Builder::new()
@@ -1764,6 +1778,24 @@ mod tests {
         assert!(!esc_should_quit(AppScreen::Search));
         assert!(!esc_should_quit(AppScreen::JumpToLine));
         assert!(!esc_should_quit(AppScreen::Review));
+    }
+
+    /// Typing a `q` into a search, a line number or a filename must not end the session.
+    #[test]
+    fn q_quits_only_from_the_viewer_and_the_diffing_wait() {
+        assert!(q_should_quit(AppScreen::Viewer));
+        assert!(q_should_quit(AppScreen::Diffing));
+        for screen in [
+            AppScreen::SelectFile,
+            AppScreen::SelectTheme,
+            AppScreen::RenderOptions,
+            AppScreen::Help,
+            AppScreen::Search,
+            AppScreen::JumpToLine,
+            AppScreen::Review,
+        ] {
+            assert!(!q_should_quit(screen), "{screen:?}");
+        }
     }
 
     #[test]

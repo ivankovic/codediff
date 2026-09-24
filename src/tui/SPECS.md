@@ -13,8 +13,9 @@ dedicated OS thread. A prior version of this code spawned a thread that called
 that burns a full CPU core continuously and was a major source of the TUI feeling slow. There is no
 dedicated input thread or task at all: `UI` owns the `EventStream` and the tick/render
 `tokio::time::Interval`s directly, and `next_event` loops internally (without returning) past
-crossterm event kinds the app has no use for (focus/paste), only ever yielding `None` once the
-input stream itself closes.
+crossterm event kinds the app has no use for (focus/paste, and key *release* events - Windows
+reports one for every press, and acting on both would run each keybinding twice), only ever
+yielding `None` once the input stream itself closes.
 
 Tick rate and frame rate remain independently configurable (defaults: 4 Hz tick, 60 fps render);
 the builder methods `UI::tick_rate`/`frame_rate` rebuild the corresponding `Interval` so they take
@@ -106,10 +107,37 @@ recorded in `App::dialog_target`. Selecting a file loads it into that one panel 
 (`DiffViewer::set_before_file`/`set_after_file`) and remembers the path in
 `App::before_path`/`after_path`. The diff is (re-)computed automatically — moving to `Diffing` and
 back to `Viewer` — whenever *both* paths are set after a pick, whether that's the first time both
-sides are filled in or a later reselect of just one side. `Esc` cancels the active file dialog
-instead of quitting the app while one is open (it quits the app from every other screen, alongside
-`q`). A failed diff (e.g. an unsupported file extension) is reported via `App::last_error` and
-rendered as a one-line red banner under the panels rather than failing silently.
+sides are filled in or a later reselect of just one side. A failed diff (e.g. an unsupported file
+extension) is reported via `App::last_error` and rendered as a one-line red banner under the
+panels rather than failing silently.
+
+### Quitting
+
+`q` and `Esc` quit only from the bare viewer (`q_should_quit`/`esc_should_quit` in `app.rs`; `q`
+also quits during the "Diffing…" wait, which `Esc` cancels instead). On every other screen the key
+belongs to the open dialog: `Esc` closes it, and `q` is an ordinary character in the three that take
+typed text (search, go-to-line, the file dialog's filter). The web viewer follows the same rule.
+
+## Crash handling
+
+`tui::ui::install_panic_hook`, installed by `main` before the app starts, restores the terminal
+(raw mode off, mouse capture off, main screen, cursor shown) before the default hook prints the
+panic, then adds a line asking for a bug report at the issue tracker. Without it the message lands
+in the alternate screen and is wiped when `UI` is dropped, leaving an exit code and nothing else.
+`UI::drop` is best effort for the same reason: a panic inside `drop` during unwinding aborts the
+process before the hook's output reaches the user.
+
+The one panic the hook leaves alone is on the diff-computation thread (named
+`app::DIFF_THREAD_NAME`): `App::start_diff` catches it and shows it in the error banner, so the
+terminal must stay as it is and nothing may be written to stderr underneath the live TUI.
+
+## Logging
+
+The TUI writes no log file unless `RUST_LOG` is set (`tui::initialize_logging`). When it is, the
+value is the `tracing` filter and the file is `$XDG_STATE_HOME/codediff/log.txt`, falling back to
+`$HOME/.local/state/codediff/log.txt` and then the system temp directory - a per-user path, never
+a world-shared one that another user could create first or point a symlink from. The file is
+truncated on every start.
 
 ## File dialog
 

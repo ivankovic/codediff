@@ -995,11 +995,12 @@ work that was already done. What is written below is what the code actually says
 *  DONE 2026-09-10: the magenta diff color. Note the entry was wrong about which one: `Update` is
    yellow, and the magenta was `Move` in **headless** output only - every TUI preset had already
    moved to grey ("grey at the purple's own weight"). Headless now matches.
+*  DONE 2026-09-24: `q` quit from *every* screen, including the search modal and the file
+   dialog's filter, so typing a `q` into a search ended the session. `q_should_quit` in `app.rs`
+   now limits it to the viewer and the "Diffing…" wait, the same shape as `esc_should_quit`; the
+   web viewer already behaved this way.
 *  Found 2026-09-10 while porting the viewer to the browser (src/web/SPECS.md lists them; the
    port keeps each so the two front ends agree, so fixing one means fixing both):
-   - `q` quits from *every* screen, including the search modal and the file dialog's filter -
-     `App::handle_events` matches `Char('q')` before any screen check, so typing a `q` into a
-     search ends the session. The web viewer deliberately does not copy this one.
    - `DiffViewer::merged_change_count_and_index` counts stops ordered by `(panel, position)`, not
      in the order `n` walks them (before-file order with panel as the tiebreak), so `change N/M`
      does not climb monotonically across a panel switch, contrary to its own doc comment.

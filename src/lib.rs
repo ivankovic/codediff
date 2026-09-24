@@ -20,6 +20,15 @@
 //! [`diff_strings`] is the entry point: it parses both sides into [`code::Code`] and returns a
 //! [`diff::Diff`]: the mapping between the two syntax trees plus the changed text ranges it implies.
 //! The `tui` and `web` features add the terminal and browser viewers built on it.
+//!
+//! # Stability
+//!
+//! This crate is published for the `codediff` binary. Its stable contracts are the command line
+//! and the `--mode json` output, which the editor integrations consume. The library API - the
+//! `diff` module's solver passes, the `tui` and `web` modules, and the `tree_sitter` and `ratatui`
+//! types in their signatures - is the binary's internals made visible, and changes between 0.x
+//! minor versions without notice. [`diff_strings`] and the [`code`] and [`diff`] module roots are
+//! the parts meant for use from another crate.
 #[cfg(feature = "stats")]
 pub mod anomalous_paths;
 pub mod code;

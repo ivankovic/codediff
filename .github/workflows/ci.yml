@@ -108,11 +108,16 @@ jobs:
           args: format --check
           src: research scripts assets
 
-      # The Gentoo ebuild names all ~293 dependency crates, generated from Cargo.lock. A lock
+      # The Gentoo ebuild names all 265 dependency crates, generated from Cargo.lock. A lock
       # change that does not reach the ebuild produces a package that fails to build for users
       # while looking perfectly fine in review, so it is checked rather than remembered.
       - name: Gentoo CRATES list is in sync with Cargo.lock
         run: python3 scripts/generate_gentoo_crates.py --check
+
+      # The AUR, Gentoo and Nix recipes repeat Cargo.toml's version by hand; a recipe left on the
+      # previous number builds the previous tag under the new one. See the script's docstring.
+      - name: Packaging recipes name Cargo.toml's version
+        run: make check-versions
 
       # The Python unit tests, in research/'s uv environment (pytest is a dev dependency there).
       - uses: astral-sh/setup-uv@v6
@@ -157,6 +162,69 @@ jobs:
           key: painting
 
       - run: make check-painting-attribution
+
+  # The suite on the two other operating systems the release ships binaries for, with default
+  # features: the fixture corpus is feature-independent and already sharded across the Linux
+  # matrix below, so it is left out here (`test::fixtures::`) and the rest runs whole. Without this
+  # job, release.yml is the first time macOS or Windows compiles the crate, and no test ever runs
+  # there.
+  cross-platform:
+    name: test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: cross-${{ matrix.os }}
+
+      - uses: taiki-e/install-action@nextest
+
+      - run: cargo nextest run --release -E 'not test(/^test::fixtures::/)'
+
+  # Cargo.toml's `rust-version` is a promise to `cargo install` users on an older toolchain, and
+  # only a build on exactly that toolchain keeps it: a dependency bump can raise the real floor
+  # without any line of this crate changing. The version appears twice below on purpose - the
+  # action needs a literal ref - and the first step fails if it drifts from Cargo.toml.
+  msrv:
+    name: cargo check (MSRV)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: The toolchain below is Cargo.toml's rust-version
+        run: grep -q '^rust-version = "1.88"$' Cargo.toml
+
+      - uses: dtolnay/rust-toolchain@1.88
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: msrv
+
+      - run: cargo check --locked
+
+  # `cargo publish --dry-run` without the upload: packages the crate from `include` and builds it
+  # from its own tarball, so a file the allow-list dropped (an `include_str!` target, a module)
+  # fails here rather than at `make deploy-crates`, which publishes first and cannot be undone.
+  package:
+    name: cargo package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: package
+
+      - run: cargo package --locked
 
   build-and-test:
     name: build + test (${{ matrix.features == '' && 'default' || matrix.features }})

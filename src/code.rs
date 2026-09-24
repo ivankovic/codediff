@@ -407,6 +407,7 @@ mod tests {
     }
 
     /// git passes `/dev/null` for the missing side of an added or deleted file.
+    #[cfg(unix)]
     #[test]
     fn is_binary_file_says_dev_null_is_not_binary() {
         assert!(!is_binary_file(std::path::Path::new("/dev/null")).expect("classify"));

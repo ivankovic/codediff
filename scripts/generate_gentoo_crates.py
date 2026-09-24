@@ -5,7 +5,7 @@ Lives here rather than beside the ebuild so ruff covers it: CI lints research/, 
 assets/ only.
 
 Gentoo's ``cargo.eclass`` fetches every crate in the dependency graph individually, so the ebuild
-has to name all of them - 294 at the time of writing. ``pycargoebuild`` is the usual tool for this,
+has to name all of them - 265 at the time of writing. ``pycargoebuild`` is the usual tool for this,
 but it is not always installed, and the job is small enough to not need it: every registry crate in
 Cargo.lock becomes one ``name@version`` line.
 
@@ -22,7 +22,7 @@ exits non-zero instead of writing, for CI.
 
 **The Manifest is checked too, and that is a separate failure from the ebuild's.** Gentoo fetches
 each crate against the Manifest's digests, and until 2026-09-18 nothing compared it to anything:
-``--check`` passed on a Manifest whose ``CRATES`` list was current while **65 of its 293 crate
+``--check`` passed on a Manifest whose ``CRATES`` list was current while **65 of its crate
 digests named older versions and one crate had no line at all**, because the two files had drifted
 apart over dependency bumps that only ever touched the ebuild. ``--check`` now also asserts that
 the set of ``name-version.crate`` DIST lines is exactly Cargo.lock's - the drift that actually
