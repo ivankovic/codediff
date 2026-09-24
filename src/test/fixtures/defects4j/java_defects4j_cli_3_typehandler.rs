@@ -23,12 +23,9 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // One `return` statement becomes two, recorded as all-to-all 1:2 groups over the statement
-    // and each of its descendants (see `MultiMapGroup::pairing`). Eight of the fourteen are those
-    // groups' second after member, which a one-to-one output cannot reach - the N:M floor. The
-    // other six are a genuine gap: the before `method_invocation` chain is deleted whole and the
-    // new nested `if`/`return` inserted whole, rather than matched through the added nesting -
-    // the same `qualified_name` nesting-bridging gap `rust-algorithm-change` documents.
+    // One `return` becomes two: all-to-all 1:2 groups, whose second after members a one-to-one
+    // output cannot reach (the N:M floor). The rest is the `qualified_name` nesting-bridging gap
+    // of `rust-algorithm-change`: the call chain is deleted and the nested `if`/`return` inserted.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "java-defects4j-cli-3-typehandler",
         14,

@@ -22,12 +22,9 @@ use crossterm::event::{KeyEvent, MouseEvent};
 pub enum Event {
     /// The tick timer fired (app logic update, independent of rendering).
     Tick,
-    /// The render timer fired; the app should redraw.
     Render,
     /// The terminal was resized to (width, height).
     Resize(u16, u16),
-    /// A key was pressed.
     Key(KeyEvent),
-    /// A mouse event occurred.
     Mouse(MouseEvent),
 }

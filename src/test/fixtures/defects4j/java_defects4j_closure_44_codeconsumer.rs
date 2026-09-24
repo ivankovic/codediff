@@ -23,8 +23,8 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // No group is involved: the human pairs an `if` body's `block` (and its closing brace) with
-    // the one the edit keeps, codediff pairs it with the other arm's. A two-node ordinary gap.
+    // The human pairs an `if` body's `block` with the one the edit keeps, codediff with the
+    // other arm's.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "java-defects4j-closure-44-codeconsumer",
         2,

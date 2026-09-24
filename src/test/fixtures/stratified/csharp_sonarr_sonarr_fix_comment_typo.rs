@@ -35,9 +35,7 @@ fn painting() -> Result<()> {
 
 #[test]
 fn invariants() -> Result<()> {
-    // `Full` must not delete the second of the two `// ` copies on row 234, ending its run on a
-    // space; it now deletes the first, which covers the same bytes, ends on `/`, and is the
-    // left-anchored spelling the rule in RULES_AND_PREFERENCES.md asks for. The invariant and the
-    // rule agreed here.
+    // `Full` deletes the first of the two `// ` copies on row 234 (ending on `/`, left-anchored),
+    // not the second, which would end its run on a space.
     assert_ground_truth_invariants("csharp-sonarr-sonarr-fix-comment-typo")
 }

@@ -16,27 +16,14 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-//! Single-pair worker for `apted_only_benchmark`: computes exactly one whole-tree tree-edit-
-//! distance between two files via `apted::for_roots(..., Algorithm::AptedWholeTree, ...)` -
-//! CodeDiff's own APTED implementation, with none of the 7-phase pipeline's pre-matching
-//! heuristics run first (no hash descent, no bottom-up expansion, nothing) and with the engine's
-//! own shortcuts off too: `Algorithm::Apted` settles a many-child root by Myers over its
-//! children and, since 2026-09-02, decomposes any single pair over `APTED_MAX_CELLS` instead of
-//! running the kernel on it - the product's answer to this measurement, not the measurement.
-//! This is deliberately the most
-//! favorable case for whole-tree tree-edit-distance: real commits touch a small fraction of a
-//! file (see `research/papers/introductory-paper/main.tex`'s Phase 1 discussion), so running APTED
-//! directly on the full trees, unaided, is what "just run a generic tree-diff algorithm" means in
-//! practice.
+//! Single-pair worker for `apted_only_benchmark`: one whole-tree tree-edit-distance between two
+//! files via `Algorithm::AptedWholeTree`, with no pipeline phases and none of the engine's own
+//! shortcuts (`Algorithm::Apted`'s Myers root split and `APTED_MAX_CELLS` decomposition). That is
+//! what "just run a generic tree-diff algorithm" means.
 //!
-//! Exists as its own process, not an in-process call from `apted_only_benchmark`, so the driver
-//! can enforce the RQ1 experiment's 1-second budget with an OS-level `kill()` instead of merely
-//! abandoning a thread: APTED's cost on a large or pathological tree can run for minutes and
-//! consume gigabytes, and most inputs in this experiment are expected to exceed the budget by
-//! design (that is the point of the measurement) - a thread-abandon timeout, as used by
-//! `benchmark_diff_pairs.rs` for the full pipeline (which rarely blows its own much larger 120s
-//! budget), would accumulate unboundedly here. A killed process returns all its memory to the OS
-//! immediately; an abandoned thread does not.
+//! A separate process so the driver can enforce the 1-second budget with `kill()`: most inputs
+//! exceed it by design, and an abandoned thread keeps its CPU and memory while a killed process
+//! returns them.
 
 use anyhow::{Context, Result, anyhow};
 use clap::Parser;
@@ -58,8 +45,7 @@ struct Args {
     #[arg(long)]
     after: PathBuf,
 
-    /// Original repository-relative path (or just a filename with the right extension) - used
-    /// only to detect the language via `language_for_path`. Its content is never read.
+    /// Path (or bare filename) used only to detect the language; never read.
     #[arg(long)]
     lang_path: String,
 }

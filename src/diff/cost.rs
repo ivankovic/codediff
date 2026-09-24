@@ -17,59 +17,21 @@
  */
 
 /**
-* Total edit cost of a *finished* mapping between two subtrees - not APTED's internal DP (which
-* only ever sees a small unmatched residual, see `apted::UnitCostModel`), but a single number for
-* "how expensive is this complete before-to-after mapping, root to every leaf."
-*
-* Two callers need this and must agree on the same numbers, or "is codediff's mapping cheaper or
-* more expensive than the human's" stops being a meaningful question:
-* - `diff_cost`, over codediff's own `ASTDiff` output.
-* - `crate::test::helper::human_mapping::human_mapping_cost`, over a human-authored
-*   `human_mapping.json` (kept in `human_mapping.rs`, not here, since it depends on
-*   `test`-only path-resolution helpers - this module stays free of that dependency).
-*
-* Both reduce to summing `operation_cost` over a flat list of (operation, subtree size) pairs, one
-* per mapping entry - see that function's doc comment for the per-operation cost table this
-* encodes, and why matched-but-not-identical nodes cost 0 at the root rather than double-counting
-* their descendants' own entries.
-*
-* This is the "current cost" baseline the cost model can be extended from: `benchmark_optimal_
-* solutions` prints both sides' totals per fixture so a future cost-model change can be judged by
-* whether it moves codediff's cost *toward* the human's, not just by the existing node-by-node
-* mismatch count.
+* Total edit cost of a finished mapping, root to every leaf (not APTED's internal DP). `diff_cost`
+* and `human_mapping::human_mapping_cost` both sum `operation_cost`, so codediff's cost and the
+* human's are comparable.
 */
 use crate::code::ASTMetadata;
 use crate::diff::{ASTDiff, ASTMappingOperation, COST_DELETE, COST_INSERT, COST_UPDATE};
 
 /**
-* Unit cost of one mapping entry with the given `operation`, whose subtree has `subtree_size`
-* nodes (only consulted for the two `*WithChildren` operations - everything else is a single-node
-* cost, since a matched internal node's differing descendants each get their own separate entry
-* rather than being folded into their ancestor's cost).
+* Unit cost of one mapping entry, mirroring `apted::common::UnitCostModel`. `subtree_size` is
+* read only by the `*WithChildren` operations, which stand in for a whole subtree (human mappings
+* use them; the pipeline does not).
 *
-* Mirrors `apted::common::UnitCostModel`'s per-operation costs, generalized from "match/rename a
-* pair of node labels" (what APTED's DP evaluates candidate by candidate) to "here is the fully
-* resolved operation for this entry" (what a finished mapping already records):
-* - `Identical` and `NotYetSet` -> 0, and `MatchButNotIdentical` -> 0 *unless*
-*   `owned_text_changed`. A same-kind internal-node match costs nothing at the root because the
-*   real cost of any difference inside the subtree shows up as its own, separate entries for the
-*   differing descendants, and double-charging the ancestor would count it twice - the same premise
-*   `UnitCostModel::ren` rests on. The exception is a node that owns text *directly*, in the gaps
-*   its children don't cover: there is no descendant entry carrying that difference, so charging 0
-*   loses it outright. That is not hypothetical - it is why
-*   `yaml-draios-sysdig-string-url-change` scored `algorithm_cost 0 / human_cost 0` for a file in
-*   which six URLs changed. See `ASTNodeMetadata::owned_text_hash` for how widespread gap-owned
-*   text is (every XML attribute value, every CSS numeric and colour literal, every Rust comment).
-*   Priced at `COST_UPDATE`, exactly as the equivalent leaf change would be.
-* - `Update` -> `COST_UPDATE`, `Delete` -> `COST_DELETE`, `Insert` -> `COST_INSERT`: single-node
-*   costs, matching `UnitCostModel::del`/`ins`/`ren`'s leaf-rename case exactly.
-* - `DeleteWithChildren`/`InsertWithChildren` -> `COST_DELETE`/`COST_INSERT` times `subtree_size`:
-*   these operations fold an entire subtree into one entry (no separate per-descendant entries),
-*   so the entry's own cost has to stand in for all of them at once. Not currently produced by any
-*   pipeline pass (`add_delete_mappings`/`add_insert_mappings` always recurse to one entry per
-*   node - see `apted::common`), but a human-authored mapping uses them routinely, so this must be
-*   handled correctly for `human_mapping_cost` even though `diff_cost` should never hit this arm in
-*   practice today.
+* `MatchButNotIdentical` is free, since its descendants' differences carry their own entries,
+* unless `owned_text_changed`: text a node owns in the gaps between its children has no
+* descendant entry, so it costs `COST_UPDATE` like the equivalent leaf change.
 */
 pub fn operation_cost(
     operation: &ASTMappingOperation,
@@ -89,14 +51,7 @@ pub fn operation_cost(
     }
 }
 
-/**
-* Total cost of a finished `ASTDiff`: sums `operation_cost` over every entry in `diff.mapping`: one
-* entry per node (either half of a matched pair, or a lone delete/insert), so this is a straight
-* sum with no double-counting.
-*
-* `before_metadata`/`after_metadata` supply subtree sizes for `*WithChildren` operations - see
-* `operation_cost`'s doc comment on why those should never actually appear here today.
-*/
+/// Total cost of a finished `ASTDiff`: `operation_cost` summed over its entries, one per node.
 pub fn diff_cost(
     diff: &ASTDiff,
     before_metadata: &ASTMetadata,
@@ -118,8 +73,7 @@ pub fn diff_cost(
                     .unwrap_or(1),
                 _ => 1,
             };
-            // Only meaningful for a matched pair; `before_id`/`after_id` is 0 on the missing side
-            // of a lone delete/insert, and a lookup for it simply finds nothing.
+            // Id 0 on a delete/insert's missing side finds nothing.
             let owned_text_hash = |metadata: &ASTMetadata, id: usize| {
                 metadata.node_info.get(&id).map(|info| info.owned_text_hash)
             };
@@ -194,9 +148,6 @@ mod tests {
     #[test]
     fn diff_cost_sums_single_node_entries_without_double_counting() {
         let mut diff = ASTDiff::default();
-        // A matched pair (1 <-> 1), one real content update elsewhere (2 <-> 2), one delete (3),
-        // one insert (4). Matches `add_delete_mappings`/`add_insert_mappings`'s "one entry per
-        // node" shape.
         diff.add_mapping(1, 1, mapping(ASTMappingOperation::Identical));
         diff.add_mapping(2, 2, mapping(ASTMappingOperation::Update));
         diff.add_mapping(3, 0, mapping(ASTMappingOperation::Delete));
@@ -226,12 +177,8 @@ mod tests {
         );
     }
 
-    /// A matched pair whose *own* text differs must not be free. `MatchButNotIdentical` is priced
-    /// at 0 because a matched internal node's differences show up as separate entries for its
-    /// differing descendants - which is exactly wrong for a node owning text in the gaps its
-    /// children don't cover, since no such descendant entry exists. Concretely: this is why
-    /// `yaml-draios-sysdig-string-url-change` reported a total cost of 0 for a file in which six
-    /// URLs changed.
+    /// Text a node owns between its children has no descendant entry to carry its cost
+    /// (`yaml-draios-sysdig-string-url-change`).
     #[test]
     fn match_but_not_identical_charges_for_a_node_s_own_changed_text() {
         assert_eq!(
@@ -251,8 +198,7 @@ mod tests {
         );
     }
 
-    /// `diff_cost` must derive that flag from the nodes rather than be told it, so that a
-    /// gap-owning pair cannot contribute nothing on the whole-pipeline path.
+    /// `diff_cost` derives the flag from the nodes rather than being told it.
     #[test]
     fn diff_cost_charges_a_gap_owning_matched_pair() {
         let node = |owned_text_hash: u64| crate::code::ASTNodeMetadata {

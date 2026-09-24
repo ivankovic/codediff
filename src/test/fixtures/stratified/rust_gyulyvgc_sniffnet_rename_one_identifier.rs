@@ -30,12 +30,8 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // The right-anchored alternative painting was removed: inside a node whose value we read
-    // character by character, ground truth anchors an ambiguous add/delete LEFT.
-    // `intra_node_update_ranges` takes the common prefix first and the suffix of the remainder, so
-    // it is right-anchored by construction and still emits the dropped spelling. This residual is
-    // that disagreement, and it is expected - it is the price of the rule, not a regression. See
-    // TODO.md for why the renderer was not flipped to match (it would fix 4 fixtures and break 12).
+    // Ground truth anchors an ambiguous add/delete inside a value LEFT; `intra_node_update_ranges`
+    // is right-anchored by construction. An expected residual, the price of that rule.
     assert_matches_human_painting_within_limit("rust-gyulyvgc-sniffnet-rename-one-identifier", 0.05)
 }
 

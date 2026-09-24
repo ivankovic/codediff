@@ -17,18 +17,12 @@
  */
 //! What the server sends the page: a computed diff, and a re-highlighting of one.
 //!
-//! **Every column here is a UTF-16 code unit, not a byte.** The rest of this crate works in bytes
-//! (`diff::text_range::SourceColumn`, and `tui::json_output` says so in its schema), because that
-//! is what tree-sitter reports and what a terminal renderer slices by. A browser indexes a string
-//! by UTF-16 code units, and `model.js` does every cursor step, range lookup and paint against
-//! the string it holds - so the conversion happens once, here, against the real line text, rather
-//! than on every lookup in JavaScript. `tui::json_output` deliberately does *not* do this (Neovim
-//! consumes bytes directly); the two outputs serve different consumers and stay different.
+//! **Every column here is a UTF-16 code unit, not a byte.** The rest of the crate works in bytes,
+//! as tree-sitter does; a browser indexes strings in UTF-16, so the conversion happens once, here.
+//! `tui::json_output` stays in bytes on purpose: Neovim consumes bytes.
 //!
-//! Syntax highlighting rides along as colour spans per line, from the same syntect setup
-//! `tui::widgets::code_viewer` uses (same syntax set, same theme set, same language table), so
-//! the browser paints what the terminal would have. Only the foreground colour is carried, which
-//! is also all the TUI applies.
+//! Highlighting comes as per-line foreground colour spans from the TUI's own syntect setup, so the
+//! browser paints what the terminal would.
 
 use serde::Serialize;
 use std::path::Path;
@@ -46,10 +40,8 @@ use crate::tui::widgets::code_viewer::{language_to_syntect, syntax_set, theme_se
 /// reaches for when the configured name is unknown.
 pub const DEFAULT_SYNTAX_THEME: &str = "base16-ocean.dark";
 
-/// The UTF-16 index of `byte_column` in `line`. A column past the end of the line (a range that
-/// runs to the row's end, or the `(next row, 0)` normalization landing on an absent row) clamps
-/// to the line's length; one inside a multi-byte character rounds down to that character's start,
-/// the way every renderer in this crate does.
+/// The UTF-16 index of `byte_column` in `line`. Past the end clamps to the line's length; inside a
+/// multi-byte character rounds down to its start, as every renderer in this crate does.
 pub fn utf16_column(line: &str, byte_column: usize) -> usize {
     let end = floor_char_boundary(line, byte_column.min(line.len()));
     line[..end].encode_utf16().count()
@@ -193,9 +185,7 @@ fn resolve_theme(name: Option<&str>) -> (String, &'static syntect::highlighting:
     (chosen.to_string(), theme)
 }
 
-/// The page colours of a theme. syntect themes without an explicit background or foreground
-/// (there are none among the bundled ones, but the fields are optional) fall back to the
-/// conventional dark-on-light pair rather than to nothing.
+/// The page colours of a theme; a theme without them falls back to dark-on-light.
 pub fn syntax_payload(name: Option<&str>) -> SyntaxPayload {
     let (theme, resolved) = resolve_theme(name);
     SyntaxPayload {
@@ -213,11 +203,8 @@ pub fn syntax_payload(name: Option<&str>) -> SyntaxPayload {
     }
 }
 
-/// Highlights `lines` the way `CodeViewerWidget::highlight_lines` does - same syntax lookup, same
-/// theme fallback, foreground only - and returns one span list per line, in UTF-16 columns.
-/// Adjacent runs of the same colour are merged, which shrinks the payload several-fold on real
-/// code without changing what is painted. A language syntect has no definition for (or none at
-/// all) yields empty span lists, and the page paints the theme's plain foreground.
+/// Highlights `lines` as `CodeViewerWidget::highlight_lines` does, one span list per line in UTF-16
+/// columns, with adjacent same-colour runs merged. A language syntect lacks yields empty lists.
 pub fn highlight(
     lines: &[&str],
     language: Option<Language>,
@@ -257,9 +244,8 @@ pub fn highlight(
         .collect()
 }
 
-/// The language a side is shown as. `/dev/null` (empty, no extension) takes the other side's,
-/// exactly as `tui::app::substitute_missing_language` re-parses it - the diff was computed that
-/// way, so the panel should say so too.
+/// The language a side is shown as. `/dev/null` takes the other side's, as
+/// `tui::app::substitute_missing_language` parses it.
 pub fn side_language(path: &Path, contents: &str, other: Option<Language>) -> Option<Language> {
     match language_for_path_and_content(path, contents) {
         None if contents.is_empty() => other,

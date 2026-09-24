@@ -16,26 +16,13 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-//! Driver for the introductory paper's RQ1 ("what percentage of real-world source-code changes
-//! can a single, whole-tree tree-edit-distance computation complete within a one-second budget?").
+//! Driver for the introductory paper's RQ1: what share of real changes can a single whole-tree
+//! tree-edit-distance computation finish within a one-second budget?
 //!
-//! Reads one or more `sample_code_pairs`-format CSVs, extracts each pair's before/after blob
-//! content directly (like `benchmark_diff_pairs.rs`), then times out `apted_only_worker` - a
-//! separate process that runs *only* `apted::for_roots(..., Algorithm::Apted, ...)`, none of
-//! CodeDiff's 7-phase pipeline - at exactly `--timeout-secs` (default 1s) per pair, via poll +
-//! `kill()` rather than a thread-abandon timeout. See `apted_only_worker.rs`'s own doc comment for
-//! why a killable subprocess, not a thread, is the correct primitive for this specific experiment:
-//! most inputs are expected to exceed the budget by design, so a thread-abandon approach would
-//! accumulate unboundedly running background computations instead of freeing their memory.
-//!
-//! Every pair is attempted, regardless of size - no `max_combined_nodes` skip filter. Skipping
-//! large pairs would bias the headline RQ1 number exactly where the answer is most interesting
-//! (the large tail), and the subprocess `kill()` already bounds resource use, which is the whole
-//! reason this binary uses a subprocess instead of an in-process call.
-//!
-//! LOC/byte/AST-node sizes are computed by this driver, not by the worker, so they are available
-//! for every pair (including ones the worker times out on) - the same design `benchmark_diff_pairs`
-//! uses for its own `ast_nodes_before`/`after` columns.
+//! Runs `apted_only_worker` on every pair of `sample_code_pairs` CSVs, killing it at
+//! `--timeout-secs`. No pair is skipped for size: that would bias RQ1 exactly in the large tail,
+//! and the `kill()` already bounds resource use. Sizes are computed here, not in the worker, so
+//! they exist for pairs that time out.
 
 use anyhow::{Context, Result, anyhow};
 use clap::Parser;
@@ -53,10 +40,8 @@ use codediff::stats::count_nodes;
 
 #[derive(Parser)]
 struct Args {
-    /// One or more CSVs produced by `sample_code_pairs` (language, size_bucket, repository,
-    /// commit, path, old_path). Multiple values, not a merged file, so per-language CSVs (this
-    /// corpus's actual on-disk shape - see research/data/samples/sampled_code_pairs_*.csv) can be passed
-    /// directly without a separate concatenation step.
+    /// One or more CSVs produced by `sample_code_pairs`, e.g. the per-language
+    /// research/data/samples/sampled_code_pairs_*.csv.
     #[arg(long, required = true, num_args = 1..)]
     csv: Vec<PathBuf>,
 
@@ -68,14 +53,12 @@ struct Args {
     #[arg(long)]
     output: PathBuf,
 
-    /// Path to the apted_only_worker binary. Defaults to the sibling binary next to this one
-    /// (same target/release or target/debug directory), so the common case needs no flag.
+    /// Path to the apted_only_worker binary [default: next to this binary].
     #[arg(long)]
     worker_bin: Option<PathBuf>,
 
-    /// Hard per-pair budget in seconds. The worker process is killed if it has not exited by the
-    /// time this elapses; the reported `elapsed_ms` for a successful pair comes from the worker's
-    /// own `Instant` measurement (parse/spawn overhead excluded), not this driver's poll loop.
+    /// Hard per-pair budget in seconds; the worker is killed when it elapses. Reported times are
+    /// the worker's own, excluding spawn and parse.
     #[arg(long, default_value_t = 1.0)]
     timeout_secs: f64,
 
@@ -136,16 +119,12 @@ fn blob_content(repo: &Repository, treeish: &str, path: &str) -> Result<Vec<u8>>
     codediff::stats::git::blob_bytes(repo, &tree, Path::new(path))
 }
 
-/// Runs `apted_only_worker` on `before_text`/`after_text`, killing it if it has not exited after
-/// `timeout`. Returns `(status, elapsed_ms)` - `elapsed_ms` is the worker's own self-reported
-/// timing, `None` unless status is "ok".
+/// Runs `apted_only_worker`, killing it after `timeout`. Returns `(status, elapsed_ms)`, with
+/// `elapsed_ms` the worker's self-reported time, `None` unless status is "ok".
 ///
-/// A worker that dies because the kernel's delta matrix (one cell per node pair, so hundreds of
-/// gigabytes for a file of a few hundred thousand nodes) cannot be allocated is "out_of_memory",
-/// told apart from "worker_error" by Rust's own abort message on its stderr. It is as much a
-/// non-completion as a timeout - whole-tree edit distance on that pair does not fit the machine,
-/// let alone the second - and `apted_only_report.py` counts it in RQ1's denominator, where
-/// "worker_error" is excluded as a harness fault.
+/// "out_of_memory" (the delta matrix could not be allocated, recognised by Rust's abort message)
+/// is kept apart from "worker_error": it is a non-completion like a timeout, and
+/// `apted_only_report.py` counts it in RQ1's denominator while excluding harness faults.
 fn run_worker(
     worker_bin: &Path,
     before_text: &str,

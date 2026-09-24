@@ -23,11 +23,9 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // First baseline, a measured gap and not a regression: the added `it('To do', () => {});`
-    // carries an arrow function byte-identical to the `() => {}` that was already there, so
-    // IdenticalHashOfAncestor anchors the outer arrow's punctuation onto the newly inserted inner
-    // copy. The known phase-1 hash-matching preference for the byte-identical inner copy on a wrap;
-    // 14 of the 23 are visible.
+    // The added `it('To do', () => {});` carries an arrow function byte-identical to the existing
+    // `() => {}`, so `IdenticalHashOfAncestor` anchors the outer arrow's punctuation onto the new
+    // inner copy: phase-1 hash matching preferring the identical inner copy on a wrap.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "tsx-mui-material-ui-add-to-empty-block",
         23,
@@ -37,10 +35,7 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // After `RenderOptions::paint_displaced_moves` stopped `MINIMAL` painting a span that kept its
-    // own text and its own place and shifted only because of an edit before it: minimal 29.808% ->
-    // 20.192%. The option is off under `FULL`, which this fix leaves byte-identical at 27.885%, so
-    // `FULL` sets the limit now.
+    // `FULL` sets the limit.
     assert_matches_human_painting_within_limit("tsx-mui-material-ui-add-to-empty-block", 27.90)
 }
 

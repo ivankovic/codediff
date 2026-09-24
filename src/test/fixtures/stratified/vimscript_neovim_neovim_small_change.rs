@@ -30,9 +30,7 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // After the single 'Only one solution' painting was split into 'Minimal' and 'Full': minimal
-    // 0.103% -> 0.000%, full unchanged at 0.000%. Minimal now leaves the leading space of `
-    // iskeyword<` out of the inserted run, which is what codediff already rendered.
+    // `Minimal` leaves the leading space of ` iskeyword<` out of the inserted run.
     assert_matches_human_painting_within_limit("vimscript-neovim-neovim-small-change", 0.0)
 }
 

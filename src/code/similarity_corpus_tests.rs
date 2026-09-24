@@ -19,12 +19,9 @@
 //! [`crate::code::similarity`] measured against two real corpus fixtures, rather than against
 //! synthetic sets of integers as its own unit tests are.
 //!
-//! Both fixtures are here because they are the two halves of the question the sketch was built to
-//! answer, and a synthetic test cannot stand in for either: `yaml-draios-sysdig-string-url-change`
-//! is six near-identical URLs permuted inside one ordered `flow_sequence` - the exact shape that
-//! defeated the 2026-08-17 crossed-sibling repair, whose `sequence_edit_cost` estimator could only
-//! see "identical" or "not identical" - and `css-wordpress-reformat` is the near-miss the equality
-//! hashes have to call "different": two declarations separated by one added `;`.
+//! `yaml-draios-sysdig-string-url-change` permutes six near-identical URLs in one ordered
+//! `flow_sequence`; `css-wordpress-reformat` has the near miss the equality hashes can only call
+//! "different".
 
 #[cfg(test)]
 mod tests {
@@ -44,8 +41,7 @@ mod tests {
                 best = info.children.clone();
             }
         }
-        // `node_info` is a hash map and ties above are broken arbitrarily; document order is
-        // restored here so the returned indices mean something stable.
+        // `node_info` is a hash map, so restore document order for stable indices.
         best.sort_by_key(|c| metadata.node_info[c].start_byte);
         best
     }
@@ -76,8 +72,7 @@ mod tests {
     fn sketch_recovers_a_permutation_of_near_identical_yaml_urls() -> Result<()> {
         let (before, after, kinds) = load("yaml-draios-sysdig-string-url-change")?;
 
-        // The fixture permutes six URLs; the file is otherwise unchanged, so every `flow_node`
-        // has exactly one true counterpart and the sketch should point straight at it.
+        // Only the order changed, so each `flow_node` has exactly one true counterpart.
         let expected: Vec<(usize, usize)> = vec![(1, 3), (3, 9), (5, 1), (7, 5), (9, 11), (11, 7)];
         for (b, a) in expected {
             assert_eq!(kinds[b], "flow_node", "fixture shape changed at index {b}");
@@ -95,10 +90,8 @@ mod tests {
             );
             assert_eq!(scores[a], 1.0, "true counterparts are byte-identical here");
 
-            // The margin matters as much as the argmax: a decision rule needs the runner-up to be
-            // clearly worse, not merely worse. Measured 2026-08-18 at 1.00 vs 0.33 - the URLs
-            // share their quote tokens and nothing else, since tree-sitter-yaml keeps the string
-            // body in gap text rather than in a child node.
+            // A decision rule needs the runner-up clearly worse, not merely worse. The URLs
+            // share only their quote tokens (tree-sitter-yaml keeps the body in gap text).
             let runner_up = scores
                 .iter()
                 .enumerate()
@@ -118,18 +111,14 @@ mod tests {
         let (before, after, kinds) = load("css-wordpress-reformat")?;
         assert_eq!(kinds[1], "declaration", "fixture shape changed");
 
-        // `margin-top: ...` vs `margin-bottom: ...` - same property shape, different property,
-        // one differing token out of a handful. Every Merkle hash in `code::hash` reports only
-        // "different"; the sketch has to report "mostly the same" for the crossed-sibling repair
-        // this was built for to have anything to decide on.
+        // `margin-top: ...` vs `margin-bottom: ...`: one differing token out of a handful.
         let near_miss = before[3].jaccard(&after[2]);
         assert!(
             (0.5..1.0).contains(&near_miss),
             "near-miss declarations scored {near_miss}, wanted clearly-similar-but-not-equal"
         );
 
-        // ...while an unrelated declaration in the same block must stay far below it, or the
-        // measure is just reporting "both are declarations".
+        // Far below, or the measure only reports "both are declarations".
         let unrelated = before[1].jaccard(&after[2]);
         assert!(
             unrelated < near_miss * 0.5,

@@ -21,13 +21,10 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // An `if let Some(x) = self.foo() { ... }` is rewritten to a plain `if` with an internal
-    // `let_declaration` (the `let_condition` pattern is flattened out of the condition and into the
-    // block). The human ground truth wants the shared inner content matched across that
-    // restructure, but codediff (reason `APTED("qualified_name")`) treats it as a wholesale
-    // delete-and-reinsert of the changed region instead. Same "container/structure changed, content
-    // mostly persists" wall family as `java_add_exception_handling` and `kotlin_refactor_function`
-    // - not attempted here.
+    // `if let Some(x) = self.foo() { ... }` becomes a plain `if` with a `let` inside the block.
+    // The human matches the shared inner content across; `APTED("qualified_name")` deletes and
+    // reinserts it. The "structure changed, content persists" wall of
+    // `java_add_exception_handling` and `kotlin_refactor_function`.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "rust-zed-workspace-tasks",
         117,

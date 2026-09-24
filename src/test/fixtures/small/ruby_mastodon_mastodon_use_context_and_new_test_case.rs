@@ -21,9 +21,8 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // One multi-map group's declared MatchButNotIdentical operation doesn't match codediff's own
-    // Identical classification for the pair it actually picks (do_block and its body_statement).
-    // Any counts above describe the older, larger residual.
+    // A multi-map group declares `MatchButNotIdentical`, but codediff's pair (`do_block` and its
+    // `body_statement`) is `Identical`.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "ruby-mastodon-mastodon-use-context-and-new-test-case",
         8,

@@ -23,9 +23,7 @@ use anyhow::Result;
 fn mapping() -> Result<()> {
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "csharp-jellyfin-add-function",
-        // 14/6 became 55/36 when the ground truth gained all-to-all groups: forty of the
-        // mismatches are group members a one-to-one output cannot reach, the N:M floor. The
-        // largest such floor in the corpus so far.
+        // Includes all-to-all group members a one-to-one output cannot reach: the N:M floor.
         55,
         36,
     )

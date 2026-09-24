@@ -51,9 +51,7 @@ pub fn move_selection(selected: &mut usize, delta: i32, len: usize) {
     }
 }
 
-/// Renders a bordered, cyan-highlighted, single-column list popup with a dim hint line below it:
-/// the shared visual scaffold behind `ThemeDialog` and `FileDialog`'s `draw`, which differ only in
-/// their title and how each row is labeled.
+/// The shared list-popup scaffold behind `ThemeDialog` and `FileDialog`.
 pub fn render_list_dialog(
     frame: &mut Frame,
     area: Rect,
@@ -85,41 +83,17 @@ pub fn render_list_dialog(
 /// A visual and interactive element of the TUI.
 pub trait Component {
     /// Register an action handler that can send actions for processing if necessary.
-    ///
-    /// # Arguments
-    ///
-    /// * `tx` - An unbounded sender that can send actions.
-    ///
-    /// # Returns
-    ///
-    /// * [`Result<()>`] - An Ok result or an error.
     fn register_action_handler(&mut self, _tx: UnboundedSender<Action>) -> Result<()> {
         Ok(())
     }
 
     /// Initialize the component with a specified area if necessary.
-    ///
-    /// # Arguments
-    ///
-    /// * `area` - Rectangular area to initialize the component within.
-    ///
-    /// # Returns
-    ///
-    /// * [`Result<()>`] - An Ok result or an error.
     fn init(&mut self, _area: Rect) -> Result<()> {
         Ok(())
     }
 
-    /// Handle an incoming terminal event and produce an action if necessary.
-    ///
-    /// # Arguments
-    ///
-    /// * `event` - The event to be processed, or `None` if the caller has nothing for this
-    ///   component this tick.
-    ///
-    /// # Returns
-    ///
-    /// * [`Result<Option<Action>>`] - An action to be processed or none.
+    /// Handle an incoming terminal event and produce an action if necessary. `None` means the
+    /// caller has nothing for this component this tick.
     fn handle_events(&mut self, event: Option<Event>) -> Result<Option<Action>> {
         let Some(event) = event else {
             return Ok(None);
@@ -133,53 +107,20 @@ pub trait Component {
     }
 
     /// Handle key events and produce actions if necessary.
-    ///
-    /// # Arguments
-    ///
-    /// * `key` - A key event to be processed.
-    ///
-    /// # Returns
-    ///
-    /// * [`Result<Option<Action>>`] - An action to be processed or none.
     fn handle_key_event(&mut self, _key: KeyEvent) -> Result<Option<Action>> {
         Ok(None)
     }
 
     /// Handle mouse events and produce actions if necessary.
-    ///
-    /// # Arguments
-    ///
-    /// * `mouse` - A mouse event to be processed.
-    ///
-    /// # Returns
-    ///
-    /// * [`Result<Option<Action>>`] - An action to be processed or none.
     fn handle_mouse_event(&mut self, _mouse: MouseEvent) -> Result<Option<Action>> {
         Ok(None)
     }
 
-    /// Update the state of the component based on a received action. (REQUIRED)
-    ///
-    /// # Arguments
-    ///
-    /// * `action` - An action that may modify the state of the component.
-    ///
-    /// # Returns
-    ///
-    /// * [`Result<Option<Action>>`] - An action to be processed or none.
+    /// Update the state of the component based on a received action.
     fn update(&mut self, _action: Action) -> Result<Option<Action>> {
         Ok(None)
     }
 
-    /// Render the component on the screen. (REQUIRED)
-    ///
-    /// # Arguments
-    ///
-    /// * `f` - A frame used for rendering.
-    /// * `area` - The area in which the component should be drawn.
-    ///
-    /// # Returns
-    ///
-    /// * [`Result<()>`] - An Ok result or an error.
+    /// Render the component on the screen.
     fn draw(&mut self, frame: &mut Frame, area: Rect) -> Result<()>;
 }

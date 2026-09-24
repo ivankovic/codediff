@@ -21,9 +21,7 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // A limit above the measured number is a test that cannot fail, which is what
-    // `the_quality_baseline_accuracy_columns_are_a_projection_of_the_stub_limits` exists to catch -
-    // the baseline records the measurement, so the stub has to record it too.
+    // Residual not yet examined.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "kotlin-nextcloud-a-few-small-removals",
         2,

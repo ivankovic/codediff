@@ -19,44 +19,21 @@ use crate::code::Code;
 use crate::diff::PassCtx;
 use crate::diff::{ASTDiff, ASTMapping, ASTMappingReason};
 
-/// Terminal completeness sweep: give every node still carrying no decision at all an explicit
-/// `Delete` (before side) or `Insert` (after side).
+/// Terminal completeness sweep: every node still without a decision gets an explicit `Delete` or
+/// `Insert`, so a consumer can tell "inserted" from "not considered".
 ///
-/// Every other pass in the pipeline is free to leave a node alone when it has nothing confident to
-/// say about it. That is the right default for a *matching* pass, but it means the finished
-/// mapping could come back partial, which is a different thing from "this node was deleted": a
-/// consumer walking the after tree found no entry for a genuinely new node and had no way to
-/// distinguish "inserted" from "not considered".
+/// The ordinary source of such nodes is a wrap (typescript-add-error-handling): the new wrapper
+/// contains matched descendants, so it is not a maximal unmatched root for the Myers fallback, and
+/// `solve_bottom_up_propagation` declines it by design. Never pairs anything, so it is safe to run
+/// unconditionally last.
 ///
-/// The gap is not exotic - it is the ordinary shape of a wrap. In
-/// `typescript-add-error-handling` (2026-08-17), two statements get wrapped in a new `try`/`catch`:
-/// the statements themselves match straight through, but the new `try_statement` and its
-/// `statement_block`, and the `program` root above them, all came out with **no entry at all**.
-/// The terminal Myers fallback only ever assigns decisions to *maximal* unmatched roots
-/// (`resolve_residual_forest_via_myers_lcs` -> `maximal_unmatched_roots`), and neither the new
-/// wrapper (whose subtree contains matched descendants, so it is not maximal) nor an unmatched
-/// ancestor of matched children is one. `solve_bottom_up_propagation` cannot rescue them either:
-/// its rule 3 deliberately requires every child to have matched into the *same direct* after-parent,
-/// and a wrap is precisely the case where they didn't. 10 fixtures corpus-wide were affected,
-/// 81 nodes in total.
-///
-/// Deliberately not a matching heuristic: it never pairs anything, so it cannot make a wrong guess
-/// or take a partner away from a later pass - there is no later pass. It only converts "no
-/// decision" into the decision the absence already implied, which is what makes it safe to run
-/// unconditionally as the last thing in the pipeline.
-///
-/// `Delete`/`Insert`, never the `WithChildren` variants: a node reaching this sweep may well have
-/// matched descendants (the wrap case above is exactly that), and `DeleteWithChildren` would claim
-/// the whole subtree went away. Cost is this node alone for the same reason - its children carry
-/// their own entries and their own costs.
+/// Plain `Delete`/`Insert` with this node's own cost, never the `WithChildren` variants: such a
+/// node may well have matched descendants.
 pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
     let (before, after, node_cache) = (ctx.before, ctx.after, ctx.node_cache);
     match_roots_if_unresolved(before, after, diff);
 
-    // Sorted for determinism: `NodeCache`'s maps are `FxHashMap`s, and while the mappings added
-    // here are independent of each other (each node's decision depends only on whether that node
-    // is absent, never on what this sweep did to another node), iterating in a stable order keeps
-    // `mapping`'s insertion sequence reproducible run to run.
+    // Sorted so `mapping`'s insertion sequence is reproducible run to run.
     let mut unresolved_before: Vec<usize> = node_cache
         .before
         .keys()
@@ -88,23 +65,11 @@ pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
     }
 }
 
-/// Pair the two trees' root nodes when nothing else has, before the delete/insert sweep above gets
-/// to them.
+/// Pairs the two roots when nothing else has: two versions of one file always correspond, and a
+/// top-level wrap defeats both hash descent and propagation.
 ///
-/// The roots of two versions of one file always correspond - that is what "two versions of one
-/// file" means - so this is the one pairing that needs no evidence beyond both roots still being
-/// unclaimed. They *usually* are claimed: `solve_hash_descent` matches them outright when the file
-/// is unchanged, and propagation reaches them when the edit is contained. What defeats both is a
-/// wrap at top level (`typescript-add-error-handling`: statements moved inside a new `try`, so the
-/// root's children matched into two *different* after-parents and propagation's same-direct-parent
-/// rule correctly declined). Without this, the sweep below would then declare the file's own root
-/// deleted and a new one inserted, which is never what happened.
-///
-/// Cost 0 and `MatchButNotIdentical` rather than a real edit-distance computation: `UnitCostModel::
-/// ren` already prices a same-kind internal-node pairing at 0 (children carry their own costs), and
-/// running APTED over two whole files to rediscover that would cost more than the entire rest of
-/// the pipeline. If the roots' subtrees were identical, hash descent would have matched them long
-/// before this point, so "matched but not identical" is the only state left to record.
+/// Cost 0 and `MatchButNotIdentical` without APTED: `UnitCostModel::ren` prices a same-kind
+/// internal pairing at 0, and identical roots would already have been hash-matched.
 fn match_roots_if_unresolved(before: &Code, after: &Code, diff: &mut ASTDiff) {
     let (Some(before_ast), Some(after_ast)) = (before.ast.as_ref(), after.ast.as_ref()) else {
         return;
@@ -130,8 +95,7 @@ mod tests {
     use crate::diff::NodeCache;
     use crate::diff::{ASTMappingOperation, Diff};
 
-    /// The wrap that motivated this pass: statements move inside a new `try` block. The wrapper
-    /// nodes and the root above them must come out as explicit decisions, not as absences.
+    /// Statements moved inside a new `try`: the wrapper must be an explicit insert.
     #[test]
     fn wrapper_nodes_left_undecided_by_matching_get_explicit_inserts() {
         let before = Code::from_string("const x = f();\nlog(x);\n", &Language::TypeScript);
@@ -186,7 +150,6 @@ mod tests {
         );
     }
 
-    /// The whole point of the sweep: no node of either tree is left without a decision.
     #[test]
     fn every_node_of_both_trees_ends_up_with_a_decision() {
         let before = Code::from_string(

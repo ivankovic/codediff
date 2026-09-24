@@ -21,12 +21,8 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // Resolved by `apted::prematch_unique_named_locals` - `group` ("shift-due-to-insertion":
-    // `group="${args[4]}"` shifts to `group="${args[5]}"` when a new `powershell="${args[4]}"` line
-    // is inserted right before it) is now pre-matched by variable name before the file-root
-    // `final_pass` call gets a chance to prefer the cheaper-but-wrong by-position pairing. See that
-    // function's doc comment and `TODO.md`'s "shift-due-to- insertion" entry for the full
-    // cost-model root cause this closes.
+    // Pins `apted::prematch_unique_named_locals`: `group="${args[4]}"` shifts to `${args[5]}` under
+    // an inserted line and is pre-matched by name before `final_pass` pairs by position.
     test::helper::human_mapping::assert_matches_human_mapping(
         "shellscript-ansible-ansible-add-variable-and-string-expansion",
     )

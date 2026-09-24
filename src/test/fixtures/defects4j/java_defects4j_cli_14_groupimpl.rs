@@ -23,10 +23,9 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // An `if_statement` is inserted ahead of an existing one inside the same `for` body, so the
-    // human pairs before `if_statement:1` with after `if_statement:2`; codediff's `qualified_name`
-    // pass keeps the ordinals and reads the original as deleted. The same-kind-sibling rotation
-    // family - one mis-pairing, counted once per leaf beneath it.
+    // An `if_statement` is inserted ahead of an existing one, so the human pairs before
+    // `if_statement:1` with after `:2`; `qualified_name` keeps the ordinals. The same-kind-sibling
+    // rotation family, counted per leaf.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "java-defects4j-cli-14-groupimpl",
         29,

@@ -16,28 +16,17 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-// Split out of benchmark_other.rs (the `git`-cluster functions) purely to shrink that
-// file's visible size - no behavior change.
-
 use anyhow::{Context, Result, bail};
 use codediff::code::Code;
 use std::process::Command;
 
 use super::write_temp_pair;
 
-/// Neutralizes the user's git configuration for a child process that will run `git` - directly
-/// (`git_line_labels`) or indirectly (`bdiff_line_labels`, since BDiff shells out to
-/// `git diff --no-index ... --unified=0 --numstat` for its raw change detection).
-///
-/// This is not defensive tidiness, it is a fix for an observed silent-wrong-answer (2026-08-23).
-/// This project's own README recommends configuring codediff as git's external diff driver, and
-/// with `diff.external=codediff` set, git emits codediff's output instead of a unified diff.
-/// `--no-ext-diff` suppresses that for our own invocations, but nothing can suppress it inside
-/// BDiff's hard-coded command string - so BDiff parsed zero `@@` headers and returned a **0-entry
-/// edit script with exit status 0**, which scores as "this tool thinks nothing changed" rather
-/// than as a failure. Pointing both config files at /dev/null removes the whole class: no
-/// `diff.external`, no `diff.algorithm` overriding the flag we pass, no `core.autocrlf` rewriting
-/// line endings under the measurement.
+/// Neutralizes the user's git configuration for a child that runs `git`, directly or through
+/// BDiff. BDiff's hard-coded `git diff` cannot take `--no-ext-diff`, so a user's
+/// `diff.external=codediff` makes it return an empty edit script that scores as "nothing changed"
+/// rather than as a failure. Ignoring the config also stops `diff.algorithm` and `core.autocrlf`
+/// from altering the measurement.
 pub(crate) fn git_env(command: &mut Command) -> &mut Command {
     command
         .env("GIT_CONFIG_GLOBAL", "/dev/null")
@@ -48,21 +37,9 @@ pub(crate) fn git_env(command: &mut Command) -> &mut Command {
 /// `(before_touched, after_touched)` from `git diff --unified=0`, for one of git's four
 /// `--diff-algorithm` values.
 ///
-/// `--unified=0` so every hunk header describes exactly the changed lines with no context, and the
-/// header alone carries everything needed - no need to read the body. A header is
-/// `@@ -N,K +M,L @@`, where a missing `,K` means a count of 1.
-///
-/// **The `,0` case is the whole reason this parses headers by hand rather than counting `-`/`+`
-/// lines.** For a pure insertion git writes `@@ -N,0 +M,L @@`: `N` there is the line *before
-/// which* the insertion lands, and it is not itself touched. Treating it as a touched line shifts
-/// the entire before-side label vector by one on every insertion-only hunk, which produces
-/// completely plausible mismatch rates that are all quietly wrong. A zero count contributes no
-/// lines; a count of `K > 0` contributes lines `N ..= N + K - 1` (1-indexed, as git writes them).
-///
-/// Cross-checked against `unix_diff_line_labels`: GNU diffutils and git's libxdiff are separate
-/// implementations of the same Myers family, so `git_myers` and `unix_diff` must agree on
-/// essentially every fixture. `git_myers_agrees_with_unix_diff` in this file's tests asserts that,
-/// and a divergence there means this parser is broken, not that a difference was discovered.
+/// Only the `--unified=0` hunk headers `@@ -N,K +M,L @@` are read (a missing `,K` means 1). In the
+/// `,0` case `N` is an anchor, not a touched line; counting it shifts every insertion-only hunk by
+/// one and still yields plausible-looking rates.
 pub(crate) fn git_line_labels(
     algorithm: &str,
     before: &Code,
@@ -86,8 +63,7 @@ pub(crate) fn git_line_labels(
         .arg(after_file.path())
         .output()
         .with_context(|| format!("running git diff --diff-algorithm={algorithm}"))?;
-    // `git diff --no-index` uses exit status 1 for "the files differ", which is the normal case
-    // here, and only >1 is a real failure.
+    // Exit status 1 means "the files differ"; only >1 is a failure.
     if output.status.code().is_none_or(|code| code > 1) {
         bail!(
             "git diff --diff-algorithm={algorithm} exited with {:?}: {}",
@@ -120,8 +96,6 @@ pub(crate) fn git_line_labels(
                 _ => continue,
             };
             for line_number in start..start + count {
-                // Headers are 1-indexed; a malformed or out-of-range number is ignored rather
-                // than panicking the whole corpus run on one fixture.
                 if let Some(slot) = line_number.checked_sub(1).and_then(|i| touched.get_mut(i)) {
                     *slot = true;
                 }

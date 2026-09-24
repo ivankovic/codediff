@@ -23,8 +23,7 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // No group is involved: three nodes inside one `switch` group's statements, where codediff
-    // inserts rather than matches across the edited case. An ordinary gap.
+    // Three nodes in one `switch` group that codediff inserts rather than matches.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "java-defects4j-closure-66-typecheck",
         3,

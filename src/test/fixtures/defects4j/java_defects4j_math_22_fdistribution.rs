@@ -23,10 +23,8 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // Clamped at 1/1; exact since Java gained `BOOLEAN_LITERAL_KINDS`. The one residual was the
-    // `return true` -> `return false` flip: the human pairs the two literals, and until then no
-    // pass could, because `true` and `false` are separate kinds in this grammar and nothing let
-    // them rename into each other.
+    // Pins Java's `BOOLEAN_LITERAL_KINDS`: `return true` -> `return false` pairs the two literals,
+    // which are separate kinds in this grammar.
     test::helper::human_mapping::assert_matches_human_mapping(
         "java-defects4j-math-22-fdistribution",
     )

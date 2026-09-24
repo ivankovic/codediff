@@ -23,32 +23,17 @@ use super::{Component, move_selection, render_list_dialog};
 use crate::diff::text::RenderOptions;
 use crate::tui::actions::Action;
 
-/// A hint line explaining every key this dialog answers to, drawn under the option list by
-/// `render_list_dialog` - the same scaffold `FileDialog` uses.
 const HINT: &str = "↑/↓ move  Space toggle  Enter apply  Esc cancel  1/2 presets";
 
-/// The `M` key's settings panel: one checkbox row per [`RenderOptions`] field, plus two preset
-/// shortcuts.
+/// The `M` key's settings panel: one checkbox row per [`RenderOptions`] field, plus two presets.
 ///
-/// Every toggle applies and persists immediately, so the diff behind the panel shows what the
-/// setting does while it is still open. That is what makes `Esc` restore the options the panel was
-/// opened with rather than merely closing it (see [`Self::initial`]): without it there is no way
-/// back from a mistaken keystroke, because the mistake is already on disk.
-///
-/// **`Enter` accepts and closes, `Esc` reverts and closes** - the same split `ThemeDialog` makes,
-/// which is the app's only other dialog that writes to the viewer while it is open. Until
-/// 2026-09-18 `Enter` was a second toggle key beside `Space` and nothing accepted, so the only
-/// ways out of the panel were `Esc`, which undid the visit, and `q`, which quit the application
-/// (it is handled globally, before the event reaches any dialog). `Space` remains the toggle.
-///
-/// The presets are on `1`/`2` rather than `m`/`f` for the same reason. The panel is opened with
-/// `M`, so binding lowercase `m` to [`RenderOptions::MINIMAL`] - every field off - would let
-/// pressing the opening key twice silently wipe the whole setting and persist the result. Digits
-/// cannot collide with the key that opens the panel.
+/// Every toggle applies and persists immediately, so the diff behind the panel previews it. That is
+/// why `Esc` reverts to [`Self::initial`] rather than merely closing, and `Enter` accepts - the same
+/// split `ThemeDialog` makes. The presets are on `1`/`2`, not `m`/`f`: the panel opens on `M`, and a
+/// doubled opening key must not wipe every field and persist that.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RenderOptionsDialog {
     options: RenderOptions,
-    /// What `options` was when the panel opened, for `Esc` to restore.
     initial: RenderOptions,
     selected: usize,
 }
@@ -62,8 +47,7 @@ impl RenderOptionsDialog {
         }
     }
 
-    /// The options this panel was opened with. `app.rs` restores these when the panel is
-    /// cancelled, since every change made inside it has already been applied and persisted.
+    /// The options this panel was opened with, which `app.rs` restores on cancel.
     pub fn initial(&self) -> RenderOptions {
         self.initial
     }
@@ -72,13 +56,7 @@ impl RenderOptionsDialog {
         self.options.options().len()
     }
 
-    /// Centered popup, sized to fit every option row plus the hint line - same centering formula
-    /// as `ThemeDialog::popup_area`.
-    ///
-    /// The width is the wider of the option rows and [`HINT`], rather than a constant: at 56 the
-    /// hint was cut off after `2: ful` and `Esc` - the one key a reader opens the panel not
-    /// knowing - was the half that vanished. Derived, so editing the hint cannot silently truncate
-    /// it again.
+    /// Centered, sized to every option row and the whole of [`HINT`].
     pub fn popup_area(&self, area: Rect) -> Rect {
         let width = (HINT.chars().count() as u16 + 2).max(56).min(area.width);
         let height = (self.row_count() as u16 + 3).min(area.height);
@@ -210,10 +188,7 @@ mod tests {
         );
     }
 
-    /// `Enter` accepts: it closes the panel and reports nothing to change, because every toggle
-    /// already applied itself on the way in. Until 2026-09-18 it was a second toggle key and no
-    /// key accepted at all, so `Esc` (which reverts) and `q` (which quits the application) were
-    /// the only ways out of the panel.
+    /// Every toggle has already applied itself, so accepting has nothing left to change.
     #[test]
     fn enter_accepts_and_changes_nothing_on_the_way_out() {
         let mut dialog = RenderOptionsDialog::new(RenderOptions::MINIMAL);
@@ -229,9 +204,7 @@ mod tests {
         );
     }
 
-    /// The panel opens on `M`, so a stray lowercase `m` inside it must do nothing: bound to
-    /// MINIMAL it would turn every field off, applied and persisted, before the user could
-    /// react.
+    /// Bound to MINIMAL, a doubled `M`/`m` would turn every field off and persist it.
     #[test]
     fn the_key_that_opens_the_panel_is_inert_inside_it() {
         let mut dialog = RenderOptionsDialog::new(RenderOptions::FULL);
@@ -257,10 +230,10 @@ mod tests {
         assert_eq!(dialog.options, RenderOptions::FULL);
     }
 
-    /// `Esc` after a change is the case that matters: the change is already on disk, so the panel
-    /// has to remember what it opened with for `app.rs` to put back. The test above passes
-    /// vacuously - nothing was changed before pressing Esc - so it cannot catch a lost `initial`.
+    /// The change is already on disk, so the panel must remember what it opened with. The test
+    /// above cannot catch a lost `initial`: nothing changed before its Esc.
     #[test]
+
     fn esc_after_a_change_still_reports_what_the_panel_opened_with() {
         let mut dialog = RenderOptionsDialog::new(RenderOptions::FULL);
 
@@ -280,5 +253,12 @@ mod tests {
             dialog.handle_key_event(key(KeyCode::Down)).unwrap();
         }
         assert_eq!(dialog.selected, dialog.row_count() - 1);
+    }
+
+    #[test]
+    fn popup_is_wide_enough_for_the_whole_hint() {
+        let dialog = RenderOptionsDialog::new(RenderOptions::FULL);
+        let popup = dialog.popup_area(Rect::new(0, 0, 200, 50));
+        assert!(popup.width as usize >= HINT.chars().count() + 2);
     }
 }

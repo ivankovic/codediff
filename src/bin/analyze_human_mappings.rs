@@ -16,24 +16,10 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-//! Corpus-wide statistics over every `human_mapping.json` under `src/test/data/diffs/` - two
-//! distinct purposes in one binary:
-//!
-//! 1. **Dataset characterization** (fixture/language/size counts, operation mix, multi-map group
-//!    prevalence) - the kind of table a paper's evaluation section needs, and the one thing
-//!    `benchmark_optimal_solutions` does not report: that measures codediff's *performance*
-//!    against the corpus, not the corpus's own shape.
-//! 2. **Settling open pipeline-design questions with real numbers.** Questions like "how common is
-//!    the wrap/reparent shape `TRIVIAL_ENTRY_MAX_SIZE` targets, corpus-wide?" and "how common is
-//!    sibling reordering (the commutative-matching gap), corpus-wide?". Reading 2-3 fixtures'
-//!    mismatch paths by hand answers them misleadingly; this computes the signal over the whole
-//!    corpus instead.
-//!
-//! Every stat here comes from one of two cheap sources: `human_mapping.json`'s `before_path`/
-//! `after_path` strings (already `"kind:sibling_ordinal"`, so kind/depth/position signals need no
-//! tree-sitter parsing at all - pure string splitting), or `Code`/`NodeCache` for the handful of
-//! stats that genuinely need the parsed tree (node counts, language). No AST diffing happens here;
-//! this is strictly about the *ground truth*, not codediff's output.
+//! Corpus-wide statistics over every `human_mapping.json` under `src/test/data/diffs/`: the shape
+//! of the ground truth itself (sizes, operation mix, groups), plus corpus-wide signals for
+//! pipeline-design questions (wrap/reparent rate, sibling-reorder rate). No diffing happens here;
+//! `benchmark_optimal_solutions` measures codediff against the corpus.
 
 use anyhow::Result;
 use clap::Parser;
@@ -45,11 +31,8 @@ use codediff::test::helper::human_mapping::{self, GroupPairing, HumanOperation};
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-/// Counts a tree-sitter subtree's size (root inclusive) - a local copy of
-/// `codediff::stats::count_nodes`, not a reuse of it: that function lives behind the `stats`
-/// feature (git2/rusqlite and the rest of that feature's build-time cost), which this binary has
-/// no other reason to pull in - it only needs `test-fixtures`. Keep this in sync if
-/// `stats::count_nodes`'s definition ever changes.
+/// Subtree size, root inclusive. A copy of `codediff::stats::count_nodes`, which sits behind the
+/// `stats` feature this binary otherwise does not need; keep the two in sync.
 fn count_nodes(root: tree_sitter::Node) -> usize {
     let mut count = 1;
     let mut cursor = root.walk();
@@ -72,42 +55,25 @@ struct Args {
     #[arg(long, default_value_t = 15)]
     top_kinds: usize,
 
-    /// Dump every *paired* entry whose two nodes have different kinds, as CSV, and stop.
-    ///
-    /// The corpus-wide answer to "when did a human match two nodes the grammar calls different
-    /// things?". `match_but_not_identical` is the only operation that can carry such a pair
-    /// (`Identical` and `Update` both require equal kinds by definition), so this is the whole
-    /// population of cross-kind matches in the ground truth. Node *text* is included because the
-    /// kinds alone do not separate the cases: `identifier` -> `number_literal` reads very
-    /// differently when it is `count` -> `0` than when it is `count` -> `42`.
+    /// Dump every paired entry whose two nodes have different kinds, with their text, as CSV, and
+    /// stop. Default: ./research/data/quality/kind_mismatches.csv
     #[arg(long, value_name = "PATH", num_args = 0..=1)]
     kind_mismatches: Option<Option<PathBuf>>,
 
-    /// Count what R1/R2a would cost if they became *invariants* - i.e. if a leaf recorded as
-    /// Delete beside a leaf recorded as Insert were forbidden where the rules say the pair must be
-    /// a match. Reports candidate violations, and stops.
-    ///
-    /// The existing census counts pairs a human *did* match across kinds. This counts the
-    /// opposite: pairs a human declined to match, that the rules say must be matched. Together
-    /// they bound the question the census could not answer, because the solver's own friction
-    /// pushed painters toward delete+insert.
+    /// Count the ground-truth delete+insert leaf pairs that rules R1/R2a would require to be a
+    /// match if they were invariants, write them to
+    /// ./research/data/quality/kind_invariant_candidates.csv, and stop.
     #[arg(long)]
     kind_invariant_cost: bool,
 
-    /// Measure the *elimination* extension to invariant 18 before building it: a positional child
-    /// with no field name is still unambiguous when both parents hold the same number of children
-    /// and every other child is pairwise matched in order, because nothing else is left for it to
-    /// correspond to. `argument_list` in tree-sitter-java declares no fields at all, so
-    /// `findWrapPos(text, width, nextLineTabStop)` -> `findWrapPos(text, width, 0)` is invisible
-    /// to the field-based rule even though `text` and `width` pin the third position exactly.
+    /// List the pairs that extending invariant 18 by elimination would require, and stop: a child
+    /// with no field name is still unambiguous when both parents have the same child count and
+    /// every other child is matched in order.
     #[arg(long)]
     elimination_cost: bool,
 }
 
-/// Tally of `HumanOperation` counts for one fixture (or the whole corpus). A plain struct, not a
-/// `HashMap<HumanOperation, usize>`: `HumanOperation` doesn't derive `Hash` (nothing else in this
-/// codebase has needed it to), and there are only 7 variants - named fields are simpler than
-/// wiring up a hashable wrapper for this alone.
+/// Tally of `HumanOperation` counts for one fixture or the whole corpus.
 #[derive(Default, Clone, Copy)]
 struct OpCounts {
     identical: usize,
@@ -124,9 +90,6 @@ impl OpCounts {
         self.add_n(op, 1);
     }
 
-    /// Same tally, weighted by `n` instead of always 1 - used for the *node-instance* count
-    /// (see `node_ops` on `FixtureStats`), where a single `DeleteWithChildren`/`InsertWithChildren`
-    /// entry covers an entire subtree, not one node.
     fn add_n(&mut self, op: HumanOperation, n: usize) {
         match op {
             HumanOperation::Identical => self.identical += n,
@@ -160,10 +123,8 @@ impl OpCounts {
     }
 }
 
-/// Depth-delta histogram: `|before_path.len() - after_path.len()|` for every paired entry
-/// (`Identical`/`Update`/`MatchButNotIdentical`), bucketed 0/1/2/"3+". A delta of exactly 1 is the
-/// wrap/reparent signature `TRIVIAL_ENTRY_MAX_SIZE` (`apted/common/residual.rs`) targets - see that fix's
-/// `TODO.md` entry (2026-08-17) for the shape this is measuring the true corpus-wide prevalence of.
+/// Histogram of `|before_path.len() - after_path.len()|` over paired entries. A delta of 1 is the
+/// wrap/reparent shape.
 #[derive(Default, Clone, Copy)]
 struct DepthDeltaCounts {
     zero: usize,
@@ -190,11 +151,8 @@ impl DepthDeltaCounts {
     }
 }
 
-/// Splits a human-mapping path segment (`"kind:ordinal"`) into its kind and parsed ordinal.
-/// `ordinal` is the segment's *per-kind* sibling count (the Nth node of this exact kind under its
-/// parent, not a raw positional index across all sibling kinds - see `HumanMappingEntry`'s path
-/// format) - `split_kind_index` is named for what it returns, not for a general "tree position"
-/// concept.
+/// Splits a path segment `"kind:ordinal"`. The ordinal counts only same-kind siblings, so it is
+/// not a positional index.
 fn split_kind_index(segment: &str) -> (&str, Option<u32>) {
     match segment.rsplit_once(':') {
         Some((kind, idx)) => (kind, idx.parse().ok()),
@@ -202,9 +160,8 @@ fn split_kind_index(segment: &str) -> (&str, Option<u32>) {
     }
 }
 
-/// One same-kind-sibling candidate for reorder detection: a paired entry whose `before_path`/
-/// `after_path` share the exact same ancestor chain (no depth change anywhere above it) and the
-/// same final-segment kind, differing only in per-kind sibling ordinal.
+/// A paired entry whose two paths share the whole ancestor chain and the final kind, differing
+/// at most in the per-kind ordinal.
 struct SiblingCandidate {
     parent_path: Vec<String>,
     kind: String,
@@ -212,9 +169,6 @@ struct SiblingCandidate {
     after_idx: u32,
 }
 
-/// Collects a `SiblingCandidate` for `before_path`/`after_path` if they qualify - `None` for any
-/// depth change, reparenting, or kind change (those are wrap/reparent or unrelated-move shapes,
-/// not sibling reordering).
 fn sibling_candidate(before_path: &[String], after_path: &[String]) -> Option<SiblingCandidate> {
     if before_path.len() != after_path.len() || before_path.is_empty() {
         return None;
@@ -236,39 +190,13 @@ fn sibling_candidate(before_path: &[String], after_path: &[String]) -> Option<Si
     })
 }
 
-/// Genuine sibling-reorder count for one fixture (2026-08-17, see `TODO.md`) - a real inversion
-/// count, not "does the per-kind ordinal differ." A naive per-entry "ordinal changed" check was
-/// tried first and found empirically wrong: deleting one `<string>` from an ~1800-entry Android
-/// `strings.xml` translation list renumbers every later same-kind sibling, which such a check
-/// flags as "reordered" hundreds of times even though relative order is fully preserved - a ripple
-/// from one deletion, not a swap (`xml-nextcloud-android-delete-element-2` was the empirical
-/// evidence: 1818 false-positive "signals" from ordinary list-entry deletion).
-///
-/// Groups every candidate by `(parent_path, kind)` (same-kind direct siblings under an otherwise-
-/// unchanged parent - the `lua-neovim-neovim-if-flips-two-branches` shape, two `elseif` branches
-/// swapping position, found by hand this session), sorts each group by `before_idx`, then counts
-/// *adjacent* descents in the resulting `after_idx` sequence - the same lower-bound-on-inversions
-/// measure a bubble sort's swap count gives. A pure renumbering ripple is strictly increasing after
-/// sorting by `before_idx` (zero adjacent descents, however many members); a genuine swap produces
-/// at least one, however large the surrounding group. O(n log n) per group from the sort, not the
-/// O(n²) a full inversion count would cost - deliberately a lower bound, not an exact count, since
-/// this only needs to answer "is there a real reorder here," not "how many pairs are involved."
-///
-/// Deliberately conservative, not a general move detector: requires the *entire* ancestor path to
-/// match exactly and the kind to match, so it only catches reordering among direct same-kind
-/// siblings, not reordering nested deeper or across different kinds. Zero here doesn't mean "not
-/// reordered" in general - only "not this specific, narrow signal."
-///
-/// Known false negative, confirmed empirically: `lua-neovim-neovim-if-flips-two-branches` - the
-/// exact fixture that motivated this metric - scores **0** here, not 1+. Its swap isn't a pure
-/// same-kind reorder: one branch's condition sits as a bare child of `if_statement` while the
-/// swapped-in one is wrapped in `elseif_statement`, so ancestor-path length differs and the
-/// candidate is dropped by `sibling_candidate`'s exact-path-match requirement before it ever
-/// reaches this function - it shows up in the depth-delta-1 bucket instead. So corpus-wide
-/// "fixtures with a reorder signal" is a lower bound on true reorder prevalence, not a census -
-/// wrap+swap cases are systematically invisible to it and land in depth-delta instead.
 type SiblingGroupKey = (Vec<String>, String);
 
+/// Adjacent descents in `after_idx` within each `(parent_path, kind)` group sorted by
+/// `before_idx`: a lower bound on inversions. Counting changed ordinals instead would flag every
+/// later sibling after one deletion, although relative order is preserved. A lower bound on
+/// reordering overall: a swap that also changes wrapper depth
+/// (`lua-neovim-neovim-if-flips-two-branches`) never becomes a candidate.
 fn count_reorder_inversions(candidates: Vec<SiblingCandidate>) -> usize {
     let mut groups: HashMap<SiblingGroupKey, Vec<(u32, u32)>> = HashMap::new();
     for c in candidates {
@@ -304,24 +232,12 @@ struct FixtureStats {
     after_nodes: usize,
     has_mapping: bool,
     ops: OpCounts,
-    /// Same seven-way breakdown as `ops`, but counting AST *node instances*, not mapping
-    /// *entries*: a plain `Identical`/`Update`/`MatchButNotIdentical` entry still contributes 2
-    /// (one before-tree node, one after-tree node), a plain `Delete`/`Insert` contributes 1 (the
-    /// single node on its one side), but a `DeleteWithChildren`/`InsertWithChildren` entry
-    /// contributes its whole subtree's size, resolved via `PathCache` + `count_nodes` - see
-    /// `analyze_fixture`. `node_ops.total()` equals `before_nodes + after_nodes` exactly, by
-    /// construction: `human_mapping.rs` documents "a node with no entry at all defaults to
-    /// identical" (its own `is_identical_before`/`is_identical_after` test), so ground truth for a
-    /// large file is often sparse - only changed/relevant nodes get an explicit entry, not every
-    /// untouched one - and `analyze_fixture` folds that implicit remainder into `node_ops.identical`
-    /// after processing the explicit entries. See `implicit_identical_nodes` for how much of a
-    /// given fixture's Identical count is implicit rather than explicit.
+    /// `ops` counted in AST node instances rather than entries: a paired entry counts 2, a
+    /// `*WithChildren` entry its whole subtree. Nodes with no entry default to identical, so
+    /// `analyze_fixture` folds them into `identical` and `total()` equals
+    /// `before_nodes + after_nodes`.
     node_ops: OpCounts,
-    /// How many of `node_ops.identical`'s node instances came from the implicit-identical rule
-    /// (see `node_ops`'s doc comment) rather than an explicit `Identical` entry in
-    /// `human_mapping.json`. Zero for a fully-annotated fixture; large for a sparsely-annotated one
-    /// (e.g. a huge file where only a localized real change was explicitly marked) - see `main`'s
-    /// node-instance section for the corpus-wide prevalence this reveals.
+    /// The part of `node_ops.identical` that has no explicit entry.
     implicit_identical_nodes: usize,
     depth_delta: DepthDeltaCounts,
     reorder_signals: usize,
@@ -338,12 +254,8 @@ struct FixtureStats {
     current_mismatches: Option<usize>,
 }
 
-/// Reads `research/data/quality/optimal_solutions_benchmark.csv` (whatever the most recent `benchmark_optimal_
-/// solutions --csv` run left there) for the "solution"/"mismatches" columns, if the file exists -
-/// the cross-reference this binary's item #3 (does the wrap/reorder signal actually predict
-/// current failure?) needs. Returns an empty map, not an error, when the file is missing: this
-/// binary's other sections are still useful without it, and requiring a fresh benchmark run just to
-/// see the dataset-characterization tables would be an unnecessary coupling.
+/// Fixture name -> mismatches from a `benchmark_optimal_solutions --csv` export. Empty, not an
+/// error, when the file is missing: only the cross-reference section needs it.
 fn load_current_mismatches(path: &std::path::Path) -> HashMap<String, usize> {
     let mut out = HashMap::new();
     let Ok(mut reader) = csv::Reader::from_path(path) else {
@@ -368,14 +280,8 @@ fn load_current_mismatches(path: &std::path::Path) -> HashMap<String, usize> {
     out
 }
 
-/// Resolves `path` against `root` via `cache` and returns the resulting node's subtree size
-/// (root inclusive), for a `*WithChildren` entry's node-instance count. Falls back to 1 (as if it
-/// were a plain, non-subtree entry) when `root`/`cache` are unavailable (no AST on that side - see
-/// `analyze_fixture`'s fail-safe elsewhere) or when the path fails to resolve, logging a warning in
-/// the latter case since that should not happen against a valid ground-truth mapping. A standalone
-/// `fn`, not a closure: a closure's captured/parameter lifetimes get unified at its definition
-/// site, which conflicts here since `analyze_fixture` calls this once per side with independently-
-/// lived `Node`/`PathCache` values - a plain `fn` stays generic over the lifetime per call site.
+/// Subtree size of the node at `path`, or 1 when there is no tree or the path does not resolve.
+/// A `fn`, not a closure, so that its lifetime stays generic across the two per-side calls.
 fn subtree_size<'a>(
     root: Option<tree_sitter::Node<'a>>,
     cache: &mut Option<PathCache<'a>>,
@@ -444,12 +350,6 @@ fn analyze_fixture(
     let mapping = human_mapping::load(name)?;
     let mut sibling_candidates: Vec<SiblingCandidate> = Vec::new();
 
-    // Node-instance counting needs to resolve a mapping-entry path down to the real tree-sitter
-    // node it names, only for the two `*WithChildren` variants (everything else's contribution is
-    // a fixed 1 or 2, no tree lookup needed - see `node_ops`'s doc comment). `PathCache` amortizes
-    // repeated lookups through the same high-fanout parent across a fixture's many entries; built
-    // lazily (`Option`, not unconditionally) since plenty of fixtures have zero `*WithChildren`
-    // entries and would pay index-building cost for nothing.
     let before_root = before.ast.as_ref().map(|a| a.root_node());
     let after_root = after.ast.as_ref().map(|a| a.root_node());
     let mut before_cache = before_root.map(|_| PathCache::new());
@@ -493,8 +393,6 @@ fn analyze_fixture(
                     (&entry.before_path, &entry.after_path)
                 {
                     stats.paired_entries += 1;
-                    // One node in the before tree, one in the after tree - both carry this entry's
-                    // operation label, unlike Delete/Insert's single-sided node.
                     stats.node_ops.add_n(entry.operation, 2);
                     let delta = before_path.len().abs_diff(after_path.len());
                     stats.depth_delta.add(delta);
@@ -507,16 +405,8 @@ fn analyze_fixture(
     }
     stats.reorder_signals = count_reorder_inversions(sibling_candidates);
 
-    // Fold the implicit-identical remainder into node_ops.identical (see that field's doc
-    // comment): whatever `entries` didn't explicitly account for, out of this fixture's true
-    // `before_nodes + after_nodes` total, is either a node the ground truth left implicit (the
-    // common case) or one covered only by a `mapping.groups` entry (not tallied above - groups are
-    // rare, 130 across 33/417 fixtures corpus-wide, and small, p50 size 2, so lumping their few
-    // node instances in here rather than tallying them separately by operation isn't worth the
-    // extra complexity). `saturating_sub` rather than a bare subtraction: entries could in
-    // principle overcount (e.g. a stale/inconsistent mapping) and this section must not panic on
-    // a fixture that turns out to violate the invariant, only report it accurately via `main`'s
-    // corpus-wide section.
+    // Nodes covered only by a group also land here; groups are rare and small. Saturating because
+    // a stale mapping can overcount, and that is reported, not a panic.
     let total_physical_nodes = stats.before_nodes + stats.after_nodes;
     stats.implicit_identical_nodes = total_physical_nodes.saturating_sub(stats.node_ops.total());
     stats.node_ops.identical += stats.implicit_identical_nodes;
@@ -682,16 +572,12 @@ struct KindMismatch {
     after_parent: String,
     before_named: bool,
     after_named: bool,
-    /// No *named* children. The census's central discriminator: a leaf is one lexeme in a slot, so
-    /// a cross-kind leaf pair asserts only "this position's token changed", which is what `Update`
-    /// means. A composite pair asserts that two different structures correspond, which is a
-    /// judgement. Anonymous children are ignored on purpose - `(`/`)` under an `arguments` node do
-    /// not make it a composite in this sense.
+    /// No named children. A cross-kind leaf pair only says "this slot's token changed"; a
+    /// composite pair is a judgement that two structures correspond. Anonymous children such as
+    /// `(`/`)` do not make a node composite.
     before_leaf: bool,
     after_leaf: bool,
-    /// Whether the two nodes' parents are themselves a matched pair in this mapping. When they are
-    /// not, the two nodes are not in the same slot and the pair is a level shift, however
-    /// compatible their kinds look.
+    /// Whether the two parents are matched to each other; if not, the pair is a level shift.
     parents_matched: bool,
     depth: usize,
 }
@@ -701,9 +587,8 @@ fn is_leaf(node: tree_sitter::Node) -> bool {
     node.named_child_count() == 0
 }
 
-/// A node's text, flattened to one line and capped: these go into a CSV cell, and a matched pair
-/// can be a whole subtree. The cap is generous enough to read a statement and short enough that a
-/// 75k-node fixture cannot produce a multi-megabyte row.
+/// A node's text on one line, capped at 80 chars so that a large matched subtree stays one
+/// readable CSV cell.
 fn cell_text(node: tree_sitter::Node, src: &str) -> String {
     let raw = node.utf8_text(src.as_bytes()).unwrap_or("<unreadable>");
     let flat: String = raw
@@ -718,9 +603,8 @@ fn cell_text(node: tree_sitter::Node, src: &str) -> String {
     }
 }
 
-/// Every cross-kind paired entry in one fixture. Resolution failures are reported and skipped
-/// rather than fatal: a path that no longer resolves is a stale mapping, which is its own problem
-/// and not one this report should die on.
+/// Every cross-kind paired entry in one fixture. A path that does not resolve (a stale mapping)
+/// is warned about and skipped.
 fn kind_mismatches_of(
     name: &str,
     before: &codediff::code::Code,
@@ -744,15 +628,11 @@ fn kind_mismatches_of(
     let mut after_cache = PathCache::default();
     let mut out = Vec::new();
 
-    // The mapping's *resolved* correspondence, not its literal entry list. A node under an
-    // `Identical`/`*WithChildren` entry is matched without an entry of its own, so asking whether
-    // the two parents' paths appear as an entry answers "no" for every implicitly matched parent -
-    // which is most of them. `rebuild_caches_for_mapping` is what every other consumer of a mapping
-    // uses for exactly this reason.
+    // The resolved correspondence, not the entry list: most parents are matched implicitly, under
+    // an ancestor's entry, and have no entry of their own.
     let caches = human_mapping::rebuild_caches_for_mapping(&mapping, before_root, after_root);
 
     for entry in &mapping.entries {
-        // Only the paired operations have two nodes to disagree about.
         if !matches!(
             entry.operation,
             HumanOperation::Identical
@@ -788,8 +668,7 @@ fn kind_mismatches_of(
             after_text: cell_text(a, &after.contents),
             before_parent: b.parent().map_or("<root>".into(), |p| p.kind().to_string()),
             after_parent: a.parent().map_or("<root>".into(), |p| p.kind().to_string()),
-            // Anonymous nodes are the ones whose *kind is their text*, so a text change shows up
-            // here as a kind change. Recorded because it separates two very different populations.
+            // An anonymous node's kind is its text, so for them a text change is a kind change.
             before_named: b.is_named(),
             after_named: a.is_named(),
             before_leaf: is_leaf(b),
@@ -808,27 +687,19 @@ fn kind_mismatches_of(
 
 /// What R1/R2a would flag in one fixture if they were invariants.
 ///
-/// **R1** - a corresponding parent pair where the before parent has exactly one removed named leaf
-/// child and the after parent has exactly one inserted named leaf child. Exactly one on each side
-/// is the whole point: with two candidates on either side the pairing is ambiguous and no
-/// invariant can demand a *particular* match, so those are not counted. This is the strict
-/// reading, and therefore a lower bound.
+/// **R1**: matched parents where the before parent has exactly one removed named leaf and the
+/// after parent exactly one inserted one, in the same single-child field.
+/// **R2a**: a removed and an inserted leaf with the same text, each unique in the fixture.
 ///
-/// **R2a** - a removed leaf and an inserted leaf with identical text, where that text is carried by
-/// exactly one removed leaf and exactly one inserted leaf in the whole fixture. Same uniqueness
-/// requirement, same reason.
-///
-/// Kind equality is *not* required by either: the invariant is "this must be a match, not a
-/// delete plus an insert", which is a claim about the pair regardless of what the grammar calls
-/// them. The split is reported so the two populations can be told apart.
+/// Both demand uniqueness, because with two candidates no invariant can demand a particular
+/// match. Neither requires equal kinds; the split is reported.
 struct InvariantCost {
     r1_same_kind: usize,
     r1_diff_kind: usize,
     r2a_same_kind: usize,
     r2a_diff_kind: usize,
-    /// `(rule, before_kind, after_kind, before_text, after_text, field)` for each candidate, so the count
-    /// can be judged rather than trusted: a count alone cannot say whether a candidate is a match
-    /// the painter was pushed away from or one they correctly refused.
+    /// `(rule, before_kind, after_kind, before_text, after_text, slot, before_row, after_row)` per
+    /// candidate, so each can be judged by hand rather than trusted as a count.
     #[allow(clippy::type_complexity)]
     samples: Vec<(
         &'static str,
@@ -850,19 +721,14 @@ fn collect_nodes<'a>(root: tree_sitter::Node<'a>, out: &mut Vec<tree_sitter::Nod
     }
 }
 
-/// A true lexeme: **no children at all**, not merely no named ones.
-///
-/// Stricter than [`is_leaf`] on purpose. An empty container passes the named-children test while
-/// being a container - `()` as an `arguments` node has two anonymous children and no named ones -
-/// and pairing an `identifier` against an empty argument list is exactly the false positive this
-/// rules out. An invariant may under-fire; it may not over-fire.
+/// No children at all. Stricter than [`is_leaf`] on purpose: an empty `()` argument list has no
+/// named children but is a container. An invariant may under-fire; it may not over-fire.
 fn is_lexeme(node: tree_sitter::Node) -> bool {
     node.child_count() == 0
 }
 
-/// How many of `parent`'s children carry `field`. One means the slot is unambiguous; more means
-/// the field is a list (a command's arguments, a call's parameters) and position within that list
-/// is not identity - a removed flag and an added subcommand are both "an argument".
+/// How many of `parent`'s children carry `field`. More than one makes the field a list, where
+/// position is not identity.
 fn field_arity(parent: tree_sitter::Node, field: &str) -> usize {
     let mut cursor = parent.walk();
     let children: Vec<_> = parent.children(&mut cursor).collect();
@@ -872,10 +738,6 @@ fn field_arity(parent: tree_sitter::Node, field: &str) -> usize {
 }
 
 /// Which field of its parent a node occupies, or `None` when the grammar gives it no field.
-///
-/// The "same slot" half of R1. Without it, a `binary_expression` losing its left operand and
-/// gaining a right one would pair the two, which is a different position and therefore a different
-/// element.
 fn field_of(node: tree_sitter::Node) -> Option<String> {
     let parent = node.parent()?;
     let mut cursor = parent.walk();
@@ -919,7 +781,7 @@ fn kind_invariant_cost_of(
             )
     };
 
-    // ---- R1: one removed leaf under a parent whose counterpart holds one inserted leaf ----
+    // ---- R1 ----
     let mut removed_by_parent: HashMap<usize, Vec<tree_sitter::Node>> = HashMap::new();
     for n in before_nodes.iter().filter(|n| removed_leaf(n)) {
         if let Some(p) = n.parent() {
@@ -955,12 +817,8 @@ fn kind_invariant_cost_of(
             continue;
         }
         let (b, a) = (removed[0], inserted[0]);
-        // Same slot, not merely the same parent pair - see `field_of`. The slot must also be a
-        // *named field*: a named field is a role the grammar says persists (`type`, `value`,
-        // `name`), so "the thing in this role changed" is a claim about one element. A node the
-        // grammar gives no field to has no such role, and positional correspondence there proves
-        // nothing - two adjacent comments, or two shell words, can be entirely unrelated and a
-        // human is right to call that a delete plus an insert.
+        // Same named field, not merely the same parent pair: a field is a role that persists,
+        // while two unrelated adjacent comments share only a position.
         let (fb, fa) = (field_of(b), field_of(a));
         let (Some(fb_name), Some(fa_name)) = (fb.as_ref(), fa.as_ref()) else {
             continue;
@@ -968,7 +826,6 @@ fn kind_invariant_cost_of(
         if fb_name != fa_name {
             continue;
         }
-        // ...and the field must hold exactly one child on each side - see `field_arity`.
         let (Some(pb), Some(pa)) = (b.parent(), a.parent()) else {
             continue;
         };
@@ -993,7 +850,7 @@ fn kind_invariant_cost_of(
         }
     }
 
-    // ---- R2a: a lexeme carried by exactly one removed leaf and exactly one inserted leaf ----
+    // ---- R2a ----
     let mut removed_by_text: HashMap<&str, Vec<tree_sitter::Node>> = HashMap::new();
     for n in before_nodes.iter().filter(|n| removed_leaf(n)) {
         if let Ok(t) = n.utf8_text(before.contents.as_bytes()) {
@@ -1017,7 +874,6 @@ fn kind_invariant_cost_of(
             continue;
         }
         let (b, a) = (removed[0], inserted[0]);
-        // Already counted by R1: the rules overlap, and a pair is one violation either way.
         if r1_pairs.contains(&(b.id(), a.id())) {
             continue;
         }
@@ -1049,9 +905,8 @@ struct EliminationHit {
     before_text: String,
     after_text: String,
     same_kind: bool,
-    /// True when the mapping already pairs these two. Such a row is not a violation - it is the
-    /// extension's own validation, showing the elimination test recognises a position the ground
-    /// truth has already resolved the same way.
+    /// The mapping already pairs these two: not a violation, but a check that the test agrees
+    /// with the ground truth.
     already_matched: bool,
 }
 
@@ -1093,16 +948,13 @@ fn elimination_hits_of(
         let before_children: Vec<_> = parent.children(&mut bc).collect();
         let mut ac = after_parent.walk();
         let after_children: Vec<_> = after_parent.children(&mut ac).collect();
-        // Equal length is what makes elimination possible at all.
         if before_children.len() != after_children.len() || before_children.is_empty() {
             continue;
         }
-        // Exactly one position unresolved, every other position pairwise matched in order.
         let mut candidate = None;
         let mut ok = true;
         for (b, a) in before_children.iter().zip(after_children.iter()) {
             let paired = caches.before_match.get(&b.id()) == Some(&a.id());
-            // A same-kind pair in place is an ordinary match and says nothing either way.
             if paired && b.kind() == a.kind() {
                 continue;
             }
@@ -1114,9 +966,6 @@ fn elimination_hits_of(
                 human_mapping::status_after(*a, &caches),
                 human_mapping::NodeStatus::Marked { .. }
             );
-            // Either the position is unresolved on both sides (what the extension would newly
-            // require), or the corpus already paired it across a kind change (what validates the
-            // test recognises such a position at all).
             let interesting = (b_removed && a_removed) || paired;
             if interesting && b.is_named() && a.is_named() && is_lexeme(*b) && is_lexeme(*a) {
                 if candidate.is_some() {
@@ -1133,10 +982,8 @@ fn elimination_hits_of(
             continue;
         };
         if b.kind() == a.kind() && already_matched {
-            // Same kind and already paired: an ordinary `Update`, nothing to learn from.
             continue;
         }
-        // Already covered by the field-based rule.
         if field_of(b).is_some() && field_of(b) == field_of(a) {
             continue;
         }
@@ -1164,10 +1011,7 @@ fn write_kind_mismatches(rows: &[KindMismatch], path: &std::path::Path) -> Resul
         f,
         "fixture,language,before_kind,after_kind,before_named,after_named,before_leaf,after_leaf,parents_matched,before_parent,after_parent,depth,before_text,after_text"
     )?;
-    // Every field is quoted, not just the text ones. An anonymous node's kind *is* its source
-    // text, so `before_kind` can legitimately be `,` or `"` - which silently shears the columns of
-    // any row carrying one. Found the hard way: the first run of this report produced rows whose
-    // `before_named` column held a quote character.
+    // Quote every field: an anonymous node's kind is its text, so a kind can be `,` or `"`.
     for r in rows {
         let cells = [
             r.fixture.as_str(),
@@ -1510,10 +1354,6 @@ fn main() -> Result<()> {
     );
 
     // ---- 3b. Same mix, in AST node instances rather than mapping entries ----
-    // A `*WithChildren` entry is one line in human_mapping.json but can cover an entire subtree,
-    // so the entry-count mix above (§3) understates how many actual nodes each operation touches.
-    // This section re-tallies in node instances (see `node_ops`'s doc comment on `FixtureStats`),
-    // which is what research/analysis/human_mapping_shapes_report.py's per-fixture chart plots.
     println!("\n=== Same mix, in AST node instances rather than mapping entries ===");
     println!(
         "(a DeleteWithChildren/InsertWithChildren entry counts its whole subtree here, not 1 - \
@@ -1540,10 +1380,7 @@ fn main() -> Result<()> {
         println!("  {label:<22} {count:>10}  ({pct:>5.1}%)");
     }
     println!("  {:<22} {total_node_ops:>10}", "Total");
-    // Scoped to `has_mapping` fixtures only, matching `corpus_node_ops`'s own scope - the corpus's
-    // one unsolved fixture (no human_mapping.json at all) contributes to `total_before_nodes`/
-    // `total_after_nodes` above but never enters the entries loop, so including it here would
-    // introduce a spurious gap unrelated to the implicit-identical mechanism this checks for.
+    // Solved fixtures only, the same scope as `corpus_node_ops`.
     let expected_node_total: usize = all_stats
         .iter()
         .filter(|s| s.has_mapping)
@@ -1735,4 +1572,60 @@ fn main() -> Result<()> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn path(segments: &[&str]) -> Vec<String> {
+        segments.iter().map(|s| s.to_string()).collect()
+    }
+
+    fn candidate(before: &[&str], after: &[&str]) -> Option<SiblingCandidate> {
+        sibling_candidate(&path(before), &path(after))
+    }
+
+    #[test]
+    fn sibling_candidate_rejects_depth_parent_and_kind_changes() {
+        assert!(candidate(&["block:0", "if:1"], &["block:0", "else:0", "if:0"]).is_none());
+        assert!(candidate(&["block:0", "if:1"], &["block:1", "if:1"]).is_none());
+        assert!(candidate(&["block:0", "if:1"], &["block:0", "while:1"]).is_none());
+        let c = candidate(&["block:0", "if:1"], &["block:0", "if:0"]).unwrap();
+        assert_eq!((c.before_idx, c.after_idx), (1, 0));
+    }
+
+    #[test]
+    fn renumbering_after_a_deletion_is_not_a_reorder() {
+        let ripple = (1..50)
+            .map(|i| {
+                candidate(
+                    &["list:0", &format!("item:{i}")],
+                    &["list:0", &format!("item:{}", i - 1)],
+                )
+            })
+            .map(Option::unwrap)
+            .collect();
+        assert_eq!(count_reorder_inversions(ripple), 0);
+    }
+
+    #[test]
+    fn swapping_two_siblings_is_a_reorder() {
+        let swap = vec![
+            candidate(&["list:0", "item:0"], &["list:0", "item:1"]).unwrap(),
+            candidate(&["list:0", "item:1"], &["list:0", "item:0"]).unwrap(),
+            candidate(&["list:0", "item:2"], &["list:0", "item:2"]).unwrap(),
+        ];
+        assert_eq!(count_reorder_inversions(swap), 1);
+    }
+
+    #[test]
+    fn reorder_inversions_are_counted_per_parent_and_kind() {
+        // Descending across groups is not an inversion within either group.
+        let groups = vec![
+            candidate(&["a:0", "item:5"], &["a:0", "item:5"]).unwrap(),
+            candidate(&["b:0", "item:0"], &["b:0", "item:0"]).unwrap(),
+        ];
+        assert_eq!(count_reorder_inversions(groups), 0);
+    }
 }

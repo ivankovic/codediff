@@ -21,8 +21,7 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // One `directive` node inside a lambda literal gets classified MatchButNotIdentical instead
-    // of Identical - an isolated single-node gap, not part of a larger pattern.
+    // One `directive` inside a lambda is `MatchButNotIdentical` instead of `Identical`: isolated.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "swift-nextcloud-ios-actual-control-flow-change",
         2,

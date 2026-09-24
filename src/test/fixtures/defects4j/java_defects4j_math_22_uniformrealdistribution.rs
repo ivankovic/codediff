@@ -23,9 +23,7 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // Clamped at 1/1; exact since Java gained `BOOLEAN_LITERAL_KINDS`. The one residual was a
-    // `false` -> `true` flip - the mirror of `java-defects4j-math-22-fdistribution`, and fixed by
-    // the same kind family.
+    // Pins Java's `BOOLEAN_LITERAL_KINDS`: a `false` -> `true` flip.
     test::helper::human_mapping::assert_matches_human_mapping(
         "java-defects4j-math-22-uniformrealdistribution",
     )

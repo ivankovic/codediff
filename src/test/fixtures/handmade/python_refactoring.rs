@@ -22,21 +22,10 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // `prematch_identical_statement_siblings` (`apted::common`) is what this fixture guards. It
-    // pre-matches this function's byte-identical `average = total / count` statement, excising it
-    // (and its `total`/`count` identifier tokens) from the forest APTED sees before real APTED
-    // runs. That exposed a real gap in `ContainmentCtx`: it only forbade a pairing that
-    // contradicted where a pruned *descendant* landed relative to a hollowed-out *ancestor*, not
-    // one that silently reordered past an unrelated pruned *sibling* (there's no ancestor-
-    // descendant relationship between `average` and `total = 0` to catch). Without that guard,
-    // `total = 0`'s `total` could match some unrelated `total` occurrence positioned after
-    // `average`'s counterpart, losing the rename-target pairing needed to resolve `total = 0` ->
-    // `total = sum(numbers)` (the fixture's documented optimal solution) and falling back to a
-    // wholesale statement delete instead. Fixed at the root by extending `ContainmentCtx::adjust`
-    // with a sibling-order-consistency check: every pruned chunk's root position (`preorder_index`)
-    // is recorded, and a candidate pairing is only allowed if both nodes have the same count of
-    // pruned anchors preceding them on their respective side - see `ContainmentCtx`'s doc comment
-    // in `apted/common.rs`.
+    // Guards `prematch_identical_statement_siblings` together with `ContainmentCtx`'s
+    // sibling-order-consistency check: pre-matching `average = total / count` must not let
+    // `total = 0`'s `total` pair with a `total` beyond `average`'s counterpart, which would lose
+    // the `total = 0` -> `total = sum(numbers)` update the optimal solution needs.
     test::helper::human_mapping::assert_matches_human_mapping("python-refactoring")
 }
 

@@ -18,10 +18,7 @@
 
 //! `codediff jj configure`: the Jujutsu counterpart of `git_configure`.
 //!
-//! jj does not read git's `difftool`/`diff.external` settings, even in a colocated repo, so a
-//! separate wizard is genuinely needed rather than redundant with the git one.
-//!
-//! # What this writes, and why each key is needed
+//! jj ignores git's `difftool`/`diff.external` settings even in a colocated repo. It writes:
 //!
 //! ```toml
 //! [merge-tools.codediff]
@@ -33,27 +30,14 @@
 //! diff-formatter = "codediff"   # only if the user opts in to making it the default
 //! ```
 //!
-//! `diff-invocation-mode = "file-by-file"` is the load-bearing one. jj's default (`"dir"`)
-//! materializes each side of the diff as a whole directory tree and passes the tool two
-//! *directory* paths - verified against jj 0.44.0, which passes literally `left` and `right` -
-//! and codediff takes two files, so without this key every invocation fails. `file-by-file`
-//! makes jj invoke the tool once per changed file pair instead, which is the same shape git's
-//! `difftool.<tool>.cmd = codediff "$LOCAL" "$REMOTE"` already uses.
+//! `diff-invocation-mode = "file-by-file"` is required: jj's default (`"dir"`) passes two directory
+//! trees (literally `left` and `right`), which codediff cannot diff; `file-by-file` passes one file
+//! pair per change, keeping the repo-relative path and extension (`left/src.rs`), so language
+//! detection works. Both verified against jj 0.44.0.
 //!
-//! Language detection survives this: jj's per-file paths keep the repo-relative path, extension
-//! included (`left/src.rs`, `right/sub/thing.py` - verified empirically against jj 0.44.0, the
-//! same way `main.rs`'s `Args::paths` doc comment records the equivalent check for git 2.43).
-//!
-//! # What is deliberately *not* offered
-//!
-//! There is no jj equivalent of `git difftool`'s interactive, terminal-attached per-file viewer.
-//! `jj diff` runs its formatter under a pager, so codediff's own tty check (`should_run_headless`)
-//! correctly selects the non-interactive text renderer - which is the behavior wanted here, and
-//! means no extra configuration is needed to get it. jj's terminal-attached hook is
-//! `ui.diff-editor`, but that is for `jj diffedit`/`jj split`, where jj reads the *modified* right
-//! side back and turns it into a new commit; codediff is a read-only viewer, so registering it
-//! there would misrepresent what it does. Anyone wanting the full-screen TUI on a jj repo can run
-//! `codediff BEFORE AFTER` directly.
+//! Not offered: `jj diff` runs its formatter under a pager, so `should_run_headless` picks the text
+//! renderer with no extra config. `ui.diff-editor` is terminal-attached, but jj reads the edited
+//! right side back into a commit, which a read-only viewer must not claim to support.
 
 use std::io::{self, IsTerminal};
 use std::process::Command;
@@ -65,8 +49,7 @@ use crate::configure_prompt::{ask_yes_no, read_line, resolve_codediff_path};
 /// The tool name codediff registers itself under in `[merge-tools.<name>]`.
 const TOOL: &str = "codediff";
 
-/// Whether to write `jj config set` values with `--user` (all repositories) or `--repo` (this
-/// one only) - jj's own spelling of the same distinction git draws with `--global`/`--local`.
+/// Whether `jj config set` writes `--user` (all repositories) or `--repo` (this one only).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Scope {
     User,
@@ -89,8 +72,8 @@ impl Scope {
     }
 }
 
-/// Entry point for `codediff jj configure`. Interactive only - bails with the manual commands if
-/// stdin isn't a real terminal, rather than hanging on a read that will never get an answer.
+/// Entry point for `codediff jj configure`. Without a terminal on stdin it prints the manual
+/// commands and fails rather than block on a read nobody will answer.
 pub fn run() -> Result<()> {
     if !io::stdin().is_terminal() {
         print_manual_instructions();
@@ -140,8 +123,7 @@ pub fn run() -> Result<()> {
             &format!("merge-tools.{TOOL}.diff-args"),
             r#"["$left","$right"]"#,
         )?;
-        // Without this jj hands the tool two directories instead of a file pair - see this
-        // module's own doc comment.
+        // Required; see the module doc.
         set_config(
             scope,
             &format!("merge-tools.{TOOL}.diff-invocation-mode"),
@@ -162,9 +144,8 @@ pub fn run() -> Result<()> {
     Ok(())
 }
 
-/// One line describing `key`'s current value under `scope`, or an empty string if it isn't set -
-/// shown before a prompt that would overwrite it, so re-running this wizard is safe rather than
-/// silently clobbering an existing setting without saying so.
+/// `key`'s current value under `scope` as a line to show before the prompt that would overwrite it,
+/// or an empty string if unset.
 fn existing_value_note(key: &str, scope: Scope) -> String {
     match get_config(scope, key) {
         Some(value) => format!("(currently: {value})\n"),
@@ -174,9 +155,8 @@ fn existing_value_note(key: &str, scope: Scope) -> String {
 
 /// `jj config list <scope> <key>`, or `None` when unset.
 ///
-/// Detected by empty stdout, deliberately not by exit status: jj 0.44 reports an unset key with a
-/// `Warning: No matching config key` on *stderr* and still exits 0, so trusting the status would
-/// report every unset key as set-to-empty.
+/// Unset is detected by empty stdout, not exit status: jj 0.44 warns on stderr for an unset key
+/// and still exits 0.
 fn get_config(scope: Scope, key: &str) -> Option<String> {
     let output = Command::new("jj")
         .arg("config")
@@ -245,9 +225,7 @@ fn print_manual_instructions() {
     );
 }
 
-/// Parses `ask_scope`'s prompt input - `None` for anything that isn't a recognized answer, so the
-/// caller knows to reprompt rather than silently guessing. `u`/`r` rather than git's `g`/`l`,
-/// matching the flags jj itself uses.
+/// Parses `ask_scope`'s answer (`u`/`r`, after jj's own flags); `None` means reprompt.
 fn parse_scope(input: &str) -> Option<Scope> {
     match input.trim().to_lowercase().as_str() {
         "" | "u" | "user" => Some(Scope::User),

@@ -23,12 +23,9 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // A `return` becomes a `throw` in the deepest arm of a nine-deep `if` chain. The human
-    // mapping removes the whole `return_statement` and inserts the whole `throw_statement`;
-    // codediff keeps the `;` the two have in common and pairs it across. Two mismatches, one per
-    // statement, and both are that same semicolon seen from each side. Whether a shared delimiter
-    // survives a statement being replaced is the kind of question invariant 18 deliberately does
-    // not answer for a construct substitution - see the 2026-09-21 kind-mismatch census.
+    // A `return` becomes a `throw` deep in an `if` chain. The mapping replaces the statement
+    // whole; codediff pairs the shared `;` across. Invariant 18 deliberately does not rule on
+    // delimiters surviving a construct substitution.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "java-defects4j-cli-40-typehandler",
         2,

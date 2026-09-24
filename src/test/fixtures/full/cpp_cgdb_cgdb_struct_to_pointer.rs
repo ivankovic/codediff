@@ -21,13 +21,8 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // Interesting case of which nodes of different kinds should be allowed to map to each other
-    // Dominated by the `qualified_name` bucket (107 of 110): the human matches
-    // differently-kinded nodes across the struct-to-pointer rewrite where APTED's final pass
-    // does not. See TODO.md - that bucket is two distinct hard problems, not one fix.
-    // Known gap, characterized above but unfixed. Clamped at the observed count rather than
-    // requiring an exact match. Lower (or drop back to `assert_matches_human_mapping`) once
-    // a fix lands.
+    // Which nodes of different kinds may map to each other. Nearly all in the `qualified_name`
+    // bucket: the human matches differently-kinded nodes across the struct-to-pointer rewrite.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "cpp-cgdb-cgdb-struct-to-pointer",
         110,

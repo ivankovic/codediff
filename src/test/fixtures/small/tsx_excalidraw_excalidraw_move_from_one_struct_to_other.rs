@@ -21,11 +21,7 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // Moving code between structs also changes one import statement's named-import list (some
-    // specifiers added/removed), cascading into small mismatches for that statement's internal
-    // punctuation/identifier nodes (`{`, `,`, `import_specifier`, ...) - all downstream of the one
-    // list-content change, not independent issues. Any counts above describe the older, larger
-    // residual.
+    // One import's named-import list changes, cascading into its punctuation and specifiers.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "tsx-excalidraw-excalidraw-move-from-one-struct-to-other",
         2,

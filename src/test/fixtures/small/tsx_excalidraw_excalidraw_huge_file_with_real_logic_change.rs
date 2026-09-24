@@ -21,22 +21,10 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // Known, unreviewed gap in a real-world huge TSX file - not yet root-caused. Clamped at the
-    // observed count rather than requiring an exact match. Lower (or drop back to
-    // `assert_matches_human_mapping`) once a fix lands. Ticked down 1892 -> 1883 as an incidental
-    // side effect of extending `solve_leading_siblings` to TypeScript/TSX decorators, then 1883 ->
-    // 1882 as an incidental side effect of the `resolve_flat_tree_pair` anchor-splitting fix (see
-    // `xml_nextcloud_android_delete_element.rs`'s comment) - same "known, unreviewed gap" class as
-    // before, not a targeted fix for this fixture specifically. Any counts above describe the
-    // older, larger residual. A limit above the measured number is a test that cannot fail, which
-    // is what `the_quality_baseline_accuracy_columns_are_a_projection_of_the_stub_limits` exists to
-    // catch - the baseline records the measurement, so the stub has to record it too.
+    // Residual not yet root-caused.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "tsx-excalidraw-excalidraw-huge-file-with-real-logic-change",
-        // 228/154 became 245/169 when the ground truth gained all-to-all groups. Fifteen of the
-        // twenty-six group mismatches are all-to-all members a one-to-one output cannot reach,
-        // the N:M floor; the remaining eleven are this fixture's pre-existing any-one-to-one
-        // groups, whose realized pairings moved with the surrounding matching.
+        // Includes all-to-all group members a one-to-one output cannot reach: the N:M floor.
         245,
         169,
     )

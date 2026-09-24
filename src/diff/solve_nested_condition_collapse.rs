@@ -22,58 +22,21 @@ use crate::diff::{
     ASTDiff, ASTMapping, ASTMappingOperation, ASTMappingReason, COST_UPDATE, NodeCache,
 };
 
-/**
-* Rust's `let`-chains collapse a run of nested `if let PATTERN = EXPR { ... }` statements (each
-* one the sole statement of its parent's body) into a single `if PATTERN1 = EXPR1 && PATTERN2 =
-* EXPR2 && ... { BODY }`. `N` nested `if_expression`/`block` wrapper pairs become one
-* `if_expression` whose condition is a `let_chain` and whose block is the innermost `BODY`
-* directly.
-*
-* Phase 1 (`solve_hash_descent`) already matches `BODY` correctly on its own - `BODY`'s text is
-* byte-identical before and after, so its hash-based root match finds it regardless of how deeply
-* nested it started out. What phase 1 gets wrong is *attribution*: because it operates purely on
-* subtree hashes, it has no way to know that the *outermost* wrapper `if_expression` is the one
-* that structurally persists as the merged `if` - every wrapper's own text differs from anything
-* on the after side (each contains the *next* wrapper, not `BODY` directly), so phase 1 simply
-* never considers them as candidates, leaving the outermost wrapper's own condition to fall
-* through to `Delete`+re-`Insert` rather than being recognized as unchanged.
-*
-* This pass runs *after* phase 1, specifically to react to what phase 1 already matched rather
-* than duplicate it: it looks for a before-side chain of trivial single-statement if-wrapper
-* levels whose innermost block phase 1 already mapped, finds the after-side `if_expression`
-* ancestor of that mapped block, and - only if every one of the chain's `N` conditions is
-* byte-identical, in order, to the after `let_chain`'s `N` clauses - adds the mappings phase 1
-* structurally cannot reach: the outermost `if_expression` itself (`MatchButNotIdentical`, since
-* its condition text did change), each condition subtree (`Identical`, reusing
-* `pair_children_for_descent` for consistency with how phase 1 itself descends), and re-affirms
-* `terminal_block`'s (`BODY`'s) own match under this pass's own `NestedConditionCollapse` reason.
-* Every wrapper node's own braces are deliberately left exactly as phase 1 already has them.
-*
-* **What this pass does *not* fix, and why**: an earlier version also tried re-attributing
-* `after_block`'s `{`/`}` tokens from the innermost wrapper (where phase 1's hash descent leaves
-* them) to the outermost one, on the theory that a human always reads the outermost wrapper's own
-* braces as the ones that persist. Measured against this fixture's own hand-painted ground truth
-* (`rust-next-font-imports-generator`, `benchmark_optimal_solutions --details`), that theory was
-* wrong in a way that isn't simply "backwards": which brace the ground truth keeps does not follow
-* a single consistent outer-vs-inner rule across this fixture's own two if-let chains (a 3-level
-* and a 2-level one). Reverted rather than guessed at again - see the 2026-09-01 painting-baseline
-* investigation for the measurement. A real fix for the brace attribution needs a clearer picture
-* of what the ground truth actually wants, not a second guess at the same theory.
-*
-* **Why `BODY`'s match is re-tagged**: `crate::diff::text::ranges` classifies a matched node's
-* `Move` vs `Identical` purely from that one node's own before/after column position, independent
-* of its ancestors - and `BODY` is genuinely reindented by this transformation (nesting levels
-* removed around it), so by position alone it looks exactly like a real relocation (the same
-* signature `rust-add-if`'s genuinely-moved block has - see `ranges`'s own doc comment on why that
-* case can't be excluded by column delta alone). This pass has already verified, structurally,
-* that `BODY`'s move is *only* a reindent, so it tells `ranges` that directly via the
-* `NestedConditionCollapse` reason. Whether `ranges` actually *acts* on that tag is gated by
-* [`crate::diff::text::RenderOptions::paint_reindent_only_moves`] - `MINIMAL` and `FULL` disagree
-* about this (measured against this fixture's own separate `Minimal`/`Full` ground truths:
-* `Minimal` wants the body unpainted, `Full` wants it painted `Move`), so the tag alone isn't a
-* rendering verdict, just the fact this pass is positioned to know that a bare heuristic in
-* `ranges` cannot safely derive on its own.
-*/
+/// Rust `let`-chains collapse nested `if let` wrappers (each the sole statement of its parent's
+/// body) into one `if A && B && ... { BODY }`. Phase 1 matches `BODY` by hash but never the
+/// wrappers, whose text differs from everything on the after side, so the outer `if` and its
+/// unchanged condition come out as delete+insert.
+///
+/// When every one of the chain's conditions is hash-identical, in order, to the after `let_chain`'s
+/// clauses, this maps the outermost `if` (`MatchButNotIdentical`), its `if` token and each condition,
+/// and re-tags `BODY` as `NestedConditionCollapse`. The wrappers' braces are left as phase 1 has
+/// them: rust-next-font-imports-generator's ground truth follows no single outer-vs-inner rule
+/// for them.
+///
+/// `BODY` is re-tagged because `ranges()` judges `Move` from a node's own column alone, and a
+/// reindent looks like rust-add-if's genuine move. Whether `ranges()` acts on the tag is
+/// [`crate::diff::text::RenderOptions::paint_reindent_only_moves`]: `Minimal` wants the body
+/// unpainted, `Full` wants `Move`.
 pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
     let (before, after, node_cache) = (ctx.before, ctx.after, ctx.node_cache);
     let Some(before_tree) = &before.ast else {
@@ -105,10 +68,8 @@ pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
     }
 }
 
-/// The next node in the wrapper chain below `block`, if `block` is a trivial single-statement
-/// wrapper whose sole statement is itself an `if_expression` (an `if` used as a statement is
-/// wrapped in `expression_statement`; as a tail expression it's the direct child - both are
-/// accepted).
+/// The `if_expression` that is `block`'s sole statement, bare (tail expression) or wrapped in an
+/// `expression_statement`.
 fn single_nested_if(block: tree_sitter::Node) -> Option<tree_sitter::Node> {
     if block.named_child_count() != 1 {
         return None;
@@ -124,8 +85,7 @@ fn single_nested_if(block: tree_sitter::Node) -> Option<tree_sitter::Node> {
     }
 }
 
-/// `if_expression`'s condition and block, rejecting anything with an `else` branch (a let-chain
-/// has no room for one - each wrapper level in the chain must be a bare `if`, no `else`).
+/// `if_expression`'s condition and block; `None` with an `else` branch, which a let-chain cannot hold.
 fn condition_and_block(
     if_expr: tree_sitter::Node,
 ) -> Option<(tree_sitter::Node, tree_sitter::Node)> {
@@ -144,8 +104,6 @@ fn try_collapse(
     diff: &mut ASTDiff,
     outer_if: tree_sitter::Node,
 ) {
-    // Walk the wrapper chain, collecting each level's condition and stopping at the first level
-    // that isn't a trivial single-if wrapper - that level's block is `BODY`.
     let mut conditions = Vec::new();
     let mut level = outer_if;
     let terminal_block = loop {
@@ -161,15 +119,11 @@ fn try_collapse(
             None => break block,
         }
     };
-    // `>= 2` levels: a lone if-let (no nesting at all) needs no help from this pass.
     if conditions.len() < 2 {
         return;
     }
 
-    // Anchor on wherever phase 1 already matched `BODY` - `terminal_block` itself is the expected
-    // case (see this module's doc comment), but fall back to its mapped child (if phase 1 instead
-    // matched some node inside it) so a slightly different hash-descent outcome doesn't silently
-    // defeat this pass.
+    // Anchor on `BODY`'s match, or on a matched child if hash descent landed one level lower.
     let anchor_after_id = diff
         .before_node_map
         .get(&terminal_block.id())
@@ -187,8 +141,6 @@ fn try_collapse(
         return;
     };
 
-    // Walk up from wherever the anchor landed to the nearest `if_expression` ancestor - the
-    // merged `if`, if this really is a let-chain collapse.
     let mut after_if = *anchor_after_node;
     loop {
         if after_if.kind() == "if_expression" {
@@ -205,9 +157,7 @@ fn try_collapse(
     let Some((after_condition, after_block)) = condition_and_block(after_if) else {
         return;
     };
-    // The if_expression we walked up to must actually own `BODY` directly (or own the mapped
-    // child the fallback branch above found) - otherwise the anchor landed under some unrelated
-    // ancestor and this isn't the shape we think it is.
+    // Otherwise the anchor sits under some unrelated `if`.
     let owns_anchor = after_block.id() == anchor_after_node.id() || {
         let mut cursor = after_block.walk();
         after_block
@@ -229,7 +179,6 @@ fn try_collapse(
         return;
     }
 
-    // Every condition must match exactly, in order - deliberately conservative (see module doc).
     for (before_cond, after_cond) in conditions.iter().zip(&after_conditions) {
         let before_hash = before_metadata
             .node_to_kind_and_value_hash
@@ -242,11 +191,6 @@ fn try_collapse(
         }
     }
 
-    // Confirmed: record the outer if_expression's own match, its `if` token, every condition
-    // subtree, and re-affirm `terminal_block`'s (`BODY`'s) own match under this pass's own
-    // `NestedConditionCollapse` reason - see the module doc comment for why. Every wrapper's own
-    // braces are left exactly as phase 1 already matched them - see the module doc comment for
-    // why that part isn't fixed here.
     diff.add_mapping(
         outer_if.id(),
         after_if.id(),
@@ -282,11 +226,8 @@ fn try_collapse(
     }
 }
 
-/// Marks `before_node`/`after_node` (already confirmed `kind_and_value_hash`-identical by the
-/// caller) `Identical`, and every descendant pair the same way - the same lockstep descent
-/// `hash_tree_matching::solve_with_hash_map` itself uses for a root hash match, reused here rather
-/// than re-implemented so a commutative-container condition (unlikely inside a `let_condition`,
-/// but not impossible) gets the same reorder-aware handling either way.
+/// Maps two hash-identical subtrees `Identical` in lockstep, via phase 1's own
+/// `pair_children_for_descent` so a commutative container gets the same reorder-aware pairing.
 fn map_identical_subtree(
     before_node: tree_sitter::Node,
     after_node: tree_sitter::Node,
@@ -325,15 +266,9 @@ mod tests {
     use crate::diff::{ASTMappingOperation, ASTMappingReason, NodeCache};
     use crate::test::helper::find_first_of_kind;
 
-    /// The rules doc's own motivating shape, minimized: three nested `if let`s collapsing into
-    /// one let-chain. The outermost `if_expression` and its own condition must end up mapped -
-    /// the one gap phase 1 structurally cannot close on its own (see the module doc comment).
     #[test]
     fn outer_if_and_its_condition_are_matched_across_a_let_chain_collapse() {
-        // The body has to be big enough to clear phase 1's own `min_subtree_size` selection
-        // threshold (`NodeSelectionConfig::default`) - otherwise phase 1 never matches it in the
-        // first place, and this pass (which only reacts to what phase 1 already matched) has
-        // nothing to anchor on.
+        // Large enough for phase 1's `min_subtree_size`, or there is no anchor.
         let body = "\x20               step_one();\n\
                      \x20               step_two();\n\
                      \x20               step_three();\n\
@@ -397,8 +332,6 @@ mod tests {
         );
     }
 
-    /// A single, non-nested if-let needs no help from this pass - it's already handled correctly
-    /// upstream, and firing here would be pure risk for zero benefit.
     #[test]
     fn a_lone_if_let_is_left_alone() {
         let before = crate::code::Code::from_string(
@@ -426,8 +359,6 @@ mod tests {
         );
     }
 
-    /// An `else` branch anywhere in the chain rules out a let-chain reading (Rust let-chains have
-    /// no room for one) - must not fire.
     #[test]
     fn a_chain_with_an_else_branch_is_left_alone() {
         let before = crate::code::Code::from_string(
@@ -476,6 +407,37 @@ mod tests {
         assert!(
             !diff.before_node_map.contains_key(&outer_if.id()),
             "an else-bearing chain must not be collapsed - condition_and_block rejects it"
+        );
+    }
+
+    #[test]
+    fn a_chain_whose_condition_changed_is_left_alone() {
+        let body = "        a();\n        b();\n        c();\n        d();\n        e();\n";
+        let before = crate::code::Code::from_string(
+            &format!(
+                "fn f() {{\n    if let A(a) = x {{\n        if let B(b) = y {{\n{body}        }}\n    }}\n}}\n"
+            ),
+            &Language::Rust,
+        );
+        let after = crate::code::Code::from_string(
+            &format!("fn f() {{\n    if let A(a) = x && let B(b) = w {{\n{body}    }}\n}}\n"),
+            &Language::Rust,
+        );
+        let node_cache = NodeCache::build(&before, &after);
+        let mut diff = crate::diff::ASTDiff::default();
+        crate::diff::solve_hash_descent::solve(
+            &crate::diff::PassCtx::new(&before, &after, &node_cache),
+            &mut diff,
+        );
+        super::solve(
+            &crate::diff::PassCtx::new(&before, &after, &node_cache),
+            &mut diff,
+        );
+
+        assert!(
+            diff.mapping
+                .values()
+                .all(|m| m.reason != ASTMappingReason::NestedConditionCollapse)
         );
     }
 }

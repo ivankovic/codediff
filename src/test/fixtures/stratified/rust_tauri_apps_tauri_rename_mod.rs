@@ -33,7 +33,6 @@ fn painting() -> Result<()> {
 
 #[test]
 fn invariants() -> Result<()> {
-    // Invariant 16: the Minimal/Full split for a renamed identifier is not painted this way yet
-    // (the Full half: `v2_rc`/`v2_beta` are not painted whole). Recorded as found.
+    // Invariant 16: the Full half of a rename split is not painted (`v2_rc`/`v2_beta` not whole).
     assert_ground_truth_invariants_with_known_violations("rust-tauri-apps-tauri-rename-mod", 2)
 }

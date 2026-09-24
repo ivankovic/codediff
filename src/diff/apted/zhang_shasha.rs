@@ -22,16 +22,11 @@ use super::common::{
     ContainmentCtx, DeltaTable, ForestDist, PostorderIndexer, UnitCostModel, forest_dist,
 };
 
-/// Populates `delta[(pre_before, pre_after)]` - the fully-resolved tree edit distance between the
-/// subtree rooted at `pre_before` and the subtree rooted at `pre_after` - for every keyroot pair.
-/// Classic Zhang-Shasha keyroot decomposition (no `spfA`/`spfL`/`spfR` single-path optimization -
-/// correct, simpler, and sufficient given APTED only ever runs on the small unmatched residual
-/// left by the earlier, cheaper matching passes).
+/// Fills `delta[(pre_before, pre_after)]` with the subtree-to-subtree edit distance for every
+/// keyroot pair, by the classic Zhang-Shasha keyroot decomposition (no single-path functions).
 ///
-/// Keyroots are processed in ascending postorder index on both sides: this is what guarantees
-/// that any `delta` lookup `forest_dist` performs for a given keyroot pair was already computed
-/// in an earlier iteration (any interior point requiring a lookup is itself a keyroot pair with
-/// strictly smaller postorder ids on both sides).
+/// Keyroots run in ascending postorder on both sides, so every `delta` lookup `forest_dist`
+/// makes has already been filled by an earlier pair.
 pub(crate) fn compute_delta_zhang_shasha(
     before: &PostorderIndexer,
     after: &PostorderIndexer,

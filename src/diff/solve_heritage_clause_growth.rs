@@ -20,30 +20,18 @@ use tree_sitter::Node;
 use crate::diff::PassCtx;
 use crate::diff::{ASTDiff, ASTMappingOperation, ASTMappingReason};
 
-/// Fixes up one attribution gap phase 1's hash descent structurally cannot close: when a class or
-/// interface gains a heritage clause (`class Foo implements Bar`, `interface Foo extends Bar`),
-/// its body is byte-identical before and after but sits at a different row/column, because the
-/// heritage clause is a *new* sibling inserted before the body, not because the body itself moved.
-/// Phase 1 already matches the body correctly (`Identical`, by hash) - this pass only re-tags that
-/// existing match's `reason` so `ranges()` can recognize it as a verified pure repositioning and
-/// skip painting it `Move`, the same mechanism `solve_nested_condition_collapse` established for
-/// Rust's let-chain collapse. It never creates a new mapping.
+/// Re-tags a shifted but byte-identical `class_body`/`interface_body` as `HeritageClauseGrowth` when
+/// its class gained a heritage clause (`implements Bar`), so `ranges()` does not paint it `Move`.
+/// Never creates a mapping.
 ///
-/// Deliberately a pass over two node kinds rather than a general rule in `ranges()`. "Shift
-/// explained by an unrelated preceding insertion" is not decidable from parent-match or
-/// sibling-adjacency alone - a genuine relocation into a new block has the same geometry, and a
-/// coincidentally-duplicated literal is sometimes a `Move` in the ground truth itself. Keying on
-/// `class_body`/`interface_body` under `class_declaration`/`interface_declaration` decides it by
-/// shape instead: those kinds gain a heritage clause and nothing else.
+/// Keyed on these kinds rather than a general rule in `ranges()`: "shift explained by a preceding
+/// insertion" is not decidable from parent match or sibling adjacency, since a genuine relocation
+/// has the same geometry. These kinds gain a heritage clause and nothing else.
 pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
     let (before, after, node_cache) = (ctx.before, ctx.after, ctx.node_cache);
     let before_src = before.contents.as_bytes();
     let after_src = after.contents.as_bytes();
 
-    // A snapshot, not a live iterator: this pass only ever mutates a mapping's `reason` in place,
-    // never adds or removes entries, so a snapshot can't miss or duplicate a candidate - unlike
-    // `solve_leading_siblings`'s chain-walk, nothing here depends on seeing another candidate's
-    // own outcome mid-loop.
     let candidates: Vec<(usize, usize)> = diff
         .mapping
         .iter()
@@ -82,17 +70,12 @@ pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
             continue;
         }
 
-        // Only a real re-tag if the body's position actually moved - an unchanged file (e.g. a
-        // class body untouched between before and after) must keep whatever reason phase 1 gave
-        // it (typically `IdenticalHashOfAncestor`), not get relabeled just because the adjacency
-        // check below is trivially satisfied when nothing shifted at all.
+        // An unshifted body keeps phase 1's reason; the adjacency check is trivially true for it.
         if before_body.start_position() == after_body.start_position() {
             continue;
         }
 
-        // Belt and suspenders on top of the `Identical` operation (itself already hash-verified):
-        // compare the actual bytes directly, so a hash collision could never smuggle a real change
-        // through this pass.
+        // Byte comparison on top of the hash, so a collision cannot smuggle a change through.
         if before_body.utf8_text(before_src) != after_body.utf8_text(after_src) {
             continue;
         }
@@ -115,9 +98,7 @@ fn is_declaration_kind(kind: &str) -> bool {
     matches!(kind, "class_declaration" | "interface_declaration")
 }
 
-/// Nearest tree-sitter sibling *before* `node` that has an entry in `node_map` (before-tree id ->
-/// after-tree id, or vice versa depending which map is passed), walking back past any number of
-/// unmapped siblings. `None` means `node` is the first mapped child among its siblings.
+/// Nearest preceding sibling of `node` with an entry in `node_map`, skipping unmapped ones.
 fn nearest_mapped_prev_sibling_id(
     mut node: Node,
     node_map: &rustc_hash::FxHashMap<usize, usize>,
@@ -131,11 +112,8 @@ fn nearest_mapped_prev_sibling_id(
     None
 }
 
-/// Whether `before_body`'s shift to `after_body` is fully explained by content inserted *before*
-/// it among its own matched siblings, rather than the body itself having a different structural
-/// position: each side's nearest already-matched preceding sibling must be the other's
-/// counterpart (or both absent - both are the first matched child). Nothing with an existing
-/// identity was reordered around the body; only a brand-new heritage clause appeared ahead of it.
+/// Whether each side's nearest mapped preceding sibling is the other's counterpart (or both are
+/// absent): nothing with an identity was reordered around the body, only new content appeared.
 fn shift_explained_by_preceding_insertion(
     before_body: Node,
     after_body: Node,
@@ -214,8 +192,6 @@ mod tests {
         );
     }
 
-    /// A body that actually changed content must never be tagged, even if its class also gained a
-    /// heritage clause in the same edit - the byte-identical check is the guard.
     #[test]
     fn a_body_whose_content_also_changed_is_left_alone() {
         let body = "    constructor(public name: string, public email: string) {}\n    \
@@ -237,6 +213,26 @@ mod tests {
                 .values()
                 .all(|m| m.reason != ASTMappingReason::HeritageClauseGrowth),
             "a body that gained a new member is a real edit, not a pure repositioning"
+        );
+    }
+
+    #[test]
+    fn a_body_that_did_not_shift_keeps_its_reason() {
+        let before = Code::from_string(
+            "class A {\n    x: number;\n}\nlet y = 1;\n",
+            &Language::TypeScript,
+        );
+        let after = Code::from_string(
+            "class A {\n    x: number;\n}\nlet y = 2;\n",
+            &Language::TypeScript,
+        );
+
+        let diff = diff_code(&before, &after).ast.expect("ast diff");
+
+        assert!(
+            diff.mapping
+                .values()
+                .all(|m| m.reason != ASTMappingReason::HeritageClauseGrowth)
         );
     }
 }

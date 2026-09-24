@@ -17,117 +17,63 @@
  */
 //! Properties every fixture's *ground truth* should hold, checked against the ground truth alone.
 //!
-//! Nothing here runs `diff_code` or reads codediff's output. `assert_matches_human_mapping` and
-//! `assert_matches_human_painting_within_limit` both ask "is codediff right?", and both answer it
-//! against data whose own internal consistency nothing checks - a painting that ends a highlight
-//! in the middle of a run of spaces, or paints an opening brace and not its closing one, grades
-//! codediff against a claim its author would not defend if it were pointed out. These nineteen
-//! invariants are that missing half: they can fail only because the hand-authored data disagrees
-//! with itself.
+//! Nothing here runs `diff_code`. The mapping and painting tests grade codediff against
+//! hand-authored data; these check that data against itself, so they fail only when a fixture's
+//! mapping and paintings disagree with each other. The numbers are stable and referenced
+//! elsewhere ("invariant 16"):
 //!
-//! * [`rows_end_on_visible_characters`] - no painted run may end in a row's *trailing*
-//!   whitespace.
-//! * [`full_painting_covers_minimal`] - every byte painted under `Minimal` is painted under `Full`.
-//! * [`delimiter_pairs_agree`] - a bracket and its partner carry one verdict in the tree mapping.
-//! * [`full_paints_a_wholly_changed_line_whole`] - a `Full` line whose every visible character is
-//!   inserted, or every one deleted, has no unpainted byte before its last visible character.
-//! * [`no_unpainted_whitespace_between_painted_regions`] - a `Full` painting never breaks one
-//!   highlight in two over whitespace.
-//! * [`minimal_never_paints_leading_whitespace`] - a `Minimal` painting never claims a line's
-//!   indentation, which is the mirror of the rule above it.
-//! * [`painted_ranges_do_not_overlap`] - no two ranges of one painting claim the same byte.
-//! * [`presets_agree_on_what_survives`] - a byte one preset paints `Move` is never painted
-//!   `Insert` or `Delete` by the other.
-//! * [`mapping_and_painting_agree_on_what_survives`] - a byte the painting paints `Move` is never
-//!   one the tree mapping leaves unmatched.
-//! * [`paired_leaves_are_not_deleted_and_inserted`] - a leaf the mapping pairs with a
-//!   byte-identical leaf is never painted `Delete` while its partner is painted `Insert`.
-//! * [`removed_leaves_are_painted`] - a named leaf the mapping deletes or inserts has at least one
-//!   painted byte.
-//! * [`edited_leaves_are_painted`] - a leaf the mapping pairs with a leaf that reads differently is
-//!   painted on at least one side.
-//! * [`painting_implies_mapping_edits`] - a painting that records an edit belongs to a mapping
-//!   that records one too.
-//! * [`identical_entries_are_token_identical`] - an `Identical` entry's two subtrees carry the same
-//!   tokens.
-//! * [`match_but_not_identical_entries_differ`] - a `MatchButNotIdentical` entry's two subtrees do
-//!   not read byte-identically with every descendant paired inside.
-//! * [`identifier_updates_are_painted_by_preset`] - a renamed identifier is painted at its own
-//!   preset's granularity: `Minimal` marks the differing words or characters, `Full` marks it
-//!   entire.
-//! * [`boolean_flips_are_one_edit`] - a boolean the mapping pairs is not painted `Delete` on one
-//!   side and `Insert` on the other.
-//! * [`single_valued_fields_hold_a_pair`] - a matched pair's single-valued named field holds a
-//!   matched pair, never a delete beside an insert.
-//! * [`tokens_are_painted_whole`] - every byte of an operator such as `<=`, a boolean, or an access
-//!   modifier such as `private` carries the same highlighting.
+//! 1. [`rows_end_on_visible_characters`] - no painted run ends in a row's *trailing* whitespace.
+//! 2. [`full_painting_covers_minimal`] - every byte painted under `Minimal` is painted under `Full`.
+//! 3. [`delimiter_pairs_agree`] - a bracket and its partner carry one verdict in the tree mapping.
+//! 4. [`full_paints_a_wholly_changed_line_whole`] - a `Full` line whose every visible character is
+//!    inserted, or every one deleted, has no unpainted byte before its last visible character.
+//! 5. [`no_unpainted_whitespace_between_painted_regions`] - a `Full` painting never breaks one
+//!    highlight in two over whitespace.
+//! 6. [`minimal_never_paints_leading_whitespace`] - a `Minimal` painting never claims a line's
+//!    indentation (the mirror of 5).
+//! 7. [`painted_ranges_do_not_overlap`] - no two ranges of one painting claim the same byte.
+//! 8. [`presets_agree_on_what_survives`] - a byte one preset paints `Move` is never painted
+//!    `Insert` or `Delete` by the other.
+//! 9. [`mapping_and_painting_agree_on_what_survives`] - a byte the painting paints `Move` is never
+//!    one the tree mapping leaves unmatched.
+//! 10. [`paired_leaves_are_not_deleted_and_inserted`] - a leaf the mapping pairs with a
+//!     byte-identical leaf is never painted `Delete` while its partner is painted `Insert`.
+//! 11. [`removed_leaves_are_painted`] - a named leaf the mapping deletes or inserts has at least
+//!     one painted byte.
+//! 12. [`edited_leaves_are_painted`] - a leaf the mapping pairs with a leaf that reads differently
+//!     is painted on at least one side.
+//! 13. [`painting_implies_mapping_edits`] - a painting that records an edit belongs to a mapping
+//!     that records one too.
+//! 14. [`identical_entries_are_token_identical`] - an `Identical` entry's two subtrees carry the
+//!     same tokens.
+//! 15. [`match_but_not_identical_entries_differ`] - a `MatchButNotIdentical` entry's two subtrees
+//!     do not read byte-identically with every descendant paired inside.
+//! 16. [`identifier_updates_are_painted_by_preset`] - a renamed identifier is painted at its own
+//!     preset's granularity: `Minimal` marks the differing words or characters, `Full` marks it
+//!     entire.
+//! 17. [`boolean_flips_are_one_edit`] - a boolean the mapping pairs is not painted `Delete` on one
+//!     side and `Insert` on the other.
+//! 18. [`single_valued_fields_hold_a_pair`] - a matched pair's single-valued named field holds a
+//!     matched pair, never a delete beside an insert.
+//! 19. [`tokens_are_painted_whole`] - every byte of an operator such as `<=`, a boolean, or an
+//!     access modifier such as `private` carries the same highlighting.
 //!
-//! Invariants 4 and 5 were added on 2026-09-08 and wired in the same day, at **zero violations
-//! across all 249 painted fixtures** - so unlike the first three they arrived with no clamped
-//! fixtures behind them. Both are scoped to the paintings `FULL` is answerable to, via
-//! [`paintings_with_labels`]; `MINIMAL` is the tight reading and is free to leave whitespace
-//! alone, which is what invariant 6 states in its own right.
+//! 4 and 5 read only the paintings `FULL` answers to (see [`paintings_with_labels`]); `MINIMAL`
+//! is free to leave whitespace alone. 9 is the only rule comparing the two ground truths'
+//! rendered labels: they may chunk an edit differently, but cannot disagree about what survives.
+//! 10 to 15 read the tree mapping through [`Caches`], so they can ask about pairs and do not
+//! inherit the column-shift `Move` artifact that limits 9 to one direction. 14 compares tokens,
+//! not text, because `Identical` subtrees may differ in whitespace. 19 is also a rule of the
+//! renderer, which reads the same token list.
 //!
-//! Invariant 7 arrived on 2026-09-13 with seven `handmade` fixtures behind it, the only candidate
-//! of eleven measured that day that fired anywhere at all. Invariant 8 followed it the same day at
-//! **zero violations**, and is not vacuous for it: 285 fixtures carry both a `Minimal` and a `Full`
-//! painting, 2,653 bytes are painted `Move` by both of them, and not one of those is called
-//! `Insert` or `Delete` by the other preset. Invariant 9 is the same question asked across the two
-//! *ground truths* rather than across the two presets, and is the only rule here that compares them
-//! at all: they are expected to differ about how one edit is chunked, which is what the paper
-//! reports, and this is the one thing they cannot differ about. Four fixtures break it - five
-//! until 2026-09-14, when the fifth turned out to be the rule's own false positive rather than a
-//! contradiction in the data; see `unmatched_bytes`.
+//! Rejected as invariants: delimiter agreement *within a painting* (a `}` legitimately moves
+//! while its `{` stays) and "a matched pair lands in one painting entry" (a rename is ordinarily
+//! painted as a `Delete` plus an `Insert`).
 //!
-//! Invariants 10 to 15 read the tree mapping through [`Caches`] rather than through the renderer -
-//! so, unlike invariant 9, they can ask about the tree side's *pairs* and not only its rendered
-//! labels, and none of them inherits the column-shift `Move` artifact that limits 9 to one
-//! direction. Three cross the two ground truths at the leaf (10, 11, 12), one at the whole
-//! fixture (13), and two hold the mapping to itself (14, 15). Invariant 14 arrived at zero
-//! violations and is not vacuous: 159 `Identical` subtrees across 12 fixtures differ in
-//! whitespace, which is why it compares tokens and not text. The census also measured, and
-//! rejected, delimiter agreement *within a painting* (a `}` legitimately moves while its `{` stays
-//! put) and "a matched pair lands in one painting entry" (the ordinary `Delete`+`Insert`
-//! chunking of a rename, 99 fixtures).
-//!
-//! Invariant 18 arrived on 2026-09-21 with **five violations**, all of them cross-kind and none
-//! of them same-kind - see `research/data/quality/kind_mismatch_census_2026_09_21.md`. It is the
-//! one rule here derived from a census of what the corpus *declines* to match rather than what it
-//! records, and the asymmetry is the finding: where the two nodes share a kind the author could
-//! write `Update` and did, and where they did not the schema had nothing to offer and the solver
-//! asked a `y`/`n` question, so the author wrote delete+insert instead.
-//! `c-genymobile-scrcpy-big-change` shows both halves inside one statement - `count` -> `keyboard`
-//! recorded as an `Update` (same kind) while `0` -> `keyboard` in the same assignment was recorded
-//! as delete+insert (different kinds).
-//!
-//! It fires only where the position is unarguable: both nodes childless and named, their parents
-//! a matched pair, and the slot a *named* field holding exactly *one* child on both sides. Each
-//! of those was added to kill an observed false positive - an empty `arguments` node passing a
-//! "no named children" test, two unrelated comments in corresponding positions (comments carry no
-//! field), and a shell flag paired against a subcommand because a command's arguments are a list.
-//!
-//! Invariant 19 arrived on 2026-09-22 with **four violations in two fixtures**, both repaired the
-//! same day to the whole operator, which is the rule. `java-defects4j-jacksondatabind-16-annotationmap`
-//! painted `!=` against `==` one character wide, where
-//! `java-defects4j-chart-1-abstractcategoryitemrenderer` painted the same edit whole;
-//! `html-mozilla-pdf-add-closing-tags` painted only the `/` of a self-closing `/>`, now a `Match`
-//! of `>` against `/>` as its tree mapping already had it. Unlike the others it is also a rule of
-//! the renderer, which reads the same token list. On 2026-09-23 the list grew from operators to
-//! the booleans and the `private`/`protected` modifiers, at **zero** new violations: the corpus
-//! already paints those whole, and only the renderer was splitting them.
-//!
-//! **All nineteen are intra-fixture.** Each asks whether one fixture's mapping and paintings
-//! agree with each other; none compares two fixtures, so a pair whose paintings answer the same
-//! question differently is invisible to all of them. `cross_fixture_convention_census`
-//! (`tests/exploratory.rs`) is that other axis, and
-//! `research/data/quality/convention_violations_2026_09_18.md` is what it found.
-//!
-//! **Per fixture, not corpus-wide.** These are wired in as a third `invariants()` test in each
-//! `src/test/fixtures/**` file, next to that fixture's `mapping()` and `painting()`, so a fixture
-//! that violates one records how badly in its own file - the same "clamp at the observed number,
-//! with a dated note saying what it is" convention the other two already use, and the same reason:
-//! a corpus-wide test would have to carry a list of exempt fixture names, which is the one place
-//! nobody looks when they edit a fixture.
+//! **All nineteen are intra-fixture**; `cross_fixture_convention_census`
+//! (`tests/exploratory.rs`) covers the cross-fixture axis. They run as each fixture stub's
+//! `invariants()` test, so a fixture records its own known violations beside its other clamps
+//! rather than in a corpus-wide exemption list.
 
 use anyhow::Result;
 use tree_sitter::Node;
@@ -140,8 +86,7 @@ use crate::code::Code;
 use crate::diff::text::{RenderOptions, WHOLE_TOKENS};
 
 /// One painting projected to per-byte labels, `[before, after]` - `None` where nothing paints that
-/// byte. Named because every check here passes it around and `clippy::type_complexity` is right
-/// that the raw form reads badly in a signature.
+/// byte.
 type PaintedLabels = [Vec<Option<TextLabel>>; 2];
 
 /// Where a violation is, on one side.
@@ -149,22 +94,13 @@ type PaintedLabels = [Vec<Option<TextLabel>>; 2];
 pub struct ViolationSite {
     /// 0 = before, 1 = after - the same side convention `TextDiff::all` and `PaintedLabels` use.
     pub side: usize,
-    /// **0-based rows, byte columns** - the [`HumanTextSpan`] convention, which is what a painting
-    /// stores on disk and what `human_solver`'s text cursor addresses. The *messages* alongside
-    /// say 1-based rows instead, because that is what a file's gutter shows a reader. Anything
-    /// that consumes a site programmatically wants the former and anything that reads a message
-    /// wants the latter, so both exist rather than one being converted at every call.
+    /// **0-based rows, byte columns** (the [`HumanTextSpan`] convention, for tools). Messages say
+    /// 1-based rows, as a gutter shows them.
     pub span: HumanTextSpan,
 }
 
 /// One way a fixture's ground truth contradicts itself: which rule, what it says, and where to
-/// look.
-///
-/// The locations exist so a *tool* can act on the violation - `human_solver`'s `V` popup puts both
-/// trees and both text panels on a site - which a sentence with a row number in it cannot support.
-/// Every rule already holds this data while it builds its message (nodes for 3, 14 and 15, byte
-/// offsets for 2, 8 and 9, rows and columns for 1, 4, 5 and 6, raw spans for 7 and 13, leaves for
-/// 10, 11 and 12), so carrying it out is bookkeeping rather than a second analysis.
+/// look. The sites let a tool (`human_solver`'s `V` popup) jump to each location.
 #[derive(Debug, Clone)]
 pub struct GroundTruthViolation {
     /// Which of the nineteen rules, numbered as the module doc lists them.
@@ -178,11 +114,8 @@ pub struct GroundTruthViolation {
 }
 
 impl std::fmt::Display for GroundTruthViolation {
-    /// `[9] painting 'Full' before paints ...` - the rule's number, then its sentence.
-    ///
-    /// The number is not part of `message` because `human_solver`'s popup shows it in a column of
-    /// its own, where a repeated `[9]` in the text beside it would be noise. Everything that
-    /// prints a violation as one line wants it, so it is added here rather than at each of them.
+    /// `[9] painting 'Full' before paints ...` - the rule's number, then its sentence. Not part of
+    /// `message` because `human_solver`'s popup shows the number in its own column.
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "[{}] {}", self.invariant, self.message)
     }
@@ -204,11 +137,8 @@ impl GroundTruthViolation {
     }
 }
 
-/// At most this many sites are carried per violation.
-///
-/// Capped for the same reason the row list in a message is: a violation can cover hundreds of
-/// runs, and neither a popup nor a struct is improved by holding every one. The message's own
-/// count stays exact, so nothing is hidden - this bounds only how many of them can be jumped to.
+/// At most this many sites are carried per violation. The message's count stays exact; this only
+/// bounds how many can be jumped to.
 const MAX_SITES: usize = 20;
 
 /// The span covering `start..end` of `contents`, in 0-based rows and byte columns.
@@ -228,8 +158,7 @@ fn span_of_bytes(contents: &str, start: usize, end: usize) -> HumanTextSpan {
     }
 }
 
-/// The span a node occupies. `tree_sitter::Point::column` is already a byte offset into its row,
-/// which is the one thing that makes this a rename rather than a conversion.
+/// The span a node occupies (`tree_sitter::Point::column` is already a byte offset).
 fn span_of_node(node: Node) -> HumanTextSpan {
     HumanTextSpan {
         start_row: node.start_position().row,
@@ -239,12 +168,8 @@ fn span_of_node(node: Node) -> HumanTextSpan {
     }
 }
 
-/// Byte offsets on one side as sites, with contiguous offsets collapsed into one span each.
-///
-/// A per-byte site list is the wrong shape for every consumer: invariant 9's 60 bytes on
-/// `rust-next-font-imports-generator` are four runs of indentation, and a popup offering sixty
-/// jumps to four places is a popup nobody can use. `offsets` is expected in ascending order,
-/// which every caller produces by scanning a label vector forwards.
+/// Byte offsets on one side as sites, with contiguous offsets collapsed into one span each (a
+/// jump per byte is useless). `offsets` must be ascending.
 fn sites_from_offsets(side: usize, contents: &str, offsets: &[usize]) -> Vec<ViolationSite> {
     let mut sites: Vec<ViolationSite> = Vec::new();
     let mut run: Option<(usize, usize)> = None;
@@ -273,13 +198,9 @@ fn sites_from_offsets(side: usize, contents: &str, offsets: &[usize]) -> Vec<Vio
     sites
 }
 
-/// What invariants 2 and 8 carry while scoring one `Minimal` alternative against every `Full` one.
-///
-/// Both rules report only the closest counterpart, because the alternatives are a disjunction -
-/// see [`full_painting_covers_minimal`] - so both keep a best-so-far and everything needed to
-/// describe it. They differ only in what counts as a disagreement, which is why the bookkeeping is
-/// one type: invariant 2 names the `Full` painting in its message and has no example to give,
-/// invariant 8 gives an example that already names both paintings and so never reads the name.
+/// What invariants 2 and 8 carry while scoring one `Minimal` alternative against every `Full` one:
+/// both report only the closest counterpart, since the alternatives are a disjunction (see
+/// [`full_painting_covers_minimal`]).
 struct ClosestFull<'a> {
     /// Bytes the two disagree about - the number being minimised.
     count: usize,
@@ -313,10 +234,8 @@ pub fn ground_truth_invariant_violations(name: &str) -> Result<Vec<GroundTruthVi
 }
 
 /// [`ground_truth_invariant_violations`] over an already-loaded mapping and code pair.
-///
-/// **This is the one `human_solver` must call**, never the by-name form: that one reads
-/// `human_mapping.json` off disk, and the solver's mapping is in memory and usually unsaved, so a
-/// disk read would report violations the reader has just repaired.
+/// **`human_solver` must call this one**: its mapping is in memory and usually unsaved, so the
+/// by-name form would report violations the reader has just repaired.
 pub fn ground_truth_invariant_violations_for(
     mapping: &super::HumanMapping,
     before: &Code,
@@ -324,9 +243,8 @@ pub fn ground_truth_invariant_violations_for(
 ) -> Result<Vec<GroundTruthViolation>> {
     let mut violations = Vec::new();
 
-    // One byte-label vector per painting per side, built once: every check that reads the
-    // painting reads it through exactly the projection the scorer does (`label_bytes`), so an
-    // invariant can never fire on a byte no comparison would ever look at.
+    // Every check reads the painting through the scorer's own projection (`label_bytes`), so an
+    // invariant can never fire on a byte no comparison looks at.
     let mut paintings: Vec<(&str, PaintedLabels)> = Vec::new();
     for named in &mapping.text_mappings {
         paintings.push((named.name.as_str(), painted_labels(named, before, after)?));
@@ -335,8 +253,7 @@ pub fn ground_truth_invariant_violations_for(
     for (name, labels) in &paintings {
         violations.extend(rows_end_on_visible_characters(name, labels, before, after));
     }
-    // Reads the spans rather than the labels, so it takes the paintings themselves - see
-    // `painted_ranges_do_not_overlap` on why the projection cannot answer this one.
+    // Reads the spans, not the labels - see `painted_ranges_do_not_overlap`.
     for named in &mapping.text_mappings {
         violations.extend(painted_ranges_do_not_overlap(named, before, after));
     }
@@ -383,9 +300,7 @@ pub fn ground_truth_invariant_violations_for(
         ));
         violations.extend(single_valued_fields_hold_a_pair(&context, before, after));
     }
-    // Invariants 4 and 5 read only the paintings `FULL` answers to, so they take their own pass
-    // over `paintings_with_labels` rather than the `paintings` list above - which holds every
-    // painting, `Minimal` ones included, and those two rules have nothing to say about those.
+    // Invariants 4 and 5 read only the paintings `FULL` answers to.
     let (leading, interior, minimal_indentation) =
         full_painting_whitespace_violations(mapping, before, after)?;
     violations.extend(leading);
@@ -421,37 +336,15 @@ pub(crate) fn painted_labels(
 // Invariant 1: a painted row ends on a visible character
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 
-/// No painted run may end in a row's **trailing** whitespace.
+/// No painted run may end in a row's **trailing** whitespace: a stripe of colour hanging off the
+/// end of a line, pointing at nothing.
 ///
-/// Highlighted trailing whitespace is a stripe of colour hanging off the end of a line, pointing
-/// at nothing - it says "something happened here" about a region with no content to have happened
-/// to.
+/// A run ending on a space mid-row is the ordinary shape of an edit (deleting `foo ` from
+/// `foo bar`), and a run that is *entirely* whitespace has no visible character to end on; both
+/// pass. A row with nothing visible is skipped: no painting of it could pass.
 ///
-/// Trailing is the operative word, and until 2026-09-11 this checked only whether the row's last
-/// painted byte was whitespace - which also condemned every run that stops on a space *in the
-/// middle* of a line. Those are the ordinary shape of an edit, not a stripe hanging off anything:
-/// deleting one of the two spaces in `Team.  All` paints a single mid-row space, and deleting
-/// `foo ` from `foo bar` paints a run ending on one. Both are now accepted, as is a run that is
-/// *entirely* whitespace - it has no visible character it could have ended on, so there is no
-/// spelling of it this rule would take.
-///
-/// The rendering side of this was fixed in the product on 2026-08-31 (`columns_on_row` bounds
-/// every painted row to that row's own content), so what remains is the data: a span whose
-/// `end_column` sits a few columns past the last real character still *claims* that whitespace,
-/// and every consumer that reads bytes rather than rendering them - the scorer included - honours
-/// the claim.
-///
-/// **A row with nothing visible on it is skipped.** On a blank-but-indented line there is no
-/// character that could legally end a painted run, so the rule has nothing to say rather than
-/// condemning every possible painting of it. That is a real limit and not a loophole: interior
-/// whitespace lives in the gaps between AST nodes where no painting can reach, which is why a
-/// whitespace-only commit renders as nothing at all (measured 2026-09-05).
-///
-/// Checked against the *projected* labels, not the raw spans, deliberately. `label_bytes` already
-/// drops the `\n` a span ending at column 0 of the next row swallows, so a span written that way -
-/// 28 of them in the corpus, an artifact of how `from_treesitter_range` normalises a range ending
-/// at end of row - is not reported: nothing downstream paints that newline. What is reported is
-/// what a reader would actually see coloured.
+/// Checked against the projected labels, not raw spans, so the `\n` a span ending at column 0 of
+/// the next row swallows is not reported: nothing paints it.
 fn rows_end_on_visible_characters(
     painting: &str,
     labels: &PaintedLabels,
@@ -485,23 +378,12 @@ fn rows_end_on_visible_characters(
             if !character.is_whitespace() {
                 continue;
             }
-            // Whitespace only counts if it is *trailing* - nothing visible after it on the row.
-            // A painted run that stops on a space in the middle of a line is the ordinary shape
-            // of an edit, not a defect: deleting one of two spaces from `Team.  All` paints a
-            // single mid-row space, and deleting `foo ` from `foo bar` paints a run ending on
-            // one. Neither renders as a stripe hanging off the end of anything, which is the
-            // whole complaint this rule exists to make.
+            // Only *trailing* whitespace counts.
             if line[boundary..].chars().any(|c| !c.is_whitespace()) {
                 continue;
             }
-            // A run that is *all* whitespace has no visible character it could have ended on, so
-            // there is no painting of it this rule would accept. Same exemption, and the same
-            // reason, as the blank-row skip above: condemning every possible spelling of an edit
-            // is not a useful thing for an invariant to do. A commit that strips trailing spaces
-            // is exactly this shape.
-            // Both ends are snapped to character boundaries before slicing: `last` is a *byte*
-            // index and either end can land inside a multi-byte character (163 corpus files are
-            // not ASCII).
+            // An all-whitespace run is exempt. Both ends snap to character boundaries: `last` is a
+            // byte index.
             let run_start = (0..=last)
                 .rev()
                 .take_while(|&i| labels[side][start + i].is_some())
@@ -537,19 +419,11 @@ fn rows_end_on_visible_characters(
 
 /// Whatever `Minimal` paints, `Full` paints too.
 ///
-/// The two presets differ in *how much* of an edit to highlight, not in *what* the edit is:
-/// `Minimal` is the tightest defensible reading and `Full` the most generous, so a byte the tight
-/// reading calls changed cannot be one the generous reading calls untouched. The colour may
-/// differ - `Full` routinely widens a `Move` into the `Update` that contains it - so only
-/// painted-or-not is compared, which is exactly the part the two presets are not free to disagree
-/// about.
-///
-/// A fixture painted once asserts its rendering is unambiguous and both presets answer to that one
-/// painting, so there is nothing to compare and nothing is reported. Where a preset carries
-/// several alternatives (`Minimal (left)`, `Minimal (right)` - two equally correct readings of the
-/// same edit), each `Minimal` alternative need only be covered by *some* `Full` alternative: the
-/// alternatives are a disjunction, and holding one arm of it to another arm's `Full` would be
-/// asserting a pairing the painter never claimed.
+/// The presets differ in *how much* of an edit to highlight, not in *what* the edit is. Only
+/// painted-or-not is compared, since `Full` routinely widens a `Move` into the enclosing `Update`.
+/// A lone painting answers for both presets, so nothing is compared. With several alternatives
+/// per preset, each `Minimal` need only be covered by *some* `Full`: holding one arm of a
+/// disjunction to another's `Full` asserts a pairing the painter never claimed.
 fn full_painting_covers_minimal(
     mapping: &super::HumanMapping,
     before: &Code,
@@ -561,8 +435,7 @@ fn full_painting_covers_minimal(
     ) else {
         return Ok(Vec::new());
     };
-    // A single painting answers for both presets - the same `NamedTextMapping` on both sides of
-    // the comparison, which is trivially its own superset.
+    // A single painting is trivially its own superset.
     if minimal
         .iter()
         .all(|m| full.iter().any(|f| std::ptr::eq(*m, *f)))
@@ -636,21 +509,9 @@ fn full_painting_covers_minimal(
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 
 /// Every painting of `mapping` that `options`' own rules can be held to, paired with its per-byte
-/// labels.
-///
-/// `paintings_for_mode` answers with the fixture's single painting when it has only one, so a
-/// fixture painted once is measured here too: that one painting is what the preset is scored
-/// against, so it is what the preset's rules have to hold for.
-///
-/// **Except when that sole painting is explicitly named for the *other* preset.** Six fixtures
-/// were in that state on 2026-09-08 - five named `Minimal` (`cpp-ollama-ollama-update-commit-hash-3`
-/// through `-6`, `javascript-typescript-interesting-small-edit-refactor`) and one named `Full`
-/// (`c-openssl-openssl-whitespace-only`) - and `paintings_for_mode` hands a lone painting back for
-/// both presets regardless of its name, because a lone painting has to answer for both. Holding a
-/// reading the painter labelled *minimal* to the generous preset's closure rules, or one they
-/// labelled *full* to the tight preset's prohibition, asserts something they never claimed. All
-/// six have since been renamed to `Only one solution`; the filter stays as a guard against the
-/// state recurring.
+/// labels. A lone painting counts for both presets - **except** when it is explicitly named for
+/// the *other* preset: holding a reading labelled *minimal* to the generous preset's rules
+/// asserts something the painter never claimed.
 pub(crate) fn paintings_with_labels<'a>(
     mapping: &'a super::HumanMapping,
     before: &Code,
@@ -660,8 +521,8 @@ pub(crate) fn paintings_with_labels<'a>(
     let Ok(paintings) = paintings_for_mode(mapping, options) else {
         return Ok(Vec::new());
     };
-    // Only a *lone* painting can be misnamed in the way this guards against: with two or more,
-    // `paintings_for_mode` has already filtered to the ones named for this preset.
+    // Only a *lone* painting can be misnamed this way: with several, `paintings_for_mode` has
+    // already filtered by name.
     let wanted_minimal = options == RenderOptions::MINIMAL;
     paintings
         .iter()
@@ -674,21 +535,15 @@ pub(crate) fn paintings_with_labels<'a>(
         .collect()
 }
 
-/// Whether a painting's name declares it the `Minimal` reading - exactly the name, or the name
-/// followed by a qualifier, matching `human_mapping::designates_preset`'s own rule.
-///
-/// `pub` for `human_solver`, which asks the same question about the painting being edited: invariant
-/// 6 below is a rule it can keep for the painter rather than report afterwards (see
-/// `action_paint_one_sided`'s leading-whitespace split).
+/// Whether a painting's name declares it the `Minimal` reading (the name, or the name and a
+/// qualifier - `human_mapping::designates_preset`'s rule). `pub` for `human_solver`, which keeps
+/// invariant 6 for the painter as they paint.
 pub fn designates_minimal(name: &str) -> bool {
     super::designates_preset(name, "Minimal")
 }
 
-/// Whether a painting's name declares it the `Full` reading. See [`designates_minimal`].
-///
-/// `pub` for the same reason that one is: `human_solver` asks both questions when it branches a
-/// painting, because invariant 4 below is the rule it can keep for the painter on the way from one
-/// preset to the other.
+/// Whether a painting's name declares it the `Full` reading. `pub` for `human_solver`, which keeps
+/// invariant 4 for the painter when branching a painting.
 pub fn designates_full(name: &str) -> bool {
     super::designates_preset(name, "Full")
 }
@@ -703,41 +558,17 @@ fn rows_of(contents: &str) -> impl Iterator<Item = (usize, usize, &str)> {
     })
 }
 
-/// **Invariant 4.** If a `Full` painting calls *every* visible character on a line
-/// inserted, or every one of them deleted, the whole line - its whitespace included - carries that
-/// verdict.
+/// **Invariant 4.** If a `Full` painting calls *every* visible character on a line inserted, or
+/// every one deleted, the whole line up to its last visible character - whitespace included - is
+/// accounted for. A line entering or leaving the file does so whole; unpainted whitespace in it
+/// reads as several edits to a surviving line. The data-side counterpart of
+/// `RenderOptions::leading_whitespace`.
 ///
-/// A line all of whose content is entering or leaving the file is entering or leaving *whole*. Its
-/// indentation is not a survivor sitting on an inserted line and the spaces between its tokens are
-/// not untouched ground; they are part of what was inserted. Painting the code but not the
-/// whitespace draws a highlight broken into pieces, which reads as several edits to a surviving
-/// line rather than one line arriving or departing. This is the data-side counterpart of the
-/// closure `RenderOptions::leading_whitespace` already applies when rendering under `FULL` (see
-/// that field's doc comment, and `extend_leading_whitespace`).
-///
-/// **The condition is "all of them", not "the first one".** Asking only whether the first visible
-/// character is `Insert`/`Delete` and requiring the indentation to match is a different and wrong
-/// claim, because a *surviving* line can begin with an inserted token and keep every space after
-/// it untouched, which no rule should forbid. Requiring the whole line to be one verdict before
-/// saying anything about its whitespace is what makes the conclusion follow: there is nothing on
-/// the line that survived, so there is nothing for the unpainted whitespace to belong to.
-///
-/// Scoped to `Insert`/`Delete` deliberately. A line entirely `Move`d or `Update`d is still a
-/// surviving line whose whitespace genuinely may not have changed - `Full` widening a `Move` over
-/// a reindented block is exactly the case `paint_reindent_only_moves` exists for, and it has no
-/// business claiming the old indentation as part of the move.
-///
-/// **What the whitespace has to be is *accounted for*, not identically labelled.** A deleted line
-/// and the inserted line that replaces it can share their indentation, and a painter may say so by
-/// pairing the two runs in one `Match` entry - which resolves to `Move`, a different label from
-/// the `Insert`/`Delete` around it. That is a stronger claim than painting it `Insert`, not a
-/// weaker one: it names the surviving bytes and their counterpart on the other side.
-/// `go-lazygit-switch-to-strings` row 22 is the corpus's example, `\t\t\tindentation += "  "`
-/// against `\t\t\tcount++`. So only an **unpainted** byte is reported; any verdict at all passes.
-///
-/// A line with no visible character at all is skipped: "every visible character is `Insert`" is
-/// vacuously true there, and an all-whitespace line's own painting is what invariant 1 already
-/// declines to judge.
+/// "All of them", not "the first one": a *surviving* line may begin with an inserted token.
+/// Only `Insert`/`Delete`: a wholly `Move`d or `Update`d line survives, and its whitespace may
+/// genuinely be unchanged. Any verdict on the whitespace passes, only **unpainted** bytes are
+/// reported: pairing shared indentation in a `Match` is a stronger claim, not a weaker one
+/// (`go-lazygit-switch-to-strings` row 22). A line with nothing visible is skipped.
 fn full_paints_a_wholly_changed_line_whole(
     painting: &str,
     labels: &PaintedLabels,
@@ -767,13 +598,8 @@ fn full_paints_a_wholly_changed_line_whole(
             {
                 continue;
             }
-            // Up to and including the last visible character, never past it. Invariant 1 forbids
-            // a painted run *ending* on whitespace, so "the whole line" cannot mean the trailing
-            // whitespace too without the two rules contradicting each other - and they would, on
-            // real data: measured 2026-09-08, 16 of this check's 18 hits were a lone trailing
-            // `\r` on a CRLF file or one trailing space, i.e. bytes invariant 1 exists to keep
-            // unpainted. The line's *content* is what enters or leaves whole; what follows it is
-            // the stripe of colour hanging off the end that invariant 1 already refuses.
+            // Never past the last visible character: trailing whitespace is what invariant 1
+            // forbids painting, so including it would make the two rules contradict each other.
             let end = visible.last().copied().unwrap_or(0)
                 + line[visible.last().copied().unwrap_or(0)..]
                     .chars()
@@ -782,8 +608,7 @@ fn full_paints_a_wholly_changed_line_whole(
             let unpainted: Vec<usize> = (0..end)
                 .filter(|&i| labels[side][start + i].is_none())
                 .collect();
-            // The exact columns, not just how many: this list is read by a human repairing the
-            // painting by hand, and "12 of 16" does not say *which* twelve.
+            // The exact columns: a human repairing the painting needs *which* bytes.
             if let (Some(&low), Some(&high)) = (unpainted.first(), unpainted.last()) {
                 violations.push(GroundTruthViolation::new(
                     4,
@@ -805,17 +630,9 @@ fn full_paints_a_wholly_changed_line_whole(
     violations
 }
 
-/// **Invariant 5.** A `Full` painting never leaves a run of whitespace unpainted
-/// between two painted regions on the same line.
-///
-/// `Full` is the generous reading: once both sides of a gap are highlighted, the space between
-/// them is not a third, untouched thing - leaving it unpainted breaks one highlight into two and
-/// reads as two separate edits. Only runs that are *entirely* whitespace are reported; an
-/// unpainted run holding any visible character is a real gap between two real edits and this rule
-/// has nothing to say about it.
-///
-/// Both painted neighbours have to exist on the same row, so a painted run reaching the end of a
-/// line closes nothing across the newline.
+/// **Invariant 5.** A `Full` painting never leaves an all-whitespace run unpainted between two
+/// painted regions on the same row: that breaks one highlight into two edits. A gap holding any
+/// visible character is a real gap between two edits and passes.
 fn no_unpainted_whitespace_between_painted_regions(
     painting: &str,
     labels: &PaintedLabels,
@@ -863,25 +680,11 @@ fn no_unpainted_whitespace_between_painted_regions(
 
 /// **Invariant 6.** A `Minimal` painting never paints a line's leading whitespace.
 ///
-/// The mirror of invariant 4, and the reason the two presets need separate rules rather than one
-/// shared one. `Minimal` is the tightest defensible reading of an edit: nobody marking up a diff
-/// by hand draws the highlight through the indentation in front of the code they are pointing at,
-/// on any line, whether that line is new or edited in place. `RenderOptions::leading_whitespace`
-/// is off under `MINIMAL` for exactly this reason and its own doc comment carries the corpus
-/// measurement behind it (flipping the then-separate interior-indentation half to `false` alone
-/// moved the handmade aggregate 1.2590% -> 1.1811% across ~40 fixtures). This is the data side of
-/// that setting: a `Minimal` painting that claims the indentation is grading codediff against a
-/// reading `MINIMAL` will never produce.
-///
-/// **Unconditional on the verdict, unlike invariant 4.** Invariant 4 has to ask what the rest of
-/// the line says before it can conclude anything about the whitespace, because on a *surviving*
-/// line the indentation genuinely may be untouched. Here there is nothing to ask: `Minimal` paints
-/// as few bytes as it can, so leading whitespace is out under every verdict - `Insert` on a new
-/// line included, which is precisely where `Full` and `Minimal` part company.
-///
-/// A line with no visible character is skipped, as in invariants 1 and 4. Its whole content is
-/// whitespace, so "leading whitespace" is not a distinguishable part of it, and condemning every
-/// possible painting of such a line is not a claim this rule is making.
+/// The mirror of invariant 4, and the data side of `RenderOptions::leading_whitespace` being off
+/// under `MINIMAL`: a `Minimal` painting that claims indentation grades codediff against a
+/// reading `MINIMAL` never produces. Unconditional on the verdict, `Insert` on a new line
+/// included - that is exactly where the presets part company. A line with nothing visible is
+/// skipped, as in invariants 1 and 4.
 fn minimal_never_paints_leading_whitespace(
     painting: &str,
     labels: &PaintedLabels,
@@ -918,13 +721,8 @@ fn minimal_never_paints_leading_whitespace(
     violations
 }
 
-/// The three preset-scoped whitespace rules, as `(invariant 4, invariant 5, invariant 6)`.
-///
-/// [`ground_truth_invariant_violations_for`] calls this and flattens all three into its own list;
-/// they stay separate here so a caller sweeping the corpus can say which of the three a fixture is
-/// failing rather than only that it failed. The first two read
-/// the paintings `FULL` answers to and the third those `MINIMAL` answers to, which on a
-/// two-painting fixture are different objects entirely.
+/// The three preset-scoped whitespace rules, as `(invariant 4, invariant 5, invariant 6)`, kept
+/// apart so a corpus sweep can say which one a fixture fails.
 pub fn full_painting_whitespace_violations(
     mapping: &super::HumanMapping,
     before: &Code,
@@ -937,11 +735,8 @@ pub fn full_painting_whitespace_violations(
     let mut leading = Vec::new();
     let mut interior = Vec::new();
     let mut minimal_indentation = Vec::new();
-    // A fixture painted once is asserting that its rendering is *unambiguous*, not that it follows
-    // `Full`'s conventions; `paintings_for_mode` hands that one painting to both presets as a
-    // grading convenience, and invariant 5 reading it as a `Full` painting is the check borrowing
-    // an intention the painter never expressed. `Full`'s "account for every byte whose role
-    // changed" is exactly the convention a single painting declines to pick.
+    // A lone painting asserts its rendering is unambiguous, not that it follows `Full`'s
+    // conventions, so invariant 5 applies only to a painting actually named for `Full`.
     let named_for_full = mapping.text_mappings.len() > 1;
     for (painting, labels) in paintings_with_labels(mapping, before, after, RenderOptions::FULL)? {
         leading.extend(full_paints_a_wholly_changed_line_whole(
@@ -967,24 +762,11 @@ pub fn full_painting_whitespace_violations(
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 
 /// **Invariant 8.** A byte one preset paints `Move` is never painted `Insert` or `Delete` by the
-/// other.
+/// other. `Move` says the bytes *survive*; two renderings of one edit cannot disagree about that.
 ///
-/// `Move` is the one verdict that asserts the bytes *survive*: a `Match` whose two spans read
-/// byte-identically is the same code somewhere else. `Delete` says those bytes leave the file and
-/// `Insert` says they arrive in it. The two presets are two renderings of one edit, so whatever
-/// else they may disagree about, they cannot disagree about whether the code is still there.
-///
-/// **`Move` against `Update` is not a contradiction and is not reported.** That pair is the
-/// ordinary difference between the presets, stated in [`full_painting_covers_minimal`]: `Full`
-/// routinely widens a `Move` into the `Update` that contains it, and both readings agree the code
-/// survived. Only the survive-or-not pair is a contradiction, which is why this rule is narrower
-/// than "the two presets label every shared byte the same" - a rule that shape fires on 20
-/// fixtures and would be measuring the widening.
-///
-/// Alternatives are a disjunction, exactly as in invariant 2: a `Minimal (left)` need only be
-/// consistent with *some* `Full` alternative, so each `Minimal` is scored against its closest
-/// `Full` and only an alternative that contradicts every one of them is reported. A fixture whose
-/// single painting answers for both presets has nothing to compare and is skipped.
+/// `Move` against `Update` is the ordinary widening between presets (see
+/// [`full_painting_covers_minimal`]) and is not reported. Alternatives are a disjunction, as in
+/// invariant 2: each `Minimal` is scored against its closest `Full`. A lone painting is skipped.
 fn presets_agree_on_what_survives(
     mapping: &super::HumanMapping,
     before: &Code,
@@ -1090,28 +872,13 @@ fn presets_agree_on_what_survives(
 
 /// **Invariant 7.** No two ranges of one painting claim the same byte.
 ///
-/// An overlap is not representable. `render_paint_side` resolves one per byte by `PaintClass`'s
-/// `max`, so the highest-ranked *verdict* wins on screen, while `label_bytes` below fills its array
-/// in list order, so the *last entry* wins when the painting is scored. A painting with an overlap
-/// therefore looks like one thing and grades as another, and neither reader says so.
+/// An overlap renders one way (`render_paint_side` takes the highest-ranked verdict) and scores
+/// another (`label_bytes` takes the last entry). `human_solver` refuses new ones at the keystroke
+/// (`overlapping_painted_range`); this checks what is on disk.
 ///
-/// `human_solver` refuses a new one at the keystroke (`overlapping_painted_range`), which is why
-/// the corpus holds so few: the seven that remain were painted before that check existed. This is
-/// the same rule applied to what is already on disk.
-///
-/// **Checked against the raw spans, not the projected labels**, which is the one design decision
-/// here worth stating. Every other check in this file reads `label_bytes`' output, so that an
-/// invariant can never fire on a byte no comparison would look at. That projection is exactly what
-/// destroys the evidence for this rule - the later span simply wins and the array cannot tell you
-/// anything was ever double-claimed - so this walks the spans themselves.
-///
-/// A line terminator is never painted, whatever span covers it (see `label_bytes`), so two ranges
-/// meeting at a line break share only the newline and do not overlap. On a CRLF file the break is
-/// both bytes.
-///
-/// One violation per range that lands on ground an earlier range of the same painting already
-/// claimed, counted per side. A range overlapping two earlier ones still reports once: the repair
-/// is the same edit either way.
+/// **Checked against the raw spans**, unlike every other rule: the projection is exactly what
+/// hides a double claim. Line terminators are never painted, so ranges meeting at a line break do
+/// not overlap. One violation per range that lands on an earlier range's ground, per side.
 fn painted_ranges_do_not_overlap(
     named: &NamedTextMapping,
     before: &Code,
@@ -1120,7 +887,7 @@ fn painted_ranges_do_not_overlap(
     let mut violations = Vec::new();
     for (side, contents) in [(0usize, &before.contents), (1usize, &after.contents)] {
         let bytes = contents.as_bytes();
-        // Which entry claimed each byte, in list order - the same order `label_bytes` resolves by.
+        // Which entry claimed each byte, in list order - the order `label_bytes` resolves by.
         let mut claimed: Vec<Option<usize>> = vec![None; contents.len()];
         for (index, entry) in named.mapping.entries.iter().enumerate() {
             let spans = if side == 0 {
@@ -1163,8 +930,7 @@ fn painted_ranges_do_not_overlap(
                             index,
                             row + 1,
                         ),
-                        // The offending range whole, not just the byte that clashed: shortening
-                        // one of the two ranges is the repair, so the range is what to look at.
+                        // The whole offending range: shortening a range is the repair.
                         vec![ViolationSite {
                             side,
                             span: span_of_bytes(contents, start, end.min(contents.len())),
@@ -1183,34 +949,17 @@ fn painted_ranges_do_not_overlap(
 
 /// **Invariant 9.** A byte the painting calls `Move` is not one the tree mapping leaves unmatched.
 ///
-/// The two ground truths are authored independently and are *expected* to differ: they chunk one
-/// edit completely differently, which is what [`super::text_mapping_disagreements`] measures and
-/// what the paper reports. This is the one thing they cannot differ about. A painted `Move` is a
-/// `Match` whose two spans read byte-identically, so the painter has said that code survives; an
-/// unmatched node in the tree mapping is one the same person said has no counterpart. Both
-/// statements are about the same bytes and only one of them can hold.
+/// The two ground truths chunk one edit differently by design (see
+/// [`super::text_mapping_disagreements`]), but a painted `Move` says the code survives and an
+/// unmatched node says it has no counterpart; only one can hold.
 ///
-/// **Only that direction.** The tree side's own `Move` labels come from `TextDiff::from`'s
-/// column-shift heuristic rather than from either ground truth - neither expresses `Move`
-/// positionally - so a byte the *tree* renders `Move` and the painting calls `Delete` measures the
-/// renderer, not the humans. That pair is the larger of the two in the corpus (753 bytes over 8
-/// fixtures against 96 over 5) and is deliberately not reported.
+/// **Only that direction**: the tree side's own `Move` labels come from `TextDiff::from`'s
+/// column-shift heuristic, so a tree `Move` against a painted `Delete` measures the renderer, not
+/// the humans. **And only where the mapping really leaves the byte unmatched**, per
+/// [`unmatched_bytes`]: `TextDiff::from` also emits `Delete`/`Insert` for characters edited inside
+/// a matched leaf (`rust-rust-lang-rust-update-comment`).
 ///
-/// **And only where the mapping really does leave the byte unmatched**, which is checked against
-/// [`Caches`] rather than read off the rendering. Until 2026-09-14 this rule took a tree-side
-/// `Delete` or `Insert` as proof of an unmatched node, on the strength of a claim in this very
-/// comment that turned out to be false: `TextDiff::from` also emits them for the characters that
-/// *changed inside a matched-but-edited leaf*. `rust-rust-lang-rust-update-comment` is the case
-/// that exposed it - a fixture with no unmatched node at all (187 `Identical` entries and 12
-/// `MatchButNotIdentical`, nothing else) that was reported for two bytes of an edited comment,
-/// where the painter put a colon at the head of the surviving text and the renderer put it at the
-/// tail of the deleted text. A seam, not a contradiction. [`unmatched_bytes`] is the gate, and it
-/// drops exactly that one violation: the other four fixtures this fires on sit in nodes the
-/// mapping genuinely marks deleted or inserted.
-///
-/// Every painting is checked rather than the best-matching one. Each named painting asserts that
-/// it is a correct rendering of the edit, and a rendering that contradicts the mapping about
-/// survival is wrong whether or not a sibling painting agrees.
+/// Every painting is checked, not the best one: each claims to be a correct rendering.
 fn mapping_and_painting_agree_on_what_survives(
     mapping: &super::HumanMapping,
     before: &Code,
@@ -1268,19 +1017,11 @@ fn mapping_and_painting_agree_on_what_survives(
 /// Per byte of one side, whether the **smallest node containing it** is one the tree mapping
 /// leaves unmatched.
 ///
-/// **A node its multi-map group leaves free does not count as unmatched**, for the reason
-/// [`delimiter_pairs_agree`] gives at length: which member of a group is the one left over is
-/// [`representative_entries`](super::representative_entries)' choice, not the human's, so reading
-/// it as "the mapping says this is gone" contradicts a painting that simply made the other choice.
-/// `java-defects4j-chart-9-timeseries` was exactly that - one `(` of a 1:2 group, painted as
-/// surviving by `Full (outer parenthesis)` and inserted by the flattening.
-///
-/// Painted in preorder so a child overwrites its parent. A `Matched` node inside a
-/// `DeleteWithChildren` one therefore reads as matched, while the whitespace *between* that
-/// node's children - which no node of its own covers - keeps the parent's answer. That is exactly
-/// what `descendant_for_byte_range` would say for each byte, in one walk rather than one lookup
-/// per byte, and the inter-token-whitespace case is not a detail: 60 of the bytes this rule still
-/// reports are the indentation inside a `block` the mapping deletes, which no leaf covers.
+/// A node its multi-map group leaves free does not count: which member is left over is
+/// [`representative_entries`](super::representative_entries)' choice, not the human's
+/// (`java-defects4j-chart-9-timeseries`). Painted in preorder so a child overwrites its parent,
+/// and whitespace between children keeps the parent's answer - what `descendant_for_byte_range`
+/// would say per byte, in one walk.
 fn unmatched_bytes(
     root: Node,
     len: usize,
@@ -1308,12 +1049,8 @@ fn unmatched_bytes(
     mask
 }
 
-/// [`mapping_and_painting_agree_on_what_survives`]' comparison, over the projections it has
-/// already built - split out so it can be tested against label vectors directly. Building the tree
-/// side needs a real `ASTDiff` and a renderer, and what this rule says is about the labels.
-///
-/// `unmatched` is [`unmatched_bytes`]' output per side, and is what keeps a tree-side `Delete`
-/// over a *matched* node from being read as a missing counterpart.
+/// [`mapping_and_painting_agree_on_what_survives`]' comparison over the built projections, split
+/// out to test against label vectors. `unmatched` is [`unmatched_bytes`]' output per side.
 fn move_against_unmatched(
     painting: &str,
     painted: &PaintedLabels,
@@ -1335,15 +1072,9 @@ fn move_against_unmatched(
                 // The renderer says these bytes went away; only the mapping can say whether that
                 // is a node with no counterpart or a character edited out of one that has one.
                 || !unmatched[side].get(offset).copied().unwrap_or(false)
-                // Whitespace is not something either ground truth can own. It lives in the gaps
-                // between tokens, where the tree has no node at all, so `unmatched_bytes` can only
-                // give it the verdict of whatever encloses it - while a `Full` painting takes the
-                // indentation along with the construct it belongs to, which is what
-                // `leading_whitespace` means. The two are then made to disagree about bytes
-                // neither of them is really describing. Both instances this rule reported on
-                // 2026-09-15 were exactly that: 20 columns of indentation in front of an `else`
-                // whose condition genuinely moved (`java-defects4j-cli-12-gnuparser`), and four
-                // runs of indentation inside a deleted block (`rust-next-font-imports-generator`).
+                // Whitespace lives between tokens, where the tree has no node, so neither ground
+                // truth really describes it: `unmatched_bytes` gives it the enclosing verdict while
+                // a `Full` painting takes indentation with its construct.
                 || contents.as_bytes()[offset].is_ascii_whitespace()
             {
                 continue;
@@ -1383,16 +1114,9 @@ fn move_against_unmatched(
 // Invariant 3: a delimiter and its partner carry one verdict
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 
-/// The delimiters this pairs, opener to the closers that may end it.
-///
-/// Taken from the corpus rather than from a grammar: every anonymous leaf whose kind *is* its own
-/// text, over all 628 fixtures, is one of these twelve. The `kind == text` test is what keeps a
-/// `)` inside a string literal or a comment out - those are `string_content`/`text`/`word` leaves
-/// that merely happen to read `)`, and there are several hundred of them.
-///
-/// `<` takes `/>` as well as `>` because a self-closing tag ends with one; `<` with no closer at
-/// all among its parent's children (`a < b`, and every other comparison) simply never forms a
-/// pair, so nothing is asserted about it.
+/// The delimiters this pairs, opener to the closers that may end it: every anonymous leaf in the
+/// corpus whose kind *is* its own text. `kind == text` keeps a `)` inside a string or comment
+/// out. `<` also takes `/>`; a `<` with no closer among its siblings (`a < b`) never pairs.
 const DELIMITERS: &[(&str, &[&str])] = &[
     ("(", &[")"]),
     ("[", &["]"]),
@@ -1415,53 +1139,24 @@ fn is_closer(kind: &str) -> bool {
         .any(|(_, closers)| closers.contains(&kind))
 }
 
-/// Mark one delimiter in the tree mapping and you have said something about the construct it
-/// opens, so its partner must say the same thing: nobody deletes a `(` and keeps its `)`.
+/// **Invariant 3.** A delimiter and its partner carry one status in the tree mapping: nobody
+/// deletes a `(` and keeps its `)`.
 ///
-/// **The tree mapping only - the painting is deliberately not checked this way.** It was, and the
-/// corpus answered: a delimiter can be *replaced by a different delimiter*, and a painting that
-/// says so correctly looks like a contradiction here. `<tag>` becoming `<tag/>` makes the `/>`
-/// genuinely new while the `<` it closes is not, and a CSS rule collapsing onto one line moves its
-/// `}` without moving its `{`. Both were painted right and both were reported. The tree mapping
-/// cannot express that shape - a node is one node, matched or not - so a `{` marked inserted whose
-/// `}` is matched really is two claims about one construct. The rule holds where identity is the
-/// subject and fails where motion and content are, so it is asked only of the mapping.
+/// **The mapping only.** A painting may legitimately replace one delimiter with another (`<tag>`
+/// becoming `<tag/>`) or move a `}` without its `{`; a tree node is matched or not, so there the
+/// two halves really are two claims about one construct.
 ///
-/// **Pairing is structural, within one parent's direct children.** A stack over those children in
-/// order pairs each closer with the nearest unclosed opener that admits it, so a parent holding
-/// two pairs pairs them correctly and an unmatched delimiter is left out rather than paired with
-/// something arbitrary. Nothing crosses a parent boundary, which is what makes this safe on the
-/// 111 corpus sides that parse with errors somewhere.
+/// Pairing is structural, within one parent's direct children: a stack pairs each closer with the
+/// nearest unclosed opener that admits it, so nothing crosses a parent. A pair with a parse error
+/// between its halves is skipped, since error recovery invents pairs no human saw.
 ///
-/// **A pair with a parse error between its halves is skipped**, as the request that motivated this
-/// asks: tree-sitter's recovery invents structure, and a `{` it paired with a `}` three functions
-/// away is not a pair a human ever saw. 6819 of the corpus's ~42k pairs are skipped this way.
+/// A half its multi-map group leaves free is not a claim ([`group_leaves_status_open`]): the
+/// question is whether *some* admissible pairing agrees, as `check_group_entry` asks of codediff.
+/// Checked per pair, so two pairs jointly infeasible through one group's count go unreported -
+/// a false negative, never a false positive.
 ///
-/// **A half whose multi-map group leaves it free is not a claim either.** A group of one before
-/// `(` against two after `(` says one of the two survives without saying which, and the same
-/// fixture records its `)` the same way; `representative_entries` has to pick one pairing, and it
-/// sorts each side by start byte, which for a nested call takes the *outer* opener and the *inner*
-/// closer. Reading statuses off that flattening split every such pair and reported two violations
-/// against ground truth that has a consistent reading (outer with outer). So the question asked
-/// here is the one `check_group_entry` asks of codediff - does *some* admissible pairing agree -
-/// and [`group_leaves_status_open`] answers it: a member the group could leave over intersects
-/// both statuses, so it can never disagree with its partner. Seen on
-/// `java-defects4j-cli-1-commandline` and `java-defects4j-chart-9-timeseries`, two violations
-/// each.
-///
-/// **Per pair, not across pairs.** Two pairs drawing halves from one group can each be satisfiable
-/// on their own and jointly infeasible, because the group's count couples them - one member being
-/// the leftover decides that another is not. Answering that exactly is a feasibility problem over
-/// the whole set of groups, and this takes the false negative instead: a contradiction reported
-/// here is always real, and the shape that would hide one has no instance in the corpus.
-///
-/// Compares **status only** - deleted, inserted, or matched - and not the derived
-/// move flag or the recorded operation. `moved` is `before_path != after_path`, a consequence of
-/// where a node landed rather than a judgement anyone entered, and a `{` whose path shifted while
-/// its `}`'s did not is a numbering artifact, not a claim that half a block moved. A node the
-/// mapping says nothing about (`Unmarked`) makes no claim to contradict, so a pair with an
-/// unmarked half is not counted - which does mean a half-annotated fixture checks fewer pairs
-/// than a finished one, exactly as `graded_nodes` already reports for the mapping itself.
+/// Compares **status only** (deleted, inserted, matched), not the derived move flag, which is a
+/// numbering consequence. An `Unmarked` half makes no claim, so the pair is not counted.
 fn delimiter_pairs_agree(
     mapping: &super::HumanMapping,
     before: &Code,
@@ -1521,9 +1216,8 @@ fn delimiter_pairs_agree(
     violations
 }
 
-/// Byte ranges of every `ERROR`/`MISSING` node in `root`'s tree. A `MISSING` node is zero-width,
-/// so its range is widened to one byte - otherwise it could never overlap anything and the pairs
-/// tree-sitter invented around it would be checked as if they were real.
+/// Byte ranges of every `ERROR`/`MISSING` node in `root`'s tree. A zero-width `MISSING` node is
+/// widened to one byte, or it could never overlap the pairs invented around it.
 pub(crate) fn error_ranges(root: Node) -> Vec<(usize, usize)> {
     let mut ranges = Vec::new();
     let mut stack = vec![root];
@@ -1572,24 +1266,14 @@ pub(crate) fn delimiter_pairs<'tree>(
     pairs
 }
 
-/// What the tree mapping says happened to `node`, or `None` if it says nothing.
 /// True when the pairings `node`'s [`MultiMapGroup`](super::MultiMapGroup) admits disagree about
-/// whether *this* member is matched - in which case the mapping has made no claim here to
-/// contradict.
+/// whether *this* member is matched, so the mapping makes no claim here.
 ///
-/// A group of N before members and M after members matches `min(N, M)` pairs and leaves the rest
-/// of the longer side over. Every member of the shorter side is therefore matched under every
-/// pairing, and if the other side is empty nothing is matched at all: both are claims. Strictly
-/// between the two, whether this particular member is the one left over is a choice
-/// [`representative_entries`](super::representative_entries) makes to have something concrete to
-/// hand a caller, not something the human wrote down.
-///
-/// An [`AllToAll`](super::GroupPairing::AllToAll) group leaves nothing open: every member is
-/// matched under its one reading, so "matched" is a claim the human made, whatever N and M are.
-///
-/// Nothing propagates to descendants, because a delimiter pair cannot straddle two members: both
-/// halves are direct children of one parent, so a member that contains one half contains the
-/// other.
+/// With N before and M after members, `min(N, M)` pairs match: every member of the shorter side is
+/// always matched, and if the other side is empty none is. Strictly between, which member is left
+/// over is not something the human wrote down. An
+/// [`AllToAll`](super::GroupPairing::AllToAll) group leaves nothing open. Nothing propagates to
+/// descendants: both halves of a delimiter pair share a parent, so one member holds both.
 fn group_leaves_status_open(
     node: Node,
     side: usize,
@@ -1616,6 +1300,7 @@ fn group_leaves_status_open(
     matched > 0 && matched < mine
 }
 
+/// What the tree mapping says happened to `node`, or `None` if it says nothing.
 fn mark_of(
     node: Node,
     side: usize,
@@ -1648,13 +1333,8 @@ fn side_name(side: usize) -> &'static str {
     if side == 0 { "before" } else { "after" }
 }
 
-/// One side's sites as a row list: sorted, deduplicated and capped.
-///
-/// **Capped, at [`MAX_LISTED_ROWS`].** A violation can aggregate hundreds of sites - one fixture
-/// here is 7,800 lines long - and a message that lists every one of them stops being readable as a
-/// single line of a test failure. Ten is enough to start repairing from, and the remainder is
-/// still counted, so nothing is hidden: the count of *sites* lives in the message around this and
-/// the count of *rows* lives in the tail here.
+/// One side's sites as a sorted, deduplicated row list, capped at `MAX_LISTED_ROWS` with the
+/// remainder counted.
 fn row_list(rows: &[usize]) -> String {
     const MAX_LISTED_ROWS: usize = 10;
     let mut rows = rows.to_vec();
@@ -1673,10 +1353,8 @@ fn row_list(rows: &[usize]) -> String {
     }
 }
 
-/// Both sides' sites as one row list, naming each side - `before rows 3, 4 and after row 7`.
-///
-/// A side with no sites is left out entirely rather than printed empty, so a violation that only
-/// ever happens on one side reads as though it were written for one side.
+/// Both sides' sites as one row list, naming each side - `before rows 3, 4 and after row 7`. A
+/// side with no sites is left out.
 fn site_rows(rows: &[Vec<usize>; 2]) -> String {
     [0usize, 1]
         .into_iter()
@@ -1690,12 +1368,8 @@ fn site_rows(rows: &[Vec<usize>; 2]) -> String {
 // Invariants 10-15: the tree mapping read at the leaf, against the painting and against itself
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 
-/// What the tree mapping says about one leaf once its ancestors have been consulted.
-///
-/// A mapping speaks about subtrees, not leaves: an `Identical` entry on a function says the whole
-/// function is unchanged and records nothing for the tokens under it, and `DeleteWithChildren`
-/// does the same for a removal. So a leaf's status is the nearest entry on the path from it to the
-/// root - its own, or an ancestor's - read for what it implies about the leaf.
+/// What the tree mapping says about one leaf: the nearest entry on the path from it to the root,
+/// its own or an ancestor's, since a mapping speaks about subtrees, not leaves.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum LeafStatus<'tree> {
     /// Paired with a leaf that reads the same: the leaf's own `Identical` entry, or the leaf at
@@ -1707,16 +1381,14 @@ pub(crate) enum LeafStatus<'tree> {
     /// Deleted or inserted, by its own entry or under a `*WithChildren` ancestor.
     Removed,
     /// Under an `Update`/`MatchButNotIdentical` ancestor, or a childless `Delete`/`Insert`, with no
-    /// entry of its own, or inside a multi-map group member the group could leave over: the
-    /// mapping has not said, and no invariant here asserts anything.
+    /// entry of its own, or in a group member the group could leave over: the mapping has not said.
     Undecided,
 }
 
 /// The two trees indexed for the leaf-level invariants, built once per fixture.
 pub(crate) struct TreeContext<'tree> {
     caches: Caches,
-    /// The mapping's multi-map groups, for [`group_leaves_status_open`]: a leaf whose group could
-    /// leave it over is `Undecided`, not `Removed`.
+    /// The mapping's multi-map groups: a leaf whose group could leave it over is `Undecided`.
     groups: Vec<super::MultiMapGroup>,
     /// Node id to node, per side - how a partner id from [`Caches`] becomes a node again.
     ids: [std::collections::HashMap<usize, Node<'tree>>; 2],
@@ -1792,8 +1464,7 @@ impl<'tree> TreeContext<'tree> {
             }
             if let Some(&with_children) = removed.get(&current.id()) {
                 return if group_leaves_status_open(current, side, &self.groups, &self.caches) {
-                    // The group could just as well have paired this member and left another over,
-                    // so "removed" is the flattening talking - see `delimiter_pairs_agree`.
+                    // The group could equally have left another member over.
                     LeafStatus::Undecided
                 } else if current.id() == leaf.id() || with_children {
                     LeafStatus::Removed
@@ -1841,8 +1512,8 @@ pub(crate) fn is_visible_leaf(leaf: Node, contents: &str) -> bool {
 }
 
 /// A leaf whose text is not its own kind name: identifiers, literals, comments, string contents.
-/// Punctuation and keywords are excluded by the invariants that say so, because which of two `}`
-/// survives is a choice each ground truth makes on its own - see `delimiter_pairs_agree`.
+/// Punctuation is excluded where a rule says so, since which of two `}` survives is each ground
+/// truth's own choice.
 fn is_named_leaf(leaf: Node, contents: &str) -> bool {
     contents.get(leaf.byte_range()) != Some(leaf.kind())
 }
@@ -1863,8 +1534,7 @@ fn row_of(contents: &str, byte: usize) -> usize {
     contents[..byte].matches('\n').count() + 1
 }
 
-/// The text with every whitespace character removed - what two leaves are compared on when the
-/// question is whether they *read* differently, since a reformatting is not an edit to a token.
+/// The text with all whitespace removed: a reformatting is not an edit to a token.
 fn without_whitespace(text: &str) -> String {
     text.chars().filter(|c| !c.is_whitespace()).collect()
 }
@@ -1872,14 +1542,9 @@ fn without_whitespace(text: &str) -> String {
 /// Invariant 10: a leaf the mapping pairs with a byte-identical leaf is never painted `Delete`
 /// while that partner is painted `Insert`.
 ///
-/// The mirror of invariant 9, asked of the tree side's pairs rather than its rendered labels. A
-/// `Delete` says the text left the file and an `Insert` says it arrived new; the mapping's
-/// `Identical` says they are one text. Both cannot be so. The painter's chunking is not in
-/// question here - a rewritten line painted whole leaves the mapper's `Identical` tokens inside
-/// it under `Update`/`MatchButNotIdentical` ancestors, which [`LeafStatus::Undecided`] skips -
-/// only the case where the mapper explicitly paired two tokens the painter explicitly called gone
-/// and new. Four fixtures break it, in each of which a whole statement is painted as a deletion
-/// and an unrelated insertion that the mapping reads as one relocated statement.
+/// The mirror of invariant 9, asked of the tree's pairs. `Identical` says one text; `Delete` and
+/// `Insert` say it left and something new arrived. A line painted whole leaves the mapper's
+/// tokens under `Update` ancestors, which [`LeafStatus::Undecided`] skips.
 fn paired_leaves_are_not_deleted_and_inserted(
     painting: &str,
     painted: &PaintedLabels,
@@ -1937,12 +1602,8 @@ fn paired_leaves_are_not_deleted_and_inserted(
 
 /// Invariant 11: a named leaf the mapping deletes or inserts has at least one painted byte.
 ///
-/// Unpainted text is a positive claim - "unchanged, and in place" - and a leaf the mapping removes
-/// is the strongest claim the other record can make against it. Limited to named leaves
-/// ([`is_named_leaf`]): a deleted `}` whose partner brace the painter chose to keep instead is
-/// the ordinary brace-identity difference, 43 sites across 11 fixtures, and not a contradiction
-/// either record would concede. An unpainted deleted identifier is - closure-28 inserts the
-/// `Override` of a new `@Override` and neither painting has a byte of it.
+/// Unpainted text claims "unchanged, and in place". Named leaves only ([`is_named_leaf`]): a
+/// deleted `}` whose partner the painter kept instead is the ordinary brace-identity difference.
 fn removed_leaves_are_painted(
     painting: &str,
     painted: &PaintedLabels,
@@ -1998,11 +1659,8 @@ fn removed_leaves_are_painted(
 /// Invariant 12: a leaf the mapping pairs with a leaf that reads differently is painted on at
 /// least one side.
 ///
-/// Only *at least one side*, deliberately: `Minimal` paints the deleted `tuple_` of a
-/// `tuple_length` renamed to `length` and nothing on the after side, which is exact and fires a
-/// one-sided rule 125 times. Nothing on either side is a change nobody painted - jsoup-16 turns
-/// `"<!DOCTYPE html"` into `"<!DOCTYPE "` and both paintings walk past it. Whitespace-only
-/// differences inside a leaf are exempt, as in invariant 14.
+/// *At least one side*: `Minimal` paints a rename's deleted prefix and nothing on the after side,
+/// which is exact. Whitespace-only differences are exempt, as in invariant 14.
 fn edited_leaves_are_painted(
     painting: &str,
     painted: &PaintedLabels,
@@ -2069,12 +1727,10 @@ fn edited_leaves_are_painted(
 
 /// Invariant 13: a painting that records an edit belongs to a mapping that records one too.
 ///
-/// A mapping whose every entry is `Identical` and whose every group is balanced says the file did
-/// not change. A painting with a `Delete` of visible text, an `Insert` of visible text, or a
-/// `Match` whose two sides differ beyond whitespace says it did. One of them is wrong - and since
-/// an all-`Identical` mapping grades codediff against nothing, it is the one that has been
-/// passing vacuously. Whitespace is the exemption because it lives between nodes, where the tree
-/// cannot record it and the painting can.
+/// An all-`Identical` mapping with balanced groups says nothing changed, and grades codediff
+/// against nothing. A painting with a visible `Delete`/`Insert`, or a `Match` differing beyond
+/// whitespace, says otherwise. Whitespace is exempt: it lives between nodes, where the tree cannot
+/// record it.
 fn painting_implies_mapping_edits(
     mapping: &super::HumanMapping,
     named: &NamedTextMapping,
@@ -2115,12 +1771,8 @@ fn painting_implies_mapping_edits(
             continue;
         }
         edits += 1;
-        // The spans' own `start_row` is already the row, 0-based - there is no byte offset to
-        // convert here, unlike every other rule in this file.
         for (side, spans) in [(0usize, &entry.before), (1usize, &entry.after)] {
             rows[side].extend(spans.iter().map(|span| span.start_row + 1));
-            // The painted spans are already in this type - the one rule here that needs no
-            // conversion at all.
             sites.extend(
                 spans
                     .iter()
@@ -2163,12 +1815,8 @@ fn tokens_of(node: Node, contents: &str) -> Vec<(&'static str, String)> {
     tokens
 }
 
-/// Invariant 14: an `Identical` entry's two subtrees carry the same tokens.
-///
-/// `Identical` is the strongest thing the mapping says - the whole subtree is unchanged - and
-/// every leaf-level invariant above builds on it to find a leaf's twin. Tokens rather than text,
-/// because 159 `Identical` subtrees across 12 fixtures differ in whitespace alone, which is a
-/// reformatting and not an edit; compared token for token, no fixture in the corpus breaks this.
+/// Invariant 14: an `Identical` entry's two subtrees carry the same tokens. Tokens, not text,
+/// since a reformatting is not an edit. The leaf-level rules rely on it to find a leaf's twin.
 fn identical_entries_are_token_identical(
     context: &TreeContext,
     before: &Code,
@@ -2246,8 +1894,8 @@ fn field_of<'tree>(parent: Node<'tree>, node: Node<'tree>) -> Option<String> {
         .map(str::to_string)
 }
 
-/// How many of `parent`'s children carry `field`. One means the slot is unambiguous; more means
-/// the field is a list, and a position within a list is not an identity.
+/// How many of `parent`'s children carry `field`. More than one makes it a list, and a position
+/// in a list is not an identity.
 fn field_arity(parent: Node, field: &str) -> usize {
     let mut cursor = parent.walk();
     let count = parent.children(&mut cursor).count();
@@ -2256,19 +1904,11 @@ fn field_arity(parent: Node, field: &str) -> usize {
         .count()
 }
 
-/// The after-side node that occupies the same unambiguous position as `before_leaf`, or `None`
-/// when the position is not unambiguous.
+/// The after-side node that occupies the same unambiguous position as `before_leaf`, or `None`.
 ///
-/// Two ways a position can be pinned, and a grammar offers only one of them at a time:
-///
-/// * **By name** - the node sits in a *named* field that holds exactly one child on both sides.
-///   A named field is a role the grammar says persists.
-/// * **By elimination** - the two parents hold the same number of children and every *other*
-///   position is already paired, so nothing else is left for this one to be. Needed because a
-///   grammar may name no fields at all for the very lists where position is obvious:
-///   `argument_list` in tree-sitter-java declares `"fields": {}`, which puts
-///   `findWrapPos(text, width, nextLineTabStop)` -> `findWrapPos(text, width, 0)` out of the
-///   field rule's reach even though `text` and `width` pin the third argument exactly.
+/// * **By name** - a *named* field holding exactly one child on both sides.
+/// * **By elimination** - equal child counts with every *other* position paired. Needed because
+///   some grammars name no fields where position is obvious (tree-sitter-java's `argument_list`).
 fn pinned_counterpart<'tree>(
     context: &TreeContext<'tree>,
     before_leaf: Node<'tree>,
@@ -2310,23 +1950,12 @@ fn pinned_counterpart<'tree>(
 }
 
 /// Invariant 18: an unambiguous position of a matched pair holds a matched pair, never a
-/// delete beside an insert.
+/// delete beside an insert: the parent match already says the role persists.
 ///
-/// When two nodes are matched, their shared structure is matched with them: a named field is a
-/// role the grammar says persists, and if that role holds exactly one child on each side then the
-/// child on the left *is* the child on the right, whatever the two are called. Recording the pair
-/// as a deletion plus an insertion says the role was vacated and refilled, which the parent match
-/// has already denied.
-///
-/// The three conditions are each load-bearing, and each was added to kill a real false positive
-/// (see the module doc): a *childless* node, because an empty container has no named children
-/// either and pairing an identifier against `()` is meaningless; a *named* field, because a node
-/// the grammar gives no field to has no persisting role and two adjacent comments can be entirely
-/// unrelated; and an arity of *one*, because a command's arguments all share a field and a removed
-/// flag beside an added subcommand is not a pair.
-///
-/// `LeafStatus::Undecided` is not a violation: the mapping has not spoken, and no invariant here
-/// asserts anything about silence.
+/// Each condition prevents a real false positive: *childless* nodes (an empty container has no
+/// named children either), a *named* field (two adjacent comments share no role), and arity *one*
+/// (a removed flag beside an added subcommand in one argument list is not a pair).
+/// `LeafStatus::Undecided` is not a violation.
 fn single_valued_fields_hold_a_pair(
     context: &TreeContext,
     before: &Code,
@@ -2359,14 +1988,9 @@ fn single_valued_fields_hold_a_pair(
         {
             continue;
         }
-        // Equal kinds are out of scope, and that is the rule's whole premise rather than a
-        // convenience. This exists because `Update` is defined as "same kind, different text", so
-        // a cross-kind pair has nowhere in the schema to go and the solver asked a `y`/`n`
-        // question the author answered by writing delete+insert. Where the kinds *do* match,
-        // `Update` was one keystroke away and its absence is a decision, not an obstacle -
-        // `lua-corsixth-corsixth-refactor-if-expressions` declines to call the `field` of
-        // `humanoid.humanoid_class` the same element as the `field` of `class.is`, both plain
-        // identifiers, and is entitled to.
+        // Cross-kind pairs only: `Update` requires equal kinds, so a cross-kind pair has no
+        // schema representation, while a same-kind delete+insert is a decision the author was
+        // entitled to make.
         if before_leaf.kind() == after_leaf.kind() {
             continue;
         }
@@ -2408,14 +2032,9 @@ fn single_valued_fields_hold_a_pair(
 }
 
 /// Invariant 15: a `MatchButNotIdentical` entry's two subtrees do not read byte-identically with
-/// every descendant paired inside.
-///
-/// `MatchButNotIdentical` says the subtree differs somewhere. Two nodes of one kind whose text is
-/// the same byte for byte, and whose every descendant with an entry of its own pairs inside the
-/// partner, differ nowhere - and the grader is strict about the operation (`check_entry`), so each
-/// such entry is a claim codediff can only satisfy by calling an identical subtree not identical.
-/// Group members are skipped: a group's operation describes the whole group, and its
-/// representative pairing may well put two identical members together.
+/// every descendant paired inside. Such an entry could only be satisfied by codediff calling an
+/// identical subtree not identical, since `check_entry` is strict about the operation. Group
+/// members are skipped: the operation describes the whole group.
 fn match_but_not_identical_entries_differ(
     context: &TreeContext,
     before: &Code,
@@ -2501,20 +2120,12 @@ fn match_but_not_identical_entries_differ(
 // Invariant 16: an identifier the mapping calls edited is painted narrow by Minimal, whole by Full
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 
-/// Byte offsets inside an identifier at which a word may legally be cut: 0, both ends of any run
-/// of `_`, and any uppercase letter that begins a word. The last entry is always the identifier's length,
-/// so "the next word start at or after `n`" always has an answer.
+/// Byte offsets inside an identifier at which a word may be cut: 0, both ends of any run of `_`,
+/// and any uppercase letter that begins a word (`fooBar` -> 3; `HTTPServer` -> 0, 4, where an
+/// uppercase followed by lowercase ends an acronym). Always ends with the identifier's length.
 ///
-/// An uppercase letter begins a word when the character before it is not uppercase (`fooBar` ->
-/// 3), or when it is uppercase but the character *after* is lowercase - which is how an acronym
-/// hands off to the next word (`HTTPServer` -> 0, 4). Without that second clause `HTTPServer`
-/// would read as one word and `XMLHttpRequest` as two.
-///
-/// **Both ends of a `_` run, not just the far end.** `open_read_only` ->
-/// `open_read_only_with_config` appends `_with_config`, and the appended text starts *at* the
-/// underscore. Offering only the byte after it leaves the nearest boundary four words back, which
-/// widens the highlight to `only_with_config` and reports an edit larger than the one that
-/// happened.
+/// Both ends of a `_` run: `open_read_only` -> `open_read_only_with_config` appends text starting
+/// *at* the underscore.
 pub(crate) fn identifier_word_starts(text: &str) -> Vec<usize> {
     let characters: Vec<(usize, char)> = text.char_indices().collect();
     let mut starts = vec![0usize];
@@ -2536,20 +2147,11 @@ pub(crate) fn identifier_word_starts(text: &str) -> Vec<usize> {
     starts
 }
 
-/// The part of `text` that differs from `other`, widened outward to whole identifier words.
+/// The part of `text` that differs from `other`, widened outward to whole identifier words: a
+/// highlight split inside a word is not something a reader would draw (`calculateArea` -> `area`
+/// widens to the whole of both, `EVENT_NEW_FRAME` -> `SC_EVENT_NEW_FRAME` gives `SC_`).
 ///
-/// The raw common prefix/suffix is not the answer on its own, and the corpus already recorded why:
-/// scoring a rename by bare common suffix makes `calculateArea` and `area` share `rea`, `Box` and
-/// `Box<T>` share `Box`, `calculatePerimeter` and `perimeter` share `erimeter` - 15 of 16 false
-/// positives in the 2026-08-26 line-tail measurement came from a shared run falling *inside* a
-/// word (see `research/data/quality/text_painting_findings.md`, rule 3). Splitting a highlight
-/// there is not something a reader would ever do by hand. Widening each end to the nearest word
-/// boundary is what makes the narrow reading legible: `EVENT_NEW_FRAME` -> `SC_EVENT_NEW_FRAME`
-/// comes out as exactly `SC_`, and `calculateArea` -> `area` widens to the whole of both, which is
-/// the honest answer for a rename that shares nothing but three letters in the middle of a word.
-///
-/// An empty span (`start == end`) means this side has nothing to paint: every byte of it survives
-/// into the other, as the before side of a pure insertion does.
+/// An empty span (`start == end`) means every byte of this side survives into the other.
 pub(crate) fn differing_affix(text: &str, other: &str) -> (usize, usize) {
     let (prefix, end) = raw_affix(text, other);
     let starts = identifier_word_starts(text);
@@ -2567,15 +2169,9 @@ pub(crate) fn differing_affix(text: &str, other: &str) -> (usize, usize) {
     (start, end.max(start))
 }
 
-/// The bare common-prefix/common-suffix span, before any widening.
-///
-/// **The common suffix is taken first, which places an ambiguous run as far left as it will go.**
-/// `last_packet_timestamp` -> `last_filtered_packet_timestamp` can be read as inserting
-/// `filtered_` after `last_` or `_filtered` after `last`; both rebuild the same string, and taking
-/// the longest common *prefix* first - which is what this did until 2026-09-15 - always picks the
-/// rightmost of them. The corpus paints the leftmost: that fixture's `Minimal` painting marks
-/// columns 41..50, `_filtered`. Nothing else moves, because the two readings only ever differ when
-/// the run's own edges repeat the text beside it.
+/// The bare common-prefix/common-suffix span, before any widening. The common suffix is taken
+/// first, placing an ambiguous run as far left as it goes: `last_packet_timestamp` ->
+/// `last_filtered_packet_timestamp` yields `_filtered`, which is what the corpus paints.
 fn raw_affix(text: &str, other: &str) -> (usize, usize) {
     let suffix: usize = text
         .chars()
@@ -2595,19 +2191,9 @@ fn raw_affix(text: &str, other: &str) -> (usize, usize) {
 }
 
 /// Every span a `Minimal` painting may legitimately mark on this side of a rename: the differing
-/// words, and the differing characters.
-///
-/// The words are the widened span - `getDeclaredConstructor` -> `getDeclaredConstructors` read as
-/// the word `Constructors` changing - and the characters are the bare affix, the `s` that
-/// appeared. Both are readings a painter draws, and the corpus holds both:
-/// `java-defects4j-mockito-19-mockcandidatefilter` and `kotlin-refactor-function` mark whole
-/// words, while `java-defects4j-chart-7-timeperiodvalues` marks `in`/`ax` of
-/// `minMiddleIndex`/`maxMiddleIndex` - which is also the width the renderer paints under
-/// `MINIMAL`. Holding `Minimal` to the characters alone would condemn 13 fixtures that mark words;
-/// holding it to the words alone condemned the character readings, and misfired outright on an
-/// acronym - `PRIU64` -> `PRIu64` is a one-letter case fix, but the word splitter reads `PRIu64` as
-/// `PR` + `Iu64` and asked for `Iu64`. So either passes, and what the rule still rejects is a
-/// `Minimal` painting that marks the unchanged rest of the identifier.
+/// words (the widened span) or the differing characters (the bare affix). The corpus holds both
+/// readings, and words alone misfire on case fixes (`PRIU64` -> `PRIu64`). What is rejected is
+/// marking the unchanged rest of the identifier.
 fn minimal_affix_candidates(text: &str, other: &str) -> Vec<(usize, usize)> {
     let widened = differing_affix(text, other);
     let (start, end) = raw_affix(text, other);
@@ -2618,13 +2204,8 @@ fn minimal_affix_candidates(text: &str, other: &str) -> Vec<(usize, usize)> {
     candidates
 }
 
-/// A leaf that is an identifier: a named leaf whose text reads as one, and which is not a keyword.
-///
-/// Deliberately not a list of node kinds. Grammars spell them `identifier`, `type_identifier`,
-/// `field_identifier`, `property_identifier`, `variable_name`, `word`, ... and a kind list would
-/// be a per-language table to keep in step with every grammar upgrade. The text shape plus
-/// [`is_named_leaf`] (whose doc comment explains why a leaf whose text *is* its own kind name -
-/// `true`, `if`, `}` - is excluded) answers the same question without one.
+/// A leaf that is an identifier: a named leaf whose text reads as one, and not a keyword. Judged
+/// by text shape, not a per-grammar list of kinds.
 fn is_identifier_leaf(leaf: Node, contents: &str) -> bool {
     if leaf.child_count() != 0 || !is_named_leaf(leaf, contents) {
         return false;
@@ -2643,21 +2224,9 @@ fn is_identifier_leaf(leaf: Node, contents: &str) -> bool {
 /// **Invariant 16.** When the tree mapping pairs two identifiers that differ, `Minimal` paints
 /// only the differing words or characters and `Full` paints the whole identifier on both sides.
 ///
-/// The two presets are not degrees of care, they are two conventions (see
-/// `text_painting_findings.md`, rule 1), and this is the one edit where they are *obliged* to
-/// differ: `MINIMAL` marks the bytes that carry the change and `FULL` accounts for every byte
-/// whose role changed, and a renamed identifier has both readings at once. Today's renderer
-/// narrows before either preset is consulted, so `FULL` asks for more paint and gets *less* -
-/// the 2026-09-05 census's family D, and 225 runs over 54 fixtures in the 2026-09-15 one.
-///
-/// **Only paintings named for a preset are checked**, and a fixture painted once is skipped
-/// entirely. A single painting is held to *both* presets by `paintings_for_mode`, and the two
-/// halves of this rule contradict each other by construction - demanding both of one painting
-/// would condemn every single-painting fixture that renames anything, which is not a finding
-/// about the data.
-///
-/// The word-boundary widening is what keeps the `Minimal` half from asking for a highlight no
-/// human would draw - see [`differing_affix`].
+/// The presets are two conventions (`text_painting_findings.md`, rule 1), and a rename is the edit
+/// where they must differ. Only paintings named for a preset are checked: a lone painting is held
+/// to both presets, whose halves of this rule contradict each other.
 fn identifier_updates_are_painted_by_preset(
     painting: &str,
     painted: &PaintedLabels,
@@ -2793,21 +2362,11 @@ fn opposite_boolean(text: &str) -> Option<&'static str> {
 /// **Invariant 17.** A `true` that became a `false` in the same place is one token edited, not a
 /// token deleted and another inserted - in the tree mapping and in every painting.
 ///
-/// Flipping a default, a flag or a guard is one of the commonest one-token commits there is, and
-/// both ground truths have a spelling that says so: an `Update` entry on the two literals, and a
-/// painted `Match` whose two sides differ. Recording it as a removal plus an arrival instead says
-/// the old value went somewhere and the new one came from somewhere, which is a different claim
-/// about the same edit and the one a reader is least able to check.
-///
-/// Two halves, reported under one number because they are one rule:
-///
-/// * **mapping** - a `true`/`false` leaf the mapping removes, whose partner subtree contains the
-///   opposite literal also removed. Correspondence is required, not just co-occurrence: the two
-///   leaves must sit under ancestors the mapping pairs with each other, so a `true` deleted in one
-///   method and a `false` added in another is left alone.
-/// * **painting** - a boolean pair the mapping *does* pair, painted `Delete` on one side and
-///   `Insert` on the other. Invariant 10 asks this of byte-identical pairs and so cannot reach
-///   these: `true` and `false` are exactly the pair whose two sides differ.
+/// * **mapping** - a boolean leaf the mapping removes, whose partner subtree (under ancestors the
+///   mapping pairs) contains the opposite literal also removed. Correspondence, not
+///   co-occurrence: a `true` deleted in one method and a `false` added in another is fine.
+/// * **painting** - a boolean pair the mapping pairs, painted `Delete` on one side and `Insert`
+///   on the other. Invariant 10 cannot reach these, since the two sides differ.
 fn boolean_flips_are_one_edit(
     paintings: &[(&str, PaintedLabels)],
     context: &TreeContext,
@@ -2860,8 +2419,7 @@ fn boolean_flips_are_one_edit(
         if !matches!(context.status(*leaf, 0), LeafStatus::Removed) {
             continue;
         }
-        // The nearest ancestor the mapping pairs, and the subtree it pairs with: the flip has to
-        // have happened *here*, not anywhere in the file.
+        // The nearest ancestor the mapping pairs: the flip has to have happened *here*.
         let mut ancestor = Some(*leaf);
         let partner_subtree = loop {
             let Some(node) = ancestor else { break None };
@@ -2920,23 +2478,11 @@ fn boolean_flips_are_one_edit(
 // Invariant 19: an operator, a boolean or an access modifier is painted whole
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 
-/// **Invariant 19.** Every byte of a token in [`WHOLE_TOKENS`] carries the same highlighting - in
-/// every painting, on both sides.
-///
-/// Each of these is one symbol to a reader, however many characters spell it. `<=` becoming `<` is
-/// a different comparison, not a `<` that survived and an `=` that left; `==` becoming `!=` is a
-/// negated test, not an `=` that was kept; `true` becoming `false` keeps no `e`, and `private`
-/// becoming `protected` keeps no `pr`. Painting part of one claims the rest is unchanged, and the
-/// corpus disagreed with itself about exactly this before the rule existed:
-/// `java-defects4j-chart-1-abstractcategoryitemrenderer` painted `!=` against `==` whole, and
-/// `java-defects4j-jacksondatabind-16-annotationmap` painted the same edit one character wide.
-///
-/// Checked on every painting a fixture carries - `Full`, `Minimal` and `Only one solution` alike:
-/// the presets may disagree about *whether* one of these is painted, never about painting part of
-/// one.
-///
-/// Reads the painting alone, so a leaf is judged whatever the mapping says about it. The list is
-/// the renderer's own, which follows the same rule; only its multi-character tokens can break it.
+/// **Invariant 19.** Every byte of a token in [`WHOLE_TOKENS`] carries the same highlighting, in
+/// every painting, on both sides. Each is one symbol to a reader: `<=` becoming `<` is a different
+/// comparison, not a surviving `<`; `private` becoming `protected` keeps no `pr`. The presets may
+/// disagree about *whether* such a token is painted, never about painting part of one. The list
+/// is the renderer's own, which follows the same rule.
 fn tokens_are_painted_whole(
     painting: &str,
     painted: &PaintedLabels,
@@ -2975,27 +2521,16 @@ fn tokens_are_painted_whole(
 // The assertions the per-fixture tests call
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 
-/// Asserts `name`'s ground truth contradicts itself in no way at all - what every fixture whose
-/// data has been checked or repaired uses.
+/// Asserts `name`'s ground truth contradicts itself in no way at all.
 pub fn assert_ground_truth_invariants(name: &str) -> Result<()> {
     assert_ground_truth_invariants_with_known_violations(name, 0)
 }
 
-/// [`assert_ground_truth_invariants`] for a fixture whose ground truth has not been repaired yet:
-/// `expected` is how many violations it has, and the test fails if the real number is anything
-/// else.
+/// [`assert_ground_truth_invariants`] for a fixture with `expected` known violations.
 ///
-/// **Exact, unlike the mapping and painting clamps next door, deliberately.** Those two record a
-/// bound on a distance - a painting limit is `ceil(rate) + 0.01`, above the measurement by
-/// construction - so only the upward direction can mean anything there. This records a *count of
-/// specific contradictions*, each one written out in the comment above the call, and a count that
-/// is allowed to be an over-estimate is a test that stops checking the moment somebody repairs one
-/// of them. Half-repairing a fixture should say so, and here it does: the failure names the
-/// number to write instead, which is a one-line edit made by the person who just changed the data.
-///
-/// The alternative - passing on fewer - is how a limit outlives its measurement, which this corpus
-/// has been bitten by twice (the 86 painting stubs left at an unconditionally-passing `100.0`, and
-/// the mapping limits recorded against a mapping that was only half annotated).
+/// **Exact, unlike the mapping and painting clamps**: those bound a distance, while this counts
+/// specific contradictions, each described above the call. An over-estimate would stop checking
+/// the moment one is repaired; the failure names the number to write instead.
 pub fn assert_ground_truth_invariants_with_known_violations(
     name: &str,
     expected: usize,
@@ -3057,8 +2592,7 @@ mod tests {
             (0, 3)
         );
         // An ambiguous run goes as far left as it will go: `_filtered` after `last`, not
-        // `filtered_` after `last_`. Both rebuild the same identifier; the corpus paints the
-        // first (rust-gyulyvgc-sniffnet-rename-one-identifier, Minimal, columns 41..50).
+        // `filtered_` after `last_`, as rust-gyulyvgc-sniffnet-rename-one-identifier paints it.
         assert_eq!(
             differing_affix("last_filtered_packet_timestamp", "last_packet_timestamp"),
             (4, 13)
@@ -3098,9 +2632,7 @@ mod tests {
 
     #[test]
     fn a_shared_run_inside_a_word_does_not_split_it() {
-        // `calculateArea` and `area` share the bare suffix "rea", which is the trap
-        // `text_painting_findings.md` rule 3 records: widening to word boundaries takes the whole
-        // of both rather than highlighting `calculateA` against `a`.
+        // The bare shared suffix "rea" falls inside a word, so widening takes both whole.
         assert_eq!(differing_affix("calculateArea", "area"), (0, 13));
         assert_eq!(differing_affix("area", "calculateArea"), (0, 4));
         // A suffix added at a word boundary stays narrow.
@@ -3246,9 +2778,8 @@ mod tests {
         assert!(reported[0].contains("range 1"), "got {reported:?}");
     }
 
-    /// The case the solver's own help promises is fine, and the reason this reads the bytes rather
-    /// than the rows: a range ending at column 0 of the next row swallows the break, and nothing
-    /// downstream paints a line terminator.
+    /// A range ending at column 0 of the next row swallows the break, and nothing paints a line
+    /// terminator.
     #[test]
     fn two_ranges_meeting_at_a_line_break_do_not_overlap() {
         let before = rust("let x = 1;\nlet y = 2;\n");
@@ -3272,7 +2803,7 @@ mod tests {
         );
     }
 
-    /// A Windows break is two bytes, and neither is painted - the same fix `label_bytes` carries.
+    /// A Windows break is two bytes, and neither is painted.
     #[test]
     fn a_crlf_break_between_two_ranges_is_not_an_overlap() {
         let before = rust("let x = 1;\r\nlet y = 2;\r\n");
@@ -3336,17 +2867,14 @@ mod tests {
         assert!(violations(&mapping, &before, &after).is_empty());
     }
 
-    /// The rule is about a stripe hanging off the *end* of a line. A run that stops on a space
-    /// with visible text still to come on that row is the ordinary shape of an edit - this is
-    /// go-gin-gonic-gin-whitespace-in-comment, where one of two spaces mid-comment is deleted.
+    /// A run stopping on a space with visible text still to come on the row is an ordinary edit
+    /// (go-gin-gonic-gin-whitespace-in-comment).
     #[test]
     fn a_painted_run_that_ends_on_a_mid_row_space_is_accepted() {
         let before = rust("let x = 1;  // a  b\n");
         let after = rust("\n");
-        // `a ` at columns 15..17 - the run ends on the space at 16, with `b` still to come on
-        // the row. Deliberately a run with a visible character in it: a run of only whitespace
-        // would be exempt under the other rule too, and this test would then pass without
-        // exercising the mid-row check it is named for.
+        // `a ` at columns 15..17 ends on the space at 16, with `b` still to come. It holds a
+        // visible character, so the all-whitespace exemption does not mask the mid-row check.
         let mapping = painted(vec![("Only one solution", vec![deleted(15, 2)])]);
 
         assert!(
@@ -3355,9 +2883,8 @@ mod tests {
         );
     }
 
-    /// A run with no visible character in it has no spelling this rule would accept, so it is
-    /// exempt for the same reason a blank row is - a commit that strips trailing spaces is
-    /// exactly this shape.
+    /// A run with no visible character is exempt, as a blank row is (a commit stripping trailing
+    /// spaces).
     #[test]
     fn a_painted_run_that_is_entirely_whitespace_is_exempt() {
         let before = rust("let x = 1;  \n");
@@ -3373,8 +2900,7 @@ mod tests {
 
     #[test]
     fn a_row_with_nothing_visible_on_it_is_exempt() {
-        // The painted row is `    `, all whitespace: there is no character on it that could
-        // legally end a painted run, so the rule has nothing to say about it.
+        // The painted row is all whitespace, so nothing on it could legally end a run.
         let before = rust("fn f() {\n    \n}\n");
         let after = rust("fn f() {\n}\n");
         let mapping = painted(vec![(
@@ -3447,9 +2973,7 @@ mod tests {
 
     #[test]
     fn a_painting_that_marks_one_half_of_a_pair_is_not_a_violation() {
-        // The rule is asked of the tree mapping alone - see `delimiter_pairs_agree`. A painting is
-        // free to say the `{` went and the `}` stayed, because that is a claim about text moving
-        // and changing rather than about which node is which.
+        // Asked of the tree mapping alone: a painting may say the `{` went and the `}` stayed.
         let before = rust("fn f() { g(); }\n");
         let after = rust("\n");
         let mapping = painted(vec![("Only one solution", vec![deleted(7, 1)])]);
@@ -3459,10 +2983,7 @@ mod tests {
 
     #[test]
     fn only_a_leaf_whose_kind_is_its_own_text_is_a_delimiter() {
-        // Two `(` in this line: the call's, which is an anonymous `(` leaf, and the one inside the
-        // string, which is a `string_content` leaf that merely reads `(`. Pairing the second would
-        // be pairing text nobody wrote as a delimiter - the corpus holds several hundred such
-        // leaves.
+        // The second `(` is a `string_content` leaf that merely reads `(`, not a delimiter.
         let code = rust("fn f() { g(\"(\"); }\n");
         let pairs = delimiter_pairs(code.ast.as_ref().unwrap().root_node(), &code.contents);
 
@@ -3470,8 +2991,7 @@ mod tests {
             .iter()
             .map(|(open, _)| (open.kind(), open.start_position().column))
             .collect();
-        // `delimiter_pairs` walks the tree with a stack, so the order it reports parents in is
-        // not the source order; only the set of pairs is the contract.
+        // Reported in stack order; only the set of pairs is the contract.
         kinds.sort_by_key(|(_, column)| *column);
         assert_eq!(
             kinds,
@@ -3489,16 +3009,13 @@ mod tests {
             .collect()
     }
 
-    /// Label vectors rather than a built mapping: the tree side of this rule comes from a real
-    /// `ASTDiff` put through `TextDiff::from`, and that renderer reads the *text*, so a synthetic
-    /// pair contrived to make it emit a `Delete` ends up testing the renderer instead of the rule.
-    /// The five corpus fixtures clamped for this invariant are what exercise the wiring.
+    /// Label vectors rather than a built mapping: a synthetic pair contrived to make `TextDiff`
+    /// emit a `Delete` would test the renderer instead of the rule.
     fn labels(before_len: usize, after_len: usize) -> PaintedLabels {
         [vec![None; before_len], vec![None; after_len]]
     }
 
-    /// An `unmatched_bytes` mask saying every byte is inside a node the mapping leaves unmatched
-    /// - what the rule's own gate looks like when it is not the thing under test.
+    /// An `unmatched_bytes` mask saying every byte is unmatched - the gate held open.
     fn all_unmatched(before_len: usize, after_len: usize) -> [Vec<bool>; 2] {
         [vec![true; before_len], vec![true; after_len]]
     }
@@ -3547,11 +3064,8 @@ mod tests {
         assert_eq!(reported[0].sites, vec![site_on_row(1, 0, 4, 5)]);
     }
 
-    /// The regression test for the false positive the gate exists to stop, and the one shape this
-    /// rule got wrong for a day: the renderer says these bytes were deleted, but they are inside a
-    /// node the mapping *matched* - a character edited out of a surviving leaf, not a leaf with no
-    /// counterpart. `rust-rust-lang-rust-update-comment` is the corpus case, where a painter and
-    /// `TextDiff` put the same colon on opposite sides of one comment edit.
+    /// The renderer says these bytes were deleted, but they sit in a node the mapping *matched*: a
+    /// character edited out of a surviving leaf (`rust-rust-lang-rust-update-comment`).
     #[test]
     fn a_painted_move_the_renderer_deletes_from_inside_a_matched_node_is_not_reported() {
         let source = rust("let value = 1;\n");
@@ -3574,11 +3088,8 @@ mod tests {
         );
     }
 
-    /// The gate's own rule: the smallest node containing a byte decides, so a node the mapping
-    /// matched reads as matched even inside a subtree it deleted - while the whitespace between
-    /// that subtree's children, which no node of its own covers, keeps the deleted answer. That
-    /// whitespace case is not a corner: 60 of the bytes this rule still reports corpus-wide are
-    /// indentation inside a deleted `block`, and a leaf-only lookup would drop every one of them.
+    /// The smallest node containing a byte decides: a matched node inside a deleted subtree reads
+    /// as matched, while whitespace between that subtree's children keeps the deleted answer.
     #[test]
     fn unmatched_bytes_lets_a_matched_node_override_the_subtree_deleted_around_it() {
         let before = rust("fn f() { g(); }\n");
@@ -3625,10 +3136,8 @@ mod tests {
         );
     }
 
-    /// The direction this rule deliberately does not take: the tree side's `Move` comes from
-    /// `TextDiff::from`'s column-shift heuristic rather than from either ground truth, so a byte
-    /// the tree renders `Move` and the painting calls `Delete` measures the renderer. It is also
-    /// the larger of the two in the corpus, which is what makes reporting it a bad trade.
+    /// Not reported: a tree-side `Move` comes from `TextDiff::from`'s column-shift heuristic, so
+    /// against a painted `Delete` it measures the renderer.
     #[test]
     fn a_painted_delete_over_a_node_the_renderer_calls_moved_is_not_reported() {
         let source = rust("let value = 1;\n");
@@ -3767,11 +3276,9 @@ mod tests {
 
     #[test]
     fn a_delimiter_whose_group_leaves_it_free_contradicts_nothing() {
-        // The shape that motivated this: one call becomes two nested calls, so the human records
-        // the single before `(` against both after `(` and the single before `)` against both
-        // after `)`, each as a 1:2 group. Either choice is valid, and pairing outer with outer is
-        // consistent - but `representative_entries` sorts each side by start byte, so it takes the
-        // outer opener and the *inner* closer and splits both pairs.
+        // One call becomes two nested calls: 1:2 groups for `(` and for `)`. Pairing outer with
+        // outer is consistent, but `representative_entries` sorts by start byte and takes the
+        // outer opener with the *inner* closer, splitting both pairs.
         let before = rust("fn f() { g(x); }\n");
         let after = rust("fn f() { g(h(x)); }\n");
 
@@ -3811,10 +3318,8 @@ mod tests {
 
     #[test]
     fn an_all_to_all_group_member_is_a_claim_under_every_reading() {
-        // One statement duplicated: an any-one-to-one group would leave one copy over, and its
-        // leaves undecided. An all-to-all group says both copies correspond to the original, so
-        // a leaf inside either copy has a twin - and the rest of the rules find nothing to
-        // object to in the duplicate pairs the projection hands them.
+        // One statement duplicated under an all-to-all group: a leaf inside either copy has a
+        // twin, so nothing is undecided and nothing is objected to.
         let before = rust("fn f() { g(); }\n");
         let after = rust("fn f() { g(); g(); }\n");
         let before_root = before.ast.as_ref().unwrap().root_node();

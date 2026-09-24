@@ -21,17 +21,10 @@ use crate::code::{ASTMetadata, Code, Language};
 use crate::diff::apted::{self, Algorithm};
 use crate::diff::{ASTDiff, ASTMapping, ASTMappingReason};
 
-/// Recursively maps every descendant of an already-matched pair as `Identical`/cost 0/
-/// `IdenticalHashOfAncestor`, position-by-position in lockstep (stack-based DFS, so children are
-/// visited in reverse sibling order - doesn't matter here since every child gets mapped
-/// regardless of order). Stops descending into a child whose kind doesn't match its counterpart's
-/// (can only happen if the caller's "these subtrees are identical" guarantee doesn't actually
-/// hold) or that's already mapped on the before side.
-///
-/// Shared by `solve_comment_nodes` (whose precondition - matched comment nodes' full text is
-/// byte-identical - guarantees kinds always match, making the kind check here a no-op for that
-/// caller) and `solve_identical_diagnostic_statements` (whose precondition - matched statements'
-/// full hash is identical - gives the same guarantee).
+/// Maps every descendant of a matched pair of identical subtrees, position by position, as
+/// `Identical`/`IdenticalHashOfAncestor`. Precondition: the subtrees are identical. It skips
+/// (and does not descend into) a child pair whose kinds differ or whose before node is
+/// already mapped.
 pub fn map_identical_descendants<'a>(
     before_node: Node<'a>,
     after_node: Node<'a>,
@@ -61,12 +54,9 @@ pub fn map_identical_descendants<'a>(
     }
 }
 
-/// Walks `root`'s subtree (stack-based DFS, so children are visited in reverse sibling order)
-/// collecting every node for which `predicate` returns true and that isn't already mapped in
-/// `mapped`. Doesn't descend into already-mapped nodes - their contents are presumed already
-/// resolved by an earlier pass - but does keep descending past a collected node itself, in case a
-/// second match is nested inside the first (e.g. one diagnostic call nested in another's
-/// arguments). Its caller is `solve_identical_diagnostic_statements`.
+/// Every node under `root` that satisfies `predicate` and is not in `mapped`, in no particular
+/// order. It does not descend into mapped nodes, but does descend into collected ones, since a
+/// match can nest inside another (a diagnostic call in another's arguments).
 pub fn collect_unmatched<'a>(
     root: Node<'a>,
     mapped: &rustc_hash::FxHashMap<usize, usize>,
@@ -89,12 +79,8 @@ pub fn collect_unmatched<'a>(
     result
 }
 
-/// Proposes `(before_id, after_id)` to APTED via `apted::for_nodes` and, if it actually resolved
-/// the pair as a match (rather than a separate delete+insert - e.g. if the leftover residual
-/// outweighs reuse), relabels the resulting mapping's reason to `reason` instead of leaving it as
-/// whatever generic label `for_nodes` itself assigns. Shared "propose a pair, then stamp
-/// provenance if it stuck" idiom behind `solve_greedy_anchor_blocks` (and the deleted
-/// `solve_bottom_up_expansion`), which anchor single node pairs this same way.
+/// Proposes the pair to APTED and, if APTED kept it as a match rather than delete + insert,
+/// relabels that mapping's reason to `reason`.
 pub fn anchor_pair_via_apted(
     before_id: usize,
     after_id: usize,
@@ -120,18 +106,10 @@ pub fn anchor_pair_via_apted(
 }
 
 /**
-* Determines if a node with the given kind is a reference node for the given language.
-*
-* Reference nodes are nodes that are used as anchors for diffing. Typically these are
-* nodes that represent significant structural elements in the code, such as source files
-* or function definitions.
-*
-* You can think of reference nodes as "parts of code humans think about". I.e. humans rarely think
-* about a specific semicolon in a C++ file, but they do think about entire functions as whole
-* entities.
+* Whether `node_kind` is a reference node: a unit a reader thinks of as a whole (a function, a
+* class, an import), used as an anchor for exact-hash matching whatever its size.
 */
 pub fn is_reference(node_kind: &str, language: &Language) -> bool {
-    // Language-specific reference nodes
     match language {
         Language::Rust => {
             node_kind == "source_file"
@@ -263,39 +241,24 @@ pub fn is_reference(node_kind: &str, language: &Language) -> bool {
         }
         Language::LUA => node_kind == "chunk" || node_kind == "function_declaration",
         Language::Vimscript => node_kind == "script_file" || node_kind == "function_definition",
-        // Data formats and configuration - root nodes only
         Language::JSON | Language::YAML => node_kind == "document" || node_kind == "fragment",
-        // XML's `element` (any tag, e.g. `<string name="...">...</string>`) gets the same
-        // reference-node exception JSON/YAML's own entries above and everything else in this
-        // function relies on: `NodeSelectionConfig::min_subtree_size` (45) otherwise excludes it
-        // from exact-hash matching entirely, since a single leaf-ish element is far smaller than
-        // that - confirmed 2026-08-05 (`TODO.md`) on `xml-nextcloud-android-delete-element`, a
-        // ~1200-entry Android `strings.xml` file where every entry parses to ~16 nodes. Without
-        // this, phases 1-5 left 94% of the file (20124/21396 nodes) unmatched despite being
-        // 99.9% byte-identical text, tripping `LARGE_RESIDUAL_THRESHOLD` and substituting the
-        // crude Myers fallback for the whole file. Safe the same way every other reference-node
-        // exception here is: this only ever *enables candidacy* for exact-hash matching, which
-        // still requires byte-identical subtrees to actually match anything - it can widen what's
-        // eligible to be found, never produce a wrong match.
+        // An XML element is far below `NodeSelectionConfig::min_subtree_size`, so without this a
+        // file of many small elements (Android `strings.xml`) leaves nearly every node to the
+        // fallback. Being a reference node only makes it a candidate; a match still needs
+        // byte-identical subtrees.
         Language::XML => {
             node_kind == "document" || node_kind == "fragment" || node_kind == "element"
         }
-        // Other languages - root node only as fallback
         _ => false,
     }
 }
 
 /// True for the import/use/include statement kinds [`is_reference`] lists for `language`.
 ///
-/// Split out because phase 1's *shape-only* tier (`solve_hash_descent`'s `KindOnlyHash` call)
-/// must skip them: two imports of unrelated names with the same number of path segments have
-/// identical shape, and the tier had nothing else to go on. In `kotlin-remove-function` it paired
-/// `...service.ChatServiceError` with `...CloudLlmProvider.State.Ready` (both seven segments) and
-/// then spent four identifier Updates making it true - cheaper under the unit cost model than
-/// delete + insert, and wrong to every reader; 64 of that fixture's 66 mismatches (2026-09-01).
-/// Imports were only added to `is_reference` on 2026-07-11, with zero measured benchmark effect,
-/// so nothing is lost by keeping them out of the tier that can't tell them apart. The byte-exact
-/// tier and every later pass still see them.
+/// Phase 1's shape-only tier (`KindOnlyHash`) skips these: two unrelated imports with the same
+/// number of path segments have the same shape, and pairing them plus a few identifier updates
+/// is cheaper than delete + insert and wrong to every reader (`kotlin-remove-function`). The
+/// byte-exact tier and every later pass still see them.
 pub fn is_import_kind(node_kind: &str, language: &Language) -> bool {
     match language {
         Language::Rust => node_kind == "use_declaration",
@@ -321,31 +284,8 @@ pub fn is_import_kind(node_kind: &str, language: &Language) -> bool {
     }
 }
 
-/// A *scope-local* identity name for nodes like parameters, local variable declarations, and
-/// shell variable assignments - the same kind of stable identity signal `is_semantically_
-/// structural` provides for top-level declarations, but deliberately **not** layered onto that
-/// function or the global name-resolution pipeline it feeds (`solve_qualified_name_groups`):
-/// that walks the *entire* file, so adding parameters/local variables there would make every one
-/// of them in the whole codebase a top-level-matchable candidate - a much bigger, riskier change
-/// than the narrow, per-container mechanism this is for (`apted::prematch_unique_named_locals`)
-/// needs. Returns `(kind_bucket, name)` if `node_id` is a kind of node this should consider;
-/// `kind_bucket` disambiguates same-named entities of different kinds (a parameter named `x`
-/// must never match a local variable also named `x`).
-///
-/// Uses only `ASTNodeMetadata` (kind/children/text), not a real `tree_sitter::Node` - consistent
-/// with everything else in `apted/common` this feeds, and sufficient here since every case
-/// below only needs to walk to a specific child by *kind*, not by field name.
-///
-/// Every arm below is confirmed against that language's real parse tree, not assumed from
-/// another language's grammar.
-///
-/// Cheap upfront filter for `apted::prematch_unique_named_locals`'s file-root-level call site
-/// (`diff.rs`, phase 6): that call runs unconditionally on every diff regardless of language, so
-/// without this, every fixture pays a full O(n) tree walk (`collect_local_identities`) that can
-/// never find anything for the many languages `local_identity_name` has no arm for. Keep in sync
-/// with `local_identity_name`'s own `match` arms by construction: both list exactly the same
-/// languages, on purpose, so a future language added to one is easy to notice is missing from the
-/// other.
+/// Whether [`local_identity_name`] has any arm for `language`, so the root-level prematch can
+/// skip its whole-tree walk. Must list exactly the languages that function's arms do.
 pub(crate) fn has_local_identity_coverage(language: &Language) -> bool {
     matches!(
         language,
@@ -353,21 +293,9 @@ pub(crate) fn has_local_identity_coverage(language: &Language) -> bool {
     )
 }
 
-/// The declared name of a *container member* - a method, constructor or field of a Java class
-/// body, a field of a C/C++ struct, a C/C++ function definition - as `(kind, name)`, from
-/// `ASTNodeMetadata` alone (same design as [`local_identity_name`], and confirmed against real
-/// parse trees the same way: `ascii_visualizer` on a Java class and a C struct, 2026-09-02).
-///
-/// Feeds `apted::common::anchor_leftovers_by_member_name`: when a flat container's children fail
-/// exact-hash anchoring because their *bodies* changed, this is the signal that still says which
-/// member is which. Java's `method_declaration` name is its first direct `identifier` (modifiers,
-/// type parameters and the return type all precede it but none is an `identifier`); a field's is
-/// under its `variable_declarator`; a C field's `field_identifier` may sit under a chain of
-/// `pointer_declarator`/`array_declarator`/`function_declarator` wrappers, and a function's
-/// `identifier` under `function_declarator` (itself possibly under `pointer_declarator`).
-///
-/// Overloads and same-named fields in different structs are not a concern here: the caller only
-/// trusts a name that is unique among the leftovers on *both* sides of one container.
+/// The `(kind, name)` of a container member (Java method, constructor or field; C/C++ field or
+/// function definition), for anchoring members whose bodies changed. Overloads are not a concern:
+/// the caller only trusts a name unique among the leftovers on both sides.
 pub(crate) fn member_identity_name(
     node_id: usize,
     meta: &ASTMetadata,
@@ -433,6 +361,10 @@ pub(crate) fn member_identity_name(
     }
 }
 
+/// A scope-local `(kind_bucket, name)` for parameters, local declarations and shell assignments,
+/// used by `apted::prematch_unique_named_locals` within one container. Kept out of
+/// [`is_semantically_structural`], whose whole-file walk would make every local in the file a
+/// candidate. `kind_bucket` keeps a parameter `x` from matching a local `x`.
 pub(crate) fn local_identity_name(
     node_id: usize,
     meta: &ASTMetadata,
@@ -448,15 +380,12 @@ pub(crate) fn local_identity_name(
             .find(|&c| meta.node_info.get(&c).is_some_and(|i| i.kind == wanted))
     };
     match (language, info.kind.as_str()) {
-        // `parameter` - "task: Task" - first child is the `identifier` naming it.
         (Language::Kotlin, "parameter") => {
             let name_id = first_child_of_kind(node_id, "identifier")?;
             let text = meta.node_info.get(&name_id)?.text.clone();
             Some(("parameter", text))
         }
-        // `local_declaration_statement` - "var resources = ...;" - descends through
-        // `variable_declaration` -> `variable_declarator` -> the declared `identifier`. Keyed on
-        // the *statement*, not the declarator, so the whole `var x = ...` re-anchors as one unit.
+        // Keyed on the statement, not the declarator, so `var x = ...` re-anchors as one unit.
         (Language::CSharp, "local_declaration_statement") => {
             let decl_id = first_child_of_kind(node_id, "variable_declaration")?;
             let declarator_id = first_child_of_kind(decl_id, "variable_declarator")?;
@@ -464,28 +393,20 @@ pub(crate) fn local_identity_name(
             let text = meta.node_info.get(&name_id)?.text.clone();
             Some(("local_declaration_statement", text))
         }
-        // `variable_assignment` - `group="${args[4]}"` - first child is the `variable_name`.
         (Language::ShellScript, "variable_assignment") => {
             let name_id = first_child_of_kind(node_id, "variable_name")?;
             let text = meta.node_info.get(&name_id)?.text.clone();
             Some(("variable_assignment", text))
         }
-        // Deliberately no CSS `declaration` arm, although a formatter swapping
-        // `margin-bottom`/`margin-top` inside every rule is exactly the shape this pass exists
-        // for. Keyed on (enclosing selector, property) a declaration is unique per side, but the
-        // same selector text can name *different* rules on the two sides: a selector renamed in
-        // place with a copy under the old name added far away leaves the human holding the
-        // positional pair, selector updated, while the key follows the name elsewhere. A
-        // declaration's identity is its rule's, and a rule's identity in a theme stylesheet is not
-        // its selector text alone.
+        // No CSS `declaration` arm: the same selector text can name different rules on the two
+        // sides (a selector renamed in place, a copy under the old name added elsewhere), and a
+        // declaration's identity is its rule's, not its selector text's.
         _ => None,
     }
 }
 
-/// The identity `(node_kind, text)` of `node` when its `field` child exists (and, if `kind` is
-/// given, has that kind): the one shape most of [`is_semantically_structural`]'s arms share, so
-/// each arm is one line naming the field and the accepted kind, and the genuinely special ones
-/// (Rust `impl_item`, Go receivers, C declarators, ...) stand out.
+/// `(node_kind, text of the field child)`, when that child exists and, if `kind` is given, has
+/// that kind.
 fn named_child_text(
     node: &Node,
     bytes: &[u8],
@@ -500,14 +421,8 @@ fn named_child_text(
     Some((node.kind().to_string(), text.to_string()))
 }
 
-/*
-* Semantically structural nodes are nodes that have a semantic meaning that is "loosely fixed" and
-* typically enforced by the compiler in some way. For example, there can only ever be ONE
-* 'fn main()' in main.rs in a Rust project. It is sensible for the algorithm to match such nodes
-* immediately.
-*
-* Returns (node_kind, identifier) if the node matches.
-*/
+/// `(node_kind, identity)` for a declaration whose name the language makes (nearly) unique, such
+/// as the one `fn main()` in a Rust crate, so the pipeline can match it by name at once.
 pub fn is_semantically_structural<'a>(
     node: &Node<'a>,
     language: &Language,
@@ -517,7 +432,6 @@ pub fn is_semantically_structural<'a>(
 
     let bytes = code.contents.as_bytes();
 
-    // Language-specific reference nodes
     match language {
         Language::Rust => match node_kind {
             "function_item" | "mod_item" => {
@@ -558,7 +472,6 @@ pub fn is_semantically_structural<'a>(
                 let param_decl = receiver.named_children(&mut rc).next()?;
                 let type_node = param_decl.child_by_field_name("type")?;
                 let type_text = type_node.utf8_text(bytes).ok()?;
-                // Strip leading `*` for pointer receivers: `*Foo` \u{2192} `Foo`
                 let receiver_type = type_text.trim_start_matches('*');
                 Some((
                     node_kind.to_string(),
@@ -568,20 +481,9 @@ pub fn is_semantically_structural<'a>(
             "type_spec" | "type_alias" => {
                 named_child_text(node, bytes, "name", Some("type_identifier"))
             }
-            // A top-level `var tests = []T{...}` (or `const`) declaration is exactly as common a
-            // home for a large, table-driven data literal as a named function is, and without a
-            // name here it has no identity signal at all: `solve_large_flat_subtrees`'s
-            // `top_level_identities` only looks at direct children of the file root, not at
-            // arbitrary depth, so with nothing to key off the whole file falls through every pass
-            // to whole-tree APTED. Keyed on the *declaration* itself (not its
-            // `var_spec`/`const_spec` child) specifically so `top_level_identities` can see it
-            // without recursing; a grouped `var (a = 1; b = 2)` block is keyed by its first name
-            // only (a simplification, not a correctness issue - the group is still matched as one
-            // unit across before/after as long as that first name is unchanged).
-            // `var_spec`/`const_spec` are *also* matched independently below, for
-            // `solve_qualified_name_groups`'s fully-recursive, finer-grained walk - the two
-            // consumers have different needs (direct-children-only vs. any depth), so both arms
-            // are useful rather than redundant.
+            // A top-level `var`/`const` often holds a large table-driven literal. The declaration
+            // is keyed (by its first name) for `top_level_identities`, which sees only the root's
+            // direct children; the specs are keyed too, for the any-depth name walk.
             "var_declaration" | "const_declaration" => {
                 let mut cursor = node.walk();
                 let spec = node
@@ -605,21 +507,20 @@ pub fn is_semantically_structural<'a>(
                 let func_name = name_node.utf8_text(bytes).ok()?;
                 let name_start = name_node.start_byte();
 
-                // Extension function receiver: unnamed user_type child before the name node
+                // An extension function's receiver is the `user_type` before the name.
                 let receiver_prefix: String = {
                     let mut cur = node.walk();
                     node.named_children(&mut cur)
                         .find(|c| c.kind() == "user_type" && c.start_byte() < name_start)
                         .and_then(|r| r.utf8_text(bytes).ok())
                         .map(|s| {
-                            // Strip type params for key stability: `List<String>` \u{2192} `List`
                             let base = s.split('<').next().unwrap_or(s).trim();
                             format!("{}.", base)
                         })
                         .unwrap_or_default()
                 };
 
-                // Parameter types for overload disambiguation
+                // Parameter types disambiguate overloads.
                 let param_sig: String = {
                     let mut cur = node.walk();
                     let fvp_opt = node
@@ -634,8 +535,6 @@ pub fn is_semantically_structural<'a>(
                                 .filter(|c| c.kind() == "parameter")
                                 .filter_map(|param| {
                                     let mut pc = param.walk();
-                                    // First named child is the param name (identifier);
-                                    // the next named child is the type.
                                     param
                                         .named_children(&mut pc)
                                         .find(|c| c.kind() != "identifier")
@@ -657,19 +556,10 @@ pub fn is_semantically_structural<'a>(
                 named_child_text(node, bytes, "name", Some("identifier"))
             }
             "companion_object" => named_child_text(node, bytes, "name", Some("identifier")),
-            // `typealias Foo = Bar` uses field "type" (not "name") for the alias identifier
+            // The alias name is under field "type", not "name".
             "type_alias" => named_child_text(node, bytes, "type", Some("identifier")),
             _ => None,
         },
-        // `is_reference` above lists these C# kinds for hash-candidate selection, but without a
-        // *name* extracted from them `solve_qualified_name_groups`/`solve_large_flat_subtrees`
-        // (both keyed on `is_semantically_structural`) see every C# file as having zero named
-        // declarations, and no class, method or field gets the cheap identity-based match every
-        // other supported language gets. A C# file whose one large list is too small for
-        // `NodeSelectionConfig`'s exact-hash candidate list and whose container is unnamed cannot
-        // reach `solve_large_flat_subtrees`'s Myers fast path either (named top-level items
-        // only), so the whole file goes to whole-tree APTED. Field names are verified against the
-        // real grammar, not assumed from other C-family grammars.
         Language::CSharp => match node_kind {
             "class_declaration"
             | "struct_declaration"
@@ -678,12 +568,7 @@ pub fn is_semantically_structural<'a>(
             | "record_declaration"
             | "method_declaration"
             | "namespace_declaration" => named_child_text(node, bytes, "name", None),
-            // No direct "name" field (unlike the kinds above) - wraps a `variable_declaration`
-            // holding one or more `variable_declarator`s (`int a, b;` is one `field_declaration`
-            // naming two variables). Keyed on the *first* declarator only, same simplification
-            // Go's grouped `var (...)`/`const (...)` handling above already uses: not a
-            // correctness issue, the field is still matched as one unit as long as its first
-            // name is unchanged.
+            // `int a, b;` is one declaration; keyed by its first name, like Go's grouped `var`.
             "field_declaration" => {
                 let mut cursor = node.walk();
                 let variable_declaration = node
@@ -700,17 +585,6 @@ pub fn is_semantically_structural<'a>(
             }
             _ => None,
         },
-        // Same 2026-07-25 gap as the CSharp arm above, found chasing the same class of pathology
-        // once it turned out C and C++ dominate the remaining slow outliers even after the C# fix
-        // (6 of the corpus's 10 slowest fixtures are C/C++). `function_definition`'s name isn't a
-        // direct field - C/C++ grammars nest it inside a chain of declarator wrappers
-        // (`pointer_declarator`/`array_declarator`/... for return-type modifiers, `function_
-        // declarator` for the parameter list itself), terminating in the actual name node -
-        // `c_family_declarator_name` walks that chain. Verified empirically against real fixtures
-        // (`c-nginx-add-typedef`: `pointer_declarator -> function_declarator -> identifier`;
-        // `cpp-ladybird-refactor-variables-if-changes`: `function_declarator ->
-        // qualified_identifier`, which already carries full `Class::method` scoping - no separate
-        // impl/class pre-pass needed the way Rust's `impl_item` handling has one).
         Language::C => match node_kind {
             "function_definition" => node
                 .child_by_field_name("declarator")
@@ -722,11 +596,6 @@ pub fn is_semantically_structural<'a>(
             _ => None,
         },
         Language::CPP => match node_kind {
-            // `c_family_test_macro_name` (see its own doc comment) takes priority: a googletest
-            // `TEST(Suite, Case)` block parses as a real `function_definition` whose own name is
-            // the literal macro name, which - left unhandled - collapses every such block in the
-            // file into one shared-name, cost-tie-broken candidate group instead of matching each
-            // uniquely by its real suite/case name.
             "function_definition" => c_family_test_macro_name(node, bytes)
                 .map(|name| (node_kind.to_string(), name))
                 .or_else(|| {
@@ -737,29 +606,17 @@ pub fn is_semantically_structural<'a>(
             "class_specifier" | "struct_specifier" | "enum_specifier" | "union_specifier" => {
                 named_child_text(node, bytes, "name", None)
             }
-            // Already returns a fully-qualified name for `namespace A::B { ... }` (a
-            // `nested_namespace_specifier`, not a plain `namespace_identifier`) - confirmed
-            // empirically, no extra unwrapping needed unlike `function_definition` above.
+            // `namespace A::B` yields the fully qualified name as is.
             "namespace_definition" => named_child_text(node, bytes, "name", None),
             _ => None,
         },
-        // Same 2026-07-26 gap as the CSharp/C/CPP arms above (`TODO.md`'s speed-goal
-        // investigation) - completing coverage for every language `is_reference` above already
-        // lists a kind set for. Java/JS/TS/TSX verified empirically against real corpus fixtures
-        // (same throwaway-binary-against-real-grammar-output method as the C-family arms); the
-        // rest (below, in the final `_ =>` fallback comment) have no fixtures in this corpus to
-        // verify against - see that comment for what "unvalidated" means there.
         Language::Java => match node_kind {
             "class_declaration"
             | "interface_declaration"
             | "enum_declaration"
             | "record_declaration"
             | "method_declaration" => named_child_text(node, bytes, "name", None),
-            // No direct "name" field - wraps a `variable_declarator` (possibly several, for
-            // `int a, b;`) the same shape C#'s `field_declaration` arm above already handles,
-            // minus that language's extra `variable_declaration` wrapper layer (confirmed
-            // empirically: Java nests `variable_declarator` directly under `field_declaration`).
-            // Keyed on the first declarator only, same simplification as C#'s/Go's arms.
+            // Keyed by the first declarator, as in C#.
             "field_declaration" => {
                 let mut cursor = node.walk();
                 let declarator = node
@@ -778,13 +635,8 @@ pub fn is_semantically_structural<'a>(
             | "method_definition"
             | "interface_declaration"
             | "type_alias_declaration" => named_child_text(node, bytes, "name", None),
-            // `const f = () => ...`/`const f = function() {...}`: the function itself has no
-            // name field (confirmed empirically - only its *enclosing* `variable_declarator`
-            // does), unlike a `function_declaration`. Deliberately narrow: only fires when the
-            // function is the *direct* value of a declarator, not when it's passed as a callback
-            // argument (`arr.map(x => ...)`) - confirmed empirically those parent as `arguments`,
-            // not `variable_declarator`, and a callback argument genuinely has no identity of its
-            // own to match on.
+            // `const f = () => ...` takes the declarator's name; a callback argument has no
+            // identity of its own.
             "arrow_function" | "function_expression" => {
                 let parent = node.parent()?;
                 (parent.kind() == "variable_declarator")
@@ -793,43 +645,12 @@ pub fn is_semantically_structural<'a>(
                     .and_then(|n| n.utf8_text(bytes).ok())
                     .map(|name| (node_kind.to_string(), name.to_string()))
             }
-            // Fallback for a top-level `const`/`let`/`var X = <value>` whose value isn't itself a
-            // function/class (those already get a more specific identity above, keyed on the
-            // *declarator*) - e.g. `const APP_STATE_STORAGE_CONF = (<generic IIFE>)({...90
-            // properties...})`. Without this, such a declaration has no identity signal at all -
-            // both `solve_large_flat_subtrees` (which looks for a top-level identity match via
-            // `top_level_identities`, checking `program`'s *direct* children - a `lexical_
-            // declaration`, not its nested `variable_declarator`) and phase 4's named-group
-            // matching can't isolate it, so its entire subtree falls through to final whole-tree
-            // APTED. Deliberately keyed on the *declaration* node (not the declarator, unlike the
-            // `arrow_function` arm above) specifically so `top_level_identities`'s direct-children
-            // walk sees it, letting `solve_large_flat_subtrees` Myers-diff the flat descendant
-            // cheaply instead of routing through a real (and, for this shape, pathological)
-            // `apted::for_nodes` call.
-            //
-            // Measured live (`typescript-excalidraw-excalidraw-add-values-to-lists`): a two-line
-            // edit (one new property in each of two ~90-property object literals, one of them
-            // exactly this IIFE-const shape, densely packed with dozens of byte-identical
-            // `{ browser: false, export: false, server: false }`-shaped sibling values) took
-            // **36 seconds** - by far the single worst outlier in the whole corpus (the next
-            // slowest fixture is 25x faster) - because that IIFE-const's ~1500-node subtree had no
-            // identity signal and landed in phase 6's final APTED, which chokes specifically on
-            // that duplicate-value cluster (confirmed: keying this arm on `variable_declarator`
-            // instead - visible to phase 4's recursive named-group walk, but invisible to `top_
-            // level_identities`'s direct-children-only walk - still cost ~43s, i.e. no better,
-            // since it still forced one giant real-APTED call over the same duplicate-heavy
-            // subtree instead of the cheap Myers path).
-            //
-            // Deliberately scoped to a *top-level* declaration with exactly one declarator (parent
-            // is `program` directly, or an `export_statement` that is) and a plain identifier name
-            // (not a destructuring pattern): unlike a top-level function/class name, an arbitrary
-            // local variable name (`result`, `i`, `config`) is not reliably unique within a file -
-            // the same false-positive risk already documented and avoided elsewhere for
-            // local-variable anchoring (see `TODO.md`'s "Explored and shelved: recognizing smaller
-            // structural pieces within a changed method"). A top-level module const doesn't have
-            // that problem: it's declared exactly once, at module scope, same as a top-level
-            // function - and multi-declarator statements (`const a = 1, b = 2;`) are skipped
-            // rather than guessing which declarator the single returned name should represent.
+            // A top-level `const X = <non-function value>`. Keyed on the declaration, not the
+            // declarator, because `top_level_identities` sees only the root's direct children, and
+            // only that lets `solve_large_flat_subtrees` Myers-diff a huge literal instead of
+            // sending it to APTED (`typescript-excalidraw-excalidraw-add-values-to-lists`).
+            // Top-level, single-declarator, plain-identifier only: a local name is not reliably
+            // unique in a file.
             "lexical_declaration" | "variable_declaration" => {
                 let mut cursor = node.walk();
                 let mut declarators = node
@@ -837,7 +658,7 @@ pub fn is_semantically_structural<'a>(
                     .filter(|c| c.kind() == "variable_declarator");
                 let declarator = declarators.next()?;
                 if declarators.next().is_some() {
-                    return None; // more than one declarator - ambiguous, skip.
+                    return None;
                 }
                 let name_node = declarator
                     .child_by_field_name("name")
@@ -857,17 +678,8 @@ pub fn is_semantically_structural<'a>(
             }
             _ => None,
         },
-        // Was "unvalidated" (added via the same best-effort `name`-field convention every checked
-        // language uses, but with no PHP fixture in the corpus to verify against) until real PHP
-        // fixtures showed up and turned out slow for the same reason as Ruby's `singleton_method`
-        // gap: two of these three kind names were simply wrong. Verified against tree-sitter-php's
-        // actual grammar (throwaway sexp-dump test, deleted after use): a top-level `function foo()
-        // {}` is `function_definition`, not `function_declaration`; a class method is `method_
-        // declaration`, not `method_definition`. Only `class_declaration` was already correct.
-        // Measured 2026-08-02 (`/goal` speed investigation): `php-wordpress-wordpress-add-null-to-
-        // return` (2823 lines, 28 top-level functions, one `return;` -> `return null;` edit in one
-        // of them) - every one of those 28 functions was invisible to phase 4, same "no named
-        // candidates, falls back to one giant blob" pattern as Ruby/YAML.
+        // tree-sitter-php names these `function_definition` and `method_declaration`, unlike
+        // `is_reference`'s spelling.
         Language::PHP => match node_kind {
             "class_declaration" | "function_definition" | "method_declaration" => {
                 named_child_text(node, bytes, "name", None)
@@ -875,28 +687,14 @@ pub fn is_semantically_structural<'a>(
             _ => None,
         },
         Language::Ruby => match node_kind {
-            // `singleton_method` (`def self.foo`, Ruby's class/module-level method syntax) is a
-            // distinct grammar node from plain instance `method` (`def foo`) - omitting it left
-            // every `def self.*`-only file (e.g. a Homebrew formula-API helper module) with *no*
-            // method-level named candidates at all, forcing phase 4's named-group matching to fall
-            // back to whatever enclosing `class`/`module` it could still see - which, for a file
-            // that's just a chain of near-empty wrapper modules around the real content, meant one
-            // multi-thousand-node APTED call instead of many small per-method ones (measured
-            // 2026-08-02: `ruby-homebrew-add-or-expression`, 4.2s dominated by a single `module`
-            // pair with a 1022-node residual, for a fixture whose only real edit is one line inside
-            // one `def self.*` method - see `TODO.md`).
+            // `singleton_method` is `def self.foo`, a distinct kind from `method`.
             "class" | "module" | "method" | "singleton_method" => {
                 named_child_text(node, bytes, "name", None)
             }
             _ => None,
         },
-        // Every remaining language `is_reference` above lists a kind set for, but with no
-        // fixture in this corpus to verify field names against empirically (unlike every arm
-        // above, all confirmed live against real grammar output). Following the same `name`-field
-        // convention every verified language so far has used without exception, but genuinely
-        // **unvalidated** - treat these as a best-effort starting point, not a confirmed fix, and
-        // verify against real source the first time one of these languages gets an actual
-        // fixture (the same throwaway-binary method used for every arm above works for this too).
+        // Unvalidated: these follow the usual `name`-field convention but no fixture has checked
+        // them against the real grammar.
         Language::Swift => match node_kind {
             "function_declaration"
             | "class_declaration"
@@ -920,19 +718,8 @@ pub fn is_semantically_structural<'a>(
                 _ => None,
             }
         }
-        // YAML has no declarations in the function/class sense, but `block_mapping_pair`'s `key`
-        // field is the same kind of stable identity signal for exactly the same reason: a large
-        // localization/config YAML file is nothing but nested `key: value` mappings, and without
-        // this, phase 4 has zero named candidates to isolate a single changed key with - measured
-        // 2026-08-02 (`/goal` speed investigation): `yaml-mastodon-remove-one-pair` (939 lines, one
-        // `following: Abonaments` pair removed, otherwise untouched) cost 2442.1ms in phase 4 alone
-        // (93.3% of its 2619.1ms total), one giant top-level-mapping APTED call, for exactly the
-        // same reason Ruby's missing `singleton_method` arm did - see that fix's own comment above.
-        // Safe against repeated keys (`one`/`other`/`name`, ubiquitous across sibling objects in a
-        // locale file) the same way Ruby's `Bar::new` vs `Foo::new` is safe: every enclosing
-        // `block_mapping_pair` that's itself a candidate contributes its own key to the fully-
-        // resolved scope chain (`solve_qualified_name_groups`'s doc comment), so two pairs only
-        // ever share an identity if their *entire* ancestor key path matches, not just the leaf key.
+        // A mapping key is the identity of a config file's entries. Repeated keys (`one`, `name`)
+        // are safe: identities are resolved through the whole ancestor key path.
         Language::YAML if node_kind == "block_mapping_pair" => {
             named_child_text(node, bytes, "key", None)
         }
@@ -940,39 +727,15 @@ pub fn is_semantically_structural<'a>(
     }
 }
 
-/// Recognizes Go's ubiquitous subtest idiom - `t.Run("name", func(t *testing.T) {...})`
-/// (`testing.T`/`testing.B`), and the same shape from popular third-party test frameworks that
-/// mirror it (quicktest's `c.Run`, testify's `suite.Run`, ...) - by structure alone: a call whose
-/// callee is `<anything>.Run` and whose first argument is a string literal. The receiver name is
-/// deliberately not checked (it varies: `t`, `c`, `s`, `suite`, ...); "a `.Run(\"literal\", ...)`"
-/// call is itself already a strong, low-false-positive signal.
-///
-/// Without this, such a call has no identity signal at all - `call_expression` isn't a
-/// declaration `is_semantically_structural` otherwise recognizes - and the *entire* surrounding
-/// test function goes to whole-tree APTED as one blob rather than as one small, independently
-/// anchored diff per subtest. That is the common shape in a table-driven test file: subtests
-/// renamed and restructured internally while keeping their names. Only a
-/// mismatched (wrong-position, wrong-content) false positive elsewhere could make
-/// this heuristic *wrong* rather than merely a no-op miss, and even then only affects match
-/// quality (a coincidental non-test `.Run("...")` call getting grouped as if it had an identity),
-/// never correctness - `solve_qualified_name_groups` still runs real APTED on whatever it groups.
-/// The `identifier` name of a Go `var_spec`/`const_spec` (or, for a grouped `var (...)`/`const
-/// (...)` declaration, the same lookup applied to its first spec child).
+/// The `identifier` name of a Go `var_spec`/`const_spec`.
 fn go_spec_identifier_name<'a>(spec: Node<'a>, bytes: &'a [u8]) -> Option<&'a str> {
     spec.child_by_field_name("name")
         .filter(|n| n.kind() == "identifier")
         .and_then(|n| n.utf8_text(bytes).ok())
 }
 
-/// Unwraps a C/C++ `function_definition`'s `declarator` field chain down to the actual name -
-/// `pointer_declarator`/`array_declarator`/`parenthesized_declarator`/`reference_declarator` are
-/// return-type/reference modifiers wrapping a nested `declarator` field of their own, terminating
-/// in `function_declarator`, whose own `declarator` field is finally the real name node
-/// (`identifier` in C; `identifier`/`qualified_identifier`/`destructor_name`/`operator_name` in
-/// C++ - a `qualified_identifier` already carries full `Class::method` scoping, verified
-/// empirically against `cpp-ladybird-refactor-variables-if-changes`). Verified against real C
-/// fixtures too: `c-nginx-add-typedef` nests exactly one `pointer_declarator` before its
-/// `function_declarator` for every pointer-returning function.
+/// The name at the end of a C/C++ declarator chain (`*`, `[]`, `()`, `&` wrappers). A C++
+/// `qualified_identifier` already carries its `Class::method` scope.
 fn c_family_declarator_name<'a>(node: Node<'a>, bytes: &'a [u8]) -> Option<&'a str> {
     match node.kind() {
         "identifier"
@@ -991,30 +754,10 @@ fn c_family_declarator_name<'a>(node: Node<'a>, bytes: &'a [u8]) -> Option<&'a s
     }
 }
 
-/// Recognizes googletest's `TEST`/`TEST_F`/`TEST_P` macro idiom - `TEST(Suite, Case) { ... }` -
-/// which tree-sitter-cpp parses as an *ordinary* `function_definition` (it has no idea `TEST` is a
-/// macro): the macro name itself becomes the function's own declarator identifier, and `Suite`/
-/// `Case` become two *anonymous* parameters typed `Suite`/`Case` (a valid, if unusual, C++ parse -
-/// a function declaration with unnamed parameters). Confirmed empirically via a sexp dump:
-/// `function_definition declarator: (function_declarator declarator: (identifier "TEST")
-/// parameters: (parameter_list (parameter_declaration type: (type_identifier "Suite"))
-/// (parameter_declaration type: (type_identifier "Case"))))`.
-///
-/// Without this, every `TEST(...)`/`TEST_F(...)`/`TEST_P(...)` block in a file resolves to the
-/// *identical* literal name "TEST"/"TEST_F"/"TEST_P" via the ordinary `c_family_declarator_name`
-/// path below, collapsing potentially dozens of genuinely distinct, uniquely-named test functions
-/// into one shared-name candidate group - `solve_qualified_name_groups`'s N:M support then has to
-/// pairwise cost-compare all of them to decide which pairs with which, instead of matching 1:1 by
-/// name for free. Measured live (`cpp-opencv-add-test-case`): adding one new, uniquely-named
-/// `TEST(...)` block among ~15 pre-existing ones cost 691ms in phase 4 alone, almost entirely this
-/// pairwise cost-scoring over a group that should never have existed - see `TODO.md`.
-///
-/// Returns `"<macro>:<Suite>:<Case>"` so each test function gets its own genuinely unique identity.
-/// Guards against colliding with a real, hand-written function that happens to be named `TEST`/
-/// `TEST_F`/`TEST_P` and takes exactly two parameters (`bool TEST(int a, int b) {...}`, unlikely
-/// but possible): only fires when both parameters are genuinely anonymous (no `declarator` field
-/// of their own), the exact shape this macro idiom - and no ordinary named-parameter function -
-/// produces.
+/// `"<macro>:<Suite>:<Case>"` for a googletest `TEST(Suite, Case)` (or `TEST_F`/`TEST_P`) block,
+/// which tree-sitter-cpp parses as a function named `TEST` with two anonymous parameters. Without
+/// it every test in a file shares the name `TEST`. A real function with named parameters is not
+/// taken for the macro.
 fn c_family_test_macro_name(node: &Node, bytes: &[u8]) -> Option<String> {
     let declarator = node.child_by_field_name("declarator")?;
     if declarator.kind() != "function_declarator" {
@@ -1038,7 +781,7 @@ fn c_family_test_macro_name(node: &Node, bytes: &[u8]) -> Option<String> {
     if suite.child_by_field_name("declarator").is_some()
         || case.child_by_field_name("declarator").is_some()
     {
-        return None; // Named parameters - a real function, not this macro idiom.
+        return None;
     }
     let suite_name = suite
         .child_by_field_name("type")
@@ -1051,6 +794,9 @@ fn c_family_test_macro_name(node: &Node, bytes: &[u8]) -> Option<String> {
     Some(format!("{macro_name}:{suite_name}:{case_name}"))
 }
 
+/// The name of a Go subtest, `<anything>.Run("name", ...)`, recognized by shape alone since the
+/// receiver varies (`t`, `c`, `suite`). A coincidental match only groups a call by name; APTED
+/// still decides the pairing.
 fn go_subtest_call_name(node: &Node, bytes: &[u8]) -> Option<String> {
     let function = node.child_by_field_name("function")?;
     if function.kind() != "selector_expression" {
@@ -1073,82 +819,45 @@ fn go_subtest_call_name(node: &Node, bytes: &[u8]) -> Option<String> {
     Some(text.trim_matches(|c| c == '"' || c == '`').to_string())
 }
 
-// Families of single-token operator kinds that occupy the same grammatical "slot" in a
-// TreeSitter grammar (e.g. the `operator` field of `binary_expression`/`assignment_expression`).
-// Two leaf nodes whose kinds fall in the same family represent the same conceptual operation with
-// a different operator, so matching them as an Update (rather than a Delete+Insert) mirrors what
-// a human would consider "the same node, tweaked" - e.g. the classic `<` -> `<=` off-by-one fix.
-// Crucially these are separate arrays, not one big list: `kinds_update_allowed` only allows a
-// match when both kinds fall in the *same* family, so `<` can cross to `<=` but never to `+`.
-//
-// Tokens are drawn from the actual TreeSitter grammars this project depends on (verified against
-// each crate's `node-types.json`), not guessed. A token that never appears in a given language's
-// grammar is harmless to leave in these shared lists - it simply never matches anything.
+// Cross-kind update families: leaves whose kinds share a family occupy the same grammatical slot,
+// so `<` -> `<=` is an update, not delete + insert. Families are separate so `<` never crosses to
+// `+`. A token a grammar lacks is harmless in a shared list.
 
-/// Relational and equality comparisons (including alternate spellings: C++'s `not_eq`/`<=>`,
-/// JS/PHP's `===`/`!==`, Python/PHP's old-style `<>`, Ruby's `=~`/`!~` match operators).
-///
-/// Deliberately excludes keyword-based comparisons that double as other syntax in the same
-/// grammar (Python/JS `in`, Python `is`/`is not`/`not in`, JS/PHP `instanceof`): those tokens
-/// also appear outside of comparisons (e.g. `for x in y`), so allowing them here risks the DP
-/// matching an unrelated keyword occurrence purely because it's a cheaper leaf-level swap.
+/// Excludes keyword comparisons (`in`, `is`, `instanceof`): they also appear outside
+/// comparisons (`for x in y`), where a swap would pair unrelated keywords.
 const COMPARISON_OPS: &[&str] = &[
     "<", "<=", ">", ">=", "==", "!=", "===", "!==", "<>", "<=>", "not_eq", "=~", "!~",
 ];
 
-/// Arithmetic operators.
 const ARITHMETIC_OPS: &[&str] = &["+", "-", "*", "/", "%", "**", "//", "@"];
 
-/// PHP additionally uses `.` as its string-concatenation operator, in the same `binary_expression`
-/// slot as the arithmetic operators - a human swapping `.` for `+` (or vice versa) is a classic
-/// PHP typo/bugfix.
+/// PHP's `.` concatenation sits in the arithmetic slot.
 const PHP_ARITHMETIC_OPS: &[&str] = &["+", "-", "*", "/", "%", "**", "."];
 
-/// Bitwise operators (including C++'s alternative keyword spellings and Go's `&^` AND-NOT).
 const BITWISE_OPS: &[&str] = &[
     "&", "|", "^", "<<", ">>", ">>>", "&^", "bitand", "bitor", "xor",
 ];
 
-/// Logical/boolean operators, including keyword spellings and the null-coalescing/Elvis operators
-/// (`??`, `?:`), which occupy the same "fallback value" slot as `||` in these grammars.
+/// `??` and `?:` occupy the same fallback-value slot as `||`.
 const LOGICAL_OPS: &[&str] = &["&&", "||", "and", "or", "??", "?:"];
 
-/// Plain `=` and every compound/augmented-assignment spelling. Converting `x = x + 1` into
-/// `x += 1` is a one-token operator change on the same kind of statement, not a different one.
 const ASSIGNMENT_OPS: &[&str] = &[
     "=", "+=", "-=", "*=", "/=", "%=", "**=", "//=", "&=", "|=", "^=", "<<=", ">>=", ">>>=", "&&=",
     "||=", "??=", "@=", ".=", "and_eq", "or_eq", "xor_eq", "&^=",
 ];
 
-/// Increment/decrement.
 const INCREMENT_OPS: &[&str] = &["++", "--"];
 
-/// Rust's range operators: `a..b` (exclusive), `a..=b` (inclusive), and the pattern-only `a...b`
-/// spelling. Switching between exclusive and inclusive bounds is the single most common Rust
-/// off-by-one fix (e.g. `for i in 0..n` -> `for i in 0..=n`).
 const RUST_RANGE_OPS: &[&str] = &["..", "..=", "..."];
 
-/// Member-access operators: plain `.`, null-safe `?.` (Kotlin/Swift/TypeScript/C#), C/C++'s
-/// pointer `->`, PHP's `?->` and Ruby's `&.`. Switching one for another is the single most common
-/// shape of a null-safety or value-to-pointer refactor (`foo.bar` -> `foo?.bar`, `s.x` -> `s->x`),
-/// and the human mappings consistently read it as the same access edited - the operator leaf sits
-/// in the same `navigation_expression`/`field_expression` slot either way. Not given to PHP, where
-/// `.` is string concatenation (`PHP_ARITHMETIC_OPS`) and pairing it with `->` would be a category
-/// error.
+/// `foo.bar` -> `foo?.bar`, `s.x` -> `s->x`. Not given to PHP, where `.` is concatenation.
 const MEMBER_ACCESS_OPS: &[&str] = &[".", "?.", "->", "?->", "&."];
 
-// Deliberately *no* C/C++ `type_identifier`/`primitive_type` family, although the pair is the
-// most frequent cross-kind leaf edit in the corpus: the ground truth contradicts itself on it.
-// `cpp-tensorflow-switch-to-primitive-types` (alias -> `int`) pairs the two leaves as an update;
-// `cpp-add-templates` (`int` -> `T`) and `c-linux-small-change-struct-to-char` (`struct x` ->
-// `char`) delete one and insert the other in exactly the same declaration slot. Measured
-// 2026-09-01: the family trades 6 -> 0 on the first for 0 -> 6 and 2 -> 4 on the other two.
-// Until the annotations agree, neither reading can be encoded.
+// No C/C++ `type_identifier`/`primitive_type` family: the ground truth contradicts itself.
+// `cpp-tensorflow-switch-to-primitive-types` pairs the two as an update; `cpp-add-templates` and
+// `c-linux-small-change-struct-to-char` delete one and insert the other in the same slot.
 
-/// Numeric literal kinds across every grammar that splits integers from floats (tree-sitter names
-/// vary per language, hence the length). `1` -> `1.0` or `0` -> `0.5f` is a value edit of one
-/// literal, not the removal of one literal and the arrival of an unrelated other - the human
-/// mappings pair them without exception. Kinds a grammar doesn't have are simply never seen.
+/// `1` -> `1.0` is a value edit; human mappings pair these without exception.
 const NUMERIC_LITERAL_KINDS: &[&str] = &[
     "integer_literal",
     "float_literal",
@@ -1172,16 +881,12 @@ const NUMERIC_LITERAL_KINDS: &[&str] = &[
     "float_value",
 ];
 
-/// Shell's `[ a == b ]` / `[ a = b ]` / `[ a != b ]` test-command operators. The bash grammar
-/// yields each as its own anonymous leaf kind, and `==` -> `=` (the POSIX-portable spelling) is a
-/// classic shell cleanup (`shellscript-torvalds-linux-double-equals-to-equals`).
+/// Shell `[ a == b ]` test operators (`shellscript-torvalds-linux-double-equals-to-equals`).
 const SHELL_TEST_OPS: &[&str] = &["==", "=", "!="];
 
-/// Access-modifier keywords. `public` -> `protected` is an edit of the modifier slot, not a
-/// deletion plus an insertion (`java-scrcpy-public-to-protected`). Not given to C#: in
-/// `csharp-glibsharp-gtksharp-interesting-case-...` the only such pair sits in a deleted
-/// constructor and an inserted property, where the cheaper cross-kind pairing is exactly the
-/// wrong answer, and no C# fixture has the same-slot edit that would pay for it.
+/// `java-scrcpy-public-to-protected`. Not given to C#: in
+/// `csharp-glibsharp-gtksharp-interesting-case-...` it pairs modifiers across a deleted
+/// constructor and an inserted property.
 const ACCESS_MODIFIERS: &[&str] = &[
     "public",
     "private",
@@ -1191,63 +896,33 @@ const ACCESS_MODIFIERS: &[&str] = &[
     "open",
 ];
 
-/// Variable-declaration keywords: `let`/`var`/`const` (JavaScript, TypeScript, Swift) and
-/// Kotlin's `val`/`var`. Flipping mutability is an edit of the declaration's keyword slot.
 const DECLARATION_KEYWORDS: &[&str] = &["let", "var", "const", "val"];
 
-/// HTML/XML's two ways to end an opening tag: `>` and the self-closing `/>`. Toggling one is a
-/// one-token edit of the tag (`html-hugo-tag-to-selfclosing-tag`), though the grammar then
-/// re-kinds the whole tag (`start_tag` vs `self_closing_tag`) - that container pair is
-/// deliberately *not* a family here, per the `TS_TYPE_KEYWORD_KINDS` lesson: pair the leaf, not
-/// the parent, or APTED takes the parent-level pairing and the leaf mapping comes out wrong.
+/// `html-hugo-tag-to-selfclosing-tag`. The re-kinded parent tags are deliberately not a family:
+/// pair the leaf, or APTED takes the parent pairing and the leaf mapping comes out wrong.
 const HTML_TAG_END: &[&str] = &["/>", ">"];
 
-/// Ruby's two hash-pair separators - `:key => v` and `key: v`. A style-guide rewrite from one to
-/// the other edits the separator of every pair in place
-/// (`ruby-jmespath-jmespath-formatting-and-style-guide-fixes`). The key itself also changes kind
-/// (`simple_symbol` -> `hash_key_symbol`), but that pair is deliberately *not* a family: measured
-/// 2026-09-01, it let APTED pair a symbol inside a deleted `pair` with one inside an inserted
-/// `element_reference` in both `ruby-homebrew-brew-*` fixtures (cost 1 beats delete + insert),
-/// costing more than the same-slot edits it bought.
+/// `:key => v` vs `key: v` (`ruby-jmespath-jmespath-formatting-and-style-guide-fixes`). The keys'
+/// `simple_symbol`/`hash_key_symbol` pair is not a family: it pairs symbols across unrelated
+/// deleted and inserted code (`ruby-homebrew-brew-*`).
 const RUBY_HASH_SEPARATORS: &[&str] = &["=>", ":"];
 
-/// Python's `None` (kind `none`) swapped for a name, or back: `x = None` -> `x = default_value`
-/// edits the value slot (`python-pytorch-pytorch-add-param-to-many-places-and-update-one`). Only
-/// `identifier`, not the wider `IDENTIFIER_KINDS`: a null literal never stands where a field or
-/// type name would. Python only: the C equivalent (`null` <-> `identifier`) was measured to pair
-/// a `return NULL` with an unrelated name in `c-nginx-add-typedef` and buy nothing elsewhere.
+/// Python `x = None` -> `x = default_value`
+/// (`python-pytorch-pytorch-add-param-to-many-places-and-update-one`). Python only: in C it pairs
+/// a `return NULL` with an unrelated name (`c-nginx-add-typedef`).
 const NULL_LITERAL_KINDS: &[&str] = &["none", "identifier"];
 
-/// Shell string bodies, whose kind changes with the quoting around them: a `raw_string` losing its
-/// quotes to become `string_content`, or a string body rewritten as a `regex`
-/// (`shellscript-scikit-learn-scikit-learn-string-to-regex`,
-/// `shellscript-langchain-ai-langchain-some-interesting-changes`). The text is the subject and the
-/// kind is an artifact of the delimiter, which is exactly the shape a cross-kind family is for.
+/// Shell string bodies, whose kind is an artifact of the quoting around them
+/// (`shellscript-scikit-learn-scikit-learn-string-to-regex`).
 const SHELL_STRING_BODY_KINDS: &[&str] = &["string_content", "raw_string", "regex"];
 
-/// A boolean flipped in place: `return true` -> `return false`. In grammars that give each literal
-/// its own kind (Java's `true`/`false`, unlike Rust's single `boolean_literal`) the two cannot pair
-/// without this, so the flip reads as a delete plus an insert - `java-defects4j-math-22-fdistribution`
-/// and `java-defects4j-math-22-uniformrealdistribution` are one visible mismatch each, and both are
-/// exactly this. Java only, on the same "add a language when a fixture asks for it" rule
-/// [`NULL_LITERAL_KINDS`] above follows: a grammar with one boolean kind needs nothing here, and a
-/// grammar with two but no fixture has no measurement behind it.
+/// `return true` -> `return false` where each literal has its own kind
+/// (`java-defects4j-math-22-fdistribution`). Java only until a fixture asks for another language.
 const BOOLEAN_LITERAL_KINDS: &[&str] = &["true", "false"];
 
-/// TypeScript's built-in type keywords - the anonymous leaf tokens tree-sitter yields *inside* a
-/// `predefined_type` node (`number`, `string`, `boolean`, ... - tree-sitter names an anonymous
-/// token by its own literal text, so the keyword `number` really does have kind `"number"`; see
-/// `tree-sitter-typescript`'s grammar rule for `predefined_type`) - paired with `type_identifier`,
-/// the leaf that names a class/interface/generic type parameter. The paradigmatic
-/// `private value: number` -> `private value: T` edit (introducing a generic) swaps one for the
-/// other at exactly this leaf, which a human reads as the same type-annotation slot being edited.
-/// Deliberately the *keyword* leaves, not `predefined_type` itself: `predefined_type` is their
-/// parent and `type_identifier` is a bare leaf with no children, so pairing the parent instead
-/// costs the same as pairing the leaf (both land on `COST_UPDATE` + one `COST_DELETE` for the
-/// keyword child), so APTED is free to take the parent-level pairing - which is structurally
-/// wrong per the human mapping, which wants `predefined_type` deleted and its keyword child
-/// matched to `type_identifier` directly. Restricting the family to the keyword leaves removes
-/// that spurious parent-level option.
+/// TypeScript's type keywords (the leaves inside `predefined_type`) with `type_identifier`, for
+/// `value: number` -> `value: T`. The keyword leaves, not `predefined_type`: pairing the parent
+/// costs the same, so APTED would be free to take it, and the human mapping pairs the leaf.
 const TS_TYPE_KEYWORD_KINDS: &[&str] = &[
     "any",
     "number",
@@ -1262,14 +937,8 @@ const TS_TYPE_KEYWORD_KINDS: &[&str] = &[
     "type_identifier",
 ];
 
-/// Identifier-like node kinds that can match each other across different kinds.
-/// These all represent "names" in the code - variables, fields, types, properties - and a human
-/// would consider them the same logical entity even if the AST node kind differs.
-/// For example, in C: `pwd` (identifier) -> `cb_data.pwd` (field_identifier) should match as
-/// the same conceptual "pwd" being referenced, just with different qualification.
-///
-/// Note: scoped_identifier and scoped_type_identifier are excluded because they represent
-/// qualified names (e.g., `std::fs::File`) where the qualification is part of the identity.
+/// Name kinds that may pair across kinds (`pwd` -> `cb_data.pwd`). Scoped identifiers are
+/// excluded: their qualification is part of the identity.
 const IDENTIFIER_KINDS: &[&str] = &[
     "identifier",
     "field_identifier",
@@ -1279,32 +948,20 @@ const IDENTIFIER_KINDS: &[&str] = &[
     "shorthand_property_identifier_pattern",
 ];
 
-/// True if `kind` is one of the name-like leaf kinds in [`IDENTIFIER_KINDS`] - the membership test
-/// [`kinds_update_allowed`] runs to decide whether two differently-kinded names may still match.
+/// Whether `kind` is in [`IDENTIFIER_KINDS`].
 pub fn is_identifier_kind(kind: &str) -> bool {
     IDENTIFIER_KINDS.contains(&kind)
 }
 
-/// True if `kind_a` and `kind_b` both appear in the same family in `families`.
 fn in_shared_family(kind_a: &str, kind_b: &str, families: &[&[&str]]) -> bool {
     families
         .iter()
         .any(|family| family.contains(&kind_a) && family.contains(&kind_b))
 }
 
-/// Every cross-kind-update family above - operator families and [`TS_TYPE_KEYWORD_KINDS`] alike -
-/// in one fixed order, so a kind's membership across all of them can be packed into the bits of a
-/// single [`FamilyMask`] ([`operator_family_mask`]) and a language's applicable subset into another
-/// ([`language_operator_family_mask`]). Order is arbitrary but must stay consistent between those
-/// two functions - which is exactly why both derive from *this* list rather than hardcoding bit
-/// positions of their own. Widen [`FamilyMask`] (currently `u32`) before adding a family past its
-/// bit width - the `const` assertion below refuses to compile otherwise: `u8` silently wrapped (`1u8 << 8` shifts modulo the bit width in release builds)
-/// and collided `TS_TYPE_KEYWORD_KINDS` (index 8) onto `COMPARISON_OPS` (index 0) until this was
-/// caught by `operator_family_masks_agree_with_string_scanning_kinds_update_allowed`.
-///
-/// Deliberately built from the same `const` arrays [`kinds_update_allowed`] itself uses, not a
-/// hand-transcribed copy: the arrays stay the single source of truth, and the bitmask form is a
-/// pure derivation of them, so the two cannot drift apart as families are edited.
+/// Every family in one fixed order: index `i` is bit `i` of a [`FamilyMask`]. Both
+/// [`operator_family_mask`] and [`language_operator_family_mask`] derive their bits from this
+/// list, so they cannot disagree.
 const ALL_OPERATOR_FAMILIES: &[&[&str]] = &[
     COMPARISON_OPS,
     ARITHMETIC_OPS,
@@ -1327,21 +984,15 @@ const ALL_OPERATOR_FAMILIES: &[&[&str]] = &[
     SHELL_STRING_BODY_KINDS,
 ];
 
-/// The mask type below must have a bit per family - a silent shift-overflow is exactly the bug
-/// the `u8` -> `u16` widening fixed, so the 33rd family fails to compile instead.
+/// A family past the mask's width would wrap silently in release; fail to compile instead.
 const _: () = assert!(ALL_OPERATOR_FAMILIES.len() <= FamilyMask::BITS as usize);
 
-/// Bit-per-family mask type shared by [`operator_family_mask`], [`language_operator_family_mask`]
-/// and `KindCostClass::operator_families`.
+/// One bit per entry of `ALL_OPERATOR_FAMILIES`.
 pub type FamilyMask = u32;
 
-/// Bit `i` set iff `kind` belongs to `ALL_OPERATOR_FAMILIES[i]`. A kind may belong to several
-/// (e.g. `+` is in both `ARITHMETIC_OPS` and `PHP_ARITHMETIC_OPS`), which is why this is a mask
-/// rather than a single family id.
-///
-/// Computed once per node at metadata-build time (see `ASTNodeMetadata::kind_cost_class`), so a
-/// comparison is a bitwise AND rather than a linear scan over every family - see
-/// [`update_allowed_from_masks`].
+/// Bit `i` set iff `kind` is in `ALL_OPERATOR_FAMILIES[i]`; a kind may be in several (`+`).
+/// Computed once per node at metadata-build time, so [`update_allowed_from_masks`] is a bitwise
+/// AND.
 pub fn operator_family_mask(kind: &str) -> FamilyMask {
     let mut mask: FamilyMask = 0;
     for (i, family) in ALL_OPERATOR_FAMILIES.iter().enumerate() {
@@ -1352,10 +1003,8 @@ pub fn operator_family_mask(kind: &str) -> FamilyMask {
     mask
 }
 
-/// Bit `i` set iff `ALL_OPERATOR_FAMILIES[i]` is one of the families `language` recognizes - the
-/// bitmask form of [`kinds_update_allowed`]'s own `match language` arm, derived from it by
-/// identity comparison on the array pointers so the two can't disagree about which families a
-/// language has.
+/// Bit `i` set iff `language` recognizes `ALL_OPERATOR_FAMILIES[i]`. Compares array pointers, not
+/// contents, since families share tokens.
 pub fn language_operator_family_mask(language: &Language) -> FamilyMask {
     let mut mask: FamilyMask = 0;
     for family in families_for_language(language) {
@@ -1368,14 +1017,8 @@ pub fn language_operator_family_mask(language: &Language) -> FamilyMask {
     mask
 }
 
-/// True if two nodes' precomputed kind classes permit a cross-kind update under `language_mask`,
-/// i.e. the mask-based equivalent of [`kinds_update_allowed`]'s identifier-family and
-/// shared-operator-family checks. Assumes the callers have already handled the same-kind case
-/// (which [`kinds_update_allowed`] short-circuits first).
-///
-/// `(a & b & language) != 0` is exactly `families.iter().any(|f| f.contains(a) && f.contains(b))`
-/// restricted to `language`'s families: bit `i` survives the AND iff both kinds are in family `i`
-/// *and* `language` recognizes it - no assumption that a kind belongs to at most one family.
+/// The precomputed-mask equivalent of [`kinds_update_allowed`] for two different kinds. The
+/// caller handles the same-kind case.
 pub fn update_allowed_from_masks(
     a: &crate::code::KindCostClass,
     b: &crate::code::KindCostClass,
@@ -1388,31 +1031,14 @@ pub fn update_allowed_from_masks(
 }
 
 /**
-* Returns true if a node with kind_a is allowed to be matched with node with kind_b
-* with an Update operation.
-*
-* By default (and for any language/kind pair not covered below), nodes of different kinds are
-* never allowed to match - see `UnitCostModel::ren`'s doc comment for why. The families below are
-* deliberate, hand-picked exceptions: single-token leaves (operators, and since 2026-09-01 also
-* member-access tokens, numeric literals, type names, modifiers and declaration keywords - each
-* family's own doc comment names the corpus fixture that motivated it) that occupy the same
-* syntactic slot in their language's grammar, where a human would consider a kind change (e.g.
-* `<` -> `<=`, `.` -> `?.`, `1` -> `1.0`) to be an edit of the same node rather than a wholesale
-* replacement.
-*
-* Additionally, identifier-like kinds (identifier, field_identifier, type_identifier, etc.) are allowed
-* to match each other across all languages, since they all represent "names" that a human would
-* consider the same logical entity regardless of qualification level.
+* Whether a `kind_a` node may be updated into a `kind_b` node. Different kinds never pair, except
+* identifier kinds with each other and kinds sharing one of `language`'s families above.
 */
 pub fn kinds_update_allowed(kind_a: &str, kind_b: &str, language: &Language) -> bool {
     if kind_a == kind_b {
         return true;
     }
 
-    // Allow identifier-like kinds to match each other across all languages.
-    // This enables matching e.g. identifier "pwd" to field_identifier "pwd" in
-    // expressions like `pwd++` -> `cb_data.pwd++`, which is a common pattern
-    // in real code changes (see c-nginx-add-typedef optimal solution).
     if is_identifier_kind(kind_a) && is_identifier_kind(kind_b) {
         return true;
     }
@@ -1420,10 +1046,8 @@ pub fn kinds_update_allowed(kind_a: &str, kind_b: &str, language: &Language) -> 
     in_shared_family(kind_a, kind_b, families_for_language(language))
 }
 
-/// Which cross-kind-update families (operator families, and [`TS_TYPE_KEYWORD_KINDS`])
-/// [`kinds_update_allowed`] recognizes for `language` - empty for any language with no hand-picked
-/// cross-kind exceptions. Extracted so [`language_operator_family_mask`] derives its bitmask from
-/// this same list rather than duplicating the language-to-families mapping.
+/// The cross-kind families `language` recognizes; the one source for both
+/// [`kinds_update_allowed`] and [`language_operator_family_mask`].
 fn families_for_language(language: &Language) -> &'static [&'static [&'static str]] {
     match language {
         Language::C => &[
@@ -1562,11 +1186,7 @@ fn families_for_language(language: &Language) -> &'static [&'static [&'static st
             ACCESS_MODIFIERS,
             DECLARATION_KEYWORDS,
         ],
-        // Vimscript reached the empty default until 2026-09-17, so no operator could ever pair
-        // with a related one: `vimscript-neovim-neovim-small-change-2`'s single visible mismatch is
-        // a `let x = ...` becoming `let x .= ...`, and `.=` is already in `ASSIGNMENT_OPS`. The
-        // families given here are the ones whose tokens the grammar actually emits as their own
-        // kinds; no fixture asks for more yet.
+        // `let x = ...` -> `let x .= ...` (`vimscript-neovim-neovim-small-change-2`).
         Language::Vimscript => &[
             COMPARISON_OPS,
             ARITHMETIC_OPS,
@@ -1581,22 +1201,12 @@ fn families_for_language(language: &Language) -> &'static [&'static [&'static st
     }
 }
 
-/// Generic structural punctuation: bracket/separator tokens that exist purely as grammar glue and
-/// carry no content of their own, in every language this project supports. Deliberately a flat,
-/// language-agnostic list (unlike the operator families above) since these symbols play the same
-/// "structural glue" role in effectively every grammar - there's no language where `(` means
-/// something other than "start of a grouped/parenthesized thing".
+/// Brackets and separators: grammar glue in every supported language.
 const GENERIC_PUNCTUATION: &[&str] = &["(", ")", "{", "}", "[", "]", ";", ",", ":", "::", "."];
 
-/// Delimiters that come in pairs, opener to the closers that may end it.
-///
-/// Read off the corpus rather than any one grammar: over all 628 fixtures, every anonymous leaf
-/// whose kind *is* its own text and that closes or opens something is one of these twelve. `<`
-/// takes `/>` as well as `>`, because a self-closing tag ends with one.
-///
-/// The table is only meaningful together with [`delimiter_complement_kinds`]' "is the other half
-/// actually here" test: `<` is a tag opener in HTML and a comparison operator in Rust, and the kind
-/// string cannot tell them apart - the presence of a `>` among the same parent's children can.
+/// Delimiters that come in pairs, opener to the closers that may end it (`<` also ends in `/>`).
+/// `<` is a tag opener in HTML and an operator in Rust, so a caller must also check that the other
+/// half is among the same parent's children.
 pub const PAIRED_DELIMITERS: &[(&str, &[&str])] = &[
     ("(", &[")"]),
     ("[", &["]"]),
@@ -1606,8 +1216,7 @@ pub const PAIRED_DELIMITERS: &[(&str, &[&str])] = &[
     ("<?", &["?>"]),
 ];
 
-/// The kinds that would pair with `kind` - its closers if it is an opener, its openers if it is a
-/// closer - or `None` if `kind` is not a paired delimiter at all.
+/// `kind`'s closers if it is an opener, its openers if it is a closer, `None` otherwise.
 pub fn delimiter_complement_kinds(kind: &str) -> Option<Vec<&'static str>> {
     if let Some((_, closers)) = PAIRED_DELIMITERS.iter().find(|(open, _)| *open == kind) {
         return Some(closers.to_vec());
@@ -1620,10 +1229,8 @@ pub fn delimiter_complement_kinds(kind: &str) -> Option<Vec<&'static str>> {
     (!openers.is_empty()).then_some(openers)
 }
 
-/// Literal-value leaf kinds (string, number, boolean, ...), shared by every consumer that needs
-/// to distinguish "this leaf's identity is its value" (a literal) from "this leaf's identity is
-/// its name" (an identifier, see `IDENTIFIER_KINDS`) - e.g. the APTED rename-cost model and the
-/// multi-level normalized hashing in `code::hash`. Kept as a single list so both stay in sync.
+/// Leaves whose identity is their value, as opposed to [`IDENTIFIER_KINDS`], whose identity is a
+/// name.
 const LITERAL_KINDS: &[&str] = &[
     "string_literal",
     "number_literal",
@@ -1635,23 +1242,13 @@ const LITERAL_KINDS: &[&str] = &[
     "template_literal",
 ];
 
-/// True if `kind` is a literal-value node kind (string, number, boolean, etc.).
 pub fn is_literal_kind(kind: &str) -> bool {
     LITERAL_KINDS.contains(&kind)
 }
 
-/// True if `kind` denotes a generic punctuation/operator token - a single TreeSitter leaf that
-/// exists as grammar glue (`<`, `<=`, `(`, `{`, `::`, ...) rather than content a human would
-/// recognize as meaningful on its own. Used by `matching_allowed` to decide which matches need
-/// "small context" support beyond a bare kind check: unlike an identifier or literal, whose own
-/// text already carries evidence of a real correspondence, two `)` tokens (or a `<`/`<=` pair) are
-/// identical/compatible essentially everywhere in a file, so kind-compatibility alone is never
-/// enough to justify matching them.
-///
-/// Backed by the same operator-family lists `kinds_update_allowed` uses (plus `GENERIC_PUNCTUATION`
-/// for brackets/separators) rather than a generic "is it all symbols" heuristic, since several
-/// families include keyword-spelled operators (`and`, `bitand`, `not_eq`, ...) that a purely
-/// symbolic check would miss.
+/// Whether `kind` is punctuation or an operator: a leaf compatible with its twin almost anywhere in
+/// a file, so its kind alone is no evidence of a correspondence. Uses the family lists, not an
+/// all-symbols test, to catch keyword operators (`and`, `bitand`).
 pub fn is_generic_token_kind(kind: &str) -> bool {
     GENERIC_PUNCTUATION.contains(&kind)
         || [
@@ -1668,17 +1265,7 @@ pub fn is_generic_token_kind(kind: &str) -> bool {
         .any(|family| family.contains(&kind))
 }
 
-/**
-* Returns true if the node kind represents a comment in any supported language.
-*
-* TreeSitter grammars use various node kinds for comments:
-* - `comment` (generic, used by many languages)
-* - `line_comment` (Java, Rust, Kotlin, etc.)
-* - `block_comment` (Java, Rust, Kotlin, etc.)
-* - `js_comment` (JavaScript/TypeScript specific)
-*
-* This function provides a unified way to check if a node is a comment across all languages.
-*/
+/// Whether `kind` is a comment in any supported grammar.
 pub fn is_comment(kind: &str) -> bool {
     matches!(
         kind,
@@ -1695,33 +1282,9 @@ pub fn is_comment(kind: &str) -> bool {
 }
 
 /**
-* Returns true if `kind` is an attribute/decorator/annotation node that sits as an actual
-* *sibling* of the declaration it modifies, in `language`'s grammar - as opposed to being nested
-* *inside* that declaration's own subtree (a `modifiers`/similar wrapper child), which is how most
-* grammars actually model this and needs no special handling at all: it's already covered for
-* free the moment the declaration itself matches.
-*
-* Verified per-language by parsing a small sample and inspecting the resulting tree (not just
-* going by the grammar's node-kind name, which alone doesn't tell you sibling vs. child) - see the
-* 2026-08 "digging into #1" investigation this responds to:
-*   - **Sibling** (this function returns `true`): Rust `attribute_item` (a direct sibling of the
-*     item it precedes, at any level - `#[derive(...)] struct Foo` and a top-level `#[cfg(test)]
-*     mod tests` alike), Python `decorator` (sibling of the `function_definition`/`class_definition`
-*     it precedes, both children of a wrapping `decorated_definition`), TypeScript/TSX `decorator`
-*     (sibling of the `method_definition`/... it precedes, inside `class_body`).
-*   - **Child, not sibling** (deliberately excluded - confirmed, not assumed): Java
-*     `marker_annotation`/`annotation` and Kotlin `annotation` (both nested inside a `modifiers`
-*     child of the method/class they annotate), Scala `annotation` (direct child of the
-*     `function_definition`), PHP and C# `attribute_list` (direct child of the declaration), Swift
-*     `attribute` (nested inside a `modifiers` child) - and, easy to get wrong by assuming it
-*     matches TypeScript, plain JavaScript's own `decorator` (nested inside `method_definition`,
-*     *not* a sibling the way TypeScript's is - the two grammars model this differently despite
-*     sharing the node-kind name).
-*
-* Only the sibling case benefits from `solve_leading_siblings`'s "walk backward from an
-* already-matched node" mechanism; including a child-only kind here would just never fire (its
-* node is never any other node's `prev_sibling`), which is harmless but misleading about what this
-* function actually does.
+* Whether `kind` is an attribute/decorator that is a *sibling* of the declaration it modifies.
+* Most grammars nest these inside the declaration, where they match with it for free. Note that
+* JavaScript's `decorator` is nested, unlike TypeScript's of the same name.
 */
 pub fn is_leading_modifier(kind: &str, language: &Language) -> bool {
     match language {
@@ -1732,21 +1295,14 @@ pub fn is_leading_modifier(kind: &str, language: &Language) -> bool {
     }
 }
 
-/// Character-bigram Dice similarity threshold for `leaf_texts_similar`. 0.6 keeps clear renames
-/// (`fetch_user` -> `fetch_user_data`, `user_id` -> `userId`) while rejecting unrelated
-/// identifiers that share only a stray character pair.
+/// Keeps clear renames (`fetch_user` -> `fetch_user_data`, `user_id` -> `userId`) and rejects
+/// names sharing only a stray character pair.
 const LEAF_TEXT_SIMILARITY_THRESHOLD: f64 = 0.6;
 
 /**
-* True if two leaf texts are similar enough that a human would read the pair as "the same token,
-* renamed/tweaked" rather than two unrelated tokens.
-*
-* Uses character-bigram Dice similarity: cheap, symmetric, no allocation beyond two small sets,
-* and robust to affix changes (`foo` -> `foo_bar` scores well). Texts too short to have bigrams
-* (length <= 1, or length 2 with no overlap) effectively always fail - deliberately so: `i` -> `j`
-* or `0` -> `1` carry no textual evidence on their own, and the caller's other arm (a nearby
-* matched ancestor, i.e. same-slot context) is the correct way for those legitimate small renames
-* to survive.
+* Whether two leaf texts read as the same token renamed (character-bigram Dice similarity).
+* Single-character texts never pass unless equal: `i` -> `j` carries no textual evidence, and the
+* caller's matched-ancestor context is what lets such renames through.
 */
 pub fn leaf_texts_similar(text_a: &str, text_b: &str) -> bool {
     if text_a == text_b {
@@ -1765,21 +1321,9 @@ pub fn leaf_texts_similar(text_a: &str, text_b: &str) -> bool {
 }
 
 /**
-* Generalizes `kinds_update_allowed` with a "small context" requirement for generic tokens.
-*
-* Delegates the kind-compatibility question to `kinds_update_allowed` first. If that allows the
-* pair, and *neither* kind is a generic token (see `is_generic_token_kind`) - e.g. two
-* `identifier`s, or two `return_statement`s - the kind check alone is enough, exactly as before.
-*
-* But if either kind is a generic token, kind-compatibility is necessary and not sufficient:
-* additionally requires `parents_matched()` to hold, i.e. the two nodes' immediate enclosing
-* nodes must themselves already correspond. Without this, the tree-edit-distance search is free to
-* match any lone `<` (or unrelated `<`/`<=` pair) between two statements that have nothing else in
-* common, purely because reusing a leaf is cheaper than deleting one and inserting the other -
-* exactly the "surprising cheap match" a human wouldn't read as the same token edited in place.
-*
-* `parents_matched` is a callback rather than a plain bool so callers that already know the answer
-* is irrelevant (neither kind is a generic token) never pay for computing it.
+* [`kinds_update_allowed`], plus: if either kind is a generic token, the parents must already
+* correspond. Otherwise tree edit distance pairs a lone `<` across unrelated statements just
+* because reuse is cheaper than delete + insert. `parents_matched` is called only when needed.
 */
 pub fn matching_allowed(
     kind_a: &str,
@@ -1796,10 +1340,7 @@ pub fn matching_allowed(
     parents_matched()
 }
 
-/// A flow-control construct family. Its consumer is [`flow_control_family`], used by
-/// [`is_block_container`] to recognize `if`/`match`/`switch` constructs as anonymous-container
-/// candidates for `solve_greedy_anchor_blocks`. `Hash` (alongside `Eq`) is not required by that
-/// use.
+/// See [`flow_control_family`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum FlowControlFamily {
     Match,
@@ -1807,12 +1348,8 @@ pub enum FlowControlFamily {
     If,
 }
 
-/// Returns which [`FlowControlFamily`] `node_kind` belongs to for `language`, if any.
-///
-/// `if`/`else if` chains are supported too, but only for languages where `alternative` recurses
-/// into either a bare block or another `if` (Python's flat `elif_clause`/`else_clause` fields on a
-/// single `if_statement` don't fit that shape, so Python `if` isn't covered here - only its
-/// `match_statement` is).
+/// The [`FlowControlFamily`] of `node_kind` in `language`, if any. `If` covers only grammars whose
+/// `alternative` recurses into a block or another `if`, so not Python's flat `elif_clause`.
 pub fn flow_control_family(node_kind: &str, language: &Language) -> Option<FlowControlFamily> {
     match (language, node_kind) {
         (Language::Rust, "match_expression") => Some(FlowControlFamily::Match),
@@ -1843,16 +1380,9 @@ pub fn flow_control_family(node_kind: &str, language: &Language) -> Option<FlowC
     }
 }
 
-/// True if `node_kind` is a statement-sequence container ("a block") for `language`: its direct
-/// children are an ordered sequence of statements/expressions - exactly the shape
-/// `solve_greedy_anchor_blocks::sequence_edit_cost` treats each child as an opaque token of.
-/// Deliberately narrow (not "any node with several children"): treating every such node as a
-/// candidate anchors unrelated `call_expression`/`binary_expression` nodes whose
-/// `argument_list`/operator happens to hash-match by coincidence. Restricting candidates to
-/// genuine statement containers (plus the flow-control constructs themselves via [`flow_control_family`], since a whole
-/// `if`/`match`/`switch` is exactly the kind of anonymous "block" a name- or arm-based heuristic
-/// could still miss) keeps that cheap, position-blind cost estimate from firing on
-/// expression-level coincidences.
+/// Whether `node_kind` is a statement block or a flow-control construct, the candidates of
+/// `solve_greedy_anchor_blocks`. Deliberately narrow: treating every node with several children as
+/// a candidate anchors unrelated calls whose argument lists happen to hash-match.
 pub fn is_block_container(node_kind: &str, language: &Language) -> bool {
     if flow_control_family(node_kind, language).is_some() {
         return true;
@@ -1873,12 +1403,7 @@ pub fn is_block_container(node_kind: &str, language: &Language) -> bool {
     )
 }
 
-/// Jaccard similarity (shared entries / all distinct entries across both sides) of two precomputed
-/// string sets - generic set-overlap scoring, used by `solve_import_list_overlap` for
-/// import-symbol-set overlap.
-///
-/// Returns 0.0 if either side is empty (nothing meaningful to compare), so two empty sets never
-/// spuriously "match" each other.
+/// Jaccard similarity of two sets; 0.0 if either is empty, so two empty sets never match.
 pub fn flow_control_similarity_of_sets(
     before_set: &std::collections::HashSet<&str>,
     after_set: &std::collections::HashSet<&str>,
@@ -1891,12 +1416,8 @@ pub fn flow_control_similarity_of_sets(
     intersection as f64 / union as f64
 }
 
-/// Substrings that mark a call/macro as "meant for the programmer" (logging, error bailouts,
-/// assertions, debug prints) rather than output meant for the end user. Matched against the
-/// *lowercased last segment* of the callee path (e.g. `log::error!` -> "error",
-/// `logger.WarnF` -> "warnf", `self.logger.debug` -> "debug"), so e.g. Go's `Errorf`/`Warnf`/
-/// `Fatalln` or Java/C#'s `LogError`/`LogWarning` all match via substring containment without
-/// needing one entry per per-language spelling convention.
+/// Substrings of the lowercased last callee segment that mark a call as meant for the programmer
+/// (logging, bailouts, assertions). Substring matching covers `Errorf`, `LogWarning` and the like.
 const DIAGNOSTIC_CALLEE_KEYWORDS: &[&str] = &[
     "printf",
     "fprintf",
@@ -1922,9 +1443,6 @@ const DIAGNOSTIC_CALLEE_KEYWORDS: &[&str] = &[
     "die",
 ];
 
-/// Whether `node_kind` is a call-like node this pass should even consider - i.e. worth extracting
-/// a callee name from. Deliberately per-language, since "a function call" is a different node
-/// kind (and a different callee field name) in every grammar.
 fn is_call_like(node_kind: &str, language: &Language) -> bool {
     matches!(
         (language, node_kind),
@@ -1943,8 +1461,6 @@ fn is_call_like(node_kind: &str, language: &Language) -> bool {
     )
 }
 
-/// Extracts the callee (function/macro path) text of a call-like node, e.g. `log::error` out of
-/// `log::error!(...)`, or `logger.warn` out of `logger.warn(...)`.
 fn callee_text<'a>(node: Node, language: &Language, source: &'a [u8]) -> Option<&'a str> {
     let field_name = match (language, node.kind()) {
         (Language::Rust, "macro_invocation") => "macro",
@@ -1954,27 +1470,16 @@ fn callee_text<'a>(node: Node, language: &Language, source: &'a [u8]) -> Option<
     node.child_by_field_name(field_name)?.utf8_text(source).ok()
 }
 
-/// Whether `node` carries text of its own that a reader can actually see, rather than being pure
-/// structure whose every readable byte belongs to some descendant.
+/// Whether `node` has text of its own: a leaf, or an interior node with non-whitespace bytes in
+/// the gaps between its children (a comment whose `//` is a separate child). False for a `block`
+/// or `argument_list`, whose every byte belongs to a child.
 ///
-/// True for a leaf (its text is its own by definition), and for an interior node with non-
-/// whitespace content in the gaps its children don't cover - a `line_comment` whose `//` marker is
-/// a separate child, say, leaving the comment's actual words on the parent. False for a `block`,
-/// `argument_list` or `declaration_list`, whose entire visible content is its children's.
+/// **A function of the AST and source only, never of a diff.** Derived from the renderer, both
+/// the numerator and the denominator of a visible-mismatch rate would move with the algorithm, and
+/// a diff that renders coarsely would have almost nothing it could get visibly wrong.
 ///
-/// **A pure function of the AST and the source bytes - deliberately not of any diff.** Deriving
-/// visibility from the renderer instead (does `diff::text::ranges` emit a span for this node)
-/// would make it depend on the mapping: the same `block` is one `Identical` span inside an
-/// unchanged function and is descended into inside a changed one. That is a fine description of
-/// what got drawn, but it is unusable as a measurement, because both the numerator and the
-/// denominator of any rate built on it move when the algorithm changes - a diff that renders
-/// coarsely has almost nothing "visible" and so almost nothing it can get visibly wrong - a file
-/// whose parse collapses to a handful of rendered spans scores a perfect visible rate while its
-/// mapping is wrong throughout. Structural visibility cannot be gamed that way: the set is fixed
-/// by the input alone.
-///
-/// Non-ASCII bytes count as content (they are not ASCII whitespace), which biases toward calling a
-/// node visible - the safe direction for a metric that exists to *find* mistakes.
+/// Non-ASCII bytes count as content, biasing toward visible: the safe side for a metric that
+/// exists to find mistakes.
 pub fn is_structurally_visible(node: Node, source: &[u8]) -> bool {
     if node.child_count() == 0 {
         return true;
@@ -1993,9 +1498,7 @@ pub fn is_structurally_visible(node: Node, source: &[u8]) -> bool {
     node.end_byte() > pos && has_content(pos..node.end_byte())
 }
 
-/// Every node id in `code` for which [`is_structurally_visible`] holds. Depends only on `code`, so
-/// two different diffs of the same file always agree on it - see that function's doc comment for
-/// why that property is the whole point.
+/// Every node id in `code` for which [`is_structurally_visible`] holds.
 pub fn structurally_visible_node_ids(code: &Code) -> std::collections::HashSet<usize> {
     let mut visible = std::collections::HashSet::new();
     let Some(ast) = code.ast.as_ref() else {
@@ -2015,12 +1518,9 @@ pub fn structurally_visible_node_ids(code: &Code) -> std::collections::HashSet<u
     visible
 }
 
-/// Whether `node` is a call/macro invocation whose callee looks like it's meant for the
-/// programmer (logging, `bail!`/`panic!`, assertions, debug `printf`s) rather than the end user.
-/// This is intentionally a loose, substring-based heuristic - see [`DIAGNOSTIC_CALLEE_KEYWORDS`] -
-/// since the pass that uses it only ever pairs nodes whose *entire subtree hash* is identical, so
-/// an over-eager match here is harmless: it just means two byte-for-byte identical statements get
-/// matched, which is a reasonable outcome regardless of why they were flagged as candidates.
+/// Whether `node` is a call whose callee looks diagnostic (see [`DIAGNOSTIC_CALLEE_KEYWORDS`]).
+/// Loose on purpose: its caller only pairs byte-identical subtrees, so a false positive is
+/// harmless.
 pub fn is_diagnostic_statement(node: Node, language: &Language, source: &[u8]) -> bool {
     if !is_call_like(node.kind(), language) {
         return false;
@@ -2038,27 +1538,12 @@ pub fn is_diagnostic_statement(node: Node, language: &Language, source: &[u8]) -
         .any(|keyword| last_segment.contains(keyword))
 }
 
-/// Recognizes the node kind that directly holds a function/method/class/namespace's own ordered
-/// sequence of statements or members - `compound_statement` (C/C++), `body_statement` (Ruby),
-/// `function_body`/`class_body` (Kotlin), `block` (Rust), `declaration_list` (C++ namespaces).
-/// Language-agnostic by design: every one of these strings is unambiguous on its own (no two
-/// supported grammars reuse the same kind name for something else), so - unlike most classifiers
-/// in this file - there is no need to also gate on `Language`.
+/// Whether `node_kind` directly holds a function's, class's or namespace's statements or members.
+/// The kind names are unambiguous across grammars, so no `Language` is needed.
 ///
-/// Used to find the right anchor for [`crate::diff::apted::prematch_identical_statement_siblings`]
-/// - deliberately a kind allow-list, not "whichever descendant happens to have the most direct
-///   children" (`ASTMetadata::node_to_widest_subtree_node`, which `solve_large_flat_subtrees` uses):
-///   confirmed live that the latter can pick an unrelated, wider, but semantically irrelevant sibling
-///   instead - a Rust function containing a macro call whose `token_tree` has more raw tokens than
-///   the function's own `block` has statements gets the `token_tree` instead, missing the actual
-///   statement sequence entirely (measured on `rust-tauri-cli-ios-dev`: picked a 26-token `token_tree`
-///   over the 21-statement `block` sitting right next to it, so the pre-match found nothing worth
-///   matching there at all).
-///
-/// Not exhaustive - only the kinds confirmed against real fixtures. Safe to extend as more
-/// languages show the same pattern: this is a pure performance pre-pass (see that function's doc
-/// comment for why a missing or wrong entry here only costs a missed optimization, never a wrong
-/// answer), so a narrow list is a reasonable starting point, not a correctness risk.
+/// The anchor for [`crate::diff::apted::prematch_identical_statement_siblings`]. An allow-list,
+/// not "the widest descendant": that picks a macro's `token_tree` over the function's own `block`
+/// (`rust-tauri-cli-ios-dev`). Not exhaustive; a missing entry only costs a missed speed-up.
 pub fn is_statement_sequence_body(node_kind: &str) -> bool {
     matches!(
         node_kind,
@@ -2071,91 +1556,35 @@ pub fn is_statement_sequence_body(node_kind: &str) -> bool {
     )
 }
 
-/// Returns true if the given node kind represents a container whose children are order-independent.
-/// For these containers, the order of children doesn't affect the semantic meaning.
+/// Whether the order of `node_kind`'s children carries no meaning in `language` (struct fields,
+/// enum variants, imports, object keys). Conservative: only containers the language itself makes
+/// order-independent, not ones formatters often reorder. Hashes and child pairing honour it.
 ///
-/// Examples: struct/record fields, enum variants, import statements.
-/// These are the nodes where reordering children should NOT be considered a semantic change.
-///
-/// Note: This is intentionally conservative. We only mark containers that are definitively
-/// order-independent according to the language semantics (not just "often reordered" by formatters).
-///
-/// Every kind string below is verified against the node kinds a real `tree_sitter::Parser`
-/// reports for a representative snippet in that language - **not** against the grammar's
-/// `node-types.json`, which can omit or rename aliased node kinds. A string that looks right and
-/// does not exist makes its arm dead weight, silently and without any test noticing.
-///
-/// `Kotlin` has no arm available: imports are direct repeated children of `source_file`
-/// (interleaved with the package header and top-level statements in the grammar), never wrapped in
-/// any list/container node at all - confirmed via `tree-sitter-kotlin-ng`'s `grammar.js`. There is
-/// no string that could make this arm correct, so it's left `false` rather than guessing.
-///
-/// The answer here is respected all the way down: `is_commutative_container` support is folded
-/// into `compute_kind_and_value_hash`/`compute_kind_only_hash` at every recursion level
-/// (`code::hash`), and `pair_children_for_descent` (`hash_tree_matching.rs`) consults it when
-/// pairing children.
+/// Verify each kind against a real parse, not `node-types.json`, which can omit aliased kinds: a
+/// kind that never occurs makes its arm silently dead.
 pub fn is_commutative_container(node_kind: &str, language: &Language) -> bool {
     match language {
         Language::Rust => {
-            // Enum variants are order-independent for matching purposes
             node_kind == "enum_variant_list"
-                // Use tree items can be reordered
                 || node_kind == "use_list"
-                // Struct/union field declarations can be reordered
                 || node_kind == "field_declaration_list"
         }
-        Language::Go => {
-            // Struct field list - fields can be reordered
-            node_kind == "field_declaration_list"
-                // Import spec list - imports can be reordered
-                || node_kind == "import_spec_list"
-        }
-        Language::Python => {
-            // Dictionary - key/value pairs can be reordered
-            node_kind == "dictionary"
-        }
-        Language::Java => {
-            // Enum body - enum constants can be reordered
-            node_kind == "enum_body"
-        }
-        Language::CSharp => {
-            // Enum member declaration list - enum constants can be reordered
-            node_kind == "enum_member_declaration_list"
-        }
-        Language::C | Language::CPP => {
-            // Enum specifiers - enumerators can be reordered
-            node_kind == "enumerator_list"
-        }
-        Language::JavaScript | Language::TypeScript | Language::TSX => {
-            // Object - properties can be reordered
-            node_kind == "object"
-        }
-        // Imports aren't wrapped in any container node in this grammar at all - see this
-        // function's doc comment. Nothing to match; always false.
+        Language::Go => node_kind == "field_declaration_list" || node_kind == "import_spec_list",
+        Language::Python => node_kind == "dictionary",
+        Language::Java => node_kind == "enum_body",
+        Language::CSharp => node_kind == "enum_member_declaration_list",
+        Language::C | Language::CPP => node_kind == "enumerator_list",
+        Language::JavaScript | Language::TypeScript | Language::TSX => node_kind == "object",
+        // Kotlin imports are direct children of `source_file`, with no wrapper to name.
         Language::Kotlin => false,
         Language::Scala => {
-            // Braced import selector list (`import a.b.{X, Y, Z}`) - selectors can be reordered.
-            // The plain, unbraced multi-import form has no wrapper node to match here.
+            // `import a.b.{X, Y, Z}`.
             node_kind == "namespace_selectors"
         }
-        Language::Swift => {
-            // Enum class body - enum cases can be reordered
-            node_kind == "enum_class_body"
-        }
-        // JSON, YAML - object/mapping keys are commutative. Verified directly against
-        // tree-sitter-json/tree-sitter-yaml's actual parse trees; a wrong string here is not a
-        // near miss but dead code, since `is_commutative_container` then answers `false` for every
-        // JSON object and YAML mapping and `pair_children_for_descent` (`hash_tree_matching.rs`)
-        // takes the plain positional-zip path for all of them. A single inserted or deleted key
-        // anywhere in a large flat object then desyncs every subsequent key's position and orphans
-        // the whole rest of the object onto whole-tree APTED: jellyfin-jellyfin's `cs.json`, one
-        // deleted key out of ~140, is 1.2s and 100% `APTED`-attributed mappings for a
-        // 3,075-combined-node file that way.
+        Language::Swift => node_kind == "enum_class_body",
+        // Without these, one inserted key desyncs every later key's position in a large object.
         Language::JSON => node_kind == "object",
-        // YAML has two mapping shapes: `block_mapping` (the common indented `key: value` form) and
-        // `flow_mapping` (the JSON-style inline `{key: value}` form) - both are order-independent.
         Language::YAML => node_kind == "block_mapping" || node_kind == "flow_mapping",
-        // Default: no commutative containers
         _ => false,
     }
 }

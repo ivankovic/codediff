@@ -23,11 +23,8 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // The edit replaces a `local_variable_declaration` with an `enhanced_for_statement` over the
-    // same call, so the human carries the call's own leaves - its identifier, its `.`, its
-    // parentheses - across the two containers, while codediff's `qualified_name` pass reads them as
-    // deleted along with the declaration that held them. One disagreement about which container
-    // survives, counted once per carried leaf.
+    // A declaration becomes an `enhanced_for_statement` over the same call. The human carries the
+    // call's leaves across; `qualified_name` deletes them with the declaration.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "java-defects4j-mockito-21-constructorinstantiator",
         7,
@@ -45,9 +42,8 @@ fn painting() -> Result<()> {
 
 #[test]
 fn invariants() -> Result<()> {
-    // Invariant 16, twice: `c` renamed `constructor` on before rows 24 and 25. The `Minimal`
-    // painting marks the whole `c`, where both readings the rule accepts treat `c` as the shared
-    // prefix and mark only `onstructor` on the after side.
+    // Invariant 16, twice: `c` renamed `constructor` on before rows 24 and 25. `Minimal` marks the
+    // whole `c`, where the rule treats `c` as the shared prefix and marks only `onstructor`.
     assert_ground_truth_invariants_with_known_violations(
         "java-defects4j-mockito-21-constructorinstantiator",
         2,

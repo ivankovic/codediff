@@ -138,8 +138,8 @@ async fn main() -> Result<()> {
     let args = Args::parse();
     let pair = resolve_before_after(&args.paths)?;
 
-    // Same door as `codediff`: a side that is not text has no diff to show in any mode, so say
-    // so on stdout and leave, rather than opening a browser onto an error banner.
+    // As in `codediff`: a binary side has no diff in any mode, so report it rather than open a
+    // browser onto an error banner.
     if let Some((before, after)) = pair.as_ref() {
         let either_is_binary = codediff::code::is_binary_file(before)
             .and_then(|binary| Ok(binary || codediff::code::is_binary_file(after)?));

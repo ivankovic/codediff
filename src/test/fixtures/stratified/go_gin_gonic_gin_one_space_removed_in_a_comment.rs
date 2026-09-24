@@ -38,7 +38,6 @@ fn painting() -> Result<()> {
 
 #[test]
 fn invariants() -> Result<()> {
-    // The deleted space is mid-comment, not trailing, so the no-trailing-whitespace invariant
-    // should never have fired on it. The invariant checks what its name says.
+    // The deleted space is mid-comment, not trailing: invariant 1 must not fire.
     assert_ground_truth_invariants("go-gin-gonic-gin-one-space-removed-in-a-comment")
 }

@@ -15,18 +15,13 @@
  *  You should have received a copy of the GNU Affero General Public License
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
-//! Samples real (repository, commit, path) pointers to single-file edits, for use as candidates
-//! for hand-curated unit tests under `src/test/data/diffs/`. Unlike `sample_code_pairs`, this
-//! tool is meant to be run repeatedly against different checkout roots (the tiny/small/full
-//! research datasets): it reads whatever is already in `src/test/data/sample.csv`, and tops up
-//! each language to exactly `--count` samples rather than starting over every time.
+//! Samples (repository, commit, path) pointers to single-file edits as candidate fixtures for
+//! `src/test/data/diffs/`. Unlike `sample_code_pairs`, it tops up the existing
+//! `src/test/data/sample.csv` to `--count` per language instead of starting over, so it can be
+//! re-run against different checkout roots.
 //!
-//! `--stratified` switches the sampling unit from "language" to "(language, LOC bucket)" - the
-//! same [`codediff::stats::sampling::LOC_BUCKETS`] `sample_code_pairs` uses - so large/small files
-//! are guaranteed representation in the resulting `diffs/stratified` corpus rather than large
-//! files (rare in practice) being drowned out by small ones (common). `--count` under
-//! `--stratified` means "per (language, bucket)", *not* "per language total" - unlike
-//! `sample_code_pairs --count`, which is a per-language total split evenly across buckets.
+//! `--stratified` samples per (language, [`codediff::stats::sampling::LOC_BUCKETS`] bucket), and
+//! `--count` then means per bucket - unlike `sample_code_pairs --count`, a per-language total.
 use anyhow::{Result, bail};
 use clap::Parser;
 use git2::Delta;
@@ -43,17 +38,13 @@ use codediff::stats::filesystem::{find_git_repositories, for_each_repository};
 use codediff::stats::git::{text_loc_if_in_range, walk_single_parent_commit_diffs};
 use codediff::stats::sampling::{Reservoir, loc_bucket};
 
-// Files outside this range are excluded: near-empty files make trivial test fixtures, and
-// anything above the upper bound is past the size `expand_from_code` itself treats as
-// "too large to parse" (see `stats::expand_from_code`), so diff_code couldn't use it anyway.
+// The upper bound is the size `stats::expand_from_code` refuses to parse.
 const MIN_BYTES: usize = 1;
 const MAX_BYTES: usize = 1024 * 1024;
 
 #[derive(Parser)]
 struct Args {
-    /// Root directory containing checked-out git repositories (or a single repository). Run
-    /// this tool again with a different root (e.g. the tiny/small/full research checkouts) to
-    /// keep topping up the same sample.csv from a broader pool.
+    /// Root directory containing checked-out git repositories (or a single repository).
     #[arg(long, default_value = "/var/tmp/research/small/repositories")]
     repos_dir: PathBuf,
 
@@ -66,8 +57,7 @@ struct Args {
     #[arg(long)]
     output: Option<PathBuf>,
 
-    /// RNG seed. Omitted by default so every run draws a genuinely fresh sample; set this only
-    /// to get reproducible output (e.g. in tests).
+    /// RNG seed. Omitted by default so every run draws a fresh sample.
     #[arg(long)]
     seed: Option<u64>,
 
@@ -76,39 +66,26 @@ struct Args {
     #[arg(long)]
     language: Option<String>,
 
-    /// Stop after walking this many commits per repository (most-recent-first). Repos cloned
-    /// with `git fetch --depth=N` repeatedly can accumulate far more local history than N as
-    /// fetches deepen them over time, so an unbounded walk can take effectively forever on a
-    /// long-lived project; this keeps each repo's contribution bounded.
+    /// Stop after walking this many commits per repository (most-recent-first). Repeated
+    /// shallow fetches can deepen a clone far past its original depth.
     #[arg(long, default_value_t = 1000)]
     max_commits_per_repo: usize,
 
-    /// Which research dataset (tiny/small/full/stratified) this run's newly-sampled rows are
-    /// provenance-tagged with - recorded per row so a later promotion (`human_solver`) knows
-    /// which of `codediff::test::helper::DIFF_DATASETS` to place the fixture under. Auto-inferred
-    /// from `--repos-dir`'s parent directory name when omitted (`.../research/small/repositories`
-    /// -> "small", matching this flag's own default and `materialize_test_diffs`'s
-    /// `DEFAULT_REPO_ROOTS`) - except under `--stratified`, which defaults this to "stratified"
-    /// instead (a stratified row's dataset records its *sampling method*, not which checkout
-    /// happened to supply it, so inferring the checkout name here would be misleading - a
-    /// `diffs/small/` fixture and a `diffs/stratified/` one sampled from the exact same checkout
-    /// mean different things about how they were selected). Pass explicitly for a non-conventional
-    /// checkout root, or to override the `--stratified` default; explicitly passing a *different*
-    /// dataset together with `--stratified` is rejected outright rather than silently writing
-    /// bucket-stratified rows into a non-stratified corpus. Rows already on disk keep whatever
-    /// dataset they were originally sampled with, even if it differs from this run's.
+    /// Which research dataset (tiny/small/full/stratified) new rows are tagged with; decides
+    /// where `human_solver` promotes them. Defaults to `--repos-dir`'s parent directory name
+    /// (`.../research/small/repositories` -> "small"), or to "stratified" under `--stratified`,
+    /// since there it records the sampling method rather than the checkout. A different value
+    /// together with `--stratified` is rejected.
     #[arg(long)]
     dataset: Option<String>,
 
-    /// Stratify sampling by [`codediff::stats::sampling::LOC_BUCKETS`] (the larger of a pair's
-    /// before/after line count) in addition to language, so `--count` becomes a target *per
-    /// (language, bucket)* rather than per language - see this file's module doc comment.
+    /// Stratify sampling by [`codediff::stats::sampling::LOC_BUCKETS`] (of the larger side's line
+    /// count) as well as language; `--count` becomes a target per (language, bucket).
     #[arg(long, default_value_t = false)]
     stratified: bool,
 }
 
-/// A pointer to a (before, after) code pair: the actual content lives in the repository
-/// checkout, not in this tool's output, so only enough is recorded to look it up again later.
+/// A pointer to a (before, after) code pair in a repository checkout.
 ///
 /// Reconstruction contract: before = blob at `path` in `commit`'s (single) parent tree,
 /// after = blob at `path` in `commit`'s tree. Renames are deliberately excluded (see
@@ -119,48 +96,28 @@ struct Row {
     repository: String,
     commit: String,
     path: String,
-    /// Name of the `src/test/data/diffs/` test case this row was promoted to, if any (set by
-    /// `human_solver`, not by this tool). Carried through unchanged on every re-run so topping up
-    /// `sample.csv` never clobbers a promotion that already happened.
+    /// The `src/test/data/diffs/` case this row was promoted to, set by `human_solver`.
     promoted_to: String,
-    /// Which research dataset (tiny/small/full/stratified) this row was sampled from - see
-    /// `Args::dataset`. Carried through unchanged on every re-run, same as `promoted_to`: a row's
-    /// provenance doesn't change just because a later run happens to target a different
-    /// `--repos-dir`.
+    /// Which research dataset this row was sampled from (see `Args::dataset`).
     dataset: String,
-    /// One of `SAMPLED`/`PROMOTED`/`REJECTED` - `human_solver` moves a row from `SAMPLED` to
-    /// whichever of the other two applies when the sample is triaged (`s` to promote, `R` to
-    /// reject); this tool never sets anything but `SAMPLED` on a freshly-sampled row.
+    /// One of `SAMPLED`/`PROMOTED`/`REJECTED`; only `human_solver` moves a row off `SAMPLED`.
     status: String,
-    /// Free-form note about this sample, set (and editable) via `human_solver`'s `e`/`R` prompts -
-    /// independent of `status`, though `R` (reject) always sets it to the rejection reason. Empty
-    /// if never set; this tool never writes anything but an empty value on a freshly-sampled row.
+    /// Free-form note, set via `human_solver` (a rejection's reason lands here).
     comment: String,
-    /// `stats::sampling::loc_bucket` of `max(before_loc, after_loc)`, recorded only for a row
-    /// sampled under `--stratified` (`None` for every other row, including legacy rows and rows
-    /// from an ordinary, non-stratified run - there's no cheap way to backfill a bucket for those
-    /// without re-fetching their blobs, and no need to: `capacity_key` below only reads this field
-    /// when stratifying, so an unbucketed row simply never counts towards a stratified target,
-    /// which is the correct behavior, not a gap - see `Args::stratified`'s doc comment). Still
-    /// written to (and read from) a `size_bucket` CSV column, not renamed even though the unit
-    /// changed from bytes to lines - see `stats::sampling::loc_bucket`'s own doc comment for why.
+    /// `stats::sampling::loc_bucket` of `max(before_loc, after_loc)`, only for a row sampled
+    /// under `--stratified`; an unbucketed row never counts towards a stratified target.
     size_bucket: Option<String>,
 }
 
 type SampleKey = (String, String, String);
-/// What a target count is tracked *per*: language alone normally, or (language, size bucket)
-/// under `--stratified` - see `capacity_key`.
+/// What a target count is tracked per (see `capacity_key`).
 type CapacityKey = (String, Option<String>);
 
-/// Historical default for any row read from a sample.csv written before provenance tracking
-/// existed - every one of those was in fact sampled from the small research checkout (the only
-/// one available when they were added), so this is a real fallback value, not a placeholder.
+/// The dataset of a row without one: every such row was sampled from the small checkout.
 const LEGACY_DATASET: &str = "small";
 
-/// Backfills `status` for a row read from a sample.csv written before that column existed: a
-/// non-empty `promoted_to` means it was already promoted, otherwise it's just sitting there
-/// unsampled -- there's no way a pre-existing row could be `REJECTED`, since rejection didn't
-/// exist yet either.
+/// The `status` of a row without one, from its `promoted_to`; never `REJECTED`, which postdates
+/// the column.
 fn default_status(promoted_to: &str) -> &'static str {
     if promoted_to.is_empty() {
         "SAMPLED"
@@ -177,11 +134,8 @@ fn default_output_path() -> PathBuf {
         .join("sample.csv")
 }
 
-/// `--dataset`'s auto-inference: `repos_dir`'s parent directory name, matching the
-/// `.../research/<dataset>/repositories` convention `--repos-dir`'s own default and
-/// `materialize_test_diffs`'s `DEFAULT_REPO_ROOTS` already use. `None` for a `--repos-dir` that
-/// doesn't follow that convention (e.g. a bare repository path, or a custom checkout layout) -
-/// callers should require `--dataset` explicitly in that case rather than guessing.
+/// `--dataset`'s default: `repos_dir`'s parent directory name, per the
+/// `.../research/<dataset>/repositories` convention.
 fn infer_dataset(repos_dir: &Path) -> Option<String> {
     repos_dir
         .parent()?
@@ -219,11 +173,8 @@ fn read_existing_rows(path: &Path) -> Result<Vec<Row>> {
     Ok(rows)
 }
 
-/// `Args::dataset`/`Args::stratified`'s resolution rule - see `Args::dataset`'s doc comment for
-/// why `--stratified` gets its own default rather than falling through to `infer_dataset`, and
-/// why an explicit, *conflicting* `--dataset` is rejected rather than silently overridden or
-/// silently honored (either of which would let bucket-stratified rows land in a non-stratified
-/// corpus, or vice versa, with nothing on disk to say so).
+/// Resolves `--dataset` against `--stratified` (see `Args::dataset`). A conflict is an error, not
+/// an override: either way round, stratified rows would land in a non-stratified corpus silently.
 fn resolve_dataset(args: &Args) -> Result<String> {
     match (args.dataset.as_deref(), args.stratified) {
         (Some(dataset), true) if dataset != "stratified" => bail!(
@@ -242,11 +193,8 @@ fn resolve_dataset(args: &Args) -> Result<String> {
     }
 }
 
-/// What `row` counts towards for top-up purposes: `(language, None)` normally, aggregating every
-/// existing row for that language regardless of its own `size_bucket`; `(language, size_bucket)`
-/// under `--stratified`, so a row whose `size_bucket` is `None` correctly counts towards nothing,
-/// per `Row::size_bucket`'s doc comment - it is not a real sample of that bucket, just a row
-/// sampled a different way.
+/// What a row counts towards for top-up: `(language, None)` normally, `(language, size_bucket)`
+/// under `--stratified`.
 fn capacity_key(language: &str, bucket: Option<&str>, stratified: bool) -> CapacityKey {
     (
         language.to_string(),
@@ -335,13 +283,12 @@ fn sample_repository(
     rng: &mut StdRng,
 ) -> Result<()> {
     walk_single_parent_commit_diffs(repo_path, max_commits, false, |repo, id, delta| {
-        // Only in-place edits keep before and after at the same `path`, which is what the
-        // (repository, commit, path) schema here relies on to locate both blobs later.
-        // Rename detection is off (see the `false` above), so this also naturally excludes renames.
+        // The schema locates both blobs by one `path`, so only in-place edits qualify (rename
+        // detection is off).
         if delta.status() != Delta::Modified {
             return Ok(());
         }
-        // A no-op delta (e.g. a mode-only change) is not a useful diff pair.
+        // A mode-only change.
         if delta.old_file().id() == delta.new_file().id() {
             return Ok(());
         }
@@ -356,9 +303,8 @@ fn sample_repository(
         let Some(mut language) = language_for_path(path) else {
             return Ok(());
         };
-        // Refine a `.ts` guess by content (Qt Linguist vs. real TypeScript, see
-        // `language_for_path_and_content`'s doc comment) - gated to `TypeScript` specifically so
-        // this walk doesn't pay for a blob read on every other file it passes over.
+        // Only `.ts` needs content to disambiguate (Qt Linguist vs. TypeScript); gating on it
+        // avoids a blob read for every other file.
         if language == Language::TypeScript
             && let Ok(blob) = repo.find_blob(delta.new_file().id())
             && let Ok(text) = std::str::from_utf8(blob.content())
@@ -366,7 +312,6 @@ fn sample_repository(
         {
             language = refined;
         }
-        // Only sample languages diff_code can actually parse.
         if to_treesitter(&language).is_none() {
             return Ok(());
         }
@@ -383,10 +328,7 @@ fn sample_repository(
             return Ok(());
         }
 
-        // The larger of before/after line count decides the bucket - same convention as
-        // `sample_code_pairs`. Both counts are fetched (not just range-checked) even when
-        // `!stratified`, since `text_loc_if_in_range` is already the cheapest read available here
-        // and the boolean-only `in_range` this replaced did the identical two lookups anyway.
+        // The larger side decides the bucket, as in `sample_code_pairs`.
         let Some(before_loc) =
             text_loc_if_in_range(repo, delta.old_file().id(), MIN_BYTES, MAX_BYTES)
         else {
@@ -568,9 +510,7 @@ mod tests {
     fn stratified_top_up_ignores_unstratified_rows_and_counts_by_bucket() -> Result<()> {
         let repo_path = helper::handmade_git_repository()?;
 
-        // A pre-existing, non-stratified row for the same language: per `Row::size_bucket`'s doc
-        // comment, this must not count towards any stratified per-bucket target - it isn't a
-        // sample of a known bucket, just a row that predates (or opted out of) stratification.
+        // An unbucketed row must not count towards any stratified per-bucket target.
         let unstratified_existing = Row {
             language: "Rust".to_string(),
             repository: "handmade".to_string(),
@@ -589,10 +529,6 @@ mod tests {
             .filter(|r| r.language == "Rust" && r.size_bucket.is_some())
             .collect();
 
-        // The target is 10 *per bucket*; the handmade repository doesn't have 10 distinct Rust
-        // candidates in every bucket, but it must not have been capped at "10 total, minus the
-        // one pre-existing unstratified row" either - that would mean the unstratified row was
-        // wrongly counted against a stratified bucket's budget.
         assert!(!rust_stratified.is_empty());
         use std::collections::HashSet as StdHashSet;
         let buckets: StdHashSet<&str> = rust_stratified
@@ -614,15 +550,11 @@ mod tests {
     fn tops_up_existing_samples_without_duplicates() -> Result<()> {
         let repo_path = helper::handmade_git_repository()?;
 
-        // First pass: deliberately under-sample so there is room to top up.
         let first_pass = sample(&repo_path, 1, &[], 1, false)?;
         let rust_count_after_first: usize =
             first_pass.iter().filter(|r| r.language == "Rust").count();
         assert_eq!(rust_count_after_first, 1);
 
-        // Second pass, with the first pass's rows treated as already on disk: should top up to
-        // exactly `target_count` (bounded by how many distinct candidates actually exist) and
-        // must not reintroduce any row already present.
         let second_pass = sample(&repo_path, 5, &first_pass, 2, false)?;
         let rust_rows: Vec<&Row> = second_pass
             .iter()
@@ -638,6 +570,58 @@ mod tests {
             assert!(seen.insert(key), "duplicate row sampled: {}", row.path);
         }
 
+        Ok(())
+    }
+
+    fn args(repos_dir: &str, dataset: Option<&str>, stratified: bool) -> Args {
+        Args {
+            repos_dir: PathBuf::from(repos_dir),
+            count: 1,
+            output: None,
+            seed: None,
+            language: None,
+            max_commits_per_repo: 1,
+            dataset: dataset.map(str::to_string),
+            stratified,
+        }
+    }
+
+    #[test]
+    fn dataset_defaults_to_the_repos_dir_parent_name() {
+        let resolved = resolve_dataset(&args("/r/research/full/repositories", None, false));
+        assert_eq!(resolved.unwrap(), "full");
+        assert!(resolve_dataset(&args("/", None, false)).is_err());
+    }
+
+    #[test]
+    fn stratified_defaults_to_the_stratified_dataset_and_rejects_any_other() {
+        let checkout = "/r/research/small/repositories";
+        assert_eq!(
+            resolve_dataset(&args(checkout, None, true)).unwrap(),
+            "stratified"
+        );
+        assert_eq!(
+            resolve_dataset(&args(checkout, Some("stratified"), true)).unwrap(),
+            "stratified"
+        );
+        assert!(resolve_dataset(&args(checkout, Some("small"), true)).is_err());
+    }
+
+    #[test]
+    fn rows_without_dataset_or_status_columns_get_their_legacy_defaults() -> Result<()> {
+        let dir = tempfile::tempdir()?;
+        let csv = dir.path().join("sample.csv");
+        std::fs::write(
+            &csv,
+            "language,repository,commit,path,promoted_to\n\
+             Rust,r,c,a.rs,\n\
+             Rust,r,c,b.rs,rust-case\n",
+        )?;
+        let rows = read_existing_rows(&csv)?;
+        assert_eq!(rows.len(), 2);
+        assert!(rows.iter().all(|r| r.dataset == "small"));
+        assert_eq!(rows[0].status, "SAMPLED");
+        assert_eq!(rows[1].status, "PROMOTED");
         Ok(())
     }
 }

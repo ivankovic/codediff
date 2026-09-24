@@ -22,11 +22,8 @@ use crate::diff::{ASTMappingOperation, ASTMappingReason};
 use crate::test::helper;
 use anyhow::Result;
 
-/// `ContainmentCtx::adjust` walks `node_to_parent` (via `is_ancestor_or_self`) to decide
-/// whether a candidate rename target actually contains a pruned descendant's landing spot -
-/// left empty, every non-root node looks parentless and `adjust` degenerates to forbidding
-/// almost everything. Derived from `node_info`'s children lists, same as
-/// `compute_ast_metadata`'s real one.
+/// `ContainmentCtx::adjust` needs real parents: with none, every node looks parentless and it
+/// forbids almost everything.
 fn node_to_parent_from(
     node_info: &rustc_hash::FxHashMap<usize, ASTNodeMetadata>,
 ) -> rustc_hash::FxHashMap<usize, usize> {
@@ -79,8 +76,8 @@ fn mapping_total_cost(
         .sum()
 }
 
-/// Differential check: the new APTED-engine-backed `compute_delta` must produce a mapping
-/// with the exact same total cost as the classic Zhang-Shasha oracle, for the given forests.
+/// Differential check: APTED's `compute_delta` must yield a mapping of exactly the Zhang-Shasha
+/// oracle's total cost.
 fn assert_distance_matches_oracle(
     before_meta: &ASTMetadata,
     after_meta: &ASTMetadata,
@@ -110,9 +107,7 @@ fn assert_distance_matches_oracle_pruned(
     let before_idx = PostorderIndexer::build(before_meta, before_root_ids, before_node_map);
     let after_idx = PostorderIndexer::build(after_meta, after_root_ids, after_node_map);
 
-    // Built from the *same* pruning maps `before_idx`/`after_idx` were pruned against, so
-    // both engines below see the identical containment constraints - a differential check
-    // that only exercises `adjust()` if it's built from a real `ASTDiff`, not `None`.
+    // From the same pruning maps as the indexers, so both engines see the same constraints.
     let diff = ASTDiff {
         before_node_map: before_node_map.clone(),
         after_node_map: after_node_map.clone(),
@@ -175,10 +170,8 @@ fn assert_distance_matches_oracle_pruned(
     );
 }
 
-/// Same as `assert_distance_matches_oracle_pruned`, but pins the forced-RIGHT driver
-/// instead of the live (forced-left) engine - validates `spf_path`/`compute_keyroots`/
-/// `apted_tree_edit_dist` (all three with `PostDir::Right`) in isolation, the same way the
-/// forced-left tests above pin them with `PostDir::Left`.
+/// `assert_distance_matches_oracle_pruned` for the forced-RIGHT driver, so `PostDir::Right` is
+/// checked on every case.
 fn assert_distance_matches_oracle_forced_right(
     before_meta: &ASTMetadata,
     after_meta: &ASTMetadata,
@@ -423,8 +416,8 @@ fn meta_from_owned(nodes: &[(usize, String, String, Vec<usize>)]) -> ASTMetadata
     }
 }
 
-/// Perfectly balanced binary tree: `2^depth - 1` nodes, the adversarial shape for an
-/// L/R-only (no spfA/INNER) decomposition strategy per the APTED papers.
+/// Perfectly balanced binary tree of `2^depth - 1` nodes: the adversarial shape for an
+/// L/R-only strategy, per the APTED papers.
 fn gen_balanced_binary_tree(
     next_id: &mut usize,
     depth: usize,
@@ -460,8 +453,7 @@ fn bench_compute_delta_large_balanced_trees() {
         let before_root =
             gen_balanced_binary_tree(&mut next_id, depth, &kinds, &texts, &mut before_nodes);
         let mut after_nodes = Vec::new();
-        // A different balanced tree of the same shape/size, so nothing trivially matches by
-        // id and the engine has to do real work, like an unmatched-residual diff would.
+        // Different labels, so nothing matches trivially.
         let after_root =
             gen_balanced_binary_tree(&mut next_id, depth, &kinds, &texts, &mut after_nodes);
 
@@ -660,8 +652,7 @@ fn debug_dump_case(
 
     let mut oracle_delta =
         compute_delta_zhang_shasha(&before_idx, &after_idx, before, after, &cost_model, None);
-    // Snapshot *before* compute_edit_mapping, which mutates delta in place as it recomputes
-    // forest_dist - comparing post-mutation tables would compare the wrong thing.
+    // Before `compute_edit_mapping`, which mutates `delta`.
     let oracle_snapshot: Vec<Vec<u64>> = (0..before_idx.size)
         .map(|b| {
             (0..after_idx.size)
@@ -716,8 +707,7 @@ fn debug_dump_case(
         }
     }
 
-    // Recompute the top-level forest_dist table fresh from each snapshot, to find exactly
-    // where the two diverge (since compute_edit_mapping mutates delta as it runs).
+    // From the snapshots, to find where the two diverge.
     let rebuild = |snap: &[Vec<u64>]| {
         let mut d = DeltaTable::new(before_idx.size.max(1), after_idx.size.max(1));
         for (b, row) in snap.iter().enumerate() {
@@ -880,8 +870,7 @@ fn debug_dump_minimal_repro() {
         }
     }
 
-    // Dump the strategy table's choices (virtual-space, vroot included) to see which
-    // (v, w) pairs picked INNER.
+    // Virtual-space strategy choices, to see which pairs picked INNER.
     let mut bidx = AptedIndexer::build(&before, &[0], &empty_map);
     let mut aidx = AptedIndexer::build(&after, &[7], &empty_map);
     bidx.fill_subtree_costs(&before, &cost_model);
@@ -1018,8 +1007,7 @@ fn test_apted_engine_matches_oracle_fuzz() {
     }
 }
 
-/// Fisher-Yates shuffle, used by `gen_random_pruning` to pick a random subset of leaves on
-/// each side without repeats.
+/// Fisher-Yates shuffle.
 fn shuffle(rng: &mut Rng, v: &mut [usize]) {
     for i in (1..v.len()).rev() {
         let j = rng.range(i + 1);
@@ -1027,20 +1015,10 @@ fn shuffle(rng: &mut Rng, v: &mut [usize]) {
     }
 }
 
-/// Builds a genuine `(before_node_map, after_node_map)` pruning constraint out of a random
-/// pair of trees: picks 1-3 random *leaf* nodes on each side (excluding the roots, so the
-/// forest itself never goes empty) and cross-matches them 1:1, exactly the shape
-/// `resolve_forest` leaves behind for `ContainmentCtx` when an earlier pass has already
-/// matched some descendants elsewhere. Leaves only (not arbitrary subtrees) keeps this
-/// simple: the same restriction `test_apted_engine_matches_oracle_with_pruned_descendants`
-/// uses by hand. Combined with the `["a","b","c"]`/`["x","y","z"]` generator (same-kind
-/// candidates are always cheaply renameable under the unit cost model, so containment is the
-/// *only* thing that can rule one out), this is what gives the fuzz test below teeth: without
-/// `adjust()` applied at every `vren` site, the Apted engine is free to rename a pruned
-/// ancestor onto a same-kind sibling subtree that doesn't actually contain where its
-/// descendant landed, which the Zhang-Shasha oracle (already containment-aware via
-/// `forest_dist`) will never do - producing a real cost divergence, not just a coincidental
-/// match.
+/// A `(before_node_map, after_node_map)` that cross-matches 1-3 random non-root leaves per side,
+/// the shape an earlier pass leaves for `ContainmentCtx`. With labels that are always cheaply
+/// renameable, containment is the only thing ruling a pairing out, so an APTED `vren` site
+/// missing `adjust()` shows as a real cost divergence from the oracle.
 fn gen_random_pruning(
     rng: &mut Rng,
     before_nodes: &[(usize, String, String, Vec<usize>)],
@@ -1082,12 +1060,8 @@ fn gen_random_pruning(
     (before_map, after_map)
 }
 
-/// Extends `test_apted_engine_matches_oracle_fuzz` to the case that fuzz never exercises: a
-/// forest with real pruned-descendant constraints (see `gen_random_pruning`). Both engines go
-/// through `assert_distance_matches_oracle_pruned`, which now builds one shared
-/// `ContainmentCtx` and threads it into *both* `compute_delta_zhang_shasha` (oracle) and
-/// `compute_delta` (Apted) - a divergence here means `compute_delta`'s `vren` call sites are
-/// missing an `adjust()` application somewhere, not just that pruning crashes something.
+/// `test_apted_engine_matches_oracle_fuzz` with pruned-descendant constraints
+/// (`gen_random_pruning`); a divergence means an APTED `vren` site misses `adjust()`.
 #[test]
 fn test_apted_engine_matches_oracle_fuzz_with_containment() {
     let kinds = ["a", "b", "c"];
@@ -1146,9 +1120,7 @@ fn test_apted_engine_matches_oracle_fuzz_with_containment() {
 
 #[test]
 fn test_apted_engine_matches_oracle_with_pruned_descendants() {
-    // root(a, b, c, d) vs root(a, x, c, y) - but `b`/`d` (before) and `x`/`y` (after) are
-    // already matched elsewhere, so only `root`+`a`+`c` survive pruning into a forest of
-    // multiple unmatched roots per side (since the pruned nodes break contiguity).
+    // root(a, b, c, d) vs root(a, x, c, y) with b, d, x, y already matched elsewhere.
     let before = synthetic_meta(&[
         (0, "root", "", &[1, 2, 3, 4]),
         (1, "leaf", "a", &[]),
@@ -1170,13 +1142,7 @@ fn test_apted_engine_matches_oracle_with_pruned_descendants() {
 
 #[test]
 fn test_already_matched_nodes_are_skipped() -> Result<()> {
-    // This test verifies that APTED properly skips nodes
-    // that are already matched in the diff.
-    //
-    // Strategy: Use a code pair where nodes change, pre-populate the diff with
-    // a mapping that matches a node to a DIFFERENT node than what APTED would
-    // naturally choose, then verify that APTED doesn't create a second mapping
-    // for the same node.
+    // Pre-map two nodes to partners APTED would not choose; APTED must not map them again.
     let (before, after) = &*helper::handmade_test_code_pair("rust-leetcode-1-bugfix")?;
 
     let node_cache = NodeCache::build(before, after);
@@ -1187,25 +1153,18 @@ fn test_already_matched_nodes_are_skipped() -> Result<()> {
     let before_root = before_ast.root_node();
     let after_root = after_ast.root_node();
 
-    // Get some child nodes to create an artificial mapping
     let mut before_cursor = before_root.walk();
     let before_children: Vec<_> = before_root.children(&mut before_cursor).collect();
 
     let mut after_cursor = after_root.walk();
     let after_children: Vec<_> = after_root.children(&mut after_cursor).collect();
 
-    // If we have at least 2 children in both trees, create a cross-mapping
-    // that APTED would not naturally choose
     if before_children.len() >= 2 && after_children.len() >= 2 {
         let before_node_1 = before_children[0];
         let before_node_2 = before_children[1];
         let after_node_1 = after_children[0];
         let after_node_2 = after_children[1];
 
-        // Create a mapping that swaps the natural order
-        // Map before_node_1 to after_node_2 (wrong partner)
-        // and before_node_2 to after_node_1 (wrong partner)
-        // This forces APTED to potentially create additional correct mappings
         let wrong_mapping_1 = ASTMapping::identical(ASTMappingReason::OptimalIDU);
         diff.add_mapping(before_node_1.id(), after_node_2.id(), wrong_mapping_1);
 
@@ -1213,7 +1172,6 @@ fn test_already_matched_nodes_are_skipped() -> Result<()> {
         diff.add_mapping(before_node_2.id(), after_node_1.id(), wrong_mapping_2);
     }
 
-    // Now call APTED with the diff that already has these artificial mappings
     for_roots(
         before,
         after,
@@ -1223,19 +1181,16 @@ fn test_already_matched_nodes_are_skipped() -> Result<()> {
         &mut diff,
     );
 
-    // Check if any before node appears in multiple mappings
     let mut before_node_counts = std::collections::HashMap::new();
     for (before_id, _) in diff.mapping.keys() {
         *before_node_counts.entry(*before_id).or_insert(0) += 1;
     }
 
-    // Check if any after node appears in multiple mappings
     let mut after_node_counts = std::collections::HashMap::new();
     for (_, after_id) in diff.mapping.keys() {
         *after_node_counts.entry(*after_id).or_insert(0) += 1;
     }
 
-    // Find nodes that are mapped multiple times
     let before_nodes_with_multiple_mappings: Vec<_> = before_node_counts
         .iter()
         .filter(|&(_, count)| *count > 1)
@@ -1248,7 +1203,6 @@ fn test_already_matched_nodes_are_skipped() -> Result<()> {
         .map(|(&node_id, &count)| (node_id, count))
         .collect();
 
-    // Assert that no nodes are mapped multiple times
     assert!(
         before_nodes_with_multiple_mappings.is_empty(),
         "Nodes should not be mapped multiple times. Found before nodes with multiple mappings: {:?}",
@@ -1265,10 +1219,6 @@ fn test_already_matched_nodes_are_skipped() -> Result<()> {
 
 #[test]
 fn test_honors_pre_existing_match_and_still_finds_nested_reuse() -> Result<()> {
-    // Combines two things apted must get right at once: honoring a match that some earlier
-    // pass already made (here, faked by hand, same technique as
-    // test_already_matched_nodes_are_skipped), and still discovering the nested-reuse
-    // match (the print(...) call moved one level deeper) for everything else.
     let (before, after) = &*helper::handmade_test_code_pair("python-added-if-block-small")?;
 
     let node_cache = NodeCache::build(before, after);
@@ -1279,8 +1229,7 @@ fn test_honors_pre_existing_match_and_still_finds_nested_reuse() -> Result<()> {
     let before_root = before_ast.root_node();
     let after_root = after_ast.root_node();
 
-    // Pre-map the `numer = 12` assignment statement by hand, as if an earlier pass had
-    // already matched it.
+    // As if an earlier pass had matched `numer = 12`.
     let assignment_path = vec!["if_statement", "block", "expression_statement:1"];
     let before_assignment = helper::node_for_path(before_root, &assignment_path)?;
     let after_assignment = helper::node_for_path(after_root, &assignment_path)?;
@@ -1299,7 +1248,6 @@ fn test_honors_pre_existing_match_and_still_finds_nested_reuse() -> Result<()> {
         &mut diff,
     );
 
-    // The pre-existing match must survive untouched.
     assert_eq!(
         diff.mapping
             .get(&(before_assignment.id(), after_assignment.id()))
@@ -1307,8 +1255,6 @@ fn test_honors_pre_existing_match_and_still_finds_nested_reuse() -> Result<()> {
         Some(&ASTMappingReason::OptimalIDU)
     );
 
-    // The print(...) call should still be found and reused one level deeper inside the new
-    // if-block, despite the unrelated pre-existing match elsewhere in the same forest.
     let print_call_before = helper::node_for_path(
         before_root,
         &["if_statement", "block", "expression_statement:2"],
@@ -1325,8 +1271,7 @@ fn test_honors_pre_existing_match_and_still_finds_nested_reuse() -> Result<()> {
         .get(&(before_root.id(), after_root.id()))
         .unwrap();
     assert_eq!(mapping.operation, ASTMappingOperation::MatchButNotIdentical);
-    // Same total as test_python_added_if_block_small - the pre-existing match was for a
-    // node that would have cost 0 anyway, so honoring it changes nothing about the total.
+    // The pre-matched node would have cost 0 anyway.
     assert_eq!(mapping.cost, 8);
 
     Ok(())
@@ -1393,7 +1338,7 @@ fn test_hello_world_added_message() -> Result<()> {
     let added_node = helper::node_for_path(after_root, &path)?;
     let mapping = diff.mapping.get(&(0, added_node.id())).unwrap();
     assert_eq!(mapping.operation, ASTMappingOperation::Insert);
-    // 12 nodes in total are added. expression_statement + 11 more.
+    // expression_statement and its 11 descendants.
     assert_eq!(mapping.cost, 12);
 
     let mapping = diff
@@ -1401,7 +1346,7 @@ fn test_hello_world_added_message() -> Result<()> {
         .get(&(before_root.id(), after_root.id()))
         .unwrap();
     assert_eq!(mapping.operation, ASTMappingOperation::MatchButNotIdentical);
-    // The cost should correctly transfer upwards to the root node.
+    // The cost accumulates up to the root.
     assert_eq!(mapping.cost, 12);
 
     Ok(())
@@ -1439,7 +1384,7 @@ fn test_hello_world_removed_message() -> Result<()> {
     let deleted_node = helper::node_for_path(before_root, &path)?;
     let mapping = diff.mapping.get(&(deleted_node.id(), 0)).unwrap();
     assert_eq!(mapping.operation, ASTMappingOperation::Delete);
-    // 12 nodes in total are removed. expression_statement + 11 more.
+    // expression_statement and its 11 descendants.
     assert_eq!(mapping.cost, 12);
 
     let mapping = diff
@@ -1447,7 +1392,7 @@ fn test_hello_world_removed_message() -> Result<()> {
         .get(&(before_root.id(), after_root.id()))
         .unwrap();
     assert_eq!(mapping.operation, ASTMappingOperation::MatchButNotIdentical);
-    // The cost should correctly transfer upwards to the root node.
+    // The cost accumulates up to the root.
     assert_eq!(mapping.cost, 12);
 
     Ok(())
@@ -1480,7 +1425,7 @@ fn test_python_added_if_block_small() -> Result<()> {
         .get(&(before_root.id(), after_root.id()))
         .unwrap();
     assert_eq!(mapping.operation, ASTMappingOperation::MatchButNotIdentical);
-    // The best solution is to simply insert the 8 if_expression nodes in the tree.
+    // Only the 8 new if_expression nodes are inserted.
     assert_eq!(mapping.cost, 8);
 
     Ok(())
@@ -1488,9 +1433,6 @@ fn test_python_added_if_block_small() -> Result<()> {
 
 #[test]
 fn test_python_added_if_block() -> Result<()> {
-    // Larger, more realistic version of test_python_added_if_block_small: a function
-    // definition precedes the if-block, and the wrapped statement is an f-string print
-    // call. Pins that the nested-reuse fix generalizes beyond the minimal repro.
     let (before, after) = &*helper::handmade_test_code_pair("python-added-if-block")?;
 
     let node_cache = NodeCache::build(before, after);
@@ -1511,8 +1453,6 @@ fn test_python_added_if_block() -> Result<()> {
     let before_root = before_ast.root_node();
     let after_root = after_ast.root_node();
 
-    // The print(...) call should be reused (not deleted+reinserted) even though it's now
-    // nested one level deeper inside the new `if result != [0, 1]:` wrapper.
     let print_call_before = helper::node_for_path(
         before_root,
         &["if_statement", "block", "expression_statement:4"],
@@ -1529,10 +1469,7 @@ fn test_python_added_if_block() -> Result<()> {
         .get(&(before_root.id(), after_root.id()))
         .unwrap();
     assert_eq!(mapping.operation, ASTMappingOperation::MatchButNotIdentical);
-    // Only the new `if result != [0, 1]:` wrapper is genuinely new (if_statement, if,
-    // comparison_operator, identifier, !=, list, [, integer, ",", integer, ], :, block =
-    // 13 nodes); the print(...) call itself is fully reused at zero cost, not
-    // deleted-and-reinserted.
+    // Only the 13 nodes of the new `if result != [0, 1]:` wrapper are new.
     assert_eq!(mapping.cost, 13);
 
     Ok(())
@@ -1540,10 +1477,7 @@ fn test_python_added_if_block() -> Result<()> {
 
 #[test]
 fn test_rust_add_if() -> Result<()> {
-    // Same wrap-in-a-new-if pattern as test_python_added_if_block*, but for Rust's grammar
-    // and with the existing if/else demoted to an `else if` branch (nested one level
-    // deeper as the new if's else_clause) instead of nested inside a block - guards
-    // against tree-sitter-shape-specific assumptions in the fix.
+    // The old if/else becomes the new if's `else if` branch rather than sitting in a block.
     let (before, after) = &*helper::handmade_test_code_pair("rust-add-if")?;
 
     let node_cache = NodeCache::build(before, after);
@@ -1564,8 +1498,6 @@ fn test_rust_add_if() -> Result<()> {
     let before_root = before_ast.root_node();
     let after_root = after_ast.root_node();
 
-    // The entire original `if number % 2 == 0 { ... } else { ... }` should be reused intact
-    // as the new `else if`'s content, not deleted and rebuilt.
     let original_if = helper::node_for_path(
         before_root,
         &[
@@ -1587,9 +1519,7 @@ fn test_rust_add_if() -> Result<()> {
         .get(&(before_root.id(), after_root.id()))
         .unwrap();
     assert_eq!(mapping.operation, ASTMappingOperation::MatchButNotIdentical);
-    // Only the new outer `if number == 0 { println!("Zero"); } else if ...` wrapper plus
-    // its own new println!("Zero") body is genuinely new; the entire original if/else is
-    // reused intact (at zero cost) as the new else-if's content.
+    // Only the new outer `if number == 0 { println!("Zero"); } else ...` is new.
     assert_eq!(mapping.cost, 23);
 
     Ok(())
@@ -1597,8 +1527,7 @@ fn test_rust_add_if() -> Result<()> {
 
 #[test]
 fn flat_tree_myers_diff_matches_changed_tokens() -> Result<()> {
-    // Two token_tree-like flat structures: 100 identical tokens plus one changed value.
-    // Myers should match 100 identical tokens and mark 2 as delete/insert.
+    // 100 identical tokens plus one changed value.
     let before_tokens: Vec<&str> = (0..50)
         .map(|_| "tok")
         .chain(std::iter::once("old_value"))
@@ -1610,7 +1539,6 @@ fn flat_tree_myers_diff_matches_changed_tokens() -> Result<()> {
         .chain((0..50).map(|_| "tok"))
         .collect();
 
-    // Build synthetic metadata where the root has 101 leaf children.
     let mut before_meta = ASTMetadata::default();
     let mut after_meta = ASTMetadata::default();
 
@@ -1623,7 +1551,6 @@ fn flat_tree_myers_diff_matches_changed_tokens() -> Result<()> {
                 id,
                 ASTNodeMetadata::new("token".to_string(), tok.to_string(), vec![], id, id),
             );
-            // Use the token text as hash so identical tokens match.
             use std::hash::{Hash, Hasher};
             let mut h = std::collections::hash_map::DefaultHasher::new();
             tok.hash(&mut h);
@@ -1645,7 +1572,7 @@ fn flat_tree_myers_diff_matches_changed_tokens() -> Result<()> {
 
     let (before_root, _) = build_flat(&before_tokens, &mut before_meta);
     let (after_root, _) = build_flat(&after_tokens, &mut after_meta);
-    // Make root hashes differ so the identical fast-path is skipped.
+    // Differing root hashes, so the identical shortcut is skipped.
     before_meta.node_to_full_hash.insert(before_root, 1);
     after_meta.node_to_full_hash.insert(after_root, 2);
 
@@ -1660,7 +1587,6 @@ fn flat_tree_myers_diff_matches_changed_tokens() -> Result<()> {
         &mut diff,
     );
 
-    // Root pair should be mapped via flat-tree path.
     let root_mapping = diff
         .mapping
         .get(&(before_root, after_root))
@@ -1671,7 +1597,6 @@ fn flat_tree_myers_diff_matches_changed_tokens() -> Result<()> {
         ASTMappingOperation::MatchButNotIdentical
     );
 
-    // The 100 identical "tok" tokens should all be matched (Identical).
     let identical_count = diff
         .mapping
         .values()
@@ -1682,10 +1607,7 @@ fn flat_tree_myers_diff_matches_changed_tokens() -> Result<()> {
         "all 100 identical tokens should be matched"
     );
 
-    // "old_value" (before child 51) and "new_value" (after child 51) are the only Myers-unmatched
-    // pair on each side, so the 2026-08-08 residual-recursion fix (see TODO.md) resolves them
-    // through real APTED instead of an atomic delete+insert - same kind ("token"), so an Update is
-    // the cheaper, more accurate edit than delete+insert would have been.
+    // The lone Myers-unmatched pair goes through APTED, which relabels same-kind leaves.
     let changed_mapping = diff.mapping.get(&(51, 51)).expect(
         "changed token pair should be recursively resolved, not atomically deleted/inserted",
     );
@@ -1719,7 +1641,7 @@ fn myers_lcs_empty() {
 
 #[test]
 fn myers_lcs_exceeds_limit() {
-    // a and b share no elements → d = n+m; with limit=3 it should return None.
+    // Nothing shared, so d = n + m > 3.
     let a = [1u64, 2, 3];
     let b = [4u64, 5, 6];
     assert!(myers_lcs(&a, &b, 3).is_none());
@@ -1733,13 +1655,8 @@ fn leaf(id: usize, hash: u64, meta: &mut ASTMetadata) {
     meta.node_to_full_hash.insert(id, hash);
 }
 
-/// Same as `leaf`, but with a real `kind`/`text` (not the blank `text: String::new()` every other
-/// `leaf` call shares) - needed for tests that exercise real APTED's cost model (`UnitCostModel::
-/// ren`) directly, which compares `kind`/`text`, not `node_to_full_hash` (only `myers_lcs`-based
-/// exact-hash matching ever looks at the hash map). Every other `leaf`-built node is
-/// text-indistinguishable from every other by design (`ren` would treat any two same-kind `leaf`
-/// helper nodes as identical on text alone) - fine for tests that only exercise the exact-hash
-/// path, wrong for ones that need `ren` to see genuinely different content.
+/// `leaf` with a real kind and text: `ren` compares those, not the hash, and sees any two `leaf`
+/// nodes as identical.
 fn leaf_with_kind(id: usize, hash: u64, kind: &str, text: &str, meta: &mut ASTMetadata) {
     meta.node_info.insert(
         id,
@@ -1759,9 +1676,7 @@ fn interior(id: usize, children: Vec<usize>, meta: &mut ASTMetadata) {
 fn maximal_unmatched_roots_stops_at_first_unmatched_node_each_branch() {
     // root(1, matched) -> A(2, matched) -> C(4, unmatched)
     //                   -> B(3, unmatched) -> D(5, unmatched)
-    // Expected: {4, 3} - C is picked up independently (its matched ancestor A doesn't stop
-    // the descent), but D is *not* separately listed - B itself is unmatched, so the walk
-    // stops at B without looking at its children.
+    // Expected {4, 3}: descent continues through matched A, and stops at wholly unmatched B.
     let mut meta = ASTMetadata::default();
     interior(1, vec![2, 3], &mut meta);
     interior(2, vec![4], &mut meta);
@@ -1772,7 +1687,6 @@ fn maximal_unmatched_roots_stops_at_first_unmatched_node_each_branch() {
     let mut node_map = rustc_hash::FxHashMap::default();
     node_map.insert(1, 100); // root matched
     node_map.insert(2, 200); // A matched
-    // 3 (B), 4 (C), 5 (D) all unmatched
 
     let mut roots = maximal_unmatched_roots(1, &meta, &node_map);
     roots.sort_unstable();
@@ -1785,20 +1699,8 @@ fn maximal_unmatched_roots_stops_at_first_unmatched_node_each_branch() {
 
 #[test]
 fn resolve_residual_forest_via_myers_lcs_matches_identical_and_recurses_the_rest() {
-    // Before/after each have a matched root with two unmatched leaf children; one pair of
-    // children shares a hash (should match via the exact-hash pass), the other pair is left as
-    // the sole entry on each side of the one gap between that anchor and the sequence end.
-    //
-    // Exact-hash matching alone would drop the "unique" pair through to delete+insert. The
-    // real-APTED recursion exists for exactly this shape - a single leftover entry on each side of
-    // a gap - so that a genuinely-edited node gets a real match instead of a lossy atomic replace.
-    // That recursion goes through the real cost model (`UnitCostModel::ren`), which - by design,
-    // same as every other APTED call site in this codebase - prefers relabeling two *same-kind*
-    // leaves (`COST_UPDATE = 1`) over deleting one and inserting the other (`COST_DELETE +
-    // COST_INSERT = 2`), regardless of whether they're "really" related. `leaf`'s helper nodes are
-    // both `kind: "leaf"`, so that's what happens here now - an accepted trade-off, not a bug (see
-    // `resolve_residual_forest_via_myers_lcs_ does_not_relabel_across_different_kinds` below for
-    // the safety net that's still enforced).
+    // One child pair shares a hash; the other is alone in the gap after it, so it recurses
+    // through APTED, which relabels two same-kind leaves rather than replacing them.
     let mut before_meta = ASTMetadata::default();
     let mut after_meta = ASTMetadata::default();
     interior(1, vec![2, 3], &mut before_meta);
@@ -1839,12 +1741,7 @@ fn resolve_residual_forest_via_myers_lcs_matches_identical_and_recurses_the_rest
 
 #[test]
 fn resolve_residual_forest_via_myers_lcs_does_not_relabel_across_different_kinds() {
-    // Same shape as the test above, but the two leftover leaves have *different* kinds
-    // (`kinds_update_allowed` has no entry for this made-up pair, so they're not on the
-    // hand-picked cross-kind allow-list either). `UnitCostModel::ren` makes a cross-kind relabel
-    // strictly more expensive than delete+insert specifically to prevent this - real APTED still
-    // has to fall back to delete+insert here, confirming Phase 3b's single-entry-gap recursion
-    // didn't weaken *that* guarantee, only the same-kind one demonstrated above.
+    // As above, but the leftover leaves differ in kind, which `ren` prices above delete+insert.
     let mut before_meta = ASTMetadata::default();
     let mut after_meta = ASTMetadata::default();
     interior(1, vec![2, 3], &mut before_meta);
@@ -1880,9 +1777,7 @@ fn resolve_residual_forest_via_myers_lcs_does_not_relabel_across_different_kinds
 
 #[test]
 fn resolve_residual_forest_via_myers_lcs_replaces_everything_past_the_edit_cap() {
-    // 600 unmatched leaves on each side, zero shared hashes: true edit distance is 1200,
-    // comfortably over FALLBACK_MAX_EDIT (1000) - myers_lcs must return None, and every leaf
-    // on both sides should come out delete/insert rather than partially aligned.
+    // 600 unshared leaves a side: edit distance 1200 exceeds FALLBACK_MAX_EDIT.
     const N: usize = 600;
     let mut before_meta = ASTMetadata::default();
     let mut after_meta = ASTMetadata::default();
@@ -1892,10 +1787,7 @@ fn resolve_residual_forest_via_myers_lcs_replaces_everything_past_the_edit_cap()
     interior(9999, before_children.clone(), &mut before_meta);
     interior(19999, after_children.clone(), &mut after_meta);
     for (i, &id) in before_children.iter().enumerate() {
-        // Distinct kind *and* text per leaf (not the blank-text `leaf()` helper - see
-        // `leaf_with_kind`'s doc comment): real APTED's cost model compares kind/text, so this
-        // must give it genuinely different content per position, not just a different hash (which
-        // only the exact-hash myers_lcs path above ever consults).
+        // Distinct kind and text per leaf, so `ren` cannot relabel them.
         leaf_with_kind(
             id,
             id as u64,
@@ -1950,16 +1842,9 @@ fn resolve_residual_forest_via_myers_lcs_replaces_everything_past_the_edit_cap()
     );
 }
 
-/// `ren` must not price a *content* change at zero just because the changed bytes live in a gap
-/// rather than in a child node.
-///
-/// The zero for same-kind internal nodes rests on "children carry the cost", which is exactly true
-/// for a well-behaved node and exactly false for the several thousand corpus nodes that own text
-/// directly (XML `AttValue`, CSS numeric/colour literals, Rust comments, YAML quoted scalars - see
-/// `metadata::owned_text_hash_of`). Written against `ren` directly rather than through a diff,
-/// because whether any *fixture* happens to route through this arm is a separate question from
-/// whether the cost model is right: the corpus effect is about -1 mismatch, and the model would
-/// still be wrong without it.
+/// `ren` must not price a content change at zero because the changed bytes sit between children
+/// rather than in one. Tested on `ren` directly: the cost model is wrong without it whether or not
+/// a fixture routes through this arm.
 #[test]
 fn ren_charges_for_text_a_node_owns_directly() {
     let internal_node = |owned_text_hash: u64| ASTNodeMetadata {
@@ -1974,28 +1859,50 @@ fn ren_charges_for_text_a_node_owns_directly() {
         relabel > 0,
         "a differing attribute value must not be free to relabel"
     );
-    // ...and must stay strictly cheaper than throwing the node away and making a new one, or the
-    // DP is free to read "this value changed" as "this one went and an unrelated one arrived".
-    // Pricing this at `COST_LITERAL_UPDATE` (2, exactly `COST_DELETE + COST_INSERT`) rather than
-    // `COST_UPDATE` did precisely that, and cost a real fixture a mapping.
+    // ...but strictly cheaper than delete+insert; at a tie the DP reads "value changed" as
+    // "replaced".
     assert!(
         relabel < COST_DELETE + COST_INSERT,
         "relabel {relabel} must beat delete+insert"
     );
-    // Two nodes that genuinely agree stay free - the children still carry their own costs.
     assert_eq!(
         cost_model.ren(&internal_node(0xBEEF), &internal_node(0xBEEF)),
         0
     );
-    // And an ordinary internal node, owning nothing, is unaffected.
     assert_eq!(cost_model.ren(&internal_node(0), &internal_node(0)), 0);
 }
 
 #[test]
+fn ren_never_pairs_a_worded_comment_with_a_bare_marker() {
+    let comment = |text: &str| ASTNodeMetadata::new("comment".into(), text.into(), vec![], 0, 0);
+    let cost_model = UnitCostModel::new(Language::Ruby);
+    assert!(
+        cost_model.ren(&comment("# @return [Boolean]"), &comment("#")) > COST_DELETE + COST_INSERT
+    );
+    assert!(
+        cost_model.ren(&comment("# old words"), &comment("# new words"))
+            < COST_DELETE + COST_INSERT
+    );
+}
+
+#[test]
+fn ren_keeps_leaf_updates_strictly_cheaper_than_delete_plus_insert() {
+    let leaf =
+        |kind: &str, text: &str| ASTNodeMetadata::new(kind.into(), text.into(), vec![], 0, 0);
+    let cost_model = UnitCostModel::new(Language::Rust);
+    for (kind, a, b) in [("integer_literal", "1", "2"), ("identifier", "a", "b")] {
+        let cost = cost_model.ren(&leaf(kind, a), &leaf(kind, b));
+        assert!(
+            cost > 0 && cost < COST_DELETE + COST_INSERT,
+            "{kind}: {cost}"
+        );
+    }
+}
+
+#[test]
 fn apted_whole_tree_hands_an_oversized_pair_to_the_kernel_instead_of_decomposing_it() {
-    // 120 one-return functions a side, one of them changed: about a thousand nodes a side,
-    // a million cells, past `APTED_MAX_CELLS`. Functions rather than bare statements, so the
-    // root is not a flat container and the only way to avoid the kernel is the gate.
+    // Functions rather than bare statements, so the root is not a flat container and only the
+    // cell gate keeps the pair out of the kernel.
     let source = |changed: usize| -> String {
         (0..120)
             .map(|i| {
@@ -2038,4 +1945,237 @@ fn apted_whole_tree_hands_an_oversized_pair_to_the_kernel_instead_of_decomposing
         [ASTMappingReason::APTED("test")].into_iter().collect(),
         "{whole:?}"
     );
+}
+
+fn matched(diff: &mut ASTDiff, before_id: usize, after_id: usize) {
+    diff.add_mapping(
+        before_id,
+        after_id,
+        ASTMapping::identical(ASTMappingReason::APTED("test")),
+    );
+}
+
+#[test]
+fn split_into_anchored_segments_splits_at_matched_children_and_drops_them() {
+    let mut diff = ASTDiff::default();
+    matched(&mut diff, 3, 12);
+    assert_eq!(
+        split_into_anchored_segments(&[1, 2, 3, 4, 5], &[11, 12, 13, 14], &diff),
+        vec![(vec![1, 2], vec![11]), (vec![4, 5], vec![13, 14])]
+    );
+}
+
+#[test]
+fn split_into_anchored_segments_ignores_an_anchor_whose_partner_is_behind_the_last_split() {
+    let mut diff = ASTDiff::default();
+    matched(&mut diff, 2, 12);
+    matched(&mut diff, 4, 11);
+    assert_eq!(
+        split_into_anchored_segments(&[1, 2, 3, 4, 5], &[11, 12, 13], &diff),
+        vec![(vec![1], vec![]), (vec![3, 5], vec![13])]
+    );
+}
+
+#[test]
+fn anchor_leftovers_by_member_name_zips_equal_counts_and_leaves_unequal_counts_alone() {
+    let before = Code::from_string(
+        "class A {\n  A(int x) { f(1); }\n  A() { f(2); }\n  void q(int x) { g(1); }\n  \
+         void q() { g(2); }\n  void r() { h(1); }\n}\n",
+        &Language::Java,
+    );
+    let after = Code::from_string(
+        "class A {\n  A(int x) { f(3); }\n  A() { f(4); }\n  void q() { g(3); }\n  \
+         void r() { h(2); }\n}\n",
+        &Language::Java,
+    );
+    let before_meta = crate::code::metadata::metadata_of(&before);
+    let after_meta = crate::code::metadata::metadata_of(&after);
+    let members = |code: &Code, meta: &ASTMetadata| {
+        let body = helper::find_first_of_kind(code.ast.as_ref().unwrap().root_node(), "class_body")
+            .unwrap();
+        let children = meta.node_info[&body.id()].children.clone();
+        let named: Vec<usize> = children
+            .iter()
+            .copied()
+            .filter(|id| meta.node_info[id].kind.ends_with("_declaration"))
+            .collect();
+        (children, named)
+    };
+    let (before_children, b) = members(&before, &before_meta);
+    let (after_children, a) = members(&after, &after_meta);
+
+    let mut diff = ASTDiff::default();
+    let (before_left, after_left) = anchor_leftovers_by_member_name(
+        before_children,
+        after_children,
+        &before_meta,
+        &after_meta,
+        "test",
+        &mut diff,
+    );
+
+    // Constructors pair in document order, `r` by its unique name.
+    assert_eq!(diff.before_node_map.get(&b[0]), Some(&a[0]));
+    assert_eq!(diff.before_node_map.get(&b[1]), Some(&a[1]));
+    assert_eq!(diff.before_node_map.get(&b[4]), Some(&a[3]));
+    // Two `q`s against one: which was removed is not a question a name can answer.
+    assert!(before_left.contains(&b[2]) && before_left.contains(&b[3]));
+    assert!(after_left.contains(&a[2]));
+    assert!(!diff.before_node_map.contains_key(&b[2]));
+}
+
+#[test]
+fn widest_statement_sequence_body_takes_the_shallowest_body_over_a_wider_nested_one() {
+    let code = Code::from_string(
+        "def f():\n    a = 1\n    for i in x:\n        b = 1\n        c = 2\n        d = 3\n",
+        &Language::Python,
+    );
+    let meta = crate::code::metadata::metadata_of(&code);
+    let function = helper::find_first_of_kind(
+        code.ast.as_ref().unwrap().root_node(),
+        "function_definition",
+    )
+    .unwrap();
+    let function_body = helper::find_first_of_kind(function, "block").unwrap();
+    assert_eq!(
+        widest_statement_sequence_body(function.id(), &meta),
+        Some((2, function_body.id()))
+    );
+}
+
+#[test]
+fn prematch_identical_statement_siblings_maps_only_identical_statements() {
+    let source = |c: &str| format!("def f():\n    a = 1\n    b = 2\n    c = {c}\n    d = 4\n");
+    let before = Code::from_string(&source("3"), &Language::Python);
+    let after = Code::from_string(&source("30"), &Language::Python);
+    let before_meta = crate::code::metadata::metadata_of(&before);
+    let after_meta = crate::code::metadata::metadata_of(&after);
+    fn function(code: &Code) -> tree_sitter::Node<'_> {
+        helper::find_first_of_kind(
+            code.ast.as_ref().unwrap().root_node(),
+            "function_definition",
+        )
+        .unwrap()
+    }
+    let before_fn = function(&before);
+    let changed = helper::find_first_of_kind(before_fn, "block")
+        .unwrap()
+        .named_child(2)
+        .unwrap();
+
+    let mut diff = ASTDiff::default();
+    prematch_identical_statement_siblings(
+        before_fn.id(),
+        function(&after).id(),
+        &before_meta,
+        &after_meta,
+        "test",
+        &mut diff,
+    );
+
+    assert!(!diff.mapping.is_empty());
+    assert!(
+        diff.mapping
+            .values()
+            .all(|m| matches!(m.operation, ASTMappingOperation::Identical))
+    );
+    assert!(!diff.before_node_map.contains_key(&changed.id()));
+}
+
+/// Leaves `id -> kind "stmt"` with a similarity sketch over `hashes`.
+fn sketched(entries: &[(usize, &[u64])]) -> ASTMetadata {
+    let mut meta = ASTMetadata::default();
+    for &(id, hashes) in entries {
+        meta.node_info.insert(
+            id,
+            ASTNodeMetadata::new("stmt".to_string(), String::new(), vec![], id, id),
+        );
+        meta.node_to_similarity_sketch.insert(
+            id,
+            crate::code::similarity::SimilaritySketch::merge(
+                hashes
+                    .iter()
+                    .map(|&h| crate::code::similarity::SimilaritySketch::leaf(h)),
+            ),
+        );
+    }
+    meta
+}
+
+#[test]
+fn mutual_similarity_pairs_a_rewrite_and_leaves_the_surplus_as_inserts() {
+    let before = sketched(&[(1, &[1, 2, 3])]);
+    let after = sketched(&[(10, &[1, 2, 4]), (11, &[7, 8, 9])]);
+    assert_eq!(
+        align_segment_by_mutual_similarity(&[1], &[10, 11], &before, &after),
+        vec![(0, 0)]
+    );
+}
+
+#[test]
+fn mutual_similarity_refuses_a_tie_between_two_candidates() {
+    let before = sketched(&[(1, &[1, 2, 3])]);
+    let after = sketched(&[(10, &[1, 2, 4]), (11, &[1, 2, 4])]);
+    assert!(align_segment_by_mutual_similarity(&[1], &[10, 11], &before, &after).is_empty());
+}
+
+#[test]
+fn mutual_similarity_pairs_nothing_unless_the_smaller_side_is_fully_paired() {
+    let before = sketched(&[(1, &[1, 2, 3]), (2, &[20, 21, 22])]);
+    let after = sketched(&[(10, &[1, 2, 4]), (11, &[7, 8, 9]), (12, &[30, 31])]);
+    assert!(align_segment_by_mutual_similarity(&[1, 2], &[10, 11, 12], &before, &after).is_empty());
+}
+
+#[test]
+fn containment_forbids_pairing_a_hollowed_out_ancestor_away_from_its_pruned_descendant() {
+    // before: 1 -> 2 -> 3; after: 10 -> (11, 12 -> 13); 3 is already matched to 13.
+    let before = synthetic_meta(&[(1, "r", "", &[2]), (2, "p", "", &[3]), (3, "x", "x", &[])]);
+    let after = synthetic_meta(&[
+        (10, "r", "", &[11, 12]),
+        (11, "p", "", &[]),
+        (12, "p", "", &[13]),
+        (13, "x", "x", &[]),
+    ]);
+    let mut diff = ASTDiff::default();
+    matched(&mut diff, 3, 13);
+    let ctx = ContainmentCtx::build(&[1], &[10], &before, &after, &diff, "test");
+    assert_eq!(ctx.adjust(2, 11, 0), FORBIDDEN_RENAME_COST);
+    assert_eq!(ctx.adjust(2, 12, 0), 0);
+}
+
+#[test]
+fn longest_increasing_by_second_drops_pairs_that_contradict_the_longest_ordered_run() {
+    assert_eq!(
+        longest_increasing_by_second(&[(1, 10), (2, 40), (3, 20), (4, 30)]),
+        vec![(1, 10), (3, 20), (4, 30)]
+    );
+}
+
+#[test]
+fn slot_lcs_anchor_outweighs_every_promotion_it_blocks() {
+    // The anchor (0, 2) crosses three otherwise compatible promotions and still wins.
+    let pairs = weighted_lcs_pairs(4, 3, |i, j| match (i, j) {
+        (0, 2) => SLOT_LCS_ANCHOR_WEIGHT,
+        (0, _) | (_, 2) => 0,
+        _ => 1,
+    });
+    assert_eq!(pairs, vec![(0, 2)]);
+}
+
+#[test]
+fn for_roots_and_the_fallback_are_no_ops_without_an_ast() {
+    let before = Code::from_string("some text", &Language::Unknown);
+    let after = Code::from_string("other text", &Language::Unknown);
+    let mut diff = ASTDiff::default();
+    let node_cache = NodeCache::build(&before, &after);
+    for_roots(
+        &before,
+        &after,
+        &node_cache,
+        Algorithm::Apted,
+        "test",
+        &mut diff,
+    );
+    crate::diff::apted::for_roots_fallback(&before, &after, "test", &mut diff);
+    assert!(diff.mapping.is_empty());
 }

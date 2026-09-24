@@ -20,48 +20,20 @@ use crate::diff::nodes::anchor_pair_via_apted;
 use crate::diff::{ASTDiff, ASTMappingReason};
 use std::collections::HashMap;
 
-/// "Unique type matching", the third and last-resort sub-phase of GumTree Simple's recovery phase
-/// (Falleri & Martinez, ICSE 2024, "Fine-grained, accurate and scalable source differencing" -
-/// itself inspired by XYDiff's type-matching step). Distinct from the isomorphism passes around
-/// it: exact-subtree isomorphism is `solve_hash_descent`, and structural isomorphism ignoring leaf
-/// values is codediff's own `KindOnlyHash` sub-anchoring.
-///
-/// For every currently-matched `(before_id, after_id)` pair, look at that pair's own direct
-/// children still unmatched on both sides. If exactly one before-child and exactly one after-child
-/// share the same node *kind*, pair them - real bounded APTED (`anchor_pair_via_apted`) then scores
-/// and resolves everything inside that pair, so the cost/operation is never invented, only the
-/// pairing decision is a heuristic.
-///
-/// Deliberately conservative: a kind with zero or two-or-more unmatched candidates on either side
-/// is left alone (no plurality vote, no "closest" guess) - the whole value of this heuristic is
-/// that "exactly one of this kind on each side, under a parent we already know corresponds" is
+/// GumTree Simple's "unique type matching" recovery step: under every matched pair, a child kind
+/// with exactly one unmatched child on each side pairs those two, and bounded APTED
+/// (`anchor_pair_via_apted`) resolves and costs the pair. Zero or several candidates of a kind on
+/// either side is left alone; the value is that a unique pair under known-corresponding parents is
 /// unambiguous by construction, not merely likely.
 ///
-/// Single pass over a snapshot of currently-matched pairs (not recursive to a fixed point, unlike
-/// the literature's own placement inside a recursive bottom-up walk) - simpler, and consistent with
-/// this codebase's other single-shot passes; newly-resolved pairs from a first call could in
-/// principle unlock more unique-type matches among *their own* still-unmatched children, but that
-/// is left for a later iteration if the full corpus benchmark shows it matters, rather than assumed
-/// upfront.
-///
-/// Runs after `solve_bottom_up_propagation` (so it benefits from every parent pairing that pass
-/// resolves) and before the terminal Myers-LCS fallback (`apted::for_roots_fallback`), so this
-/// pass's precise, cheap pairs are locked in before that lossy, whole-subtree-only catch-all ever
-/// sees them.
+/// One pass over a snapshot of matched pairs, not recursive to a fixed point.
 pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
     let before_metadata = ctx.before_metadata();
     let after_metadata = ctx.after_metadata();
 
-    // Snapshot of currently-matched pairs, sorted by the before node's preorder index for
-    // deterministic iteration order regardless of `FxHashMap`'s own iteration order - see
-    // `ASTNodeMetadata::start_byte`'s doc comment on why node ids themselves aren't a safe sort key.
-    // Only pairs that actually have an unmatched child on the before side can produce anything
-    // here, and on a large, mostly-unchanged file almost none do - filtering before the sort keeps
-    // this proportional to the residual rather than to the whole file (measured 2026-08-17: ~60ms
-    // of a 907ms diff on a 258k-node fixture, for a pass that fires zero times corpus-wide, see
-    // this module's `TODO.md` entry). The filter is a necessary condition for the per-kind loop
-    // below, which re-checks everything properly; matching only ever adds map entries, so a child
-    // unmatched now can only become matched later, never the reverse.
+    // Sorted by preorder index, as node ids are not parse-stable. Pairs with no unmatched
+    // before-child are filtered out first so the sort is proportional to the residual; matching only
+    // adds entries, so the filter cannot drop a pair that becomes useful later.
     let mut matched_pairs: Vec<(usize, usize)> = diff
         .before_node_map
         .iter()
@@ -125,8 +97,6 @@ pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
             }
         }
 
-        // Sorted by kind name for deterministic pairing order within this parent, independent of
-        // `HashMap` iteration order.
         let mut kinds: Vec<&str> = before_by_kind.keys().copied().collect();
         kinds.sort_unstable();
 
@@ -142,10 +112,6 @@ pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
             else {
                 continue;
             };
-            // A pass earlier in this same loop (a sibling under the same parent, different kind)
-            // cannot have touched this child - kinds partition a parent's children - but a nested
-            // call could in principle be reached twice if this function is ever made recursive;
-            // re-check both sides are still unmatched immediately before committing, cheap and safe.
             if diff.before_node_map.contains_key(before_child_id)
                 || diff.after_node_map.contains_key(after_child_id)
             {
@@ -172,13 +138,8 @@ mod tests {
     use crate::diff::ASTMapping;
     use crate::diff::NodeCache;
 
-    /// Manually marks `before_id`/`after_id` as matched (an arbitrary placeholder mapping, not
-    /// produced by any real pass) and runs *only* `solve` - no `solve_hash_descent` or any other
-    /// pass in the setup path, so a passing assertion can only be this pass's own doing, not an
-    /// accident of an earlier, more powerful mechanism (`solve_hash_descent`'s `KindOnlyHash`
-    /// sub-anchoring already covers same-*shape* subtrees differing only in leaf values, so a
-    /// fixture whose children differ only by an identifier would pass via that mechanism with this
-    /// pass never running, silently proving nothing).
+    /// Pre-matches the container and runs only this pass: with `solve_hash_descent` in the setup,
+    /// its `KindOnlyHash` sub-anchoring could make an assertion pass without this pass.
     fn solve_with_container_pre_matched(
         before: &Code,
         after: &Code,
@@ -199,14 +160,9 @@ mod tests {
         diff
     }
 
-    /// The if-node's *internal shape* differs between before/after (an extra statement in the
-    /// after-side body), not just a leaf value - `KindOnlyHash` would not match these two subtrees,
-    /// so only this pass's coarser "same kind, unique on both sides" rule can pair them. Pre-matches
-    /// the *block* (the if-node's direct parent), not the outer function: pre-matching the function
-    /// instead would let this pass first match the block itself (also a unique-count-1 child of the
-    /// function), and the real APTED call that match triggers would then recursively resolve the
-    /// if-node too, as an internal side effect - correct, but not what this test means to isolate
-    /// (`ASTMappingReason::APTED("unique_type_matching")`, not `UniqueTypeMatching` directly).
+    /// The `if` changes shape, so `KindOnlyHash` cannot pair it. The block is pre-matched, not the
+    /// function: otherwise the block pairs first and its APTED call resolves the `if` as a side
+    /// effect, under a different reason.
     #[test]
     fn unique_leftover_child_kind_matches_under_an_already_matched_parent() {
         let before = Code::from_string(
@@ -254,10 +210,6 @@ mod tests {
         );
     }
 
-    /// Two candidates of the same kind on one side must block the match - no arbitrary pick.
-    /// Pre-matches the *block* directly (see the previous test's doc comment for why the outer
-    /// function must not be used here): a block pre-match makes the two/one `let_declaration`
-    /// candidates this pass's own direct decision, with nothing else able to resolve them first.
     #[test]
     fn ambiguous_multiple_candidates_of_the_same_kind_do_not_match() {
         let before = Code::from_string(

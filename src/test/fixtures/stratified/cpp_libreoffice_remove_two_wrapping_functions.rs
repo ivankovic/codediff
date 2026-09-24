@@ -23,9 +23,8 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // 2 mismatch(es), 2 visible. Two wrapping calls are removed and an argument list loses one of
-    // two identical `,` tokens. As with rust-rust-lang-rust-remove-path-from-using, either comma is
-    // a defensible choice and disagreeing about which costs exactly two.
+    // An argument list loses one of two identical `,` tokens; either is defensible, and
+    // disagreeing about which costs two (as in rust-rust-lang-rust-remove-path-from-using).
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "cpp-libreoffice-remove-two-wrapping-functions",
         2,

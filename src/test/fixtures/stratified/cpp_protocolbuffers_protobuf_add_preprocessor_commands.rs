@@ -23,15 +23,10 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // Clamped at the observed count rather than requiring an exact match. The commit guards the
-    // existing `#include "upb/mini_table/extension_registry.h"` behind an `#if`, and adds a
-    // different include on the line the old one occupied. The human read that as the outer include
-    // being updated in place and the guarded copy being new; codediff's phase-1 hash matching
-    // instead pairs the before include with the byte-identical guarded copy
-    // (`IdenticalHashOfAncestor`, and `WrapGrowth` for the two parents), which leaves the outer
-    // include as an insert. Same identical-copy-wins shape as the wrap/reparent cost ties already
-    // tracked in TODO.md, not a new defect. Lower once a fix lands. after the ground truth was
-    // revised: codediff now matches it exactly, so the clamp is gone.
+    // An existing include is guarded behind an `#if` and a different include takes its line. The
+    // human reads the outer include as updated in place and the guarded copy as new; phase-1 hash
+    // matching (`IdenticalHashOfAncestor`, `WrapGrowth`) pairs it with the byte-identical guarded
+    // copy instead. The identical-copy-wins shape of the wrap/reparent cost ties.
     test::helper::human_mapping::assert_matches_human_mapping(
         "cpp-protocolbuffers-protobuf-add-preprocessor-commands",
     )

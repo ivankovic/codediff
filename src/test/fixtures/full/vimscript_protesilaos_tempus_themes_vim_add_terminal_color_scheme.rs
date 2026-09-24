@@ -21,12 +21,8 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // Pure wrap/reparent: every one of the 19 is an unchanged node the human maps into a new
-    // `if_statement/else_statement/body` wrapper three levels deeper. No pass targets this
-    // shape - see the reparenting discussion in TODO.md.
-    // Known gap, characterized above but unfixed. Clamped at the observed count rather than
-    // requiring an exact match. Lower (or drop back to `assert_matches_human_mapping`) once
-    // a fix lands.
+    // Pure wrap/reparent: unchanged nodes the human maps into a new wrapper three levels deeper. No
+    // pass targets this shape.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "vimscript-protesilaos-tempus-themes-vim-add-terminal-color-scheme",
         19,

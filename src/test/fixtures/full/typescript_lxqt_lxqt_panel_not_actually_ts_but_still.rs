@@ -21,8 +21,6 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // Its 16.3 MB human_mapping.json is not why it was missing: three larger ones (79.8 MB, 56.8
-    // MB, 52.6 MB) have always had stubs. It maps exactly.
     test::helper::human_mapping::assert_matches_human_mapping(
         "typescript-lxqt-lxqt-panel-not-actually-ts-but-still",
     )

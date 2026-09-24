@@ -23,9 +23,8 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // No group is involved: a `local_variable_declaration`'s initializer is rebuilt, and codediff
-    // deletes and inserts the whole `variable_declarator` subtree where the human pairs it
-    // through. An ordinary gap, the largest of this batch.
+    // A declaration's initializer is rebuilt; codediff deletes and inserts the whole
+    // `variable_declarator` where the human pairs it through.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "java-defects4j-closure-71-checkaccesscontrols",
         14,

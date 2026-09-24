@@ -21,14 +21,9 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // Recorded distance from the human mapping, not a target: 2 mismatches (both visible) of 2282
-    // nodes, 0.09%, when this fixture's mapping was authored. Lower it when a change earns it; a
-    // rise is a regression. Both are the same decision seen from two sides, and both carry
-    // `APTED("qualified_name")`: two `comment` nodes in one `declaration_list`, where the human
-    // said the second before-side comment corresponds to the *fourth* after-side one and the second
-    // after-side one is new, while codediff paired them positionally. Costs tie exactly at 95 -
-    // which makes this a cost function that cannot tell the two answers apart, not an answer
-    // codediff was unable to reach.
+    // One decision seen from two sides (`APTED("qualified_name")`): the human pairs the second
+    // before comment with the *fourth* after one, codediff pairs positionally. The costs tie
+    // exactly: the cost function cannot tell the answers apart.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "php-theseer-directoryscanner-add-two-test-cases-and-reformat-file",
         2,

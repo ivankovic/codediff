@@ -15,14 +15,8 @@
  *  You should have received a copy of the GNU Affero General Public License
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
-//! Every test for the `human_solver` binary.
-//!
-//! One file rather than a `mod tests` per module: the suite shares a substantial set of fixtures
-//! (`test_app`, `press_on_case`, `press_in_diff_picker`, the picker view builders), and those are
-//! used by tests that exercise different modules. Splitting the tests to sit beside the code they
-//! cover is the better end state and remains worth doing - it needs the shared fixtures lifted
-//! into their own `#[cfg(test)]` module first, and the tests routed by hand, since a test's name
-//! and its body disagree often enough that automatic routing gets it wrong.
+//! Every test for the `human_solver` binary. One file because the fixtures (`test_app`,
+//! `press_on_case`, the picker view builders) are shared across modules.
 
 use super::*;
 use tempfile::NamedTempFile;
@@ -118,8 +112,7 @@ fn wrap_comment_lines_wraps_long_comments_at_word_boundaries() {
             line
         );
     }
-    // Every word survives the wrap, in order, none dropped or duplicated - strip each line's
-    // "    // " prefix first so it doesn't get counted as a word of its own.
+    // Strip each line's "    // " prefix so it is not counted as a word.
     let rejoined: Vec<&str> = wrapped
         .lines()
         .flat_map(|line| {
@@ -171,9 +164,7 @@ fn is_state_preserving_key_is_true_only_for_typing_in_the_three_text_input_modal
 
 #[test]
 fn is_state_preserving_key_is_false_for_enter_esc_on_the_same_three_modals() {
-    // Enter/Esc can search-and-move-the-cursor, promote/save, reject, or close the modal --
-    // all things that can change what the cached `FrameState` would report, unlike plain
-    // typing.
+    // Enter/Esc can move the cursor, save, reject or close: all can change `FrameState`.
     let search = Some(Modal::PromptSearch {
         input: "x".to_string(),
     });
@@ -236,11 +227,8 @@ fn is_state_preserving_key_is_true_for_pure_navigation_and_display_keys_with_no_
 
 #[test]
 fn is_state_preserving_key_is_false_for_keys_that_can_mutate_mapping_or_collapse_state() {
-    // `h`/`l`/`a`/`A` sometimes mutate a collapsed set; `m`/`M`/`f`/`d`/`D`/`i`/`I`/`u` mutate
-    // the mapping directly; `H` toggles hide_solved; `s`/`R`/`o`/`O`/`C` are left on the
-    // conservative (full-rebuild) path deliberately, per `is_navigation_or_display_key`'s doc
-    // comment - none of these must be silently added to the fast path without also auditing
-    // what they touch.
+    // These mutate collapse state or the mapping; `s`/`R`/`o`/`O`/`C` stay on the full-rebuild
+    // path deliberately (see `is_navigation_or_display_key`).
     for code in [
         KeyCode::Left,
         KeyCode::Char('h'),
@@ -285,8 +273,6 @@ fn count_unmarked_counts_only_nodes_with_no_match_or_delete_mark() {
     let mut caches = Caches::default();
     let before_unmarked = count_unmarked(&flat, &caches, status_before);
 
-    // Marking one statement's whole subtree matched must drop the unmarked count by exactly
-    // the number of nodes under it, and by nothing else.
     let mut subtree_ids = Vec::new();
     collect_subtree_ids(stmt_a, &mut subtree_ids);
     mark_subtree_matched(stmt_a, &mut caches);
@@ -297,9 +283,8 @@ fn count_unmarked_counts_only_nodes_with_no_match_or_delete_mark() {
 
 #[test]
 fn render_panel_only_scans_the_visible_window_not_the_whole_flat_list() {
-    // A tree deep enough that only a handful of its nodes fit in a tiny terminal; asserts that
-    // `render_panel` never touches (and never renders) anything outside that window, and that
-    // the header's count comes from the caller-supplied `total_unmarked`, not a fresh scan.
+    // Only a few rows fit the terminal: `render_panel` must not touch rows outside that window,
+    // and the header count must be the caller's `total_unmarked`.
     let mut source = String::from("fn main() {\n");
     for i in 0..200 {
         source.push_str(&format!("    stmt_{i}();\n"));
@@ -319,15 +304,11 @@ fn render_panel_only_scans_the_visible_window_not_the_whole_flat_list() {
 
     let caches = Caches::default();
     let mut panel = PanelState::new(root.id());
-    // Tall enough to reach past the file's fixed preamble (source_file, function_item, fn,
-    // identifier, parameters, (, ), block) down into the first statement's own leaves, but
-    // nowhere near tall enough to reach the 199th one.
     let backend = ratatui::backend::TestBackend::new(40, 20);
     let mut terminal = Terminal::new(backend).unwrap();
     let area = Rect::new(0, 0, 40, 20);
 
-    // A deliberately wrong `total_unmarked` -- if `render_panel` still scanned the whole list
-    // itself it would recompute (and show) the real count instead of trusting this value.
+    // Deliberately wrong: a full scan would show the real count instead.
     terminal
         .draw(|f| {
             render_panel(
@@ -366,8 +347,7 @@ fn render_panel_only_scans_the_visible_window_not_the_whole_flat_list() {
 
 #[test]
 fn sample_source_deserializes_a_legacy_source_json_missing_dataset_as_small() {
-    // No "dataset" key at all - the exact shape `materialize_test_diffs` wrote before
-    // provenance tracking existed, still sitting in every sample materialized before then.
+    // No "dataset" key: samples materialized before provenance tracking look like this.
     let json = r#"{"language":"Rust","repository":"repo","commit":"abc123","path":"src/a.rs"}"#;
     let source: SampleSource = serde_json::from_str(json).unwrap();
     assert_eq!(source.dataset, "small");
@@ -412,9 +392,7 @@ fn default_promoted_name_for_path_lowercases_the_detected_language() {
 
 #[test]
 fn default_promoted_name_for_path_is_empty_for_an_undetected_language() {
-    // Not a real reachable case in practice (`load_git_commit_file` already requires a
-    // working `to_treesitter` mapping before a case can be opened at all), but this should
-    // degrade to "no prefix", not panic, if it's ever called on something else.
+    // Unreachable through `load_git_commit_file`, but must degrade to "no prefix", not panic.
     assert_eq!(default_promoted_name_for_path("README"), "");
 }
 
@@ -473,7 +451,6 @@ fn action_reject_bails_on_an_empty_reason() {
         0,
         HumanMapping::default(),
     );
-    // Whitespace-only trims to empty, same as a bare empty string would.
     let err = action_reject(&app, "   ").unwrap_err();
     assert!(format!("{:#}", err).contains("cannot be empty"));
 }
@@ -507,9 +484,6 @@ fn advance_to_next_search_match_finds_the_next_leaf_containing_the_query_and_wra
     assert_eq!(found.utf8_text(source.as_bytes()).unwrap(), "beta");
     assert_eq!(panel.cursor_id, found.id());
 
-    // Searching again from `beta` for a query only `alpha` matches must wrap around past the
-    // end of the file back to it, not report "not found" just because it's earlier in the
-    // document.
     let found =
         advance_to_next_search_match(&mut panel, &flat, source.as_bytes(), "alpha").unwrap();
     assert_eq!(found.utf8_text(source.as_bytes()).unwrap(), "alpha");
@@ -517,9 +491,7 @@ fn advance_to_next_search_match_finds_the_next_leaf_containing_the_query_and_wra
 
 #[test]
 fn advance_to_next_search_match_only_matches_leaf_nodes_not_a_containers_concatenated_text() {
-    // The `block`'s own text is the concatenation of everything inside it, so it "contains"
-    // both "alpha" and "beta" -- but it must never be reported as a match, only the actual
-    // leaf tokens should be.
+    // The `block`'s text contains both names, but only leaves may match.
     let source = "fn main() {\n    alpha();\n    beta();\n}\n";
     let tree = parse_rust(source);
     let root = tree.root_node();
@@ -593,8 +565,6 @@ fn action_search_reports_the_matched_nodes_kind_and_moves_the_focused_panels_cur
             .unwrap(),
         "alpha"
     );
-    // The After panel's cursor must be untouched -- the search only ever moves the focused
-    // panel's cursor.
     assert_eq!(app.after.cursor_id, after_root.id());
 }
 
@@ -841,8 +811,6 @@ fn render_modal_prompt_search_shows_the_prefilled_query_and_instructions() {
 
 #[test]
 fn render_modal_prompt_promote_name_shows_the_actual_target_dataset_not_a_fixed_one() {
-    // The prompt must name the folder `promote_dataset` (i.e. `app.origin`) actually resolves
-    // to, not a hardcoded one.
     let backend = ratatui::backend::TestBackend::new(90, 20);
     let mut terminal = Terminal::new(backend).unwrap();
     let area = Rect::new(0, 0, 90, 20);
@@ -914,7 +882,6 @@ fn raw_before_after_reads_the_before_and_after_test_files_from_a_directory() {
 fn raw_before_after_is_none_when_a_file_is_missing() {
     let dir = tempfile::tempdir().unwrap();
     fs::write(dir.path().join("before.rs.test"), "fn old() {}\n").unwrap();
-    // No after.*.test written.
 
     assert!(raw_before_after(dir.path()).is_none());
 }
@@ -922,10 +889,8 @@ fn raw_before_after_is_none_when_a_file_is_missing() {
 #[test]
 fn sample_diff_line_count_counts_only_changed_lines_not_context_or_headers() {
     let dir = tempfile::tempdir().unwrap();
-    // Same directory layout `sample_diff_line_count` reads via `samples_root().join(name)` -
-    // exercised directly against a real temp directory here instead, via `raw_before_after` +
-    // `run_unix_diff` (the same two calls `sample_diff_line_count` itself makes), since
-    // `samples_root()` is hardcoded to this crate's own `src/test/data/samples`.
+    // `samples_root()` is fixed to this crate's samples, so this drives the two calls
+    // `sample_diff_line_count` makes against a temp directory instead.
     fs::write(
         dir.path().join("before.rs.test"),
         "fn main() {\n    old();\n    same();\n}\n",
@@ -959,10 +924,7 @@ fn sample_diff_line_count_is_zero_for_a_nonexistent_sample() {
 
 #[test]
 fn sample_diff_line_count_is_nonzero_for_a_real_sample_on_disk() {
-    // Full integrated path (`samples_root().join(name)`, not a crafted temp dir) against
-    // whatever's actually checked in under src/test/data/samples/ - skips rather than fails if
-    // none exist yet in this checkout (materialize_test_diffs hasn't run), matching
-    // `list_dir_names`'s own "not an error" treatment of a missing/empty samples/ directory.
+    // Skips when no sample is checked in, as `list_dir_names` treats a missing directory.
     let Ok(names) = list_dir_names(&samples_root()) else {
         return;
     };
@@ -975,9 +937,6 @@ fn sample_diff_line_count_is_nonzero_for_a_real_sample_on_disk() {
     );
 }
 
-/// Concatenates every cell's symbol in a `TestBackend`'s buffer, so a rendered frame's
-/// content can be checked with a plain `contains`.
-/// Builds a view with the cursor on `column`, everything else default.
 fn column_view(column: DiffColumn) -> DiffPickerView {
     DiffPickerView {
         column,
@@ -985,7 +944,6 @@ fn column_view(column: DiffColumn) -> DiffPickerView {
     }
 }
 
-/// Builds a view sorted ascending by `column`, everything else default.
 fn sort_view(column: DiffColumn) -> DiffPickerView {
     DiffPickerView {
         sort: DiffSort::default().toggled(column),
@@ -993,7 +951,6 @@ fn sort_view(column: DiffColumn) -> DiffPickerView {
     }
 }
 
-/// Builds a view with only the `Dataset` filter set.
 fn dataset_view(dataset: Option<&'static str>) -> DiffPickerView {
     DiffPickerView {
         filters: DiffFilters {
@@ -1004,7 +961,6 @@ fn dataset_view(dataset: Option<&'static str>) -> DiffPickerView {
     }
 }
 
-/// Builds a view with only the `Name` substring filter set.
 fn name_view(needle: &str) -> DiffPickerView {
     DiffPickerView {
         filters: DiffFilters {
@@ -1015,7 +971,6 @@ fn name_view(needle: &str) -> DiffPickerView {
     }
 }
 
-/// Builds a view with one flag filter set, everything else default.
 fn flag_view(column: DiffColumn, filter: FlagFilter) -> DiffPickerView {
     let mut view = DiffPickerView::default();
     *view
@@ -1025,9 +980,7 @@ fn flag_view(column: DiffColumn, filter: FlagFilter) -> DiffPickerView {
     view
 }
 
-/// The `Paint` column's filter narrows in both directions, and a case the scan never reached
-/// survives *either* of them - see `FlagFilter::keeps` for why that fail-open rule is uniform
-/// across columns and directions rather than argued per filter.
+/// A case the scan never reached survives either direction of a filter (see `FlagFilter::keeps`).
 #[test]
 fn visible_diff_options_can_narrow_to_painted_or_unpainted_cases() {
     let options = vec![
@@ -1069,8 +1022,7 @@ fn visible_diff_options_can_narrow_to_painted_or_unpainted_cases() {
     );
 }
 
-/// Two columns' filters are separate queues over separate ground truths, so turning both on
-/// shows only what matches both - the AND the picker's whole compound-query story rests on.
+/// Filters on two columns combine as an AND.
 #[test]
 fn filters_on_different_columns_combine_as_an_and() {
     let options = vec![
@@ -1107,10 +1059,8 @@ fn filters_on_different_columns_combine_as_an_and() {
     );
 }
 
-/// `s` on a column takes the sort over and orders by it; pressing it again flips the
-/// direction. The name is always the tiebreak, so rows that tie on the sorted column - every
-/// row, when its scan hasn't run - still come out alphabetically rather than in whatever
-/// order `options` happened to arrive in.
+/// `s` sorts by a column and flips direction on a second press. The name breaks ties, so an
+/// unscanned column still sorts alphabetically.
 #[test]
 fn visible_diff_options_sorts_by_the_selected_column_with_a_name_tiebreak() {
     let options = vec![
@@ -1119,8 +1069,7 @@ fn visible_diff_options_sorts_by_the_selected_column_with_a_name_tiebreak() {
         ("bravo".to_string(), "handmade"),
         ("delta".to_string(), "handmade"),
     ];
-    // `delta` is deliberately absent: an unscanned/unloadable case sorts after every known
-    // one ascending, and to the front when the direction flips.
+    // No `delta`: an unscanned case sorts last ascending, first descending.
     let unmarked = std::collections::HashMap::from([
         ("charlie".to_string(), 1),
         ("alpha".to_string(), 9),
@@ -1153,9 +1102,7 @@ fn visible_diff_options_sorts_by_the_selected_column_with_a_name_tiebreak() {
     );
 }
 
-/// `Size` ranks cases by their changed-line count the way `Unmarked` ranks them by work left:
-/// ascending puts the smallest diffs first and unknown ones last, and `f` narrows to the diffs
-/// that have any changed lines, or to the empty ones that are broken fixtures.
+/// Unknown sizes sort last ascending; `f` narrows to non-empty diffs or to empty (broken) ones.
 #[test]
 fn visible_diff_options_sorts_and_filters_by_diff_size() {
     let options = vec![
@@ -1207,8 +1154,7 @@ fn visible_diff_options_sorts_and_filters_by_diff_size() {
     );
 }
 
-/// The `o` picker's `Size` reads a case directory with the same measure as the `O` picker's, so
-/// the two never disagree about how big a change is.
+/// The `o` and `O` pickers measure `Size` the same way.
 #[test]
 fn changed_line_count_reads_a_case_directory_like_a_sample() {
     let dir = tempfile::tempdir().unwrap();
@@ -1235,8 +1181,7 @@ fn changed_line_count_reads_a_case_directory_like_a_sample() {
     );
 }
 
-/// The `Name` filter is a case-insensitive substring over the case name, and is the one filter
-/// that needs no corpus scan at all.
+/// The `Name` filter needs no corpus scan.
 #[test]
 fn visible_diff_options_narrows_by_a_name_substring() {
     let options = vec![
@@ -1252,8 +1197,7 @@ fn visible_diff_options_narrows_by_a_name_substring() {
     );
 }
 
-/// The picker offers this fixture's own paintings first, then whichever suggestions it lacks -
-/// so resaving the painting being edited is at the top, not buried under three constants.
+/// The painting being edited is at the top, above unused suggestions.
 #[test]
 fn the_solution_picker_lists_existing_paintings_before_suggestions() {
     let mut app = test_app();
@@ -1269,11 +1213,8 @@ fn the_solution_picker_lists_existing_paintings_before_suggestions() {
     );
 }
 
-/// Presses one key on the main view of a case with `origin`, and hands back the App.
-///
-/// Drives `handle_key`'s dispatch rather than `action_comment`, for the reason the solution
-/// picker's harness gives: `x` and `c` were once implemented, unit-tested through their
-/// actions, and unreachable because the key arm was never written.
+/// Presses one key on the main view of a case with `origin`. Goes through `handle_key` so an
+/// unwired key arm fails the test, which calling the action directly cannot catch.
 fn press_on_case(origin: CaseOrigin, name: &str, code: KeyCode) -> App {
     let source = "fn main() {}\n";
     let tree = parse_rust(source);
@@ -1306,8 +1247,7 @@ fn press_on_case(origin: CaseOrigin, name: &str, code: KeyCode) -> App {
     app
 }
 
-/// `e` on a diff opens the comment prompt, rather than refusing because a handmade fixture has no
-/// sample.csv row to hold a comment.
+/// A handmade fixture has no sample.csv row, but `e` still opens a prompt (for description.md).
 #[test]
 fn e_on_a_diff_opens_the_comment_prompt() {
     let app = press_on_case(CaseOrigin::Diffs, "rust-no-change", KeyCode::Char('e'));
@@ -1320,7 +1260,6 @@ fn e_on_a_diff_opens_the_comment_prompt() {
     }
 }
 
-/// A diff with no description.md yet still gets the prompt - just an empty one.
 #[test]
 fn e_on_an_un_noted_diff_opens_an_empty_prompt() {
     let app = press_on_case(
@@ -1334,8 +1273,7 @@ fn e_on_an_un_noted_diff_opens_an_empty_prompt() {
     }
 }
 
-/// A case that is neither a diff nor a sample - `C`'s git-commit view - still has nowhere to
-/// put a comment, and says so rather than opening a prompt that could not be saved.
+/// A `C` git-commit case has nowhere to save a comment, and says so.
 #[test]
 fn e_on_a_git_commit_case_refuses_with_a_message() {
     let app = press_on_case(
@@ -1356,17 +1294,9 @@ fn e_on_a_git_commit_case_refuses_with_a_message() {
     );
 }
 
-/// **A promoted fixture's note lives in its own `description.md`, and nowhere else.**
-///
-/// Stronger than the rule this replaced, which only asked that a sample.csv comment also have
-/// a file - that allowed two copies, and two copies drift: of the 19 promoted rows that
-/// carried a comment, 18 matched their `description.md` byte for byte and one had already
-/// diverged. Promotion now *moves* the note (see `update_sample_csv_at`) rather than copying
-/// it, so the correct state is no comment at all on a promoted row, and that is what this
-/// checks.
-///
-/// A rejected or still-untriaged row keeps its comment: there is no fixture directory to put
-/// it in, and for a rejection the reason is the only record of the decision.
+/// A promoted fixture's note lives only in its `description.md`: promotion moves it (see
+/// `update_sample_csv_at`), because two copies drift. A rejected or untriaged row keeps its
+/// comment, since it has no fixture directory and a rejection reason is the only record.
 #[test]
 fn no_promoted_row_carries_a_comment() {
     let rows = read_sample_csv_rows(&sample_csv_path()).expect("sample.csv");
@@ -1382,17 +1312,13 @@ fn no_promoted_row_carries_a_comment() {
     );
 }
 
-/// Opens the solution picker over a fixture holding `paintings`, and presses `keys` in it.
-///
-/// Drives `handle_modal_key` rather than `action_delete_solution`, because that is the layer
-/// where this feature has already failed once: `x` and `c` were implemented, unit-tested
-/// through their actions, and unreachable for a week because the key arm was never added.
+/// Opens the solution picker over a fixture holding `paintings` and presses `keys` through
+/// `handle_modal_key`, so an unwired key fails the test.
 fn press_in_solution_picker(paintings: &[&str], keys: &[KeyCode]) -> App {
     press_in_solution_picker_editing(paintings, None, keys)
 }
 
-/// As above, but editing `editing` rather than whichever painting `starting_solution` picks -
-/// the only way to reach the case where the deleted painting is *not* the current one.
+/// As above, but editing `editing`, so the deleted painting need not be the current one.
 fn press_in_solution_picker_editing(
     paintings: &[&str],
     editing: Option<&str>,
@@ -1450,8 +1376,7 @@ fn painting_names(app: &App) -> Vec<String> {
         .collect()
 }
 
-/// One `D` arms, the second fires. There is no undo for a painting that may have taken an
-/// hour, so a single keystroke next to `d` (delete-range) must not be able to destroy one.
+/// There is no undo for a painting, so `D` needs two presses.
 #[test]
 fn deleting_a_painting_takes_two_presses_of_d() {
     let armed = press_in_solution_picker(&["Full", "Minimal"], &[KeyCode::Char('D')]);
@@ -1474,8 +1399,6 @@ fn deleting_a_painting_takes_two_presses_of_d() {
     assert_eq!(painting_names(&deleted), vec!["Minimal"]);
 }
 
-/// The case this exists for: a fixture painted once turns out to need a Minimal and a Full
-/// answer, so the single painting has to go before the pair can be made.
 #[test]
 fn deleting_the_last_painting_leaves_the_fixture_unpainted() {
     let app = press_in_solution_picker(
@@ -1499,8 +1422,7 @@ fn deleting_the_last_painting_leaves_the_fixture_unpainted() {
     );
 }
 
-/// The confirmation is about a painting, not about a row. Moving the cursor between the two
-/// presses must not let the second `D` land on whatever ended up highlighted instead.
+/// Moving the cursor between the two presses must not retarget the second `D`.
 #[test]
 fn moving_the_cursor_cancels_a_pending_deletion() {
     let app = press_in_solution_picker(
@@ -1521,15 +1443,11 @@ fn moving_the_cursor_cancels_a_pending_deletion() {
     }
 }
 
-/// Deleting a painting you are not editing must not move you. The harness's default always
-/// deletes the current one (the picker lists it first), so this is the case the other tests
-/// structurally cannot reach.
+/// Deleting a painting you are not editing must not move you.
 #[test]
 fn deleting_another_painting_leaves_you_editing_your_own() {
-    // Three paintings, not two: `starting_solution` returns the *first* survivor, so with two
-    // it happens to return the one being edited anyway and an unguarded reset would look
-    // correct. Deleting "Full" while editing "Custom" leaves "Minimal" first, so the two
-    // behaviours finally differ.
+    // Three, not two: `starting_solution` returns the first survivor, which with two would be
+    // the edited one anyway and hide an unguarded reset.
     let app = press_in_solution_picker_editing(
         &["Full", "Minimal", "Custom"],
         Some("Custom"),
@@ -1551,13 +1469,10 @@ fn deleting_another_painting_leaves_you_editing_your_own() {
     );
 }
 
-/// The picker lists suggestions the fixture has not used yet alongside its real paintings.
-/// Pressing `D` on one of those is a misunderstanding, not a request, and must not silently
-/// look like it worked.
+/// `D` on an unused suggestion must not look like it worked.
 #[test]
 fn d_on_an_unused_suggestion_deletes_nothing() {
-    // "Full" exists; "Minimal" and "Only one solution" are offered but unused, so j lands on a
-    // suggestion.
+    // "Full" exists; j lands on an unused suggestion.
     let app = press_in_solution_picker(
         &["Full"],
         &[KeyCode::Char('j'), KeyCode::Char('D'), KeyCode::Char('D')],
@@ -1575,9 +1490,7 @@ fn d_on_an_unused_suggestion_deletes_nothing() {
     assert!(!app.dirty, "nothing changed, so nothing needs saving");
 }
 
-/// The property this whole feature exists for: a fixture can hold more than one painting at once.
-/// Renaming must copy the ranges under the new name rather than move them, or however many times
-/// you save you still end up with exactly one.
+/// Renaming copies the ranges, so a fixture can hold more than one painting.
 #[test]
 fn branching_keeps_both_paintings_on_file() {
     let (before_src, after_src) = ("gone\n", "\n");
@@ -1614,10 +1527,8 @@ fn branching_keeps_both_paintings_on_file() {
     );
 }
 
-/// Branching `Minimal` to `Full` widens every wholly-changed line to its own indentation, which is
-/// what invariant 4 requires of a `Full` painting and invariant 6 forbids a `Minimal` one. The two
-/// presets disagree about exactly these bytes, so the branch is the point where the difference can
-/// be applied mechanically instead of line by line.
+/// Branching `Minimal` to `Full` widens every wholly-changed line to its indentation: invariant 4
+/// requires that of `Full` and invariant 6 forbids it in `Minimal`.
 #[test]
 fn branching_minimal_to_full_widens_a_wholly_changed_line_to_its_indentation() {
     let source = indented_block();
@@ -1668,8 +1579,7 @@ fn branching_minimal_to_full_widens_a_wholly_changed_line_to_its_indentation() {
     );
 }
 
-/// The checker is what this is for, so the checker is what pins it: one fixture carrying both
-/// paintings must satisfy invariant 6 on its `Minimal` and invariant 4 on its `Full` at once.
+/// One fixture with both paintings satisfies invariant 6 on `Minimal` and 4 on `Full`.
 #[test]
 fn the_two_branched_paintings_satisfy_their_own_preset_rules() {
     let source = indented_block();
@@ -1690,12 +1600,11 @@ fn the_two_branched_paintings_satisfy_their_own_preset_rules() {
     );
 }
 
-/// A line the edit only partly touches keeps its indentation unpainted under both presets: the
-/// rest of the line survives, so the space in front of it is not part of what changed.
+/// A partly changed line's indentation stays unpainted under both presets.
 #[test]
 fn branching_leaves_a_partly_changed_line_alone() {
     let source = indented_block();
-    // Columns 8..13 of row 1 only - `a = 1` out of `    let a = 1;`.
+    // `a = 1` out of `    let a = 1;`.
     let state = TextPaintState {
         anchor: [Some((1, 8)), None],
         cursor: [(1, 12), (0, 0)],
@@ -1712,8 +1621,8 @@ fn branching_leaves_a_partly_changed_line_alone() {
     );
 }
 
-/// A `Match` entry resolves to a `Move` or an `Update`, which invariant 4 excludes by name: a
-/// surviving line's old indentation may genuinely be untouched, so the branch must not claim it.
+/// A `Match` resolves to Move/Update, which invariant 4 excludes: a surviving line's indentation
+/// may be untouched.
 #[test]
 fn branching_leaves_a_matched_line_alone() {
     let source = indented_block();
@@ -1740,8 +1649,7 @@ fn branching_leaves_a_matched_line_alone() {
     assert_eq!(spans[0].start_column, 4, "a move keeps its own columns");
 }
 
-/// Keyed on both names: a branch to a free-form name states no preset, and the rule belongs to the
-/// preset rather than to the act of branching.
+/// The rule belongs to the preset, so a free-form name widens nothing.
 #[test]
 fn branching_to_a_free_form_name_widens_nothing() {
     let source = indented_block();
@@ -1762,8 +1670,7 @@ fn branching_to_a_free_form_name_widens_nothing() {
     );
 }
 
-/// Two answers to one edit usually share most of their spans, so `e` (start empty) is the
-/// rarer option and Enter copies - but both have to be reachable.
+/// Enter copies the ranges and `e` starts empty; both must be reachable.
 #[test]
 fn branching_empty_starts_the_new_painting_from_nothing() {
     let (before_src, after_src) = ("gone\n", "\n");
@@ -1786,8 +1693,7 @@ fn branching_empty_starts_the_new_painting_from_nothing() {
     assert!(solution_entries(&app.mapping, "Full").is_empty());
 }
 
-/// Picking a name that already exists must never write: merging would leave overlapping
-/// duplicates, replacing would silently discard somebody's work, and there is no undo here.
+/// An existing name is never written: merging duplicates ranges, replacing loses work.
 #[test]
 fn branching_to_an_existing_name_switches_without_overwriting_it() {
     let mut app = test_app();
@@ -1853,8 +1759,6 @@ fn loading_switches_which_painting_is_edited_without_touching_any() {
     assert!(!app.dirty, "switching which one you edit changes nothing");
 }
 
-/// Two paintings must not bleed into each other: painting under one name and switching leaves
-/// the other empty.
 #[test]
 fn ranges_painted_under_one_name_stay_out_of_another() {
     let (before_src, after_src) = ("gone\n", "\n");
@@ -1876,7 +1780,6 @@ fn ranges_painted_under_one_name_stay_out_of_another() {
     assert!(solution_entries(&app.mapping, "Full").is_empty());
 }
 
-/// The overlay cycles through all four and back, so `p` is always the only key needed.
 #[test]
 fn the_text_overlay_cycles_human_codediff_disagreements_tree_disagreement() {
     assert_eq!(TextOverlay::default(), TextOverlay::Human);
@@ -1889,9 +1792,8 @@ fn the_text_overlay_cycles_human_codediff_disagreements_tree_disagreement() {
     assert_eq!(TextOverlay::TreeDisagreement.next(), TextOverlay::Human);
 }
 
-/// codediff's own rendering comes through `TextDiff`, the projection the real TUI and the
-/// mapping site both draw - so what the solver shows is what codediff produces, not a second
-/// reading of its node mapping.
+/// codediff's side comes from `TextDiff`, the projection the TUI draws, not a second reading of
+/// its node mapping.
 #[test]
 fn codediff_text_spans_reports_the_changed_regions_of_a_real_diff() {
     let before = Code::from_string("fn main() {\n    foo();\n}\n", &Language::Rust);
@@ -1904,15 +1806,12 @@ fn codediff_text_spans_reports_the_changed_regions_of_a_real_diff() {
         "a renamed call must show as changed"
     );
     assert!(!after_spans.is_empty());
-    // Identical text contributes nothing: the untouched `fn main() {` line is not painted.
     assert!(
         before_spans.iter().all(|(span, _)| span.start_row > 0),
         "row 0 is unchanged and should carry no span: {before_spans:?}"
     );
 }
 
-/// The disagreement overlay is empty exactly when the two accounts agree, which is the signal
-/// a person painting ground truth is actually looking for.
 #[test]
 fn the_disagreement_overlay_is_empty_when_the_two_accounts_match() {
     let (before_src, after_src) = ("alpha\n", "beta\n");
@@ -1951,8 +1850,7 @@ fn the_disagreement_overlay_is_empty_when_the_two_accounts_match() {
     );
 }
 
-/// The painted ranges use the shared overlay palette, not hardcoded ANSI colours - so a range
-/// looks the same here as the same range does in the `codediff` TUI.
+/// The shared overlay palette, so a range looks as it does in the `codediff` TUI.
 #[test]
 fn painted_ranges_use_the_shared_overlay_palette() {
     let palette = OverlayTheme::default().palette();
@@ -1979,9 +1877,8 @@ fn painted_ranges_use_the_shared_overlay_palette() {
     );
 }
 
-/// A multi-row span's middle row is fully covered up to its last real character, but never
-/// past it - a human painting never means to paint a line's trailing whitespace, and least of
-/// all its newline.
+/// A middle row is covered up to its last real character, never its trailing whitespace or
+/// newline.
 #[test]
 fn span_covers_stops_at_the_last_real_character_of_a_middle_row() {
     let span = HumanTextSpan {
@@ -2002,9 +1899,8 @@ fn span_covers_stops_at_the_last_real_character_of_a_middle_row() {
     );
 }
 
-/// A blank row caught in the middle of a multi-row span has no character of its own, so it is
-/// still reported as covered at column 0 - `render_paint_side`'s one-space fallback is what
-/// makes that visible, and it needs `span_covers` to say the row belongs to the span at all.
+/// A blank middle row counts as covered at column 0, so `render_paint_side`'s one-space fallback
+/// draws it.
 #[test]
 fn span_covers_still_covers_a_blank_middle_row() {
     let span = HumanTextSpan {
@@ -2017,8 +1913,6 @@ fn span_covers_still_covers_a_blank_middle_row() {
     assert!(span_covers(span, 1, 0, 0));
 }
 
-/// The span's own end row is unaffected either way - `end_column` already says exactly where
-/// the human stopped painting.
 #[test]
 fn span_covers_uses_the_exact_end_column_on_the_last_row() {
     let span = HumanTextSpan {
@@ -2032,8 +1926,7 @@ fn span_covers_uses_the_exact_end_column_on_the_last_row() {
     assert!(!span_covers(span, 0, 3, 5));
 }
 
-/// Unset means Dracula, which is what makes these render tests deterministic rather than
-/// dependent on whatever `.codediff.toml` the machine running them happens to hold.
+/// Unset means Dracula, which keeps render tests independent of the machine's `.codediff.toml`.
 #[test]
 fn the_palette_falls_back_to_the_default_theme_when_none_was_installed() {
     assert_eq!(
@@ -2042,8 +1935,6 @@ fn the_palette_falls_back_to_the_default_theme_when_none_was_installed() {
     );
 }
 
-/// A live selection is drawn in the same colour the TUI paints a cursor's counterpart: both
-/// mean "the region you are pointing at".
 #[test]
 fn a_selection_uses_the_cross_panel_highlight_colour() {
     assert_eq!(
@@ -2052,15 +1943,13 @@ fn a_selection_uses_the_cross_panel_highlight_colour() {
     );
 }
 
-/// The shape this exists for: several ranges banked on each side commit as ONE match, so three
-/// occurrences before against two after is a single correspondence rather than five.
+/// Several banked ranges per side commit as ONE match, not one per range.
 #[test]
 fn x_banks_ranges_so_m_can_commit_an_n_to_m_match() {
     let (before_src, after_src) = ("foo\nfoo\nfoo\n", "bar\nbar\n");
     let mut app = test_app();
     let mut state = TextPaintState::default();
 
-    // Two banked before-ranges plus a live third; two live/banked after-ranges.
     state.pending[0] = vec![
         HumanTextSpan {
             start_row: 0,
@@ -2105,8 +1994,7 @@ fn x_banks_ranges_so_m_can_commit_an_n_to_m_match() {
     );
 }
 
-/// The live selection commits along with the bank, so forgetting the final `x` before `m`
-/// doesn't silently drop a range - a loss this view has no undo for.
+/// The live selection commits with the bank, so a forgotten final `x` loses nothing.
 #[test]
 fn the_live_selection_commits_together_with_banked_ranges() {
     let source = "foo\nfoo\n";
@@ -2123,8 +2011,7 @@ fn the_live_selection_commits_together_with_banked_ranges() {
     assert_eq!(state.committable(0, source).len(), 2);
 }
 
-/// A group whose spans disagree within one side is refused at the keystroke, while the
-/// selection is still on screen to fix - not silently stored to fail at save time.
+/// Refused at the keystroke, while the selection is still on screen, not at save time.
 #[test]
 fn m_refuses_a_group_whose_spans_differ_within_a_side() {
     let (before_src, after_src) = ("foo\nqux\n", "bar\n");
@@ -2194,10 +2081,7 @@ fn d_paints_every_banked_range_as_one_entry() {
     );
 }
 
-/// Drives the text view through `handle_modal_key` rather than calling the actions directly,
-/// because the bug this pins was a missing *key binding*, not a broken action: `x` banked
-/// nothing because its match arm was never wired into the text view at all, while every test
-/// that called `action_paint_match` with a pre-filled bank kept passing.
+/// Through `handle_modal_key`, not the actions: an unwired key arm is what this pins.
 #[test]
 fn x_in_the_text_view_banks_the_live_selection() {
     let source = "foo\nfoo\n";
@@ -2247,7 +2131,6 @@ fn x_in_the_text_view_banks_the_live_selection() {
     );
 }
 
-/// `c` is the other half of the same pair, and was missing alongside `x`.
 #[test]
 fn c_in_the_text_view_clears_both_sides_banks() {
     let source = "foo\nfoo\n";
@@ -2293,15 +2176,13 @@ fn c_in_the_text_view_clears_both_sides_banks() {
     assert!(state.pending[0].is_empty() && state.pending[1].is_empty());
 }
 
-/// A 40-line pair whose two sides differ in three places: an inserted line near the top, a
-/// reworded line in the middle, and a deleted line near the bottom. Deliberately taller than the
-/// text view's 20-row viewport, so a jump has somewhere to scroll to.
+/// A 40-line pair differing in three places (insert, reword, delete), taller than the 20-row
+/// viewport so a jump has somewhere to scroll.
 fn navigable_pair() -> (String, String) {
     let mut before: Vec<String> = (0..40)
         .map(|row| format!("let line_{row} = {row};"))
         .collect();
     let mut after = before.clone();
-    // Bottom-up, so each edit's row numbers are the ones written here.
     before.remove(30);
     after[20] = "let line_20 = 999;".to_string();
     after.insert(10, "let inserted = 0;".to_string());
@@ -2311,12 +2192,7 @@ fn navigable_pair() -> (String, String) {
     )
 }
 
-/// Drives one keystroke through `handle_modal_key` into an open text view over a before/after
-/// pair that actually differs, and hands back the app and the paint state it left behind.
-///
-/// Through the real key handler rather than the action directly, for the reason
-/// `x_in_the_text_view_banks_the_live_selection` gives: these tests are about keys being *wired*,
-/// and an action called directly passes even when nothing dispatches to it.
+/// One keystroke through `handle_modal_key` into a text view over a differing pair.
 fn press_in_text_view(
     before_src: &str,
     after_src: &str,
@@ -2326,8 +2202,7 @@ fn press_in_text_view(
     press_in_text_view_painting("Minimal", before_src, after_src, state, code)
 }
 
-/// [`press_in_text_view_painting`] with a chance to put ranges into the painting first - what a
-/// rule about *existing* ranges (the overlap refusal) needs in order to be tested at all.
+/// [`press_in_text_view_painting`] with ranges painted first.
 fn press_in_text_view_seeded(
     solution: &str,
     source: &str,
@@ -2371,9 +2246,7 @@ fn press_in_text_view_seeded(
     (app, state)
 }
 
-/// [`press_in_text_view`] with the painting being edited named explicitly - what the rules keyed
-/// on that name (`Minimal`'s leading-whitespace split) need in order to be tested against a
-/// painting they do *not* apply to.
+/// [`press_in_text_view`] editing a named painting, for rules keyed on the name.
 fn press_in_text_view_painting(
     solution: &str,
     before_src: &str,
@@ -2416,9 +2289,7 @@ fn press_in_text_view_painting(
     (app, state)
 }
 
-/// The hunk list `n`/`p` walk: one entry per differing region, holding the first unmatched row on
-/// each side. An unchanged pair has none, which is what makes "No differences" reportable rather
-/// than a silent no-op.
+/// One hunk per differing region; an unchanged pair has none, so "No differences" is reportable.
 #[test]
 fn text_diff_hunks_finds_one_entry_per_differing_region() {
     assert_eq!(text_diff_hunks("a\nb\nc\n", "a\nb\nc\n"), Some(Vec::new()));
@@ -2439,9 +2310,8 @@ fn text_diff_hunks_finds_one_entry_per_differing_region() {
     );
 }
 
-/// `n` has to move *both* cursors and scroll *both* panels: the two sides scroll independently,
-/// so moving only the focused one leaves the other showing an unrelated part of the file, which
-/// is the hand-scrolling this key exists to remove.
+/// `n` moves and scrolls *both* sides; they scroll independently, so moving one leaves the other
+/// showing an unrelated part of the file.
 #[test]
 fn n_in_the_text_view_jumps_both_sides_to_the_next_hunk() {
     let (before_src, after_src) = navigable_pair();
@@ -2460,8 +2330,6 @@ fn n_in_the_text_view_jumps_both_sides_to_the_next_hunk() {
         app.status
     );
 
-    // The third hunk is past the viewport, so reaching it must scroll both panels, not just the
-    // focused one.
     let (_, state) = press_in_text_view(&before_src, &after_src, state, KeyCode::Char('n'));
     assert_eq!(state.cursor[0].0, 20, "the reworded line, before side");
     assert_eq!(state.cursor[1].0, 21, "one lower after the insertion");
@@ -2475,8 +2343,7 @@ fn n_in_the_text_view_jumps_both_sides_to_the_next_hunk() {
     assert!(state.scroll[1] > 0, "and so did the unfocused after panel");
 }
 
-/// `p` is the other half, and wraps at the top the way the tree view's own `n`/`N` wrap - holding
-/// it on a short file keeps cycling instead of stopping silently on the first hunk.
+/// `p` wraps at the top like the tree view's `n`/`N`, so holding it keeps cycling.
 #[test]
 fn p_in_the_text_view_walks_back_and_wraps_to_the_last_hunk() {
     let (before_src, after_src) = navigable_pair();
@@ -2500,8 +2367,7 @@ fn p_in_the_text_view_walks_back_and_wraps_to_the_last_hunk() {
     );
 }
 
-/// `n` from the After panel steps through *after*-side rows: the reader is looking at that side,
-/// so "the next difference" is the next one down the page they are reading.
+/// `n` from the After panel steps by after-side rows: the side being read.
 #[test]
 fn the_focused_side_decides_which_hunk_is_next() {
     let (before_src, after_src) = navigable_pair();
@@ -2591,9 +2457,7 @@ fn a_clamps_to_the_other_sides_last_line() {
     );
 }
 
-/// An indented block with a blank line in the middle of it - the shape a multi-line delete is
-/// painted over, and the one where "do not paint the indentation" has something to say on every
-/// row.
+/// An indented block with a blank middle line: the shape a multi-line delete is painted over.
 fn indented_block() -> &'static str {
     "fn main() {\n    let a = 1;\n\n        let b = 2;\n    println!();\n}\n"
 }
@@ -2618,9 +2482,8 @@ fn painted_entries(app: &App) -> Vec<(HumanTextOperation, Vec<HumanTextSpan>)> {
         .collect()
 }
 
-/// The rule invariant 6 states, kept at the keystroke: a `Minimal` painting never claims a line's
-/// indentation, and a full-line sweep is the one selection shape that cannot say so itself - so
-/// `d` decomposes it into one range per row, each starting at that row's first code character.
+/// Invariant 6 at the keystroke: `Minimal` never claims indentation, and a full-line sweep cannot
+/// say so itself, so `d` splits it into one range per row, starting at the first code character.
 #[test]
 fn a_minimal_full_line_sweep_is_painted_without_any_indentation() {
     let source = indented_block();
@@ -2667,8 +2530,7 @@ fn a_minimal_full_line_sweep_is_painted_without_any_indentation() {
     );
 }
 
-/// The point of the split is the ground-truth checker, so the checker is what pins it: the
-/// painting `d` records must draw no invariant-6 violation, and the same painting left whole must.
+/// The split `d` records draws no invariant-6 violation; the same painting left whole does.
 #[test]
 fn the_split_painting_passes_invariant_6_and_the_unsplit_one_does_not() {
     let source = indented_block();
@@ -2690,9 +2552,8 @@ fn the_split_painting_passes_invariant_6_and_the_unsplit_one_does_not() {
     let (app, _) = press_in_text_view(source, source, sweep_over_the_block(), KeyCode::Char('d'));
     assert!(leading(&app).is_empty(), "got {:?}", leading(&app));
 
-    // The negative control, which is what keeps the assertion above from passing vacuously: the
-    // same sweep painted under a name the split does not apply to, then renamed to `Minimal`, is
-    // exactly the painting a human would otherwise have to repair by hand.
+    // Negative control, so the assertion above is not vacuous: the same sweep painted unsplit,
+    // then renamed to `Minimal`.
     let (mut unsplit, _) = press_in_text_view_painting(
         "Full",
         source,
@@ -2710,8 +2571,7 @@ fn the_split_painting_passes_invariant_6_and_the_unsplit_one_does_not() {
     );
 }
 
-/// A `Full` painting is the generous reading, and invariant 4 wants a wholly-deleted line painted
-/// *whole*, indentation included. So the sweep it records is the one that was drawn.
+/// Invariant 4 wants a wholly-deleted line painted whole in `Full`, so the sweep is kept as drawn.
 #[test]
 fn a_full_painting_keeps_the_sweep_exactly_as_drawn() {
     let source = indented_block();
@@ -2741,13 +2601,11 @@ fn a_full_painting_keeps_the_sweep_exactly_as_drawn() {
     );
 }
 
-/// A vertical selection already names its own columns on every row it touches, so there is nothing
-/// to infer and nothing to reshape - even in a `Minimal` painting.
+/// A vertical selection names its own columns, so even `Minimal` does not reshape it.
 #[test]
 fn a_vertical_selection_is_never_reshaped() {
     let source = indented_block();
-    // Columns 2..6 of rows 1 and 3 - inside both rows' indentation, which is exactly what a
-    // vertical selection is for and exactly what the sweep's split would have removed.
+    // Columns 2..6 of rows 1 and 3: inside the indentation, which the split would have removed.
     let state = TextPaintState {
         anchor: [Some((1, 2)), None],
         cursor: [(3, 6), (0, 0)],
@@ -2765,8 +2623,7 @@ fn a_vertical_selection_is_never_reshaped() {
                 end_row: 1,
                 end_column: 7,
             },
-            // Row 2 is empty, and a vertical selection skips a row with no character at those
-            // columns - its own rule, not the split's.
+            // Row 2 is empty; a vertical selection skips rows with no character at its columns.
             HumanTextSpan {
                 start_row: 3,
                 start_column: 2,
@@ -2779,10 +2636,8 @@ fn a_vertical_selection_is_never_reshaped() {
     assert_eq!(app.status.as_deref(), Some("Painted 2 deletion(s)"));
 }
 
-/// The split runs *before* the overlap check, and that ordering is load-bearing: a sweep whose
-/// only collision with an existing range is in the indentation no longer collides at all, because
-/// the split removed the bytes that collided. Refusing it would be refusing over bytes a `Minimal`
-/// painting never claims. Pinned so the two steps are not reordered by accident.
+/// The split runs *before* the overlap check: a sweep that collides only in indentation no longer
+/// collides once split, and `Minimal` never claims those bytes. Pinned against reordering.
 #[test]
 fn a_minimal_sweep_commits_over_a_range_that_only_overlapped_the_indentation() {
     let source = indented_block();
@@ -2818,9 +2673,8 @@ fn a_minimal_sweep_commits_over_a_range_that_only_overlapped_the_indentation() {
         Some("Painted 1 deletion(s) - indentation left unpainted (Minimal)")
     );
 
-    // The same sweep in a painting the split does not apply to still runs into the seeded range,
-    // which is what makes the assertion above a statement about the split rather than about the
-    // overlap check having been removed.
+    // Without the split the same sweep still collides, so the assertion above is about the split,
+    // not a removed overlap check.
     let (app, _) = press_in_text_view_seeded(
         "Full",
         source,
@@ -2839,9 +2693,8 @@ fn a_minimal_sweep_commits_over_a_range_that_only_overlapped_the_indentation() {
     );
 }
 
-/// A sweep over nothing but blank lines trims away to nothing. That is not the "nothing selected"
-/// case - the painter did select something - so it gets its own answer rather than advice to
-/// press `v`.
+/// A sweep over only blank lines trims to nothing. The painter did select something, so it is not
+/// told to press `v`.
 #[test]
 fn a_minimal_sweep_over_blank_lines_only_paints_nothing_and_says_so() {
     let source = "fn main() {\n\n   \n}\n";
@@ -2863,8 +2716,8 @@ fn a_minimal_sweep_over_blank_lines_only_paints_nothing_and_says_so() {
     );
 }
 
-/// The split's own coordinate arithmetic, away from the key handler: partial first and last rows,
-/// a blank row in the middle, and a row whose indentation swallows the whole span.
+/// The split's arithmetic: partial first and last rows, a blank middle row, and a row whose
+/// indentation swallows the whole span.
 #[test]
 fn skip_leading_whitespace_splits_a_sweep_row_by_row() {
     let source = indented_block();
@@ -2900,9 +2753,8 @@ fn skip_leading_whitespace_splits_a_sweep_row_by_row() {
     assert!(skip_leading_whitespace(indentation_only, source).is_empty());
 }
 
-/// `^` sits between `0` and `$`: the first character that is actually code. On an indented line
-/// that is where a painted range wants to start - starting at `0` sweeps the indentation into the
-/// range, which then reads differently from the same code painted anywhere else.
+/// `^` is the first code character. Painted ranges start there: starting at `0` sweeps the
+/// indentation in, which reads differently from the same code painted elsewhere.
 #[test]
 fn caret_moves_to_the_first_non_whitespace_character() {
     let source = "    let a = 1;\n\tlet b = 2;\n   \nlet c = 3;\n";
@@ -2945,9 +2797,8 @@ fn the_first_code_column_is_a_byte_offset() {
     assert_eq!(TextPaintState::first_code_column("a\n", 9), 0);
 }
 
-/// A fixture with no tree-sitter grammar opens in text-only mode - no tree, `None` roots - and
-/// painting is the *only* thing there is to do in it. So the three navigation keys have to work
-/// with no roots at all, which the tests above (all of which parse a tree) would not catch.
+/// A fixture with no grammar opens text-only with `None` roots, and the navigation keys must still
+/// work; the tests above all parse a tree.
 #[test]
 fn the_navigation_keys_work_in_text_only_mode() {
     let (before_src, after_src) = navigable_pair();
@@ -2994,8 +2845,8 @@ fn the_navigation_keys_work_in_text_only_mode() {
     );
 }
 
-/// `o` cycles the overlay and `p` navigates. Pinned as a pair: the binding is only half right if
-/// `p` cycles as well, and a reader following the help would then find two keys doing it.
+/// `o` cycles the overlay and `p` navigates; if `p` also cycled, the help would show two keys for
+/// one job.
 #[test]
 fn o_cycles_the_overlay_and_p_no_longer_does() {
     let (before_src, after_src) = navigable_pair();
@@ -3007,9 +2858,8 @@ fn o_cycles_the_overlay_and_p_no_longer_does() {
     );
     assert_eq!(app.text_overlay, TextOverlay::CodeDiff);
 
-    // Each press starts a fresh app, so `Human` here is the *default* rather than a value `p`
-    // restored - what actually rules out `p` cycling is the status line, which reports a jump
-    // instead of an overlay switch.
+    // Each press starts a fresh app, so `Human` is the default; the status line (a jump, not an
+    // overlay switch) is what rules out `p` cycling.
     let (app, _) = press_in_text_view(
         &before_src,
         &after_src,
@@ -3024,9 +2874,8 @@ fn o_cycles_the_overlay_and_p_no_longer_does() {
     );
 }
 
-/// `diff -u` reports positions only in its hunk headers; the gutter turns counting into
-/// reading. A deleted line has no after-side number and an inserted one has no before-side
-/// number - the blank half is the point, not an omission.
+/// `diff -u` gives positions only in hunk headers, so the gutter numbers each row. A deleted line
+/// has no after number and an inserted one no before number; the blank half is intended.
 #[test]
 fn the_unix_diff_view_numbers_both_sides() {
     let backend = ratatui::backend::TestBackend::new(110, 16);
@@ -3038,25 +2887,19 @@ fn the_unix_diff_view_numbers_both_sides() {
         .draw(|f| render_unix_diff_modal(f, area, output, 0))
         .unwrap();
 
-    // Asserted per row on collapsed whitespace, not on exact column padding: the gutter's
-    // field width is a layout choice, and pinning it would make this test fail for a cosmetic
-    // change while saying nothing about the numbering it exists to check.
+    // Compared on collapsed whitespace: the gutter's field width is cosmetic.
     let rows: Vec<String> = rendered_text(&terminal)
         .split('\u{2502}')
         .map(|row| row.split_whitespace().collect::<Vec<_>>().join(" "))
         .collect();
     let has = |wanted: &str| rows.iter().any(|row| row.contains(wanted));
 
-    // The context line carries both counters, starting at the hunk header's positions.
     assert!(has("10 20 context"), "got: {rows:#?}");
-    // A deletion advances only the before side, an insertion only the after side - so each
-    // shows one number and leaves the other half of the gutter blank.
     assert!(has("11 -gone"), "got: {rows:#?}");
     assert!(has("21 +new"), "got: {rows:#?}");
 }
 
-/// `:` opens the jump prompt, digits accumulate, Enter moves the cursor - the whole point
-/// being a file too big to reach with `j`.
+/// `:` opens the jump prompt, digits accumulate, Enter moves the cursor.
 #[test]
 fn colon_jumps_to_a_line_in_the_text_view() {
     let source = "a\nb\nc\nd\ne\nf\n";
@@ -3100,10 +2943,8 @@ fn colon_jumps_to_a_line_in_the_text_view() {
     assert!(state.line_prompt.is_none(), "the prompt closes on Enter");
 }
 
-/// Every key in the painting views preserves the cached `FrameState`, because painting writes
-/// `text_mappings` and the caches are built from `entries`. Falling through to `false` here
-/// re-walked both ASTs on every cursor keystroke, which is what made the view unusable on a
-/// large file.
+/// Every painting-view key preserves the cached `FrameState`: painting writes `text_mappings`, and
+/// the caches are built from `entries`. A rebuild per cursor key makes large files unusable.
 #[test]
 fn text_view_keys_do_not_invalidate_the_frame_state() {
     let text_view = Modal::TextView {
@@ -3123,9 +2964,8 @@ fn text_view_keys_do_not_invalidate_the_frame_state() {
     }
 }
 
-/// The painting test is clamped at 100.0, not 0.0. Nothing in the corpus agrees exactly yet,
-/// so a fresh 0.0 would fail on the first run and have to be loosened - which is the "clamp
-/// moved for a reason that was not a measurement" habit the per-file layout exists to prevent.
+/// Clamped at 100.0, not 0.0: nothing agrees exactly yet, so 0.0 would fail at once and be
+/// loosened for a reason that is not a measurement.
 #[test]
 fn a_fresh_painting_test_passes_and_says_it_means_nothing_yet() {
     let block = painting_test_block("rust-add-if");
@@ -3139,13 +2979,11 @@ fn a_fresh_painting_test_passes_and_says_it_means_nothing_yet() {
         block.contains("fn painting()"),
         "the test name has to match the module's convention: {block}"
     );
-    // Appended to a file that already has the licence header and the mapping test, so it
-    // carries neither of its own - it starts at the blank line before its own `#[test]`.
+    // Appended to a file that already has the licence header and the mapping test.
     assert!(block.starts_with("\n#[test]"), "got: {block}");
 }
 
-/// Unlike the painting stub above, this one is generated in its strict form: an invariant is a
-/// property the data either has or does not, so there is no placeholder to forget to replace.
+/// Generated strict: an invariant holds or it does not, so there is no placeholder to replace.
 #[test]
 fn a_fresh_invariants_test_is_generated_strict_with_no_number_to_fill_in() {
     let block = invariants_test_block("rust-add-if");
@@ -3165,9 +3003,7 @@ fn a_fresh_invariants_test_is_generated_strict_with_no_number_to_fill_in() {
     assert!(block.starts_with("\n#[test]"), "got: {block}");
 }
 
-/// A bare `App` for the text-painting action tests: they only touch `mapping`, `dirty` and
-/// `status`, so the AST panels' node ids are irrelevant and a dummy pair keeps the setup to
-/// one line.
+/// A bare `App` for the text-painting tests, which only touch `mapping`, `dirty` and `status`.
 fn test_app() -> App {
     App::new(
         "test".to_string(),
@@ -3192,8 +3028,7 @@ fn paint_state_at(
     state
 }
 
-/// A selection includes the character *under* the cursor. Anything else surprises a reader
-/// every time: they see a highlight covering `foo` and get a span covering `fo`.
+/// A selection includes the character under the cursor, as the highlight shows.
 #[test]
 fn a_selection_includes_the_character_under_the_cursor() {
     let source = "let foo = 1;\n";
@@ -3216,18 +3051,15 @@ fn a_backwards_selection_normalizes_to_the_same_span() {
     let forward = paint_state_at(0, (0, 6), Some((0, 4)));
     let backward = paint_state_at(0, (0, 4), Some((0, 6)));
 
-    // Both cover `foo`, but each includes the character under its own cursor, so the backward
-    // one runs from 4 through the cursor at 4 and out to the anchor at 6 inclusive.
     assert_eq!(forward.selection(0, source), backward.selection(0, source));
 }
 
-/// Byte columns, not character columns - a multi-byte character before the selection must not
-/// shift it. The same trap `span_text`'s own test pins from the other side.
+/// Byte columns, not character columns: a multi-byte character before the selection must not
+/// shift it.
 #[test]
 fn a_selection_past_a_multibyte_character_lands_on_the_right_text() {
     let source = "let é = foo;\n";
-    // "let é = " is 9 bytes ('é' costs two), so `foo` starts at byte 9 and its last character
-    // starts at byte 11.
+    // 'é' is two bytes, so `foo` starts at byte 9.
     let state = paint_state_at(0, (0, 11), Some((0, 9)));
 
     let span = state.selection(0, source)[0];
@@ -3238,10 +3070,8 @@ fn a_selection_past_a_multibyte_character_lands_on_the_right_text() {
     );
 }
 
-/// A selection spanning several rows is vertical: one span per row, all sharing the same
-/// column range, rather than a single span sweeping full lines in between - the bug this
-/// feature replaces would highlight (and let `d`/`i` swallow) every untouched character
-/// between the two columns on the middle rows.
+/// A multi-row selection is vertical: one span per row over the same columns, so `d`/`i` do not
+/// swallow the untouched characters between them on middle rows.
 #[test]
 fn a_multi_row_selection_is_a_stack_of_per_row_spans_not_a_line_sweep() {
     let source = "aaaXaaa\nbbbYbbb\ncccZccc\n";
@@ -3275,8 +3105,7 @@ fn a_multi_row_selection_is_a_stack_of_per_row_spans_not_a_line_sweep() {
     );
 }
 
-/// A row too short to reach the selected columns contributes no span - there is nothing there
-/// to select, rather than the selection falling back to covering whatever the row does have.
+/// A row too short to reach the selected columns contributes no span.
 #[test]
 fn a_multi_row_selection_skips_a_row_shorter_than_the_selected_columns() {
     let source = "aaaaaa\nbb\ncccccc\n";
@@ -3291,9 +3120,8 @@ fn a_multi_row_selection_skips_a_row_shorter_than_the_selected_columns() {
     );
 }
 
-/// `V` swaps a selection back to the pre-vertical behaviour: one span sweeping every full row
-/// between anchor and cursor end to end, needed for a single contiguous multi-line block where
-/// `m`'s identical-text-per-side check would otherwise fail on a per-row decomposition.
+/// `V` makes one span sweeping full rows, for a contiguous block where `m`'s identical-text check
+/// would fail on a per-row split.
 #[test]
 fn toggling_off_vertical_restores_the_full_line_sweep() {
     let source = "aaaXaaa\nbbbYbbb\ncccZccc\n";
@@ -3329,16 +3157,13 @@ fn style_at(lines: &[Line<'static>], row: usize, column: usize) -> Style {
     panic!("column {column} past the end of row {row}'s content: {line:?}");
 }
 
-/// The user-visible reason this toggle exists: a vertical selection leaves the untouched tail
-/// of a middle row unstyled, while the same anchor and cursor in full-line mode sweeps that
-/// tail in too. Exercises the actual render path, not just the spans `selection` computes.
+/// Through the render path: a vertical selection leaves a middle row's tail unstyled, full-line
+/// mode styles it.
 #[test]
 fn vertical_selection_leaves_a_middle_rows_tail_unstyled_but_full_line_does_not() {
     let source = "aaaXaaaaaaaa\nbbbYbbbbbbbb\ncccZcccccccc\n";
     let mut state = paint_state_at(0, (2, 4), Some((0, 3)));
     let selected_bg = Some(OverlayTheme::default().palette().cross_highlight_bg);
-    // Row 1, well past the selection's column 3-4 range but still inside the line - the tail
-    // a full-line sweep would highlight and a vertical selection would not.
     let tail_column = 10;
 
     let vertical = render_paint_side(source, &[], &state, 0, 5, 10_000);
@@ -3357,8 +3182,7 @@ fn vertical_selection_leaves_a_middle_rows_tail_unstyled_but_full_line_does_not(
     );
 }
 
-/// `h`/`l` step by characters, so the cursor can never land inside one - a column that did
-/// would produce a span `span_text` correctly refuses to read back.
+/// `h`/`l` step by characters, never landing inside one (`span_text` refuses such a span).
 #[test]
 fn stepping_across_a_multibyte_character_lands_on_boundaries() {
     let source = "aéb\n";
@@ -3456,9 +3280,8 @@ fn d_and_i_paint_one_sided_ranges_on_their_own_side() {
     assert!(entries[1].before.is_empty(), "an insert has no before side");
 }
 
-/// `u` removes the whole entry, both halves of a `Match` included: a half-removed match is a
-/// malformed entry that `verdict` refuses to read, so removing one side is not a smaller edit
-/// but a broken file.
+/// `u` removes the whole entry, both halves of a `Match`: a half match is a malformed entry
+/// `verdict` refuses to read.
 #[test]
 fn u_removes_a_whole_match_from_either_side() {
     let (before_src, after_src) = ("alpha\nbeta\n", "beta\nalpha\n");
@@ -3481,8 +3304,6 @@ fn u_removes_a_whole_match_from_either_side() {
     );
 }
 
-/// The `None`/`Some(empty)` distinction the field's `Option` exists for, reachable only
-/// deliberately.
 #[test]
 fn z_marks_an_unpainted_fixture_as_deliberately_empty() {
     let mut app = test_app();
@@ -3589,13 +3410,11 @@ fn rendered_text(terminal: &Terminal<ratatui::backend::TestBackend>) -> String {
         .collect()
 }
 
-/// The picker's header row is where its whole interaction state lives: the `Unmarked` count
-/// column exists, the sorted column carries a direction arrow, and a filtered column is
-/// marked - with the filters spelled out in the title so a compound one is readable.
+/// The header row carries the interaction state: the `Unmarked` column, the sort arrow and the
+/// filter marker, with the filters spelled out in the title.
 #[test]
 fn render_open_diff_picker_shows_the_unmarked_column_and_the_sort_and_filter_markers() {
-    // Wide enough that the block title isn't truncated: this asserts on the title's contents,
-    // so a narrower backend would be testing ratatui's truncation rather than the picker.
+    // Wide enough that the title is not truncated; this asserts on its contents.
     let backend = ratatui::backend::TestBackend::new(160, 14);
     let mut terminal = Terminal::new(backend).unwrap();
     let area = Rect::new(0, 0, 160, 14);
@@ -3650,10 +3469,8 @@ fn render_open_diff_picker_shows_the_unmarked_column_and_the_sort_and_filter_mar
     assert!(text.contains("s sort, f filter"), "the key legend: {text}");
 }
 
-/// The title is longer than the popup at ordinary terminal widths, so ratatui truncates it -
-/// and what has to survive that truncation is the filter list, the part that actually changes
-/// as the reader works. Guards the abbreviation in `render_open_diff_picker`'s title: at 110
-/// columns the key legend is expected to be cut, the filters are not.
+/// At 110 columns ratatui truncates the title: the key legend may be cut, the filter list (the
+/// part that changes) must survive.
 #[test]
 fn the_diff_picker_title_keeps_its_filter_list_when_the_terminal_truncates_it() {
     let backend = ratatui::backend::TestBackend::new(110, 12);
@@ -3780,21 +3597,15 @@ fn centered_rect_at_least_grows_past_the_percentage_to_meet_the_minimum() {
 
 #[test]
 fn centered_rect_at_least_never_exceeds_the_available_area() {
-    // A terminal too small even for the minimum (a phone-sized SSH client is the motivating
-    // case) must still produce a rect that fits, not one that's clamped to a minimum bigger
-    // than the terminal itself.
+    // A terminal smaller than the minimum still gets a rect that fits.
     let tiny_area = Rect::new(0, 0, 20, 8);
     let rect = centered_rect_at_least(60, 30, 50, 20, tiny_area);
     assert!(rect.width <= tiny_area.width);
     assert!(rect.height <= tiny_area.height);
 }
 
-/// Regression guard for the real bug: on a small terminal (a phone-sized SSH client is the
-/// motivating case), `render_text_modal`'s old fixed `centered_rect(60, 30, area)` could come
-/// out short enough that the `> {input}` line - the actual input box, well past the first
-/// couple of lines of instructions - was clipped out of the visible area entirely, with no
-/// scroll indicator to hint why (a plain `Paragraph` has none). This is exactly the
-/// `PromptPromoteName` modal's own body shape (instructions, then a blank line, then `> `).
+/// On a small terminal a percentage-sized `render_text_modal` can clip the `> {input}` line with
+/// no sign that anything is cut off. The body is `PromptPromoteName`'s shape.
 #[test]
 fn render_text_modal_shows_every_line_including_the_input_box_on_a_small_terminal() {
     let backend = ratatui::backend::TestBackend::new(40, 12);
@@ -3813,7 +3624,6 @@ fn render_text_modal_shows_every_line_including_the_input_box_on_a_small_termina
     );
 }
 
-/// A `SampleRow` without spelling out five fields at each of the call sites below.
 fn sample_row(
     name: &str,
     language: &str,
@@ -3921,8 +3731,7 @@ fn visible_sample_rows_sorts_by_the_selected_column() {
         vec!["charlie", "alpha", "bravo"],
         "untriaged rows first - they are what the picker exists to surface"
     );
-    // 30-100 before 1000-3000, and the unbucketed row last. Sorting these as strings would put
-    // "1000-3000" first, which is the whole reason `bucket_order` parses the lower bound.
+    // 30-100 before 1000-3000, unbucketed last: as strings, "1000-3000" would sort first.
     assert_eq!(
         names(SampleColumn::Bucket, false),
         vec!["charlie", "alpha", "bravo"]
@@ -4082,9 +3891,7 @@ fn the_sample_picker_title_names_the_sorted_column_and_the_filters() {
 
 #[test]
 fn open_sample_picker_enter_opens_the_visible_entry_not_the_raw_index() {
-    // Regression guard for `visible.get(selected)` rather than `rows[selected]`: with the Status
-    // filter narrowing to untriaged rows, `selected` indexes the *filtered* list, so a raw index
-    // would open the wrong sample.
+    // With a filter on, `selected` indexes the filtered list; a raw index opens the wrong sample.
     let source = "fn main() {}\n";
     let tree = parse_rust(source);
     let root = tree.root_node();
@@ -4142,9 +3949,7 @@ fn open_sample_picker_enter_opens_the_visible_entry_not_the_raw_index() {
 }
 #[test]
 fn open_sample_picker_s_sorts_by_the_cursor_column_and_keeps_the_selected_row() {
-    // `s` takes the sort over to whichever column `h`/`l` last moved to, and the selection
-    // follows the row it was on - which is the point of re-sorting while looking at a particular
-    // sample.
+    // `s` sorts by the cursor column and the selection follows its row.
     let source = "fn main() {}\n";
     let tree = parse_rust(source);
     let root = tree.root_node();
@@ -4280,7 +4085,6 @@ fn open_commit_picker_j_k_move_selection_clamped_to_bounds() {
         selected: 0,
     });
 
-    // Up at the top must stay clamped at 0, not underflow.
     handle_modal_key(
         &mut app,
         KeyCode::Char('k'),
@@ -4299,7 +4103,6 @@ fn open_commit_picker_j_k_move_selection_clamped_to_bounds() {
         other => panic!("expected Modal::OpenCommitPicker, got {other:?}"),
     }
 
-    // Two Downs must clamp at the last index (1), not run past it.
     for _ in 0..2 {
         handle_modal_key(
             &mut app,
@@ -4360,9 +4163,8 @@ fn open_commit_picker_esc_cancels() {
 
 #[test]
 fn open_commit_picker_enter_on_an_unresolvable_commit_reports_an_error_without_crashing() {
-    // Doesn't depend on this repository's actual git history (which the CI checkout may only
-    // have a shallow slice of - see `list_commit_files`'s doc comment): any hash git can't
-    // resolve at all takes the same `git diff-tree` failure path, regardless of clone depth.
+    // Independent of this repository's history (CI may be shallow): any unresolvable hash takes
+    // the same `git diff-tree` failure path.
     let source = "fn main() {}\n";
     let tree = parse_rust(source);
     let root = tree.root_node();
@@ -4461,9 +4263,8 @@ fn open_commit_file_picker_enter_opens_the_selected_file_as_an_open_target() {
 
 #[test]
 fn open_commit_file_picker_enter_from_a_dirty_git_commit_file_case_cannot_save_directly() {
-    // Mirrors `CaseOrigin::Sample`'s existing `can_save = false`: a git-commit-sourced case
-    // isn't a real diffs/ case yet either, so it needs `s`'s promote-name prompt (from the
-    // main view), not a single-key save, before it can be switched away from.
+    // Like `CaseOrigin::Sample`, a git-commit case is not a diffs/ case yet, so it cannot be
+    // saved with one key before switching away.
     let source = "fn main() {}\n";
     let tree = parse_rust(source);
     let root = tree.root_node();
@@ -4566,8 +4367,7 @@ fn open_sample_picker_modal_selects_the_currently_open_case_under_the_given_view
         sample_row("charlie", "Rust", None, SampleTriageStatus::Sampled, 20),
     ];
 
-    // "bravo" is index 1 in `rows`' own order, but index 0 once sorted by Size ascending -
-    // proves `selected` is computed against the sorted/filtered view, not raw `rows`.
+    // "bravo" is index 1 in `rows` but 0 sorted by Size: `selected` indexes the sorted view.
     let view = SamplePickerView {
         sort: SampleSort {
             column: SampleColumn::Size,
@@ -4674,8 +4474,8 @@ fn visible_diff_options_cmpl_filter_excludes_only_cases_the_map_measured() {
     );
 }
 
-/// Setting both `Cmpl` and `Unmarked` the same way narrows nothing further, so the title bar
-/// must not read as two constraints - see `DiffFilters::labels`.
+/// `Cmpl` and `Unmarked` set the same way narrow nothing further, so the title shows one
+/// constraint (see `DiffFilters::labels`).
 #[test]
 fn the_title_lists_a_matching_cmpl_and_unmarked_filter_once() {
     let mut filters = DiffFilters {
@@ -4685,14 +4485,13 @@ fn the_title_lists_a_matching_cmpl_and_unmarked_filter_once() {
     };
     assert_eq!(filters.labels(), vec!["incomplete only"]);
 
-    // Opposite directions really are two constraints (an unsatisfiable pair, but the reader
-    // should be able to see that), so both are listed.
+    // Opposite directions are two constraints (unsatisfiable, and visibly so).
     filters.unmarked = FlagFilter::No;
     assert_eq!(filters.labels(), vec!["incomplete only", "none unmarked"]);
 }
 
-/// `Cmpl` and `Unmarked` read one map (`App::diff_unmarked`), so their filters must select
-/// exactly the same rows - the two columns differ in how they *sort*, not in what they hide.
+/// `Cmpl` and `Unmarked` read one map, so their filters select the same rows; they differ only in
+/// how they sort.
 #[test]
 fn the_cmpl_and_unmarked_filters_select_the_same_rows() {
     let options = vec![
@@ -4718,9 +4517,7 @@ fn the_cmpl_and_unmarked_filters_select_the_same_rows() {
 
 #[test]
 fn next_dataset_filter_cycles_through_diff_datasets_and_back_to_all() {
-    // Walks every entry rather than hardcoding `DIFF_DATASETS`' length, so this doesn't need
-    // editing again the next time a dataset is added (it already needed exactly that edit
-    // once, when `stratified` became the fourth).
+    // Walks every entry, so a new dataset needs no edit here.
     let mut current = None;
     for &dataset in DIFF_DATASETS {
         current = next_dataset_filter(current);
@@ -4738,8 +4535,7 @@ fn open_diff_picker_modal_selects_the_currently_open_case_under_the_given_filter
     ];
     let view = dataset_view(Some("handmade"));
 
-    // "charlie" is index 2 in `options`' own order, but index 1 once filtered to just
-    // "handmade" - proves `selected` is computed against the filtered view, not raw options.
+    // "charlie" is index 2 in `options` but 1 filtered: `selected` indexes the filtered view.
     let modal = open_diff_picker_modal(options, "charlie", view, DiffPickerData::default());
 
     match modal {
@@ -4758,9 +4554,7 @@ fn open_diff_picker_modal_falls_back_to_the_first_entry_when_the_current_case_is
         ("bravo".to_string(), "small"),
     ];
     let view = dataset_view(Some("small"));
-    // "alpha" is the currently open case, but it's a "handmade" fixture and the filter above
-    // is "small" - alpha isn't in the filtered view at all, so this must fall back to the
-    // first visible entry instead of panicking or landing out of bounds.
+    // The open case "alpha" is filtered out, so the selection falls back to the first visible one.
     let modal = open_diff_picker_modal(options, "alpha", view, DiffPickerData::default());
     match modal {
         Modal::OpenDiffPicker { selected, .. } => assert_eq!(selected, 0),
@@ -4768,9 +4562,7 @@ fn open_diff_picker_modal_falls_back_to_the_first_entry_when_the_current_case_is
     }
 }
 
-/// Opens the `o` picker over `options` with `view` in force and feeds it `keys` in order,
-/// handing back the App - the shared body of every picker key test below, so each says only
-/// what it is actually about.
+/// Opens the `o` picker over `options` with `view` and feeds it `keys`.
 fn press_in_diff_picker(
     options: Vec<(String, &'static str)>,
     view: DiffPickerView,
@@ -4820,7 +4612,7 @@ fn picker_view(app: &App) -> DiffPickerView {
     }
 }
 
-/// `h`/`l` walk the cursor across the header and clamp at both ends rather than wrapping.
+/// `h`/`l` clamp at both ends of the header rather than wrapping.
 #[test]
 fn open_diff_picker_h_and_l_move_the_column_cursor_and_clamp_at_the_ends() {
     let options = vec![("alpha".to_string(), "handmade")];
@@ -4837,7 +4629,6 @@ fn open_diff_picker_h_and_l_move_the_column_cursor_and_clamp_at_the_ends() {
         "the cursor column persists on App too, so the next o reopens on it"
     );
 
-    // Eight presses from the far left overshoots the eight-column table by one.
     let app = press_in_diff_picker(
         options.clone(),
         DiffPickerView::default(),
@@ -4857,10 +4648,8 @@ fn open_diff_picker_h_and_l_move_the_column_cursor_and_clamp_at_the_ends() {
     );
 }
 
-/// The `Invariant` column reads `App::diff_invariants`, and - like every other lazily-scanned
-/// column - shows `?` rather than a number until that scan has run. The distinction that matters
-/// is between a case the scan has not reached and one it found clean: the first must not sort or
-/// filter as if it were the second.
+/// The `Invariant` column shows `?` until its scan runs: an unscanned case must not sort or filter
+/// as a clean one.
 #[test]
 fn diff_picker_invariant_column_separates_unscanned_from_clean() {
     let mut app = App::new(
@@ -4891,16 +4680,14 @@ fn diff_picker_invariant_column_separates_unscanned_from_clean() {
         "a case the scan left out - no mapping to check - stays unknown, not clean"
     );
 
-    // The filter has to fail open on the unknown row in both directions, or narrowing the picker
-    // would hide exactly the cases nobody has looked at yet.
+    // Fails open on the unknown row both ways, or narrowing would hide exactly the unchecked cases.
     assert!(FlagFilter::Yes.keeps(data.invariants_of("beta").map(|count| count > 0)));
     assert!(!FlagFilter::Yes.keeps(data.invariants_of("alpha").map(|count| count > 0)));
     assert!(FlagFilter::Yes.keeps(data.invariants_of("gamma").map(|count| count > 0)));
     assert!(FlagFilter::No.keeps(data.invariants_of("gamma").map(|count| count > 0)));
 }
 
-/// `f` on `Dataset` is the old `d` key: it cycles the dataset filter, and - like every other
-/// filter and sort change here - persists the result on `App` so the next `o` reopens with it.
+/// `f` on `Dataset` cycles the filter and persists it on `App` for the next `o`.
 #[test]
 fn open_diff_picker_f_on_the_dataset_column_persists_the_filter_on_app() {
     let app = press_in_diff_picker(
@@ -4917,8 +4704,7 @@ fn open_diff_picker_f_on_the_dataset_column_persists_the_filter_on_app() {
     assert_eq!(picker_view(&app).filters.dataset, Some(DIFF_DATASETS[0]));
 }
 
-/// `s` takes the sort over to the cursor column ascending, and flips direction when pressed
-/// again on the column that already owns it - the "last column selected sorts" rule.
+/// `s` sorts ascending by the cursor column and flips on a second press.
 #[test]
 fn open_diff_picker_s_sorts_by_the_cursor_column_and_flips_on_a_second_press() {
     let view = column_view(DiffColumn::Dataset);
@@ -4944,8 +4730,7 @@ fn open_diff_picker_s_sorts_by_the_cursor_column_and_flips_on_a_second_press() {
     );
 }
 
-/// While the `Name` filter's prompt is open it takes every keystroke - so a name containing
-/// `j`, `s` or `f` is typed rather than moving the selection and re-sorting mid-word.
+/// The open `Name` prompt takes every key, so `j`, `s` and `f` are typed, not acted on.
 #[test]
 fn open_diff_picker_name_filter_prompt_swallows_command_keys_until_enter() {
     let options = vec![
@@ -4972,7 +4757,6 @@ fn open_diff_picker_name_filter_prompt_swallows_command_keys_until_enter() {
         other => panic!("expected Modal::OpenDiffPicker to stay open, got {other:?}"),
     }
 
-    // Enter commits it, lowercased, and it narrows the list.
     let app = press_in_diff_picker(
         options.clone(),
         DiffPickerView::default(),
@@ -4989,7 +4773,6 @@ fn open_diff_picker_name_filter_prompt_swallows_command_keys_until_enter() {
         vec!["rust-add-if"]
     );
 
-    // Esc abandons the prompt and leaves the filter exactly as it was.
     let app = press_in_diff_picker(
         options,
         DiffPickerView::default(),
@@ -5008,8 +4791,8 @@ fn open_diff_picker_name_filter_prompt_swallows_command_keys_until_enter() {
     );
 }
 
-/// An empty submission clears the filter rather than being stored as a needle that matches
-/// everything while the header still reads as filtered.
+/// An empty submission clears the filter, rather than storing a match-all needle that still shows
+/// as filtered.
 #[test]
 fn open_diff_picker_name_filter_prompt_clears_on_an_empty_submission() {
     let app = press_in_diff_picker(
@@ -5028,8 +4811,7 @@ fn open_diff_picker_name_filter_prompt_clears_on_an_empty_submission() {
     assert_eq!(app.diff_view.filters.name, None);
 }
 
-/// Moving the cursor must never kick off one of the corpus-wide scans - only `s`/`f` do, and
-/// those are deliberate presses that can afford the seconds it costs (see
+/// Moving the cursor never starts a corpus-wide scan; only `s`/`f` do (see
 /// `ensure_diff_column_data`).
 #[test]
 fn open_diff_picker_column_movement_does_not_trigger_a_corpus_scan() {
@@ -5075,9 +4857,7 @@ fn draw_ui_shows_only_the_focused_panel_below_the_single_panel_width_threshold()
     let before_unmarked = count_unmarked(&before_flat, &caches, status_before);
     let after_unmarked = count_unmarked(&after_flat, &caches, status_after);
 
-    // Narrower than `SINGLE_PANEL_WIDTH_THRESHOLD`: only the focused (Before, by
-    // `App::new`'s default) panel should render, and the After panel's content shouldn't
-    // appear anywhere on screen.
+    // Below `SINGLE_PANEL_WIDTH_THRESHOLD`: only the focused (Before) panel renders.
     let backend = ratatui::backend::TestBackend::new(SINGLE_PANEL_WIDTH_THRESHOLD - 1, 24);
     let mut terminal = Terminal::new(backend).unwrap();
     terminal
@@ -5107,7 +4887,6 @@ fn draw_ui_shows_only_the_focused_panel_below_the_single_panel_width_threshold()
         "unfocused panel should not render in single-panel mode: {text}"
     );
 
-    // At or above the threshold, both panels render side by side.
     let backend = ratatui::backend::TestBackend::new(SINGLE_PANEL_WIDTH_THRESHOLD, 24);
     let mut terminal = Terminal::new(backend).unwrap();
     terminal
@@ -5140,19 +4919,8 @@ fn draw_ui_shows_only_the_focused_panel_below_the_single_panel_width_threshold()
 
 #[test]
 fn help_modal_renders_keybindings() {
-    // Sized generously (well past HELP_TEXT's longest line and line count) so nothing is
-    // clipped by the popup's width or height -- this test is about content, not layout.
-    //
-    // The height has to stay ahead of HELP_TEXT: the popup takes 90% of it and spends two rows
-    // on borders, so it renders `0.9 * height - 2` lines. At 80 rows that was 70 against a
-    // 73-line reference, and this test started failing for the reference having grown rather
-    // than for anything it exists to check - which had already cost two rounds of trimming
-    // real content to fit a fixture. The modal scrolls (j/k) precisely because the reference
-    // outgrew one screen long ago on any ordinary terminal.
-    //
-    // Derived from HELP_TEXT rather than fixed, so the next entry added to the reference does not
-    // fail this test again: at 90% minus the two border rows, the popup needs `(lines + 2) / 0.9`
-    // rows to show all of it.
+    // Content, not layout: the popup renders `0.9 * height - 2` lines, so the height is derived
+    // from HELP_TEXT's length and grows with it.
     let lines = HELP_TEXT.lines().count();
     let height = ((lines + 2) as f32 / 0.9).ceil() as u16 + 1;
     let backend = ratatui::backend::TestBackend::new(140, height);
@@ -5180,8 +4948,6 @@ fn help_modal_renders_keybindings() {
     );
 }
 
-/// Parses a tiny Rust snippet for the `fully_solved_nodes`/`flatten_visible` tests below,
-/// decoupled from any real fixture on disk.
 fn parse_rust(source: &str) -> tree_sitter::Tree {
     let language =
         codediff::code::language::to_treesitter(&codediff::code::Language::Rust).unwrap();
@@ -5199,7 +4965,6 @@ fn find_first<'a>(node: Node<'a>, kind: &str) -> Option<Node<'a>> {
         .find_map(|child| find_first(child, kind))
 }
 
-/// The function body's two top-level statements, `a();` and `b();`.
 fn two_statements(root: Node) -> (Node, Node) {
     let block = find_first(root, "block").unwrap();
     let mut cursor = block.walk();
@@ -5241,8 +5006,7 @@ fn fully_solved_nodes_hides_fully_marked_subtree_but_keeps_unmarked_ancestors() 
     let mut caches = Caches::default();
     // `a();` and everything under it is matched: fully solved.
     mark_subtree_matched(stmt_a, &mut caches);
-    // `b();` itself is matched, but its `call_expression` child is left Unmarked, so the
-    // statement as a whole is not fully solved.
+    // `b();` is matched but its `call_expression` child is not.
     caches.before_match.insert(stmt_b.id(), usize::MAX);
 
     let solved = fully_solved_nodes(root, &caches, status_before);
@@ -5284,8 +5048,7 @@ fn count_unmarked_nodes_in_tree_counts_every_hole_not_just_the_first() {
         "every node (including unnamed tokens) is marked, so none should be left unmarked"
     );
 
-    // Unmark two nodes again. The boolean predicate this replaced would have stopped at the
-    // first; the count is what the picker's `Unmarked` column ranks by, so it has to see both.
+    // Two holes count as two: the picker's `Unmarked` column ranks by this count.
     let stmt = find_first(root, "expression_statement").unwrap();
     let call = find_first(stmt, "call_expression").unwrap();
     caches.before_match.remove(&call.id());
@@ -5297,15 +5060,11 @@ fn count_unmarked_nodes_in_tree_counts_every_hole_not_just_the_first() {
     );
 }
 
-/// The work queue must not drop, duplicate or reorder anything relative to a plain loop -
-/// every worker count has to produce the identical map. Runs over enough synthetic names that
-/// the shared cursor is genuinely contended, with a `scan` that returns `None` for some of
-/// them so the filtering path is covered too.
+/// Every worker count produces the identical map, with a contended cursor and some `None` scans.
 #[test]
 fn scan_corpus_returns_the_same_map_at_every_worker_count() {
     let names: Vec<String> = (0..500).map(|i| format!("case-{i:03}")).collect();
-    // Deliberately a pure function of the name, so the expected map is knowable independently
-    // of which thread happened to run which entry.
+    // A pure function of the name, so the expected map does not depend on thread scheduling.
     let scan = |name: &str| {
         let n: usize = name.trim_start_matches("case-").parse().unwrap();
         (!n.is_multiple_of(3)).then_some(n * 2)
@@ -5327,8 +5086,6 @@ fn scan_corpus_returns_the_same_map_at_every_worker_count() {
     }
 }
 
-/// More workers than entries must not spawn idle threads or lose work - the cursor runs out
-/// immediately for most of them.
 #[test]
 fn scan_corpus_handles_more_workers_than_entries() {
     let names = vec!["only".to_string()];
@@ -5342,14 +5099,13 @@ fn scan_corpus_handles_more_workers_than_entries() {
     );
 }
 
-/// A panicking worker must take the process down the way a sequential scan always did, rather
-/// than quietly handing back a map missing that thread's share - which would read as `?` in
-/// the picker and be indistinguishable from "not scanned yet".
+/// A panicking worker takes the process down, rather than returning a map missing its share,
+/// which would read as `?` ("not scanned") in the picker.
 #[test]
 fn scan_corpus_propagates_a_worker_panic() {
     let names: Vec<String> = (0..64).map(|i| format!("case-{i}")).collect();
 
-    // The default hook would dump a backtrace for a panic this test is deliberately causing.
+    // Silences the default hook's backtrace for this deliberate panic.
     let hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(|_| {}));
     let result = std::panic::catch_unwind(|| {
@@ -5377,11 +5133,7 @@ fn default_scan_threads_is_at_least_one_and_within_the_cap() {
 
 #[test]
 fn diff_case_unmarked_count_returns_some_for_a_real_case_on_disk() {
-    // Full integrated path (`diffs_case_dir`/`code_pair_from_dir`/`human_mapping::load`, not
-    // crafted temp files) against whatever's actually checked in under src/test/data/diffs/ -
-    // skips rather than fails if none exist yet, same convention
-    // `sample_diff_line_count_is_nonzero_for_a_real_sample_on_disk` uses for this repo's
-    // optional/local-only test data.
+    // Against the checked-in corpus; skips when there is none.
     let Ok(options) = list_available_cases() else {
         return;
     };
@@ -5408,8 +5160,7 @@ fn open_diff_picker_f_on_cmpl_uses_the_cached_unmarked_map_without_recomputing_i
         root.id(),
         HumanMapping::default(),
     );
-    // Pre-seeded, so this exercises only the filter - not the lazy full-corpus scan (see
-    // `open_diff_picker_f_computes_the_unmarked_map_lazily_when_not_yet_cached` for that).
+    // Pre-seeded, so only the filter runs, not the lazy corpus scan.
     app.diff_unmarked = Some(std::collections::HashMap::from([
         ("alpha".to_string(), 3),
         ("bravo".to_string(), 0),
@@ -5465,9 +5216,7 @@ fn open_diff_picker_f_on_cmpl_uses_the_cached_unmarked_map_without_recomputing_i
 
 #[test]
 fn open_diff_picker_f_computes_the_unmarked_map_lazily_when_not_yet_cached() {
-    // Full integrated path against whatever's actually under src/test/data/diffs/ - skips if
-    // there's nothing to scan, same convention as
-    // `diff_case_unmarked_count_returns_some_for_a_real_case_on_disk` above.
+    // Against the checked-in corpus; skips when there is none.
     let Ok(options) = list_available_cases() else {
         return;
     };
@@ -5515,12 +5264,9 @@ fn open_diff_picker_f_computes_the_unmarked_map_lazily_when_not_yet_cached() {
         .diff_unmarked
         .as_ref()
         .expect("s on Unmarked should compute the map lazily when it wasn't cached yet");
-    // Cases that fail to load are deliberately absent rather than present with a made-up
-    // count, so an equality would be wrong - but a *loose* upper bound alone would pass even
-    // if the parallel work queue silently dropped most of the corpus, which is the thing
-    // worth guarding here. `scan_corpus_returns_the_same_map_at_every_worker_count` proves
-    // the queue itself loses nothing; this only has to prove the real scan is wired to it and
-    // reaches nearly every case.
+    // Unloadable cases are absent, so equality is wrong, but a loose bound would miss a queue that
+    // drops most of the corpus. Losing nothing is pinned by
+    // `scan_corpus_returns_the_same_map_at_every_worker_count`; this pins that the scan uses it.
     assert!(map.len() <= options.len());
     assert!(
         map.len() * 10 >= options.len() * 9,
@@ -5553,16 +5299,11 @@ fn flatten_visible_skips_hidden_subtree_entirely_but_keeps_siblings() {
         flat.iter().any(|(n, _)| n.id() == stmt_b.id()),
         "sibling of a hidden node should still appear"
     );
-    // The root is always an ancestor of the still-visible sibling, so it must survive too.
     assert!(flat.iter().any(|(n, _)| n.id() == root.id()));
 }
 
-/// The synthetic-Caches tests above prove `fully_solved_nodes` is correct *given* every node
-/// in a subtree (including unnamed tokens like `;`, `{`, `}`) has an entry. They don't prove
-/// the real marking path actually produces that. `M` (`auto_match_pair`) is the tool the docs
-/// point people at for matching a whole subtree at once, specifically so `H` has something to
-/// hide -- this drives it for real, on a real (unchanged) pair, and checks the result through
-/// the same `rebuild_caches` -> `fully_solved_nodes` pipeline the running app uses.
+/// The synthetic-`Caches` tests assume every node, unnamed tokens included, gets an entry. This
+/// drives `M` for real through `rebuild_caches` -> `fully_solved_nodes` to show it does.
 #[test]
 fn fully_solved_nodes_hides_a_subtree_matched_for_real_via_m() {
     let source = "fn main() {\n    a();\n    b();\n}\n";
@@ -5665,7 +5406,7 @@ fn action_match_to_end_matches_identical_trees_completely() {
         );
     }
 
-    // Running it again once everything is matched must be a no-op, not a duplicate sweep.
+    // Running it again once everything is matched is a no-op.
     let entries_before = app.mapping.entries.len();
     let outcome = action_match_to_end(
         &mut app,
@@ -5739,22 +5480,19 @@ fn action_match_to_end_stops_at_a_kind_mismatch_but_keeps_prior_matches() {
     };
     assert_ne!(before_kind, after_kind);
 
-    // The common prefix (fn main() { ... before the differing statement) must already be
-    // matched, even though the sweep didn't run to completion.
+    // The common prefix is matched even though the sweep stopped.
     assert!(app.dirty);
     assert!(
         !app.mapping.entries.is_empty(),
         "should have matched at least the common prefix"
     );
 
-    // The cursor is parked exactly on the mismatched pair, ready for a human (or a plain `m`)
-    // to resolve it and then resume with `f` again.
+    // The cursor is parked on the mismatched pair, so `m` then `f` resumes.
     assert_eq!(app.before.cursor_id, before_id);
     assert_eq!(app.after.cursor_id, after_id);
 }
 
-/// `f` on a change that only adds lines: the mismatch is the after tree carrying something extra,
-/// so the After panel takes the focus and the sweep stops instead of raising a modal.
+/// `f` on an insert-only change: the After panel takes the focus and the sweep stops, no modal.
 #[test]
 fn action_match_to_end_focuses_after_when_the_diff_only_adds() {
     let before_source = "fn main() {\n    a();\n}\n";
@@ -5806,8 +5544,8 @@ fn action_match_to_end_focuses_after_when_the_diff_only_adds() {
     );
 }
 
-/// The unit behind both: only-adds and only-removes each name a side, and anything else - a mixed
-/// diff, an empty one - names none, which is what keeps the modal for the cases that need it.
+/// Only-adds and only-removes each name a side; a mixed or empty diff names none and keeps the
+/// modal.
 #[test]
 fn one_sided_diff_names_a_side_only_when_the_diff_has_one() {
     let adds = "--- before\n+++ after\n@@ -1 +1,2 @@\n a();\n+b();\n";
@@ -5817,8 +5555,7 @@ fn one_sided_diff_names_a_side_only_when_the_diff_has_one() {
     assert_eq!(one_sided_diff(removes), Some(Side::Before));
     assert_eq!(one_sided_diff(mixed), None);
     assert_eq!(one_sided_diff(""), None);
-    // The `---`/`+++` header starts with the characters being counted and is not a change: a diff
-    // of nothing but a header names no side.
+    // A header alone is not a change.
     assert_eq!(one_sided_diff("--- before\n+++ after\n"), None);
 }
 
@@ -5832,16 +5569,9 @@ fn collect_subtree_ids(node: Node, out: &mut Vec<usize>) {
 
 #[test]
 fn action_match_to_end_does_not_pair_a_trailing_statement_against_the_wrong_node() {
-    // Before has an extra trailing statement the After side has nothing to pair it with.
-    // `f` pairs cursors positionally (exactly like repeated `m`), so once the shared `a(); b();`
-    // prefix is consumed the After cursor lands on the block's closing `}` while the Before
-    // cursor is still sitting on `c();` -- a kind mismatch, so the sweep must stop there rather
-    // than inventing a match for `c();`.
-    //
-    // This diff only removes lines, so the stop is the focus-moving one rather than the modal
-    // (`one_sided_diff`): the Before panel is where `c();` is and where the next mark goes. What
-    // the test is really guarding either way is the line below it - that nothing paired `c();`
-    // with the `}` it happened to be sitting opposite.
+    // Before has an extra trailing `c();`. `f` pairs positionally, so the After cursor reaches the
+    // closing `}` while Before is on `c();`: a kind mismatch where the sweep must stop, never
+    // pairing `c();` with `}`. The diff only removes lines, so the Before panel takes the focus.
     let before_source = "fn main() {\n    a();\n    b();\n    c();\n}\n";
     let after_source = "fn main() {\n    a();\n    b();\n}\n";
     let before_tree = parse_rust(before_source);
@@ -5911,14 +5641,8 @@ fn action_match_to_end_does_not_pair_a_trailing_statement_against_the_wrong_node
     }
 }
 
-/// Regression guard for a real hang: on a ~5,500-node real-world fixture, the original
-/// implementation (which called `apply_match_entry`/`rebuild_caches` -- each O(current entry
-/// count) -- once per node, and re-derived the cursor's flat-array position by linear scan
-/// every iteration) took 26s to reach only 740 of 5477 matches, and was still accelerating: an
-/// effective hang for anything but a toy fixture. Generates a large *synthetic* identical
-/// before/after tree (no dependency on any file under src/test/data/, which can be renamed or
-/// removed) and asserts the sweep finishes fast. If this regresses back to quadratic, this
-/// test will time out or take drastically longer, not just get slower by a little.
+/// `f` must stay linear in tree size: a quadratic sweep is an effective hang on real files. Uses
+/// a large synthetic identical pair, so no fixture on disk is needed.
 #[test]
 fn action_match_to_end_is_linear_not_quadratic_in_tree_size() {
     let mut source = String::from("fn main() {\n");
@@ -5983,13 +5707,8 @@ fn action_match_to_end_is_linear_not_quadratic_in_tree_size() {
     );
 }
 
-/// `M`'s recursive workhorse (`auto_match_pair`) had the same O(n^2) shape `f` did, for the
-/// same reason: it called `apply_match_entry` (O(current entry count) per call, via
-/// `remove_direct_entries_for`'s full scan) once per node in the subtree. On the same
-/// ~5,500-node real fixture matched against itself (so `same_shape` holds all the way down and
-/// the whole tree gets recursed), the original implementation didn't finish within 2 minutes.
-/// Mirrors `action_match_to_end_is_linear_not_quadratic_in_tree_size`'s synthetic large tree so
-/// this doesn't depend on any file under src/test/data/.
+/// `M`'s recursion (`auto_match_pair`) must stay linear too; one dedup scan per node is quadratic.
+/// Same synthetic tree as `action_match_to_end_is_linear_not_quadratic_in_tree_size`.
 #[test]
 fn action_match_subtree_is_linear_not_quadratic_in_tree_size() {
     let mut source = String::from("fn main() {\n");
@@ -6062,11 +5781,8 @@ fn action_match_subtree_is_linear_not_quadratic_in_tree_size() {
 
 #[test]
 fn m_preserves_a_pre_existing_match_under_a_subtree_it_bails_out_of() {
-    // Shapes: `if true { a(); }` before vs `if true { a(); c(); }` after -- the `if`'s inner
-    // block has 3 children before, 4 after, so `auto_match_pair` bails at that block (pushes
-    // one MatchButNotIdentical for the block itself, does not recurse into its children).
-    // `a();`'s `expression_statement` sits *below* that bail point, so `M` (pressed above it,
-    // at the whole function) should never touch its pre-existing entry.
+    // The `if`'s block has 3 children before and 4 after, so `auto_match_pair` stops there. `a();`
+    // is below that point, so `M` at the function must leave its existing entry alone.
     let before_source = "fn main() {\n    if true {\n        a();\n    }\n    b();\n}\n";
     let after_source =
         "fn main() {\n    if true {\n        a();\n        c();\n    }\n    b();\n}\n";
@@ -6145,11 +5861,8 @@ fn m_preserves_a_pre_existing_match_under_a_subtree_it_bails_out_of() {
 
 #[test]
 fn m_replaces_a_pre_existing_match_on_a_node_it_actually_revisits() {
-    // Identical before/after: `same_shape` holds at every level, so `M` pressed at the root
-    // recurses all the way down and revisits every node, including `a();`. Pre-seed a *wrong*
-    // pre-existing entry for `a();` (pointing at `b();` instead of its own counterpart) and
-    // confirm `M` replaces it with exactly one correct entry -- not a leftover stale one
-    // alongside the new one, which would silently corrupt the saved mapping.
+    // Identical pair: `M` at the root revisits every node, `a();` included, so its wrong
+    // pre-seeded entry must be replaced by exactly one correct entry, with no stale leftover.
     let source = "fn main() {\n    a();\n    b();\n}\n";
     let before_tree = parse_rust(source);
     let after_tree = parse_rust(source);
@@ -6249,8 +5962,7 @@ fn write_csv(path: &Path, rows: &[(&str, &str, &str, &str, &str, &str)]) {
     writer.flush().unwrap();
 }
 
-/// (path, promoted_to, dataset) per row - the three columns every test in this section
-/// actually cares about; language/repository/commit are only there to match rows.
+/// (path, promoted_to, dataset) per row; the other columns only identify rows.
 fn read_csv(path: &Path) -> Vec<(String, String, String)> {
     let mut reader = csv::Reader::from_path(path).unwrap();
     reader
@@ -6299,9 +6011,7 @@ fn update_sample_csv_sets_promoted_to_on_the_matching_row_only() {
             (
                 "src/b.rs".to_string(),
                 "".to_string(),
-                // Every other row's dataset must survive untouched, same as its other
-                // columns - this is the one column a naive "just rewrite promoted_to"
-                // implementation could plausibly clobber.
+                // Every other row's dataset survives: the column a naive rewrite would clobber.
                 "full".to_string()
             ),
         ]
@@ -6326,7 +6036,7 @@ fn update_sample_csv_returns_false_when_no_row_matches() {
     let found = update_sample_csv_at(file.path(), &source, "rust-new-case").unwrap();
     assert!(!found);
 
-    // Untouched: no row matched, so nothing should have been rewritten.
+    // No row matched, so nothing is rewritten.
     let rows = read_csv(file.path());
     assert_eq!(
         rows,
@@ -6365,9 +6075,8 @@ fn sample_triage_statuses_at_reads_the_status_column_for_every_row() {
             ("Rust", "repo", "def456", "src/b.rs", "", "small"),
         ],
     );
-    // Reject the second row so the map has one of each of the three statuses (the third being
-    // whatever `write_csv` alone leaves as its backward-compat default, exercised by the
-    // no-`status`-column case below).
+    // Reject the second row, so the map has all three statuses (the third is `write_csv`'s
+    // default).
     let rejected_source = SampleSource {
         language: "Rust".to_string(),
         repository: "repo".to_string(),
@@ -6430,8 +6139,7 @@ fn sample_metadata_at_is_empty_when_file_does_not_exist() {
     assert!(statuses.is_empty());
 }
 
-/// (path, promoted_to, dataset, status, comment) per row - like `read_csv`, but for tests that
-/// also care about the two newest columns.
+/// `read_csv` plus the `status` and `comment` columns.
 fn read_csv_with_status(path: &Path) -> Vec<(String, String, String, String, String)> {
     let mut reader = csv::Reader::from_path(path).unwrap();
     reader
@@ -6542,8 +6250,7 @@ fn reject_sample_csv_at_returns_false_when_no_row_matches() {
     let found = reject_sample_csv_at(file.path(), &source, "reason").unwrap();
     assert!(!found);
 
-    // Untouched: no row matched, so the file is never rewritten -- still the original
-    // (pre-`status`/`comment`) 6-column shape, not a backfilled 8-column one.
+    // No row matched, so the file keeps its original 6-column shape.
     let rows = read_csv_with_status(file.path());
     assert_eq!(
         rows,
@@ -6591,8 +6298,7 @@ fn set_sample_comment_at_sets_comment_without_touching_status_or_promoted_to() {
         vec![
             (
                 "src/a.rs".to_string(),
-                // A comment must never touch promoted_to or status - unlike reject, this can
-                // be set on an already-PROMOTED row without disturbing either.
+                // A comment never touches promoted_to or status, even on a PROMOTED row.
                 "rust-already-promoted".to_string(),
                 "small".to_string(),
                 "PROMOTED".to_string(),
@@ -6708,10 +6414,8 @@ fn algo_reason_reports_the_pass_that_produced_each_side_of_a_match() {
     let before_ast = before.ast.as_ref().unwrap();
     let after_ast = after.ast.as_ref().unwrap();
 
-    // Identical before/after source: the whole tree matches via a single hash comparison at
-    // the root, so both roots should report `IdenticalHash` - and nothing further down should
-    // even have its own entry (see `add_delete_mappings`'s sibling passes: a hash-matched
-    // subtree's descendants are never visited individually).
+    // Identical source matches by one hash comparison at the root, so both roots report
+    // `IdenticalHash` and descendants have no entry of their own.
     let before_reason = algo_reason(Side::Before, before_ast.root_node(), &diff_ast);
     let after_reason = algo_reason(Side::After, after_ast.root_node(), &diff_ast);
     assert_eq!(before_reason, Some(ASTMappingReason::IdenticalHash));
@@ -6721,8 +6425,7 @@ fn algo_reason_reports_the_pass_that_produced_each_side_of_a_match() {
 
 #[test]
 fn algo_reason_is_none_when_the_diff_has_no_entry_for_the_node() {
-    // A fresh, unpopulated ASTDiff has no entries at all, so every lookup should miss cleanly
-    // rather than panicking - this is the state before `p` has ever been pressed.
+    // An empty ASTDiff (before `p`) misses cleanly rather than panicking.
     let source = "fn f() {}\n";
     let code = codediff::code::Code::from_string(source, &codediff::code::Language::Rust);
     let root = code.ast.as_ref().unwrap().root_node();
@@ -6734,9 +6437,8 @@ fn algo_reason_is_none_when_the_diff_has_no_entry_for_the_node() {
 
 #[test]
 fn reason_label_matches_benchmark_optimal_solutions_abbreviations() {
-    // Kept in sync by hand with `src/bin/benchmark_optimal_solutions.rs`'s `REASONS` table -
-    // this test exists so a label drift between the two tools fails loudly instead of quietly
-    // making the same abbreviation mean two different things.
+    // Must match `benchmark_optimal_solutions`' `REASONS` table, so one abbreviation means one
+    // thing in both tools.
     assert_eq!(reason_label(ASTMappingReason::IdenticalHash), "IdHash");
     assert_eq!(
         reason_label(ASTMappingReason::IdenticalHashOfAncestor),
@@ -6774,8 +6476,6 @@ fn reason_detail_shows_apted_provenance_but_reason_label_does_not() {
     let reason = ASTMappingReason::APTED("bottom_up_expansion");
     assert_eq!(reason_label(reason), "APTED");
     assert_eq!(reason_detail(reason), "APTED:bottom_up_expansion");
-    // Every other variant has no payload to show, so `reason_detail` just falls back to the
-    // same short label as `reason_label`.
     assert_eq!(
         reason_detail(ASTMappingReason::BottomUpPropagation),
         "BottomUpProp"
@@ -6783,7 +6483,7 @@ fn reason_detail_shows_apted_provenance_but_reason_label_does_not() {
 }
 
 // -----------------------------------------------------------------------------------------
-// Multi-map groups (Phase 2: x/c selection, m/M commit, u removal)
+// Multi-map groups (x/c selection, m/M commit, u removal)
 // -----------------------------------------------------------------------------------------
 
 #[test]
@@ -6824,8 +6524,7 @@ fn commit_multi_map_group_replaces_any_prior_entry_touching_its_nodes() {
     assert_eq!(before_foos.len(), 3);
     assert_eq!(after_foos.len(), 2);
 
-    // A pre-existing plain entry pairing the first before-foo with the first after-foo, which
-    // the new group commit (covering all 3/2) should displace.
+    // A plain entry on the first before/after foo, which the group commit displaces.
     let mut mapping = HumanMapping {
         entries: vec![HumanMappingEntry {
             operation: HumanOperation::Identical,
@@ -6924,10 +6623,8 @@ fn commit_multi_map_group_replaces_a_prior_group_sharing_a_node() {
 
 #[test]
 fn commit_multi_map_group_orders_paths_by_source_position_not_by_arena_id() {
-    // A `BTreeSet<usize>` orders by node id, not source position - parse-unstable (same
-    // lesson as this project's benchmark-determinism-fix). The committed group's paths must
-    // come out in source order regardless, so re-selecting the same nodes in a later session
-    // can't shuffle a `human_mapping.json` that otherwise didn't change.
+    // A `BTreeSet<usize>` orders by node id, which is not parse-stable. Paths must come out in
+    // source order, so re-selecting in a later session does not reshuffle the saved file.
     let source = "fn main() {\n    a();\n    b();\n    c();\n}\n";
     let tree = parse_rust(source);
     let root = tree.root_node();
@@ -6970,10 +6667,8 @@ fn commit_multi_map_group_with_children_clears_a_pre_existing_descendant_entry()
     assert_eq!(before_foos.len(), 2);
     assert_eq!(after_foos.len(), 1);
 
-    // A stale entry on a descendant of `before_foos[0]` (its inner `call_expression`),
-    // pointing at some unrelated after node - exactly what a `with_children` commit must
-    // sweep, the same way `d`/`i`'s own `clear_before_descendants`/`clear_after_descendants`
-    // calls already do for a plain delete/insert-with-children mark.
+    // A stale entry on a descendant of `before_foos[0]`, which a `with_children` commit sweeps as
+    // `d`/`i`'s `clear_before_descendants`/`clear_after_descendants` do.
     let descendant = find_first(before_foos[0], "call_expression").unwrap();
     let mut mapping = HumanMapping {
         entries: vec![HumanMappingEntry {
@@ -7192,8 +6887,7 @@ fn action_commit_multi_map_group_commits_directly_when_kinds_match() {
 
     assert!(matches!(outcome, ActionOutcome::Done(_)));
     assert_eq!(mapping.groups.len(), 1);
-    // No content hashes were supplied (`no_hashes`), so every lookup misses and the group
-    // falls back to `MatchButNotIdentical` - see `multi_map_group_operation`.
+    // No content hashes, so the group falls back to `MatchButNotIdentical`.
     assert_eq!(
         mapping.groups[0].operation,
         HumanOperation::MatchButNotIdentical
@@ -7241,8 +6935,7 @@ fn action_unmark_on_a_group_member_removes_the_whole_group() {
     ));
     let caches = rebuild_caches_for_mapping(&mapping, before_root, after_root);
 
-    // Any one member - here, the leftover before-foo that landed on Delete rather than a
-    // matched pair - should be enough to drop the whole group.
+    // Any member, here a leftover on Delete, drops the whole group.
     let leftover = before_foos
         .iter()
         .find(|n| {
@@ -7395,12 +7088,11 @@ fn handle_key_m_with_a_pending_selection_commits_a_multi_map_group() {
         app.before_multi_select.is_empty() && app.after_multi_select.is_empty(),
         "the selection should be cleared once committed"
     );
-    // `m`, not `M`: the committed group should not require subtree closure.
+    // `m`, not `M`: no subtree closure required.
     assert!(!app.mapping.groups[0].with_children);
 }
 
-/// A three-statement before, two-statement after pair with every statement pending on both sides
-/// - the fixture the multi-map key tests share.
+/// Three statements before, two after, every one pending on both sides.
 fn app_with_every_statement_pending() -> (
     App,
     tree_sitter::Tree,
@@ -7519,8 +7211,7 @@ fn handle_key_m_with_an_all_to_all_selection_commits_it_and_resets_the_pairing()
         before_source,
         after_source,
     );
-    // `m`, not `M`: on an all-to-all selection `M` walks the whole subtrees instead (see
-    // `action_commit_all_to_all_subtrees`), so `m` is what commits the selected roots alone.
+    // On an all-to-all selection `M` walks the subtrees, so `m` commits the roots alone.
     press(
         &mut app,
         KeyCode::Char('m'),
@@ -7534,8 +7225,7 @@ fn handle_key_m_with_an_all_to_all_selection_commits_it_and_resets_the_pairing()
     let group = &app.mapping.groups[0];
     assert_eq!(group.pairing, GroupPairing::AllToAll);
     assert!(!group.with_children);
-    // No content hashes were supplied, so nothing can be proven identical - same inference as
-    // for any group (`multi_map_group_operation`).
+    // No content hashes, so nothing is provably identical.
     assert_eq!(group.operation, HumanOperation::MatchButNotIdentical);
     assert!(
         app.status
@@ -7667,8 +7357,7 @@ fn action_unmark_names_the_kind_of_group_it_removes() {
     assert!(app.mapping.groups.is_empty());
 }
 
-/// An app with every `foo();`-shaped statement of both sides pending, flipped to all-to-all -
-/// the state `M`'s lockstep walk starts from.
+/// Every `foo();` statement pending on both sides, flipped to all-to-all.
 fn app_with_all_to_all_selection(before_root: Node, after_root: Node) -> App {
     let mut app = App::new(
         "test".to_string(),
@@ -7705,8 +7394,8 @@ fn all_to_all_subtree_groups_returns_one_member_set_per_position() {
     )
     .unwrap();
 
-    // `foo();` is seven nodes: the statement, the call, its identifier, the arguments and their
-    // two parens, and the semicolon - one group each, every one 1:1 here.
+    // `foo();` is seven nodes (statement, call, identifier, arguments, two parens, semicolon):
+    // one 1:1 group each.
     assert_eq!(groups.len(), 7, "{groups:?}");
     let kinds: Vec<&str> = groups.iter().map(|(before, _)| before[0].kind()).collect();
     assert_eq!(
@@ -7953,8 +7642,7 @@ fn render_panel_marks_an_all_to_all_member_with_a_capital_g() {
         .unwrap();
 
     let content = terminal.backend().buffer().content();
-    // Every member is matched - including the third, which an any-one-to-one group would have
-    // left over - and each carries the all-to-all marker.
+    // Every member is matched, including the third an any-one-to-one group would leave over.
     for statement in block_statements(before_root) {
         assert_eq!(status_before(statement, &caches), NodeStatus::Matched);
         let row = flat
@@ -8006,8 +7694,7 @@ fn render_panel_marks_a_group_matched_node_and_a_pending_selection_distinctly() 
     ));
     let mut panel = PanelState::new(before_root.id());
 
-    // Mark one before-foo (not part of any group) as a pending multi-map selection, to prove
-    // it renders distinctly from the already-committed group members.
+    // A before-foo outside any group, pending, to show it renders distinctly.
     let mut pending = std::collections::BTreeSet::new();
     let plain_node = find_first(before_root, "function_item").unwrap();
     pending.insert(plain_node.id());
@@ -8037,8 +7724,7 @@ fn render_panel_marks_a_group_matched_node_and_a_pending_selection_distinctly() 
         })
         .unwrap();
 
-    // `render_panel` draws inside a bordered `Block`, so row 0 and column 0 of the buffer are
-    // the border itself - list content starts at row 1, column 1.
+    // Row 0 and column 0 are the `Block` border.
     let content = terminal.backend().buffer().content();
     let plain_row_idx = flat
         .iter()
@@ -8067,9 +7753,8 @@ fn render_panel_marks_a_group_matched_node_and_a_pending_selection_distinctly() 
     );
 }
 
-/// A tab reaching a ratatui cell is what left the `t` view's characters on screen after the modal
-/// closed (see `display_safe_char`). `go-lazygit-switch-to-strings` is Go, so it is tab-indented,
-/// which makes it the fixture that actually reproduced it.
+/// A tab in a ratatui cell leaves characters on screen after the modal closes (see
+/// `display_safe_char`). This Go fixture is tab-indented.
 #[test]
 fn text_view_renders_no_literal_tabs_for_a_tab_indented_fixture() {
     let dir = diffs_root()
@@ -8093,9 +7778,7 @@ fn text_view_renders_no_literal_tabs_for_a_tab_indented_fixture() {
     }
 }
 
-/// The tab replacement has to be one character wide, not an expansion to the next tab stop:
-/// `render_paint_side` maps a paint cursor's column straight onto the line's byte offsets, so a
-/// widened tab would paint the wrong bytes.
+/// A tab becomes one character, not a tab stop: paint cursor columns are byte offsets.
 #[test]
 fn text_view_keeps_one_screen_column_per_source_character() {
     let source = "\tif x {\n\t\treturn \"y\"\n\t}\n";
@@ -8124,10 +7807,8 @@ fn display_safe_str_replaces_every_tab_and_leaves_everything_else() {
     assert_eq!(display_safe_str("no tabs here"), "no tabs here");
 }
 
-/// A `\r` is worse in a terminal than the `\t` the rule above was written for: it returns the
-/// cursor to column 0 of the row being drawn, so the row is overwritten from its start instead of
-/// merely shifted. `render_paint_side` walks each row from `split('\n')`, which keeps the `\r`
-/// that ends every line of a Windows CRLF file, so this is the last place it can be caught.
+/// A `\r` returns the terminal cursor to column 0, overwriting the row. `split('\n')` keeps a CRLF
+/// file's `\r`, so the renderer must catch it.
 #[test]
 fn the_text_view_never_puts_a_carriage_return_in_the_buffer() {
     let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -8151,10 +7832,8 @@ fn the_text_view_never_puts_a_carriage_return_in_the_buffer() {
     }
 }
 
-/// A CRLF row's `\r` is part of the line terminator, not a column of the row. Left in, it gives
-/// every row of a Windows file one phantom column past its last visible character: `$` lands on
-/// it, a selection can cover it, and a multi-row painted span runs into it - so a painted region
-/// draws one highlighted cell wider on every row than the reader asked for.
+/// A CRLF row's `\r` is part of the terminator, not a column: otherwise `$`, selections and
+/// multi-row spans reach one phantom cell past the last visible character.
 #[test]
 fn a_crlf_row_ends_at_its_last_visible_character() {
     let source = "let x = 1;\r\nlet y = 2;\r\n";
@@ -8166,7 +7845,6 @@ fn a_crlf_row_ends_at_its_last_visible_character() {
         "the row must be exactly one byte shorter than what split('\\n') hands back"
     );
 
-    // A span covering the whole first row must not reach a column the row no longer has.
     let span = HumanTextSpan {
         start_row: 0,
         start_column: 0,
@@ -8181,18 +7859,15 @@ fn a_crlf_row_ends_at_its_last_visible_character() {
     );
 }
 
-/// The substitution has to stay one byte for one byte, which `is_control` would not be: a C1 code
-/// point (U+0080-U+009F) is two UTF-8 bytes, and every `HumanTextSpan` is stored in byte columns
-/// of the untouched source.
+/// One byte for one byte: a C1 code point is two UTF-8 bytes, and spans are in byte columns.
 #[test]
 fn display_safe_leaves_multi_byte_control_code_points_alone() {
     assert_eq!(display_safe_char('\u{9c}'), '\u{9c}');
     assert_eq!(display_safe_char('\r'), ' ');
 }
 
-/// Promoting or rejecting one sample rewrites the whole sample.csv, so any column the reader drops
-/// is erased for every other row at the same time. `size_bucket` was exactly that column between
-/// the stratified draw landing and this test.
+/// Promoting or rejecting rewrites the whole sample.csv, so a column the reader drops is erased
+/// from every row.
 #[test]
 fn sample_csv_round_trip_preserves_the_size_bucket() {
     let dir = tempfile::tempdir().unwrap();
@@ -8216,9 +7891,8 @@ fn sample_csv_round_trip_preserves_the_size_bucket() {
     assert_eq!(again[1].comment, "a note", "the columns must not shift");
 }
 
-/// The same guarantee against the real corpus file, so a future column added to sample.csv by
-/// `sample_test_diffs` but not to this tool's reader/writer fails here rather than silently
-/// deleting itself the next time someone presses `s` in the `O` picker.
+/// The same against the real corpus file, so a new sample.csv column this tool does not know
+/// fails here instead of being deleted on the next promotion.
 #[test]
 fn round_tripping_the_real_sample_csv_loses_nothing() {
     let rows = read_sample_csv_rows(&sample_csv_path()).unwrap();
@@ -8262,8 +7936,7 @@ fn codediff_text_entries_keeps_the_pairing_that_the_span_view_drops() {
     }
 }
 
-/// The point of the seed: what it writes must *be* codediff's rendering, so the starting point
-/// shows zero disagreement and every remaining edit is a correction the human chose to make.
+/// The seed must *be* codediff's rendering, so it starts at zero disagreement.
 #[test]
 fn seeding_a_painting_reproduces_codediffs_own_spans_on_both_sides() {
     let before_src = "fn main() {\n    foo();\n}\n";
@@ -8319,8 +7992,7 @@ fn seeding_refuses_to_overwrite_a_painting_that_already_has_ranges() {
     );
 
     action_paint_seed_from_codediff(&mut app, &before, &after);
-    // `HumanTextEntry` comes from the library and carries no `PartialEq`, so compare the rendered
-    // shape rather than deriving one on a public type purely for this assertion.
+    // `HumanTextEntry` has no `PartialEq`; compare the rendered shape.
     let seeded = format!("{:?}", solution_entries(&app.mapping, &app.text_solution));
     app.dirty = false;
 
@@ -8341,10 +8013,9 @@ fn seeding_refuses_to_overwrite_a_painting_that_already_has_ranges() {
     );
 }
 
-/// The overlap guard, against a fixture that actually trips it. codediff's own rendering produces
-/// overlapping ranges on 22 of the 513 corpus fixtures, so this is a real shape, not a contrived
-/// one - and a painting cannot represent it, because the renderer resolves an overlap by highest
-/// verdict while the scorer resolves it by list order.
+/// The overlap guard, against a fixture that trips it: codediff's rendering overlaps on some
+/// corpus fixtures, and a painting cannot represent that (the renderer resolves an overlap by
+/// highest verdict, the scorer by list order).
 #[test]
 fn seeding_refuses_a_pair_whose_codediff_ranges_overlap() {
     let pair = codediff::test::helper::handmade_test_code_pair("xml-odoo-odoo-add-two-attributes")
@@ -8389,7 +8060,7 @@ fn spans_overlap_detects_a_shared_byte_and_allows_touching_ranges() {
     assert!(!spans_overlap(&[]));
 }
 
-/// The text of every screen row a call produced, gutter included - what the reader actually sees.
+/// The text of every screen row a call produced, gutter included.
 fn painted_screen_rows(lines: &[ratatui::text::Line<'static>]) -> Vec<String> {
     lines
         .iter()
@@ -8418,7 +8089,7 @@ fn a_long_line_wraps_across_screen_rows_with_a_blank_continuation_gutter() {
         "the next source row still gets its own number: {rows:?}"
     );
 
-    // Nothing is lost or duplicated: the wrapped rows reassemble into the original line.
+    // The wrapped rows reassemble into the original line.
     let rejoined: String = rows[1..4]
         .iter()
         .map(|r| r[4..].to_string())
@@ -8441,9 +8112,8 @@ fn wrapping_never_emits_more_screen_rows_than_the_viewport_holds() {
     assert_eq!(rows.len(), 5, "a 5-row viewport must render exactly 5 rows");
 }
 
-/// `scroll_into_view` keeps the cursor inside a *source*-row window, which stops meaning the same
-/// thing once rows wrap: one very long line can fill the viewport by itself. The renderer walks
-/// its start row forward so the cursor's row is always on screen.
+/// `scroll_into_view` bounds the cursor in source rows; one long wrapped line can fill the
+/// viewport, so the renderer walks its start row forward to keep the cursor row on screen.
 #[test]
 fn the_cursor_row_stays_visible_when_the_rows_above_it_wrap() {
     let source = format!("{}\n{}\nCURSORROW\n", "a".repeat(400), "b".repeat(400));
@@ -8451,8 +8121,7 @@ fn the_cursor_row_stays_visible_when_the_rows_above_it_wrap() {
     state.cursor[0] = (2, 0);
     state.scroll[0] = 0;
 
-    // Rows 0 and 1 wrap to 12 screen rows each at this width, so a naive render from row 0 would
-    // never reach row 2 inside a 10-row viewport.
+    // Rows 0 and 1 wrap to 12 screen rows each: a render from row 0 never reaches row 2.
     let rows = painted_screen_rows(&render_paint_side(&source, &[], &state, 0, 10, 40));
     assert!(
         rows.iter().any(|r| r.contains("CURSORROW")),
@@ -8482,8 +8151,7 @@ fn a_width_with_no_room_beside_the_gutter_does_not_wrap_or_hang() {
 #[test]
 fn a_painted_span_keeps_its_style_across_a_wrap_boundary() {
     let source = format!("{}\n", "q".repeat(80));
-    // Focus the other side: `PaintClass::Cursor` outranks `Painted`, so a cursor resting on this
-    // row would style its first character as the cursor and mask what this test checks.
+    // Focus the other side: `PaintClass::Cursor` outranks `Painted` and would mask the check.
     let state = TextPaintState {
         side: 1,
         ..TextPaintState::default()
@@ -8516,8 +8184,7 @@ fn a_painted_span_keeps_its_style_across_a_wrap_boundary() {
     }
 }
 
-/// A wrapped row must respect terminal *cells*, not characters: a CJK ideograph is one character
-/// and two cells, so a character-counted wrap overflows the panel by one column per ideograph.
+/// Wrapping counts terminal cells: a CJK ideograph is one character and two cells.
 #[test]
 fn wrapping_measures_terminal_cells_not_characters() {
     let source = format!("{}\n", "漢".repeat(20));
@@ -8552,9 +8219,8 @@ fn wrapping_measures_terminal_cells_not_characters() {
     );
 }
 
-/// Two painted ranges claiming the same byte are not representable: the renderer resolves an
-/// overlap by highest verdict and the scorer by list order, so such a painting looks like one
-/// thing and grades as another. Refused at the keystroke, while the selection is still on screen.
+/// Two ranges claiming one byte are not representable (the renderer and the scorer resolve an
+/// overlap differently), so they are refused at the keystroke.
 #[test]
 fn painting_over_an_already_painted_range_is_refused() {
     let before_src = "aaaabbbbcccc\n";
@@ -8573,7 +8239,6 @@ fn painting_over_an_already_painted_range_is_refused() {
         ..TextPaintState::default()
     };
 
-    // Paint cols 0..8 on the Before side.
     state.cursor[0] = (0, 0);
     state.anchor[0] = Some((0, 7));
     action_paint_one_sided(
@@ -8590,7 +8255,7 @@ fn painting_over_an_already_painted_range_is_refused() {
         app.status
     );
 
-    // Now paint cols 4..12, which shares bytes 4..8 with it.
+    // Cols 4..12 share bytes 4..8 with it.
     state.cursor[0] = (0, 4);
     state.anchor[0] = Some((0, 11));
     action_paint_one_sided(
@@ -8613,9 +8278,8 @@ fn painting_over_an_already_painted_range_is_refused() {
     );
 }
 
-/// Two ranges meeting at a line boundary share only the newline, which `label_bytes` never
-/// labels. They disagree about nothing, and refusing them would make ordinary line-by-line
-/// painting impossible.
+/// Ranges meeting at a line boundary share only the newline, which `label_bytes` never labels;
+/// refusing them would make line-by-line painting impossible.
 #[test]
 fn painting_two_ranges_that_meet_at_a_newline_is_allowed() {
     let before_src = "first line\nsecond line\n";
@@ -8654,8 +8318,8 @@ fn painting_two_ranges_that_meet_at_a_newline_is_allowed() {
     );
 }
 
-/// `!` clears all three grounds truth at once. Clearing the tree mapping while leaving paintings
-/// behind would leave a fixture asserting things about a mapping that no longer exists.
+/// `!` clears all three ground truths: paintings left behind would assert about a mapping that no
+/// longer exists.
 #[test]
 fn resetting_a_case_clears_the_mapping_the_groups_and_every_painting() {
     let source = "fn main() {}\n";
@@ -8705,9 +8369,8 @@ fn resetting_a_case_clears_the_mapping_the_groups_and_every_painting() {
     assert!(status.contains("Reset"), "status should say so: {status}");
 }
 
-/// The confirmation only goes through on the explicit key. Enter confirms everywhere else in this
-/// tool, so it is exactly the key most likely to be pressed by reflex on a modal that cannot be
-/// undone.
+/// Only the explicit key confirms: Enter confirms everywhere else, so it is the reflex press on a
+/// modal that cannot be undone.
 #[test]
 fn resetting_a_case_needs_the_explicit_key_and_enter_will_not_do() {
     let source = "fn main() {}\n";
@@ -8768,8 +8431,7 @@ fn resetting_a_case_needs_the_explicit_key_and_enter_will_not_do() {
 // Text-only mode: a fixture tree-sitter has no grammar for
 // ---------------------------------------------------------------------------------------------
 
-/// A Bazel `BUILD`-shaped pair, in a language tree-sitter has no grammar for. The solver must
-/// open it rather than refusing with "Before code for '...' has no AST".
+/// A Bazel `BUILD`-shaped pair, in a language with no tree-sitter grammar. It must open.
 fn unparseable_pair() -> (Code, Code) {
     let before = "cc_library(\n    name = \"a\",\n    srcs = [\"a.cc\"],\n)\n";
     let after = "cc_library(\n    name = \"a\",\n    srcs = [\"b.cc\"],\n)\n";
@@ -8793,13 +8455,13 @@ fn compute_frame_state_has_no_roots_for_a_pair_with_no_grammar() -> Result<()> {
     assert!(state.roots().is_none(), "there is no tree to hand out");
     assert!(state.before_flat.is_empty() && state.after_flat.is_empty());
     assert_eq!((state.before_unmarked, state.after_unmarked), (0, 0));
-    // The text is present either way, which is the whole point: it is what a painting is made of.
+    // The text is present either way: a painting is made of it.
     assert_eq!(state.before_src, before.contents.as_bytes());
     assert_eq!(state.after_src, after.contents.as_bytes());
     Ok(())
 }
 
-/// The panels say why they are empty rather than just being empty, which would read as a bug.
+/// Empty panels without a reason would read as a bug.
 #[test]
 fn draw_ui_names_the_missing_grammar_instead_of_drawing_an_empty_tree() {
     let (before, after) = unparseable_pair();
@@ -8834,8 +8496,7 @@ fn draw_ui_names_the_missing_grammar_instead_of_drawing_an_empty_tree() {
     );
 }
 
-/// Painting is reachable with no tree: `t` opens the paint view exactly as it does anywhere else.
-/// This is the key the whole mode exists to keep working.
+/// `t` opens the paint view with no tree: the key text-only mode exists for.
 #[test]
 fn the_paint_view_opens_without_a_tree() {
     let (before, after) = unparseable_pair();
@@ -8858,7 +8519,7 @@ fn the_paint_view_opens_without_a_tree() {
     );
 }
 
-/// A tree key is answered rather than silently swallowed - a dead keypress reads as a hang.
+/// A tree key is answered, not swallowed: a dead keypress reads as a hang.
 #[test]
 fn a_tree_key_explains_itself_in_text_only_mode() {
     let (before, after) = unparseable_pair();
@@ -8882,9 +8543,8 @@ fn a_tree_key_explains_itself_in_text_only_mode() {
     assert!(app.mapping.entries.is_empty(), "and must not map anything");
 }
 
-/// The same key with a tree present stays silent: `handle_key` claims `m` itself and never
-/// reaches the fallthrough, so the explanation must not fire there and overwrite whatever `m` had
-/// to say.
+/// With a tree, `handle_key` claims `m` itself, so the explanation must not overwrite what `m`
+/// reports.
 #[test]
 fn the_same_key_is_not_explained_away_when_there_is_a_tree() {
     let (before, after) = unparseable_pair();
@@ -8904,8 +8564,8 @@ fn the_same_key_is_not_explained_away_when_there_is_a_tree() {
     assert_eq!(app.status, before_status);
 }
 
-/// codediff's own answer for a pair with no grammar is its plain-text fallback, not nothing - so
-/// the `p` overlay has something to draw and `P` has something to seed from.
+/// For a pair with no grammar codediff answers with its plain-text fallback, so `p` and `P` have
+/// something to work with.
 #[test]
 fn codediff_text_spans_falls_back_to_the_plain_text_diff() {
     let (before, after) = unparseable_pair();
@@ -8917,8 +8577,7 @@ fn codediff_text_spans_falls_back_to_the_plain_text_diff() {
     );
 }
 
-/// A text-only fixture's generated stub asserts a painting, never a tree mapping: there is no
-/// tree to map, so `assert_matches_human_mapping` could only ever fail there.
+/// No tree, so `assert_matches_human_mapping` could only fail.
 #[test]
 fn a_text_only_stub_has_no_mapping_test() {
     let contents = stub_test_contents("bazel-not-actually-supported-by-treesitter", None, true);
@@ -8942,19 +8601,13 @@ fn a_text_only_stub_has_no_mapping_test() {
         contents.lines().all(|line| line.len() <= 100),
         "no line should run past this codebase's comment width: {contents}"
     );
-    // `ensure_painting_stub_test`/`ensure_invariants_stub_test` append theirs onto this, and both
-    // find their anchor here even though there is no `use crate::test;` line to sit beside.
+    // The later writers need an anchor here even without `use crate::test;`.
     assert!(contents.contains("use anyhow::Result;\n"));
 }
 
-/// The finished file a text-only fixture ends up with, assembled by the three writers in the
-/// order `action_save` calls them: a painting test, the ground-truth invariants, and no mapping
-/// test at all.
-///
-/// The imports land next to the one already there rather than after the tests - `insert_use_line`
-/// has no `use crate::test;` to anchor to here, which is the case that motivated its second
-/// anchor. rustfmt reorders that import group on the next run, exactly as it does for an ordinary
-/// stub; what matters is that the file is valid, complete Rust the moment it is written.
+/// The file a text-only fixture ends up with, written in `action_save`'s order: a painting test,
+/// the invariants test, no mapping test. The imports must land in the import block, anchored on
+/// `use anyhow::Result;`.
 #[test]
 fn a_text_only_fixture_file_carries_a_painting_and_invariants_but_no_mapping() {
     let name = "bazel-not-actually-supported-by-treesitter";
@@ -8976,8 +8629,6 @@ fn a_text_only_fixture_file_carries_a_painting_and_invariants_but_no_mapping() {
         "{file}"
     );
     assert!(!file.contains("fn mapping()"), "{file}");
-    // Both imports sit in the import block, above the first test - not appended past the end of
-    // the file, which is where they landed before `insert_use_line` learned its second anchor.
     let first_test = file.find("#[test]").unwrap();
     for import in [
         "assert_matches_human_painting_within_limit;",
@@ -8991,13 +8642,9 @@ fn a_text_only_fixture_file_carries_a_painting_and_invariants_but_no_mapping() {
 // `A` in the text view: put this side's tree panel on the leaf under the text cursor
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 
-/// Presses `A` in the text view with the cursor at `(row, column)` on `side`, and answers with the
-/// kind and text of the leaf that side's tree panel ended up on.
-///
-/// Drives it through `handle_modal_key`, for the reason `x_in_the_text_view_banks_the_live_selection`
-/// gives: the failure mode worth pinning is an unwired key, which calling the action directly
-/// cannot see. Both the `Code` passed in and the tree the assertion reads come from one parse -
-/// node ids are addresses inside a particular parse, so a second one would answer about nothing.
+/// Presses `A` in the text view at `(row, column)` on `side` through `handle_modal_key` (an unwired
+/// key is the failure worth pinning), and returns the kind and text of the leaf the tree panel
+/// landed on. `Code` and the asserted tree share one parse: node ids are only valid within it.
 fn press_reveal_node(
     source: &str,
     side: usize,
@@ -9075,8 +8722,8 @@ fn a_in_the_text_view_moves_the_panel_for_the_side_it_is_on() {
     );
 }
 
-/// A column in the whitespace between two tokens belongs to no leaf at all, so the next one is
-/// what `A` lands on - and the status line says so rather than letting the jump look exact.
+/// Whitespace between tokens belongs to no leaf, so `A` lands on the next one and the status line
+/// says so.
 #[test]
 fn a_in_the_text_view_lands_on_the_next_leaf_from_inter_token_whitespace() {
     let (app, kind, text, _) = press_reveal_node("let alpha  =  1;\n", 0, 0, 10);
@@ -9090,9 +8737,8 @@ fn a_in_the_text_view_lands_on_the_next_leaf_from_inter_token_whitespace() {
     );
 }
 
-/// The CRLF case, which is what `byte_offset` exists for rather than reusing `row_text`: that
-/// strips a trailing `\r`, and a row offset built from stripped rows falls one byte further behind
-/// per row. Here that is two bytes by row 2 - enough to land on `let` instead of `ccc`.
+/// `byte_offset`, not `row_text` (which strips `\r`): offsets from stripped rows fall a byte behind
+/// per row, landing on `let` instead of `ccc` here.
 #[test]
 fn a_in_the_text_view_finds_the_right_leaf_in_a_crlf_file() {
     let (_, kind, text, _) =
@@ -9117,8 +8763,7 @@ fn byte_offset_counts_a_crlf_terminator_as_two_bytes() {
     );
 }
 
-/// A fixture with no tree-sitter grammar opens in this solver too (text-only mode), and has no
-/// tree for `A` to reveal anything in.
+/// A text-only fixture has no tree for `A` to reveal anything in.
 #[test]
 fn a_in_the_text_view_says_so_on_a_side_with_no_syntax_tree() {
     let text_only = Code::from_string("plain words\n", &Language::Unknown);
@@ -9145,10 +8790,8 @@ fn a_in_the_text_view_says_so_on_a_side_with_no_syntax_tree() {
 // `V`: the invariant list
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 
-/// A case whose `Minimal` painting claims a line's indentation - one invariant-6 violation, and
-/// nothing else: the run ends mid-row rather than in trailing whitespace (so not invariant 1), the
-/// line is only partly painted (so not invariant 4), the painted bytes are contiguous (so not
-/// invariant 5), and the tree mapping is empty (so not invariant 13).
+/// A `Minimal` painting claiming a line's indentation: one invariant-6 violation and no other
+/// (the run ends mid-row, the line is partly painted, the bytes are contiguous, no tree mapping).
 fn app_with_one_violation(source: &str) -> (App, Code) {
     let code = Code::from_string(source, &Language::Rust);
     let root = code.ast.as_ref().expect("parsed").root_node();
@@ -9178,7 +8821,6 @@ fn app_with_one_violation(source: &str) -> (App, Code) {
     (app, code)
 }
 
-/// Presses `key` at the top level of a case carrying one violation.
 fn press_with_one_violation(key: KeyCode) -> App {
     let source = "fn f() {\n    let x = 1;\n}\n";
     let (mut app, code) = app_with_one_violation(source);
@@ -9215,8 +8857,7 @@ fn v_lists_the_violations_of_the_in_memory_mapping() {
     assert_eq!(*selected, 0);
     assert_eq!(entries[0].violation.invariant, 6);
     assert_eq!(entries[0].violation.painting.as_deref(), Some("Minimal"));
-    // The painting only exists in memory - nothing has been saved - so a check that read
-    // `human_mapping.json` off disk would have found nothing to report.
+    // The painting is only in memory, so a check reading `human_mapping.json` would find nothing.
     assert_eq!(
         entries[0].details,
         vec!["before 2:0-2:4  \"    \"  in block 7..25".to_string()],
@@ -9263,8 +8904,7 @@ fn v_says_so_when_a_case_breaks_nothing() {
     );
 }
 
-/// Enter is the whole point of the popup: the row an invariant names becomes both a tree cursor
-/// and a text cursor, without the reader hunting for either.
+/// Enter puts both a tree cursor and a text cursor on the row an invariant names.
 #[test]
 fn enter_in_the_invariant_list_moves_the_tree_and_the_text_cursor() {
     let source = "fn f() {\n    let x = 1;\n}\n";
@@ -9310,4 +8950,326 @@ fn enter_in_the_invariant_list_moves_the_tree_and_the_text_cursor() {
         "column 0 is indentation, so the tree lands on the next leaf"
     );
     assert_eq!(app.focus, Focus::Before);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+// Contracts of the flatten/navigate/stubs/actions/render helpers
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+
+#[test]
+fn algo_disagrees_never_flags_a_node_the_human_has_not_marked() {
+    let tree = parse_rust("fn main() {\n    a();\n    b();\n}\n");
+    let (stmt_a, _) = two_statements(tree.root_node());
+    let mut diff = ASTDiff::default();
+    diff.before_node_map.insert(stmt_a.id(), 0);
+
+    assert!(!algo_disagrees(
+        Side::Before,
+        stmt_a,
+        &Caches::default(),
+        &diff
+    ));
+}
+
+#[test]
+fn algo_disagrees_flags_a_match_to_a_different_partner() {
+    let tree = parse_rust("fn main() {\n    a();\n    b();\n}\n");
+    let (stmt_a, stmt_b) = two_statements(tree.root_node());
+    let mut caches = Caches::default();
+    caches.before_match.insert(stmt_a.id(), stmt_a.id());
+    let mut diff = ASTDiff::default();
+
+    diff.before_node_map.insert(stmt_a.id(), stmt_a.id());
+    assert!(!algo_disagrees(Side::Before, stmt_a, &caches, &diff));
+
+    diff.before_node_map.insert(stmt_a.id(), stmt_b.id());
+    assert!(
+        algo_disagrees(Side::Before, stmt_a, &caches, &diff),
+        "both sides say matched, but to different nodes"
+    );
+}
+
+#[test]
+fn advance_to_next_mismatch_wraps_around_in_both_directions() {
+    let tree = parse_rust("fn main() {\n    a();\n    b();\n}\n");
+    let root = tree.root_node();
+    let (stmt_a, stmt_b) = two_statements(root);
+    let flat = FlatIndex::new(flatten_visible(
+        root,
+        &std::collections::HashSet::new(),
+        None,
+    ));
+    // Stands in for "disagrees": true only on the first statement.
+    fn is_first_statement(node: Node, _: &Caches, _: &ASTDiff) -> bool {
+        node.kind() == "expression_statement" && node.prev_named_sibling().is_none()
+    }
+
+    let mut panel = PanelState::new(stmt_b.id());
+    let found = advance_to_next_mismatch(
+        &mut panel,
+        &flat,
+        &Caches::default(),
+        &ASTDiff::default(),
+        is_first_statement,
+        true,
+    );
+    assert_eq!(
+        found.map(|n| n.id()),
+        Some(stmt_a.id()),
+        "forward wraps past the end"
+    );
+
+    let mut panel = PanelState::new(root.id());
+    let found = advance_to_next_mismatch(
+        &mut panel,
+        &flat,
+        &Caches::default(),
+        &ASTDiff::default(),
+        is_first_statement,
+        false,
+    );
+    assert_eq!(
+        found.map(|n| n.id()),
+        Some(stmt_a.id()),
+        "backward wraps past the start"
+    );
+}
+
+#[test]
+fn advance_to_next_mismatch_leaves_the_cursor_put_when_nothing_disagrees() {
+    let tree = parse_rust("fn main() {\n    a();\n}\n");
+    let root = tree.root_node();
+    let flat = FlatIndex::new(flatten_visible(
+        root,
+        &std::collections::HashSet::new(),
+        None,
+    ));
+    let mut panel = PanelState::new(root.id());
+
+    let found = advance_to_next_mismatch(
+        &mut panel,
+        &flat,
+        &Caches::default(),
+        &ASTDiff::default(),
+        |_, _, _| false,
+        true,
+    );
+
+    assert!(found.is_none());
+    assert_eq!(panel.cursor_id, root.id());
+}
+
+#[test]
+fn reveal_node_expands_collapsed_ancestors_and_centers_an_offscreen_target() {
+    let source = (0..40)
+        .map(|i| format!("    f{i}();\n"))
+        .collect::<String>();
+    let tree = parse_rust(&format!("fn main() {{\n{source}}}\n"));
+    let root = tree.root_node();
+    let block = find_first(root, "block").unwrap();
+    let mut cursor = block.walk();
+    let target = block
+        .children(&mut cursor)
+        .filter(|n| n.kind() == "expression_statement")
+        .nth(30)
+        .unwrap();
+
+    let mut panel = PanelState::new(root.id());
+    panel.viewport_height = 10;
+    panel.collapsed.insert(block.id());
+
+    let revealed = reveal_node(&mut panel, root, target.id());
+
+    assert_eq!(revealed.map(|n| n.id()), Some(target.id()));
+    assert_eq!(panel.cursor_id, target.id());
+    assert!(!panel.collapsed.contains(&block.id()), "ancestor expanded");
+    let flat = FlatIndex::new(flatten_visible(root, &panel.collapsed, None));
+    let idx = flat.index_of(target.id()).unwrap();
+    assert_eq!(panel.scroll, idx - 5, "target centered in the viewport");
+}
+
+#[test]
+fn reveal_node_moves_nothing_for_an_id_not_in_the_tree() {
+    let tree = parse_rust("fn main() {\n    a();\n}\n");
+    let root = tree.root_node();
+    let mut panel = PanelState::new(root.id());
+    panel.scroll = 3;
+
+    assert!(reveal_node(&mut panel, root, usize::MAX).is_none());
+    assert_eq!(panel.cursor_id, root.id());
+    assert_eq!(panel.scroll, 3);
+}
+
+#[test]
+fn insert_use_line_leaves_a_file_that_already_has_the_import_untouched() {
+    let line =
+        "use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;\n";
+    let once = insert_use_line(&stub_test_contents("rust-x", None, false), line);
+
+    assert_eq!(insert_use_line(&once, line), once);
+    assert_eq!(once.matches(line).count(), 1);
+}
+
+#[test]
+fn delete_with_children_drops_a_prior_match_on_a_descendant() {
+    let source = "fn main() {\n    a();\n}\n";
+    let before_tree = parse_rust(source);
+    let after_tree = parse_rust(source);
+    let (before_root, after_root) = (before_tree.root_node(), after_tree.root_node());
+    let before_stmt = find_first(before_root, "expression_statement").unwrap();
+    let before_call = find_first(before_stmt, "call_expression").unwrap();
+    let after_call = find_first(after_root, "call_expression").unwrap();
+    let mut mapping = HumanMapping {
+        entries: vec![HumanMappingEntry {
+            operation: HumanOperation::Identical,
+            before_path: Some(path_for_node(before_call)),
+            after_path: Some(path_for_node(after_call)),
+        }],
+        ..Default::default()
+    };
+    let flat = FlatIndex::new(flatten_visible(
+        before_root,
+        &std::collections::HashSet::new(),
+        None,
+    ));
+    let caches = rebuild_caches(&mapping.entries, before_root, after_root);
+
+    action_delete(
+        &mut mapping,
+        &flat,
+        before_stmt.id(),
+        before_root,
+        after_root,
+        true,
+        &caches,
+    )
+    .unwrap();
+
+    assert_eq!(mapping.entries.len(), 1, "{:?}", mapping.entries);
+    assert_eq!(
+        mapping.entries[0].operation,
+        HumanOperation::DeleteWithChildren
+    );
+}
+
+/// Promotion moves the note to the fixture's `description.md`, so the sample.csv row keeps no copy
+/// that could drift from it.
+#[test]
+fn update_sample_csv_clears_the_rows_comment() {
+    let file = NamedTempFile::new().unwrap();
+    write_csv(
+        file.path(),
+        &[("Rust", "repo", "abc123", "src/a.rs", "", "small")],
+    );
+    let source = SampleSource {
+        language: "Rust".to_string(),
+        repository: "repo".to_string(),
+        commit: "abc123".to_string(),
+        path: "src/a.rs".to_string(),
+        dataset: "small".to_string(),
+    };
+    assert!(set_sample_comment_at(file.path(), &source, "a note").unwrap());
+
+    assert!(update_sample_csv_at(file.path(), &source, "rust-new-case").unwrap());
+
+    let rows = read_csv_with_status(file.path());
+    assert_eq!(rows[0].4, "", "the promoted row must not keep the comment");
+}
+
+/// A sample's recorded dataset is checked, not trusted: a typo in source.json would otherwise
+/// create a diffs/ folder nothing reads. The check runs before anything is written.
+#[test]
+fn action_promote_refuses_a_sample_whose_recorded_dataset_is_unknown() {
+    let source = SampleSource {
+        language: "Rust".to_string(),
+        repository: "repo".to_string(),
+        commit: "abc123".to_string(),
+        path: "src/a.rs".to_string(),
+        dataset: "not-a-dataset".to_string(),
+    };
+    let mut app = App::new(
+        "sample-name".to_string(),
+        CaseOrigin::Sample(source),
+        0,
+        0,
+        HumanMapping::default(),
+    );
+    let name = "rust-promote-refused-for-unknown-dataset";
+
+    let err = action_promote(&mut app, name, b"fn a() {}\n", b"fn b() {}\n").unwrap_err();
+
+    assert!(format!("{err:#}").contains("not-a-dataset"), "{err:#}");
+    assert!(diffs_case_dir(name).is_none(), "nothing may be written");
+    assert!(matches!(app.origin, CaseOrigin::Sample(_)));
+}
+
+/// Esc in the text view backs out one step at a time - the live selection, then this side's
+/// banked ranges - so an accidental `v` or a half-built N:M group does not close the view.
+#[test]
+fn esc_in_the_text_view_clears_the_selection_then_the_bank_before_closing() {
+    let source = "let a = 1;\n";
+
+    let (_, state) = press_in_text_view(
+        source,
+        source,
+        paint_state_at(0, (0, 2), Some((0, 0))),
+        KeyCode::Esc,
+    );
+    assert_eq!(state.anchor[0], None, "the first Esc clears the selection");
+
+    let mut banked = paint_state_at(0, (0, 0), None);
+    banked.pending[0].push(HumanTextSpan {
+        start_row: 0,
+        start_column: 0,
+        end_row: 0,
+        end_column: 3,
+    });
+    let (_, state) = press_in_text_view(source, source, banked, KeyCode::Esc);
+    assert!(state.pending[0].is_empty(), "the next Esc clears the bank");
+}
+
+/// Esc while typing a painting name goes back to the picker's list rather than closing it, so a
+/// mistyped name costs one key.
+#[test]
+fn esc_while_naming_a_painting_returns_to_the_picker_list() {
+    let mut keys = vec![KeyCode::Char('j'); 5];
+    keys.extend([KeyCode::Enter, KeyCode::Char('x'), KeyCode::Esc]);
+
+    let app = press_in_solution_picker(&["Full"], &keys);
+
+    assert!(
+        matches!(
+            &app.modal,
+            Some(Modal::SolutionPicker { new_name: None, .. })
+        ),
+        "expected the picker list, got {:?}",
+        app.modal
+    );
+}
+
+/// `diff_case_has_text_mapping` searches the saved file for the quoted key, so a fixture `Z`
+/// marked as having nothing to paint must still carry the key, and an unpainted one must not.
+#[test]
+fn the_paint_column_counts_a_deliberately_empty_painting_as_painted() {
+    let mut app = test_app();
+    let unpainted = serde_json::to_string(&app.mapping).unwrap();
+    assert!(!unpainted.contains("\"text_mappings\""));
+
+    action_paint_mark_empty(&mut app);
+
+    let painted = serde_json::to_string(&app.mapping).unwrap();
+    assert!(painted.contains("\"text_mappings\""));
+}
+
+#[test]
+fn first_leaf_from_skips_whitespace_to_the_next_leaf_and_is_none_past_the_last_one() {
+    let source = "fn main() {\n    a();\n}\n   \n";
+    let tree = parse_rust(source);
+    let root = tree.root_node();
+
+    let in_indent = source.find("a();").unwrap() - 2;
+    let leaf = first_leaf_from(root, in_indent).unwrap();
+    assert_eq!(&source[leaf.byte_range()], "a");
+
+    assert!(first_leaf_from(root, source.len() - 2).is_none());
 }

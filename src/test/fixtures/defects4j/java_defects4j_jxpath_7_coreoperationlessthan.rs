@@ -23,11 +23,9 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // All four `CoreOperation*` fixtures in this batch carry the same disagreement and the same
-    // 36/22: the human deletes the first `method_declaration` whole and inserts its replacement,
-    // while codediff keeps that method's scaffolding - its `}`, its `;`, its `<` operator leaf -
-    // and re-uses it inside the surviving method. One choice about which of two near-identical
-    // methods survives, counted once per re-used leaf, rather than 36 independent errors.
+    // Shared by all four `CoreOperation*` fixtures: the human replaces the first
+    // `method_declaration` whole, codediff reuses its scaffolding (`}`, `;`, the `<` leaf) in the
+    // surviving method. One choice of which near-identical method survives.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "java-defects4j-jxpath-7-coreoperationlessthan",
         36,

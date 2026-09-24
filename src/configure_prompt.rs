@@ -18,21 +18,15 @@
 
 //! The interactive-prompt plumbing `git_configure` and `jj_configure` share.
 //!
-//! Only the genuinely VCS-independent pieces live here: reading a line, parsing a yes/no answer,
-//! and resolving this binary's own path. Each wizard keeps its own scope type and config keys,
-//! because those are exactly where the two VCSs differ (`--global`/`--local` vs `--user`/`--repo`,
-//! and entirely different key names) - unifying them would mean an abstraction that has to be
-//! un-abstracted at every call site to say anything useful.
+//! Scope types and config keys stay in each wizard: they are exactly where git and jj differ, so a
+//! shared abstraction would have to be undone at every call site.
 
 use std::io::{self, Write};
 
 use anyhow::{Context, Result};
 
-/// The absolute path to the running `codediff` binary, so the config a wizard writes points at
-/// *this* binary rather than whatever bare `codediff` happens to resolve to on PATH - those can
-/// differ (a checkout build run via `cargo run` vs. a stale `cargo install`), which is exactly
-/// the confusion these commands exist to prevent. Falls back to the bare name if the running
-/// executable's path can't be resolved (rare - e.g. it was deleted after this process started).
+/// The absolute path to the running binary, so the written config points at *this* build rather
+/// than whatever `codediff` resolves to on PATH. Falls back to the bare name if it can't be resolved.
 pub fn resolve_codediff_path() -> String {
     std::env::current_exe()
         .ok()
@@ -40,8 +34,7 @@ pub fn resolve_codediff_path() -> String {
         .unwrap_or_else(|| "codediff".to_string())
 }
 
-/// Parses a yes/no prompt's input against `default` for an empty line (just pressing Enter) -
-/// `None` for anything else unrecognized, so the caller knows to reprompt.
+/// Parses a yes/no answer; an empty line is `default`, anything unrecognized is `None` (reprompt).
 pub fn parse_yes_no(input: &str, default: bool) -> Option<bool> {
     match input.trim().to_lowercase().as_str() {
         "" => Some(default),
@@ -77,9 +70,6 @@ mod tests {
 
     #[test]
     fn resolve_codediff_path_never_returns_an_empty_string() {
-        // Can't control what current_exe() resolves to under `cargo test`, but it must always
-        // produce *some* non-empty path (or the "codediff" fallback), never silently empty - an
-        // empty program path would be a confusing, hard-to-diagnose config to write.
         assert!(!resolve_codediff_path().is_empty());
     }
 

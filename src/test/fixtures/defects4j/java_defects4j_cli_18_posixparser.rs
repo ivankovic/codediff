@@ -23,10 +23,8 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // The human deletes an `expression_statement` inside a nested `if` and inserts its replacement;
-    // codediff re-uses the deleted statement's leaves - both identifiers, both parentheses, the
-    // semicolon - inside the inserted one. The scaffolding-reuse family, counted once per re-used
-    // leaf on each side.
+    // The human deletes an `expression_statement` in a nested `if` and inserts its replacement;
+    // codediff reuses the deleted leaves inside the inserted one. The scaffolding-reuse family.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "java-defects4j-cli-18-posixparser",
         16,
@@ -41,8 +39,7 @@ fn painting() -> Result<()> {
 
 #[test]
 fn invariants() -> Result<()> {
-    // Invariant 11, both sides under both presets. The removed `identifier` `token` on row 128 is
-    // left unpainted although the tree mapping says it is gone. Recorded as found, waiting on a
-    // repair of the painting.
+    // Invariant 11, both sides under both presets: the removed `identifier` `token` on row 128 is
+    // unpainted. Waiting on a repair of the painting.
     assert_ground_truth_invariants_with_known_violations("java-defects4j-cli-18-posixparser", 4)
 }

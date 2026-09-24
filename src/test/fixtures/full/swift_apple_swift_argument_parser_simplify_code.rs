@@ -21,10 +21,8 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // `qualified_name` matches a bare `simple_identifier` to the wrong one of two candidates that
-    // both spell the same name inside sibling `call_expression`s (a `property_declaration`
-    // initializer vs. a `guard`'s `try_expression`) - a same-shape sibling-choice tie, not a
-    // structural miss.
+    // `qualified_name` picks the wrong one of two `simple_identifier`s spelling the same name in
+    // sibling `call_expression`s: a same-shape sibling-choice tie.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "swift-apple-swift-argument-parser-simplify-code",
         2,

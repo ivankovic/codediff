@@ -23,12 +23,9 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // One `simple_symbol` in an `argument_list` is replaced by a different one.
-    // `APTED("qualified_name")` renames it in place - same kind, same slot - and the list's
-    // commas follow that pairing, while the human deletes the old symbol and inserts the new one
-    // and keeps the commas with their surviving neighbours. A rename of a leaf costs less than a
-    // delete plus an insert, so this is the cost model choosing, not a search gap; the comma
-    // mismatches are bookkeeping downstream of that one choice. Not attempted.
+    // One `simple_symbol` in an `argument_list` is replaced. `APTED("qualified_name")` renames it
+    // in place and the commas follow; the human deletes and inserts. A leaf rename is cheaper than
+    // delete plus insert: the cost model choosing, not a search gap.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "ruby-mastodon-mastodon-normal-change",
         4,

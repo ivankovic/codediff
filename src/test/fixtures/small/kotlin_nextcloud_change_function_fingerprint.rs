@@ -21,20 +21,10 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // Resolved by `apted::prematch_unique_named_locals` - `TaskView`'s
-    // `capability`/`showTaskActions` parameters keep their names but shift position when a new
-    // `viewModel` parameter is inserted before them; now pre-matched by parameter name (see
-    // `TODO.md`'s "shift-due-to-insertion" entry). The remaining 11 are a different, already-
-    // investigated-and-declined-to-fix pattern: `viewModel` (a pure insert) and
-    // `showTranslateScreen` (a pure delete, unrelated to it) get cross-matched by real APTED's
-    // same-kind-internal-node cost preference, even though they share no name - the "near-
-    // duplicate but distinct reuse-vs-replace" gap (see `kotlin-remove-function`/`rust-algorithm-
-    // change`), tried and reverted twice already (`TODO.md`, container-dissimilarity-surcharge and
-    // leaf-rename-graduation) - not re-attempted here. Three of the four are the two `,` parameter
-    // separators and their pairing (the mapping now says the comma that survives the inserted
-    // `viewModel` parameter is a different comma than the one codediff matches it to), and the
-    // fourth is one `identifier` inside a nested lambda that the re-verified mapping moves rather
-    // than deletes.
+    // Pins `apted::prematch_unique_named_locals` for parameters shifted by an inserted one. The
+    // rest: `viewModel` (inserted) and `showTranslateScreen` (deleted) are cross-matched by APTED's
+    // same-kind cost preference despite sharing no name - the near-duplicate reuse-vs-replace gap
+    // (see `kotlin-remove-function`); plus the two `,` separators and one lambda `identifier`.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "kotlin-nextcloud-change-function-fingerprint",
         4,

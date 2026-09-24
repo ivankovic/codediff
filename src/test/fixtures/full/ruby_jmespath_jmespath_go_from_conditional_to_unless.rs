@@ -21,12 +21,8 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // The deleted end is mateched to the if The conditional-to-unless rewrite reparents the body;
-    // codediff's `fast_fallback` leaves 21 of the human's MatchButNotIdentical pairs unmatched
-    // across the new wrapper. Known gap, characterized above but unfixed. Clamped at the observed
-    // count rather than requiring an exact match. Lower (or drop back to
-    // `assert_matches_human_mapping`) once a fix lands. Any counts above describe the older, larger
-    // residual.
+    // The deleted `end` is matched to the `if`. The rewrite reparents the body, and
+    // `fast_fallback` leaves the human's pairs across the new wrapper unmatched.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "ruby-jmespath-jmespath-go-from-conditional-to-unless",
         37,

@@ -35,9 +35,7 @@ fn painting() -> Result<()> {
 
 #[test]
 fn invariants() -> Result<()> {
-    // One of the two spaces after "Gin Core Team." on row 1 is deleted, and the run therefore ended
-    // on a space. The invariant was the thing that was wrong, not the painting - that space is
-    // mid-row, with `All rights reserved.` still to come, so nothing about it is *trailing*. The
-    // invariant says trailing and means it.
+    // One of two spaces after "Gin Core Team." is deleted, so the run ends on a space - mid-row,
+    // with text still to come, so not *trailing*: invariant 1 must not fire.
     assert_ground_truth_invariants("go-gin-gonic-gin-whitespace-in-comment")
 }

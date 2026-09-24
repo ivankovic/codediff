@@ -203,7 +203,7 @@ fn process_repository(
     delta_tx: Sender<(DiffStats, String, String)>,
 ) -> Result<()> {
     let mut walk = repo.revwalk()?;
-    // We don't need to set sorting here, because we don't really care.
+    // No sorting: every commit is visited and recorded independently, so order is irrelevant.
     walk.push_head()?;
 
     for id in walk {
@@ -349,8 +349,7 @@ fn process_delta(stats: &DiffStats, before: &str, after: &str) -> Result<DiffSta
         .and_then(|code| code.ast.as_ref())
         .map_or(0, |ast| ast.root_node().child_count() as u64);
 
-    // For now, we'll just set some basic values for changes
-    // The actual diff processing will be implemented later
+    // TODO: compute line and node change counts; they are zero until then.
     result.lines_added = 0;
     result.lines_removed = 0;
     result.lines_changed = 0;
@@ -512,7 +511,6 @@ mod tests {
 
         let mut rows = columns_stmt.query([])?;
         if let Some(row) = rows.next()? {
-            // Verify we can read all the expected columns
             let commit_id: String = row.get(0)?;
             let relative_file_path: String = row.get(1)?;
             let git_reported_status: String = row.get(2)?;

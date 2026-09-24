@@ -29,36 +29,21 @@ use super::engine::compute_delta;
 #[cfg(test)]
 use super::zhang_shasha::compute_delta_zhang_shasha;
 
-/// Cost for updating a literal leaf's value (string/number/etc. contents changed).
+/// Cost for updating a literal leaf's value, kept as its own named tier.
 ///
-/// Equal to `COST_UPDATE` since 2026-08-18, kept as a named tier so the literal case stays an
-/// explicit seam. It was 2 - "medium, between an identifier rename and delete+insert" - but 2 is
-/// *exactly* `COST_DELETE + COST_INSERT`, and a cost equal to delete+insert is not a
-/// discouragement, it is a coin flip; measurement showed APTED resolving that tie toward
-/// delete+insert every time (raising this to 3 changed nothing corpus-wide), turning "discourage"
-/// into a de-facto forbid that `rust-sniffnet-protocol`'s ground truth explicitly contradicts.
-/// At 1: -4 mismatches, +1 zero-mismatch fixture, one deliberate +1 (see
-/// `rust_add_comments_and_real_new_logic.rs`). The rename-vs-replace ordering rule this encodes:
-/// anything cheaper than `COST_DELETE + COST_INSERT` is a preference, anything above it is a
-/// prohibition, and nothing should ever sit exactly on the boundary.
+/// The tie rule every rename cost here obeys: below `COST_DELETE + COST_INSERT` is a preference,
+/// above it is a prohibition, and nothing sits exactly on it - the DP resolves an exact tie toward
+/// delete+insert, which silently turns "discourage" into "forbid".
 const COST_LITERAL_UPDATE: u64 = 1;
 
-/// Cost model for APTED - unit cost model
+/// Cost model for APTED.
 pub(crate) struct UnitCostModel {
-    /// Which operator families the language both sides are parsed as recognizes, in bitmask form
-    /// (`nodes::language_operator_family_mask`) - the only thing `ren` needs the language *for*:
-    /// permitting a small, hand-picked set of cross-kind operator swaps (see
-    /// `kinds_update_allowed`) that would otherwise always be forbidden.
-    ///
-    /// Stored pre-reduced rather than as a `Language`, because `ren` runs once per tree-edit-
-    /// distance DP cell and re-deriving the family list per call is exactly the O(n^2) string
-    /// scanning `KindCostClass` exists to remove.
+    /// The language's operator families, pre-reduced to a bitmask because `ren` runs once per DP
+    /// cell; `ren` needs the language only to permit `kinds_update_allowed`'s cross-kind swaps.
     language_family_mask: nodes::FamilyMask,
 }
 
 impl UnitCostModel {
-    /// Derives [`UnitCostModel::language_family_mask`] from `language` - the only constructor, so
-    /// the two can't fall out of step.
     pub(crate) fn new(language: Language) -> Self {
         UnitCostModel {
             language_family_mask: nodes::language_operator_family_mask(&language),
@@ -73,69 +58,31 @@ impl UnitCostModel {
         COST_INSERT
     }
 
-    /// Cost for renaming (matching) two nodes.
-    ///
-    /// Uses an adaptive cost model based on node kinds:
-    /// - Identical nodes: 0
-    /// - Literal nodes: 2 - medium cost for value changes
-    /// - Identifiers and generic punctuation/operators: COST_UPDATE (1) - low cost
-    ///   (literals share the same value today - see COST_LITERAL_UPDATE's doc comment)
-    /// - Internal nodes: 0 - cost is accounted for by children
-    /// - Different kinds (allowed): COST_UPDATE (1) to COST_DELETE + COST_INSERT + 1
-    ///
-    /// A prior version of this also special-cased type/field/property identifiers at cost 5, but
-    /// that branch was unreachable dead code (an identifier-kind check above it already matched
-    /// every kind that branch checked for, per `IDENTIFIER_KINDS` in `diff::nodes`) - and
-    /// benchmarking the branch made reachable showed cost 5 for those kinds is a net regression
-    /// (APTED starts preferring delete+insert over a same-kind rename in several fixtures), so it
-    /// was removed rather than fixed. See review discussion for the reachable variant and its
-    /// benchmark impact if this is worth revisiting with a smaller cost value.
+    /// Cost of matching `node1` to `node2`. Same-kind internal nodes are free (their children
+    /// carry the cost) unless they own text directly; cross-kind pairs cost more than
+    /// delete+insert, so they are never chosen, except the hand-picked `kinds_update_allowed` swaps.
     pub(crate) fn ren(&self, node1: &ASTNodeMetadata, node2: &ASTNodeMetadata) -> u64 {
         if node1.kind == node2.kind {
             if node1.children.is_empty() && node2.children.is_empty() {
-                // Both are leaves
                 if node1.text == node2.text {
-                    0 // Identical
+                    0
                 } else if nodes::is_comment(&node1.kind)
                     && is_marker_only(&node1.text) != is_marker_only(&node2.text)
                 {
-                    // A substantive comment and a bare marker (`#`, `//`, an empty `/* */`) are
-                    // not one comment edited: the marker is a blank line in a comment block.
-                    // Under plain `COST_UPDATE` the two tie with the right pairing, and the DP
-                    // then takes whichever comes first - `ruby-...-process_executer` paired a
-                    // rewritten `# @return [Boolean] ...` with the new blank `#` inserted above
-                    // it, leaving the real rewrite as an Insert. Strictly dearer than delete +
-                    // insert, so the pairing is never chosen, same as a cross-kind pair.
+                    // A bare marker (`#`, `//`) is a blank line in a comment block, not the
+                    // worded comment edited; at `COST_UPDATE` it ties with the right pairing.
                     COST_DELETE + COST_INSERT + 1
                 } else if node1.kind_cost_class.literal_like {
-                    // Literals (strings, numbers, etc.) - see the constant's doc comment for why
-                    // this tier currently equals COST_UPDATE rather than sitting above it
                     COST_LITERAL_UPDATE
                 } else {
-                    // Identifiers are cheap to update (common in refactorings); generic
-                    // punctuation/operators are also low cost.
                     COST_UPDATE
                 }
             } else if node1.owned_text_hash == node2.owned_text_hash {
-                // Same kind, internal nodes - can be matched with 0 cost (children cost is
-                // accounted for separately via `delta`/recursion).
                 0
             } else {
-                // ...except that "children carry the cost" is false for a node that owns text
-                // *directly*, in the gaps its children don't cover. Nothing else in this model
-                // ever charges for those bytes, so without this arm relabelling `role="button"`
-                // to `role="menu"` costs zero - and matching an `AttValue` to a completely
-                // unrelated one is free, leaving the DP no reason to prefer the right partner.
-                //
-                // Not an edge case: XML keeps *every* attribute value there, as do CSS's numeric
-                // and colour literals, Rust's comments and YAML's quoted scalars (census on
-                // `metadata::owned_text_hash_of`).
-                //
-                // Priced `COST_UPDATE`, strictly cheaper than delete+insert. When this was
-                // (accidentally) priced at the then-2 `COST_LITERAL_UPDATE` - exactly
-                // `COST_DELETE + COST_INSERT` - the resulting indifference measurably cost
-                // `css-wordpress-...-change-simple-values-to-vars` a mapping; see
-                // `COST_LITERAL_UPDATE`'s doc comment for the tie rule.
+                // A node owning text in the gaps between its children (XML attribute values, CSS
+                // literals, Rust comments, YAML quoted scalars) is charged nowhere else, so
+                // without this arm any two such nodes pair for free.
                 COST_UPDATE
             }
         } else if nodes::update_allowed_from_masks(
@@ -143,50 +90,38 @@ impl UnitCostModel {
             &node2.kind_cost_class,
             self.language_family_mask,
         ) {
-            // A hand-picked exception (e.g. `<` -> `<=`): different kinds, but the same
-            // conceptual operator slot. These are always leaves with differing text, so this is
-            // exactly the same-kind/different-text case above.
+            // e.g. `<` -> `<=`: the same operator slot, priced like a same-kind leaf update.
             COST_UPDATE
         } else {
-            // Different kinds - matching is more expensive than delete + insert
-            // to ensure that nodes with different kinds are not matched.
-            COST_DELETE + COST_INSERT + 1 // Make it strictly more expensive
+            COST_DELETE + COST_INSERT + 1
         }
     }
 }
 
-/// True for comment text that carries no words at all - only its own markers, punctuation and
-/// whitespace (`#`, `//`, `/* */`, `--`, `*`). See `UnitCostModel::ren`.
+/// True for comment text with no words, only markers, punctuation and whitespace.
 fn is_marker_only(text: &str) -> bool {
     !text.chars().any(char::is_alphanumeric)
 }
 
 /// A pruned, postorder-indexed view of one side of a forest comparison.
 ///
-/// "Pruned" means: any node already present in the relevant side of `diff`'s
-/// `before_node_map`/`after_node_map` is excluded, along with its entire subtree - it has
-/// already been fully resolved by an earlier pass (or an earlier step of this same recursion)
-/// and must not be touched again.
+/// Any node already in the side's node map is excluded with its whole subtree: it is resolved.
 ///
-/// Index convention: postorder ids and the "boundary" variables used by
-/// `forest_dist`/`compute_edit_mapping` represent prefix lengths (0..=size), while the underlying
-/// arrays are plain 0-based `Vec`s.
+/// Index convention: the "boundary" variables of `forest_dist`/`compute_edit_mapping` are prefix
+/// lengths (0..=size), so boundary `b` is the node at 0-based postorder index `b - 1`.
 pub(crate) struct PostorderIndexer {
-    /// Number of nodes in the pruned forest.
     pub(crate) size: usize,
     /// 0-based postorder index -> node id.
     pub(crate) post_to_node_id: Vec<usize>,
     /// 0-based postorder index -> 0-based preorder index.
     pub(crate) post_to_pre: Vec<usize>,
-    /// 0-based preorder index -> 0-based postorder index. Read only by the Zhang-Shasha test
-    /// oracle (`zhang_shasha.rs`); the APTED engine builds its own indexer.
+    /// 0-based preorder index -> 0-based postorder index. Test oracle only.
     #[cfg(test)]
     pub(crate) pre_to_post: Vec<usize>,
     /// 0-based postorder index -> 0-based postorder index of the leftmost leaf descendant.
     pub(crate) post_to_lld: Vec<usize>,
-    /// 0-based preorder indices of the keyroots: the forest's own roots, plus every node that
-    /// has a left sibling. Drives the Zhang-Shasha oracle's bottom-up `delta` computation - test
-    /// only, like `pre_to_post`.
+    /// 0-based preorder indices of the keyroots: the forest's roots plus every node with a left
+    /// sibling. Test oracle only.
     #[cfg(test)]
     pub(crate) keyroots: Vec<usize>,
 }
@@ -239,7 +174,6 @@ impl PostorderIndexer {
 
         let size = pre_to_node_id.len();
 
-        // Pruned, left-to-right children lists, indexed by preorder.
         let mut pre_children: Vec<Vec<usize>> = vec![Vec::new(); size];
         for pre in 0..size {
             let node_id = pre_to_node_id[pre];
@@ -252,8 +186,6 @@ impl PostorderIndexer {
             }
         }
 
-        // A node is a keyroot iff it's one of the forest's own roots, or it has a left sibling.
-        // Only the Zhang-Shasha test oracle reads them.
         #[cfg(test)]
         let keyroots: Vec<usize> = {
             let mut has_left_sibling = vec![false; size];
@@ -275,8 +207,6 @@ impl PostorderIndexer {
                 .collect()
         };
 
-        // Postorder traversal + leftmost-leaf-descendant, computed together: children are
-        // finalized (and their `post_to_lld` written) strictly before their parent.
         let mut post_to_pre: Vec<usize> = Vec::with_capacity(size);
         let mut pre_to_post: Vec<usize> = vec![usize::MAX; size];
         let mut post_to_lld: Vec<usize> = Vec::with_capacity(size);
@@ -317,19 +247,14 @@ impl PostorderIndexer {
         }
     }
 
-    /// Node id at a given 1-based "boundary" position (boundary `b` corresponds to the node at
-    /// 0-based postorder index `b - 1`).
+    /// Node id at 1-based boundary `boundary`.
     pub(crate) fn node_id_at(&self, boundary: usize) -> usize {
         self.post_to_node_id[boundary - 1]
     }
 }
 
-/// Dense, flat-backed 2D buffer indexed as `grid[(row, col)]`. A flat `Vec<T>` (rather than
-/// `Vec<Vec<T>>`) avoids one heap allocation and pointer indirection per row, which matters since
-/// every table built on this is on the algorithm's hottest inner loops. Shared storage/indexing
-/// behind `ForestDist`, `DeltaTable`, `StrategyTable` and `Mat`, which all want the same
-/// flat-`Vec` layout (see `StrategyTable`'s doc comment for why `delta` and `strategy` still get
-/// a buffer each).
+/// Dense, flat-backed 2D buffer indexed as `grid[(row, col)]`, flat because every table on it is
+/// in the DP's innermost loops.
 pub(crate) struct Grid<T> {
     pub(crate) cols: usize,
     pub(crate) data: Vec<T>,
@@ -357,9 +282,7 @@ impl<T> std::ops::IndexMut<(usize, usize)> for Grid<T> {
     }
 }
 
-/// `spf_a`'s `s`/`t` tables track a signed path-offset space (see the doc comments at their call
-/// sites), so their indices are naturally `i64` rather than `usize` - this impl lets `Mat` alias
-/// `Grid` directly instead of needing its own wrapper.
+/// `spf_a`'s `s`/`t` tables are indexed in a signed path-offset space.
 impl<T> std::ops::Index<(i64, i64)> for Grid<T> {
     type Output = T;
     fn index(&self, (row, col): (i64, i64)) -> &T {
@@ -373,14 +296,10 @@ impl<T> std::ops::IndexMut<(i64, i64)> for Grid<T> {
     }
 }
 
-/// Dense, flat-backed `forestdist[(row, col)]` buffer.
 pub(crate) type ForestDist = Grid<u64>;
 
-/// Dense table of `delta[(pre_before, pre_after)]` values, indexed directly by the pruned
-/// trees' own 0-based preorder indices. Wraps `Grid` rather than aliasing it directly (unlike
-/// `ForestDist`) because unset cells need to read back as `0`, not `Grid`'s own zero-initialized
-/// value - `new` fills with a distinct sentinel instead, so a genuine `0` written via `set` stays
-/// distinguishable from "never written" while both still read back the same way through `get`.
+/// `delta[(pre_before, pre_after)]`, the subtree-pair distance, indexed by the pruned trees'
+/// 0-based preorder indices. Unset cells read back as 0.
 pub(crate) struct DeltaTable {
     grid: Grid<u64>,
 }
@@ -404,23 +323,14 @@ impl DeltaTable {
     }
 }
 
-/// Generic forest-distance recurrence - `forestDist`.
+/// The forest-distance recurrence, `forestDist`: fills `forestdist[(di, dj)]` for every
+/// `lld(i) <= di <= i`, `lld(j) <= dj <= j`. Deleting or inserting costs per single node, not per
+/// subtree, which is what lets reused content be found at a different depth.
 ///
-/// Fills `forestdist[(di, dj)]` for every `lld(i) <= di <= i`, `lld(j) <= dj <= j`, where deleting
-/// or inserting a *single* node (leaf or internal) always costs exactly one unit, and matching
-/// two nodes as tree roots either recurses directly (when their ranges align exactly with the
-/// outer `(i, j)` boundary) or looks up the precomputed `delta` value for their subtree pair.
-/// This single-node granularity (as opposed to atomic whole-subtree delete/insert) is what
-/// allows reused content to be discovered even when it has moved to a different depth.
-///
-/// Whenever the aligned branch is taken, this also writes `delta[(pre_di, pre_dj)] =
-/// forestdist[(di-1, dj-1)]` as a side effect - the same thing `treeEditDist` (the spfL/spfR
-/// helper) does, and what actually populates `delta` for every aligned position encountered
-/// along the way, not just the final corner of whichever outer (i, j) call triggered it. This is
-/// essential: a great many of the `(pre_di, pre_dj)` pairs later looked up by the unaligned
-/// branch are *not* themselves a (keyroot, keyroot) pair that `compute_delta`'s outer loop would
-/// ever call `forest_dist` on directly - they only ever get a value because some larger keyroot
-/// pair's own computation happened to pass through them as an aligned interior point.
+/// `write_delta_on_aligned` records `delta` at every aligned interior point. Only the Zhang-Shasha
+/// oracle sets it: it builds `delta` from scratch and relies on those interior writes, since many
+/// pairs it later looks up are never keyroot pairs. APTED must not set it, or this call's local
+/// values clobber the ones spfL/spfR/spfA already wrote.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn forest_dist(
     before: &PostorderIndexer,
@@ -440,10 +350,6 @@ pub(crate) fn forest_dist(
 
     forestdist[(lld_i, lld_j)] = 0;
 
-    // Precompute per-dj node id/metadata/lld/preorder once, outside the di loop - the di loop
-    // would otherwise redo the same `node_info` HashMap lookup (and lld/pre array reads) for
-    // every dj on every single di iteration, turning what should be O(range) prep work into
-    // O(di_range * dj_range) redundant lookups.
     let dj_info: Vec<(usize, &ASTNodeMetadata, usize, usize)> = ((lld_j + 1)..=j)
         .map(|dj| {
             let after_id = after.node_id_at(dj);
@@ -482,12 +388,6 @@ pub(crate) fn forest_dist(
                 forestdist[(di, dj)] = (forestdist[(di - 1, dj)] + cost_model.del(node1))
                     .min(forestdist[(di, dj - 1)] + cost_model.ins(node2))
                     .min(forestdist[(di - 1, dj - 1)] + cost_ren);
-                // `forestDist` deliberately never writes `delta` here: overwriting it would
-                // clobber the sparse, already-correct values spfL/spfR/spfA wrote during the
-                // forward pass with this call's local (possibly different) forestdist value at the
-                // same cell. Only the Zhang-Shasha oracle's own keyroot-sweep construction (which
-                // has no pre-existing delta to protect - it's building delta from scratch) needs
-                // this side effect.
                 if write_delta_on_aligned {
                     delta.set(pre_di, pre_dj, forestdist[(di - 1, dj - 1)]);
                 }
@@ -501,7 +401,7 @@ pub(crate) fn forest_dist(
     }
 }
 
-/// A single, single-node-granularity decision produced by `compute_edit_mapping`.
+/// One node-level decision produced by `compute_edit_mapping`.
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum RawDecision {
     Match(usize, usize),
@@ -509,9 +409,8 @@ pub(crate) enum RawDecision {
     Insert(usize),
 }
 
-/// Backtracks through `forest_dist` to produce the globally optimal node-level edit mapping -
-/// `computeEditMapping`. Every node in both pruned forests ends up
-/// with exactly one decision.
+/// Backtracks through `forest_dist` to the optimal node-level edit mapping,
+/// `computeEditMapping`. Every node in both pruned forests gets exactly one decision.
 pub(crate) fn compute_edit_mapping(
     before: &PostorderIndexer,
     after: &PostorderIndexer,
@@ -629,23 +528,20 @@ pub(crate) fn compute_edit_mapping(
     decisions
 }
 
-/// What ultimately happens to a before-tree node, per the raw decision list.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum BeforeDecision {
     Match(usize),
     Delete,
 }
 
-/// What ultimately happens to an after-tree node, per the raw decision list.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum AfterDecision {
     Match(usize),
     Insert,
 }
 
-/// What [`BeforeDecision`] and [`AfterDecision`] have in common, so the before/after halves of
-/// the emission and slot logic can share one body instead of a mirrored copy each, so a fix
-/// lands on both sides at once.
+/// What [`BeforeDecision`] and [`AfterDecision`] share, so the before/after halves of emission
+/// and slot logic are one body rather than mirrored copies.
 pub(crate) trait SideDecision: Copy {
     /// The fresh match target, or `None` for the side's prune decision (`Delete`/`Insert`).
     fn match_target(self) -> Option<usize>;
@@ -669,9 +565,7 @@ impl SideDecision for AfterDecision {
     }
 }
 
-/// Which tree a node belongs to, for the helpers whose before and after versions differ only in
-/// which maps they consult, which key shape `(before, after)` they write, and which of
-/// delete/insert they charge.
+/// Which tree a node belongs to.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Side {
     Before,
@@ -700,7 +594,6 @@ impl Side {
         }
     }
 
-    /// This side's node map in `diff`.
     pub(crate) fn node_map(self, diff: &ASTDiff) -> &rustc_hash::FxHashMap<usize, usize> {
         match self {
             Side::Before => &diff.before_node_map,
@@ -724,8 +617,7 @@ pub(crate) struct ResolveCtx<'a> {
     pub(crate) after_decision: HashMap<usize, AfterDecision>,
     pub(crate) before_has_match_below: HashMap<usize, bool>,
     pub(crate) after_has_match_below: HashMap<usize, bool>,
-    /// Provenance label for every `ASTMappingReason::APTED` entry this resolution produces - see
-    /// `for_nodes`'s doc comment.
+    /// Provenance label for every `ASTMappingReason::APTED` entry this resolution produces.
     pub(crate) source: &'static str,
 }
 
@@ -764,12 +656,8 @@ pub(crate) fn compute_has_match_below(
     if let Some(&cached) = memo.get(&node_id) {
         return cached;
     }
-    // A pre-existing match (e.g. from pre_match_identical_subtrees, which runs before the
-    // indexer is even built and so never shows up in the decision list at all) is fully
-    // resolved already - safe to stop here, nothing below it is ever independently visited.
-    // A *fresh* Match decision from this call's compute_edit_mapping is different: its
-    // children still get their own independent Match/Delete/Insert decisions, so we must keep
-    // recursing into them regardless of whether `node_id` itself matched.
+    // A pre-existing match is resolved whole, so stop; a fresh match's children still get their
+    // own decisions, so keep recursing.
     if is_pre_matched(node_id) {
         memo.insert(node_id, true);
         return true;
@@ -786,8 +674,8 @@ pub(crate) fn compute_has_match_below(
     result
 }
 
-/// Classifies a matched (before_id, after_id) pair into the right `ASTMappingOperation` plus the
-/// cost of relabeling just the root pair (children are accounted for separately by the caller).
+/// Classifies a matched pair into its `ASTMappingOperation` plus the cost of relabeling just the
+/// root pair; the caller accounts for children.
 pub(crate) fn classify_match(
     before_id: usize,
     after_id: usize,
@@ -800,14 +688,11 @@ pub(crate) fn classify_match(
 
     if before_info.kind != after_info.kind {
         if kinds_update_allowed(&before_info.kind, &after_info.kind, &before_meta.language) {
-            // A hand-picked cross-kind exception (e.g. `<` -> `<=`) that `ren` priced the same as
-            // a same-kind, different-text leaf update. Matches the `HumanOperation` convention:
-            // matched pairs with different kinds are always `MatchButNotIdentical`, never
-            // `Update` (which is reserved for same-kind pairs).
+            // `HumanOperation` convention: a cross-kind pair is `MatchButNotIdentical`, never
+            // `Update`, which is reserved for same-kind pairs.
             return (ASTMappingOperation::MatchButNotIdentical, COST_UPDATE);
         }
-        // Should not happen in practice: UnitCostModel::ren makes this strictly more expensive
-        // than a separate delete + insert, so compute_edit_mapping should never choose it.
+        // Unreachable in practice: `ren` prices this above delete+insert.
         return (
             ASTMappingOperation::Update,
             cost_model.ren(before_info, after_info),
@@ -831,74 +716,43 @@ pub(crate) fn classify_match(
     if hashes_match {
         (ASTMappingOperation::Identical, 0)
     } else if before_info.owned_text_hash != after_info.owned_text_hash {
-        // This function's contract is "the cost of relabeling just the root pair", and for a node
-        // owning text directly that cost is not zero - `ren` charges `COST_UPDATE` for exactly
-        // this case during the DP search, and `operation_cost` charges it again when scoring, so
-        // recording 0 here would leave `mapping.cost` disagreeing with both. (`mapping.cost`
-        // drives no decisions - this is consistency, not behavior; twice today a recorded zero
-        // that "didn't matter" derailed a diagnosis.)
+        // Agrees with `ren` and `operation_cost`, which both charge for owned text.
         (ASTMappingOperation::MatchButNotIdentical, COST_UPDATE)
     } else {
         (ASTMappingOperation::MatchButNotIdentical, 0)
     }
 }
 
-/// True if `before_id`'s immediate parent is itself matched to `after_id`'s immediate parent -
-/// either because an earlier, coarser pass already anchored that correspondence (checked via
-/// `diff.before_node_map`, populated before this DP call even started), or because this same DP
-/// call itself decided to match them (checked via `ctx.before_decision`, which - unlike
-/// `diff.mapping` - is fully populated before any emission happens, so this is safe to call
-/// regardless of emission order between a node and its parent).
-/// How many ancestor levels to climb from a candidate generic-token leaf while looking for a
-/// nearby already-decided match. Bounded, rather than walking all the way to the tree root, so
-/// this stays a "small context" check: the enclosing *function* being matched is not evidence
-/// that a stray `;` inside it corresponds to a specific other `;` - but climbing more than one
-/// level does need to be allowed, to tolerate a single newly-inserted (or removed) wrapper node
-/// sitting directly between the leaf and its real small context (e.g. wrapping an existing
-/// `identifier` in a new `reference_declarator`, or an existing `;` in a new `type_definition`).
+/// How many ancestor levels to climb from a generic-token leaf looking for an already-decided
+/// match. Two, not one, to tolerate a single inserted or removed wrapper node; bounded, because
+/// the enclosing function matching is no evidence that a stray `;` inside it pairs with another.
 const MAX_CONTEXT_ANCESTOR_DEPTH: usize = 2;
 
-/// Climb bound for the before side of `update_context_supported`, and (via the shared
-/// `UPDATE_CONTEXT_DEPTH_BUDGET`) implicitly for the after side too.
+/// Climb bound for the before side of `update_context_supported`.
 const MAX_UPDATE_CONTEXT_ANCESTOR_DEPTH: usize = 3;
 
-/// Combined both-sides depth budget for `update_context_supported`: the before-side climb to the
-/// nearest matched ancestor plus the after-side climb from the Update's target up to that
-/// ancestor's match target must not exceed this. The asymmetric budget (rather than a fixed
-/// per-side bound) is what separates a legitimate deep-nested rename from skeleton reuse: a loop
-/// variable 3 expression levels deep in `before` whose `after` counterpart sits *directly under*
-/// the matched `for_expression` spends 3+1 and passes, while a reused identifier that is also
-/// deep on the after side (buried in a brand-new call chain) spends 3+3 and fails.
+/// Combined before+after climb budget for `update_context_supported`. A shared budget, not a
+/// per-side bound, separates a deep rename (3 levels before, 1 after: passes) from skeleton reuse
+/// that is deep on both sides (3+3: fails).
 const UPDATE_CONTEXT_DEPTH_BUDGET: usize = 4;
 
-/// Read-only context for the decision-level match validation in `improve_slot_alignment` -
-/// everything the small-context checks below need to answer "is this pair anchored to matched
-/// surroundings", bundled so they don't each take six parameters.
+/// Read-only context for the small-context match validation in `improve_slot_alignment`.
 pub(crate) struct SlotCtx<'a> {
     pub(crate) before_meta: &'a ASTMetadata,
     pub(crate) after_meta: &'a ASTMetadata,
     pub(crate) diff: &'a ASTDiff,
     pub(crate) before_parents: &'a rustc_hash::FxHashMap<usize, usize>,
     pub(crate) after_parents: &'a rustc_hash::FxHashMap<usize, usize>,
-    /// The before-side roots of the forest this `resolve_forest` call was invoked on. A pair
-    /// whose before node is one of these has its context *outside* the forest - the caller
-    /// (e.g. the name-keyed pass recursing into an anchored container's children) already vouched
-    /// for the surrounding correspondence, but hasn't written its own anchor mapping into `diff`
-    /// yet, so parent lookups see nothing. Validation must treat these like tree roots.
+    /// The before-side roots of this `resolve_forest` call's forest. Validation treats them like
+    /// tree roots: the caller vouched for their context but has not yet written its anchor.
     pub(crate) before_forest_roots: &'a std::collections::HashSet<usize>,
 }
 
-/// True if `before_id` has an ancestor, within `max_depth` levels, that's already
-/// decided as a `Match` (either a pre-existing anchor from an earlier, coarser pass - checked via
-/// `diff.before_node_map`, populated before this DP call even started - or a fresh decision from
-/// this same DP call).
+/// True if `before_id` has an ancestor within `max_depth` levels that is matched, by an earlier
+/// pass or by this DP call.
 ///
-/// Deliberately one-sided: it does not separately check that the matched ancestor's target
-/// actually contains `after_id`. It doesn't need to - `before_decision`/`after_decision` are one
-/// coherent, already-validated ordered tree mapping (that's what the DP guarantees), so if some
-/// ancestor `v` of `before_id` matches target `t`, and `before_id` (a descendant of `v`) matches
-/// `after_id`, ancestor-order preservation *guarantees* `after_id` is a descendant of `t`. Finding
-/// the ancestor match at all is the only real question.
+/// One-sided on purpose: the decisions are an ordered tree mapping, so the partner of a matched
+/// ancestor already contains `after_id`.
 fn has_nearby_matched_ancestor(
     before_id: usize,
     max_depth: usize,
@@ -918,17 +772,11 @@ fn has_nearby_matched_ancestor(
     false
 }
 
-/// Two-sided small-context check for the leaf-pair validation in `validate_fresh_matches`: climbs
-/// the before side (up to `MAX_UPDATE_CONTEXT_ANCESTOR_DEPTH`) to the *nearest* matched ancestor,
-/// then requires the after side to reach that ancestor's match target within the remaining
-/// `UPDATE_CONTEXT_DEPTH_BUDGET`. Only the nearest matched before-ancestor is tried: any higher
-/// matched ancestor's target is a strict ancestor of this one's, so the after-side climb to it
-/// would only be longer - if the nearest one is over budget, they all are.
-///
-/// The symmetry is the point: a `(` two levels under a matched function body passes a one-sided
-/// check no matter where its partner sits - even inside a brand-new call expression half a
-/// function away (cpp-optimize-algorithm's `for (...)` paren pairing with `min_element(`). Budget
-/// spent on *both* climbs keeps "nearby" meaning nearby on both sides of the pair.
+/// Two-sided small-context check for `validate_fresh_matches`: the before-side climb to the
+/// nearest matched ancestor plus the after-side climb to that ancestor's partner must fit
+/// `UPDATE_CONTEXT_DEPTH_BUDGET`. Only the nearest ancestor is tried; a higher one's partner is
+/// only further away. Unlike `has_nearby_matched_ancestor`, this bounds the after side too, so a
+/// `(` near a matched body cannot pair with one inside an unrelated new call far away.
 fn update_context_supported(
     before_id: usize,
     after_id: usize,
@@ -988,8 +836,7 @@ pub(crate) fn emit_match(
             if matches!(ctx.after_decision.get(&child), Some(AfterDecision::Insert)) {
                 total += emit_after_subtree(child, ctx, diff);
             }
-            // A Match after-child was already (or will be) handled via the before-children
-            // loop above, walking that child's before-side partner.
+            // A matched after-child is emitted through its before-side partner.
         }
     }
 
@@ -1013,9 +860,8 @@ pub(crate) fn emit_after_subtree(after_id: usize, ctx: &ResolveCtx, diff: &mut A
     emit_subtree(Side::After, after_id, ctx, diff)
 }
 
-/// Emits the mappings for `id`'s subtree on `side` per this call's decisions, returning their
-/// total cost: a fresh match is emitted as one; a subtree with nothing reused below it is pruned
-/// whole; otherwise just this node is pruned (unit cost) and each child is classified on its own.
+/// Emits the mappings for `id`'s subtree on `side` per this call's decisions and returns their
+/// total cost.
 fn emit_subtree(side: Side, id: usize, ctx: &ResolveCtx, diff: &mut ASTDiff) -> u64 {
     if let Some(partner) = ctx.fresh_match_target(side, id) {
         let (before_id, after_id) = side.pair(id, partner);
@@ -1031,8 +877,6 @@ fn emit_subtree(side: Side, id: usize, ctx: &ResolveCtx, diff: &mut ASTDiff) -> 
         return subtree_cost(side, id, meta, &UnitCostModel::new(meta.language));
     }
 
-    // Something below this node is reused elsewhere: prune just this node (unit cost) and let
-    // its children be independently classified.
     let (operation, unit_cost) = side.prune_operation();
     let mut total = unit_cost;
     if let Some(info) = meta.node_info.get(&id) {
@@ -1053,9 +897,8 @@ fn emit_subtree(side: Side, id: usize, ctx: &ResolveCtx, diff: &mut ASTDiff) -> 
     total
 }
 
-/// Mark a pair of bit-for-bit identical subtrees (and all their descendants) as `Identical`,
-/// without running any tree-edit-distance computation. Safe because identical full hashes
-/// guarantee identical structure (so children lists line up 1:1, in order).
+/// Marks a pair of subtrees with equal full hashes, and all their descendants, as `Identical`.
+/// Equal full hashes guarantee the children line up 1:1.
 pub(crate) fn emit_identical_subtree(
     before_id: usize,
     after_id: usize,
@@ -1082,11 +925,7 @@ pub(crate) fn emit_identical_subtree(
     }
 }
 
-/// Adds a prune (delete-or-insert) mapping for an entire subtree that's not reused elsewhere,
-/// recursively. Shared shape behind `add_delete_mappings`/`add_insert_mappings`, parameterized
-/// over the four things that actually differ per side: which side's node map already-mapped
-/// nodes are checked against, the `(before, after)` mapping-key shape (`(id, 0)` vs `(0, id)`),
-/// the operation label, and the subtree-cost function.
+/// Adds a delete or insert mapping for every not-yet-mapped node of a subtree.
 #[allow(clippy::too_many_arguments)]
 fn add_prune_mappings(
     node_id: usize,
@@ -1171,7 +1010,6 @@ pub(crate) fn add_insert_mappings(
     );
 }
 
-/// Compute the cost of deleting an entire subtree.
 pub(crate) fn subtree_del_cost(
     node_id: usize,
     meta: &ASTMetadata,
@@ -1180,7 +1018,6 @@ pub(crate) fn subtree_del_cost(
     subtree_cost(Side::Before, node_id, meta, cost_model)
 }
 
-/// Compute the cost of inserting an entire subtree.
 pub(crate) fn subtree_ins_cost(
     node_id: usize,
     meta: &ASTMetadata,
@@ -1189,7 +1026,6 @@ pub(crate) fn subtree_ins_cost(
     subtree_cost(Side::After, node_id, meta, cost_model)
 }
 
-/// The cost of pruning `node_id`'s entire subtree on `side` (delete before, insert after).
 fn subtree_cost(side: Side, node_id: usize, meta: &ASTMetadata, cost_model: &UnitCostModel) -> u64 {
     if node_id == 0 {
         return 0;
@@ -1203,8 +1039,6 @@ fn subtree_cost(side: Side, node_id: usize, meta: &ASTMetadata, cost_model: &Uni
     }
     cost
 }
-
-// --- Flat-tree fast path: Myers O(ND) sequence diff ---
 
 mod myers;
 pub(crate) use myers::*;

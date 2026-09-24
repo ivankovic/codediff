@@ -35,17 +35,14 @@ struct Args {
     #[arg(long)]
     db: PathBuf,
 
-    /// Number of parsing worker threads. Defaults to (CPU cores - 1) so at least one core is
-    /// always left free for the rest of the system, even on a fully loaded run.
+    /// Number of parsing worker threads. Defaults to (CPU cores - 1).
     #[arg(long)]
     threads: Option<usize>,
 
     #[arg(long, default_value_t = 1000)]
     queue_capacity: usize,
 
-    /// How many file records to buffer in memory before each SQLite commit. Keeps peak memory
-    /// bounded regardless of corpus size, instead of accumulating every file's stats until the
-    /// very end of the run.
+    /// How many file records to buffer in memory before each SQLite commit.
     #[arg(long, default_value_t = 500)]
     batch_size: usize,
 
@@ -54,10 +51,8 @@ struct Args {
     #[arg(long, default_value_t = 100)]
     max_db_size_gb: u64,
 
-    /// Only (re)process files of at least this many bytes. The database is upserted by path, so
-    /// this re-measures a size class in place without walking the parse over the other seven
-    /// million files: added 2026-09-19 to bring the 4,014 code files above the 1 MiB cap that
-    /// `stats::for_path` had until then into the statistics, `--min-bytes 1048576`.
+    /// Only (re)process files of at least this many bytes. Rows are upserted by path, so this
+    /// re-measures one size class in place without re-parsing the rest of the corpus.
     #[arg(long, default_value_t = 0)]
     min_bytes: u64,
 }
@@ -69,8 +64,6 @@ fn main() {
 
     let project_path = &args.path;
     let db_path = &args.db;
-    // Reserve one core for the rest of the system: a corpus scan should never be able to make
-    // the machine unresponsive to other work.
     let n_threads = args
         .threads
         .unwrap_or_else(|| num_cpus::get().saturating_sub(1).max(1));
@@ -90,9 +83,7 @@ fn main() {
     }
 }
 
-/// Best-effort niceness bump so CPU-bound worker threads yield to the rest of the system under
-/// contention. Applied once in `main`, before any worker threads are spawned, so every spawned
-/// thread inherits the lowered priority. Failure is not fatal - e.g. some sandboxes disallow it.
+/// Best-effort niceness bump. Must run before any worker thread is spawned, so they inherit it.
 #[cfg(unix)]
 fn lower_priority() {
     unsafe {
@@ -115,12 +106,8 @@ fn file_stats(
     let (path_tx, path_rx) = bounded::<PathBuf>(queue_capacity);
     let (stats_tx, stats_rx) = bounded::<(PathBuf, CodeStats)>(queue_capacity);
 
-    // Real-world corpora contain pathologically deep trees (huge generated/minified files,
-    // deeply nested JSON, long chained expressions) that overflow the default ~8MB thread stack
-    // in the recursive AST walks (count_nodes, compute_kind_stats). A stack overflow aborts the
-    // whole process unconditionally (unlike a panic, it can't be caught), losing every file
-    // processed so far since results are only persisted at the very end. A generous stack size
-    // raises the ceiling far enough that this is no longer the practical limit.
+    // Real corpora hold trees deep enough to overflow the default stack in the recursive AST
+    // walks, and a stack overflow aborts the process where a panic could be caught.
     const WORKER_STACK_SIZE: usize = 256 * 1024 * 1024;
 
     let mut workers = Vec::with_capacity(n_threads);
@@ -138,8 +125,6 @@ fn file_stats(
 
     let project_path_owned = project_path.to_owned();
 
-    // With `--min-bytes`, a filter stage between the walker and the workers drops everything
-    // smaller before it is ever read; the walker itself is unchanged.
     let path_producer = if min_bytes == 0 {
         thread::spawn(move || filesystem::all_files_from_path(&project_path_owned, path_tx))
     } else {
@@ -160,12 +145,8 @@ fn file_stats(
         })
     };
 
-    // The writer commits in small batches and never retains more than `batch_size` files' worth
-    // of stats at once. This is the key difference from the earlier design, which accumulated a
-    // `HashMap` of every file's stats in memory and only wrote to SQLite at the very end: on a
-    // multi-million-file corpus that unbounded accumulation, combined with each entry still
-    // holding the file's full raw source text, exhausted system memory and hung the whole
-    // machine. Streaming writes bound peak memory to O(batch_size) regardless of corpus size.
+    // Streaming batched writes bound peak memory to O(batch_size); holding every file's stats
+    // until the end exhausts memory on a multi-million-file corpus.
     let db_path_owned = db_path.to_owned();
     let writer =
         thread::spawn(move || writer_loop(&db_path_owned, stats_rx, batch_size, max_db_bytes));
@@ -185,9 +166,7 @@ fn worker_loop(path_rx: Receiver<PathBuf>, stats_tx: Sender<(PathBuf, CodeStats)
 
     while let Ok(path) = path_rx.recv() {
         let mut s = codediff::stats::for_path(&path, &mut parser);
-        // The raw file contents are only needed to compute the derived stats above; keeping them
-        // around after that just inflates the size of every in-flight item on the channel. Drop
-        // them as soon as we're done with them.
+        // Drop the raw contents before the item crosses the channel.
         s.code.contents = String::new();
         if stats_tx.send((path, s)).is_err() {
             break;
@@ -212,7 +191,6 @@ fn writer_loop(
     let mut batch = Vec::with_capacity(batch_size);
     let mut stopped_early = false;
 
-    // `recv()` returning `Err` means all workers are done and the channel is closed.
     while let Ok(item) = stats_rx.recv() {
         batch.push(item);
         if batch.len() >= batch_size {
@@ -257,10 +235,8 @@ fn report_progress(db_path: &Path, processed: u64, elapsed: Duration) {
     );
 }
 
-/// Size of the database on disk, in bytes. Deliberately reads only the main DB file (not any
-/// `-wal`/`-journal` sidecar) - we intentionally use the default rollback-journal mode (see
-/// `create_tables`) rather than WAL, so committed data is reflected in this file's size
-/// immediately and the `max_db_size_gb` cap check stays accurate.
+/// Size of the main database file, in bytes. Accurate for the size cap only because the database
+/// uses the rollback journal, not WAL, so committed data lands in this file immediately.
 fn db_size_bytes(db_path: &Path) -> Result<u64> {
     Ok(std::fs::metadata(db_path)?.len())
 }
@@ -292,12 +268,8 @@ fn create_tables(conn: &Connection) -> Result<()> {
         [],
     )?;
 
-    // Per-(file, node kind) occurrence count, keyed by `files.id` rather than the file's path -
-    // the path string would otherwise be repeated across dozens of kind rows per file, and at
-    // multi-million-file scale that repetition is a meaningful chunk of database size.
-    // `language` isn't duplicated here either - join against `files` to slice by language, tip,
-    // etc: `SELECT f.language, k.kind, SUM(k.count) FROM node_kind_counts k JOIN files f ON
-    // f.id = k.file_id GROUP BY f.language, k.kind ORDER BY f.language, 3 DESC`.
+    // Keyed by `files.id`, not path, to keep the database small; join `files` to slice by
+    // language or tip.
     conn.execute(
         r#"
         CREATE TABLE IF NOT EXISTS node_kind_counts (
@@ -310,11 +282,7 @@ fn create_tables(conn: &Connection) -> Result<()> {
         [],
     )?;
 
-    // Per-(file, node kind, size bucket) histogram of subtree sizes, where bucket B covers
-    // subtree sizes in [2^B, 2^(B+1)) (see `stats::KindStats`). Powers the "distribution of
-    // subtree sizes per node kind" analysis: e.g. `SELECT f.language, h.kind, h.size_bucket,
-    // SUM(h.count) FROM node_kind_subtree_size_histogram h JOIN files f ON f.id = h.file_id
-    // GROUP BY f.language, h.kind, h.size_bucket ORDER BY 1, 2, 3`.
+    // Bucket B covers subtree sizes in [2^B, 2^(B+1)) (see `stats::KindStats`).
     conn.execute(
         r#"
         CREATE TABLE IF NOT EXISTS node_kind_subtree_size_histogram (
@@ -332,9 +300,7 @@ fn create_tables(conn: &Connection) -> Result<()> {
 }
 
 /// Writes one batch of file stats in a single transaction and returns how many files were
-/// written. Re-running against paths already present in `db_path` updates the existing row (and
-/// its `id`) in place rather than duplicating it, so repeated runs don't leave orphaned
-/// node_kind_counts/node_kind_subtree_size_histogram rows behind.
+/// written. A path already present is updated in place, leaving no orphaned per-kind rows.
 fn write_batch(conn: &mut Connection, batch: &mut Vec<(PathBuf, CodeStats)>) -> Result<usize> {
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -381,8 +347,7 @@ fn write_batch(conn: &mut Connection, batch: &mut Vec<(PathBuf, CodeStats)>) -> 
         )?;
 
         for (_, s) in batch.drain(..) {
-            // Language and tip don't implement ToSql and I don't want to add a dependency to
-            // rusqlite from code.rs. Likewise, PathBuf also doesn't.
+            // Stringified here to keep rusqlite out of code.rs.
             let path = s
                 .code
                 .metadata
@@ -393,8 +358,6 @@ fn write_batch(conn: &mut Connection, batch: &mut Vec<(PathBuf, CodeStats)>) -> 
             let language = s.code.metadata.language.map(|l| l.to_string());
             let tip = s.code.metadata.tip.map(|t| t.to_string());
 
-            // Without a path we have nothing to key rows on, and no way to join
-            // node_kind_counts/node_kind_subtree_size_histogram back to `files` - skip entirely.
             let Some(path) = path else { continue };
 
             let file_id: i64 = upsert_file.query_row(
@@ -485,7 +448,6 @@ mod tests {
         let none: i64 = conn.query_row("SELECT COUNT(*) FROM files", [], |r| r.get(0))?;
         assert_eq!(none, 0);
 
-        // A threshold of one byte keeps every non-empty file, which is what the full run has.
         file_stats(
             &repo_path,
             db_path,
@@ -512,8 +474,7 @@ mod tests {
         let db_file = NamedTempFile::new()?;
         let db_path = db_file.path();
 
-        // Force multiple small batches (and a final partial batch) instead of one batch covering
-        // the whole run, to make sure batching boundaries don't drop or duplicate files.
+        // Several batches plus a partial one, so batch boundaries are exercised.
         file_stats(&repo_path, db_path, 2, 1000, 1, 100 * 1024 * 1024 * 1024, 0)?;
 
         verify_database_contents(db_path)?;
@@ -528,8 +489,6 @@ mod tests {
         let db_file = NamedTempFile::new()?;
         let db_path = db_file.path();
 
-        // A 1-byte cap is exceeded as soon as the first batch is committed, so the run must stop
-        // after writing at least one file rather than erroring out or hanging.
         file_stats(&repo_path, db_path, 2, 1000, 1, 1, 0)?;
 
         let conn = Connection::open(db_path)?;
@@ -616,7 +575,6 @@ mod tests {
 
         let mut rows = columns_stmt.query([])?;
         if let Some(row) = rows.next()? {
-            // Verify we can read all the expected columns
             let path: Option<String> = row.get(0)?;
             let _language: Option<String> = row.get(1)?;
             let tip: Option<String> = row.get(2)?;
@@ -682,9 +640,6 @@ mod tests {
             );
         }
 
-        // Join both new tables back to `files` by file_id, the way downstream analysis is
-        // expected to: e.g. per-language node-kind distributions, or per-kind subtree-size
-        // histograms.
         let mut counts_stmt = conn.prepare(
             "SELECT f.language, k.kind, k.count
              FROM node_kind_counts k JOIN files f ON f.id = k.file_id

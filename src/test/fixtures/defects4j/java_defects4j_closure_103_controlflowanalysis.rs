@@ -23,10 +23,8 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // A `case` group is inserted into a run of `switch_block_statement_group` siblings, and
-    // codediff's `large_flat_subtree` pass pairs group 8 with group 9 and shifts every member of
-    // the run after it. The same-kind-sibling rotation family, counted once per leaf in the two
-    // mis-paired groups.
+    // A `case` group is inserted into a run; `large_flat_subtree` pairs group 8 with 9 and shifts
+    // the rest. The same-kind-sibling rotation family.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "java-defects4j-closure-103-controlflowanalysis",
         16,

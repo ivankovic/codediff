@@ -277,10 +277,7 @@ fn mapping_details() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // After `RenderOptions::paint_displaced_moves` stopped `MINIMAL` painting a span that kept its
-    // own text and its own place and shifted only because of an edit before it: minimal 8.388% ->
-    // 7.087%. The option is off under `FULL`, which this fix leaves byte-identical at 6.567%, so
-    // `MINIMAL` sets the limit now.
+    // `MINIMAL` sets the limit.
     assert_matches_human_painting_within_limit("rust-hash-optimization", 7.10)
 }
 

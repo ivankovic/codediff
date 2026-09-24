@@ -22,13 +22,8 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // Known, pre-existing gap against the human-authored mapping - not yet root-caused, so clamped
-    // rather than fixed here. 84 -> 85 from the `COST_LITERAL_UPDATE` tie fix (see
-    // `rust_sniffnet_protocol.rs`): a deliberate, measured +1 - the fixture's `algorithm_cost`
-    // *improved* 273 -> 271 (human 261) under the same change, so the extra mismatch is the mapping
-    // moving further from the human's labels while getting cheaper by the objective, on a fixture
-    // whose gap is unexplained to begin with. Lower (or drop back to
-    // `assert_matches_human_mapping`) once the gap is root-caused.
+    // Residual not yet root-caused. Part of it is the `COST_LITERAL_UPDATE` tie resolution (see
+    // `rust_sniffnet_protocol.rs`), which is cheaper by the objective but further from the labels.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "rust-add-comments-and-real-new-logic",
         85,
@@ -38,10 +33,7 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // After `RenderOptions::paint_displaced_moves` stopped `MINIMAL` painting a span that kept its
-    // own text and its own place and shifted only because of an edit before it: minimal 0.707% ->
-    // 0.622%. The option is off under `FULL`, which this fix leaves byte-identical at 0.777%, so
-    // `FULL` sets the limit now.
+    // `FULL` sets the limit.
     assert_matches_human_painting_within_limit("rust-add-comments-and-real-new-logic", 0.8)
 }
 

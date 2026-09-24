@@ -16,22 +16,15 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-// Hand-run instruments, not checks. Every fn here is `#[test] #[ignore]`: it prints or dumps an
-// analysis rather than asserting anything, so `cargo test` compiles them and runs none of them.
-//
-// Three write a live artifact and are wired into a Make target or a plan -
-// `painting_failure_census` (`make update-painting-attribution`), `mismatch_census` and
-// `cross_fixture_convention_census`. The other five take a fixture name
-// or a list through an env var and answer a question about that fixture, which is what makes them
-// worth keeping: a corpus-wide census answers its question once and belongs in
-// `research/data/quality/` as a write-up, while "why does *this* fixture disagree" comes up every
-// time a fixture is clamped.
+// Hand-run instruments, not checks: every fn here is `#[test] #[ignore]` and prints or writes an
+// analysis. `painting_failure_census` (`make update-painting-attribution`), `mismatch_census` and
+// `cross_fixture_convention_census` write artifacts; the rest answer "why does *this* fixture
+// disagree" for a fixture named in an env var.
 
 use super::*;
 
-/// EXPLORATORY: every disagreement run between the *tree mapping* and the painting (structural
-/// agreement) for the fixture named by the `FIXTURE` env var - unlike `painting_disagreement_detail`
-/// below, which checks codediff's *rendering* against it.
+/// EXPLORATORY: every disagreement run between the *tree mapping* and the painting for the fixture
+/// in `FIXTURE` (`painting_disagreement_detail` checks codediff's *rendering* instead).
 /// `FIXTURE=name cargo test --lib --features test-fixtures
 /// mapping_vs_painting_disagreement_detail_for_fixture -- --ignored --nocapture`.
 #[test]
@@ -65,12 +58,9 @@ fn mapping_vs_painting_disagreement_detail_for_fixture() -> Result<()> {
     Ok(())
 }
 
-/// EXPLORATORY: prints just the Minimal/Full percentages for fixtures named by the
-/// `FIXTURES` env var (comma-separated): `FIXTURES=a,b,c cargo test --lib --features test-fixtures
-/// measure_stub_fixtures -- --ignored --nocapture`.
-///
-/// `research/data/quality/painting_attribution.csv` already carries every fixture's rate; naming a
-/// handful is the fastest way to re-measure after a change, without paying for the whole corpus.
+/// EXPLORATORY: just the Minimal/Full percentages for the comma-separated `FIXTURES`, to
+/// re-measure a few fixtures after a change: `FIXTURES=a,b,c cargo test --lib --features
+/// test-fixtures measure_stub_fixtures -- --ignored --nocapture`.
 #[test]
 #[ignore]
 fn measure_stub_fixtures() -> Result<()> {
@@ -93,17 +83,13 @@ fn measure_stub_fixtures() -> Result<()> {
     Ok(())
 }
 
-/// EXPLORATORY: prints every run of bytes where codediff's rendering (under `options`)
-/// disagrees with the human painting for one fixture - the `compare_painting` byte-projection
-/// itself, not `text_mapping_disagreements`' separate node-vs-painting comparison. Fixture and
-/// mode are read from env vars so this can be pointed at any `painting_disagreement_report`
-/// offender without editing this function: `FIXTURE=<name> MODE=<minimal|full> cargo test --lib
-/// --features test-fixtures painting_disagreement_detail -- --ignored --nocapture`.
+/// EXPLORATORY: every run of bytes where codediff's rendering disagrees with the closest human
+/// painting for one fixture (`compare_painting`'s byte projection): `FIXTURE=<name>
+/// MODE=<minimal|full> cargo test --lib --features test-fixtures painting_disagreement_detail --
+/// --ignored --nocapture`.
 ///
-/// `MAPPING=human` renders the fixture's human tree mapping instead of codediff's, with
-/// codediff's reasons borrowed exactly as `painting_failure_census` does - the runs behind that
-/// census's `renderer_bytes` column, i.e. what only a rendering change can fix. Either way the
-/// comparison is against the closest of the preset's candidate paintings, as the census scores it.
+/// `MAPPING=human` renders the human tree mapping instead, with codediff's reasons borrowed as
+/// `painting_failure_census` does - the runs only a rendering change can fix.
 #[test]
 #[ignore]
 fn painting_disagreement_detail() -> Result<()> {
@@ -160,7 +146,6 @@ fn painting_disagreement_detail() -> Result<()> {
     // the census chooses it, so the two report runs against the same painting.
     let chooser = if human { render(real) } else { ours.clone() };
 
-    // The closest candidate, as the census scores it.
     // Mismatched bytes, the painting, and its per-byte labels per side.
     type Candidate<'a> = (usize, &'a NamedTextMapping, [Vec<Option<TextLabel>>; 2]);
     let mut best: Option<Candidate> = None;
@@ -227,14 +212,9 @@ fn painting_disagreement_detail() -> Result<()> {
     Ok(())
 }
 
-/// DIAGNOSTIC: every ground-truth invariant `invariants()` would report, for the fixtures named in
-/// the comma-separated `FIXTURES` env var, or for the whole corpus when it is unset.
-/// `FIXTURES=a,b cargo test --lib --features test-fixtures invariant_violations -- --ignored
-/// --nocapture`.
-///
-/// The per-fixture test only ever says how many there are (its recorded count is exact, so a repair
-/// makes it fail with the new number), which is the right thing for a gate and useless while
-/// actually repairing one. This prints what they are. The corpus-wide form is the worklist.
+/// DIAGNOSTIC: every ground-truth invariant violation, for the comma-separated `FIXTURES` or the
+/// whole corpus: `FIXTURES=a,b cargo test --lib --features test-fixtures invariant_violations --
+/// --ignored --nocapture`. The per-fixture test only counts them; this says what they are.
 #[test]
 #[ignore]
 fn invariant_violations() -> Result<()> {
@@ -288,18 +268,9 @@ fn invariant_violations() -> Result<()> {
     Ok(())
 }
 
-/// EXPLORATORY: the mismatches of one fixture, spelled out - the per-fixture counterpart of
-/// [`mismatch_census`].
-///
-/// The census answers "what shapes are there, corpus-wide" and writes a CSV to group by. This
-/// answers the question that follows it: the census says this fixture disagrees twice on `||`
-/// under `binary_expression`, so *which* `||`, reading what, next to what. It prints the mismatch
-/// message unmodified - `compute_mismatches_*` already writes the human's operation, both paths
-/// and the partner codediff chose - and adds the one thing the message cannot carry, the node's
-/// own bytes and where they are, since a mismatch on a `,` is unreadable without them.
-///
-/// Invisible mismatches are printed too, under their own heading: the goals are stated in visible
-/// nodes, but when a visible one looks arbitrary its explanation is often an invisible sibling.
+/// EXPLORATORY: the mismatches of one fixture spelled out, with each node's own bytes and
+/// position (a mismatch on a `,` is unreadable without them). Invisible mismatches are printed
+/// under their own heading: they often explain an arbitrary-looking visible one.
 ///
 /// `FIXTURE=name cargo test --release --lib --features test-fixtures mismatch_detail_for_fixture
 /// -- --ignored --nocapture`
@@ -331,9 +302,7 @@ fn mismatch_detail_for_fixture() -> Result<()> {
         "-".to_string()
     }
 
-    // The message names the partner codediff chose by *kind* only ("but it mapped to ||"), which
-    // is exactly the word that repeats in the cases worth reading. Its position is what settles
-    // which `||` that was, so it is looked up here rather than inferred from the message.
+    // The message names the chosen partner by kind only; its position settles which one it was.
     let diff = crate::diff::diff_code_with_config(before, after, &config);
     let diff_ast = diff.ast.as_ref();
 
@@ -361,26 +330,15 @@ fn mismatch_detail_for_fixture() -> Result<()> {
     Ok(())
 }
 
-/// **Every mismatch in the corpus, classified - the matching-side counterpart of
-/// [`painting_failure_census`].**
-///
-/// That census answers "who owns the painting disagreement" and its answer is the renderer. This
-/// one asks the same question of the *mapping*: of the mismatches `assert_matches_human_mapping`
-/// counts, what shapes are they, and which pass produced the mapping that disagrees. One row per
-/// mismatch in `research/data/quality/mismatch_census.csv`, so the taxonomy is a file to group by
-/// rather than a table someone read once.
-///
-/// The three fields that discriminate are `expected_op` (what the human said), `actual_op` (what
-/// codediff produced) and `reason` (the [`crate::diff::ASTMappingReason`] of the mapping it
-/// produced instead), all parsed back out of the mismatch message - the message is generated text,
-/// not free-form, so the parse is against a format this file's own `compute_mismatches_*` writes.
-/// `kind`/`parent_kind`/`named` come from the node id the mismatch already carries.
+/// **Every mismatch in the corpus, classified** - the mapping-side counterpart of
+/// [`painting_failure_census`]. One row per mismatch in
+/// `research/data/quality/mismatch_census.csv`: `expected_op`, `actual_op` and `reason` parsed
+/// back out of the generated mismatch message, `kind`/`parent_kind`/`named` from its node.
 ///
 /// `cargo test --release --lib --features test-fixtures mismatch_census -- --ignored --nocapture`
 #[test]
 #[ignore]
-// The CSV half needs the `csv` crate, which is only linked under `test-fixtures` - the same gate
-// `painting_failure_census` below carries, for the same reason.
+// `csv` is only linked under `test-fixtures`.
 #[cfg(feature = "test-fixtures")]
 fn mismatch_census() -> Result<()> {
     use std::collections::BTreeMap;
@@ -395,8 +353,7 @@ fn mismatch_census() -> Result<()> {
         }
     }
 
-    /// The `(op X, reason Y)` tail, when the message carries one. `Delete (with children)` style
-    /// messages name neither, and report `-`.
+    /// The `(op X, reason Y)` tail, or `-` when the message carries none.
     fn op_and_reason_of(message: &str) -> (String, String) {
         let Some(start) = message.rfind("(op ") else {
             return ("-".to_string(), "-".to_string());
@@ -409,8 +366,7 @@ fn mismatch_census() -> Result<()> {
         }
     }
 
-    /// `APTED("qualified_name")` -> `APTED`, so the reason groups by pass rather than by pass and
-    /// argument. The argument is kept as its own column.
+    /// `APTED("qualified_name")` -> (`APTED`, `qualified_name`), so the reason groups by pass.
     fn split_reason(reason: &str) -> (String, String) {
         match reason.split_once('(') {
             Some((pass, rest)) => (
@@ -475,10 +431,8 @@ fn mismatch_census() -> Result<()> {
             skipped += 1;
             continue;
         };
-        // A `*WithChildren` message names no pass - `check_subtree_maps_to_zero` reports the node
-        // it found a mapping for, not the mapping. That is 22% of the corpus's mismatches, so the
-        // diff is recomputed here and the node's own entry read out of it directly, the way
-        // `actual_mapping_info` does for the messages that do carry one.
+        // A `*WithChildren` message names no pass, so the node's own entry is read from a
+        // recomputed diff, as `actual_mapping_info` does.
         let diff = crate::diff::diff_code_with_config(before, after, &config);
         let diff_ast = diff.ast.as_ref();
         solved += 1;
@@ -604,58 +558,25 @@ fn mismatch_census() -> Result<()> {
     Ok(())
 }
 
-/// **Where two fixtures' paintings answer the same question differently.**
+/// **Where two fixtures' paintings answer the same question differently** - the cross-fixture
+/// axis the intra-fixture invariants cannot see.
 ///
-/// Every rule in [`crate::test::helper::human_mapping::invariants`] is *intra*-fixture: it asks
-/// whether one fixture's mapping and paintings agree with each other. None of them compares two
-/// fixtures, so a pair whose paintings imply opposite conventions for the same shape is invisible
-/// to all seventeen - and a corpus that disagrees with itself across fixtures grades a renderer
-/// against a coin flip, however self-consistent each fixture is on its own.
+/// The population is leaves the human's tree mapping pairs with a leaf that reads the same
+/// ([`LeafStatus::Same`]): the text survived, so only its geometry and whether it is painted
+/// remain. The geometry is facts about the *file*, not the renderer's predicates (which could only
+/// rediscover the renderer): `row_moved`, `column_moved`, `row_edited`, and
+/// `drift_matches_neighbours` (pushed by an insertion above, versus genuinely relocated).
 ///
-/// The population is the one place the two fixtures can be made comparable: a **leaf the human's
-/// own tree mapping pairs with a leaf that reads the same** ([`LeafStatus::Same`]). No matcher is
-/// involved and no judgement about what the change *is* - the human has already said this text
-/// survived. All that is left is where it ended up, which is geometry, and whether the painting
-/// colours it, which is the convention. Two fixtures that answer differently for the same geometry
-/// are the finding.
-///
-/// Three booleans describe the geometry, and they are deliberately facts about the *file* rather
-/// than about any rule in `diff::text` - a class defined by the renderer's own predicates could
-/// only ever re-discover the renderer:
-///
-/// * `row_moved` - the leaf is on a different row index than its partner.
-/// * `column_moved` - it starts at a different column.
-/// * `row_edited` - its whole row reads differently on the two sides. False means the row is
-///   byte-identical and whatever moved the leaf happened elsewhere in the file.
-///
-/// A fourth fact separates the two things `row_moved` alone conflates - a leaf pushed down by an
-/// insertion somewhere above it, and a leaf that genuinely relocated. `drift_matches_neighbours`
-/// asks whether the leaf's row delta is the one its immediate neighbours also carry: text that
-/// insertions above it pushed down moves by the same amount as everything around it, and a block
-/// that moved does not. The same neighbour evidence [`crate::diff::solve_orphaned_leaves`] and
-/// `solve_leaf_neighbour_agreement` both key on, asked of rows.
-///
-/// The verdict is `clean` (no byte of the leaf is painted), `painted` (all of them are, and under
-/// which label), or `partial`. `partial` is reported and never counted as either: a leaf half
-/// inside a larger painted region is the painting's chunking talking, not its verdict on this
-/// leaf.
-///
-/// Scoped to visible leaves, because a painting cannot colour whitespace it does not reach, and to
-/// the two named presets, because `Minimal` and `Full` are *specified* to disagree - a split
-/// between them is the design, and only a split *within* one of them is a contradiction.
-///
-/// **The CSV holds the exceptions, not the population.** One row per leaf whose verdict is not
-/// `clean`, carrying its class's own `clean` count for that fixture and preset as the denominator
-/// beside it. The population is 3.3 million leaves and 261MB of it; the exceptions are four
-/// thousand, they are what anyone acts on, and each one arrives with the number it is an exception
-/// to.
+/// The verdict is `clean`, `painted` (with its label) or `partial`; `partial` is the painting's
+/// chunking and is counted as neither. Visible leaves and the two named presets only, since the
+/// presets are specified to disagree. The CSV holds only non-`clean` leaves, each with its class's
+/// `clean` count as denominator.
 ///
 /// `cargo test --release --lib --features test-fixtures cross_fixture_convention_census --
 /// --ignored --nocapture`
 #[test]
 #[ignore]
-// The CSV half needs the `csv` crate, which is only linked under `test-fixtures` - the same gate
-// `mismatch_census` above carries, for the same reason.
+// `csv` is only linked under `test-fixtures`.
 #[cfg(feature = "test-fixtures")]
 fn cross_fixture_convention_census() -> Result<()> {
     use crate::test::helper::human_mapping::invariants::painted_labels;
@@ -702,9 +623,7 @@ fn cross_fixture_convention_census() -> Result<()> {
         drift_matches_neighbours: bool,
     }
 
-    // Held back until the end so each row can carry its own class's `clean` count for that fixture
-    // and preset - the denominator is what makes an exception readable, and it is not known until
-    // the class has been walked.
+    // Held until the end, when each class's `clean` denominator is known.
     let mut exceptions: Vec<Exception> = Vec::new();
     // (preset, class) -> fixture -> (clean, painted, partial)
     let mut tally: BTreeMap<(String, String), BTreeMap<String, [usize; 3]>> = BTreeMap::new();
@@ -721,8 +640,7 @@ fn cross_fixture_convention_census() -> Result<()> {
         };
         let context = TreeContext::build(&mapping, before_tree.root_node(), after_tree.root_node());
 
-        // Every `Same` leaf's row delta, per side, in document order - the neighbourhood
-        // `drift_matches_neighbours` reads. Built once per fixture rather than per painting.
+        // Every `Same` leaf's row delta, per side, in document order.
         let drifts: [Vec<(usize, i64)>; 2] = std::array::from_fn(|side| {
             context.leaves[side]
                 .iter()
@@ -774,10 +692,8 @@ fn cross_fixture_convention_census() -> Result<()> {
                         if row_edited { "+edited" } else { "+same" },
                     );
 
-                    // The drift its neighbours carry. A leaf with no `Same` neighbour on either
-                    // side has nothing to agree with and reports `false`, which keeps the column
-                    // meaning "verified to move with its surroundings" rather than "not known to
-                    // disagree".
+                    // No `Same` neighbour reports `false`: the column means "verified to move
+                    // with its surroundings".
                     let drift =
                         partner.start_position().row as i64 - leaf.start_position().row as i64;
                     let index = drifts[side].iter().position(|&(id, _)| id == leaf.id());
@@ -885,9 +801,7 @@ fn cross_fixture_convention_census() -> Result<()> {
         csv_path.display()
     );
 
-    // A fixture "says clean" for a class when every one of its leaves in that class is unpainted,
-    // and "says painted" when every one is painted. A fixture that does both is itself the
-    // contradiction and is counted apart - no cross-fixture comparison is needed to condemn it.
+    // A fixture both "clean" and "painted" for one class contradicts itself and is counted apart.
     eprintln!(
         "\n{:<9} {:<18} {:>6} {:>8} {:>6} {:>9}",
         "preset", "class", "clean", "painted", "both", "leaves"
@@ -909,40 +823,23 @@ fn cross_fixture_convention_census() -> Result<()> {
     Ok(())
 }
 
-/// EXPLORATORY: the painting round's worklist - every run of bytes where codediff's rendering
-/// disagrees with the hand-painted ground truth, classified by what it is, and **attributed** to
-/// the node matcher or to the renderer.
+/// EXPLORATORY: every run of bytes where codediff's rendering disagrees with the painting,
+/// classified and **attributed** to the node matcher or the renderer, per preset:
 ///
-/// Three label vectors per side per preset:
+/// * `real` - `diff_code`'s mapping, rendered. What a reader sees.
+/// * `ideal` - the human tree mapping through the same `TextDiff` (via
+///   [`as_ast_diff_for_mapping`]): what the renderer paints with perfect matching.
+/// * `painted` - the painting the preset is answerable to.
 ///
-/// * `real` - `diff_code`'s own mapping, rendered. What a reader actually sees.
-/// * `ideal` - the fixture's *human tree mapping* pushed through the same `TextDiff` (via
-///   [`as_ast_diff_for_mapping`]). What the renderer would paint if node matching were perfect.
-/// * `painted` - the human painting the preset is answerable to.
-///
-/// `ideal` vs `painted` is the residue **no matcher improvement can remove**: a rendering rule
-/// disagreeing with a human about a mapping the two agree on. That is what a painting-only round
-/// can fix. `real` vs `ideal` is matcher-attributable, and `real` vs `painted` is the number
-/// `painting_disagreement_report` prints.
-///
-/// One caveat on the `ideal` column: `as_ast_diff_for_mapping` leaves `ASTMappingReason::default()`
-/// on every entry, so the two reason-tagged escapes from `Move` (`known_pure_reindent` via
-/// `NestedConditionCollapse`/`WrapGrowth`, `known_pure_relocation` via `HeritageClauseGrowth`)
-/// cannot fire there. It over-attributes `Move` to the renderer, never under-attributes.
-///
-/// Counted by **runs and fixtures first, bytes last**: a stray `}` is one byte and the corpus's
-/// largest fixture is twelve thousand, so the byte-weighted ranking
-/// `painting_disagreement_report` sorts by hides exactly the small repeated mistake this round is
-/// about.
+/// `ideal` vs `painted` is what no matcher improvement can remove; `real` vs `ideal` is the
+/// matcher's. Counted by runs and fixtures before bytes, since a byte ranking hides small
+/// repeated mistakes.
 ///
 /// `cargo test --release --lib --features test-fixtures painting_failure_census --
 /// --ignored --nocapture`
 #[test]
 #[ignore]
-// The CSV half needs the `csv` crate, which is only linked under `test-fixtures` (see
-// `helper::sample_provenance`'s own note) - and this measurement has nothing to read without the
-// fixtures anyway. Same gate `the_quality_baseline_accuracy_columns_are_a_projection_of_the_stub_limits`
-// carries for the same reason.
+// `csv` is only linked under `test-fixtures`.
 #[cfg(feature = "test-fixtures")]
 fn painting_failure_census() -> Result<()> {
     use crate::diff::text::{RangeMatch, RenderOptions};
@@ -966,10 +863,8 @@ fn painting_failure_census() -> Result<()> {
         /// What the mapping that produced `ours` says about it, and why.
         ours_op: String,
         ours_reason: String,
-        /// For a `Move` we painted: the geometry `identical_or_move` decided it on - whether the
-        /// span's start column and start row changed, whether it spans a row boundary, and
-        /// whether the two sides' text is byte-identical. Empty when the run is not a `Move` of
-        /// ours, or when no single range covers its first byte.
+        /// For a `Move` we painted: the geometry `identical_or_move` decided it on. Empty
+        /// otherwise, or when no single range covers the run's first byte.
         geometry: String,
         sample: String,
     }
@@ -981,9 +876,9 @@ fn painting_failure_census() -> Result<()> {
         }
     }
 
-    /// `whitespace` when there is no visible character at all, `punctuation` when every visible
-    /// character is one [`crate::diff::text::is_structural_only`] would drop, `code` otherwise.
-    /// The split matters because the first two are what `MINIMAL`'s filters are *for*.
+    /// `whitespace` (nothing visible), `punctuation` (every visible character is one
+    /// [`crate::diff::text::is_structural_only`] drops), or `code` - the first two are what
+    /// `MINIMAL`'s filters are *for*.
     fn text_class(text: &str) -> &'static str {
         if text.chars().all(char::is_whitespace) {
             "whitespace"
@@ -1006,14 +901,9 @@ fn painting_failure_census() -> Result<()> {
         ))
     }
 
-    /// The shape `identical_or_move` read to call the range covering `byte` a `Move`: did its
-    /// start column change (the `column_shift_is_meaningful` branch), did its start row, does it
-    /// span a row boundary (the precondition of both `crossed_backwards` and
-    /// `shifted_within_its_own_line`), and is the text on the two sides byte-identical.
-    ///
-    /// `col-same` with no row boundary cannot have come from a column shift at all, so a `Move`
-    /// there is `crossed_backwards`' doing - the two are the only ways out of `Identical` and
-    /// they need completely different fixes.
+    /// The shape `identical_or_move` read to call the range covering `byte` a `Move`: start
+    /// column changed, start row changed, spans a row boundary, text byte-identical. `col-same`
+    /// with no row boundary can only be `crossed_backwards`' doing.
     fn move_geometry(
         ranges: &[RangeMatch],
         contents: [&String; 2],
@@ -1029,9 +919,7 @@ fn painting_failure_census() -> Result<()> {
             return "no-single-range".to_string();
         };
         let (source, destination) = (&range.source, &range.destination);
-        // Three-valued on purpose. A range whose destination this function cannot address - a
-        // column inside a multi-byte character, a row past the end - is *unknown*, not different,
-        // and folding the two together would invent a family out of the UTF-8-heavy fixtures.
+        // Three-valued: an unaddressable destination is *unknown*, not different.
         let same_text = match (
             range_bytes(contents[side], source),
             range_bytes(contents[1 - side], destination),
@@ -1101,8 +989,7 @@ fn painting_failure_census() -> Result<()> {
     names.sort();
 
     let mut runs: Vec<(&'static str, Run)> = Vec::new();
-    // One row per (fixture, preset), written out at the end: this is the artifact that makes the
-    // renderer's own residue a number the project can watch rather than a table someone read once.
+    // One row per (fixture, preset), written at the end.
     let mut rows: Vec<[String; 8]> = Vec::new();
     // preset -> (real, ideal, matcher) mismatched bytes, and the corpus size they are out of.
     let mut totals: BTreeMap<&'static str, [usize; 4]> = BTreeMap::new();
@@ -1124,8 +1011,7 @@ fn painting_failure_census() -> Result<()> {
             continue;
         }
         if before.ast.is_none() || after.ast.is_none() {
-            // The plain-text fallback has no tree to classify a run against, and no human tree
-            // mapping to build an `ideal` column from. Counted, not measured.
+            // The plain-text fallback has no tree to classify against. Counted, not measured.
             no_tree += 1;
             continue;
         }
@@ -1140,12 +1026,9 @@ fn painting_failure_census() -> Result<()> {
                 continue;
             }
         };
-        // The human format records no `ASTMappingReason`, but the renderer reads one:
-        // `identical_or_move` keeps a relocated node unpainted when the matcher verified the
-        // relocation is a pure reindent or heritage-clause shift. Untagged, every human pair loses
-        // those overrides, and the `ideal` column blames the renderer for `Move`s codediff's own
-        // output never paints. Every pair both mappings make borrows codediff's reason, which is
-        // a verified fact about that pair, not a choice of the matcher's.
+        // The human format records no `ASTMappingReason`, but `identical_or_move` reads one to
+        // keep a verified pure reindent or relocation unpainted. Pairs both mappings make borrow
+        // codediff's reason, or `ideal` would blame the renderer for `Move`s it never paints.
         for (key, human) in human_ast.mapping.iter_mut() {
             if let Some(real) = real_ast.mapping.get(key) {
                 human.reason = real.reason;
@@ -1176,9 +1059,7 @@ fn painting_failure_census() -> Result<()> {
             let Ok(candidates) = paintings_for_mode(&mapping, options) else {
                 continue;
             };
-            // The filtered ranges come back alongside the labels: a label says *what* we
-            // painted, and the range it came from says *why* - which is the half a rule has to
-            // key on.
+            // The ranges come back with the labels: the range says *why* it was painted.
             let sides = |ast: &ASTDiff| -> ([Vec<Option<TextLabel>>; 2], [Vec<RangeMatch>; 2]) {
                 let text_diff = crate::diff::text::TextDiff::from_with_options(
                     before,
@@ -1203,9 +1084,8 @@ fn painting_failure_census() -> Result<()> {
             let ours = [real_labels, ideal_labels];
             let ours_ranges = [real_ranges, ideal_ranges];
 
-            // One painting per preset for all three comparisons, so the three numbers decompose.
-            // Chosen the way `compare_painting`'s grader chooses: the candidate closest to what a
-            // reader actually sees.
+            // One painting per preset for all three comparisons, so they decompose: the one
+            // closest to what a reader sees, as `compare_painting` chooses.
             let mut best: Option<([Vec<Option<TextLabel>>; 2], usize)> = None;
             for painting in candidates {
                 let mut spans: [Vec<(HumanTextSpan, TextLabel)>; 2] = [Vec::new(), Vec::new()];
@@ -1290,9 +1170,8 @@ fn painting_failure_census() -> Result<()> {
                             continue;
                         }
                         let start = offset;
-                        // One run is one *verdict pair*, not merely one stretch of disagreement:
-                        // a `Delete`-where-`Move`-was-wanted next to an unpainted-where-`Insert`
-                        // are two different mistakes and must not be counted as one.
+                        // One run is one *verdict pair*: two adjacent different mistakes are two
+                        // runs.
                         while offset < ours.len()
                             && ours[offset] != theirs[offset]
                             && ours[offset] == ours[start]
@@ -1340,9 +1219,7 @@ fn painting_failure_census() -> Result<()> {
                                 sample: format!(
                                     "{name} {preset} side={side} row={} {:?}",
                                     contents[side][..start].matches('\n').count() + 1,
-                                    // Cut back to a character boundary, not to byte 40:
-                                    // `xml-libreoffice-unicode`'s runs are CJK, where every
-                                    // character is three bytes and byte 40 lands inside one.
+                                    // Cut at a character boundary: byte 40 can land inside one.
                                     &text[..(0..=40.min(text.len()))
                                         .rev()
                                         .find(|&at| text.is_char_boundary(at))
@@ -1374,14 +1251,9 @@ fn painting_failure_census() -> Result<()> {
         "breaks_invariants",
     ];
     if std::env::var("PAINTING_ATTRIBUTION_CHECK").is_ok() {
-        // Gate mode: compare against the committed baseline instead of overwriting it. A fixture
-        // present in both may not get *worse*; one only in this run is new data, not a regression.
-        //
-        // The baseline is a measurement, not a hand-authored limit, so editing a painting or a
-        // mapping moves it legitimately - unlike `quality_baseline.csv`, whose accuracy columns are
-        // a projection of the stubs precisely so that no run can re-baseline a regression away.
-        // The failure message says so, because otherwise this gate reads as broken every time the
-        // ground truth is improved.
+        // Gate mode: a fixture in both runs may not get *worse*; one only in this run is new.
+        // This baseline is a measurement, so improving the ground truth moves it legitimately,
+        // and the failure message says so.
         let mut baseline: std::collections::HashMap<(String, String), [usize; 3]> =
             std::collections::HashMap::new();
         let mut reader = csv::Reader::from_path(&csv_path).with_context(|| {
@@ -1551,9 +1423,7 @@ fn painting_failure_census() -> Result<()> {
         );
     }
 
-    // The confusion cells above split only by what the text *is*. Coarse on purpose: the
-    // by-node-kind table below fragments a wide family across dozens of kinds and then shows only
-    // its top rows, so a family that is 128 runs over 81 fixtures can fail to appear there at all.
+    // Split only by what the text *is*: the by-kind table below fragments a wide family.
     print(
         "renderer's own errors by what the disagreeing text is",
         &tally(&|(stream, _)| *stream == "ideal", &|run| {
@@ -1664,12 +1534,8 @@ fn painting_failure_census() -> Result<()> {
         72,
     );
 
-    // The cross-tab the punctuation rule needs: which *reason* mapped the node, per fixture. The
-    // corpus's two reason-tagged carve-outs from `Move` (`known_pure_reindent`,
-    // `known_pure_relocation`) are the house pattern for a narrow rule, and `identical_or_move`
-    // already receives `reason`. Read against the fixtures a candidate blanket rule improves and
-    // the ones it breaks: if the reasons separate the two sets, that is the predicate; if they do
-    // not, no available predicate does.
+    // Which *reason* mapped the node, per fixture: if the reasons separate the fixtures a
+    // blanket punctuation rule improves from those it breaks, that is the predicate.
     print(
         "the punctuation-painted-grey worklist, by fixture and mapping reason (as a reader sees it)",
         &tally(

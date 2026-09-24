@@ -22,11 +22,8 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // The 4 predefined_type<->type_identifier mismatches (e.g. "number" becoming a generic "T") are
-    // fixed - see TS_TYPE_KEYWORD_KINDS in nodes.rs. The remaining 10/7 is an unrelated
-    // fast_fallback issue: the renamed "const container = new NumberContainer(42)" line fails to
-    // match its "const numberContainer = new Container<number>(42)" counterpart at all. Any counts
-    // above describe the older, larger residual.
+    // Pins `TS_TYPE_KEYWORD_KINDS` (`number` becoming `T`). The residual is `fast_fallback` failing
+    // to match the renamed `const container = new NumberContainer(42)` line at all.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "typescript-add-generics",
         1,
@@ -41,7 +38,6 @@ fn painting() -> Result<()> {
 
 #[test]
 fn invariants() -> Result<()> {
-    // Invariant 16: the Minimal/Full split for a renamed identifier is not painted this way yet
-    // (`NumberContainer` against `Container`). Recorded as found.
+    // Invariant 16: the rename split is not painted (`NumberContainer` against `Container`).
     assert_ground_truth_invariants_with_known_violations("typescript-add-generics", 4)
 }

@@ -23,9 +23,8 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // Three closing braces, and they are the mapping's own brace confusion seen from codediff's
-    // side - see this fixture's `invariants` below. codediff pairs two `}`s the mapping does not
-    // and drops one it does (reason `APTED("qualified_name")`).
+    // The mapping's own brace confusion (see `invariants` below) seen from codediff's side
+    // (`APTED("qualified_name")`).
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "java-defects4j-closure-138-closurereverseabstractinterpreter",
         3,
@@ -43,19 +42,10 @@ fn painting() -> Result<()> {
 
 #[test]
 fn invariants() -> Result<()> {
-    // 2026-09-21, invariant 3, two: a crossed brace pairing. The `if` on before row 203 closes on
-    // row 222 and the `if` on row 208 closes on row 220, nested inside it. The mapping keeps row
-    // 203's `{` and row 220's `}` while deleting row 208's `{` and row 222's `}` - so what
-    // survives is the *outer* opener paired with the *inner* closer, which is neither "outer with
-    // outer" nor "inner with inner". Invariant 3 sees it as two separate disagreements, one per
-    // pair, because it compares each bracket against its own partner's status.
-    //
-    // Recorded as found. The repair is to pick one reading and keep both halves of it; which one
-    // is a free choice, and the corpus has no rule preferring inner or outer - see
-    // `research/data/quality/kind_mismatch_census_2026_09_21.md` on why that choice is left to the
-    // author and `delimiter_pairs_agree`'s own doc on the multi-map group that usually expresses
-    // it. The fixture's three `mapping()` mismatches are the same braces seen from codediff's
-    // side.
+    // Invariant 3, twice: a crossed brace pairing. The `if` on before row 203 closes on row 222,
+    // the nested one on row 208 closes on row 220. The mapping keeps row 203's `{` and row 220's
+    // `}` and deletes the others: outer opener with inner closer. The repair is to pick either
+    // reading and keep both halves of it.
     assert_ground_truth_invariants_with_known_violations(
         "java-defects4j-closure-138-closurereverseabstractinterpreter",
         2,

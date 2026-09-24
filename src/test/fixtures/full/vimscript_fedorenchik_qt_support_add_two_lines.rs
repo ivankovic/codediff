@@ -21,13 +21,8 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // 19 mismatches: the whole script_file root plus its 18 leading (license-header) comment
-    // lines all come back `reason=APTED("fast_fallback")` - the terminal `fast_fallback` pass's cheap Myers-LCS
-    // substitute for full APTED (see LARGE_RESIDUAL_THRESHOLD/PendingDiff::looks_expensive in
-    // diff.rs), triggered because this two-line addition still leaves a large enough unmatched
-    // residual. The fallback deletes+reinserts every one of the 18 identical comment lines instead
-    // of matching them, rather than paying for exact tree-edit-distance. Not yet root-caused
-    // further; lower (or drop back to assert_matches_human_mapping) if that's revisited.
+    // The root and 18 unchanged licence-header comments are deleted and reinserted by
+    // `fast_fallback`, the cheap Myers-LCS path taken because a large residual is left unmatched.
     test::helper::human_mapping::assert_matches_human_mapping(
         "vimscript-fedorenchik-qt-support-add-two-lines",
     )

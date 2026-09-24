@@ -21,11 +21,8 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // A new `elseif` branch (genuinely new logic, per the fixture name) contains a string-
-    // concatenation chain (`..` operator plus its identifier operands) whose individual tokens
-    // coincidentally match earlier occurrences elsewhere in the file. codediff correctly treats
-    // the branch as new (Delete) since its surrounding structure has no match; the human mapping
-    // instead correlates a few of those coincidentally-identical leaf tokens.
+    // A new `elseif` branch whose `..` chain tokens coincidentally match earlier occurrences.
+    // codediff treats the branch as new; the human correlates a few of those tokens.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "lua-neovim-neovim-add-new-logic",
         10,

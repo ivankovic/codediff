@@ -23,8 +23,7 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // One identifier: the mapping deletes it and inserts the new one, codediff pairs them. Two
-    // mismatches, one per side (reason `APTED("large_flat_subtree")`).
+    // One identifier the mapping replaces and codediff pairs (`APTED("large_flat_subtree")`).
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "java-defects4j-closure-123-codegenerator",
         2,

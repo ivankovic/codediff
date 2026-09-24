@@ -16,8 +16,6 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 //! Applying and undoing the human's mapping decisions on the open case.
-//!
-//! Split out of `main.rs` along the section banner that already marked this boundary.
 
 use crate::*;
 
@@ -25,9 +23,8 @@ use crate::*;
 // Marking actions
 // ---------------------------------------------------------------------------------------------
 
-/// Removes any existing entry whose before_path resolves to `before_id`, or whose after_path
-/// resolves to `after_id`, so that re-marking a node cleanly replaces its previous decision
-/// instead of leaving stale/contradictory entries behind.
+/// Removes the entries whose paths resolve to `before_id` or `after_id`, so re-marking a node
+/// replaces its previous decision.
 pub(crate) fn remove_direct_entries_for(
     entries: &mut Vec<HumanMappingEntry>,
     before_id: Option<usize>,
@@ -54,11 +51,8 @@ pub(crate) fn remove_direct_entries_for(
     });
 }
 
-/// Like [`remove_direct_entries_for`], but removes every entry touching *any* id in `before_ids`/
-/// `after_ids` in one pass, instead of one id at a time. Used by `apply_modal_choice` to batch-clear
-/// a whole subtree's worth of potential conflicts before `auto_match_pair` recurses into it and
-/// appends entries directly -- doing this per-node instead (i.e. calling `remove_direct_entries_for`
-/// once per node like `apply_match_entry` does) is what made `M` quadratic over a big subtree.
+/// [`remove_direct_entries_for`] for whole id sets in one pass. `M` over a big subtree needs this:
+/// one scan per node is quadratic.
 pub(crate) fn remove_entries_touching(
     entries: &mut Vec<HumanMappingEntry>,
     before_ids: &std::collections::HashSet<usize>,
@@ -81,11 +75,8 @@ pub(crate) fn remove_entries_touching(
     });
 }
 
-/// Finds a node anywhere in `root`'s subtree by id, unlike [`find_node_by_id`], which only looks
-/// among the (possibly collapsed/hidden) visible rows a `flat` slice covers. Used only when
-/// resolving a multi-map selection at commit time: a node toggled into `App::before_multi_select`/
-/// `after_multi_select` with `x` can end up hidden by a later `Left`/`H` press on an ancestor
-/// before `m`/`M` commits the group, and it must still resolve correctly then.
+/// Finds `id` anywhere under `root`, unlike [`find_node_by_id`]. A multi-map selection member can
+/// be collapsed or hidden by the time `m`/`M` commits it.
 pub(crate) fn find_node_anywhere(root: Node, id: usize) -> Option<Node> {
     let mut stack = vec![root];
     while let Some(n) = stack.pop() {
@@ -100,10 +91,8 @@ pub(crate) fn find_node_anywhere(root: Node, id: usize) -> Option<Node> {
     None
 }
 
-/// Removes any existing [`MultiMapGroup`] that shares a node (on either side) with `before_ids`/
-/// `after_ids` - the group-level counterpart of [`remove_entries_touching`], used so committing a
-/// new multi-map selection can't leave a stale group half-referencing a node that just got
-/// reassigned to a different group or a plain match.
+/// Removes any [`MultiMapGroup`] sharing a node with `before_ids`/`after_ids`, so no stale group
+/// half-references a reassigned node.
 pub(crate) fn remove_groups_touching(
     groups: &mut Vec<MultiMapGroup>,
     before_ids: &std::collections::HashSet<usize>,
@@ -137,9 +126,8 @@ pub(crate) fn is_strict_descendant_of(node: Node, ancestor: Node) -> bool {
     false
 }
 
-/// Drops any entry whose before_path resolves to a strict descendant of `ancestor`. Used when
-/// marking `ancestor` deleted-with-children, so a previous direct mark on one of its descendants
-/// (e.g. a Match) can't survive alongside it and export a self-contradictory mapping.
+/// Drops entries on strict descendants of `ancestor`, which a with-children mark on it overrides;
+/// keeping them would export a self-contradictory mapping.
 pub(crate) fn clear_before_descendants(
     entries: &mut Vec<HumanMappingEntry>,
     ancestor: Node,
@@ -155,7 +143,6 @@ pub(crate) fn clear_before_descendants(
     });
 }
 
-/// Same as [`clear_before_descendants`], but for the After tree (used by insert-with-children).
 pub(crate) fn clear_after_descendants(
     entries: &mut Vec<HumanMappingEntry>,
     ancestor: Node,
@@ -171,23 +158,18 @@ pub(crate) fn clear_after_descendants(
     });
 }
 
-/// What an `m`/`M` press should do next: either it's fully resolved (a mapping entry was added,
-/// or nothing needed to change), or it needs a direct human answer before anything is written.
+/// What an `m`/`M` press does next: done, or a question for the human before anything is written.
 pub(crate) enum ActionOutcome {
     Done(String),
-    /// Boxed: `Modal`'s largest variant is much bigger than `Done`'s `String`, so an unboxed
-    /// enum would pay that size on every `ActionOutcome` returned. One indirection on a
-    /// keystroke-rate path is free; the size difference is what clippy flags.
+    /// Boxed because `Modal` is much larger than `Done`'s `String` (clippy `large_enum_variant`).
     NeedsModal(Box<Modal>),
 }
 
-/// True if `b` and `a` have the exact same text.
 pub(crate) fn node_values_equal(b: Node, a: Node, before_src: &[u8], after_src: &[u8]) -> bool {
     b.utf8_text(before_src).unwrap_or("") == a.utf8_text(after_src).unwrap_or("")
 }
 
-/// Replaces any existing direct entry touching `b` or `a` with a single new entry pairing them
-/// under `operation`.
+/// Replaces any direct entry touching `b` or `a` with one entry pairing them.
 pub(crate) fn apply_match_entry(
     mapping: &mut HumanMapping,
     before_root: Node,
@@ -210,11 +192,8 @@ pub(crate) fn apply_match_entry(
     });
 }
 
-/// Classifies a same-kind pair with children as `Identical` or `MatchButNotIdentical` without
-/// asking: `before_hash`/`after_hash` are each node's precomputed full-content hash (kind + text +
-/// children's hashes, folded bottom-up -- see `code::hash::hash_code`), so two subtrees hash equal
-/// iff they're byte-identical. Missing hashes (shouldn't happen once `load_case` has run
-/// `ensure_parsed`) are treated conservatively as not identical.
+/// `Identical` iff the two content hashes (kind, text and children, see `code::hash::hash_code`)
+/// match, else `MatchButNotIdentical`. A missing hash counts as not identical.
 pub(crate) fn subtree_match_operation(
     before_id: usize,
     after_id: usize,
@@ -232,12 +211,8 @@ pub(crate) fn subtree_match_operation(
     }
 }
 
-/// Classifies a multi-map selection's operation the same way [`subtree_match_operation`]
-/// classifies a single pair - by full-content hash - generalized to a set: `Identical` only if
-/// *every* selected node, on both sides, shares the exact same hash (the whole selection really is
-/// N interchangeable copies of one subtree), `MatchButNotIdentical` otherwise. Never `Update` -
-/// see `MultiMapGroup::operation`'s own doc comment for why a group has no single fixed pair to
-/// call a text edit against.
+/// `Identical` only if every selected node on both sides shares one content hash. Never `Update`:
+/// see `MultiMapGroup::operation`.
 pub(crate) fn multi_map_group_operation(
     before_ids: &std::collections::BTreeSet<usize>,
     after_ids: &std::collections::BTreeSet<usize>,
@@ -260,10 +235,8 @@ pub(crate) fn multi_map_group_operation(
     }
 }
 
-/// Commits `before_ids`/`after_ids` (a confirmed multi-map selection - see `App::before_multi_select`/
-/// `after_multi_select`) as a new [`MultiMapGroup`], clearing out any prior plain entry or group
-/// that touched one of these nodes first (the group-level equivalent of [`apply_match_entry`]'s own
-/// "replace whatever was there" behavior for a single pair).
+/// Commits a confirmed multi-map selection as a new [`MultiMapGroup`], first removing any entry or
+/// group that touches one of its nodes.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn commit_multi_map_group(
     mapping: &mut HumanMapping,
@@ -289,9 +262,8 @@ pub(crate) fn commit_multi_map_group(
                 .context("A selected After node could no longer be found in the tree")
         })
         .collect::<Result<Vec<Node>>>()?;
-    // Deterministic, parse-stable order - not the arena-id order iterating a `BTreeSet<usize>`
-    // would otherwise produce (see the project's benchmark-determinism-fix lesson on node ids as
-    // ordering keys), and the same order `representative_entries` sorts its own pairing by.
+    // Source-position order: arena ids are not stable across parses. `representative_entries`
+    // sorts the same way.
     before_nodes.sort_by_key(|n| n.start_byte());
     after_nodes.sort_by_key(|n| n.start_byte());
 
@@ -312,12 +284,8 @@ pub(crate) fn commit_multi_map_group(
         after_root,
     );
     if with_children {
-        // A member's descendants must stay free to close over whichever specific pair codediff's
-        // own diff actually realizes (see `check_subtree_maps_within`) - a leftover pre-existing
-        // entry on one would otherwise pin a pairing the group deliberately leaves open, or flatly
-        // contradict a leftover member's "this whole subtree must be removed" requirement. Same
-        // "with-children can't coexist with a descendant mark" invariant `d`/`i`'s own
-        // `clear_before_descendants`/`clear_after_descendants` calls already enforce.
+        // A with-children member's descendants must stay free for codediff to pair however it pairs
+        // them (see `check_subtree_maps_within`), so leftover entries on them go, as for `d`/`i`.
         for &node in &before_nodes {
             clear_before_descendants(&mut mapping.entries, node, before_root);
         }
@@ -345,8 +313,7 @@ pub(crate) fn commit_multi_map_group(
     ))
 }
 
-/// How a group is named in a status line or a modal: "multi-map" is the original kind, and
-/// keeps its name, so the many existing messages and habits around it stay true.
+/// "multi-map" is the original kind of group and keeps its name in messages.
 pub(crate) fn group_pairing_name(pairing: GroupPairing) -> &'static str {
     match pairing {
         GroupPairing::AnyOneToOne => "multi-map",
@@ -354,9 +321,8 @@ pub(crate) fn group_pairing_name(pairing: GroupPairing) -> &'static str {
     }
 }
 
-/// Same precondition `action_match`/`action_match_subtree` enforce for a single pair: a member
-/// sitting under an ancestor already marked deleted/inserted-with-children can't also be committed
-/// into a group without producing a self-contradictory mapping.
+/// A member under a deleted/inserted-with-children ancestor would make the mapping contradict
+/// itself.
 fn ensure_members_not_under_removed_ancestor(
     before_root: Node,
     after_root: Node,
@@ -387,16 +353,10 @@ fn ensure_members_not_under_removed_ancestor(
     Ok(())
 }
 
-/// The member sets `M` commits for an all-to-all selection: the selected roots themselves, then,
-/// position by position, every descendant of theirs - the first child of every root as one set,
-/// the second child as another, and so on down to the leaves - so that every node of every
-/// subtree ends up in exactly one all-to-all group with its counterparts at the same position.
-///
-/// That only means something when the subtrees have one shape. Every member of a set must agree
-/// with the others on kind and on child count; the first position that does not is reported with
-/// both offending nodes, and nothing is returned, so the caller commits all of it or none of it.
-/// A human who wants the roots grouped despite differing shapes underneath has `m`, which commits
-/// the roots alone.
+/// The member sets `M` commits for an all-to-all selection: the roots, then one set per child
+/// position at every depth, so every node lands in exactly one group with its counterparts.
+/// Every member of a set must agree on kind and child count; the first divergence is an error and
+/// nothing is returned, so the caller commits all or nothing (`m` commits the roots alone).
 pub(crate) fn all_to_all_subtree_groups<'t>(
     before: Vec<Node<'t>>,
     after: Vec<Node<'t>>,
@@ -415,9 +375,8 @@ fn collect_all_to_all_subtree_groups<'t>(
     after_src: &[u8],
     groups: &mut Vec<(Vec<Node<'t>>, Vec<Node<'t>>)>,
 ) -> Result<()> {
-    // The first before node is the shape every other member is read against - an arbitrary choice
-    // among equals, which only decides which of two divergent nodes a message calls the expected
-    // one.
+    // The first before node is the reference shape; it only decides which node a message calls
+    // the expected one.
     let reference = before[0];
     let members = before
         .iter()
@@ -464,8 +423,7 @@ fn collect_all_to_all_subtree_groups<'t>(
     Ok(())
 }
 
-/// The nodes `ids` names, in the deterministic, parse-stable order `commit_multi_map_group` also
-/// sorts by - not the arena-id order iterating a `BTreeSet<usize>` would give.
+/// `ids` as nodes, in `commit_multi_map_group`'s source-position order.
 fn selected_nodes<'t>(
     root: Node<'t>,
     ids: &std::collections::BTreeSet<usize>,
@@ -481,12 +439,9 @@ fn selected_nodes<'t>(
     Ok(nodes)
 }
 
-/// What `M` does for an all-to-all selection: commits [`all_to_all_subtree_groups`]' member sets,
-/// one group each, every one `AllToAll` and none `with_children` - a descendant's own group is
-/// the claim about that descendant, so there is nothing left for closure to assert. Each group's
-/// operation is inferred separately ([`multi_map_group_operation`]), so identical tokens under
-/// differing parents still come out `Identical`. A divergence anywhere commits nothing, since the
-/// walk returns the whole list or an error.
+/// `M` on an all-to-all selection: one `AllToAll` group per [`all_to_all_subtree_groups`] set, none
+/// `with_children` (each descendant has its own group). Operations are inferred per group, so
+/// identical tokens under differing parents are still `Identical`.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn action_commit_all_to_all_subtrees(
     mapping: &mut HumanMapping,
@@ -541,10 +496,8 @@ pub(crate) fn action_commit_all_to_all_subtrees(
     ))
 }
 
-/// What `m`/`M` does when the multi-map selection (`App::before_multi_select`/`after_multi_select`)
-/// is non-empty: infers the group's operation (see [`multi_map_group_operation`]), then either
-/// commits it directly (every selected node shares one AST kind) or raises
-/// `Modal::ConfirmMultiMapGroup` first - the group-level counterpart of [`kind_mismatch_modal`].
+/// `m`/`M` with a non-empty multi-map selection: commits it directly when every node shares one
+/// kind, otherwise raises `Modal::ConfirmMultiMapGroup` first.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn action_commit_multi_map_group(
     mapping: &mut HumanMapping,
@@ -613,10 +566,8 @@ pub(crate) fn action_commit_multi_map_group(
     Ok(ActionOutcome::Done(msg))
 }
 
-/// Builds the `NeedsModal` outcome for a before/after cursor pair whose kinds don't match -
-/// shared by every action that requires same-kind nodes before it can proceed. `recursive`
-/// distinguishes a single-node match attempt (`m`, `false`) from a whole-subtree one (`M`, `true`)
-/// - see [`Modal::ConfirmKindMismatch`].
+/// The `NeedsModal` outcome for a cursor pair of different kinds; `recursive` is `M` rather than
+/// `m` (see [`Modal::ConfirmKindMismatch`]).
 pub(crate) fn kind_mismatch_modal(
     before_node: Node,
     after_node: Node,
@@ -631,12 +582,8 @@ pub(crate) fn kind_mismatch_modal(
     }))
 }
 
-/// Classifies a same-kind cursor pair as it would be auto-classified by a single `m` press:
-/// `Identical`/`Update` by raw text for a leaf pair, or via [`subtree_match_operation`] (content
-/// hash) for a pair with children. Shared by [`action_match`] and [`action_match_to_end`], which
-/// both just need the resulting operation before continuing their own, differing follow-up logic
-/// - unlike [`action_match_subtree`]'s leaf case, which resolves and returns immediately instead
-///   of continuing, so it classifies its own leaf pairs inline rather than sharing this helper.
+/// The operation a single `m` gives a same-kind pair: by text for leaves, by content hash
+/// ([`subtree_match_operation`]) otherwise.
 pub(crate) fn classify_match_operation(
     before_node: Node,
     after_node: Node,
@@ -717,33 +664,12 @@ pub(crate) fn action_match(
     )))
 }
 
-/// Implements `f`: repeats exactly what a single `m` press does -- match the Before and After
-/// cursor nodes (auto-classified Identical/Update for leaves, or by content hash for nodes with
-/// children, precisely like [`action_match`]), then advance both cursors to their own next
-/// `Unmarked` node -- over and over, as if `m` were being pressed by hand again and again.
+/// `f`: repeats `m` and advance-both-cursors until one side has no `Unmarked` node left or the
+/// next pair's kinds differ (where `m` would ask). Earlier matches are kept, and `f` resumes.
 ///
-/// Stops in exactly the two places a human doing that would have to stop too: once neither cursor
-/// has an `Unmarked` node left to advance to (there's nothing left to pair up -- end of file), or
-/// the moment the next pair has different kinds, which is precisely when a real `m` press would
-/// raise [`Modal::ConfirmKindMismatch`] instead of matching outright. Every match applied before
-/// that point is kept; pressing `f` again after resolving the mismatch (or manually) resumes the
-/// sweep from the new cursor position.
-///
-/// Deliberately doesn't go through [`apply_match_entry`]/[`rebuild_caches`]/[`path_for_node`] on
-/// every single node the way a literal "call `action_match` in a loop" implementation would:
-/// those are built for a human's pace (one call per keypress, cost spread over real time), and
-/// each costs O(current entry count) or O(sibling count) -- fine for a single `m` press, but this
-/// loop can run once per AST node, so paying that on every iteration turns an O(n) sweep into
-/// O(n^2). Two real fixtures exposed this: a ~5,500-node real-world file took 26s to reach 740
-/// matches and climbing (`rebuild_caches`/`apply_match_entry`'s O(entries)-per-call cost), and a
-/// large flat JSON-array-shaped tree took 52s even after that fix (`path_for_node`'s O(siblings)
-/// occurrence-counting, paid per node, on a level with thousands of same-kind children). Both are
-/// worked around here: `caches` is built once and updated incrementally in place; entries are
-/// appended directly, skipping `apply_match_entry`'s dedup scan (provably a no-op here, since
-/// `status_before`/`status_after` having just reported `Unmarked` means neither node has an
-/// existing entry to remove); cursors are tracked as plain indices into `before_flat`/`after_flat`
-/// so advancing never re-scans from the start; and every node's path is looked up in a table
-/// built by one O(n) pass per tree ([`precompute_paths`]) instead of walked fresh from each node.
+/// Must stay linear: it can run once per node, so it updates `caches` in place, appends entries
+/// without [`apply_match_entry`]'s dedup scan (both nodes are `Unmarked`, so there is nothing to
+/// remove), tracks cursors as indices, and reads paths from [`precompute_paths`].
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn action_match_to_end(
     app: &mut App,
@@ -772,9 +698,7 @@ pub(crate) fn action_match_to_end(
         let before_node = before_flat[before_idx].0;
         let after_node = after_flat[after_idx].0;
 
-        // Nothing left to pair up on at least one side: reached the end of what `f` can do. (This
-        // also covers a node under an inherited delete/insert-with-children mark, since
-        // `status_before`/`status_after` never report those as `Unmarked`.)
+        // Also covers nodes under an inherited with-children mark: those are never `Unmarked`.
         if status_before(before_node, &caches) != NodeStatus::Unmarked
             || status_after(after_node, &caches) != NodeStatus::Unmarked
         {
@@ -784,14 +708,9 @@ pub(crate) fn action_match_to_end(
         if before_node.kind() != after_node.kind() {
             app.before.cursor_id = before_node.id();
             app.after.cursor_id = after_node.id();
-            // A one-sided diff already answers the question the modal would ask - see
-            // [`one_sided_diff`]. Hand the panel that owns the discrepancy the focus and stop
-            // there, so the next keystroke lands on the node that needs marking instead of on a
-            // `y`/`n` prompt. A mixed diff still asks, because then it genuinely is a question.
-            //
-            // Stopping rather than marking is deliberate: which node is inserted is the shape of
-            // the diff talking, but *what* to record for it is the ground truth's author talking,
-            // and this walk has already written enough entries without being asked twice.
+            // A one-sided diff already answers the modal's question (see [`one_sided_diff`]), so focus
+            // the side that needs marking and stop. It does not mark for the human: what to record is
+            // the ground truth author's call.
             if let Some(side) = run_unix_diff(before_src, after_src)
                 .ok()
                 .as_deref()
@@ -866,10 +785,7 @@ pub(crate) fn action_match_to_end(
     }))
 }
 
-/// The first index at or after `start` whose node is `Unmarked`, or `None` if there isn't one.
-/// Callers that advance `start` monotonically across repeated calls (as `action_match_to_end`
-/// does) get amortized O(n) total work rather than O(n) *per call* -- each slot in `flat` is only
-/// ever examined once across the whole sweep.
+/// The first `Unmarked` index at or after `start`. Monotonic callers do O(n) work in total.
 pub(crate) fn next_unmarked_index(
     start: usize,
     flat: &[(Node, usize)],
@@ -918,7 +834,6 @@ pub(crate) fn action_match_subtree(
         return Ok(kind_mismatch_modal(before_node, after_node, true));
     }
 
-    // A leaf top pair has no children to auto-fill, so resolve it immediately like `m` does.
     if before_node.child_count() == 0 && after_node.child_count() == 0 {
         let identical = node_values_equal(before_node, after_node, before_src, after_src);
         let operation = if identical {
@@ -963,36 +878,14 @@ pub(crate) fn action_match_subtree(
     Ok(ActionOutcome::Done(msg))
 }
 
-/// Auto-matches `b` <-> `a` and all descendants, with no prompting: leaves are classified
-/// Identical/Update by comparing text; container nodes are classified Identical only if every
-/// descendant came back Identical too, otherwise MatchButNotIdentical. Recursion stops (without
-/// matching further) the moment a level's child-kind sequences diverge, or a node is already
-/// covered by an unrelated ancestor mark. Returns whether the whole subtree matched Identically.
+/// Auto-matches `b` <-> `a` and every descendant pair, without prompting: leaves by text,
+/// containers `Identical` only if every descendant was. Stops descending where child kinds
+/// diverge or a node is under an unrelated ancestor mark. `Identical` pairs with children are
+/// collapsed in both panels. Returns whether the whole subtree matched `Identical`.
 ///
-/// Used to bulk-fill the rest of an `M` (recursive match) after the top-level pair's own operation
-/// has already been decided (via `subtree_match_operation` or a confirmed `Modal::ConfirmKindMismatch`)
-/// -- classifying each descendant individually by hash keeps this fast for a tree of any size.
-///
-/// Any pair (this one or a descendant) that ends up classified `Identical` and has children is
-/// also collapsed in both panels, so a whole-unchanged subtree doesn't clutter the view -- this is
-/// the main payoff of `M` over doing the same matches one at a time with `m`.
-///
-/// Rather than pushing straight into `mapping.entries` (via `apply_match_entry`, which costs
-/// O(current entry count) per call through its dedup scan -- recursing over a subtree of size k
-/// would turn that into O(k^2), the hang `action_match_to_end` (`f`) avoids the same way, and one
-/// `M` reaches too since this function is its recursive workhorse), this buffers new entries into
-/// `new_entries` and records every node id it actually decides on into
-/// `touched_before`/`touched_after`. The caller ([`apply_modal_choice`]) removes pre-existing
-/// entries for exactly those touched ids in one batch pass *after* recursion finishes, then
-/// appends `new_entries` -- cheaper than a scan per node, and correct in a way that eagerly
-/// collecting a subtree's ids up front isn't: recursion can bail out of a node early (kind
-/// mismatch or a shape mismatch) without visiting its descendants at all, and a descendant that
-/// was never visited must keep whatever pre-existing entry it had, not have it wiped because it
-/// happened to be nested under the node `M` was pressed on.
-///
-/// Paths are looked up from `before_paths`/`after_paths` (each precomputed once, in
-/// `apply_modal_choice`, by [`precompute_paths`]) instead of calling `path_for_node` fresh per
-/// node, for the same reason.
+/// Buffers entries into `new_entries` and records decided ids in `touched_before`/`touched_after`
+/// so [`apply_modal_choice`] can clear old entries in one pass (a scan per node is quadratic). Only
+/// touched ids are cleared: a descendant the recursion never visited keeps its entry.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn auto_match_pair(
     new_entries: &mut Vec<HumanMappingEntry>,
@@ -1031,8 +924,7 @@ pub(crate) fn auto_match_pair(
     };
 
     if b.kind() != a.kind() {
-        // Shouldn't happen for children reached via the same_shape check below, but the very
-        // first call into this function (the top pair's children) hasn't been shape-checked yet.
+        // The top pair's children reach here without a shape check.
         push(
             new_entries,
             touched_before,
@@ -1120,9 +1012,8 @@ pub(crate) fn auto_match_pair(
     all_identical
 }
 
-/// Applies `operation` to the top pair -- whether decided by `subtree_match_operation` (`M`) or a
-/// confirmed `Modal::ConfirmKindMismatch` -- and if `recursive`, auto-fills the rest of the subtree
-/// via [`auto_match_pair`].
+/// Applies `operation` to the top pair and, if `recursive`, auto-fills the subtree via
+/// [`auto_match_pair`].
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn apply_modal_choice(
     mapping: &mut HumanMapping,
@@ -1202,13 +1093,8 @@ pub(crate) fn apply_modal_choice(
             );
         }
 
-        // Batched equivalent of what `apply_match_entry`'s per-node dedup scan would otherwise do
-        // node by node inside `auto_match_pair` (an O(existing entries) scan for every node in the
-        // subtree, which goes quadratic over a big one -- see `auto_match_pair`'s doc comment):
-        // clear out, in one pass, any pre-existing entry that touches a node the recursion above
-        // actually decided on, *then* append what it produced. Using the ids `auto_match_pair`
-        // actually touched (rather than every id in the subtree) matters: a node the recursion
-        // bailed out of without visiting keeps whatever pre-existing entry it had.
+        // One batched clear of the ids the recursion decided on, then append (see
+        // `auto_match_pair`).
         remove_entries_touching(
             &mut mapping.entries,
             &touched_before,
@@ -1337,9 +1223,7 @@ pub(crate) fn action_insert(
     ))
 }
 
-// Each parameter is genuinely distinct context (the mapping, focus, both sides' flattened node
-// lists, both cursors, both roots, the caches) - a params struct here would just relocate the
-// same fields, not reduce them.
+// A params struct would only relocate these fields.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn action_unmark(
     mapping: &mut HumanMapping,
@@ -1371,10 +1255,7 @@ pub(crate) fn action_unmark(
         ),
     };
 
-    // A group member (whichever specific pair `representative_entries` realized, or a leftover)
-    // isn't recorded as its own `mapping.entries` item at all - the whole group is one
-    // `MultiMapGroup` in `mapping.groups` - so `u` here removes that entire group rather than
-    // trying (and failing) to find a single direct entry to drop.
+    // A group member has no entry of its own, so `u` removes its whole group.
     if let Some(group_idx) = group
         && group_idx < mapping.groups.len()
     {

@@ -23,7 +23,6 @@ use tempfile::tempdir;
 
 use codediff::code::Code;
 
-/// Command line arguments for the ASCII visualizer
 #[derive(Parser, Debug)]
 #[command(
     author,
@@ -32,12 +31,12 @@ use codediff::code::Code;
     long_about = "This tool reads a code file, parses it using TreeSitter, and displays the Abstract Syntax Tree in ASCII format."
 )]
 struct Args {
-    /// Path to the file to visualize
+    /// File to parse; a trailing `.test` is ignored when detecting the language.
     #[arg(value_name = "FILE")]
     file_path: PathBuf,
 }
 
-/// Print the ASCII tree representation of the AST
+/// Prints `node`'s subtree, one node per line, and returns how many nodes it printed.
 fn print_ast_tree(node: tree_sitter::Node, indent: usize, code: &Code) -> usize {
     let indent_str = "  ".repeat(indent);
 
@@ -58,31 +57,23 @@ fn print_ast_tree(node: tree_sitter::Node, indent: usize, code: &Code) -> usize 
     child_count + 1
 }
 
-/**
-* This is a helper binary that can visualize Code objects in ASCII.
-*
-* TODO: Make it also visualize Diff objects.
-*/
+// TODO: also visualize Diff objects.
 fn main() -> Result<()> {
     let args = Args::parse();
 
-    // Check if the file path ends with ".test"
+    // Language detection goes by extension, so a `foo.rs.test` fixture is copied to `foo.rs` first.
     let (file_path, _temp_dir) = if args.file_path.to_string_lossy().ends_with(".test") {
-        // Create a temporary directory
         let temp_dir = tempdir()?;
         let temp_dir_path = temp_dir.path();
 
-        // Create filename with ".test" removed
         let original_filename = args.file_path.file_name().unwrap().to_string_lossy();
         let new_filename = original_filename.trim_end_matches(".test");
         let temp_path = temp_dir_path.join(new_filename);
 
-        // Read the original file content
         let original_content = std::fs::read_to_string(&args.file_path).map_err(|e| {
             anyhow::anyhow!("Failed to read file {}: {}", args.file_path.display(), e)
         })?;
 
-        // Write to the temporary file
         std::fs::write(&temp_path, original_content)
             .map_err(|e| anyhow::anyhow!("Failed to write to temp file: {}", e))?;
 
@@ -91,7 +82,6 @@ fn main() -> Result<()> {
         (args.file_path, None)
     };
 
-    // Create Code object from file
     let code = Code::from_file(&file_path)?;
 
     println!("Visualizing AST for: {}", file_path.display());
@@ -99,13 +89,11 @@ fn main() -> Result<()> {
     println!("File size: {} bytes", code.contents.len());
     println!("\nAST Tree:");
 
-    // Print tree from the AST Code::from_file already parsed
     let tree = code.ast.as_ref().context("Code has no parsed AST")?;
     let root_node = tree.root_node();
     let total_nodes = print_ast_tree(root_node, 0, &code);
 
     println!("\nTotal nodes: {}", total_nodes);
 
-    // The temp_dir will be dropped here, cleaning up automatically
     Ok(())
 }

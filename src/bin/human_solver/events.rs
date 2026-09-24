@@ -16,8 +16,6 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 //! The key dispatch: one arm per keybinding, and the modal handler.
-//!
-//! Split out of `main.rs` along the section banner that already marked this boundary.
 
 use crate::*;
 
@@ -26,19 +24,12 @@ use crate::*;
 // ---------------------------------------------------------------------------------------------
 
 /// Everything derived from the current trees, mapping, and collapse/hide state that drawing a
-/// frame or interpreting a keystroke needs. Rebuilding this is the expensive part of the loop (a
-/// handful of whole-tree passes); see `run_event_loop`'s `needs_redraw` for why it only happens
-/// once per keystroke rather than on every idle poll timeout.
+/// frame or interpreting a keystroke needs. Rebuilding it costs several whole-tree passes, so
+/// `run_case_session` caches it across keys that cannot change it.
 pub(crate) struct FrameState<'a> {
-    /// `None` for a file pair whose language tree-sitter has no grammar for - the *text-only*
-    /// mode a case opens in when `Code::ast` is missing on either side (a `BUILD` file, say).
-    /// There is no tree to flatten, so `before_flat`/`after_flat` are empty and `caches` is
-    /// `Caches::default()`; the panels draw a single "not supported" row (`draw_ui`) and every
-    /// key that reads a tree is routed away from `handle_key` (`run_case_session`). Painting is
-    /// unaffected: it works on the raw text, which is present either way.
-    ///
-    /// Both sides are `Some` or both are `None` - `compute_frame_state` never mixes them, so a
-    /// consumer can take them as a pair (`FrameState::roots`).
+    /// `None` in text-only mode: a language with no tree-sitter grammar (a `BUILD` file, say).
+    /// The flat indexes are then empty and tree-reading keys never reach `handle_key`; painting
+    /// still works on the raw text. Both roots are `Some` or both `None`.
     pub(crate) before_root: Option<Node<'a>>,
     pub(crate) after_root: Option<Node<'a>>,
     pub(crate) before_src: &'a [u8],
@@ -47,15 +38,11 @@ pub(crate) struct FrameState<'a> {
     pub(crate) before_flat: FlatIndex<'a>,
     pub(crate) after_flat: FlatIndex<'a>,
     /// Counts of `Unmarked` nodes in `before_flat`/`after_flat`, for `render_panel`'s "N unmarked"
-    /// header. Computed once here rather than by scanning all of `flat` on every single draw call
-    /// (see `render_panel`), since on a large case that scan -- calling `status_before`/
-    /// `status_after` on every node, not just the visible ones -- was itself a real cost paid every
-    /// frame for no reason: it only changes when this `FrameState` does.
+    /// header. Kept here because counting walks every node, not just the visible ones.
     pub(crate) before_unmarked: usize,
     pub(crate) after_unmarked: usize,
 }
 
-/// The number of `flat`'s nodes with `NodeStatus::Unmarked`, per `status_fn`.
 pub(crate) fn count_unmarked(
     flat: &[(Node, usize)],
     caches: &Caches,
@@ -74,9 +61,6 @@ pub(crate) fn compute_frame_state<'a>(
     let before_src = before.contents.as_bytes();
     let after_src = after.contents.as_bytes();
 
-    // No grammar for this pair's language: there is nothing to flatten, nothing to resolve the
-    // mapping's paths against, and nothing to count as unmarked - but the file pair is still
-    // real, and its *text* is all a painting needs. See `FrameState::before_root`.
     let (Some(before_tree), Some(after_tree)) = (before.ast.as_ref(), after.ast.as_ref()) else {
         return Ok(FrameState {
             before_root: None,
@@ -95,8 +79,6 @@ pub(crate) fn compute_frame_state<'a>(
 
     let caches = rebuild_caches_for_mapping(&app.mapping, before_root, after_root);
 
-    // Recomputed fresh whenever frame state is rebuilt, so `H` can't show a subtree as hidden
-    // after it's actually been un-marked, or vice versa.
     let before_hidden = app
         .hide_solved
         .then(|| fully_solved_nodes(before_root, &caches, status_before));
@@ -132,16 +114,13 @@ pub(crate) fn compute_frame_state<'a>(
 }
 
 impl<'a> FrameState<'a> {
-    /// Both trees, or `None` in text-only mode - see [`FrameState::before_root`]. The one place
-    /// the two `Option`s are turned back into the pair every tree-reading consumer wants, so no
-    /// caller has to decide what a half-present pair would mean.
+    /// Both trees, or `None` in text-only mode - see [`FrameState::before_root`].
     pub(crate) fn roots(&self) -> Option<(Node<'a>, Node<'a>)> {
         self.before_root.zip(self.after_root)
     }
 }
 
-/// What a case session (`run_case_session`) ended on: either the user quit, or a modal asked to
-/// switch to a different case (`o`/`O`'s pickers, or a discard-unsaved confirmation).
+/// How `run_case_session` ended: the user quit, or asked to switch to a different case.
 pub(crate) enum SessionEnd {
     Quit,
     Open(OpenTarget),
@@ -154,11 +133,8 @@ pub(crate) fn run_event_loop(
     mut after: Code,
 ) -> Result<()> {
     loop {
-        // `run_case_session` only ever reads `before`/`after` (never reassigns them), so it's free
-        // to cache state that borrows from them for as long as the whole session runs, with none of
-        // the self-referential-across-a-mutation problem that caching across *this* loop's own
-        // iterations would run into: those iterations are exactly the ones that reassign `before`/
-        // `after` below.
+        // The session borrows `before`/`after` immutably, so its cached `FrameState` can live for
+        // the whole session; only this loop reassigns them, between sessions.
         match run_case_session(terminal, app, &before, &after)? {
             SessionEnd::Quit => break,
             SessionEnd::Open(OpenTarget::Diffs(name)) => match load_case(&name) {
@@ -178,9 +154,7 @@ pub(crate) fn run_event_loop(
                     app.algo_text_spans = None;
                     app.tree_text_spans = None;
                     app.text_overlay = TextOverlay::default();
-                    // Follow the newly-opened case's own paintings rather than carrying the last
-                    // case's solution name into it, which would silently start a second, near-
-                    // duplicate painting under a name that means nothing here.
+                    // The previous case's solution name would start a near-duplicate painting here.
                     app.text_solution = starting_solution(&app.mapping);
                     app.clear_multi_select();
                     app.status = Some(format!("Opened '{}'", app.name));
@@ -206,9 +180,6 @@ pub(crate) fn run_event_loop(
                     app.algo_text_spans = None;
                     app.tree_text_spans = None;
                     app.text_overlay = TextOverlay::default();
-                    // Follow the newly-opened case's own paintings rather than carrying the last
-                    // case's solution name into it, which would silently start a second, near-
-                    // duplicate painting under a name that means nothing here.
                     app.text_solution = starting_solution(&app.mapping);
                     app.clear_multi_select();
                     app.status = Some(format!(
@@ -248,9 +219,6 @@ pub(crate) fn run_event_loop(
                     app.algo_text_spans = None;
                     app.tree_text_spans = None;
                     app.text_overlay = TextOverlay::default();
-                    // Follow the newly-opened case's own paintings rather than carrying the last
-                    // case's solution name into it, which would silently start a second, near-
-                    // duplicate painting under a name that means nothing here.
                     app.text_solution = starting_solution(&app.mapping);
                     app.clear_multi_select();
                 }
@@ -268,23 +236,6 @@ pub(crate) fn run_event_loop(
     Ok(())
 }
 
-/// Keys `handle_key` (only reachable when no modal is open -- see `is_state_preserving_key`)
-/// processes without touching `App::mapping`, either panel's `collapsed` set, or
-/// `App::hide_solved`: the three things `run_case_session`'s cached `FrameState` depends on. Pure
-/// cursor movement (`j`/`k`/arrows/`Tab`/`g`/`G`/`n`/`N`), the multi-map selection (`x`/`c`, read
-/// directly off `App` by `render_panel`, not through `FrameState`), and view/display toggles
-/// (`p`/`r`/`t`/`T`/`/`/`?`) whose own state (`algo_diff`, `show_reason`) is likewise read
-/// straight off `App`. On a large case, rebuilding `FrameState` for every one of these -- which is
-/// what browsing a case mostly consists of -- would mean paying `rebuild_caches_for_mapping`
-/// (documented up to ~2s on a heavily-annotated fixture), two `fully_solved_nodes` walks and two
-/// `flatten_visible` walks on every single keystroke, whether or not anything `FrameState` derives
-/// from had actually changed.
-///
-/// Deliberately conservative: `h`/`l`/`a`/`A` (which sometimes mutate a `collapsed` set, depending
-/// on where the cursor already is) and `s`/`R`/`o`/`O`/`C` (which open a modal or save, and are
-/// rare enough that the full-rebuild cost isn't worth the extra classification surface)
-/// are NOT included here, even though some of their branches don't actually need a rebuild either
-/// -- see `handle_key` for the exact effect of every key this list omits.
 /// The footer line for a pending multi-map selection, after `x` or `X` changes it: the counts,
 /// the pairing it will be committed with, and how to commit or clear it.
 pub(crate) fn multi_select_status(app: &App) -> String {
@@ -299,6 +250,10 @@ pub(crate) fn multi_select_status(app: &App) -> String {
     )
 }
 
+/// Keys `handle_key` handles without touching `App::mapping`, a `collapsed` set, or
+/// `App::hide_solved` - the inputs of the cached `FrameState` - so they skip its rebuild. Browsing
+/// is most keystrokes, and a rebuild on a large case is expensive. Keys that only sometimes
+/// mutate (`h`/`l`/`a`/`A`) or that are rare (`s`/`R`/`o`/`O`/`C`) are left out on purpose.
 pub(crate) fn is_navigation_or_display_key(code: KeyCode) -> bool {
     matches!(
         code,
@@ -326,17 +281,9 @@ pub(crate) fn is_navigation_or_display_key(code: KeyCode) -> bool {
 }
 
 /// Whether `code`, delivered in the current `modal` state, is guaranteed not to touch the mapping,
-/// either panel's collapsed set, or `hide_solved` -- the three things `run_case_session`'s cached
-/// `FrameState` depends on.
-///
-/// With no modal open, this is `is_navigation_or_display_key` (`handle_key`'s own pure-navigation
-/// keys). With a modal open, only typing into (or backspacing out of) `PromptSearch`'s,
-/// `PromptPromoteName`'s, `PromptRejectReason`'s, or `PromptComment`'s own `input` string
-/// qualifies: those modals only ever mutate that string in response to these keys, everything else
-/// about the case is untouched. Every other key while a modal is open -- including Enter/Esc on
-/// these same four modals, which can search-and-move-the-cursor, promote/reject/comment/save, or
-/// close the modal -- is treated conservatively as "might have changed something", so the cache is
-/// thrown away and rebuilt fresh, exactly as if this function didn't exist.
+/// either panel's collapsed set, or `hide_solved` -- the inputs of the cached `FrameState`.
+/// In a prompt modal only typing and Backspace qualify; its Enter/Esc may act on the case, so
+/// they (and any other modal key) conservatively force a rebuild.
 pub(crate) fn is_state_preserving_key(modal: Option<&Modal>, code: KeyCode) -> bool {
     match modal {
         None => is_navigation_or_display_key(code),
@@ -346,19 +293,9 @@ pub(crate) fn is_state_preserving_key(modal: Option<&Modal>, code: KeyCode) -> b
         | Some(Modal::PromptComment { .. }) => {
             matches!(code, KeyCode::Char(_) | KeyCode::Backspace)
         }
-        // The text-painting views cannot invalidate the cached `FrameState`, so *every* key in
-        // them preserves it - including the ones that write.
-        //
-        // `FrameState` caches the flattened trees and the `Caches` built from them, and
-        // `rebuild_caches_for_mapping` reads only `entries`/`groups`. Painting writes
-        // `text_mappings`, a separate ground truth that no tree state is derived from (see
-        // `HumanTextMapping`), so nothing the `t` view does can make the cache wrong.
-        //
-        // This is a correctness observation with a large performance consequence. Falling through
-        // to `false` re-flattened both ASTs and rebuilt every cache on each cursor keystroke; on a
-        // ~900 KB fixture that is a full walk of a few hundred thousand nodes per keypress, which
-        // is what made the view unusable on big files. The painting view is exactly where a reader
-        // holds down `j`.
+        // Every key here preserves the cache, even the ones that paint: painting writes only
+        // `text_mappings`, and the cache derives from `entries`/`groups` alone. This matters
+        // because the painting view is where a reader holds down `j` on a large file.
         Some(Modal::TextView { .. })
         | Some(Modal::SolutionPicker { .. })
         | Some(Modal::UnixDiffView { .. }) => true,
@@ -366,35 +303,19 @@ pub(crate) fn is_state_preserving_key(modal: Option<&Modal>, code: KeyCode) -> b
     }
 }
 
-/// Runs the event loop for a single case (before/after AST pair) until the user quits or asks to
-/// switch to a different one. Split out from `run_event_loop` specifically so the `state` cache
-/// below -- which borrows from `before`/`after` -- never has to coexist with a reassignment of
-/// them: `before`/`after` are `&Code` here, immutable for this whole call, so the cache is free to
-/// survive across as many keystrokes as it likes with no lifetime conflict. A case switch is
-/// reported back to the caller as a `SessionEnd::Open` instead of being handled in place.
+/// Runs the event loop for a single case until the user quits or asks to switch to a different
+/// one. Separate from `run_event_loop` so the cached `FrameState`, which borrows `before`/`after`,
+/// never coexists with their reassignment; a case switch is returned as `SessionEnd::Open`.
 pub(crate) fn run_case_session(
     terminal: &mut Terminal<CrosstermBackend<Stdout>>,
     app: &mut App,
     before: &Code,
     after: &Code,
 ) -> Result<SessionEnd> {
-    // Whether the on-screen frame reflects the current state. Set whenever something might have
-    // changed (a key was handled, the terminal was resized) and cleared right after redrawing. On
-    // a pure idle poll timeout -- the common case, since the TUI just sits there most of the time
-    // -- nothing is redrawn at all.
+    // An idle poll timeout redraws nothing.
     let mut needs_redraw = true;
 
-    // Cached result of `compute_frame_state` -- rebuilding both caches and re-flattening both
-    // (possibly multi-thousand-node) trees is real work, so it's only redone when something that
-    // could actually change it happens, not on every idle tick or every keystroke. `None` forces a
-    // fresh (potentially expensive) recompute; set back to `None` only by a key that could
-    // plausibly touch the mapping, a collapsed set, or `hide_solved` -- see
-    // `is_state_preserving_key`/`is_navigation_or_display_key` for the exact set that's exempted.
-    // That set is deliberately generous: browsing a case (moving the cursor, jumping between
-    // mismatches, toggling `p`/`r`/`t`/`T` display) is the overwhelming majority of keys pressed in
-    // a session, and none of it needs a rebuild, so those keys reuse this `FrameState` untouched.
-    // Only the keys that actually mutate the mapping or a collapsed set (`m`/`M`/`f`/`d`/`D`/`i`/
-    // `I`/`u`/`h`/`l`/`a`/`A`/`H`, plus text-modal Enter/Esc) still pay the full recompute.
+    // `None` forces a rebuild; only keys outside `is_state_preserving_key` reset it.
     let mut state: Option<FrameState> = None;
 
     loop {
@@ -404,9 +325,7 @@ pub(crate) fn run_case_session(
         let frame_state = state.as_ref().expect("just populated above if empty");
 
         if needs_redraw {
-            // Cloned rather than borrowed from `app`: draw_ui also takes `app: &mut App`, and
-            // passing both `app` and `&app.name` as separate arguments to the same call would
-            // conflict.
+            // Cloned: `draw_ui` also takes `app` mutably.
             let current_name = app.name.clone();
             terminal.draw(|f| {
                 draw_ui(
@@ -432,7 +351,6 @@ pub(crate) fn run_case_session(
 
         let event = event::read()?;
         let Event::Key(key) = event else {
-            // e.g. a resize: nothing to recompute, just redraw at the (possibly new) size.
             needs_redraw = true;
             continue;
         };
@@ -459,10 +377,7 @@ pub(crate) fn run_case_session(
                 after,
             );
         } else if let Some((before_root, after_root)) = frame_state.roots() {
-            // `load_case` runs `ensure_parsed` on both sides whenever there is a tree to parse,
-            // so full-content hashes are always available on this branch; used by `m`/`M` to
-            // decide Identical vs MatchButNotIdentical for nodes with children without asking
-            // (see `subtree_match_operation`).
+            // Every loader runs `ensure_parsed` when there is a tree, so the hashes exist here.
             let before_hash = &before
                 .metadata
                 .ast_metadata
@@ -492,9 +407,7 @@ pub(crate) fn run_case_session(
                 after,
             );
         } else {
-            // Text-only mode (see `FrameState::before_root`): no trees to hand `handle_key`, and
-            // no `ast_metadata` to read either, so the keys that need neither are dispatched
-            // directly.
+            // Text-only mode (see `FrameState::before_root`).
             handle_tree_independent_key(
                 app,
                 key.code,
@@ -675,9 +588,8 @@ pub(crate) fn handle_key(
                     &mut app.after.collapsed,
                 )
             } else if app.multi_select_pairing == GroupPairing::AllToAll {
-                // `M` on an all-to-all selection means the whole subtrees, not just the roots -
-                // see `action_commit_all_to_all_subtrees`. It never raises the mixed-kinds modal:
-                // the walk it runs is stricter than that check, and reports a divergence itself.
+                // Whole subtrees, not just the roots. No mixed-kinds modal: the walk is stricter
+                // than that check and reports a divergence itself.
                 action_commit_all_to_all_subtrees(
                     &mut app.mapping,
                     before_root,
@@ -862,10 +774,6 @@ pub(crate) fn handle_key(
             });
             None
         }
-        // Every key left is one the trees play no part in - quitting, the modals, the text
-        // views, saving. `handle_tree_independent_key` owns those, because text-only mode
-        // (`FrameState::before_root`) has no trees to hand this function and reaches them
-        // directly.
         _ => {
             handle_tree_independent_key(app, code, before_src, after_src, before, after, true);
             return;
@@ -875,17 +783,11 @@ pub(crate) fn handle_key(
     apply_key_result(app, result);
 }
 
-/// The keys that read no tree: quit, the help/reset modals, `Tab`, `p`, the `t`/`T` text views,
-/// save/reject/comment, and the three pickers.
+/// The keys that read no tree. [`handle_key`] falls through to this, and text-only mode calls it
+/// directly, so each key has one implementation in both modes.
 ///
-/// Split out of [`handle_key`] rather than duplicated, because a case whose language tree-sitter
-/// has no grammar for still gets all of them - see [`FrameState::before_root`]. `handle_key`
-/// falls through to this for anything its own tree-reading arms don't claim, so a key only ever
-/// has one implementation and the two modes cannot drift.
-///
-/// `tree_available` is false exactly in text-only mode, and only changes what an *unhandled* key
-/// does: there it says why the tree keys do nothing, rather than leaving a keypress looking like
-/// a hang.
+/// `tree_available` is false in text-only mode, where an unhandled key reports why the tree keys
+/// do nothing instead of looking like a hang.
 pub(crate) fn handle_tree_independent_key(
     app: &mut App,
     code: KeyCode,
@@ -900,9 +802,8 @@ pub(crate) fn handle_tree_independent_key(
             app.should_quit = true;
             None
         }
-        // Shift-1 rather than a letter: every letter near the ones this view uses is a keystroke
-        // away from something harmless, and this is the one action in the tool that cannot be
-        // undone.
+        // Shift-1 rather than a letter: this is the one action that cannot be undone, so it
+        // should not be one slip away from a harmless key.
         KeyCode::Char('!') => {
             app.modal = Some(Modal::ConfirmResetCase {
                 entries: app.mapping.entries.len(),
@@ -941,8 +842,6 @@ pub(crate) fn handle_tree_independent_key(
             });
             None
         }
-        // `V` for the invariants this case's own ground truth breaks - the detail behind the `o`
-        // picker's `Invariant` column, which can only ever show a count.
         KeyCode::Char('V') => {
             match invariant_entries(&app.mapping, before, after) {
                 Ok(entries) if entries.is_empty() => {
@@ -1015,17 +914,13 @@ pub(crate) fn handle_tree_independent_key(
         }
         KeyCode::Char('e') => {
             if let CaseOrigin::Diffs = &app.origin {
-                // Just the note: a promoted fixture's sample.csv row no longer carries a comment
-                // to fall back to, because `action_promote` moves it into `description.md` and
-                // clears the cell rather than leaving a second copy behind.
+                // Only the note: `action_promote` moves the sample.csv comment into it.
                 let existing = read_note(&app.name).unwrap_or_default();
                 app.modal = Some(Modal::PromptComment {
                     input: existing,
                     error: None,
                 });
             } else if let CaseOrigin::Sample(source) = &app.origin {
-                // Pre-fill with whatever's already recorded, so this is an edit, not a blind
-                // overwrite - same idea as `PromptPromoteName`'s pre-filled default name.
                 let existing = read_sample_csv_rows(&sample_csv_path())
                     .ok()
                     .and_then(|rows| find_sample_row(&rows, source).map(|row| row.comment.clone()))
@@ -1041,10 +936,7 @@ pub(crate) fn handle_tree_independent_key(
             None
         }
         KeyCode::Char('o') => {
-            // Loaded here, unlike the unmarked/painted/disagreement maps which wait for the key
-            // that sorts or filters by them: notes are *displayed*, so they have to be present the
-            // first time the list is drawn. Affordable exactly because this scan is the cheap one
-            // - a stat and a short read per fixture, and most have no note at all.
+            // Eager, unlike the other per-case maps: notes are displayed, not just sorted by.
             if app.diff_comments.is_none() {
                 app.diff_comments = Some(compute_diff_comments());
             }
@@ -1070,10 +962,7 @@ pub(crate) fn handle_tree_independent_key(
         KeyCode::Char('O') => {
             match list_sample_rows() {
                 Ok(rows) if !rows.is_empty() => {
-                    // Only the names we have not already measured, scanned in parallel: this is
-                    // one external `diff` per sample, so all 1489 of them serially cost 3.9s of
-                    // frozen picker on every `O` (1.9s across the scan threads, and nothing at
-                    // all on the presses after the first - see `sample_diff_sizes`).
+                    // One external `diff` per sample: scan only the unmeasured ones, in parallel.
                     let missing: Vec<String> = rows
                         .iter()
                         .map(|row| row.name.clone())
@@ -1135,9 +1024,6 @@ pub(crate) fn handle_tree_independent_key(
     apply_key_result(app, result);
 }
 
-/// Reports what a key handler returned in the status line: the message on success, the error
-/// chain on failure. Shared by [`handle_key`] and [`handle_tree_independent_key`] so a key's
-/// outcome is reported the same way whichever of the two claimed it.
 fn apply_key_result(app: &mut App, result: Option<Result<String>>) {
     if let Some(res) = result {
         app.status = Some(match res {
@@ -1147,42 +1033,29 @@ fn apply_key_result(app: &mut App, result: Option<Result<String>>) {
     }
 }
 
-/// What the two tree-committing modals say if they are somehow reached with no tree. Neither can
-/// be raised in text-only mode - both come from `handle_key`'s `m`/`M`, which that mode never
-/// reaches - so this is the answer to "what if the impossible happened", written down instead of
-/// unwrapped.
+/// The tree-committing modals' answer if reached with no tree. Unreachable (they come from
+/// `m`/`M`), but reported rather than unwrapped.
 const NO_TREE_TO_MAP: &str = "No tree-sitter grammar for this file: there is no tree to map";
 
-/// Routes a keypress while `app.modal` is `Some`. Returns `Some(name)` when the human just
-/// confirmed switching to a different test case (via the open picker, possibly after a save/
-/// discard decision): the caller is responsible for actually loading it, since that needs
-/// mutable access to the owned `Code` values that `run_event_loop` holds, which can't be threaded
-/// down here alongside `Node`s borrowed from them.
+/// Routes a keypress while `app.modal` is `Some`. Returns the case to switch to when the human
+/// confirmed one; the caller loads it, because that replaces the `Code`s these `Node`s borrow.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn handle_modal_key(
     app: &mut App,
     code: KeyCode,
     before_flat: &FlatIndex,
     after_flat: &FlatIndex,
-    // `None` in text-only mode (see `FrameState::before_root`). Only the two confirmation modals
-    // that commit a *tree* mapping read these, and neither can be raised without a tree to raise
-    // it from - every other modal here (the text views, the pickers, the prompts, the help) is
-    // reachable in both modes and needs no tree at all.
+    // `None` in text-only mode (see `FrameState::before_root`).
     before_root: Option<Node>,
     after_root: Option<Node>,
     caches: &Caches,
     before_src: &[u8],
     after_src: &[u8],
-    // Needed only by the text view's `o`/`P` (running codediff to show, or adopt, its own
-    // rendering), but the modal handler is one function, so it takes the pair the same way
-    // `handle_key` does.
     before: &Code,
     after: &Code,
 ) -> Option<OpenTarget> {
     let modal = app.modal.take()?;
 
-    // The one place the two `Option`s above are opened, so the arms that need a tree read the
-    // same "both or neither" fact `FrameState::roots` states.
     let roots = before_root.zip(after_root);
 
     match modal {
@@ -1190,9 +1063,7 @@ pub(crate) fn handle_modal_key(
             KeyCode::Char('y') | KeyCode::Char('Y') => {
                 app.status = Some(action_reset_case(app));
             }
-            // Anything else backs out. A reset is unrecoverable without re-solving the fixture by
-            // hand, so only the explicit key goes through - not Enter, which is the confirming key
-            // everywhere else here and is therefore the one most likely to be hit by reflex.
+            // Only `y` confirms, not Enter: Enter confirms everywhere else, so it is hit by reflex.
             _ => {
                 app.status = Some("Reset cancelled".to_string());
             }
@@ -1718,15 +1589,11 @@ pub(crate) fn handle_modal_key(
     None
 }
 
-/// `text_only` says this fixture's language has no tree-sitter grammar, which changes only what
-/// the *generated stub* asserts - see `ensure_stub_test`. Everything else here is the same: the
-/// mapping file is written, and the painting and invariants stubs are added on the same terms.
+/// Saves the mapping and ensures the fixture's test stubs exist.
 ///
-/// `comment` is only ever `Some` from `action_promote` (a sample's recorded `Modal::PromptComment`
-/// text, if any) - the plain save path (`s` on an already-real `CaseOrigin::Diffs` case) always
-/// passes `None`, since only samples have a comment to carry forward. Only takes effect when
-/// `ensure_stub_test` is *creating* the stub file for the first time; a comment added or edited
-/// after promotion has no generated file left to write into.
+/// `text_only` (no tree-sitter grammar) changes only what the generated stub asserts - see
+/// `ensure_stub_test`. `comment` is a promoted sample's comment; it is written only when the stub
+/// file is created, never into an existing one.
 pub(crate) fn action_save(
     mapping: &mut HumanMapping,
     dirty: &mut bool,
@@ -1736,13 +1603,11 @@ pub(crate) fn action_save(
 ) -> Result<String> {
     human_mapping::save(name, mapping)?;
     let created = ensure_stub_test(name, comment, text_only)?;
-    // Only once there is something to score: an unpainted fixture has no painting for the test to
-    // compare against, and a stub for it would fail rather than report a distance.
+    // An unpainted fixture has nothing to score, and its painting stub would fail.
     if !mapping.text_mappings.is_empty() {
         ensure_painting_stub_test(name)?;
     }
-    // Unconditional, unlike the painting stub above: the invariants cover the tree mapping too,
-    // which every saved fixture has.
+    // The invariants also cover the tree mapping, which every saved fixture has.
     ensure_invariants_stub_test(name)?;
     *dirty = false;
     Ok(if created {
@@ -1755,9 +1620,8 @@ pub(crate) fn action_save(
     })
 }
 
-/// Rust keywords (2015 through 2024 edition, strict and reserved). `module_name` turns a case
-/// name directly into a module identifier (`-` -> `_`), so a name that collides with one of these
-/// would produce a stub that fails to compile -- caught here instead, before anything is written.
+/// Rust keywords (2015 through 2024 edition, strict and reserved). A case name becomes a module
+/// identifier, so a keyword name would produce a stub that does not compile.
 pub(crate) const RUST_KEYWORDS: &[&str] = &[
     "as", "async", "await", "break", "const", "continue", "crate", "dyn", "else", "enum", "extern",
     "false", "fn", "for", "if", "impl", "in", "let", "loop", "match", "mod", "move", "mut", "pub",
@@ -1766,9 +1630,7 @@ pub(crate) const RUST_KEYWORDS: &[&str] = &[
     "override", "priv", "try", "typeof", "unsized", "virtual", "yield",
 ];
 
-/// A name must be non-empty, start with a letter (so `module_name` -- which just swaps `-` for
-/// `_` -- produces a valid Rust identifier) and contain only characters safe to use directly as
-/// a directory name.
+/// A name must be a valid Rust module identifier after `module_name`, and safe as a directory name.
 pub(crate) fn validate_new_case_name(name: &str) -> Result<()> {
     if name.is_empty() {
         bail!("Name cannot be empty");
@@ -1792,16 +1654,10 @@ pub(crate) fn validate_new_case_name(name: &str) -> Result<()> {
     Ok(())
 }
 
-/// Promotes the currently open sample or git-commit-sourced case (`app.origin` must be
-/// `CaseOrigin::Sample` or `CaseOrigin::GitCommitFile`) into a real test case under
-/// `src/test/data/diffs/<dataset>/<new_name>/` (`dataset` per `promote_target_dataset`: a
-/// sample's own recorded `source.dataset`, or always `"handmade"` for a git-commit-sourced case):
-/// copies the before/after content sitting in `before_src`/`after_src` (the same bytes currently
-/// on screen), saves human_mapping.json and the optimal_solutions stub via the normal
-/// `action_save` path, and -- for a sample only, since a git-commit-sourced case has no
-/// sample.csv row to update -- records `new_name` against the matching row in sample.csv. On
-/// success, `app` is switched over to the new diffs/ case so subsequent `s` presses behave like a
-/// normal save.
+/// Promotes the open sample or git-commit-sourced case into
+/// `src/test/data/diffs/<dataset>/<new_name>/` (see `promote_target_dataset`), writing
+/// `before_src`/`after_src` and saving via `action_save`. A sample also gets `new_name` recorded in
+/// its sample.csv row. On success `app` is switched to the new diffs/ case.
 pub(crate) fn action_promote(
     app: &mut App,
     new_name: &str,
@@ -1821,11 +1677,7 @@ pub(crate) fn action_promote(
     validate_new_case_name(new_name)?;
 
     if let Some(source) = &sample_source {
-        // The sample's own recorded provenance decides the target dataset folder, not a hardcoded
-        // guess - see `SampleSource::dataset`. Checked against `DIFF_DATASETS` rather than trusted
-        // outright: a bad value here (e.g. a hand-edited source.json, or a `--dataset` typo when
-        // the sample was originally materialized) would otherwise silently create a fourth diffs/
-        // folder that nothing else in this codebase knows to look in.
+        // Not trusted outright: a typo in source.json would create a diffs/ folder nothing reads.
         if !DIFF_DATASETS.contains(&source.dataset.as_str()) {
             bail!(
                 "sample's recorded dataset '{}' is not one of {:?} - check source.json under \
@@ -1837,9 +1689,7 @@ pub(crate) fn action_promote(
         }
     }
 
-    // Collision check spans every dataset folder (`diffs_case_dir` searches `DIFF_DATASETS`) - the
-    // flat-name lookup every other case name resolution in this file relies on breaks the moment
-    // two different datasets can hold the same name.
+    // Across every dataset: case names are resolved by flat name, so they must be unique.
     if diffs_case_dir(new_name).is_some() {
         bail!("'{}' already exists in src/test/data/diffs", new_name);
     }
@@ -1854,13 +1704,8 @@ pub(crate) fn action_promote(
     fs::write(dir.join(format!("before.{ext}.test")), before_src)?;
     fs::write(dir.join(format!("after.{ext}.test")), after_src)?;
 
-    // Carries the sample's provenance/license attribution (written by `materialize_test_diffs`,
-    // via `codediff::stats::license`) forward into `diffs/` - the before/after content is
-    // someone else's code, not codediff's own, so that attribution needs to survive promotion,
-    // not just live in `samples/` until this directory gets cleaned up once triage finishes (see
-    // the `d285097` commit that deleted the small dataset's fully-triaged `samples/`). Only a
-    // `Sample` origin has a README.md to copy; `GitCommitFile` promotions are sourced from this
-    // repo's own commits, not a third-party one.
+    // The README carries the third-party code's license attribution, which must survive
+    // promotion. A git-commit case is this repo's own code and has none.
     let readme_note = if sample_source.is_some() {
         let readme_src = samples_root().join(&app.name).join("README.md");
         match fs::copy(&readme_src, dir.join("README.md")) {
@@ -1874,8 +1719,6 @@ pub(crate) fn action_promote(
         String::new()
     };
 
-    // A sample's recorded comment (if any) rides along into the generated stub test - see
-    // `action_save`'s doc comment for why this is fetched here rather than threaded further down.
     let comment = match &sample_source {
         Some(source) => sample_comment(source)?,
         None => None,
@@ -1885,16 +1728,12 @@ pub(crate) fn action_promote(
         &mut app.dirty,
         new_name,
         comment.as_deref(),
-        // Always false: `load_sample`/`load_git_commit_file` still require a parseable language on
-        // both sides, so nothing that reaches promotion can be text-only. Only a fixture already
-        // sitting under `diffs/` (which `load_case` opens either way) can be.
+        // Samples and git-commit files load only with a grammar, so they are never text-only.
         false,
     )?;
 
-    // ...and into the fixture's own `description.md`, which is where `diff_inventory` reads a note
-    // from and where `e` on the promoted case writes one. The sample.csv cell is cleared below:
-    // the note **moves** here rather than being copied, so a promoted fixture has exactly one
-    // note and there is no second copy to drift. `no_promoted_row_carries_a_comment` pins that.
+    // The note moves to `description.md`; `update_sample_csv` clears the sample.csv cell so there
+    // is one copy (pinned by `no_promoted_row_carries_a_comment`).
     let note_written = match &comment {
         Some(comment) => write_note(new_name, comment).is_ok(),
         None => false,
@@ -1931,10 +1770,8 @@ pub(crate) fn action_promote(
     ))
 }
 
-/// Rejects the currently open sample instead of promoting it: records `reason` verbatim in its
-/// sample.csv row (`comment`, with `status` set to `REJECTED`) and leaves everything else -- the
-/// sample directory, `promoted_to` -- untouched. Only a sample has a sample.csv row to update; a
-/// git-commit-sourced case (`CaseOrigin::GitCommitFile`) has nothing to reject.
+/// Rejects the open sample: records `reason` as its sample.csv `comment` with `status` REJECTED.
+/// Fails for anything but a sample, and for an empty reason.
 pub(crate) fn action_reject(app: &App, reason: &str) -> Result<String> {
     let CaseOrigin::Sample(source) = &app.origin else {
         bail!("Only a sample (opened via O) can be rejected");
@@ -1951,19 +1788,12 @@ pub(crate) fn action_reject(app: &App, reason: &str) -> Result<String> {
     }
 }
 
-/// Records or clears the currently open sample's sample.csv `comment` column, without touching
-/// `status`/`promoted_to` -- unlike `R`'s reject flow (`action_reject`), this works regardless of
-/// whether the sample is still unreviewed, already promoted, or already rejected, and an empty
-/// `comment` is valid (clears any previously-recorded one, unlike a rejection reason, which can't
-/// be empty). Only a sample has a sample.csv row to update; a git-commit-sourced case
-/// (`CaseOrigin::GitCommitFile`) has nothing to comment on.
+/// Records or clears (empty `comment`) the open case's note: a diffs/ case's or promoted sample's
+/// `description.md`, otherwise the sample's sample.csv `comment`, leaving `status` alone.
 pub(crate) fn action_comment(app: &App, comment: &str) -> Result<String> {
     let comment = comment.trim();
 
-    // An already-promoted sample edits its *fixture's* `description.md`, not its own sample.csv
-    // row. That row is no longer what anything reads - `diff_inventory` prefers the file - so
-    // writing to it would be an edit that appears to work and shows up nowhere. One note per
-    // fixture, one writer.
+    // Not the sample.csv row: nothing reads it once the fixture has a `description.md`.
     if let CaseOrigin::Sample(source) = &app.origin
         && let Some(promoted) = promoted_case_name(source)
     {
@@ -1975,12 +1805,8 @@ pub(crate) fn action_comment(app: &App, comment: &str) -> Result<String> {
         });
     }
 
-    // A promoted or handmade fixture keeps its note in its own directory, as `description.md`,
-    // because there is no sample.csv row to hold one - a handmade case was never sampled at all.
-    // Written here and now rather than on the next `w`: `app.dirty` means "human_mapping.json has
-    // unsaved edits", and letting one keystroke ride a flag that saves a different file is how a
-    // comment gets lost to a quit-without-saving. The sample branch below has always written
-    // immediately too, so this keeps `e` meaning one thing.
+    // Written now, not on save: `app.dirty` tracks human_mapping.json, and a note riding it would
+    // be lost to a quit-without-saving.
     if let CaseOrigin::Diffs = &app.origin {
         write_note(&app.name, comment)?;
         return Ok(if comment.is_empty() {
@@ -2017,22 +1843,15 @@ pub(crate) struct SampleCsvRow {
     pub(crate) dataset: String,
     /// One of `SAMPLED`/`PROMOTED`/`REJECTED` - see `sample_test_diffs::Row::status`.
     pub(crate) status: String,
-    /// Free-form note about this sample, verbatim from `Modal::PromptComment`'s input - independent
-    /// of `status`: settable (and editable) whether the row is still SAMPLED, already PROMOTED, or
-    /// REJECTED. `action_reject` also writes here (the rejection reason *is* the comment, not a
-    /// separate column) - see that function and `Modal::PromptRejectReason`. Empty if never set.
+    /// Free-form note, independent of `status`. A rejection reason is stored here too.
     pub(crate) comment: String,
-    /// The `stats::sampling::loc_bucket` this row was drawn for, or empty for a row that predates
-    /// bucket tracking or was not sampled with `sample_test_diffs --stratified` - see
-    /// `sample_test_diffs::Row::size_bucket`. Read and written purely so a round-trip through this
-    /// tool preserves it: promoting or rejecting one sample rewrites the whole file, so a column
-    /// this reader dropped would be erased for every other row at the same time.
+    /// See `sample_test_diffs::Row::size_bucket`. Unused here, but carried because every write
+    /// rewrites the whole file, and a dropped column would be erased for every row.
     pub(crate) size_bucket: String,
 }
 
-/// Same backfill `sample_test_diffs::default_status` uses for a sample.csv row written before
-/// `status` existed: duplicated rather than shared across the two binaries, same as the
-/// `dataset` fallback ("small") a few lines below already is.
+/// The `status` of a row that has none; duplicates `sample_test_diffs::default_status`, as the
+/// two binaries share no code.
 pub(crate) fn default_sample_status(promoted_to: &str) -> &'static str {
     if promoted_to.is_empty() {
         "SAMPLED"
@@ -2057,7 +1876,7 @@ pub(crate) fn read_sample_csv_rows(path: &Path) -> Result<Vec<SampleCsvRow>> {
             commit: record[2].to_string(),
             path: record[3].to_string(),
             promoted_to,
-            // Same historical fallback as `legacy_dataset()`/`sample_test_diffs::LEGACY_DATASET`.
+            // Same fallback as `sample_test_diffs::LEGACY_DATASET`.
             dataset: record.get(5).unwrap_or("small").to_string(),
             status,
             comment: record.get(7).unwrap_or("").to_string(),
@@ -2097,17 +1916,7 @@ pub(crate) fn write_sample_csv_rows(path: &Path, rows: &[SampleCsvRow]) -> Resul
     Ok(())
 }
 
-/// Finds the sample.csv row matching `source`'s identity (language/repository/commit/path) -
-/// shared by every write path that needs to locate exactly one row to update
-/// (`update_sample_csv_at`, `reject_sample_csv_at`, `set_sample_comment_at`), plus the read-only
-/// `sample_comment_at`/the `e` keybinding's prefill lookup. `source` uniquely identifies a row by
-/// construction (`sample_test_diffs` never writes two rows for the same commit+path), so "first
-/// match" is never ambiguous in practice.
-/// The fixture name this sample was promoted to, if it has been promoted at all.
-///
-/// The inverse of `promoted_sample_comment`'s join, and the check that tells `action_comment`
-/// whether a sample still owns its own note or whether the promoted fixture's `description.md`
-/// has taken over.
+/// The fixture name this sample was promoted to, if any.
 pub(crate) fn promoted_case_name(source: &SampleSource) -> Option<String> {
     let rows = read_sample_csv_rows(&sample_csv_path()).ok()?;
     find_sample_row(&rows, source)
@@ -2115,6 +1924,8 @@ pub(crate) fn promoted_case_name(source: &SampleSource) -> Option<String> {
         .filter(|name| !name.trim().is_empty())
 }
 
+/// The sample.csv row for `source` (language/repository/commit/path). `sample_test_diffs` never
+/// writes two rows for one commit+path, so the first match is the only one.
 pub(crate) fn find_sample_row<'a>(
     rows: &'a [SampleCsvRow],
     source: &SampleSource,
@@ -2127,7 +1938,6 @@ pub(crate) fn find_sample_row<'a>(
     })
 }
 
-/// Mutable counterpart of `find_sample_row`, for the write paths.
 pub(crate) fn find_sample_row_mut<'a>(
     rows: &'a mut [SampleCsvRow],
     source: &SampleSource,
@@ -2144,11 +1954,9 @@ pub(crate) fn update_sample_csv(source: &SampleSource, new_name: &str) -> Result
     update_sample_csv_at(&sample_csv_path(), source, new_name)
 }
 
-/// Marks the sample.csv row matching `source` as promoted to `new_name`, preserving every other
-/// row and column (including `comment`) untouched. Returns `Ok(false)` (not an error) if no row
-/// matches -- e.g. the sample was placed under samples/ by hand rather than by
-/// `sample_test_diffs` -- since that shouldn't undo a promotion that has already otherwise
-/// succeeded.
+/// Marks the sample.csv row matching `source` as promoted to `new_name` and clears its comment.
+/// `Ok(false)`, not an error, if no row matches (a hand-placed sample), so a missing row does not
+/// fail a promotion that otherwise succeeded.
 pub(crate) fn update_sample_csv_at(
     path: &Path,
     source: &SampleSource,
@@ -2164,11 +1972,8 @@ pub(crate) fn update_sample_csv_at(
     };
     row.promoted_to = new_name.to_string();
     row.status = "PROMOTED".to_string();
-    // The note **moves** to the fixture's own `description.md` (written by `action_promote` just
-    // before this call) rather than being copied there. A promoted row that kept its comment would
-    // leave the fixture with two notes that can drift apart. `no_promoted_row_carries_a_comment`
-    // pins the invariant; a rejection keeps its reason here, because a rejected sample has no
-    // directory to hold one.
+    // The note has moved to the fixture's `description.md`; two copies would drift. A rejection
+    // keeps its reason here, as a rejected sample has no directory.
     row.comment.clear();
 
     write_sample_csv_rows(path, &rows)?;
@@ -2179,12 +1984,8 @@ pub(crate) fn reject_sample(source: &SampleSource, reason: &str) -> Result<bool>
     reject_sample_csv_at(&sample_csv_path(), source, reason)
 }
 
-/// Marks the sample.csv row matching `source` as rejected, recording `reason` in its `comment`
-/// column -- the reject counterpart of `update_sample_csv_at`. `promoted_to` is deliberately left
-/// as-is (empty, in practice: `action_reject` only ever runs against a case that's still
-/// `CaseOrigin::Sample`, which a promotion would have already moved past) since a rejected sample
-/// was never promoted. Returns `Ok(false)` (not an error) if no row matches, same reasoning as
-/// `update_sample_csv_at`.
+/// Marks the sample.csv row matching `source` as rejected with `reason` as its comment, leaving
+/// `promoted_to` alone. `Ok(false)` if no row matches.
 pub(crate) fn reject_sample_csv_at(
     path: &Path,
     source: &SampleSource,
@@ -2209,12 +2010,8 @@ pub(crate) fn set_sample_comment(source: &SampleSource, comment: &str) -> Result
     set_sample_comment_at(&sample_csv_path(), source, comment)
 }
 
-/// Records `comment` verbatim in the sample.csv row matching `source`'s `comment` column,
-/// preserving every other column -- including `status`/`promoted_to` -- untouched. Unlike
-/// `reject_sample_csv_at`, this never changes `status`, so it works the same whether the row is
-/// still SAMPLED, already PROMOTED, or REJECTED; an empty `comment` is valid and clears any
-/// previously-recorded one. Returns `Ok(false)` (not an error) if no row matches, same reasoning
-/// as `update_sample_csv_at`.
+/// Sets the `comment` of the sample.csv row matching `source`, leaving every other column alone.
+/// An empty `comment` clears it. `Ok(false)` if no row matches.
 pub(crate) fn set_sample_comment_at(
     path: &Path,
     source: &SampleSource,
@@ -2238,9 +2035,7 @@ pub(crate) fn sample_comment(source: &SampleSource) -> Result<Option<String>> {
     sample_comment_at(&sample_csv_path(), source)
 }
 
-/// The `comment` column value for `source`'s row in sample.csv, if the row exists and its comment
-/// is non-empty (after trimming) - `None` either way otherwise. `action_promote`'s own way of
-/// asking "should the generated stub test get a leading explanatory comment".
+/// The trimmed `comment` of `source`'s sample.csv row; `None` if missing or blank.
 pub(crate) fn sample_comment_at(path: &Path, source: &SampleSource) -> Result<Option<String>> {
     if !path.exists() {
         return Ok(None);
@@ -2251,9 +2046,7 @@ pub(crate) fn sample_comment_at(path: &Path, source: &SampleSource) -> Result<Op
         .filter(|c| !c.is_empty()))
 }
 
-/// `handle_modal_key`'s `Modal::SolutionPicker` arm. Split out at 105 lines: an arm that
-/// long stops being readable as one case of a match, and taking only the 0 of
-/// nine threaded values it actually uses makes its real dependencies visible.
+/// `handle_modal_key`'s `Modal::SolutionPicker` arm.
 #[allow(clippy::too_many_arguments)]
 fn handle_solution_picker(
     app: &mut App,
@@ -2264,9 +2057,8 @@ fn handle_solution_picker(
     new_name: Option<String>,
     confirm_delete: Option<String>,
     state: TextPaintState,
-    // Only the save-as branch reads these, to widen a `Minimal` painting's ranges to the
-    // indentation `Full` requires (`expand_leading_whitespace_for_full`). Same fallback as
-    // `handle_text_view`: these are the bytes of a `String`, so the conversion cannot fail.
+    // Read by save-as, to widen a `Minimal` painting to `Full`
+    // (`expand_leading_whitespace_for_full`).
     before_src: &[u8],
     after_src: &[u8],
 ) -> Option<OpenTarget> {
@@ -2303,8 +2095,7 @@ fn handle_solution_picker(
             }
             app.modal = Some(Modal::TextView { state });
         }
-        // Esc backs out of typing to the list rather than closing outright, so a mistyped
-        // name costs one key, not the whole picker.
+        // Back to the list, not closed: a mistyped name costs one key, not the picker.
         (Some(_), KeyCode::Esc) => reopen(app, names, selected, None, None),
         (Some(typed), _) => reopen(app, names, selected, Some(typed), None),
 
@@ -2329,17 +2120,14 @@ fn handle_solution_picker(
                 app.modal = Some(Modal::TextView { state });
             }
         }
-        // `e` is the one-key alternative to Enter: start the chosen name from nothing
-        // instead of from a copy of what is currently painted.
+        // Like Enter, but starts the chosen name empty instead of from a copy of the painting.
         (None, KeyCode::Char('e')) if saving && selected < free_form_index => {
             let chosen = names[selected].clone();
             action_save_solution_as(app, &chosen, false, before_text, after_text);
             app.modal = Some(Modal::TextView { state });
         }
-        // `D` twice deletes the highlighted painting. Capital, and twice, because there
-        // is no undo: the first press names what is about to go in the picker's title, the
-        // second acts on that name rather than on whatever row the cursor reached in
-        // between. Any other key clears the pending confirmation.
+        // Twice, because there is no undo. The second press acts on the name the first one
+        // armed, not on whatever row the cursor reached in between.
         (None, KeyCode::Char('D')) if selected < free_form_index => {
             let chosen = names[selected].clone();
             let exists = app
@@ -2372,9 +2160,7 @@ fn handle_solution_picker(
     None
 }
 
-/// `handle_modal_key`'s `Modal::TextView` arm. Split out at 270 lines: an arm that
-/// long stops being readable as one case of a match, and taking only the 4 of
-/// nine threaded values it actually uses makes its real dependencies visible.
+/// `handle_modal_key`'s `Modal::TextView` arm.
 fn handle_text_view(
     app: &mut App,
     code: KeyCode,
@@ -2384,15 +2170,11 @@ fn handle_text_view(
     before: &Code,
     after: &Code,
 ) -> Option<OpenTarget> {
-    // `before_src`/`after_src` are the bytes of a `String` (`Code::contents`), so these
-    // conversions cannot fail; the fallback exists so a hypothetical non-UTF-8 source
-    // degrades to an empty painting surface rather than panicking mid-session.
+    // Cannot fail (`Code::contents` is a `String`); the fallback avoids a panic mid-session.
     let before_text = std::str::from_utf8(before_src).unwrap_or_default();
     let after_text = std::str::from_utf8(after_src).unwrap_or_default();
-    // The viewport height the cursor has to stay inside. The real popup height isn't known
-    // outside `render_text_view_modal`, and threading it back here would couple the key
-    // handler to the layout for one number - a conservative constant keeps the cursor on
-    // screen for any terminal at least this tall and merely over-scrolls on a shorter one.
+    // A conservative stand-in for the popup height, which only the renderer knows: it keeps
+    // the cursor on screen on any terminal at least this tall.
     const VIEWPORT_ROWS: usize = 20;
     let focused_source = if state.side == 0 {
         before_text
@@ -2401,8 +2183,7 @@ fn handle_text_view(
     };
     let mut close = false;
 
-    // While the `:` prompt is open it takes every keystroke, so a digit is a digit rather
-    // than a movement command.
+    // The `:` prompt takes every keystroke, so a digit is not a movement command.
     if let Some(mut typed) = state.line_prompt.take() {
         match code {
             KeyCode::Char(c) if c.is_ascii_digit() => {
@@ -2414,8 +2195,7 @@ fn handle_text_view(
                 state.line_prompt = Some(typed);
             }
             KeyCode::Enter => match typed.parse::<usize>() {
-                // 1-based in, 0-based out: the gutter shows 1-based numbers, so that is
-                // what a reader will type.
+                // The gutter shows 1-based numbers.
                 Ok(line) if line >= 1 => {
                     let last = TextPaintState::row_count(focused_source).saturating_sub(1);
                     let row = (line - 1).min(last);
@@ -2446,9 +2226,7 @@ fn handle_text_view(
         KeyCode::PageUp => state.step_row(-(VIEWPORT_ROWS as isize), focused_source),
         KeyCode::PageDown => state.step_row(VIEWPORT_ROWS as isize, focused_source),
         KeyCode::Char('0') | KeyCode::Home => state.cursor[state.side].1 = 0,
-        // `^` between them, as in vi: the first character that is actually code, which on an
-        // indented line is where a painted range almost always wants to start - `0` lands in the
-        // indentation, and painting from there sweeps leading whitespace into the range.
+        // As in vi. Where a painted range wants to start: `0` would sweep in the indentation.
         KeyCode::Char('^') => {
             let row = state.cursor[state.side].0;
             state.cursor[state.side].1 = TextPaintState::first_code_column(focused_source, row);
@@ -2477,10 +2255,8 @@ fn handle_text_view(
                 None => "Selection cleared".to_string(),
             });
         }
-        // Swaps how a selection spanning several rows reads: vertical picks the same
-        // columns down each row (a stack of squares), full-line sweeps every row end to
-        // end - what a single contiguous multi-line block (e.g. a whole moved function)
-        // still needs, since `m` requires every span on a side to read identical text.
+        // Vertical selects the same columns on each row; full-line sweeps rows end to end, which
+        // a contiguous multi-line block needs because `m` requires identical text on both sides.
         KeyCode::Char('V') => {
             state.vertical = !state.vertical;
             let mode = if state.vertical {
@@ -2490,10 +2266,8 @@ fn handle_text_view(
             };
             app.status = Some(format!("Selections are now {mode}"));
         }
-        // Same pair the tree panels use for their own multi-map selection: `x` banks what
-        // is selected so another range can be selected on the same side, `c` clears both
-        // sides' banks. This is what makes an N:M match reachable - one live selection can
-        // only ever describe one range.
+        // As in the tree panels: banking is what makes an N:M match reachable, since one live
+        // selection describes one range.
         KeyCode::Char('x') => {
             let spans = state.selection(state.side, focused_source);
             if spans.is_empty() {
@@ -2529,9 +2303,6 @@ fn handle_text_view(
         ),
         KeyCode::Char('u') => action_paint_unmark(app, &state, before_text, after_text),
         KeyCode::Char('Z') => action_paint_mark_empty(app),
-        // `n`/`p` step through the plain line diff's hunks, `a` lines the other panel up with
-        // this one - the three keys that spare a painter the manual re-scrolling of two
-        // independently scrolled panels.
         KeyCode::Char('n') => action_paint_next_diff(
             app,
             &mut state,
@@ -2551,25 +2322,16 @@ fn handle_text_view(
         KeyCode::Char('a') => {
             action_paint_align(app, &mut state, before_text, after_text, VIEWPORT_ROWS)
         }
-        // The other half of the align family, one level down: `a` lines the two *text* panels up
-        // with each other, `A` lines this side's *tree* panel up with this text cursor.
+        // Unlike `a`, aligns this side's *tree* panel with the text cursor.
         KeyCode::Char('A') => action_paint_reveal_node(app, &state, before, after),
-        // Shift-`p`, next to the `p` that *used* to cycle overlays - now `o`, which `n`/`p`
-        // displaced. Kept on `P` anyway: it is the same idea one step further (`o` looks at
-        // codediff's rendering, `P` adopts it as the draft to correct), and rebinding a
-        // destructive-ish key to chase that pairing would cost more muscle memory than it buys.
+        // Adopts codediff's rendering (what `o` shows) as the draft to correct.
         KeyCode::Char('P') => action_paint_seed_from_codediff(app, before, after),
         KeyCode::Char('o') => {
             let next = app.text_overlay.next();
-            // Computed on the first cycle away from `Human` and kept for the rest of the
-            // case: running codediff is real work on a large fixture, and the default view
-            // never needs it.
+            // Lazy, and kept for the case: running codediff is slow on a large fixture.
             if next != TextOverlay::Human && app.algo_text_spans.is_none() {
                 app.algo_text_spans = Some(codediff_text_spans(before, after));
             }
-            // Same lazy contract, for the tree-mapping side `TreeDisagreement` needs -
-            // built independently of `algo_text_spans` since a case might be cycled
-            // straight past `CodeDiff`/`Disagreements` without ever needing it.
             if next == TextOverlay::TreeDisagreement && app.tree_text_spans.is_none() {
                 app.tree_text_spans = Some(tree_mapping_text_spans(&app.mapping, before, after));
             }
@@ -2631,8 +2393,6 @@ fn handle_text_view(
                 }
             });
         }
-        // `s` and `L` both raise the same picker; `saving` is the only difference, and it
-        // decides only what Enter does with the chosen name.
         KeyCode::Char('s') | KeyCode::Char('L') => {
             let saving = matches!(code, KeyCode::Char('s'));
             app.modal = Some(Modal::SolutionPicker {
@@ -2653,9 +2413,8 @@ fn handle_text_view(
             Err(err) => app.status = Some(format!("Error running diff: {:#}", err)),
         },
         KeyCode::Esc => {
-            // Esc backs out one step at a time, so an accidental `v` - or a half-built
-            // N:M group - doesn't cost the whole view. Only an Esc with nothing pending
-            // closes.
+            // One step at a time, so an accidental `v` or a half-built N:M group does not
+            // cost the whole view.
             if state.anchor[state.side].is_some() {
                 state.anchor[state.side] = None;
                 app.status = Some("Selection cleared".to_string());
@@ -2679,11 +2438,9 @@ fn handle_text_view(
     None
 }
 
-/// `handle_modal_key`'s `Modal::OpenSamplePicker` arm, split out for the same reason as
-/// `handle_open_diff_picker` just below: it works purely on `App` and its own payload, and is too
-/// long to read as one arm of a match. The two are deliberately parallel - same keys, same
-/// re-anchoring, same persistence back onto `App` - since they are the same table over two
-/// different corpora (see `SampleColumn` on why the *types* are not shared).
+/// `handle_modal_key`'s `Modal::OpenSamplePicker` arm. Deliberately parallel to
+/// `handle_open_diff_picker`: the same table over a different corpus (see `SampleColumn` on why
+/// the types are not shared).
 fn handle_open_sample_picker(
     app: &mut App,
     code: KeyCode,
@@ -2695,9 +2452,7 @@ fn handle_open_sample_picker(
     let mut view = view;
     let mut selected = selected;
 
-    // The `Name` filter's prompt takes every keystroke while it is open, so a name containing
-    // `j`, `s` or `f` types those characters instead of moving the selection and re-sorting the
-    // table mid-word - same posture as `handle_open_diff_picker`.
+    // The `Name` filter prompt takes every keystroke, so `j`/`s`/`f` type rather than act.
     if let Some(mut typed) = name_input {
         match code {
             KeyCode::Char(c) => {
@@ -2768,8 +2523,6 @@ fn handle_open_sample_picker(
         KeyCode::Right | KeyCode::Char('l') => {
             view.column = view.column.right();
         }
-        // `s` takes the sort over to the cursor column, or flips the direction if it already owns
-        // it. The selection follows the row it was on rather than jumping to the top.
         KeyCode::Char('s') => {
             let current = visible.get(selected).map(|row| row.name.clone());
             view.sort = view.sort.toggled(view.column);
@@ -2779,9 +2532,6 @@ fn handle_open_sample_picker(
             app.modal = Some(modal);
             return None;
         }
-        // `f` cycles the cursor column's own filter: a value from the column for `Lang`/`Bucket`,
-        // a triage state for `Status`, off/yes/no for `Size`, and a typed substring for `Name`
-        // (which opens `name_input` above rather than taking effect immediately).
         KeyCode::Char('f') => {
             let current = visible.get(selected).map(|row| row.name.clone());
             match view.column {
@@ -2790,8 +2540,6 @@ fn handle_open_sample_picker(
                         "Filter by name: type a substring, Enter to apply, Esc to cancel"
                             .to_string(),
                     );
-                    // Pre-filled with the filter already in force, so `f` edits rather than
-                    // blindly overwrites.
                     let name_input = view.filters.name.clone().unwrap_or_default();
                     app.modal = Some(Modal::OpenSamplePicker {
                         rows,
@@ -2842,8 +2590,7 @@ fn handle_open_sample_picker(
         }
         _ => {}
     }
-    // Covers `h`/`l`: the cursor column persists across closing and reopening the picker, the same
-    // way the sort and filters do. The other keys reaching here leave `view` untouched.
+    // Persists `h`/`l`'s column across reopening the picker, as the sort and filters do.
     app.sample_view = view.clone();
     app.modal = Some(Modal::OpenSamplePicker {
         rows,
@@ -2855,9 +2602,7 @@ fn handle_open_sample_picker(
     None
 }
 
-/// `handle_modal_key`'s `Modal::OpenDiffPicker` arm. Split out at 182 lines: an arm that
-/// long stops being readable as one case of a match. It needs none of the nine values
-/// `handle_modal_key` threads through - it works purely on `App` and its own payload.
+/// `handle_modal_key`'s `Modal::OpenDiffPicker` arm.
 fn handle_open_diff_picker(
     app: &mut App,
     code: KeyCode,
@@ -2869,9 +2614,7 @@ fn handle_open_diff_picker(
     let mut view = view;
     let mut selected = selected;
 
-    // The `Name` filter's prompt takes every keystroke while it is open, so a name
-    // containing `j`, `s` or `f` types those characters instead of moving the selection
-    // and re-sorting the table mid-word. Same posture as the text view's `:` line prompt.
+    // The `Name` filter prompt takes every keystroke, so `j`/`s`/`f` type rather than act.
     if let Some(mut typed) = name_input {
         match code {
             KeyCode::Char(c) => {
@@ -2893,15 +2636,10 @@ fn handle_open_diff_picker(
                 });
             }
             KeyCode::Enter => {
-                // Which row the selection was on *before* the new filter narrows the list,
-                // so it can follow that row rather than resetting to the top - same
-                // re-anchoring every other filter/sort key here does.
+                // Taken before the filter narrows the list, so the selection follows its row.
                 let current = visible_diff_options(&options, &view, DiffPickerData::from_app(app))
                     .get(selected)
                     .cloned();
-                // Lowercased once here rather than per row per frame; blank clears the
-                // filter rather than being stored as a needle that matches everything
-                // while still reading as "filtered" in the header.
                 let needle = typed.trim().to_lowercase();
                 view.filters.name = if needle.is_empty() {
                     None
@@ -2946,20 +2684,13 @@ fn handle_open_diff_picker(
         KeyCode::Down | KeyCode::Char('j') => {
             selected = (selected + 1).min(visible.len().saturating_sub(1));
         }
-        // Column movement never triggers a scan: `s`/`f` are deliberate presses that can
-        // afford to stall for several seconds the first time (see
-        // `ensure_diff_column_data`), but walking the cursor across the header to reach
-        // one of them must stay instant.
+        // Never triggers a scan (`ensure_diff_column_data`): only the deliberate `s`/`f` may stall.
         KeyCode::Left | KeyCode::Char('h') => {
             view.column = view.column.left();
         }
         KeyCode::Right | KeyCode::Char('l') => {
             view.column = view.column.right();
         }
-        // `s` takes the sort over to the cursor column, or flips the direction if it is
-        // already the sorted one. The selection follows the row it was on rather than
-        // jumping to the top, which is the whole point of re-sorting while looking at a
-        // particular fixture.
         KeyCode::Char('s') => {
             let current = visible.get(selected).cloned();
             ensure_diff_column_data(app, view.column);
@@ -2974,17 +2705,12 @@ fn handle_open_diff_picker(
             app.modal = Some(modal);
             return None;
         }
-        // `f` cycles the cursor column's own filter - a dataset for `Dataset`, a
-        // three-state off/yes/no for each yes-no column, and a typed substring for `Name`
-        // (which opens `name_input` above instead of taking effect immediately).
         KeyCode::Char('f') => {
             let current = visible.get(selected).cloned();
             if view.column == DiffColumn::Name {
                 app.status = Some(
                     "Filter by name: type a substring, Enter to apply, Esc to cancel".to_string(),
                 );
-                // Pre-filled with the filter already in force, so `f` is an edit rather
-                // than a blind overwrite - same idea as `PromptComment`.
                 let name_input = view.filters.name.clone().unwrap_or_default();
                 app.modal = Some(Modal::OpenDiffPicker {
                     options,
@@ -3028,10 +2754,7 @@ fn handle_open_diff_picker(
         }
         _ => {}
     }
-    // Covers `h`/`l`: the cursor column persists across closing and reopening the picker
-    // the same way the sort and filters `s`/`f` set do, so reopening lands back on the
-    // column that was being worked with. The other keys reaching here leave `view`
-    // untouched, so this is a no-op for them.
+    // Persists `h`/`l`'s column across reopening the picker, as the sort and filters do.
     app.diff_view = view.clone();
     app.modal = Some(Modal::OpenDiffPicker {
         options,

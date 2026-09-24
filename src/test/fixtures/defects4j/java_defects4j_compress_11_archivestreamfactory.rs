@@ -41,9 +41,8 @@ fn painting() -> Result<()> {
 
 #[test]
 fn invariants() -> Result<()> {
-    // Invariant 3, twice, on one pair of braces each: the mapping marks the `{` on after row 209
-    // matched and its `}` on row 251 inserted, and the `{` on row 240 inserted and its `}` on row
-    // 250 matched. The two blocks' closing braces look paired the wrong way round.
+    // Invariant 3, twice: the `{` on after row 209 is matched and its `}` on row 251 inserted, and
+    // the `{` on row 240 inserted and its `}` on row 250 matched - closers paired the wrong way.
     assert_ground_truth_invariants_with_known_violations(
         "java-defects4j-compress-11-archivestreamfactory",
         2,

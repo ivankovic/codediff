@@ -29,10 +29,8 @@ use ratatui::{
 use super::Component;
 use crate::tui::actions::Action;
 
-/// The `g` jump-to-line prompt: same visual scaffold as `SearchModal` (bordered, cyan title, a
-/// hint line, text entry), but digits-only input - non-digit characters are silently ignored
-/// rather than accepted-then-rejected on submit, so the field can never hold something that
-/// wouldn't parse. Submitting an empty field just cancels (there is no "line nothing").
+/// The `g` jump-to-line prompt. Non-digits are ignored as typed rather than rejected on submit, so
+/// the field never holds something that would not parse.
 #[derive(Default)]
 pub struct LinePrompt {
     digits: String,
@@ -43,8 +41,6 @@ impl LinePrompt {
         Self::default()
     }
 
-    /// The area the popup itself should occupy, centered within `area` - same shape as
-    /// `SearchModal::popup_area`.
     pub fn popup_area(&self, area: Rect) -> Rect {
         let width = 40.min(area.width);
         let height = 4.min(area.height);
@@ -53,8 +49,7 @@ impl LinePrompt {
         Rect::new(x, y, width, height)
     }
 
-    /// Where the text cursor should be drawn on screen within `area` (the same area passed to
-    /// `draw`), right after the typed digits.
+    /// The on-screen cursor position, for the same `area` passed to `draw`.
     pub fn cursor_screen_position(&self, area: Rect) -> (u16, u16) {
         // +1 for the border, +1 for the leading ":" the input line is prefixed with.
         let col = area.x + 2 + self.digits.chars().count() as u16;
@@ -75,7 +70,6 @@ impl Component for LinePrompt {
             }
             KeyCode::Enter => match self.digits.parse::<usize>() {
                 Ok(line) if line > 0 => Ok(Some(Action::JumpToLineSubmitted(line))),
-                // Empty (or a pathological "0"/overflow) - nothing meaningful to jump to.
                 _ => Ok(Some(Action::DialogCancelled)),
             },
             KeyCode::Esc => Ok(Some(Action::DialogCancelled)),

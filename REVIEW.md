@@ -98,7 +98,7 @@ done; the §4 typos are fixed except `symetric` (×3).
 - **2026-09-05, section 4 item 6** - done: `diff/text.rs ranges` is 57 lines over a
   `RangeWalk` whose methods are the former arms (`identical_or_move`, `update_ranges`,
   `own_content_update_ranges`, `whole_content_prune` + `own_gap_ranges`, `placed`, `push`),
-  with the measurement narratives carried over as each method's doc comment; `classify_node`/
+  each method documented by its contract; `classify_node`/
   `NodeChange` is the one operation-to-visible-change classification, used by both `ranges` and
   `summary::scan`.
 - **2026-09-05, section 5 (boolean parameters)** - done for the `RenderOptions` chain:
@@ -172,6 +172,16 @@ done; the §4 typos are fixed except `symetric` (×3).
   section), the JSON fixture 2.94s to 2.44s (3.08s), instructions 15.99G to 13.80G (18.46G).
   What is left is APTED's own core (`spf_path` 35%, `spf_a`, `ContainmentCtx::adjust` 4%) and
   malloc (~5%); items 6.4-6.8 in the list above cover those, and each needs its own profile.
+- **2026-09-23, section 5 (history narrated in source)** - done: a comment pass over every
+  `.rs` file, `Cargo.toml` and the `Makefile` removed dated measurements, "an earlier version"
+  narration and comments that restate the code, and cut doc comments to the contract plus the
+  non-obvious reason. Behaviour that only a comment described is pinned by a named test instead.
+  Doc comments found attached to the wrong item along the way (in `text.rs`, `nodes.rs`,
+  `human_mapping.rs`, `invariants.rs`, the APTED submodules, three solver passes, `hash.rs`,
+  `stats.rs` and `human_solver`) are on their own items. Section 7's zero-test list is shorter:
+  `analyze_human_mappings`, `benchmark_astdiff_oracle` and the difftastic, diffsitter and
+  GumTree parsers have tests; `bdiff`, `git`, `nvim`, `stats/git.rs`, `tui.rs`, `tui/events.rs`
+  and `tui/actions.rs` still have none.
 - **Runtime finding from the same measurement**: over the corpus, AST metadata costs about three
   times the tree-sitter parse, and the parse plus metadata (15.5s) is more than half the diff
   itself (28s per the quality baseline). Section 6's items 1-3 are that cost.

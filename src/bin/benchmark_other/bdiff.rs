@@ -16,9 +16,6 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-// Split out of benchmark_other.rs (the `bdiff`-cluster functions) purely to shrink that
-// file's visible size - no behavior change.
-
 use anyhow::{Context, Result, bail};
 use codediff::code::Code;
 use codediff::diff::text_range::TextRange;
@@ -29,17 +26,11 @@ use std::process::Command;
 use super::git::git_env;
 use super::{external_tool_bin, span_on_row_chars, whole_row_span, write_temp_pair};
 
-/// The BDiff driver script (see its own doc comment), embedded rather than shipped as a loose
-/// file so it cannot drift from the binary that runs it.
+/// Embedded rather than shipped as a loose file so it cannot drift from the binary that runs it.
 const BDIFF_DRIVER: &str = include_str!("../../../assets/bdiff_driver.py");
 
-/// Python interpreter with BDiff importable, from `BDIFF_PYTHON` - by convention the `venv/bin/
-/// python` of a virtualenv that has BDiff installed. Not auto-installed for the same reason
-/// GumTree isn't: it is a separate project with its own dependencies.
-///
-/// Note BDiff's `pyproject.toml` under-declares: it lists numpy and scipy but its `bdiff.py`
-/// also imports `rapidfuzz`, which must be installed separately or every invocation dies on
-/// `ModuleNotFoundError`. See data/comparison/PROVENANCE.md.
+/// Python interpreter with BDiff importable, from `BDIFF_PYTHON`. BDiff's `pyproject.toml` omits
+/// `rapidfuzz`, which must be installed separately (see data/comparison/PROVENANCE.md).
 pub(crate) fn bdiff_python() -> Result<std::path::PathBuf> {
     external_tool_bin(
         "BDIFF_PYTHON",
@@ -50,32 +41,20 @@ pub(crate) fn bdiff_python() -> Result<std::path::PathBuf> {
 
 /// `(before_touched, after_touched)` from BDiff's edit script.
 ///
-/// BDiff reports eight edit modes. Every one carries `src_line` (before side) and `dest_line`
-/// (after side), 1-indexed, and the block modes also carry `block_length`. Which side each mode
-/// actually *touches* is the only judgement call here, and it is made to match what every other
-/// tool in this comparison is scored on - `changed_spans` counts a line as changed when its
-/// `TextOperation` is anything other than `Identical`, and `Move` is one of those - so a moved
-/// line counts as touched for codediff and must count as touched here too:
+/// Every mode carries 1-indexed `src_line`/`dest_line`; block modes add `block_length`. Which side
+/// a mode touches matches how codediff is scored (a moved line counts as changed):
 ///
-/// * `insert` - after side only. Its `src_line` is the anchor the line was inserted at, not a
-///   before-side line that changed.
-/// * `delete` - before side only, for the mirror-image reason.
-/// * `update`, `m_update`, `c_update` - both sides. The latter two are line-level updates inside
-///   a move or copy block, and are ordinary updates for this metric.
-/// * `move` - both sides, `block_length` lines from `src_line` and from `dest_line`.
-/// * `split` - the one before-side line, and `block_length` after-side lines.
-/// * `merge` - the mirror: `block_length` before-side lines, one after-side line.
-/// * `copy` - **after side only.** A copy leaves its source block in place, unchanged, present
-///   in both files; only the new duplicate at `dest_line` is a change. (Rare: 7 occurrences
-///   across the first 60 fixtures.)
+/// * `insert` - after side only; its `src_line` is an anchor. `delete` is the mirror.
+/// * `update`, `m_update`, `c_update` - both sides.
+/// * `move` - both sides, `block_length` lines each.
+/// * `split` - one before-side line, `block_length` after-side lines. `merge` is the mirror.
+/// * `copy` - after side only: the source block is unchanged and present in both files.
 pub(crate) fn bdiff_line_labels(before: &Code, after: &Code) -> Result<(Vec<bool>, Vec<bool>)> {
     let script = bdiff_edit_script(before, after)?;
     bdiff_touched_from_script(before, after, &script)
 }
 
-/// Runs BDiff once and returns its raw edit script. Shared by [`bdiff_line_labels`] and
-/// [`bdiff_node_spans`], which read different fields of the same entries - the same
-/// one-invocation-per-metric shape `gumtree_line_labels`/`gumtree_node_spans` already have.
+/// Runs BDiff once and returns its raw edit script.
 pub(crate) fn bdiff_edit_script(before: &Code, after: &Code) -> Result<Vec<serde_json::Value>> {
     let python = bdiff_python()?;
     let (before_file, after_file) = write_temp_pair(before, after, None)?;
@@ -106,8 +85,7 @@ pub(crate) fn bdiff_edit_script(before: &Code, after: &Code) -> Result<Vec<serde
     serde_json::from_slice(&output.stdout).context("parsing bdiff driver JSON output")
 }
 
-/// The pure half of [`bdiff_line_labels`], split out so the mode-to-side rules documented there
-/// are unit-testable without an installed BDiff.
+/// The pure half of [`bdiff_line_labels`], testable without an installed BDiff.
 pub(crate) fn bdiff_touched_from_script(
     before: &Code,
     after: &Code,
@@ -164,19 +142,11 @@ pub(crate) fn bdiff_touched_from_script(
     Ok((before_touched, after_touched))
 }
 
-/// Per-fixture BDiff timings measured inside **one** Python interpreter, mirroring
-/// `gumtree_warm_batch` and existing for exactly the same reason.
+/// Per-fixture BDiff timings measured inside one Python interpreter (`bdiff_warm_ms`).
 ///
-/// Importing BDiff pulls in numpy, scipy and rapidfuzz: ~394 ms, against a ~12 ms bare
-/// interpreter (measured 2026-08-23). A per-invocation wall-clock number for BDiff is therefore
-/// ~97% import overhead, which would put it last in any speed table while saying nothing at all
-/// about its algorithm. `bdiff_ms` keeps that per-process number, because it is what a developer
-/// running the tool once actually waits for; this function supplies `bdiff_warm_ms`, the cost
-/// once startup is amortized. Reporting only one of the two would be misleading in one direction
-/// or the other.
-///
-/// `Ok(None)` when `BDIFF_PYTHON` is unset - the same opt-in-per-run contract `gumtree_warm_batch`
-/// has, not a per-fixture language scope.
+/// Importing numpy, scipy and rapidfuzz dominates a per-process run, so the per-process number
+/// (`bdiff_ms`) says little about the algorithm; both are reported. `Ok(None)` when
+/// `BDIFF_PYTHON` is unset.
 pub(crate) fn bdiff_warm_batch(
     fixtures: &[(&str, &Code, &Code)],
 ) -> Result<Option<HashMap<String, f64>>> {
@@ -191,8 +161,7 @@ pub(crate) fn bdiff_warm_batch(
     std::io::Write::write_all(&mut driver, BDIFF_DRIVER.as_bytes())
         .context("writing bdiff batch driver temp file")?;
 
-    // Kept alive until the child has read every path off its stdin, exactly as in
-    // `gumtree_warm_batch`.
+    // Kept alive until the child has read every path off its stdin.
     let mut before_files = Vec::with_capacity(fixtures.len());
     let mut after_files = Vec::with_capacity(fixtures.len());
     let mut requests = String::new();
@@ -249,8 +218,7 @@ pub(crate) fn bdiff_warm_batch(
             .as_str()
             .context("bdiff batch response missing `id`")?
             .to_string();
-        // A pair BDiff itself fails on is a per-fixture gap, not a run-ending failure - same
-        // policy as the GumTree batch above, and for the same reason.
+        // A pair BDiff fails on is a per-fixture gap, not a run-ending failure.
         if let Some(ms) = json.get("ms").and_then(|v| v.as_f64()) {
             results.insert(id, ms);
         }
@@ -258,28 +226,12 @@ pub(crate) fn bdiff_warm_batch(
     Ok(Some(results))
 }
 
-/// BDiff's changed regions, from the same edit script `bdiff_line_labels` parses - but keeping
-/// each `update` entry's real character range instead of collapsing it to the line it sits on.
+/// BDiff's changed regions, keeping each `update` entry's character range from its `str_diff`
+/// field: `[before_ranges, after_ranges]`, each a list of **inclusive** `[start, end]` character
+/// offsets into the line (`[]` means nothing on that side, e.g. a pure insertion).
 ///
-/// This is what moves BDiff out of the `line_only` bucket. Its edit script carries a `str_diff`
-/// field on every `update`-family entry: `[before_ranges, after_ranges]`, where each side is a
-/// list of **inclusive** `[start, end]` character offsets into that line (an empty `[]` means the
-/// side has nothing there, e.g. a pure insertion into a line). Verified live, 2026-08-24:
-///
-/// * `abcdefghij` -> `abcXYZfghij` gives `[[[3, 4]], [[3, 5]]]` - `de` on one side, `XYZ` on the
-///   other, so both ends are inclusive and the two sides' lengths differ independently.
-/// * `hello world` -> `hello there world` gives `[[[]], [[6, 11]]]` - the before side's empty
-///   list is the insertion's zero-width position.
-///
-/// One limitation worth knowing before reading the resulting numbers: BDiff reports the **hull**
-/// of a line's changes, not each one. `one two three four` -> `onX two threX four` gives a single
-/// `[2, 12]`, spanning the untouched `e two thre` between the two edited characters, rather than
-/// two ranges. So its sub-line output is finer than a line but coarser than the true edit, and it
-/// will over-report on lines with several separated changes.
-///
-/// Modes with no `str_diff` (`insert`, `delete`, `move`, `split`, `merge`, `copy`) contribute
-/// whole-line spans, following exactly the same mode-to-side rules `bdiff_line_labels` documents -
-/// dropping them would leave BDiff scored only on the lines it happens to call updates.
+/// BDiff reports the hull of a line's changes, so lines with several separated edits over-report.
+/// Other modes contribute whole lines on the sides [`bdiff_line_labels`] documents.
 pub(crate) fn bdiff_node_spans(
     before: &Code,
     after: &Code,
@@ -288,9 +240,7 @@ pub(crate) fn bdiff_node_spans(
     bdiff_spans_from_script(before, after, &script)
 }
 
-/// The pure half of [`bdiff_node_spans`], split out for the same reason
-/// [`bdiff_touched_from_script`] is: the range conventions above are unit-testable without an
-/// installed BDiff, and they are exactly the part that is easy to get wrong.
+/// The pure half of [`bdiff_node_spans`], testable without an installed BDiff.
 pub(crate) fn bdiff_spans_from_script(
     before: &Code,
     after: &Code,
@@ -301,7 +251,6 @@ pub(crate) fn bdiff_spans_from_script(
     let mut before_spans = Vec::new();
     let mut after_spans = Vec::new();
 
-    // BDiff line numbers are 1-based; `TextRange` rows are 0-based.
     let whole = |spans: &mut Vec<TextRange>, lines: &[&str], start: u64, count: u64| {
         for line_number in start..start + count.max(1) {
             if let Some(row) = (line_number as usize).checked_sub(1)
@@ -322,7 +271,6 @@ pub(crate) fn bdiff_spans_from_script(
                     .iter()
                     .filter_map(|range| {
                         let pair = range.as_array()?;
-                        // `[]` is the empty range BDiff emits for the side that has no text here.
                         Some((
                             pair.first()?.as_u64()? as usize,
                             pair.get(1)?.as_u64()? as usize,
@@ -354,9 +302,7 @@ pub(crate) fn bdiff_spans_from_script(
                     .map(|d| (side_ranges(d, 0), side_ranges(d, 1)))
                     .unwrap_or_default();
                 let (before_sub, after_sub) = sub;
-                // No `str_diff` at all (or one that named nothing on either side) means BDiff
-                // gave no sub-line detail for this update, so fall back to the whole lines rather
-                // than silently reporting no change there.
+                // No sub-line detail: report whole lines rather than no change.
                 if before_sub.is_empty() && after_sub.is_empty() {
                     whole(&mut before_spans, &before_lines, src, 1);
                     whole(&mut after_spans, &after_lines, dest, 1);
@@ -370,7 +316,7 @@ pub(crate) fn bdiff_spans_from_script(
                         continue;
                     };
                     for (start, end) in ranges {
-                        // Inclusive end -> half-open, which is what every other span here is.
+                        // Inclusive end -> half-open.
                         spans.push(span_on_row_chars(lines, row, start, end + 1));
                     }
                 }

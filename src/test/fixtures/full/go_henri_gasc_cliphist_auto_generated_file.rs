@@ -21,13 +21,8 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // Auto-generated file
-    // The human marks whole `function_declaration`s as Delete-with-children; codediff matches
-    // their punctuation and keyword leaves (`}`, `)`, `return`) to leaves of the surviving
-    // functions instead. Leaf-token matching inside a wholly-removed subtree.
-    // Known gap, characterized above but unfixed. Clamped at the observed count rather than
-    // requiring an exact match. Lower (or drop back to `assert_matches_human_mapping`) once
-    // a fix lands.
+    // Auto-generated file. The human deletes whole `function_declaration`s; codediff matches their
+    // punctuation and keyword leaves to leaves of surviving functions.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "go-henri-gasc-cliphist-auto-generated-file",
         164,

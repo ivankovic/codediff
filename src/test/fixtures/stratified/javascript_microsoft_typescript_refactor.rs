@@ -23,13 +23,10 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // The edit unwraps an IIFE: every statement moves from `call_expression > arguments >
-    // function_expression > statement_block` up to the file's top level. The human pairs the
-    // statements across those four removed levels; the pipeline's structural matchers do not
-    // bridge removed nesting, so `APTED("fast_fallback")` deletes and re-inserts the string and
-    // its punctuation. The same "bridge across added/removed nesting" gap `rust-algorithm-change`
-    // documents as its case 2 and `typescript-async-await` carries in the other direction. Not
-    // attempted here.
+    // An IIFE unwrapped: every statement moves up four levels to the top level. The human pairs
+    // across the removed levels; the structural matchers do not bridge removed nesting, so
+    // `APTED("fast_fallback")` deletes and re-inserts. The gap `rust-algorithm-change` documents as
+    // case 2.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "javascript-microsoft-typescript-refactor",
         10,

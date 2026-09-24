@@ -23,14 +23,8 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // First baseline, not a regression: this fixture was promoted with its human mapping already
-    // written, so the stub's generated 0/0 never reflected a measurement.
-    //
-    // 2026-09-21, 102/69 -> 103/70: repairing the invariant-18 violation added a mismatch rather
-    // than removing one. The mapping now pairs `0` with `keyboard` across
-    // `assignment_expression.right`, which is the reading the invariant argued for, and codediff
-    // still deletes the `0` (reason `APTED("qualified_name")`). The ground truth got better and
-    // the measured distance to codediff grew, which is what a clamp is for.
+    // Includes the invariant-18 pairing of `0` with `keyboard` across
+    // `assignment_expression.right`, which codediff still deletes (`APTED("qualified_name")`).
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "c-genymobile-scrcpy-big-change",
         103,
@@ -40,9 +34,7 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // 2026-09-21, 40.44 -> 41.07: the same mapping repair that moved the mapping clamp. Pairing
-    // `0` with `keyboard` changes what codediff's rendering is compared against, so the painting
-    // number moves with the tree mapping rather than independently of it.
+    // Includes the `0`/`keyboard` pairing the mapping clamp describes.
     assert_matches_human_painting_within_limit("c-genymobile-scrcpy-big-change", 41.07)
 }
 

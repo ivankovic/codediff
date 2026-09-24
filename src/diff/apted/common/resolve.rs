@@ -17,51 +17,21 @@
  */
 //! The entry points: `resolve_forest`, the oversized-pair fallback, and the context they thread
 //! through everything else.
-//!
-//! Split out of `common.rs`, which was 4,426 lines.
 
 use super::*;
 
-/// Per-`resolve_forest`-call context letting `ren()` refuse pairings that would contradict a
-/// mapping some earlier pass already fixed. `PostorderIndexer` prunes already-matched descendants
-/// out of the forest entirely, so without this, nothing stops the DP from matching a "hollowed
-/// out" ancestor - one whose real child was pruned away into some unrelated part of the other
-/// tree - to any other same-kind node, including ones that break the ancestor-order-preservation
-/// every tree-edit-distance mapping is supposed to guarantee. Concretely: if `before_id`'s pruned
-/// descendant landed at `t`, then `before_id` may only be matched to an ancestor-or-self of `t`;
-/// symmetrically for the after side. Concretely, without it an `if`/`else` wrapper statement can
-/// be matched deep inside the sibling `if` branch its own child was pruned into, for free, since
-/// both are internal nodes of the same kind.
+/// Per-`resolve_forest` context that vetoes pairings contradicting mappings earlier passes fixed.
+/// Pruning removes those subtrees from the DP's view, so without it nothing stops a "hollowed
+/// out" ancestor from pairing, for free, with any same-kind node.
 ///
-/// A second, related check covers pruning's other blind spot: an *unrelated sibling* of a pruned
-/// node. That has no ancestor-descendant relationship to the pruned node at all, so the check
-/// above can never catch it, yet the DP is just as free to match it across the pruned node's
-/// former position as it is a hollowed-out ancestor. Concretely: once `average = total / count` is
-/// pre-matched and excised, nothing stops `total = 0`'s `total` (positioned *before* `average` in
-/// the source) from being matched to some unrelated `total` occurrence positioned *after*
-/// `average`'s counterpart, silently reordering past a fixed point. Guarded the same way:
-/// `before_anchor_preorders`/`after_anchor_preorders` hold the sorted `preorder_index` of every
-/// *trusted* pruned chunk root reachable from this forest's roots (via
-/// `collect_pruned_chunk_pairs`, filtered down by `longest_increasing_by_second` - see its doc
-/// comment for why not every pruned pair is safe to trust), and a candidate pairing is only
-/// allowed if both nodes have the same *rank* - the same count of trusted anchors preceding them -
-/// on their respective side. Comparing raw `preorder_index` this way is safe for
-/// ancestor-descendant pairs too (an ancestor's `preorder_index` always precedes all of its own
-/// descendants', so it can never be mis-ranked as "after" a pruned node nested inside it) - no
-/// separate ancestor exclusion needed.
+/// Containment: if `before_id`'s pruned descendant landed at `t`, `before_id` may pair only with
+/// an ancestor-or-self of `t`, and symmetrically.
 ///
-/// This second check is deliberately scoped to `source`s that pre-match content in strict
-/// positional order (currently `prematch_identical_statement_siblings`'s two callers,
-/// `"qualified_name"`/`"large_flat_subtree_container"` - see `PREMATCH_SIBLING_ORDER_ SOURCES`),
-/// not enabled for every `resolve_forest` call the way the ancestor check above is. A source that
-/// anchors near-identical *repeated* bodies by content similarity rather than by strict positional
-/// order hands this check anchors that are not order-preserving, which is the opposite of what it
-/// assumes; it stays opt-in per `source` until a second caller needs it.
-///
-/// Built once per `resolve_forest` call and threaded down into `forest_dist` everywhere it's
-/// invoked (both the keyroot sweep and the backtrace). Parent maps are only built when the
-/// corresponding pruned-targets map is non-empty, so the common case (nothing pruned in this
-/// particular forest) costs nothing beyond a few empty-collection checks.
+/// Sibling order, for `PREMATCH_SIBLING_ORDER_SOURCES` only: both nodes of a pair must have the
+/// same rank among the trusted pruned chunk roots (by `preorder_index`), so a pairing cannot
+/// reorder past a fixed point. Ancestors rank correctly because they precede their descendants.
+/// Sources that anchor repeated bodies by similarity produce anchors that are not order-preserving,
+/// so the check is opt-in.
 pub(crate) struct ContainmentCtx<'a> {
     before_pruned_targets: rustc_hash::FxHashMap<usize, Vec<usize>>,
     after_pruned_targets: rustc_hash::FxHashMap<usize, Vec<usize>>,
@@ -73,8 +43,8 @@ pub(crate) struct ContainmentCtx<'a> {
     after_meta: &'a ASTMetadata,
 }
 
-/// `source` tags whose `resolve_forest` call should get `ContainmentCtx`'s sibling-order check -
-/// see that struct's doc comment for why this isn't every `source`.
+/// `source` tags that pre-match in strict positional order and so get `ContainmentCtx`'s
+/// sibling-order check.
 pub(crate) const PREMATCH_SIBLING_ORDER_SOURCES: &[&str] = &[
     "qualified_name",
     "large_flat_subtree_container",
@@ -111,11 +81,7 @@ impl<'a> ContainmentCtx<'a> {
                 })
                 .collect();
                 anchor_preorders.sort_unstable();
-                // Only the longest mutually order-consistent run is trusted as sibling-order
-                // fixed points - see `longest_increasing_by_second`'s doc comment for why. Both
-                // projections come out already sorted: `.0` because it's a subsequence of
-                // `anchor_preorders` (sorted by `.0`), `.1` because that's exactly what the LIS
-                // enforces.
+                // Both projections come out sorted, as `adjust`'s `partition_point` needs.
                 let trusted = longest_increasing_by_second(&anchor_preorders);
                 (
                     trusted.iter().map(|&(b, _)| b).collect(),
@@ -124,9 +90,6 @@ impl<'a> ContainmentCtx<'a> {
             } else {
                 (Vec::new(), Vec::new())
             };
-        // Parent maps are precomputed once per file in `ASTMetadata` (see `node_to_parent`), so
-        // borrowing them here - even when this particular forest has nothing pruned and won't
-        // end up using them - costs nothing beyond the borrow itself.
         ContainmentCtx {
             before_pruned_targets,
             after_pruned_targets,
@@ -139,11 +102,8 @@ impl<'a> ContainmentCtx<'a> {
         }
     }
 
-    /// Adjusts a `ren()`-computed `base` cost: if matching `before_id` to `after_id` would
-    /// contradict where an already-pruned descendant of either landed, or would cross an
-    /// unrelated pruned sibling in a way that reorders it, escalate to `FORBIDDEN_RENAME_COST` so
-    /// the DP looks elsewhere. `base` is returned unchanged whenever there's nothing pruned to
-    /// check against (the common case).
+    /// `base`, or `FORBIDDEN_RENAME_COST` if pairing `before_id` with `after_id` breaks
+    /// containment or sibling order.
     pub(crate) fn adjust(&self, before_id: usize, after_id: usize, base: u64) -> u64 {
         if base >= FORBIDDEN_RENAME_COST {
             return base;
@@ -185,40 +145,17 @@ impl<'a> ContainmentCtx<'a> {
     }
 }
 
-/// Largest `before.size * after.size` (pruned node counts) a *single* subtree pair may hand to the
-/// full tree-edit-distance engine. Above it, [`resolve_oversized_pair`] decomposes the pair one
-/// level instead.
-///
-/// Every multi-root forest reaching `resolve_forest` is already bounded by its caller
-/// (`FLAT_UNMATCHED_RECURSE_MAX_TOTAL_SIZE`, the residual segment caps), but a single pair never
-/// was: `fast_fallback`'s per-position recursion, `qualified_name`'s per-entity call and
-/// `large_flat_subtree_container` each hand over whole functions or classes of 500-1100 nodes,
-/// and profiling (callgrind + gdb on every fixture over 400ms, 2026-09-01) found that one such
-/// call was the entire latency story every time - the O(n*m)-and-worse edit-distance kernel on
-/// a (848, 679) pair, not anything file-wide.
-///
-/// Calibrated 2026-09-02 by sweeping the corpus per fixture (`--compare`): 250,000 and 400,000
-/// both regress `lua-luakit-luakit-actual-test-change-merging-two-tests-into-one` (107 -> 380) -
-/// its whole file is one (848, 679) = 575,632-cell pair whose top-level statements all changed
-/// quote style, so exact-hash anchoring finds nothing and the decomposition falls to shape
-/// anchors and atomic delete/insert where full APTED aligned everything; 250,000 also trades
-/// `c-graph-algorithms-...` (70 -> 87) for `c-postgres-real-logic-change` (27 -> 14). 600,000
-/// is the first value with no fixture worse and none better: every pair the corpus needs solved
-/// exactly stays exact, and the pairs above it (rustdesk's (716, 878), openvr's (1068, 1088))
-/// decompose to the same mapping they had. Lowering it is a latency-for-quality trade that the
-/// per-fixture gate will show; raising it buys nothing today.
+/// Largest `before.size * after.size` (pruned node counts) a single subtree pair may hand to the
+/// APTED kernel; above it, [`resolve_oversized_pair`] decomposes the pair one level. Multi-root
+/// forests are bounded by their callers, but a single whole function or class pair was not, and
+/// one such kernel call is what dominates slow diffs. The value is the lowest that leaves every
+/// corpus fixture's quality unchanged; lowering it trades quality for latency.
 pub(crate) const APTED_MAX_CELLS: usize = 600_000;
 
-/// What `resolve_forest` does with a single pair over [`APTED_MAX_CELLS`]: pair the two roots
-/// (or delete/insert them if their kinds may not meet), then resolve their children as an
-/// anchored sequence exactly the way a flat container's children are - exact-hash LCS first,
-/// leftovers positionally when the counts agree, as a bounded APTED pool otherwise. Each
-/// leftover pair re-enters `resolve_forest` on its own, so the gate applies again a level down.
-///
-/// The decomposition is the same one every flat container already gets, so the risk is not a
-/// new kind of guess but a coarser one: a function body that gained a statement *and* edited a
-/// neighbour lands in the unequal-count branch, where the flat path's pool caps decide between a
-/// bounded pool and atomic delete/insert. Measured per fixture before landing (see the commit).
+/// What `resolve_forest` does with a single pair over [`APTED_MAX_CELLS`]: pairs the two roots
+/// (or deletes and inserts them if their kinds may not meet), then resolves their children the
+/// way a flat container's are. Each leftover pair re-enters `resolve_forest`, so the gate applies
+/// again a level down.
 pub(crate) fn resolve_oversized_pair(
     before_root: usize,
     after_root: usize,
@@ -259,8 +196,7 @@ pub(crate) fn resolve_oversized_pair(
             },
         );
     } else {
-        // Root only - the children get their own decisions below, same as `emit_before_subtree`'s
-        // "something below is reused" branch.
+        // Root only; the children get their own decisions below.
         diff.add_mapping(
             before_root,
             0,
@@ -284,33 +220,23 @@ pub(crate) fn resolve_oversized_pair(
     );
 }
 
-/// Which tree-edit-distance algorithm `resolve_forest` should run to populate the delta table
-/// that `compute_edit_mapping` then backtraces through. Both produce optimal distances; this is
-/// purely a backend choice threaded through from `for_roots`/`for_nodes`. `ZhangShasha` is the
-/// test oracle the fuzz tests compare `Apted` against, and exists only under `cfg(test)`.
+/// Which tree-edit-distance backend `resolve_forest` runs. Both compute optimal distances;
+/// `ZhangShasha` is the test oracle.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Algorithm {
     #[cfg(test)]
     ZhangShasha,
     Apted,
-    /// APTED on the whole pair, with every one of `resolve_forest`'s shortcuts off: no
-    /// byte-identical emit, no flat-container Myers pass, no thin-wrapper decomposition, no
-    /// [`APTED_MAX_CELLS`] gate. The two roots go to the kernel as they are, however many cells
-    /// that costs. Not for the product - those shortcuts exist because that computation is what
-    /// does not fit an interactive budget - but for `apted_only_worker`, whose whole point is to
-    /// measure exactly that computation (the paper's RQ2). Introduced 2026-09-19, when
-    /// re-measuring RQ2 through `Apted` turned 44% of the old timeouts into sub-millisecond
-    /// completions: the 2026-09-02 cell gate, and before it the flat-container pass, were being
-    /// reported as properties of tree edit distance.
+    /// APTED on the whole pair with every `resolve_forest` shortcut off (identical emit, flat
+    /// containers, thin wrappers, the [`APTED_MAX_CELLS`] gate), however much it costs. Not for
+    /// the product: `apted_only_worker` uses it to measure tree edit distance itself, which the
+    /// shortcuts would otherwise be credited as.
     AptedWholeTree,
 }
 
-// Each parameter is genuinely distinct context (both root-id lists, both metadata sets, the
-// algorithm choice, the diff) - a params struct here would just relocate the same fields, not
-// reduce them.
-/// Resolve the mapping for a forest of (possibly already partially mapped) sibling roots on
-/// each side. This is the single entry point that builds the pruned postorder indexers, runs
-/// the tree-edit-distance engine, and translates the result into `diff`.
+/// Resolves the mapping for a forest of sibling roots on each side, any of them possibly already
+/// partly mapped, and writes it into `diff`. It touches only descendants of the given roots.
+// Each parameter is distinct context; a params struct would only relocate the fields.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn resolve_forest(
     before_root_ids: Vec<usize>,
@@ -340,17 +266,7 @@ pub(crate) fn resolve_forest(
         return;
     }
 
-    // Fast path: a single root pair whose subtrees are bit-for-bit identical (same structure
-    // and same leaf values) never benefits from running the expensive tree-edit-distance
-    // machinery - just walk both subtrees in lockstep and mark everything Identical. Unlike a
-    // general hash-based pre-matching pass over arbitrary interior nodes - which could pick a
-    // same-kind-but-unrelated node as a "free rename" partner for genuinely new content, since
-    // the cost model treats any two same-kind internal nodes as freely renameable regardless of
-    // content - this is always safe: it only ever matches the exact pair it was asked to
-    // resolve, never an arbitrary interior node.
-    // Every shortcut below is the engine's, not tree edit distance's: byte-identical subtrees,
-    // flat containers settled by Myers over their children, thin wrappers around one, and the
-    // cell gate. `AptedWholeTree` takes none of them, by definition of what it measures.
+    // Every shortcut below is the engine's, not tree edit distance's; `AptedWholeTree` takes none.
     let whole_tree = algorithm == Algorithm::AptedWholeTree;
     if !whole_tree && before_root_ids.len() == 1 && after_root_ids.len() == 1 {
         let b = before_root_ids[0];
@@ -364,25 +280,14 @@ pub(crate) fn resolve_forest(
             emit_identical_subtree(b, a, before_meta, after_meta, source, diff);
             return;
         }
-        // Fast path: flat trees (single root, all leaf children) → Myers O(ND) sequence diff.
-        // Zhang-Shasha has no structural savings on depth-1 trees; Myers is O(N·d) where d is
-        // the edit distance, typically much smaller than N for lightly-modified files.
         if let (Some(bc), Some(ac)) = (flat_children(b, before_meta), flat_children(a, after_meta))
         {
             resolve_flat_tree_pair(b, a, bc, ac, before_meta, after_meta, source, diff);
             return;
         }
-        // A thin wrapper around a flat container - `struct_specifier` around its
-        // `field_declaration_list`, `class_declaration` around its `class_body` - gets the same
-        // one-level decomposition an oversized pair does, so the flat container underneath
-        // reaches the Myers path above instead of the wrapper being solved as one ordered tree.
-        // Same kind on both sides is required of the flat child only; the wrappers themselves
-        // are the pair the caller already decided corresponds.
-        // Ordered tree-edit-distance cannot express a reordering of the container's members at
-        // all: `c-sched-ext-scx-many-many-moves-...` (2026-09-02) is a 100-field struct whose
-        // fields moved, and general APTED on the `struct_specifier` pair mis-paired 96 of them
-        // with same-shaped neighbours (245 mismatches), while the flat path one level down
-        // anchors every moved field by exact hash and by name.
+        // A thin wrapper around a flat container (`struct_specifier` around its field list) is
+        // decomposed so the container reaches the flat path: ordered TED cannot express members
+        // reordering, and mis-pairs moved fields with same-shaped neighbours.
         if let (Some(bf), Some(af)) = (
             sole_flat_child(b, before_meta),
             sole_flat_child(a, after_meta),
@@ -414,9 +319,7 @@ pub(crate) fn resolve_forest(
         return;
     }
 
-    // Built once and threaded into every `ren()` evaluation below (both the delta sweep and the
-    // backtrace), so a "hollowed out" ancestor left behind by pruning can't freely rename onto a
-    // node that would contradict where its pruned descendant already landed. See `ContainmentCtx`.
+    // Used by both the delta computation and the backtrace; they must agree on every cost.
     let containment = ContainmentCtx::build(
         &before_root_ids,
         &after_root_ids,
@@ -426,16 +329,6 @@ pub(crate) fn resolve_forest(
         source,
     );
 
-    // `compute_delta` (engine.rs) is now containment-aware: `EngineCtx.containment` is threaded
-    // into every `vren` call site (`spf_a`'s `ren_cost` closure, `apted_tree_edit_dist` for both
-    // `PostDir`s) via `vren_adjusted`, mirroring the `ctx.adjust(...)` call in `forest_dist`'s own
-    // `ren` computation (Zhang-Shasha side), so the algorithm choice below does not need to fall
-    // back to `Algorithm::ZhangShasha` just because this forest has real pruned-descendant
-    // constraints - both engines respect them identically. Verified via
-    // `test_apted_engine_matches_oracle_fuzz_with_containment` (fuzzes forests with genuine
-    // containment constraints, comparing Apted-with-containment against
-    // Zhang-Shasha-with-containment) plus a manual check that each of the three `vren_adjusted`
-    // sites, when individually disabled, makes that fuzz test fail on a real cost divergence.
     let mut delta = match algorithm {
         #[cfg(test)]
         Algorithm::ZhangShasha => compute_delta_zhang_shasha(
@@ -537,14 +430,11 @@ pub(crate) fn resolve_forest(
     }
 }
 
-/// Compute the optimal tree edit distance using a postorder, single-node-granularity
-/// Zhang-Shasha/APTED-style forest distance, given before/after node id lists.
+/// Resolves the before and after forests rooted at the given node ids by optimal tree edit
+/// distance, writing the mapping into `diff`.
 ///
-/// `source` is a short, call-site-specific label (e.g. `"fast_fallback"`, `"qualified_name"`)
-/// recorded on every `ASTMappingReason::APTED` entry this resolution produces - see that variant's
-/// doc comment. Every caller passes a distinct literal identifying which heuristic invoked APTED,
-/// so two `APTED`-reasoned mappings can be told apart by provenance, not just by the fact that
-/// APTED produced both.
+/// `source` is a distinct, call-site-specific label (e.g. `"qualified_name"`) recorded on every
+/// `ASTMappingReason::APTED` mapping produced, so mappings can be told apart by provenance.
 pub fn for_nodes(
     before_metadata: &ASTMetadata,
     after_metadata: &ASTMetadata,
@@ -567,8 +457,7 @@ pub fn for_nodes(
     );
 }
 
-/// Compute the tree edit distance for root nodes, using whichever `algorithm` the caller picks.
-/// See `for_nodes` for what `source` records.
+/// [`for_nodes`] on the two files' root nodes. A no-op when either side has no AST.
 pub fn for_roots(
     before: &Code,
     after: &Code,
@@ -577,17 +466,11 @@ pub fn for_roots(
     source: &'static str,
     diff: &mut ASTDiff,
 ) {
-    // Fail safe rather than panic when either side has no AST (e.g. `Language::Unknown` and
-    // several other languages tree-sitter has no grammar for - `Code::from_string`/`parse`
-    // deliberately leave `ast: None` for those, a valid state, not a bug - see `code.rs`'s
-    // doc comment on `Code::parse`). `Diff`'s own doc comment promises every function taking a
-    // `Code` should "fail-safe... returning a safe zero result" - with no root node to anchor on,
-    // there is nothing this phase can match, so it's a no-op rather than a crash.
+    // `ast: None` is a valid state (no grammar for the language), not a bug.
     if before.ast.is_none() || after.ast.is_none() {
         return;
     }
 
-    // Compute metadata once at the top level
     let before_metadata = crate::code::metadata::metadata_of(before);
     let after_metadata = crate::code::metadata::metadata_of(after);
 

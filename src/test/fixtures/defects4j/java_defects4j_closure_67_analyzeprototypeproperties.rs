@@ -23,10 +23,8 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // Two of the three are one any-one-to-one 3:3 group of `binary_expression`s where codediff
-    // realizes only two of the three pairs it could - an under-match, not an N:M floor, since a
-    // one-to-one output can satisfy a 3:3 group exactly. The third is an inserted
-    // `parenthesized_expression`. All three are invisible (they carry no text of their own).
+    // A 3:3 any-one-to-one group of `binary_expression`s where codediff realizes two pairs, an
+    // under-match rather than an N:M floor; plus an inserted `parenthesized_expression`. Invisible.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "java-defects4j-closure-67-analyzeprototypeproperties",
         3,

@@ -30,15 +30,10 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // minimal 17.224% (unchanged), full 39.589%, up from 17.481% the same day. Nothing new is
-    // wrong here - codediff already called the one command line a `Move` on the before side, and
-    // `RenderOptions::paint_resized_moves` now paints the same claim on the after side under
-    // `FULL`, doubling a residual instead of creating one. The underlying false `Move` is the
-    // documented one-row-two-edits gap in `node_untouched_on_its_row`: the before file indents
-    // every line by one space and the after file does not, *and* the command gains a
-    // `--strategy=...` argument at the end, so the row's single common-prefix/common-suffix pair
-    // finds neither edit and the one-column de-indent reads as a relocation. Fixing that needs a
-    // multi-segment row diff, not a limit.
+    // A false `Move` painted on both sides under `FULL`: the before file indents every line by one
+    // space and the command also gains an argument, so the row's single common-prefix/suffix pair
+    // finds neither edit and reads the de-indent as a relocation. The one-row-two-edits gap in
+    // `node_untouched_on_its_row`; needs a multi-segment row diff.
     assert_matches_human_painting_within_limit("shellscript-stgpetrovic-stacuist-pure-add", 39.60)
 }
 

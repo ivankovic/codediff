@@ -22,39 +22,24 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // Wrap/reparent: `class_specifier` gets a new `template_declaration` parent. Fixed from 25 to 2
-    // mismatches by `resolve_residual_forest_via_myers_lcs`'s trivial-entry filtering
-    // (`TRIVIAL_ENTRY_MAX_SIZE`, apted/common.rs) - excluding an unrelated size-1 `;` in the same
-    // gap from the count comparison let the real `class_specifier`/`template_declaration` pair
-    // recurse through real APTED instead of falling to atomic delete/insert. Exact since:
-    // `rescue_wrapped_trivial_entries` finishes the job. That filtered `;` was not unrelated after
-    // all - it was wrapped along with the declaration and ends up *inside* the new
-    // `template_declaration`, where the substantial pair's own recursion had already emitted it as
-    // an `Insert`. Re-pointing that insert to the before-side `;` closes the last mismatch. This is
-    // now an exact-match fixture; keep it that way.
+    // Wrap/reparent: `class_specifier` gains a `template_declaration` parent. Pins
+    // `resolve_residual_forest_via_myers_lcs`'s trivial-entry filtering (`TRIVIAL_ENTRY_MAX_SIZE`)
+    // and `rescue_wrapped_trivial_entries`, which re-points the wrapped `;`'s insert to its
+    // before-side twin. Keep this exact.
     test::helper::human_mapping::assert_matches_human_mapping("cpp-add-templates")
 }
 
 #[test]
 fn painting() -> Result<()> {
-    // After `RenderOptions::paint_displaced_moves` stopped `MINIMAL` painting a span that kept its
-    // own text and its own place and shifted only because of an edit before it: minimal 29.615% ->
-    // 10.548%. The option is off under `FULL`, which this fix leaves byte-identical at 5.882%, so
-    // `MINIMAL` sets the limit now.
+    // `MINIMAL` sets the limit.
     assert_matches_human_painting_within_limit("cpp-add-templates", 10.56)
 }
 
 #[test]
 fn invariants() -> Result<()> {
-    // Invariant 16: the Minimal/Full split for a renamed identifier is not painted this way yet
-    // (`IntBox` against `Box`, four times over). Recorded as found.
-    //
-    // 2026-09-21, invariant 18, three more: `class IntBox` becomes
-    // `template<typename T> class Box`, and `int` becomes `T` in the field's type
-    // (`field_declaration.type`, row 4 -> 5), the constructor parameter's type
-    // (`parameter_declaration.type`, row 6 -> 7) and the method's return type
-    // (`function_definition.type`, row 7 -> 8). Each parent is matched and each `.type` field
-    // holds one child on both sides, so the type of that declaration changed rather than the
-    // declaration being replaced - but the mapping deletes `int` and inserts `T`.
+    // Invariant 16: the rename split is not painted (`IntBox` against `Box`, four times).
+    // Invariant 18, three more: `int` becomes `T` in `field_declaration.type`,
+    // `parameter_declaration.type` and `function_definition.type`. Each parent is matched and each
+    // field holds one child, yet the mapping deletes `int` and inserts `T`.
     assert_ground_truth_invariants_with_known_violations("cpp-add-templates", 9)
 }

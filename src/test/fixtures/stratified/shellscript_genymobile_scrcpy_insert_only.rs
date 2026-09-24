@@ -30,9 +30,8 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // Was 39.664% until the `own_content_span` guard in `classify_node` landed the same day: one
-    // line added to a `\`-continued argument list, whose container therefore holds a non-whitespace
-    // character in every gap between its children. See that guard's doc comment in `diff::text`.
+    // A `\`-continued container holds a non-whitespace character in every gap; the
+    // `own_content_span` guard in `classify_node` keeps it from being painted whole.
     assert_matches_human_painting_within_limit("shellscript-genymobile-scrcpy-insert-only", 0.35)
 }
 

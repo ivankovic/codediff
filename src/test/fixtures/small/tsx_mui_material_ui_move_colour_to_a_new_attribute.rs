@@ -21,10 +21,8 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // The `color` jsx_attribute is deleted and its value reappears nested inside a new `sx={{...}}`
-    // object property, not as a sibling attribute - codediff matches the surrounding attributes by
-    // position instead, so the 4th attribute shifts into the old 3rd slot and the value's
-    // identifier/string subtree gets flagged as changed rather than moved. 16 mismatches.
+    // The `color` attribute's value moves into a new `sx={{...}}` object. codediff pairs the
+    // surrounding attributes by position, so the value reads as changed rather than moved.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "tsx-mui-material-ui-move-colour-to-a-new-attribute",
         16,

@@ -27,7 +27,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // Minimal 13.793%, full 7.635%
     assert_matches_human_painting_within_limit("rust-data-structure", 13.8)
 }
 

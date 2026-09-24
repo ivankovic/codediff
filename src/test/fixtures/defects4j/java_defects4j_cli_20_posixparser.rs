@@ -33,11 +33,8 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // High for this corpus, and the same restructured `if` the mapping note describes is why:
-    // codediff and the human disagree about which of the two after-`if`s the before one became, so
-    // they paint different halves of it. Full costs three times minimal, which is the usual
-    // direction - it keeps the standalone brackets and the leading whitespace minimal drops - but
-    // the multiple was not examined.
+    // The two disagree about which of two after-`if`s the before one became, so they paint
+    // different halves of it.
     assert_matches_human_painting_within_limit("java-defects4j-cli-20-posixparser", 2.00)
 }
 

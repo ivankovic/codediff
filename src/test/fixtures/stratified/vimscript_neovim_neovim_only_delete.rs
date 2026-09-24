@@ -33,9 +33,6 @@ fn painting() -> Result<()> {
 
 #[test]
 fn invariants() -> Result<()> {
-    // Repaired in the ground truth and back to 0, from the 2 violations this pinned since. Both
-    // presets deleted `iskeyword< ` on row 24 and ended the run on a space; `Full` now takes `
-    // iskeyword<` (the left-anchored spelling) and `Minimal` `iskeyword<`. Both end on `<`, so the
-    // no-trailing-whitespace invariant holds.
+    // Both presets delete `iskeyword<` on row 24 ending on `<`, not on the following space.
     assert_ground_truth_invariants("vimscript-neovim-neovim-only-delete")
 }

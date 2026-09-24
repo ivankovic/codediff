@@ -22,14 +22,9 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // A callback-to-async/await rewrite: the top-level `fetchData(...)` call's identifier/arguments
-    // would need to match their counterparts now nested inside an async IIFE's `await` expression -
-    // a "bridge across added nesting" gap in the same family as `rust-algorithm-change`'s
-    // documented case 2 (see that fixture's doc comment), not attempted here. (the
-    // `TRIVIAL_ENTRY_MAX_SIZE` wrap/reparent path) - some of this gap turned out to be the same
-    // trivial-leaf-alongside-a-real-wrap shape as `cpp-add-templates`, not solely the
-    // bridge-across-nesting gap described above. After the ground truth was revised; the baseline
-    // measures fewer mismatches than the old clamp allowed.
+    // A callback becomes async/await: the top-level `fetchData(...)` call's parts now sit inside an
+    // async IIFE's `await`. The bridge-across-added-nesting gap of `rust-algorithm-change`'s
+    // case 2, partly the trivial-leaf-beside-a-wrap shape of `cpp-add-templates`.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "typescript-async-await",
         2,
@@ -39,16 +34,8 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // After ranges_for_options gained extend_leading_whitespace (`Full` now paints a whole inserted
-    // line's own leading indentation, per RenderOptions::FULL's own doc comment - see that
-    // function): minimal unchanged at 28.668%, full 34.312%. The extra bytes are `return new
-    // Promise((resolve) => {`'s own indentation on line 2, which this fixture's ground truth
-    // happens to leave unpainted even though the line is a whole new insert - a defensible but not
-    // the only reading; not a regression in the rule this option now actually honors. re- after
-    // `RenderOptions::paint_displaced_moves` stopped `MINIMAL` painting a span that kept its own
-    // text and its own place and shifted only because of an edit before it: minimal 27.540% ->
-    // 2.709%. The option is off under `FULL`, which this fix leaves byte-identical at 10.835%, so
-    // `FULL` sets the limit now.
+    // `FULL` sets the limit. It paints the whole inserted `return new Promise((resolve) => {` line
+    // including indentation, which the ground truth leaves unpainted: defensible either way.
     assert_matches_human_painting_within_limit("typescript-async-await", 10.85)
 }
 

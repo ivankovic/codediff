@@ -20,28 +20,14 @@ use crate::diff::hash_tree_matching::{self, NodeSelectionConfig};
 use crate::diff::nodes::is_import_kind;
 use crate::diff::{ASTDiff, ASTMappingReason};
 
-/**
-* Phase 1 of the matching pipeline (`Diff::pending_with_config` lists all ten phases): "hash-based, largest-subtree-
-* first descent". Runs the generalized `hash_tree_matching::solve_with_hash_map` engine twice,
-* once per hash algorithm - each call finds and matches whatever it can, then the next call only
-* sees whatever's left unmatched (`PostorderIndexer`/the engine's own `before_node_map` check skip
-* anything already claimed):
-*
-* 1. `KindAndValueHash` - byte-identical subtrees. Extended node selection (reference nodes +
-*    big-enough nodes).
-* 2. `KindOnlyHash` - same shape, any leaf value. Reference nodes only. Deliberately one coarse
-*    tier rather than several intermediate granularities (ignore punctuation only, literals only,
-*    identifiers only, ...) - see `TODO.md`'s accepted precision-loss tradeoff.
-*
-* A third hash variant (normalized import path - import statements matched by normalized path
-* rather than syntax) existed here through 2026-08-16; removed outright (not just left disabled)
-* once the 2026-07-15 ablation study's finding (net-negative, `-89` when disabled individually)
-* had stood permanently off by default for a month with no re-measurement changing that.
-*
-* Both remaining hashes are order-independent per `nodes::is_commutative_container` at *every*
-* recursion level (see `code::hash::compute_kind_and_value_hash`'s doc comment) - order-
-* independence is inherent to both hashes, not a bolted-on third one.
-*/
+/// Phase 1: largest-subtree-first hash descent, run twice; the second call sees only what the
+/// first left unmatched.
+///
+/// 1. `KindAndValueHash`: byte-identical subtrees, over reference nodes plus big-enough nodes.
+/// 2. `KindOnlyHash`: same shape, any leaf value, over reference nodes only. One coarse tier on
+///    purpose, rather than several intermediate normalisations.
+///
+/// Both hashes are order-independent for `nodes::is_commutative_container` kinds at every level.
 pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
     let (before, after, node_cache) = (ctx.before, ctx.after, ctx.node_cache);
     let selector_config = NodeSelectionConfig::default();
@@ -68,8 +54,7 @@ pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
         &after_metadata.kind_only_hash_to_node,
         ASTMappingReason::StructurallyIdenticalSubtrees,
         ASTMappingReason::StructurallyIdenticalAncestor,
-        // Imports are reference nodes, but shape alone cannot tell two of them apart - see
-        // `nodes::is_import_kind` for the fixture this pairing wrecked.
+        // Shape alone cannot tell two imports apart; see `nodes::is_import_kind`.
         |metadata| {
             metadata
                 .reference_nodes_ordered
@@ -95,11 +80,7 @@ mod tests {
     use crate::diff::{ASTMappingOperation, ASTMappingReason, COST_UPDATE};
     use crate::test::helper::find_first_of_kind;
 
-    /// Reordering a Rust `use_list` (a `nodes::is_commutative_container` kind) with no other
-    /// change must be distinguishable from a genuinely untouched one - see the user request this
-    /// responds to ("we do need a way to distinguish between truly identical and reordered", then
-    /// "make reordering cost more than 0 and change operation to MatchButNotIdentical") and
-    /// `ASTMappingReason::FullyMappingSubtrees`'s doc comment.
+    /// A reordered commutative container is matched, but not as a no-op.
     #[test]
     fn reordered_commutative_container_is_distinguished_from_truly_identical() {
         let before = Code::from_string("use std::{a, b, c};\nfn f() {}\n", &Language::Rust);
@@ -136,8 +117,6 @@ mod tests {
             "a pure reorder must cost more than 0"
         );
 
-        // The unrelated, untouched `fn f() {}` must NOT get relabeled - only the actually-
-        // reordered node should carry the distinguishing reason.
         let before_fn = find_first_of_kind(before_root, "function_item").unwrap();
         let after_fn = find_first_of_kind(after_root, "function_item").unwrap();
         let fn_mapping = diff.mapping.get(&(before_fn.id(), after_fn.id())).unwrap();
@@ -147,9 +126,7 @@ mod tests {
             "an untouched, non-reordered node must not be tagged FullyMappingSubtrees"
         );
 
-        // `use_declaration` and `scoped_use_list` wrap `use_list` but aren't commutative
-        // containers themselves - a reorder several levels down must still downgrade them from
-        // Identical, since neither is a true no-op match either.
+        // Ancestors of the reordered container are not no-ops either.
         let before_use_decl = find_first_of_kind(before_root, "use_declaration").unwrap();
         let after_use_decl = find_first_of_kind(after_root, "use_declaration").unwrap();
         let use_decl_mapping = diff
@@ -162,8 +139,6 @@ mod tests {
             "an ancestor of a reordered container must also be downgraded from Identical"
         );
         assert_eq!(use_decl_mapping.cost, COST_UPDATE);
-        // The ancestor itself didn't reorder anything - only the actual commutative container
-        // gets tagged FullyMappingSubtrees.
         assert_ne!(
             use_decl_mapping.reason,
             ASTMappingReason::FullyMappingSubtrees

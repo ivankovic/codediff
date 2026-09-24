@@ -18,25 +18,10 @@
 
 //! The GitHub Pages showcase: the real browser viewer, running on static files.
 //!
-//! `codediff-web`'s page (`assets/web/app.js` + `model.js`) never computes a diff itself; it asks
-//! its server for one as JSON (`web::payload::DiffPayload`) and paints what it gets. That makes it
-//! a static site waiting to happen: bake the JSON for a fixed list of changes at build time, serve
-//! the same page and scripts as files, and answer the page's `/api/*` calls from those files with
-//! a `fetch` shim (`assets/showcase/showcase.js`). Nothing runs on the server, and the viewer the
-//! reader gets is the product's own, keys and all, not a screenshot of it.
-//!
-//! Every case is baked twice from the same two files: once as codediff maps it, once as Unix
-//! `diff` marks it (`human_mapping::unix_diff_line_labels`, the real GNU diff, whole touched lines
-//! as deletions and insertions), so the reader can flip between the two on the same code. The
-//! list is hand-picked in [`CASES`]: ten changes where `diff` marks lines a reader has to re-diff
-//! by eye and codediff's mapping matches the human one exactly, and ten where a plain line diff
-//! is already the right answer and codediff agrees. "Exactly" and "agrees" are the line-level
-//! agreement scores in `research/data/comparison/benchmark_other.csv`, the same measurement the
-//! introductory paper reports; the list was drawn from the rows where codediff has zero mismatched
-//! lines.
-//!
-//! Published by `.github/workflows/pages.yml` next to the human-mapping site, under `showcase/`.
-//! Nothing this binary produces is committed.
+//! `codediff-web`'s page only paints the JSON its server sends, so this bakes that JSON for the
+//! cases in [`CASES`] and serves the same page with a `fetch` shim (`assets/showcase/showcase.js`)
+//! answering `/api/*` from files. Each case is baked twice: as codediff maps it and as GNU `diff`
+//! marks it. Published by `.github/workflows/pages.yml` under `showcase/`; nothing is committed.
 
 use std::collections::HashMap;
 use std::fs;
@@ -78,7 +63,6 @@ struct Case {
     name: &'static str,
     group: Group,
     title: &'static str,
-    /// What changed and what each tool makes of it, for the reader who has not looked yet.
     blurb: &'static str,
 }
 
@@ -230,8 +214,7 @@ const CASES: &[Case] = &[
     },
 ];
 
-/// One entry of `cases.json`: what the page needs to list, label and link a case, plus the two
-/// numbers the showcase is about.
+/// One entry of `cases.json`.
 #[derive(Serialize)]
 struct CaseIndex {
     name: &'static str,
@@ -242,15 +225,13 @@ struct CaseIndex {
     language: String,
     /// Lines in the after-side file.
     lines: usize,
-    /// Lines GNU `diff` marks, both sides together - the number of lines a reader of its output
-    /// is asked to look at.
+    /// Lines GNU `diff` marks, both sides together.
     diff_marked: usize,
-    /// What codediff paints on the same pair under the default options, per operation. Counted
-    /// from the baked ranges rather than taken from the payload's `change_counts`, which is the
-    /// footer's tally and says "0 updates" for a pure in-line deletion like `buffer` -> `buf`.
+    /// What codediff paints under the default options, per operation. Counted from the baked
+    /// ranges, not the payload's `change_counts`, which says "0 updates" for a pure in-line
+    /// deletion like `buffer` -> `buf`.
     codediff: PaintedCounts,
-    /// codediff's one-line reading of the whole change, when it has one ("Whitespace changes
-    /// only"), which is the verdict `diff` cannot give.
+    /// codediff's one-line reading of the whole change, e.g. "Whitespace changes only".
     summary: Option<String>,
     /// The upstream commit the change was taken from, when the fixture is a sampled one.
     upstream: Option<String>,
@@ -268,8 +249,6 @@ fn main() -> Result<()> {
     let cases_dir = args.out.join("cases");
     fs::create_dir_all(&cases_dir)?;
 
-    // The viewer's own page assets, byte for byte, plus the showcase's shim and chrome. Embedded
-    // so the generator is one self-contained binary, as generate_mapping_site is.
     for (name, contents) in [
         (
             "index.html",
@@ -290,13 +269,10 @@ fn main() -> Result<()> {
         fs::write(args.out.join(name), contents)?;
     }
 
-    // What `/api/state` answers. `Session::from_config` reads whoever's `.codediff.toml` is on
-    // this machine, so every setting a reader could notice is pinned here rather than inherited:
-    // the site must look the same generated on CI or on a laptop. Dual layout rather than Auto,
-    // because Auto's cut-over is the TUI's 220 terminal columns, which is single-panel on most
-    // browser windows, and side by side is what a reader came to see (the layout key still
-    // cycles it). A pair is "open" so the page starts diffing as soon as it loads; the paths are
-    // placeholders, since the shim answers with the selected case whatever the page asks for.
+    // What `/api/state` answers. Every visible setting is pinned, not read from the local
+    // `.codediff.toml`, so CI and a laptop generate the same site. Dual, not Auto: Auto's
+    // 220-column cut-over is single-panel on most browser windows. The paths are placeholders;
+    // the shim answers with the selected case.
     let mut state = Session::from_config(Some(RenderOptions::default())).state();
     state.before = Some("before".to_string());
     state.after = Some("after".to_string());
@@ -336,8 +312,8 @@ fn main() -> Result<()> {
 }
 
 struct Baked {
-    /// codediff's diff under the default render options, and under each preset the `M` panel
-    /// can switch to, so that switch works on the static site too.
+    /// codediff's diff under the default render options and under each preset the `M` panel
+    /// can switch to.
     codediff: DiffPayload,
     minimal: DiffPayload,
     full: DiffPayload,
@@ -360,16 +336,13 @@ fn bake(
         .unwrap_or_default();
     let (before_path, after_path) = side_files(&dir)?;
 
-    // The very computation codediff-web's server runs for `/api/diff`, then the same re-filter
-    // it runs for `/api/render_options` under each preset.
+    // The same computation codediff-web runs for `/api/diff` and `/api/render_options`.
     let (data, large_residual) =
         compute_diff_with_options(&before_path, &after_path, RenderOptions::default())?;
     let codediff = diff_payload(&data, large_residual, RenderOptions::default(), None);
     let minimal = diff_payload(&data, large_residual, RenderOptions::MINIMAL, None);
     let full = diff_payload(&data, large_residual, RenderOptions::FULL, None);
 
-    // GNU diff's verdict over the same bytes, as whole-line deletions and insertions, poured
-    // into the same session shape so the same page paints it.
     let pair = helper::handmade_test_code_pair(case.name)?;
     let (before_touched, after_touched) = human_mapping::unix_diff_line_labels(&pair.0, &pair.1)?;
     let (before_ranges, after_ranges) = unix_ranges(&before_touched, &after_touched);
@@ -381,8 +354,6 @@ fn bake(
         ..data.clone()
     };
     let mut unix = diff_payload(&unix_data, false, RenderOptions::FULL, None);
-    // The summary line ("whitespace only", "comment only") is codediff's reading of the change;
-    // `diff` has no such opinion, so its view carries none.
     unix.summary = None;
 
     let diff_marked = before_touched.iter().filter(|t| **t).count()
@@ -415,10 +386,9 @@ fn bake(
     })
 }
 
-/// codediff's painted ranges by operation. A deletion lives on the before side and an insertion
-/// on the after side; an update or a move is painted on both sides, once each, and a pure
-/// in-line deletion (`buffer` -> `buf`) is an update with nothing to paint on the after side, so
-/// those two are counted as the larger of the two sides rather than the sum.
+/// codediff's painted ranges by operation. Updates and moves count the larger side, not the sum:
+/// they paint both sides, except a pure in-line deletion (`buffer` -> `buf`), which paints only
+/// the before side.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 struct PaintedCounts {
     insertions: usize,
@@ -441,9 +411,7 @@ impl PaintedCounts {
     }
 }
 
-/// The `before.<ext>.test` and `after.<ext>.test` files of a fixture directory, whatever the
-/// extension - the same two `code_pair_from_dir` reads, by path rather than parsed, because
-/// `compute_diff_with_options` takes paths like the real front ends do.
+/// The paths of a fixture directory's `before.<ext>.test` and `after.<ext>.test` files.
 fn side_files(dir: &Path) -> Result<(PathBuf, PathBuf)> {
     let mut before = None;
     let mut after = None;
@@ -464,11 +432,9 @@ fn side_files(dir: &Path) -> Result<(PathBuf, PathBuf)> {
     }
 }
 
-/// `diff`'s per-line verdict as ranges. Untouched lines pair up in order on the two sides, one
-/// identical range per pair; each run of touched lines is one deletion (before side) or one
-/// insertion (after side), anchored at the row the other side has reached, which is where the
-/// viewer's cross-panel cursor lands for it. The same convention `diff::text::plain_text_diff`
-/// uses for a gap it cannot pair, minus the pairing: `diff` has none.
+/// `diff`'s per-line verdict as ranges. Untouched lines pair up in order; each run of touched
+/// lines is one deletion or insertion, anchored at the row the other side has reached (where the
+/// viewer's cross-panel cursor lands), as `diff::text::plain_text_diff` does for an unpaired gap.
 fn unix_ranges(
     before_touched: &[bool],
     after_touched: &[bool],
@@ -517,9 +483,8 @@ fn unix_ranges(
         b += 1;
         a += 1;
     }
-    // `diff` leaves the same number of untouched lines on both sides, so both cursors run out
-    // together; a leftover is a bug in the labels rather than in the file, but it is still shown
-    // rather than dropped.
+    // Both sides have the same number of untouched lines, so a leftover means bad labels; it is
+    // still shown rather than dropped.
     if b < before_touched.len() {
         before_ranges.push(RangeMatch {
             source: TextRange::new(b, 0, before_touched.len(), 0),
@@ -670,11 +635,8 @@ mod tests {
 
     #[test]
     fn baking_every_case_matches_the_published_scores() {
-        // The whole point of the list: codediff has nothing to hide on any of these, and on the
-        // first ten `diff` marks lines the human mapping does not. The line-level scores that
-        // decided the list live in research/data/comparison/benchmark_other.csv; this re-derives
-        // the codediff half from the mapping itself, so a matcher regression that broke a case
-        // fails here before it is published.
+        // The list promises codediff matches the human mapping on every case; a matcher
+        // regression must fail here before it is published.
         let provenance = helper::sample_provenance().unwrap();
         let repository_urls = helper::repository_urls().unwrap();
         for case in CASES {

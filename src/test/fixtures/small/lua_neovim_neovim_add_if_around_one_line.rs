@@ -21,19 +21,11 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // Pre-existing (not introduced by this session's work - confirmed via `git stash`),
-    // cost-model-optimal, not a bug. The change wraps a single statement, `assert(session):stop()`,
-    // in a new `if loop_running then ... end`. Codediff matches the *outer* function-body `block`
-    // (before) to the *inner* if-block (after) - both containing just that byte-identical assert
-    // call - and inserts only the wrapper (`if_statement`, `if`/`then`/`end`, the `loop_running`
-    // condition). That's cheaper under unit cost than the "obvious" outer-to-outer match a human
-    // expects: `block` is an internal node (rename cost 0 either way), but the outer-to-outer
-    // match's *children* differ in kind (`expression_statement` vs `if_statement`, not on
-    // `kinds_update_allowed`'s list), forcing a full delete-and-reinsert of the assert statement's
-    // whole subtree - far more expensive than inserting just the wrapper. Single-node-granularity
-    // tree edit distance is explicitly designed to find exactly this kind of cross-depth reuse (see
-    // `forest_dist`'s own doc comment) - same category as `c-nginx-add-typedef`'s documented
-    // pwd/field_expression case: genuinely optimal, not what a human would write.
+    // Cost-model optimal, not a bug. `assert(session):stop()` gets wrapped in a new `if`. codediff
+    // matches the outer function-body `block` to the inner if-block (both holding just that call)
+    // and inserts the wrapper: outer-to-outer would need the call's whole subtree deleted and
+    // reinserted, since `expression_statement` vs `if_statement` cannot update. Tree edit
+    // distance is built to find such cross-depth reuse; compare `c-nginx-add-typedef`.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "lua-neovim-neovim-add-if-around-one-line",
         2,

@@ -25,42 +25,7 @@ use crate::code::metadata::NodeRecord;
 use crate::code::{ASTMetadata, Code, Language};
 use crate::diff::nodes::is_commutative_container;
 
-/**
-* Compute hashes for the given TreeSitter tree from the given root node.
-*
-* This function computes both full hashes and structural hashes for all nodes in the AST
-* and populates the provided ASTMetadata structure.
-*
-* Full hashes include both the structure (node types) and the values of the nodes and their
-* entire subtree, in order. This creates unique hashes for nodes with different content.
-*
-* Structural hashes include only the types of AST nodes in the subtree, not the values of the
-* nodes. This creates hashes that are robust to changes like constant value changes.
-*
-* The metadata structure will be populated with:
-*   - node_to_full_hash: Map from node IDs to full hashes
-*   - full_hash_to_node: Reverse map from full hashes to node IDs (since multiple nodes can have
-*     the same full hash), in the deterministic order this function visits them
-*   - node_to_structural_hash: Map from node IDs to structural hashes
-*   - structural_hash_to_node: Reverse map from structural hashes to node IDs, same ordering
-*     guarantee as full_hash_to_node
-*
-* Note that TS Node IDs are semi-stable. The TS documentation goes into detail, but for our purpose
-* they are stable between edits and re-parsing, and since we do neither we are ok.
-*
-* The aim is for the hash to have the following properties:
-*   - Fast. Speed is of the essence. 99.999% of files in the full dataset should hash in under 50ms.
-*   - Robust. The hash is used for duplicate detection so statistical properties must be robust.
-*
-* There is NO requirement for security. Crypto hashes are way too slow for our use case and
-* reversing the hash is irrelevant, we return the reverse map anyhow.
-*
-* @param code The Code structure containing the AST to hash
-* @param metadata Mutable reference to ASTMetadata that will be populated with hash data
-*/
-/// Inserts `node_id -> hash` into `forward` and appends `node_id` to `reverse`'s bucket for
-/// `hash` - the same "store both directions of one hash map" pair `hash_code` below repeats once
-/// per hash kind (full/structural/kind-and-value/kind-only).
+/// Inserts `node_id -> hash` into `forward` and appends `node_id` to `reverse`'s bucket.
 fn record_hash(
     forward: &mut rustc_hash::FxHashMap<usize, u64>,
     reverse: &mut rustc_hash::FxHashMap<u64, Vec<usize>>,
@@ -71,6 +36,13 @@ fn record_hash(
     reverse.entry(hash).or_default().push(node_id);
 }
 
+/**
+* Fills `metadata`'s four hash maps (full, structural, kind-and-value, kind-only; see
+* [`ASTMetadata`]), their reverse maps, and the similarity sketches. Errors if `code` is unparsed.
+*
+* Speed matters (every file is hashed) and security does not, hence MetroHash. Node ids are only
+* stable within one parse, which is all the maps need.
+*/
 pub fn hash_code(code: &Code, metadata: &mut ASTMetadata) -> Result<()> {
     let ast = code
         .ast
@@ -86,19 +58,12 @@ pub fn hash_code(code: &Code, metadata: &mut ASTMetadata) -> Result<()> {
     Ok(())
 }
 
-/// [`hash_code`] over an already collected node table (see `metadata::collect_nodes`), which is
-/// how `compute_ast_metadata` calls it - one walk of the tree serves every step.
+/// [`hash_code`] over an already collected node table (see `metadata::collect_nodes`).
 ///
-/// Visits the table in reverse preorder, which is post-order with children right to left: every
-/// descendant's hashes are stored before its ancestor needs them, and the order nodes are
-/// appended to the `*_hash_to_node` buckets - the last-resort tie-break `solve_moved_subtrees`
-/// and `hash_tree_matching` fall back on for an exact-distance tie - is the same order the
-/// explicit-stack walk this replaced produced.
-///
-/// This replaces an earlier version where each of the four `compute_*_hash` functions recursed
-/// into every descendant itself, on every node - O(n * average nested-subtree size), quadratic
-/// on a deeply nested tree (a synthetic deeply-nested expression went from 35ms at 616 nodes to
-/// 8.46s at 9616 nodes before the post-order rewrite, and linear after).
+/// Visits the table in reverse preorder (post-order, children right to left), so each child's
+/// hash is computed once and read by index: linear, not quadratic, on deep trees. That order is
+/// also the order of the `*_hash_to_node` buckets, the last-resort tie-break of
+/// `solve_moved_subtrees` and `hash_tree_matching`, so changing it changes diffs.
 pub(crate) fn hash_nodes(
     nodes: &[NodeRecord],
     source: &[u8],
@@ -115,7 +80,6 @@ pub(crate) fn hash_nodes(
     metadata.kind_only_hash_to_node.clear();
     metadata.node_to_similarity_sketch.clear();
 
-    // Per-table-index hashes, so a child's hash is an indexed read rather than a map lookup.
     let n = nodes.len();
     let mut full = vec![0u64; n];
     let mut structural = vec![0u64; n];
@@ -171,19 +135,8 @@ pub(crate) fn hash_nodes(
             kind_only_hash,
         );
 
-        // The similarity sketch rides along on the same post-order guarantee as the four hashes
-        // above: a leaf seeds a one-element sketch from its own full hash, an internal node merges
-        // its children's already-computed sketches. `SimilaritySketch` has no reverse map, so it
-        // isn't recorded. Children are merged in document order for determinism's sake, though
-        // `merge` sorts and dedups and so is order-independent by construction anyway.
-        //
-        // The extra element for owned gap text is not an embellishment - without it the sketch is
-        // blind on whole languages. In tree-sitter-yaml a double-quoted scalar's *leaves* are the
-        // two quote characters and the string body sits in the gap between them, so six completely
-        // different URLs in a `flow_sequence` all sketch to the identical one-element set (measured
-        // 2026-08-18; every pairing scored 1.00). Any node owning non-whitespace text contributes
-        // it, exactly like a leaf does, which is what makes "the set of content tokens in this
-        // subtree" a faithful description of it rather than a description of its tokenization.
+        // Owned gap text counts as a leaf: in tree-sitter-yaml a quoted scalar's leaves are just
+        // its quotes, so without it every such string sketches identically.
         let mut elements = Vec::with_capacity(record.children.len() + 1);
         if record.children.is_empty() {
             elements.push(SimilaritySketch::leaf(full_hash));
@@ -204,19 +157,12 @@ pub(crate) fn hash_nodes(
 }
 
 /**
-* Compute the full hash for a node: a Merkle hash over structure (kind, child count), each
-* child's own hash, and the "gap" text directly owned by this node but not covered by any child
-* (before the first child, between children, after the last child - and for a leaf, its entire
-* span). A node's own span can't be hashed wholesale: it would include every byte between
-* descendant tokens (indentation, newlines), making the hash change on pure reformatting (e.g. a
-* block re-indented one level deeper) even though no token actually changed. But a gap isn't
-* always just formatting - e.g. tree-sitter-r represents `"Hello, World!\n"` as a `string_content`
-* node whose only *child* is the `\n` escape sequence, with "Hello, World!" itself sitting
-* uncaptured in the gap before it - so gaps can't be dropped outright either. Splitting the
-* difference: skip a gap only when it's *entirely* whitespace (safe to assume that's formatting,
-* not content), otherwise hash it in full - never trimmed, since trimming would still lose real
-* whitespace embedded inside otherwise-meaningful gap text (e.g. two files whose only difference
-* is trailing spaces before a `\n` escape would trim down to the same gap and falsely collide).
+* The full hash: a Merkle hash of kind, child count, each child's hash, and the gap text this node
+* owns around its children (a leaf's whole span).
+*
+* Gaps rather than the whole span, so reformatting keeps the hash; but a gap can be content
+* (tree-sitter-r leaves a string's body outside its only child), so only an all-whitespace gap is
+* skipped, and a kept gap is hashed untrimmed so embedded whitespace still counts.
 */
 fn compute_full_hash(
     record: &NodeRecord,
@@ -226,7 +172,6 @@ fn compute_full_hash(
 ) -> u64 {
     let mut hasher = MetroHash64::new();
 
-    // Hash node type and child count
     hasher.write(record.kind_id.to_le_bytes().as_slice());
     hasher.write(record.children.len().to_le_bytes().as_slice());
 
@@ -241,14 +186,9 @@ fn compute_full_hash(
     hasher.finish()
 }
 
-/// A hash of the text an internal node owns directly - the gaps before, between and after its
-/// children - or `None` when every one of those gaps is empty or pure formatting.
-///
-/// `compute_full_hash` folds the same gaps into a Merkle hash over the whole subtree; this pulls
-/// them out on their own so [`crate::code::similarity`]'s leaf-set sketch can count them as content
-/// tokens. Grammars differ on whether a scalar's body is a child node or gap text (tree-sitter-yaml
-/// chooses the latter for quoted strings), and a similarity measure must not depend on which choice
-/// a grammar made.
+/// A hash of the gap text an internal node owns around its children, or `None` when it is all
+/// whitespace - the gaps alone, so the similarity sketch does not depend on whether a grammar made
+/// a scalar's body a child or gap text.
 fn compute_owned_text_hash(
     record: &NodeRecord,
     source_code: &[u8],
@@ -278,8 +218,7 @@ fn compute_owned_text_hash(
     any_content.then(|| hasher.finish())
 }
 
-/// Hashes `source[start..end]` into `hasher`, unless that span is empty or entirely whitespace
-/// (formatting between/around structural children, not owned content - see `compute_full_hash`).
+/// Hashes `source[start..end]` into `hasher` unless it is all whitespace; see `compute_full_hash`.
 fn hash_gap(hasher: &mut MetroHash64, source: &[u8], start: usize, end: usize) {
     if start >= end {
         return;
@@ -291,15 +230,10 @@ fn hash_gap(hasher: &mut MetroHash64, source: &[u8], start: usize, end: usize) {
     }
 }
 
-/**
-* Compute the structural hash for a node, including only the structure (node types).
-* This is a recursive function that hashes only the node type and child structure,
-* ignoring the actual values and positions.
-*/
+/// The structural hash: kinds and child counts only, in order.
 fn compute_structural_hash(record: &NodeRecord, child_hashes: &[u64]) -> u64 {
     let mut hasher = MetroHash64::new();
 
-    // Hash only node type and child count (structure), not position or values
     hasher.write(record.kind_id.to_le_bytes().as_slice());
     hasher.write(record.children.len().to_le_bytes().as_slice());
 
@@ -311,20 +245,10 @@ fn compute_structural_hash(record: &NodeRecord, child_hashes: &[u64]) -> u64 {
 }
 
 /**
-* `KindAndValueHash` - like `compute_full_hash` (kind, child count, gap text, each child's own
-* hash, all in document order), but order-independence is checked at *every* recursion level via
-* `is_commutative_container`, not bolted on as a separate third hash the way an earlier,
-* now-removed `compute_commutative_structural_hash` was: that function's non-commutative branch
-* delegated to plain `compute_structural_hash` instead of recursing back into itself, so order-
-* invariance never propagated past the commutative container itself - an ancestor of a reordered
-* container (e.g. the `enum_item` wrapping a reordered `enum_variant_list`) still hashed
-* identically to its plain structural hash before/after the reorder, so a pass matching on the
-* ancestor reference node (rather than the bare container) never actually fired for its documented
-* use case. Recursing into *this same function* unconditionally, instead of falling back once
-* outside a commutative container, fixes that by construction: a reordered commutative container's
-* ancestors hash identically before/after too, so hash-descent matches them directly. This in turn
-* requires `hash_tree_matching`'s descendant pairing to be commutative-aware (see
-* `pair_children_for_descent`), or reordered children get re-mangled by a positional `zip`.
+* Like `compute_full_hash`, but a commutative container's children are hashed in sorted order.
+* Children's hashes come from this same function, so the order-independence reaches every
+* ancestor: the `enum_item` around a reordered `enum_variant_list` keeps its hash. That requires
+* `hash_tree_matching::pair_children_for_descent` to pair such children by hash, not position.
 */
 fn compute_kind_and_value_hash(
     record: &NodeRecord,
@@ -338,9 +262,7 @@ fn compute_kind_and_value_hash(
     hasher.write(record.children.len().to_le_bytes().as_slice());
 
     if is_commutative_container(record.kind, &language) {
-        // Order-independent: sort (child_hash) pairs, drop gap text (gap order/identity is
-        // itself a document-order artifact that doesn't make sense to preserve once children are
-        // allowed to reorder).
+        // Gap text is a document-order artifact, so it is dropped here.
         let mut sorted_hashes: Vec<u64> = child_hashes.to_vec();
         sorted_hashes.sort_unstable();
         for hash in sorted_hashes {
@@ -360,14 +282,9 @@ fn compute_kind_and_value_hash(
 }
 
 /**
-* Six-phase pipeline rework (`TODO.md`, 2026-07-17): `KindOnlyHash` - like `compute_structural_hash`
-* (kind, child count, each child's own hash; no leaf values, no gap text), with the same per-level
-* `is_commutative_container` order-independence fix described on `compute_kind_and_value_hash`.
-* Replaces both `compute_structural_hash` and the 4 `compute_normalized_*` variants for the new
-* pipeline: those existed to bridge different granularities between "byte-identical" and "same
-* shape, any leaf value" (ignore punctuation only, ignore literals only, ignore identifiers only,
-* ignore both) - `KindOnlyHash` collapses all of that into the single coarsest tier (any leaf
-* value, since leaf values aren't hashed at all), an accepted precision loss - see `TODO.md`.
+* Like `compute_structural_hash`, with `compute_kind_and_value_hash`'s order-independence for
+* commutative containers. The single "same shape, any leaf values" tier: coarser than separate
+* ignore-identifiers / ignore-literals tiers, a deliberate precision trade.
 */
 fn compute_kind_only_hash(record: &NodeRecord, child_hashes: &[u64], language: Language) -> u64 {
     let mut hasher = MetroHash64::new();
@@ -402,11 +319,9 @@ mod tests {
             let mut metadata = ASTMetadata::default();
             hash_code(&code, &mut metadata)?;
 
-            // Test full hashing
             assert!(!metadata.node_to_full_hash.is_empty());
             assert!(!metadata.full_hash_to_node.is_empty());
 
-            // Verify that all nodes are covered in both directions
             assert_eq!(
                 metadata.node_to_full_hash.len(),
                 metadata
@@ -416,7 +331,6 @@ mod tests {
                     .sum::<usize>()
             );
 
-            // Test that each node's hash correctly maps back to a set containing that node
             for (node_id, hash) in &metadata.node_to_full_hash {
                 if let Some(node_set) = metadata.full_hash_to_node.get(hash) {
                     assert!(
@@ -433,11 +347,9 @@ mod tests {
                 }
             }
 
-            // Test structural hashing
             assert!(!metadata.node_to_structural_hash.is_empty());
             assert!(!metadata.structural_hash_to_node.is_empty());
 
-            // Verify that all nodes are covered in both directions for structural hashing
             assert_eq!(
                 metadata.node_to_structural_hash.len(),
                 metadata
@@ -447,7 +359,6 @@ mod tests {
                     .sum::<usize>()
             );
 
-            // Test that each node's structural hash correctly maps back to a set containing that node
             for (node_id, hash) in &metadata.node_to_structural_hash {
                 if let Some(node_set) = metadata.structural_hash_to_node.get(hash) {
                     assert!(
@@ -472,16 +383,13 @@ mod tests {
     fn test_full_vs_structural_hashing() -> Result<()> {
         let codes = helper::handmade_test_code()?;
 
-        // Test on all handmade code files
         for (filename, code) in &codes {
             let mut metadata = ASTMetadata::default();
             hash_code(code, &mut metadata)?;
 
-            // Full hashes should be more unique than structural hashes
             let full_hash_count = metadata.full_hash_to_node.len();
             let structural_hash_count = metadata.structural_hash_to_node.len();
 
-            // Structural hashes should generally have fewer unique values since they ignore content
             assert!(
                 structural_hash_count <= full_hash_count,
                 "For file {}: Structural hashes ({}) should be <= full hashes ({})",
@@ -490,13 +398,10 @@ mod tests {
                 full_hash_count
             );
 
-            // Test that nodes with same structural hash can have different full hashes
-            // (this happens when nodes have same structure but different content)
             let mut found_different_content_same_structure = false;
 
             for node_set in metadata.structural_hash_to_node.values() {
                 if node_set.len() > 1 {
-                    // Multiple nodes share the same structural hash
                     let mut full_hashes = HashSet::new();
                     for node_id in node_set {
                         if let Some(full_hash) = metadata.node_to_full_hash.get(node_id) {
@@ -504,8 +409,6 @@ mod tests {
                         }
                     }
 
-                    // If there are multiple full hashes for the same structural hash,
-                    // it means we found nodes with same structure but different content
                     if full_hashes.len() > 1 {
                         found_different_content_same_structure = true;
                         break;
@@ -513,11 +416,7 @@ mod tests {
                 }
             }
 
-            // This should be true for most non-trivial code
-            // (e.g., multiple string literals, different variable names, etc.)
-            //
-            // 20 was chosen so that the hello world in JavaScript and TypeScript are excluded,
-            // since those are so trivial they don't actually pass this check.
+            // Above 20 nodes; the JavaScript and TypeScript hello worlds are too trivial.
             if metadata.node_to_full_hash.len() > 20 {
                 assert!(
                     found_different_content_same_structure,
@@ -528,6 +427,43 @@ mod tests {
         }
 
         Ok(())
+    }
+
+    fn root_hashes(source: &str, language: Language) -> (u64, u64) {
+        let code = Code::from_string(source, &language);
+        let root = code.ast.as_ref().unwrap().root_node().id();
+        let mut metadata = ASTMetadata {
+            language,
+            ..Default::default()
+        };
+        hash_code(&code, &mut metadata).unwrap();
+        (
+            metadata.node_to_full_hash[&root],
+            metadata.node_to_kind_and_value_hash[&root],
+        )
+    }
+
+    #[test]
+    fn full_hash_ignores_reindentation() {
+        let (flat, _) = root_hashes("fn f() {\n    x();\n}\n", Language::Rust);
+        let (deeper, _) = root_hashes("fn f() {\n        x();\n}\n", Language::Rust);
+        assert_eq!(flat, deeper);
+    }
+
+    #[test]
+    fn full_hash_counts_string_content_a_grammar_leaves_in_a_gap() {
+        // tree-sitter-r's `string_content` has the `\n` escape as its only child.
+        let (hello, _) = root_hashes("x <- \"Hello, World!\\n\"\n", Language::R);
+        let (other, _) = root_hashes("x <- \"Goodbye, World!\\n\"\n", Language::R);
+        assert_ne!(hello, other);
+    }
+
+    #[test]
+    fn kind_and_value_hash_of_an_ancestor_survives_reordering_a_commutative_container() {
+        let (full_ab, kv_ab) = root_hashes("enum E { A, B }\n", Language::Rust);
+        let (full_ba, kv_ba) = root_hashes("enum E { B, A }\n", Language::Rust);
+        assert_ne!(full_ab, full_ba);
+        assert_eq!(kv_ab, kv_ba);
     }
 
     #[test]
@@ -542,7 +478,6 @@ mod tests {
         hash_code(code, &mut metadata1)?;
         hash_code(code, &mut metadata2)?;
 
-        // Both full and structural hashes should be identical for identical code
         assert_eq!(metadata1.node_to_full_hash, metadata2.node_to_full_hash);
         assert_eq!(metadata1.full_hash_to_node, metadata2.full_hash_to_node);
         assert_eq!(
@@ -561,7 +496,7 @@ mod tests {
     fn test_different_code_structural_similarity() -> Result<()> {
         let codes = helper::handmade_test_code()?;
 
-        // Compare hello-world.rs with zdravo-svijete.rs (same structure, different string content)
+        // Same structure, different string content.
         let code1 = codes
             .get("hello-world.rs")
             .ok_or_else(|| anyhow::anyhow!("Test file 'hello-world.rs' not found"))?;
@@ -573,12 +508,9 @@ mod tests {
         hash_code(code1, &mut metadata1)?;
         hash_code(code2, &mut metadata2)?;
 
-        // Full hashes should be different (different value of the string constant)...
         assert_ne!(metadata1.node_to_full_hash, metadata2.node_to_full_hash);
 
-        // ...but structural hashes should be the same (same distribution of hashes).
-        // Compare the structural_hash_to_node maps by checking they have the same keys
-        // and that each key maps to sets of the same size (same number of nodes per hash).
+        // Node ids differ, so compare how many nodes share each structural hash.
         assert_eq!(
             metadata1.structural_hash_to_node.len(),
             metadata2.structural_hash_to_node.len(),
@@ -604,8 +536,6 @@ mod tests {
         Ok(())
     }
 
-    /// Benchmark function for hash_code performance
-    /// This can be used for quick performance testing without criterion
     pub fn benchmark_hash_code(code: &Code, iterations: usize) -> Result<std::time::Duration> {
         use std::time::Instant;
 
@@ -628,18 +558,14 @@ mod tests {
             .get("hello-world.rs")
             .ok_or_else(|| anyhow::anyhow!("Test file 'hello-world.rs' not found"))?;
 
-        // Test that benchmark function runs without error
         let duration = benchmark_hash_code(code, 1000)?;
 
-        // Should complete in reasonable time (less than 2000 millisecond for 1000 iterations, or
-        // 1 milliseconds per iteration)
         assert!(
             duration.as_millis() < 2000,
             "Benchmark took too long: {:?}",
             duration
         );
 
-        // Duration should be measurable (greater than 0)
         assert!(
             duration.as_nanos() > 0,
             "Benchmark duration should be measurable"

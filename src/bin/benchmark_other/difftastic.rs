@@ -16,9 +16,6 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-// Split out of benchmark_other.rs (the `difftastic`-cluster functions) purely to shrink
-// that file's visible size - no behavior change.
-
 use anyhow::{Context, Result, bail};
 use codediff::code::{Code, Language};
 use codediff::diff::text_range::TextRange;
@@ -26,22 +23,15 @@ use std::process::Command;
 
 use super::{external_tool_bin, span_on_row, write_temp_pair};
 
-/// Path to the `difft` binary, from the `DIFFT_BIN` environment variable - not bundled or
-/// auto-installed, same reasoning as `gumtree_bin`. Install with
-/// `cargo install --root /var/tmp/codediff-tools difftastic` (installs the `difft` binary to
-/// `/var/tmp/codediff-tools/bin/difft`, outside this checkout and outside the system-wide cargo
-/// bin directory) and point `DIFFT_BIN` at the result.
+/// Path to the `difft` binary, from `DIFFT_BIN`. Install with
+/// `cargo install --root /var/tmp/codediff-tools difftastic`.
 pub(crate) fn difftastic_bin() -> Result<std::path::PathBuf> {
     external_tool_bin("DIFFT_BIN", "point it at a built `difft` binary")
 }
 
-/// File extension difftastic's own language auto-detection maps back to `language`, confirmed
-/// live against `difft --list-languages` (difftastic v0.69.0, 2026-07). `None` for every corpus
-/// language difftastic has no grammar for at all: `Bazel` (also not tree-sitter-parseable by
-/// codediff itself - see `Code`'s own doc comment), `MarkDown`, `ProtoBuf`, and `Vimscript`.
-/// `Language::Lisp` maps to `.el` - codediff's own extension table (`code/language.rs`) treats
-/// `Language::Lisp` as Emacs Lisp specifically, and difftastic lists Emacs Lisp and Common Lisp as
-/// separate languages with disjoint extensions, so `.el` is the correct, unambiguous match.
+/// File extension that difftastic's auto-detection maps to `language` (`difft --list-languages`);
+/// `None` where difftastic has no grammar. `Lisp` is `.el` because codediff's `Lisp` is Emacs Lisp,
+/// which difftastic keeps separate from Common Lisp.
 pub(crate) fn difftastic_extension(language: Language) -> Option<&'static str> {
     match language {
         Language::Rust => Some("rs"),
@@ -74,11 +64,8 @@ pub(crate) fn difftastic_extension(language: Language) -> Option<&'static str> {
     }
 }
 
-/// Runs `difft --display json` and reduces its output to the same per-line touched signal every
-/// other `ExternalTool` produces. `DFT_UNSTABLE=yes` is required by difftastic itself - JSON
-/// output is explicitly marked an unstable feature that may change format in a future release
-/// (confirmed live, difftastic v0.69.0 refuses `--display json` without it) - see
-/// `difftastic_touched_from_json` for the schema this code depends on.
+/// Per-line touched flags from `difft --display json`, which difftastic refuses without
+/// `DFT_UNSTABLE=yes`.
 pub(crate) fn difftastic_line_labels(
     before: &Code,
     after: &Code,
@@ -110,15 +97,9 @@ pub(crate) fn difftastic_line_labels(
     difftastic_touched_from_json(before, after, &json)
 }
 
-/// Difftastic's JSON has one relevant field, `chunks`: a list of hunks, each a list of line
-/// entries. Each entry has an optional `lhs`/`rhs`, each `{line_number, changes}` - `line_number`
-/// is 0-indexed (confirmed empirically against this project's own fixtures, 2026-07: a change on
-/// a file's second line reports `line_number: 1`) and `changes` is empty for a context line shown
-/// only for readability, non-empty for a line difftastic considers actually touched. Confirmed
-/// live that `chunks` only ever contains touched lines, never surrounding context, in JSON mode
-/// (unlike difftastic's own terminal display, which does show context) - so every `lhs`/`rhs`
-/// entry present here is touched, `changes` non-empty or not. A file with `status: "unchanged"`
-/// has no `chunks` key at all, not an empty array.
+/// Reads `chunks`: lists of entries with optional `lhs`/`rhs` `{line_number, changes}`,
+/// `line_number` 0-indexed. JSON mode lists no context lines, so every present side is touched
+/// even with empty `changes`. An unchanged file has no `chunks` key at all.
 pub(crate) fn difftastic_touched_from_json(
     before: &Code,
     after: &Code,
@@ -152,11 +133,7 @@ pub(crate) fn difftastic_touched_from_json(
     Ok((before_touched, after_touched))
 }
 
-/// difftastic's changed spans. Its `--display json` chunks carry, per side, a `line_number` plus a
-/// `changes` array of `{start, end}` column offsets into that line - the token-level highlighting
-/// it draws - so each `changes` entry becomes one single-line span. An entry with an empty
-/// `changes` array is a line difftastic reports as part of a chunk without marking any token on it
-/// (context within a changed region), and contributes no span.
+/// difftastic's changed spans: one single-line span per `{start, end}` in each side's `changes`.
 pub(crate) fn difftastic_node_spans(
     before: &Code,
     after: &Code,
@@ -214,4 +191,29 @@ pub(crate) fn difftastic_node_spans(
         }
     }
     Ok((before_spans, after_spans))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn difftastic_touched_from_json_marks_a_side_with_empty_changes_as_touched() {
+        let code = Code::from_string("a\nb\nc\n", &Language::Rust);
+        let json = serde_json::json!({"chunks": [[
+            {"lhs": {"line_number": 1, "changes": []}},
+            {"rhs": {"line_number": 2, "changes": [{"start": 0, "end": 1}]}},
+        ]]});
+        let (before, after) = difftastic_touched_from_json(&code, &code, &json).unwrap();
+        assert_eq!(before, vec![false, true, false, false]);
+        assert_eq!(after, vec![false, false, true, false]);
+    }
+
+    #[test]
+    fn difftastic_touched_from_json_without_chunks_touches_nothing() {
+        let code = Code::from_string("a\nb\n", &Language::Rust);
+        let json = serde_json::json!({"status": "unchanged"});
+        let (before, after) = difftastic_touched_from_json(&code, &code, &json).unwrap();
+        assert!(!before.contains(&true) && !after.contains(&true));
+    }
 }

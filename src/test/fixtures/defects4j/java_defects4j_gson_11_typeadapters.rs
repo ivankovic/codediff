@@ -23,12 +23,8 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // A new `case` is inserted into a `switch`. The human mapping keeps group 2 where it is and
-    // calls group 3 new; codediff (reason `APTED("large_flat_subtree")`) slides the match by one
-    // group instead, pairing the inserted group's label with group 2's and reporting group 2's
-    // identifier as an `Update`. Same "equal-looking siblings, ambiguous anchor" family as
-    // `java-defects4j-closure-31-compiler` next door - a switch body is exactly the large flat
-    // subtree that shortcut is named for. Not attempted here.
+    // A new `case` in a `switch`: the human calls group 3 new, `APTED("large_flat_subtree")` slides
+    // the match by one group. The equal-looking-siblings family of `closure-31-compiler`.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "java-defects4j-gson-11-typeadapters",
         10,

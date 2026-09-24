@@ -21,8 +21,7 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // Resolved by the `resolve_flat_tree_pair` anchor-splitting fix - same root cause and fix as
-    // `xml_nextcloud_android_delete_element.rs`, see that file's comment.
+    // Same mechanism as `xml_nextcloud_android_delete_element.rs`.
     test::helper::human_mapping::assert_matches_human_mapping(
         "xml-nextcloud-android-delete-element-2",
     )

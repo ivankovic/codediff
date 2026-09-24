@@ -21,11 +21,8 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // A call moves from inside a closure literal into a new if_statement branch - the same
-    // structural cross-boundary move gap as the scrcpy for-loop fixture - plus two multi-map group
-    // pairings codediff doesn't realize. One extra node, in the same already-documented
-    // cross-boundary move. After the ground truth was revised; the baseline measures fewer
-    // mismatches than the old clamp allowed.
+    // A call moves from a closure into a new if branch - the cross-boundary move gap - plus two
+    // multi-map group pairings codediff does not realize.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "swift-swiftlang-swift-actual-logic-change",
         36,

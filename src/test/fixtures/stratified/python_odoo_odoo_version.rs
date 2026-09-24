@@ -28,11 +28,9 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // Was 36.018% until the `own_content_span` guard in `classify_node` landed the same day. The
-    // whole change is one word inside a `\`-continued triple-quoted string, and those continuations
-    // split the string node's own content across several gaps - which is the shape the guard now
-    // sends down the descent path instead of painting whole. See that guard's doc comment in
-    // `diff::text`.
+    // One word changes inside a `\`-continued triple-quoted string, whose content is split
+    // across several gaps; the `own_content_span` guard in `classify_node` descends instead of
+    // painting the string whole.
     assert_matches_human_painting_within_limit("python-odoo-odoo-version", 0.13)
 }
 

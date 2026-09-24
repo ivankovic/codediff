@@ -23,47 +23,17 @@ use crate::diff::apted::{self, Algorithm};
 use crate::diff::solve_syntax_aware_matching::solve_qualified_name_groups_within;
 use crate::diff::{ASTDiff, nodes};
 
-/// Minimum direct-child count for a node to be treated as a "flat" sequence worth Myers-diffing
-/// on its own - matches `apted::common`'s own `FLAT_MIN_CHILDREN` threshold (the fast path this
-/// pass exists to trigger proactively), so a candidate found here is guaranteed to actually
-/// qualify once handed to `for_nodes`.
+/// Matches `apted::common`'s `FLAT_MIN_CHILDREN`, so a container found here is guaranteed to take
+/// the Myers fast path once handed to `for_nodes`.
 const FLAT_CONTAINER_MIN_CHILDREN: usize = 50;
 
-/**
-* Pre-match top-level items with large flat descendants (e.g. a Rust macro's `token_tree` body,
-* a big flat argument/element list, ...) via Myers O(ND) sequence diff, before anything else in
-* the pipeline gets a chance to bury them inside a much larger, non-flat comparison.
-*
-* Originally this only looked for Rust `macro_invocation` nodes by macro name (see git history:
-* `solve_flat_macro_bodies`, since removed - folded into this file). Generalized
-* (2026-07-17) to any top-level item, in any supported language, whose identity can be
-* established (either `nodes::is_semantically_structural`'s cross-language name extraction, or -
-* preserving the original Rust macro case, which `is_semantically_structural` does not cover -
-* the macro's own callee name) and which contains a large flat descendant anywhere inside it.
-*
-* Mechanism: for each matched top-level (before, after) pair, BFS both subtrees for the single
-* largest node with >= `FLAT_CONTAINER_MIN_CHILDREN` direct children (any kind - not just Rust's
-* `token_tree`). If both sides have one, diff that flat pair directly first (`resolve_forest`
-* inside `for_nodes` detects the flat shape and routes to Myers instead of Zhang-Shasha/APTED),
-* then diff the top-level pair itself (the flat descendant is already in `diff` -> pruned by the
-* postorder indexer, so this second call is cheap regardless of how big the item is).
-*
-* Deliberately scoped to *top-level* items only (direct children of the file root), not every
-* `semantically_structural_nodes` entry at any depth: that map is populated by a full-tree walk
-* (methods, nested items, ...), and BFS-ing inside every one of those as well would rescan a lot
-* of already-covered ground for no expected benefit - nested large-flat cases inside an otherwise
-* deeply-structured item are comparatively rare, and this can be widened later if the benchmark
-* shows it's worth it.
-*
-* A file whose grammar wraps a single anonymous root value (JSON, YAML, ...) has no named
-* top-level item to key off at all, so the name-based matching above finds nothing and this pass
-* used to do nothing for such files (2026-07-23 gap, since fixed): `only_named_child` gives the
-* file's one real top-level value an implicit identity when there's exactly one on each side and
-* nothing already matched by name, so a large flat object/mapping at the very top of the file
-* still gets the same Myers fast path instead of the whole file falling to the old whole-file `final_pass` APTED on every
-* edit (see this pass's own git history / `nodes::is_commutative_container`'s doc comment for the
-* concrete case this fixes).
-*/
+/// Pre-matches identity-matched top-level items that hold a large flat descendant: the flat pair
+/// is diffed on its own first (Myers, via `resolve_forest`'s fast path), then the item itself, with
+/// the flat part already pruned. Otherwise the flat part is buried inside a much larger non-flat
+/// comparison where the fast path never fires.
+///
+/// Top-level items only: nested large-flat cases inside deeply structured items are rare, and
+/// scanning every structural node rescans covered ground.
 pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
     let (before, after, node_cache) = (ctx.before, ctx.after, ctx.node_cache);
     let before_metadata = ctx.before_metadata();
@@ -82,18 +52,8 @@ pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
     let mut after_items =
         top_level_identities(after_ast.root_node(), after_metadata, &language, after);
 
-    // A data-shaped file (JSON, YAML, ...) has no named top-level declarations to key off at
-    // all - its whole content is one anonymous value (an `object`/`array`/mapping/...), so
-    // `top_level_identities` above always comes back empty for it. Without this arm the pass does
-    // nothing for such files at all, which is a real gap rather than a missed optimization: the
-    // *entire* file then falls through every other pass onto whole-tree APTED, when the same
-    // top-level object fed through this pass's Myers machinery resolves directly.
-    //
-    // Unlike the general "match top-level items by name" case above, this doesn't need a name to
-    // disambiguate *which* top-level item corresponds to which: when there's exactly one named
-    // top-level node on each side (true for any file whose grammar wraps a single root value,
-    // and only ever attempted when nothing already matched by name), it's necessarily the same
-    // logical thing on both sides - there is nothing else it could correspond to.
+    // A data file (JSON, YAML) is one anonymous root value with no name to key on; with exactly
+    // one named child on each side, they can only correspond to each other.
     if before_items.is_empty()
         && after_items.is_empty()
         && let (Some(b), Some(a)) = (
@@ -120,8 +80,6 @@ pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
             continue;
         };
 
-        // Diff the flat descendant directly - the flat-tree fast path in `resolve_forest` picks
-        // it up and routes to Myers.
         apted::for_nodes(
             before_metadata,
             after_metadata,
@@ -132,18 +90,8 @@ pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
             diff,
         );
 
-        // Also pre-match any *named* content nested inside this item (e.g. Go's literal-named
-        // `t.Run("...", ...)` subtest calls) before the container-wide call below - otherwise it
-        // pays full, unconstrained tree-edit-distance for content that `solve_named_reference_
-        // groups` would otherwise have matched cheaply by name, since that pass runs *after* this
-        // one (deliberately - see this function's doc comment) and so never gets the chance. See
-        // `solve_qualified_name_groups_within`'s doc comment for the confirmed live cases this
-        // fixes.
-        //
-        // Neither helper fires on a `dictionnary_entry`: `solve_qualified_name_groups_within`
-        // matches only named declarations and `prematch_identical_statement_siblings` only
-        // statement sequences, so the ordering against the Myers call above is not load-bearing
-        // for a data entry - there is no substructure either of them could claim first.
+        // The whole-file name pass runs after this one, so named content nested here (Go `t.Run`
+        // subtests) would otherwise pay for unconstrained APTED in the container call below.
         if let (Some(&before_node), Some(&after_node)) = (
             node_cache.before.get(&before_id),
             node_cache.after.get(&after_id),
@@ -161,10 +109,6 @@ pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
             );
         }
 
-        // Also pre-match any *other* mostly-unchanged statement sequence still left inside this
-        // item (e.g. the item's own body, if the flat descendant found above was something else
-        // entirely - a nested data literal, not the item's top-level statements) - see that
-        // function's own doc comment. Purely additive, same as the pre-match above.
         apted::prematch_identical_statement_siblings(
             before_id,
             after_id,
@@ -174,8 +118,6 @@ pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
             diff,
         );
 
-        // Diff the top-level item itself (flat descendant, and anything just pre-matched above,
-        // already in `diff` -> pruned).
         apted::for_nodes(
             before_metadata,
             after_metadata,
@@ -188,12 +130,8 @@ pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
     }
 }
 
-/// `(kind, identity) -> node_id` for every direct child of `root_node` whose identity can be
-/// established - `nodes::is_semantically_structural`'s cross-language name extraction first,
-/// falling back to a macro's own callee name (Rust `macro_invocation`, which
-/// `is_semantically_structural` does not cover - see that function's doc comment for why: it's
-/// about compiler-enforced-unique declarations, and a macro invocation is neither), then a
-/// kind-uniqueness fallback (see below) for children neither of those cover at all.
+/// `(kind, identity) -> node_id` for `root_node`'s direct children, identified by
+/// `nodes::is_semantically_structural`, else a Rust macro's callee name, else kind-uniqueness.
 fn top_level_identities(
     root_node: tree_sitter::Node,
     metadata: &ASTMetadata,
@@ -219,22 +157,10 @@ fn top_level_identities(
         }
     }
 
-    // Kind-uniqueness fallback: a top-level child with no name and no macro-callee identity (a
-    // control-flow/block wrapper - `if`/`try`/`while`/... - has neither) is still unambiguously
-    // identifiable if its *kind* appears exactly once among root's direct children on this side:
-    // there is nothing else on this side it could positionally correspond to, the same reasoning
-    // `only_named_child` (below) already uses for a whole-file single-value root, just scoped to
-    // "unique by kind among *several* top-level items" instead of "the only item at all" -
-    // deliberately skipped when `root_node` has at most one named child at all, leaving that
-    // narrower, kind-agnostic case entirely to `only_named_child` below (matching a before/after
-    // pair whose single root value's *kind* changed entirely - e.g. a JSON file rewritten from an
-    // object to an array - is exactly the case a kind-keyed lookup here can't express, since the
-    // two sides would get different keys and silently fail to match at all instead of falling
-    // through to that mechanism). Exists because a large flat data literal can be buried
-    // arbitrarily deep inside such a wrapper (an `if`/`try` guard around most of a script's body,
-    // say) with nothing above it in the tree to name-match on - confirmed against a live case
-    // (a single top-level `if_statement` wrapping a several-hundred-child `dictionnary` many
-    // levels down, which goes to whole-tree APTED when this pass cannot reach it).
+    // A child whose kind is unique among the unidentified children can only correspond to its
+    // same-kind counterpart (a top-level `if` wrapping a large literal). Skipped with a single
+    // named child: `only_named_child` handles that case kind-agnostically, which also covers a root
+    // value whose kind changed (a JSON object rewritten as an array).
     if root_node.named_child_count() > 1 {
         let mut kind_counts: HashMap<&str, usize> = HashMap::new();
         let mut cursor = root_node.walk();
@@ -256,19 +182,14 @@ fn top_level_identities(
     result
 }
 
-/// `root_node`'s single named child, if it has exactly one - i.e. `root_node` wraps exactly one
-/// substantive value (as a JSON/YAML file's document root does) rather than a sequence of several
-/// top-level items. Anonymous children (punctuation, etc.) don't count, so a trailing newline
-/// token (if the grammar even emits one at this level) can't spuriously disqualify a file that
-/// otherwise has just one real top-level value.
+/// `root_node`'s single named child, if it has exactly one; anonymous tokens do not count.
 fn only_named_child(root_node: tree_sitter::Node) -> Option<tree_sitter::Node> {
     (root_node.named_child_count() == 1)
         .then(|| root_node.named_child(0))
         .flatten()
 }
 
-/// Macro name = text of the first `identifier`/`scoped_identifier` child of a `macro_invocation`
-/// node (e.g. `println` in `println!(...)`, `foo::bar` in `foo::bar!(...)`).
+/// Text of a `macro_invocation`'s first `identifier`/`scoped_identifier` child (`foo::bar`).
 fn macro_callee_name(macro_id: usize, meta: &ASTMetadata) -> Option<String> {
     let info = meta.node_info.get(&macro_id)?;
     info.children.iter().find_map(|&id| {
@@ -279,24 +200,10 @@ fn macro_callee_name(macro_id: usize, meta: &ASTMetadata) -> Option<String> {
     })
 }
 
-/// The node with the most direct children found anywhere in `root_id`'s own subtree (inclusive),
-/// provided that count is >= `FLAT_CONTAINER_MIN_CHILDREN`. Any kind qualifies - unlike the
-/// Rust-macro-specific predecessor this generalizes, which only ever looked for `token_tree`.
-///
-/// O(1): `ASTMetadata::node_to_widest_subtree_node` is precomputed once per file (bottom-up,
-/// alongside `node_to_subtree_size`), so this pass never needs to walk a candidate's subtree
-/// itself just to find out it has nothing flat in it - which is the common case (a qualifying
-/// flat subtree is rare; most top-level items never have one).
-///
-/// Below `FLAT_CONTAINER_MIN_CHILDREN`, falls back to `widest_data_literal_container` - a
-/// dedicated walk for a recognized data-literal body (`is_data_literal_container`) with at least
-/// `DATA_LITERAL_MIN_CHILDREN` children. This can't reuse the precomputed widest-subtree-of-any-
-/// kind the way the general case above does: the *overall* widest subtree in a function
-/// containing, say, a 15-element `testCases` table is routinely something else entirely (the
-/// function's own body, a nested closure, ...) with more direct children than the table itself,
-/// so a plain kind check on it misses the table completely - confirmed against a live case
-/// (cockroachdb's `api_v2_grants_test.go`: the precomputed widest subtree wasn't the table at all,
-/// so the table never got a chance).
+/// The widest node in `root_id`'s subtree (inclusive) if it has at least
+/// `FLAT_CONTAINER_MIN_CHILDREN` children, else [`widest_data_literal_container`]. The precomputed
+/// widest node cannot answer the data-literal question: a small test table is routinely narrower
+/// than its function's own body.
 fn largest_flat_container_in(
     root_id: usize,
     meta: &ASTMetadata,
@@ -309,24 +216,14 @@ fn largest_flat_container_in(
     widest_data_literal_container(root_id, meta, language)
 }
 
-/// The widest `is_data_literal_container` node (>= `DATA_LITERAL_MIN_CHILDREN` direct children)
-/// found anywhere in `root_id`'s own subtree (inclusive), or `None`.
-///
-/// Not O(1) like `largest_flat_container_in`'s general case - a real walk of `root_id`'s subtree,
-/// since (unlike the widest-subtree-of-*any*-kind precomputation) nothing tracks "widest subtree
-/// of *this specific* kind" up front. Bounded by `root_id`'s own subtree size, though (one
-/// top-level item, e.g. one test function - not the whole file), so this stays cheap: exactly the
-/// walk `solve_large_flat_subtrees` did everywhere before the O(1) precomputation existed, just
-/// scoped down to the kinds that actually need it.
+/// The widest `is_data_literal_container` node with at least `DATA_LITERAL_MIN_CHILDREN` children
+/// in `root_id`'s subtree (inclusive). A real walk, bounded by one top-level item.
 fn widest_data_literal_container(
     root_id: usize,
     meta: &ASTMetadata,
     language: &Language,
 ) -> Option<usize> {
-    // `is_data_literal_container` is only ever true for `Language::Go`, so for every other
-    // language this walk is guaranteed to return `None` - skip paying for it on the common case
-    // (every non-Go top-level item that didn't already qualify via the O(1) widest-subtree check
-    // above).
+    // Only Go has data-literal kinds; skip the walk elsewhere.
     if !matches!(language, Language::Go) {
         return None;
     }
@@ -349,26 +246,13 @@ fn widest_data_literal_container(
     best.map(|(_, id)| id)
 }
 
-/// Minimum direct-child count for a *data-literal* body (see `is_data_literal_container`) to
-/// qualify for the Myers fast path - much lower than `FLAT_CONTAINER_MIN_CHILDREN`, since a real
-/// table-driven test table commonly has far fewer than 50 entries (the live case this was tuned
-/// against, cockroachdb's `api_v2_grants_test.go`, has 15).
+/// Lower than `FLAT_CONTAINER_MIN_CHILDREN`: a table-driven test table often has far fewer than 50
+/// entries.
 const DATA_LITERAL_MIN_CHILDREN: usize = 8;
 
-/// Node kinds that hold a data literal's *elements* - each one an independent, self-contained data
-/// item, unlike a `block`/`statement_list`'s sequentially-related statements. Safe to Myers-diff
-/// at a much smaller size than an arbitrary container (`DATA_LITERAL_MIN_CHILDREN` vs.
-/// `FLAT_CONTAINER_MIN_CHILDREN`) precisely because Go's `testCases := []struct{...}{ {...}, {...},
-/// ... }` idiom - the whole reason this exists - is exactly this shape and commonly has well under
-/// 50 entries.
-///
-/// Deliberately does *not* include ordinary code containers (`block`, `statement_list`, ...), and
-/// lowering `FLAT_CONTAINER_MIN_CHILDREN` uniformly is not the same thing: Myers-by-exact-hash can
-/// only recognize byte-identical elements, and unlike a data table's independent entries, ordinary
-/// statements are routinely related-but-different - which real tree-edit-distance can still
-/// partially match (`Update`) and hash-only Myers cannot (it can only call each one an outright
-/// delete+insert). Restricting to kinds that are genuinely data-literal bodies keeps the low
-/// threshold from ever applying to that case at all.
+/// Kinds whose children are independent data items (Go's `testCases := []struct{...}{...}`), safe
+/// to Myers-diff at a small size. Code containers are excluded on purpose: their statements are
+/// often related-but-different, which APTED can match as `Update` and hash-only Myers cannot.
 fn is_data_literal_container(kind: &str, language: &Language) -> bool {
     match language {
         Language::Go => kind == "literal_value",
@@ -406,8 +290,6 @@ mod tests {
             &mut diff,
         );
 
-        // The macro_invocation (vec!) itself should end up mapped, with the flat body
-        // pre-matched via the "large_flat_subtree" reason before it was diffed.
         let has_flat_reason = diff.mapping.values().any(|m| {
             matches!(
                 &m.reason,
@@ -440,10 +322,7 @@ mod tests {
         );
     }
 
-    /// Regression guard: a JSON (or YAML, ...) file has no named top-level declaration to key
-    /// off - its whole content is one anonymous `object` - so without the single-root arm this
-    /// pass never fires for such a file at all, however large the top-level object is, and the
-    /// *entire* file goes to whole-tree APTED.
+    /// A JSON file's one anonymous root value gets an implicit identity.
     #[test]
     fn large_flat_top_level_json_object_is_myers_diffed() {
         let mut pairs_before: Vec<String> = (0..80)
@@ -477,12 +356,6 @@ mod tests {
         );
     }
 
-    /// A JSON file with more than one top-level value doesn't parse (JSON only ever has one root
-    /// value) - `only_named_child`'s fallback should quietly do nothing rather than guess when a
-    /// (hypothetical, for another language) file's root has several unnamed children, since which
-    /// one corresponds to which would be ambiguous. Exercised here via a small object (too small
-    /// to have a qualifying flat descendant either way) to confirm the fallback path doesn't
-    /// misfire or panic on an otherwise-ordinary file.
     #[test]
     fn small_json_object_is_left_alone() {
         let before = Code::from_string(r#"{"a": 1, "b": 2}"#, &Language::JSON);
@@ -501,14 +374,8 @@ mod tests {
         );
     }
 
-    /// Regression guard for the 2026-07-23 fix (`widest_data_literal_container`): a Go
-    /// table-driven test's `testCases := []struct{...}{...}` (well under
-    /// `FLAT_CONTAINER_MIN_CHILDREN`, but a recognized `literal_value` data-literal body with
-    /// enough entries to clear `DATA_LITERAL_MIN_CHILDREN`) still gets the Myers fast path, even
-    /// though it is *not* the single widest subtree in its enclosing function - a large amount of
-    /// surrounding code (here, a big `switch` acting as deliberate padding) outweighs it in direct
-    /// child count, confirmed against a live case (cockroachdb's `api_v2_grants_test.go`) to
-    /// otherwise make the data table invisible to the plain widest-subtree-of-any-kind check.
+    /// A Go test table below `FLAT_CONTAINER_MIN_CHILDREN` is found even when padding makes
+    /// another node the widest subtree.
     #[test]
     fn data_literal_table_is_myers_diffed_even_when_not_the_widest_subtree() {
         let cases_before: String = (0..15)
@@ -520,11 +387,7 @@ mod tests {
         cases_after[7] = "{name: \"changed\"},".to_string();
         let cases_after = cases_after.join("\n");
 
-        // A run of 20 byte-identical statements (not a `literal_value`, so it can't itself be
-        // picked up by `widest_data_literal_container`'s kind-filtered walk) makes the enclosing
-        // `block`/`statement_list` wider than the 15-element testCases table, so the *overall*
-        // widest-subtree-of-any-kind precomputation points here instead - all identical content,
-        // so it's still instant to diff (an `IdenticalHash` match).
+        // Identical statements that make the function body wider than the table.
         let padding: String = "_ = 0\n".repeat(16);
 
         let before_src = format!(
@@ -560,12 +423,7 @@ mod tests {
         );
     }
 
-    /// Regression guard for the 2026-07-23 fix (`solve_qualified_name_groups_within`): a Go test
-    /// function containing *both* a large data-literal table and an independent, literal-named
-    /// `t.Run(...)` subtest call should get the subtest call pre-matched by name
-    /// (`qualified_name`) before the container-wide `large_flat_subtree_container` call, rather
-    /// than paying full tree-edit-distance for it: in such a file the subtest call is the
-    /// residual cost left over once the data table itself has the Myers fast path.
+    /// A `t.Run` subtest next to a data table is matched by name before the container call.
     #[test]
     fn named_subtest_inside_a_data_literal_function_is_prematched_by_name() {
         let cases_before: String = (0..15)
@@ -608,5 +466,67 @@ mod tests {
             has_qualified_name_reason,
             "expected the independent t.Run(\"independent case\", ...) call to be pre-matched by name"
         );
+    }
+
+    fn python_script_with_guarded_dict(changed: usize, second_if: bool) -> String {
+        let entries: Vec<String> = (0..80)
+            .map(|i| {
+                let value = if i == changed { 999 } else { i };
+                format!("\"k{i}\": {value}")
+            })
+            .collect();
+        let extra = if second_if {
+            "if False:\n    pass\n"
+        } else {
+            ""
+        };
+        format!(
+            "x = 1\nif True:\n    d = {{{}}}\n{extra}",
+            entries.join(", ")
+        )
+    }
+
+    #[test]
+    fn kind_unique_top_level_wrapper_reaches_a_nested_flat_literal() {
+        let before = Code::from_string(
+            &python_script_with_guarded_dict(99, false),
+            &Language::Python,
+        );
+        let after = Code::from_string(
+            &python_script_with_guarded_dict(40, false),
+            &Language::Python,
+        );
+        let node_cache = NodeCache::build(&before, &after);
+        let mut diff = ASTDiff::default();
+        solve(
+            &crate::diff::PassCtx::new(&before, &after, &node_cache),
+            &mut diff,
+        );
+        assert!(diff.mapping.values().any(|m| matches!(
+            &m.reason,
+            crate::diff::ASTMappingReason::APTED("large_flat_subtree")
+        )));
+    }
+
+    #[test]
+    fn repeated_top_level_wrapper_kind_has_no_identity() {
+        let before = Code::from_string(
+            &python_script_with_guarded_dict(99, true),
+            &Language::Python,
+        );
+        let after = Code::from_string(
+            &python_script_with_guarded_dict(40, true),
+            &Language::Python,
+        );
+        let node_cache = NodeCache::build(&before, &after);
+        let mut diff = ASTDiff::default();
+        solve(
+            &crate::diff::PassCtx::new(&before, &after, &node_cache),
+            &mut diff,
+        );
+        assert!(!diff.mapping.values().any(|m| matches!(
+            &m.reason,
+            crate::diff::ASTMappingReason::APTED("large_flat_subtree")
+        )));
     }
 }

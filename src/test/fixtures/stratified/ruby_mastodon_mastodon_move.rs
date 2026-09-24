@@ -24,12 +24,8 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 #[test]
 fn mapping() -> Result<()> {
     // Three neighbouring comments are rotated. `StructurallyIdenticalAncestor` pairs them by
-    // position - `comment:6` with `comment:8`, `comment:7` with `comment:6`, `comment:8` with
-    // `comment:7` - and calls all three `Update`, where the human follows each comment's own text
-    // to where it moved. Position is the only signal any pass uses inside a run of same-kind
-    // siblings, so a rotation mis-pairs every member of the run; see
-    // `ruby-mastodon-mastodon-rare-example-of-true-move` for the same three-comment shape and
-    // `lua-awesomewm-awesome-insert-only` for the insertion version of it. Not attempted.
+    // position and calls all three `Update`; the human follows each comment's text. Position is
+    // the only signal inside a run of same-kind siblings, so a rotation mis-pairs every member.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "ruby-mastodon-mastodon-move",
         3,

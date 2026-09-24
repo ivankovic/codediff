@@ -30,12 +30,9 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // The corpus's largest painting disagreement. Minified CSS expanded to multi-line: every
-    // disagreement is `ours=Move, theirs=None`, i.e. codediff calls each rule a Move because the
-    // added comment and newlines displaced it, while the human painting says a rule shifted by an
-    // edit beside it has not moved. That is the Move-vs-nothing family (the largest single family
-    // of painting disagreements), amplified here because the file is 196 bytes and one insertion
-    // displaces all of it. The rate is recorded to stop it growing, NOT endorsed.
+    // Minified CSS expanded to multiple lines: codediff calls every displaced rule a Move, while
+    // the painting says a rule shifted by an edit beside it has not moved. The Move-vs-nothing
+    // family, amplified by a tiny file. Recorded to stop it growing, not endorsed.
     assert_matches_human_painting_within_limit(
         "css-wordpress-wordpress-one-line-to-multiline",
         71.60,

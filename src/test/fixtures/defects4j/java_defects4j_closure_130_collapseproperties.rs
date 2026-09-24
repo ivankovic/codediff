@@ -23,9 +23,7 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // A `binary_expression` the mapping pairs and codediff pairs differently. Both mismatches are
-    // invisible - no painted byte moves - so this one costs a reader nothing today, which is why
-    // the visible limit stays at 0 (reason `APTED("large_flat_subtree")`).
+    // A `binary_expression` paired differently (`APTED("large_flat_subtree")`). Invisible.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "java-defects4j-closure-130-collapseproperties",
         2,

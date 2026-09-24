@@ -21,9 +21,8 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // A heredoc (`<<~EOS ... EOS`) becomes a plain string literal - tree-sitter-ruby represents
-    // the two very differently, so the enclosing `call`/`argument_list` can't be matched across
-    // the representation change; codediff deletes rather than transforms them.
+    // A heredoc becomes a plain string, represented very differently, so the enclosing
+    // `call`/`argument_list` cannot be matched across the change.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "ruby-homebrew-brew-change-heredoc-to-string",
         2,

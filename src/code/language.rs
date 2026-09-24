@@ -24,9 +24,7 @@ use crate::code::Language;
 pub fn language_for_path(path: &std::path::Path) -> Option<Language> {
     let ext = path.extension()?.to_string_lossy().to_ascii_lowercase();
     if ext == "test" {
-        // Test fixtures are named e.g. `before.py.test` so the test harness can strip the
-        // `.test` suffix before treating them as real source; recognize the inner extension too,
-        // so opening one directly (e.g. in the TUI) still detects its real language.
+        // Fixtures are named `before.py.test`; opening one directly still detects Python.
         return language_for_path(std::path::Path::new(path.file_stem()?));
     }
     language_for_extension(ext.as_str())
@@ -63,9 +61,7 @@ pub fn language_for_path_and_content(path: &std::path::Path, content: &str) -> O
 }
 
 /// True if `content` opens with an XML declaration, ignoring a leading UTF-8 BOM and whitespace.
-/// Deliberately just the `<?xml` prolog rather than also requiring Qt Linguist's specific
-/// `<!DOCTYPE TS>` - any XML document misnamed `.ts` is equally not TypeScript, so there is no
-/// value in narrowing this to Qt Linguist specifically.
+/// Not narrowed to Qt Linguist's `<!DOCTYPE TS>`: any XML named `.ts` is not TypeScript.
 fn looks_like_xml(content: &str) -> bool {
     content
         .trim_start_matches('\u{feff}')
@@ -170,8 +166,6 @@ mod tests {
 
     #[test]
     fn language_for_path_strips_test_suffix() {
-        // Test fixtures are named e.g. `before.py.test`; opening one directly should still
-        // detect the real (inner) language rather than failing on the literal `.test` extension.
         assert_eq!(
             language_for_path(std::path::Path::new("before.py.test")),
             Some(Language::Python)
@@ -213,7 +207,6 @@ mod tests {
             ),
             Some(Language::TypeScript)
         );
-        // Empty/unrelated content: no XML declaration, so no override.
         assert_eq!(
             language_for_path_and_content(std::path::Path::new("app.ts"), ""),
             Some(Language::TypeScript)
@@ -222,8 +215,7 @@ mod tests {
 
     #[test]
     fn xml_content_sniff_is_scoped_to_ts_extension() {
-        // A `.tsx` file starting with `<?xml` is not a real-world collision (Qt Linguist only
-        // ever uses `.ts`) - don't let the sniff misfire on genuinely broken/unusual TSX content.
+        // Qt Linguist only uses `.ts`, so the sniff must not touch `.tsx`.
         assert_eq!(
             language_for_path_and_content(
                 std::path::Path::new("app.tsx"),
@@ -231,7 +223,6 @@ mod tests {
             ),
             Some(Language::TSX)
         );
-        // Other extensions are untouched by this function entirely.
         assert_eq!(
             language_for_path_and_content(
                 std::path::Path::new("app.rs"),

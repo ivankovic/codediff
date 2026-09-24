@@ -21,13 +21,9 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // Two near-identical doc comment blocks (vertical/horizontal alignment) are rewritten in
-    // parallel, each swapping prose and reformatting a `* **word**` bullet list to `` * `"word"` ``
-    // - comment nodes carry no syntactic substructure to disambiguate by, so matching individual
-    // rewritten comment lines to their old counterparts across two near-duplicate blocks is
-    // inherently ambiguous, not a matcher bug. `solve_leading_siblings` walks a whole chain of
-    // leading comments rather than just one hop, which correctly anchors some of the unchanged
-    // comment lines in these blocks; the rest are the genuinely ambiguous rewritten ones.
+    // Two near-identical doc comment blocks are rewritten in parallel. Comments have no
+    // substructure, so pairing rewritten lines across the two blocks is inherently ambiguous;
+    // `solve_leading_siblings` walking the whole comment chain anchors the unchanged ones.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "lua-awesomewm-awesome-change-doccomments",
         21,

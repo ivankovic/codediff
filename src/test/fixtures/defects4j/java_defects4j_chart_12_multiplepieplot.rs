@@ -23,12 +23,9 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // The two residuals are one pairing: inside the second constructor, the human reads the
-    // `dataset` field assignment as gone and the `setDataset(...)` call that replaced it as new,
-    // while codediff's APTED pass reads the two `identifier` leaves as one `Update` because they
-    // sit in the same large flat subtree and share their text. A container-choice disagreement
-    // rather than a wrong pairing - the enclosing statements are already matched - so the number is
-    // recorded as the bar, not as a defect with a fix behind it.
+    // One pairing: the human reads the `dataset` field assignment as gone and `setDataset(...)` as
+    // new; APTED reads the two `identifier` leaves (same flat subtree, same text) as one `Update`. A
+    // container-choice disagreement, the statements already matched.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "java-defects4j-chart-12-multiplepieplot",
         2,

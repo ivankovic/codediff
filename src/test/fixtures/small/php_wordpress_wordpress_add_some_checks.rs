@@ -21,10 +21,8 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // A `!$var` negation moves from being the top-level condition into a new binary_expression
-    // (an added `||` condition wraps it) - codediff's APTED pass maps the moved unary_op_expression
-    // subtree to Delete/Insert instead of following it into the new binary_expression, the same
-    // kind of structural cross-boundary move gap documented elsewhere in this suite.
+    // `!$var` moves into a new `||` binary_expression; APTED deletes and inserts the moved
+    // subtree rather than following it: the cross-boundary move gap.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "php-wordpress-wordpress-add-some-checks",
         10,

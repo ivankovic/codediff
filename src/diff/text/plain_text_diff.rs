@@ -16,60 +16,39 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-// Split out of text.rs (its plain-text/Myers line-diff fallback path, used for non-AST /
-// non-code files) purely to shrink that file's visible size. No behavior change.
+//! The line-level diff for files without a tree-sitter grammar.
 
 use crate::diff::text_range::TextRange;
 
 use super::render_options::{RangeMatch, TextOperation};
 use super::{common_prefix_byte_len, common_suffix_byte_len};
 
-/// `myers_lcs`'s edit-distance search gives up past this and falls back to treating the whole
-/// file as replaced. `myers_lcs` allocates O(max_edit²) `usize`s and does O(max_edit²) work in
-/// the worst case (two sides with no common lines at all) - at 10,000 that's ~1.6GB and a
-/// genuinely slow search, so this only pays that cost for a file pair that's actually that
-/// different; an ordinary edit to a large file (even a 10k-line one) finds its solution and
-/// returns long before reaching the cap, since Myers' search terminates as soon as it finds the
-/// *actual* edit distance, however small, rather than always running to `max_edit`. Deliberately
-/// much higher than `apted::common::FALLBACK_MAX_EDIT` (1000): that one bounds a residual
-/// *subtree* forest, typically small even for a large file, while this one bounds whole-file
-/// *lines*, where 1000 was too easy to exceed on real config/lockfile-sized files with a
-/// legitimately large (but not pathological) number of changed lines.
+/// The edit distance past which `myers_lcs` gives up and the whole file counts as replaced. Its
+/// memory and work are quadratic in this only when the files really differ that much; an ordinary
+/// edit stops at its actual distance. Far above `apted::common::FALLBACK_MAX_EDIT`, which bounds a
+/// residual subtree forest rather than whole-file lines.
 pub(crate) const PLAIN_TEXT_MAX_EDIT: usize = 10_000;
 
-/// A plain line-level diff (Myers LCS over hashed lines, no AST) for files with no tree-sitter
-/// grammar - `app::compute_diff`'s fallback when either side's `Code::ast` is `None` (an
-/// unrecognized extension, e.g. a `Makefile`). Returns `(before_ranges, after_ranges)`, the same
-/// shape `TextDiff::all(0)`/`all(1)` produce, so every downstream consumer (the TUI's overlay
-/// rendering, `headless::render_text_diff`, `json_output::build_side`, `change_counts`,
-/// `DiffSummary`) works unchanged - none of them actually require an AST, only a `RangeMatch`
-/// list.
+/// A line diff (Myers LCS over hashed lines) for files with no grammar, returning
+/// `(before_ranges, after_ranges)` in the shape of [`super::TextDiff::all`].
 ///
-/// Never produces `Move`: detecting one needs a notion of identity that survives relocation, and
-/// hashed lines give none - a line that moved elsewhere is a delete plus an unrelated insert here,
-/// same as a plain `diff -u`.
-///
-/// It *does* produce `Update`, with sub-line columns, which `diff -u` cannot. `plan_gap` pairs
-/// rows inside a hunk by [`shared_affix`] rather than positionally, and each paired row goes
-/// through [`intra_line_ranges`], which splits it into an identical prefix, an `Update` over the
-/// differing middle, and an identical suffix. So a rewritten line renders as one changed line with
-/// the changed characters marked, not as an adjacent delete+insert pair.
+/// Never produces `Move`: hashed lines carry no identity that survives relocation. Does produce
+/// `Update` with sub-line columns: rows in a hunk that share enough affix ([`shared_affix`]) are
+/// split by [`intra_line_ranges`] instead of rendering as a delete plus an insert.
 pub fn plain_text_line_diff(before: &str, after: &str) -> (Vec<RangeMatch>, Vec<RangeMatch>) {
     plain_text_line_diff_with_max_edit(before, after, PLAIN_TEXT_MAX_EDIT)
 }
 
-/// `plain_text_line_diff`'s actual implementation, parameterized on the edit-distance cap so
-/// tests can exercise the "gave up" path with a small cap instead of paying `PLAIN_TEXT_MAX_EDIT`
-/// squared (10,000² ≈ 1.6GB and genuinely slow) just to prove that path exists.
+/// [`plain_text_line_diff`] with the edit-distance cap as a parameter, so tests can reach the
+/// give-up path cheaply.
 pub(crate) fn plain_text_line_diff_with_max_edit(
     before: &str,
     after: &str,
     max_edit: usize,
 ) -> (Vec<RangeMatch>, Vec<RangeMatch>) {
     match line_diff_core(before, after, max_edit) {
-        // Re-split rather than widening `LineDiffCore`: that struct is also the matching
-        // pipeline's own entry point (see its doc comment), which needs only counts and pairs, and
-        // `str::lines` is a cheap linear scan next to the `myers_lcs` that just ran.
+        // Re-split rather than widen `LineDiffCore`, which the matching pipeline also uses and
+        // which needs only counts and pairs.
         Some(core) => {
             let before_lines: Vec<&str> = before.lines().collect();
             let after_lines: Vec<&str> = after.lines().collect();
@@ -85,24 +64,16 @@ pub(crate) fn plain_text_line_diff_with_max_edit(
     }
 }
 
-/// The parser-independent line-diff core, shared between `plain_text_line_diff`'s visualization
-/// path (via `plain_text_line_diff_with_max_edit`) and the matching pipeline's phases-4-7
-/// rearchitecture (`TODO.md`, `~/.claude/plans/iterative-herding-panda.md`, Phase 3a). `None` means
-/// `myers_lcs` gave up past `max_edit` - callers fall back to treating the whole file as replaced
-/// (`whole_file_replaced`) rather than trusting a partial/nonexistent match set.
+/// The matched lines of a line diff, shared by [`plain_text_line_diff`] and the matching pipeline.
 pub struct LineDiffCore {
-    /// Matched `(before_row, after_row)` pairs, ascending in both (an LCS matching preserves
-    /// relative order on both sides).
+    /// Matched `(before_row, after_row)` pairs, ascending in both.
     pub pairs: Vec<(usize, usize)>,
     pub before_line_count: usize,
     pub after_line_count: usize,
 }
 
-/// Classification of a whole-file line diff, used to license (or refuse to license) a
-/// constrained, delete-free/insert-free resolver downstream - see the phases-4-7 rearchitecture
-/// plan's "Step 2 - text-diff-first classification" section. Corpus-census-validated at whole-file
-/// granularity (72/338 fixtures `InsertOnly`/`DeleteOnly`, zero ground-truth counterexamples); not
-/// yet validated at hunk granularity within `Mixed` files.
+/// What kind of change a whole-file line diff is. Licenses a delete-free or insert-free resolver
+/// downstream, so a class must never claim less than what changed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WholeFileClass {
     /// No lines changed at all.
@@ -111,14 +82,11 @@ pub enum WholeFileClass {
     InsertOnly,
     /// Every after-line is matched (nothing inserted); at least one before-line is gone.
     DeleteOnly,
-    /// Both insertions and deletions present, or `myers_lcs` gave up past `max_edit` (treated as
-    /// `Mixed` since no license can be safely granted without knowing what actually changed).
+    /// Both insertions and deletions, or `myers_lcs` gave up: nothing safe can be licensed.
     Mixed,
 }
 
 impl LineDiffCore {
-    /// See `WholeFileClass`'s doc comment. `pairs.len() < before_line_count` means some
-    /// before-line has no match (a delete happened somewhere); symmetric for inserts.
     pub fn whole_file_class(&self) -> WholeFileClass {
         let has_delete = self.pairs.len() < self.before_line_count;
         let has_insert = self.pairs.len() < self.after_line_count;
@@ -131,9 +99,7 @@ impl LineDiffCore {
     }
 }
 
-/// Whole-file classification at the pipeline's default edit-distance cap (`PLAIN_TEXT_MAX_EDIT`) -
-/// the entry point Phase 3a's dispatcher uses. A `myers_lcs` give-up is treated as `Mixed`: no
-/// license should ever be granted from an edit distance too large to have actually been measured.
+/// [`LineDiffCore::whole_file_class`] at `PLAIN_TEXT_MAX_EDIT`; `Mixed` when `myers_lcs` gives up.
 pub fn whole_file_text_class(before: &str, after: &str) -> WholeFileClass {
     match line_diff_core(before, after, PLAIN_TEXT_MAX_EDIT) {
         Some(core) => core.whole_file_class(),
@@ -141,8 +107,8 @@ pub fn whole_file_text_class(before: &str, after: &str) -> WholeFileClass {
     }
 }
 
-/// Runs `myers_lcs` over hashed lines. Returns `None` if it gave up past `max_edit` (see
-/// `PLAIN_TEXT_MAX_EDIT`'s doc comment) - callers must not treat a `None` as "no changes."
+/// Runs `myers_lcs` over hashed lines. `None` when it gave up past `max_edit`, which callers must
+/// not read as "no changes".
 pub fn line_diff_core(before: &str, after: &str, max_edit: usize) -> Option<LineDiffCore> {
     let before_lines: Vec<&str> = before.lines().collect();
     let after_lines: Vec<&str> = after.lines().collect();
@@ -170,33 +136,20 @@ pub(crate) fn hash_lines(lines: &[&str]) -> Vec<u64> {
         .collect()
 }
 
-/// One whole line as a `TextRange`: `(row, 0)` to `(row + 1, 0)` - this module's convention for
-/// "all of row, including its own line break" (see `text_range.rs`'s doc comment on referring to
-/// a full row via `(row + 1, 0)`).
+/// All of `row`, including its line break: `(row, 0)` to `(row + 1, 0)`.
 pub(crate) fn whole_line_range(row: usize) -> TextRange {
     TextRange::new(row, 0, row + 1, 0)
 }
 
-/// How much of the longer of two unmatched lines their common prefix and suffix must cover before
-/// [`intra_line_ranges`] will decompose them into "same, changed, same" instead of leaving them as
-/// a whole-line delete + insert.
-///
-/// A *ratio* on the longer line, not an absolute length: structured text shares long affixes by
-/// coincidence all the time (two unrelated rows of a wide CSV both ending `,0,0,0,0,0` clear any
-/// absolute bar trivially), and decomposing an unrelated pair is worse than not decomposing it at
-/// all - it invents a "common prefix" out of two rows that merely share a column layout, and hides
-/// the real change inside a span labelled `Identical`. 50% was chosen against
-/// `research/data/quality/optimal_solutions_benchmark.csv`, where a regenerated row differs only in
-/// its `elapsed_ms` field (~97% shared affix) while two unrelated fixture rows sit far below half.
+/// The share of the longer of two unmatched lines their common prefix and suffix must cover for
+/// [`intra_line_ranges`] to split them. A ratio, not a length: unrelated rows of a wide CSV share
+/// long affixes like `,0,0,0,0` by coincidence, and splitting such a pair hides the real change
+/// inside a span labelled `Identical`.
 pub(crate) const MIN_SHARED_AFFIX_PERCENT: usize = 50;
 
-/// Byte lengths of the common prefix and suffix of two unmatched lines, or `None` if they are too
-/// dissimilar to be treated as one line rewritten (see [`MIN_SHARED_AFFIX_PERCENT`]). Split out
-/// from [`intra_line_ranges`] because [`plan_gap`] needs the *decision* while it is still choosing
-/// which lines pair with which, and only pays for the ranges once that is settled.
-///
-/// The suffix is measured on the already-prefix-trimmed remainders (exactly as
-/// `intra_node_update_ranges` does), so prefix + suffix can never overlap on the shorter line.
+/// Byte lengths of the common prefix and suffix of two unmatched lines, or `None` when they are
+/// too dissimilar to be one line rewritten ([`MIN_SHARED_AFFIX_PERCENT`]) or are byte-identical.
+/// The two never overlap.
 pub(crate) fn shared_affix(before_line: &str, after_line: &str) -> Option<(usize, usize)> {
     let prefix = common_prefix_byte_len(before_line, after_line);
     let suffix = common_suffix_byte_len(&before_line[prefix..], &after_line[prefix..]);
@@ -205,30 +158,19 @@ pub(crate) fn shared_affix(before_line: &str, after_line: &str) -> Option<(usize
     if longer == 0 || (prefix + suffix) * 100 < longer * MIN_SHARED_AFFIX_PERCENT {
         return None;
     }
-    // Both middles empty means the two lines are byte-identical. `myers_lcs` can leave such a pair
-    // unmatched when ordering constraints prevent it (reordered duplicate lines), and claiming a
-    // match it deliberately didn't make is not this function's call - the caller's whole-line
-    // treatment is the honest answer.
+    // `myers_lcs` can leave identical lines unmatched (reordered duplicates); pairing them here
+    // would claim a match it deliberately did not make.
     if before_line.len() - suffix == prefix && after_line.len() - suffix == prefix {
         return None;
     }
     Some((prefix, suffix))
 }
 
-/// Sub-line ranges for one *changed* line pair: the common prefix and suffix render as `Identical`
-/// and only the differing middle as `Update`, so a one-field edit in a wide line highlights that
-/// field instead of the whole row. `None` under the same condition as [`shared_affix`].
+/// Sub-line ranges for one changed line pair: `Identical` prefix and suffix around an `Update`
+/// middle. `None` under the same condition as [`shared_affix`]. Columns are bytes.
 ///
-/// Columns are byte offsets within the row, matching tree-sitter's own `Point` convention that
-/// `TextRange` inherits - see `text_range::SourceText::byte_index`, whose doc comment records the
-/// multi-byte-character crash that established it. `common_prefix_byte_len`/`common_suffix_byte_len`
-/// both guarantee char boundaries, and the suffix is measured on the already-prefix-trimmed
-/// remainders (exactly as `intra_node_update_ranges` does) so prefix + suffix can never overlap on
-/// the shorter line.
-///
-/// Both sides always get the same number of ranges. That symmetry is load-bearing: the two
-/// vectors are consumed index-comparably downstream (see `merge_ranges`, and the AST path's own
-/// note in `ranges` about bypassing the merging accumulator to keep the counts from diverging).
+/// Both sides always get the same number of ranges, since the two lists are consumed
+/// index-for-index downstream (see `merge_ranges`).
 pub(crate) fn intra_line_ranges(
     before_row: usize,
     before_line: &str,
@@ -278,17 +220,11 @@ pub(crate) fn intra_line_ranges(
     Some((before_ranges, after_ranges))
 }
 
-/// Walks `pairs` (matched `(before_row, after_row)`, ascending in both - an LCS matching
-/// preserves relative order on both sides) once, emitting one `Identical` `RangeMatch` per match
-/// and one merged `Delete`/`Insert` `RangeMatch` per *gap* between matches (so a multi-line
-/// block reads, and n/p-navigates, as a single change rather than one per line).
+/// One `Identical` range per matched pair in `pairs`, and the gaps between them via [`emit_gap`].
 ///
-/// Every unmatched run's `destination` is anchored at the other side's most recently confirmed
-/// match, advanced past it via `right_limit` - the exact convention `diff::text::
-/// advance_and_build_range` uses for the AST path's own plain Insert/Delete ranges, so the
-/// cross-panel cursor lands at "where this content would be if it existed on the other side"
-/// instead of at a coordinate-space-confused row (before-side and after-side rows generally
-/// diverge once there's been any earlier insert/delete).
+/// An unmatched run's destination is anchored just past the other side's last match, as
+/// `advance_and_build_range` does on the AST path: the two sides' row numbers diverge after any
+/// earlier insert or delete.
 pub(crate) fn build_line_ranges(
     before_lines: &[&str],
     after_lines: &[&str],
@@ -348,18 +284,9 @@ pub(crate) fn build_line_ranges(
     (before_ranges, after_ranges)
 }
 
-/// One unmatched run - the before-rows and after-rows between two consecutive LCS matches (or
-/// after the last one).
-///
-/// Default behaviour is one merged `Delete` and one merged `Insert` for the whole run, which is
-/// what makes a block insert/delete read, and `n`/`p`-navigate, as a single change rather than one
-/// step per line. That is preserved exactly whenever the run is a genuine block: if *no* line pairs
-/// off similarly enough for [`intra_line_ranges`], this emits byte-for-byte what it always did.
-///
-/// When lines do pair off - the same row rewritten rather than removed, e.g. a wide CSV row where
-/// one field changed - the run is emitted per [`plan_gap`] instead, so each changed row narrows to
-/// the part that actually differs. Consecutive unpaired rows are still merged into one range, so a
-/// block sitting inside an otherwise-rewritten run keeps reading as a block.
+/// One unmatched run between two matches (or after the last one). A run with no rewritten row is
+/// one merged `Delete` and one merged `Insert`, so a block reads and `n`/`p`-navigates as one
+/// change. Otherwise it follows [`plan_gap`], still merging consecutive unpaired rows.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn emit_gap(
     before_lines: &[&str],
@@ -400,9 +327,7 @@ pub(crate) fn emit_gap(
         return;
     }
 
-    // Consecutive `Delete`s (and `Insert`s) coalesce into one range, for the same
-    // reads-as-one-change reason the whole-gap merge above exists. `plan_gap` emits each side's
-    // rows in ascending order, so a run of them is always contiguous.
+    // `plan_gap` emits each side's rows in ascending order, so a run of them is contiguous.
     let mut pending_delete: Option<std::ops::Range<usize>> = None;
     let mut pending_insert: Option<std::ops::Range<usize>> = None;
     let flush_delete = |pending: &mut Option<std::ops::Range<usize>>, out: &mut Vec<RangeMatch>| {
@@ -455,39 +380,26 @@ pub(crate) fn emit_gap(
     flush_insert(&mut pending_insert, after_ranges);
 }
 
-/// One decision in a gap's line-by-line plan. `Pair` means "the same line, rewritten" and gets
-/// [`intra_line_ranges`]; the other two are ordinary whole-line deletes and inserts.
+/// One decision in a gap's plan: `Pair` is one line rewritten, the others whole-line changes.
 pub(crate) enum GapOp {
     Pair(usize, usize),
     Delete(usize),
     Insert(usize),
 }
 
-/// How far [`plan_gap`] will look ahead on one side to resynchronise after the two sides fall out
-/// of step, i.e. the longest run of pure insertions or deletions it can step over and still
-/// recognise the rows after it as pairs.
-///
-/// Needed because a gap's two sides are only aligned at their ends, not throughout: a regenerated
-/// `research/data/quality/optimal_solutions_benchmark.csv` gained 18 rows, and being sorted by
-/// mismatch count, those rows land *among* the existing ones. Strict k-th-with-k-th pairing
-/// recognised the first 33 rows and then silently gave up on all 400+ below the first inserted
-/// row - the whole file downstream of it read as one block rewrite again.
-///
-/// Bounded rather than unbounded so the scan stays O(gap x window) instead of quadratic, and so a
-/// genuinely unrelated pair of blocks can't find a spurious partner far away.
+/// How far [`plan_gap`] looks ahead on one side to resynchronise, i.e. the longest run of pure
+/// insertions or deletions it can step over and still pair the rows after it. A gap's sides are
+/// aligned only at their ends: rows inserted among rewritten rows (a sorted CSV) would otherwise end
+/// the pairing for the rest of the gap. Bounded so the scan stays linear in the gap and an
+/// unrelated block cannot find a spurious partner far away.
 pub(crate) const GAP_RESYNC_WINDOW: usize = 16;
 
-/// Decides, for one unmatched run, which before-rows are rewrites of which after-rows.
+/// Decides which before-rows of one unmatched run are rewrites of which after-rows. Out of step,
+/// it takes the nearest resynchronising position within [`GAP_RESYNC_WINDOW`] (insertions first on
+/// a tie, for determinism) and emits the rows stepped over as plain inserts or deletes.
 ///
-/// Walks both sides together. Where the current pair clears [`shared_affix`] it is a rewrite; where
-/// it doesn't, the run has fallen out of step, so this looks ahead up to [`GAP_RESYNC_WINDOW`] rows
-/// on each side for the nearest position that does clear it, and emits the rows stepped over as
-/// plain inserts or deletes. Nearest wins, and insertions are preferred on a tie, purely so the
-/// result is deterministic.
-///
-/// The walk is monotonic on both sides - pairs never cross - which the renderer requires: both
-/// range vectors have to come out in ascending row order for `merge_ranges` and the cursor-follow
-/// logic to line up.
+/// Pairs never cross: both range lists must stay in ascending row order for `merge_ranges` and
+/// the cursor-follow logic.
 pub(crate) fn plan_gap(
     before_lines: &[&str],
     after_lines: &[&str],
@@ -526,8 +438,7 @@ pub(crate) fn plan_gap(
                 plan.extend((b..b + d).map(GapOp::Delete));
                 b += d;
             }
-            // Neither side resynchronises within the window: this row really was replaced rather
-            // than rewritten, so both sides advance and it renders as a delete plus an insert.
+            // Replaced rather than rewritten.
             None => {
                 plan.push(GapOp::Delete(b));
                 plan.push(GapOp::Insert(a));
@@ -542,11 +453,7 @@ pub(crate) fn plan_gap(
     plan
 }
 
-/// `myers_lcs` gave up (edit distance past `PLAIN_TEXT_MAX_EDIT`): treat the whole file as
-/// replaced rather than paying for an unbounded search - same fallback-of-a-fallback
-/// `apted::common::resolve_residual_forest_via_myers_lcs` already uses for the same reason. No
-/// range at all for an empty side, matching `diff::text::ranges`'s own `(None, None)` "no code on
-/// either side" case.
+/// The whole file as replaced, for when `myers_lcs` gives up. An empty side gets no range.
 pub(crate) fn whole_file_replaced(
     before_line_count: usize,
     after_line_count: usize,

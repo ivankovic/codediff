@@ -27,33 +27,22 @@ use crate::diff::text_range::TextRange;
 use crate::tui::actions::Action;
 use crate::tui::theme::OverlayTheme;
 
-/// A component that displays source code
-///
-/// This component wraps the CodeViewerWidget and manages its state.
-/// It implements the Component trait for integration with the TUI architecture.
+/// One code panel: the `CodeViewerWidget` plus its cursor, scroll and range state.
 #[derive(Default)]
 pub struct CodeViewer {
-    /// The underlying widget
     widget: crate::tui::widgets::code_viewer::CodeViewerWidget,
-    /// The widget state (scroll position and viewport)
     state: crate::tui::widgets::code_viewer::CodeViewerState,
-    /// Action sender
     command_tx: Option<UnboundedSender<Action>>,
-    /// The column `move_cursor_vertical` (up/down) tries to return to on each move, remembered
-    /// across a run of vertical moves even while an intervening short/indented line forces
-    /// `cursor_col` somewhere else - the "sticky column" most text editors implement, so
-    /// `k k k j j j` lands back where it started instead of drifting left. `None` means "not
-    /// sticky yet" (any other cursor movement resets it - see `clamp_and_set_cursor`).
+    /// The editor-style "sticky column" `move_cursor_vertical` returns to across a run of
+    /// vertical moves, so `k k k j j j` does not drift left. Any other cursor movement clears it.
     desired_col: Option<usize>,
 }
 
 impl CodeViewer {
-    /// Create a new CodeViewer
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Create a CodeViewer for a specific file
     pub fn with_file(path: PathBuf) -> Self {
         Self {
             widget: crate::tui::widgets::code_viewer::CodeViewerWidget::with_file(path),
@@ -61,20 +50,18 @@ impl CodeViewer {
         }
     }
 
-    /// Load a file into the viewer
     pub fn load_file(&mut self, path: PathBuf) -> Result<()> {
         self.widget.load_file(path)?;
         self.reset_state();
         Ok(())
     }
 
-    /// Load already-read contents into the viewer (no filesystem access).
+    /// Load already-read contents, without filesystem access.
     pub fn load_contents(&mut self, path: PathBuf, contents: String) {
         self.widget.load_contents(path, contents);
         self.reset_state();
     }
 
-    /// Reset scroll/diff/cursor state, e.g. after loading a new file.
     fn reset_state(&mut self) {
         self.state.scroll = 0;
         self.state.scroll_col = 0;
@@ -82,19 +69,16 @@ impl CodeViewer {
         self.desired_col = None;
     }
 
-    /// Get the total number of lines
     pub fn line_count(&self) -> usize {
         self.widget.line_count()
     }
 
-    /// Scroll up by one line
     pub fn scroll_up(&mut self) {
         if self.state.scroll > 0 {
             self.state.scroll = self.state.scroll.saturating_sub(1);
         }
     }
 
-    /// Scroll down by one line
     pub fn scroll_down(&mut self) {
         let total = self.line_count();
         if self.state.scroll < total.saturating_sub(1) {
@@ -102,13 +86,12 @@ impl CodeViewer {
         }
     }
 
-    /// Scroll to a specific line
     pub fn scroll_to(&mut self, line: usize) {
         self.state.scroll = line.min(self.line_count().saturating_sub(1));
     }
 
-    /// Set the diff ranges for this side (as returned by `TextDiff::all`), and place the cursor
-    /// on the first navigable (non zero-width) range.
+    /// Set this side's ranges (as returned by `TextDiff::all`) and place the cursor on the first
+    /// non-zero-width range.
     pub fn set_ranges(&mut self, ranges: Vec<RangeMatch>) {
         self.state.load_ranges(ranges);
         self.desired_col = None;
@@ -123,66 +106,51 @@ impl CodeViewer {
         self.desired_col = None;
     }
 
-    /// This panel's ranges, as last loaded - read by `DiffViewer::change_stops`, which has to see
-    /// both panels' ranges at once to order them into a single walk.
     pub fn ranges(&self) -> &[RangeMatch] {
         &self.state.ranges
     }
 
-    /// The destination range matched to wherever the cursor currently sits, i.e. the range the
-    /// other panel's cursor should follow.
+    /// The destination range matched to the cursor: where the other panel's cursor follows.
     pub fn cursor_destination(&self) -> Option<TextRange> {
         self.state.cursor_destination()
     }
 
-    /// Same as `cursor_destination`, but `None` for an `Identical` match - the range to
-    /// cross-highlight on the other panel (unchanged content isn't highlighted there).
+    /// Like `cursor_destination`, but `None` for an `Identical` match, which is not
+    /// cross-highlighted.
     pub fn cursor_destination_for_highlight(&self) -> Option<TextRange> {
         self.state.cursor_destination_for_highlight()
     }
 
-    /// Set (or clear) the cross-highlighted range coming from the other panel's cursor.
     pub fn set_highlight_destination(&mut self, destination: Option<TextRange>) {
         self.state.highlight_destination = destination;
     }
 
-    /// Apply a syntax-highlighting theme by name (rebuilds the widget's highlight cache).
     pub fn set_syntax_theme(&mut self, name: String) {
         self.widget.set_theme(name);
     }
 
-    /// Whether the node highlight is painted on this panel - the `H` toggle. See
-    /// `CodeViewerState::node_highlight` for why it defaults to off.
+    /// The `H` toggle; see `CodeViewerState::node_highlight` for why it defaults to off.
     pub fn is_node_highlight_enabled(&self) -> bool {
         self.state.node_highlight
     }
 
-    /// Turn the node highlight on or off. Purely a painting change - the cursor still follows its
-    /// counterpart on the other panel either way.
+    /// Painting only: the cursor follows its counterpart either way.
     pub fn set_node_highlight(&mut self, enable: bool) {
         self.state.node_highlight = enable;
     }
 
-    /// Mark whether this side's cursor is the one currently driving navigation; see
-    /// `CodeViewerState::is_focused`.
     pub fn set_focused(&mut self, focused: bool) {
         self.state.is_focused = focused;
     }
 
-    /// Set the palette used to paint the diff/cursor overlay, picked via the `c` theme picker.
     pub fn set_overlay_theme(&mut self, theme: OverlayTheme) {
         self.widget.set_overlay_theme(theme);
     }
 
-    /// Whether syntax highlighting is currently on - see `toggle` counterpart below. A thin
-    /// pass-through to the widget layer; an identical wrapper was removed as dead code in a
-    /// 2026-08-07 health pass because no keybinding ever reached it - the `S` key
-    /// (`DiffViewer::toggle_syntax_highlighting`) is that missing caller.
     pub fn is_syntax_highlighting_enabled(&self) -> bool {
         self.widget.is_syntax_highlighting_enabled()
     }
 
-    /// Turn syntax highlighting on or off (rebuilds the widget's highlight cache).
     pub fn set_syntax_highlighting(&mut self, enable: bool) {
         if enable {
             self.widget.enable_syntax_highlighting();
@@ -191,12 +159,8 @@ impl CodeViewer {
         }
     }
 
-    /// Move the cursor up (`direction < 0`) or down (`direction > 0`) by one line, keeping it on
-    /// the same "sticky" column across a run of vertical moves (see `desired_col`'s doc comment)
-    /// rather than the destination row's actual column - except where that column doesn't land
-    /// on real content on the new line: past the last non-whitespace character, it's pulled back
-    /// to it; before the first (i.e. in the line's own indentation), it's pushed forward to it.
-    /// Scrolls to keep the cursor visible afterward.
+    /// Move one line up (`direction < 0`) or down, on the sticky `desired_col` clamped into the
+    /// new line's non-whitespace content.
     pub fn move_cursor_vertical(&mut self, direction: i32) {
         let total_lines = self.line_count();
         if total_lines == 0 || direction == 0 {
@@ -212,11 +176,8 @@ impl CodeViewer {
         self.scroll_to_cursor();
     }
 
-    /// Move the cursor left (`direction < 0`) or right (`direction > 0`) by one character,
-    /// wrapping to the end of the previous line / start of the next line at row boundaries, like
-    /// a normal text cursor. Resets `desired_col` - an explicit horizontal move always means the
-    /// user wants *this* column from now on, not whatever `move_cursor_vertical` was last sticky
-    /// on.
+    /// Move one character left (`direction < 0`) or right, wrapping across line ends. Resets
+    /// `desired_col`.
     pub fn move_cursor_horizontal(&mut self, direction: i32) {
         if direction == 0 {
             return;
@@ -241,14 +202,8 @@ impl CodeViewer {
         self.scroll_to_cursor();
     }
 
-    /// Move the cursor to the start of the next (`forward = true`) or previous (`forward =
-    /// false`) actual change, wrapping around at the ends - see `CodeViewerState::
-    /// next_change_position`. Unlike other cursor movement (which only scrolls the minimum
-    /// needed to keep the cursor visible - see `scroll_to_cursor`), this centers the destination
-    /// row in the viewport, clamped to the start/end of the file when centering would scroll
-    /// past either edge: jumping between scattered changes across a large file benefits from
-    /// full context around the target, not just "barely on screen" at whichever edge it
-    /// happened to enter from. A no-op if this side has no changes at all.
+    /// Move to the next or previous change, wrapping. Unlike other movement this centers the
+    /// target row: a jump across a large file needs context on both sides of the change.
     pub fn jump_to_change(&mut self, forward: bool) {
         if let Some((row, col)) = self.state.next_change_position(forward)
             && self.clamp_and_set_cursor(row, col)
@@ -258,17 +213,12 @@ impl CodeViewer {
         }
     }
 
-    /// Total distinct changes and how many are at or before the cursor - see
-    /// `CodeViewerState::change_count_and_index`.
     pub fn change_count_and_index(&self) -> Option<(usize, usize)> {
         self.state.change_count_and_index()
     }
 
-    /// Search this file for case-insensitive occurrences of `query`, replacing any previous
-    /// search, and jump the cursor to the nearest match at or after the current position (wrapping
-    /// to the first match otherwise) - what pressing Enter in the search modal does. Clears any
-    /// existing highlighted matches with no jump if `query` matches nothing (including an empty
-    /// query).
+    /// Replace the search with case-insensitive `query` and jump to the nearest match at or
+    /// after the cursor, wrapping. No match leaves the cursor where it is.
     pub fn search(&mut self, query: &str) {
         self.state.search_matches = self.widget.find_matches(query);
         if let Some((row, col)) = self.state.nearest_search_match_position() {
@@ -276,35 +226,24 @@ impl CodeViewer {
         }
     }
 
-    /// Highlight `query`'s matches without moving the cursor - the search modal's live preview
-    /// while typing (the cursor only jumps on submit, via `search`). Returns the match count.
+    /// Highlight `query`'s matches without moving the cursor; returns the match count.
     pub fn preview_search(&mut self, query: &str) -> usize {
         self.state.search_matches = self.widget.find_matches(query);
         self.state.search_matches.len()
     }
 
-    /// Move the cursor to the next (`forward = true`) or previous (`forward = false`) search
-    /// match (`>`/`<`) - see `CodeViewerState::next_search_match_position`. A no-op if there's no
-    /// active search.
     pub fn jump_to_search_match(&mut self, forward: bool) {
         if let Some((row, col)) = self.state.next_search_match_position(forward) {
             self.set_cursor_position(row, col);
         }
     }
 
-    /// Total current search matches and how many are at or before the cursor - see
-    /// `CodeViewerState::search_match_count_and_index`.
     pub fn search_match_count_and_index(&self) -> Option<(usize, usize)> {
         self.state.search_match_count_and_index()
     }
 
-    /// Clamp `(row, col)` to valid bounds and move the cursor there, without touching scroll.
-    /// Returns `false` (and does nothing else) if the file is empty. Shared by
-    /// `set_cursor_position` (keeps the cursor merely visible afterward) and `jump_to_change`
-    /// (centers it - see that method's own doc comment for why the two need different scroll
-    /// behavior). Resets `desired_col` - every caller of this is an explicit reposition (search,
-    /// change navigation, cross-panel cursor sync), not `move_cursor_vertical`'s own sticky
-    /// column, so a later vertical move should start fresh from wherever this lands.
+    /// Clamp and move the cursor without scrolling; `false` on an empty file. Resets
+    /// `desired_col`, since every caller is an explicit reposition.
     fn clamp_and_set_cursor(&mut self, row: usize, col: usize) -> bool {
         let total_lines = self.line_count();
         if total_lines == 0 {
@@ -319,19 +258,15 @@ impl CodeViewer {
         true
     }
 
-    /// Set the cursor to a specific (row, column) position, clamping to valid bounds,
-    /// and scroll to keep it visible. Used to synchronize the inactive panel's cursor
-    /// to match the active panel's cursor destination.
+    /// Clamp and move the cursor, scrolling only as far as needed to show it.
     pub fn set_cursor_position(&mut self, row: usize, col: usize) {
         if self.clamp_and_set_cursor(row, col) {
             self.scroll_to_cursor();
         }
     }
 
-    /// Where the cursor should be drawn on screen within `area` (the same content area passed to
-    /// `draw` - the widget itself draws no border to account for), given the current scroll
-    /// position - offset past the line-number gutter and by the horizontal scroll. `None` if the
-    /// cursor's row or column is scrolled out of view.
+    /// The cursor's screen cell within `area` (the area passed to `draw`), or `None` when it is
+    /// scrolled out of view.
     pub fn cursor_screen_position(&self, area: Rect) -> Option<(u16, u16)> {
         let row_in_viewport = self.state.cursor_row.checked_sub(self.state.scroll)?;
         let col_in_viewport = self.state.cursor_col.checked_sub(self.state.scroll_col)?;
@@ -347,15 +282,12 @@ impl CodeViewer {
         ))
     }
 
-    /// Scroll the viewport so the cursor's row and column are both visible.
     fn scroll_to_cursor(&mut self) {
         self.scroll_to_show_row(self.state.cursor_row);
         self.scroll_to_show_col(self.state.cursor_col);
     }
 
-    /// Scroll the viewport horizontally to keep `col` visible, without moving the cursor - the
-    /// horizontal counterpart of `scroll_to_show_row`. A no-op before the first frame has
-    /// rendered (`viewport_width` still 0, i.e. unknown - see `CodeViewerState::viewport_width`).
+    /// Scroll horizontally to show `col`. A no-op until the first frame sets `viewport_width`.
     pub fn scroll_to_show_col(&mut self, col: usize) {
         let width = self.state.viewport_width;
         if width == 0 {
@@ -368,12 +300,10 @@ impl CodeViewer {
         }
     }
 
-    /// Get the filename for display
     pub fn filename(&self) -> String {
         self.widget.filename()
     }
 
-    /// The filename, or a hint to press `o` if no file is loaded into this panel yet.
     pub fn filename_or_hint(&self) -> String {
         if self.widget.has_file() {
             self.widget.filename()
@@ -382,12 +312,10 @@ impl CodeViewer {
         }
     }
 
-    /// Get the language name for display
     pub fn language_name(&self) -> String {
         self.widget.language_name()
     }
 
-    /// Scroll the viewport to keep `row` visible, without moving the cursor.
     pub fn scroll_to_show_row(&mut self, row: usize) {
         let row = row.min(self.line_count().saturating_sub(1));
         if row < self.state.scroll {
@@ -399,13 +327,8 @@ impl CodeViewer {
         }
     }
 
-    /// Scroll the viewport so `row` is vertically centered, without moving the cursor - unlike
-    /// `scroll_to_show_row`, this always re-centers rather than only scrolling when `row` would
-    /// otherwise fall out of view. Clamped to the start/end of the file (`max_scroll`) when
-    /// centering `row` would scroll past either edge, so a change near the very first or last
-    /// line still pins the viewport there instead of leaving dead space above/below the file.
-    /// Used by `jump_to_change` (`n`/`p`) and `DiffViewer::sync_scroll_centered`, which centers
-    /// the *other* panel on its matched destination the same way.
+    /// Center `row` without moving the cursor, clamped so no dead space shows past either end
+    /// of the file.
     pub fn scroll_to_center_row(&mut self, row: usize) {
         let total_lines = self.line_count();
         if total_lines == 0 || self.state.viewport_height == 0 {
@@ -417,31 +340,24 @@ impl CodeViewer {
         self.state.scroll = row.saturating_sub(half_viewport).min(max_scroll);
     }
 
-    /// Get the viewport height
     pub fn viewport_height(&self) -> usize {
         self.state.viewport_height
     }
 
-    /// Set the viewport height
     pub fn set_viewport_height(&mut self, height: usize) {
         self.state.viewport_height = height;
     }
 
-    /// Get reference to the state
     pub fn state(&self) -> &crate::tui::widgets::code_viewer::CodeViewerState {
         &self.state
     }
 
-    /// Width of the line-number gutter (see `CodeViewerWidget::gutter_width`) - used by mouse
-    /// hit-testing to translate a clicked screen column into a content column.
     pub fn gutter_width(&self) -> usize {
         self.widget.gutter_width()
     }
 
-    /// The change-overview strip's cells: the file's rows divided into `bands` equal slices, each
-    /// reporting the highest-priority operation (see `band_priority`) of any change touching it,
-    /// or `None` for an untouched slice. This is the minimap next to each panel - "where are the
-    /// changes in this file," at a glance, without `n`-stepping through them one at a time.
+    /// The minimap cells: the file's rows split into `bands` equal slices, each holding the
+    /// highest-`band_priority` change touching it, or `None`.
     pub fn change_bands(&self, bands: usize) -> Vec<Option<TextOperation>> {
         let total = self.line_count();
         let mut out = vec![None; bands];
@@ -477,9 +393,8 @@ impl CodeViewer {
     }
 }
 
-/// Which operation "wins" a minimap band touched by several kinds of change - structural
-/// insert/delete over update over move, an arbitrary but stable ordering (a band is one terminal
-/// cell; something has to win).
+/// Which operation wins a minimap band touched by several kinds of change. The order is
+/// arbitrary but stable: a band is one cell, so something has to win.
 fn band_priority(op: &TextOperation) -> u8 {
     match op {
         TextOperation::Delete => 4,
@@ -490,10 +405,8 @@ fn band_priority(op: &TextOperation) -> u8 {
     }
 }
 
-/// The `[first, last)` non-whitespace column bounds of `line` (character indices; `last` is one
-/// past the last non-whitespace character, i.e. itself a valid cursor column - a cursor there
-/// sits immediately after that character, same convention as `line_len`/`cursor_col`), or `None`
-/// if `line` is empty or entirely whitespace, in which case there's no content to snap to.
+/// The `[first, last)` character columns of `line`'s non-whitespace content, or `None` for a
+/// blank line. `last` is itself a valid cursor column.
 fn non_whitespace_bounds(line: &str) -> Option<(usize, usize)> {
     let mut first = None;
     let mut last = None;
@@ -506,10 +419,6 @@ fn non_whitespace_bounds(line: &str) -> Option<(usize, usize)> {
     first.zip(last)
 }
 
-/// Clamp `col` into `line`'s non-whitespace bounds (see `non_whitespace_bounds`) - used by
-/// `move_cursor_vertical` so a "sticky" column never lands inside a line's leading indentation
-/// or past its actual content into trailing whitespace. Falls back to the plain `[0, line_len]`
-/// clamp on an empty/all-whitespace line, where there's nothing to snap to.
 fn clamp_to_non_whitespace(col: usize, line: &str) -> usize {
     match non_whitespace_bounds(line) {
         Some((first, last)) => col.clamp(first, last),
@@ -524,26 +433,18 @@ impl Component for CodeViewer {
     }
 
     fn init(&mut self, area: Rect) -> Result<()> {
-        // -1 for `DiffViewer`'s own single title row - see `panel_title`'s doc comment; this
-        // widget draws no border of its own. Superseded by `draw`'s own `set_viewport_height`
-        // call on every real frame - this only matters for the very first frame.
+        // -1 for `DiffViewer`'s title row. Only the first frame uses this; `draw` resets it.
         self.state.viewport_height = area.height.saturating_sub(1) as usize;
         Ok(())
     }
 
-    // No `handle_key_event` override: `DiffViewer::handle_key_event` (the only place a
-    // `CodeViewer` is ever constructed) intercepts every key this component could handle itself:
-    // arrows/hjkl via `move_cursor_vertical`/`move_cursor_horizontal`, PageUp/PageDown/
-    // Home/End via `scroll_up`/`scroll_down`/`scroll_to` - before ever reaching the fallback that
-    // forwards to `left_viewer`/`right_viewer`. Nothing constructs a bare `CodeViewer` outside
-    // `diff_viewer.rs`, so this falls through to `Component`'s default `Ok(None)`.
+    // No `handle_key_event`: `DiffViewer`, the only owner, handles every key itself.
 
     fn update(&mut self, action: Action) -> Result<Option<Action>> {
         match action {
             Action::Tick => {}
             Action::Render => {}
             Action::Resize(_w, h) => {
-                // Update viewport height
                 self.state.viewport_height = h.saturating_sub(2) as usize;
             }
             _ => {}
@@ -552,9 +453,6 @@ impl Component for CodeViewer {
     }
 
     fn draw(&mut self, frame: &mut Frame, area: Rect) -> Result<()> {
-        // Use the StatefulWidget render method via frame.render_stateful_widget
-        // We need to pass self.widget by value, but we can't move out of self
-        // So we use a reference and implement StatefulWidget for &CodeViewerWidget
         frame.render_stateful_widget(&self.widget, area, &mut self.state);
         Ok(())
     }
@@ -599,9 +497,6 @@ mod tests {
         assert_eq!(clamp_to_non_whitespace(10, ""), 0);
     }
 
-    /// The defining "sticky column" case: a column that survives an intervening short/indented
-    /// line and reappears once a line wide enough for it comes back around - not just "clamp to
-    /// whatever the immediately previous line allowed".
     #[test]
     fn move_cursor_vertical_remembers_the_desired_column_across_a_shorter_line() {
         let mut viewer = viewer_with("hello world\nhi\nhello again\n");
@@ -802,10 +697,7 @@ mod tests {
         assert_eq!(viewer.search_match_count_and_index(), Some((2, 2)));
     }
 
-    /// Builds a `line_count`-line file with an `Update` range (a "change") at each row in
-    /// `change_rows`, `Identical` elsewhere - just enough range structure for
-    /// `next_change_position`/`jump_to_change` to navigate between changes, for the centering
-    /// tests below.
+    /// A `line_count`-line file with an `Update` range at each of `change_rows`.
     fn viewer_with_changes_at(line_count: usize, change_rows: &[usize]) -> CodeViewer {
         use crate::diff::text::TextOperation;
 
@@ -840,9 +732,6 @@ mod tests {
         viewer
     }
 
-    /// `n`/`p` (`jump_to_change`) must *center* the destination row, not just scroll the minimum
-    /// needed to keep it visible: a change already inside the viewport should still cause a
-    /// re-center, unlike `move_cursor_vertical`/other movement (`scroll_to_show_row`).
     #[test]
     fn jump_to_change_centers_the_destination_row() {
         let mut viewer = viewer_with_changes_at(100, &[50]);
@@ -858,8 +747,6 @@ mod tests {
         );
     }
 
-    /// A change near the very start of the file can't be centered without scrolling above line
-    /// 0 - the viewport should pin to the start instead of leaving dead space above the file.
     #[test]
     fn jump_to_change_clamps_to_the_start_of_the_file() {
         let mut viewer = viewer_with_changes_at(100, &[2]);
@@ -872,8 +759,6 @@ mod tests {
         assert_eq!(viewer.state.scroll, 0);
     }
 
-    /// A change near the very end of the file can't be centered without scrolling past the last
-    /// line - the viewport should pin to the end instead of leaving dead space below the file.
     #[test]
     fn jump_to_change_clamps_to_the_end_of_the_file() {
         let mut viewer = viewer_with_changes_at(100, &[97]);
@@ -886,5 +771,70 @@ mod tests {
             viewer.state.scroll, 90,
             "a 100-line file with a 10-row viewport can scroll no further than row 90"
         );
+    }
+
+    fn range(start_row: usize, end_row: usize, end_col: usize, op: TextOperation) -> RangeMatch {
+        RangeMatch {
+            source: TextRange::new(start_row, 0, end_row, end_col),
+            destination: TextRange::new(start_row, 0, end_row, end_col),
+            operation: op,
+        }
+    }
+
+    #[test]
+    fn change_bands_marks_each_band_a_change_touches_and_skips_identical_ranges() {
+        let mut viewer = viewer_with(&(0..10).map(|i| format!("l{i}\n")).collect::<String>());
+        viewer.set_ranges(vec![
+            range(0, 2, 0, TextOperation::Identical),
+            range(2, 2, 2, TextOperation::Update),
+            range(3, 8, 0, TextOperation::Identical),
+            range(8, 8, 2, TextOperation::Insert),
+        ]);
+        assert_eq!(
+            viewer.change_bands(5),
+            vec![
+                None,
+                Some(TextOperation::Update),
+                None,
+                None,
+                Some(TextOperation::Insert)
+            ]
+        );
+    }
+
+    #[test]
+    fn change_bands_does_not_count_the_row_a_range_ends_on_at_column_zero() {
+        let mut viewer = viewer_with(&(0..4).map(|i| format!("l{i}\n")).collect::<String>());
+        viewer.set_ranges(vec![range(0, 2, 0, TextOperation::Update)]);
+        assert_eq!(
+            viewer.change_bands(4),
+            vec![
+                Some(TextOperation::Update),
+                Some(TextOperation::Update),
+                None,
+                None
+            ]
+        );
+    }
+
+    #[test]
+    fn change_bands_shows_the_highest_priority_operation_in_a_shared_band() {
+        let mut viewer = viewer_with("a\nb\nc\nd\n");
+        viewer.set_ranges(vec![
+            range(0, 0, 1, TextOperation::Move),
+            range(1, 1, 1, TextOperation::Delete),
+            range(2, 2, 1, TextOperation::Update),
+        ]);
+        assert_eq!(viewer.change_bands(1), vec![Some(TextOperation::Delete)]);
+    }
+
+    #[test]
+    fn cursor_screen_position_is_none_once_the_cursor_scrolls_out_of_view() {
+        let mut viewer = viewer_with(&(0..50).map(|i| format!("l{i}\n")).collect::<String>());
+        viewer.set_viewport_height(10);
+        let area = Rect::new(0, 0, 40, 10);
+        assert!(viewer.cursor_screen_position(area).is_some());
+        viewer.scroll_to_show_row(30);
+        assert_eq!(viewer.cursor_screen_position(area), None);
     }
 }

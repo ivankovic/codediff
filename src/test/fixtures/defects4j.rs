@@ -15,10 +15,7 @@
  *  You should have received a copy of the GNU Affero General Public License
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
-// One entry per solved `defects4j` fixture (see `test::helper::DIFF_DATASETS`). The dataset's
-// 996 fixture directories are all present; this list grows as they are mapped in `human_solver`,
-// whose `insert_mod_declaration` adds entries here the same way it does for
-// `handmade.rs`/`small.rs`/`full.rs`/`stratified.rs`.
+// One `mod` per mapped fixture; `human_solver`'s `insert_mod_declaration` keeps it sorted.
 #[cfg(test)]
 mod java_defects4j_chart_10_standardtooltiptagfragmentgenerator;
 #[cfg(test)]
@@ -133,6 +130,8 @@ mod java_defects4j_cli_28_parser;
 mod java_defects4j_cli_29_util;
 #[cfg(test)]
 mod java_defects4j_cli_2_posixparser;
+#[cfg(test)]
+mod java_defects4j_cli_30_defaultparser;
 #[cfg(test)]
 mod java_defects4j_cli_31_helpformatter;
 #[cfg(test)]
@@ -332,11 +331,29 @@ mod java_defects4j_compress_4_tararchiveoutputstream;
 #[cfg(test)]
 mod java_defects4j_compress_4_ziparchiveoutputstream;
 #[cfg(test)]
+mod java_defects4j_csv_11_csvparser;
+#[cfg(test)]
+mod java_defects4j_csv_12_csvformat;
+#[cfg(test)]
+mod java_defects4j_csv_13_csvformat;
+#[cfg(test)]
+mod java_defects4j_csv_14_csvformat;
+#[cfg(test)]
 mod java_defects4j_csv_1_extendedbufferedreader;
 #[cfg(test)]
 mod java_defects4j_csv_2_csvrecord;
 #[cfg(test)]
+mod java_defects4j_csv_4_csvparser;
+#[cfg(test)]
+mod java_defects4j_csv_5_csvprinter;
+#[cfg(test)]
+mod java_defects4j_csv_6_csvrecord;
+#[cfg(test)]
 mod java_defects4j_gson_11_typeadapters;
+#[cfg(test)]
+mod java_defects4j_gson_13_jsonreader;
+#[cfg(test)]
+mod java_defects4j_gson_15_jsonwriter;
 #[cfg(test)]
 mod java_defects4j_gson_5_iso8601utils;
 #[cfg(test)]
@@ -344,17 +361,49 @@ mod java_defects4j_gson_6_jsonadapterannotationtypeadapterfactory;
 #[cfg(test)]
 mod java_defects4j_jacksoncore_11_bytequadscanonicalizer;
 #[cfg(test)]
+mod java_defects4j_jacksoncore_12_utf8streamjsonparser;
+#[cfg(test)]
 mod java_defects4j_jacksoncore_13_jsongeneratorimpl;
+#[cfg(test)]
+mod java_defects4j_jacksoncore_21_filteringparserdelegate;
+#[cfg(test)]
+mod java_defects4j_jacksoncore_25_readerbasedjsonparser;
 #[cfg(test)]
 mod java_defects4j_jacksoncore_26_nonblockingjsonparser;
 #[cfg(test)]
+mod java_defects4j_jacksoncore_3_utf8streamjsonparser;
+#[cfg(test)]
+mod java_defects4j_jacksoncore_5_jsonpointer;
+#[cfg(test)]
+mod java_defects4j_jacksoncore_8_textbuffer;
+#[cfg(test)]
+mod java_defects4j_jacksondatabind_103_basicbeandescription;
+#[cfg(test)]
+mod java_defects4j_jacksondatabind_103_basicdeserializerfactory;
+#[cfg(test)]
+mod java_defects4j_jacksondatabind_103_databindcontext;
+#[cfg(test)]
+mod java_defects4j_jacksondatabind_103_deserializercache;
+#[cfg(test)]
+mod java_defects4j_jacksondatabind_103_stddeserializer;
+#[cfg(test)]
+mod java_defects4j_jacksondatabind_103_stdvalueinstantiator;
+#[cfg(test)]
 mod java_defects4j_jacksondatabind_105_jdkdeserializers;
+#[cfg(test)]
+mod java_defects4j_jacksondatabind_107_typedeserializerbase;
 #[cfg(test)]
 mod java_defects4j_jacksondatabind_111_atomicreferencedeserializer;
 #[cfg(test)]
+mod java_defects4j_jacksondatabind_15_beanserializerfactory;
+#[cfg(test)]
 mod java_defects4j_jacksondatabind_15_javatype;
 #[cfg(test)]
+mod java_defects4j_jacksondatabind_15_stdserializer;
+#[cfg(test)]
 mod java_defects4j_jacksondatabind_16_annotationmap;
+#[cfg(test)]
+mod java_defects4j_jacksondatabind_17_objectmapper;
 #[cfg(test)]
 mod java_defects4j_jacksondatabind_1_beanpropertywriter;
 #[cfg(test)]

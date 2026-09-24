@@ -28,19 +28,14 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // The right-anchored alternative painting was removed: inside a node whose value we read
-    // character by character, ground truth anchors an ambiguous add/delete LEFT.
-    // `intra_node_update_ranges` takes the common prefix first and the suffix of the remainder, so
-    // it is right-anchored by construction and still emits the dropped spelling. This residual is
-    // that disagreement, and it is expected - it is the price of the rule, not a regression. See
-    // TODO.md for why the renderer was not flipped to match (it would fix 4 fixtures and break 12).
+    // Ground truth anchors an ambiguous add/delete inside a value LEFT; `intra_node_update_ranges`
+    // is right-anchored by construction. An expected residual, the price of that rule.
     assert_matches_human_painting_within_limit("rust-rust-lang-rust-update-comment", 4.51)
 }
 
 #[test]
 fn invariants() -> Result<()> {
-    // Invariant 9 read a tree-side `Delete` as an unmatched node, and this fixture has no unmatched
-    // node at all - the two bytes it reported were a colon that the painter put at the head of the
-    // surviving comment text and `TextDiff` put at the tail of the deleted text.
+    // No node is unmatched, so invariant 9 must not read the renderer's `Delete` of an edited
+    // character (a colon the painter and `TextDiff` put on opposite sides) as a missing partner.
     assert_ground_truth_invariants("rust-rust-lang-rust-update-comment")
 }

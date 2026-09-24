@@ -38,10 +38,8 @@ fn painting() -> Result<()> {
 
 #[test]
 fn invariants() -> Result<()> {
-    // Invariant 1: both paintings end a run on the trailing space of after rows 321, 332 and 368,
-    // once per painting. The file is CRLF and those lines carry a real space before the `\r`, so
-    // this is painted trailing whitespace rather than a line-ending artifact - three spans to
-    // shorten by one character, in each painting.
+    // Invariant 1: both paintings end a run on the trailing space of after rows 321, 332 and 368.
+    // The file is CRLF and those lines carry a real space before the `\r`, so these are real.
     assert_ground_truth_invariants_with_known_violations(
         "java-defects4j-chart-22-keyedobjects2d",
         6,

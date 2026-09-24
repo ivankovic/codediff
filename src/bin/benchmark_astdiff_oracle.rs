@@ -18,49 +18,33 @@
 
 //! Scores codediff's node mapping against an oracle nobody on this project wrote: the
 //! Alikhanifard & Tsantalis AST node-mapping benchmark (TOSEM 2025, arXiv 2403.05939), Defects4J
-//! half. `research/external/README.md` says what the data is and how to fetch it; this file says
-//! how a JDT mapping and a tree-sitter mapping get compared at all, because that is where every
-//! number this tool prints can go wrong.
+//! half. `research/external/README.md` says what the data is and how to fetch it; this doc says
+//! how a JDT mapping and a tree-sitter mapping are compared.
 //!
-//! **The oracle's unit is a JDT node; ours is a tree-sitter node. The common ground is the span.**
-//! A record `ExpressionStatement[3293-3364] : ExpressionStatement[3293-3364]` becomes the byte-span
-//! pair `((3293,3364),(3293,3364))` after converting JDT's UTF-16 indices to bytes, and is
-//! *resolved* if both files have a tree-sitter node with exactly that span. Both sides' mappings
-//! are then plain sets of span pairs, so precision and recall are set arithmetic
-//! (`TP = O ∩ C`, `FP = C \ O`, `FN = O \ C`), the same definition as the paper's Definition 5.1.
-//! Records that do not resolve - JDT's synthetic `METHOD_INVOCATION_RECEIVER`, the `TextElement`s
-//! inside a Javadoc that tree-sitter sees as one `block_comment` - are dropped from the oracle
-//! set and counted, per JDT type, in the `--details` output. **Quote that resolution rate next
-//! to any precision or recall from here**: it is the part of the oracle we could not ask.
+//! **The common ground is the byte span.** A JDT record's UTF-16 offsets become a byte-span pair,
+//! *resolved* if both files have a tree-sitter node with that span (allowing the boundary
+//! differences in `Side::resolve`). Both mappings are then sets of span pairs, and precision and
+//! recall are set arithmetic, as in the paper's Definition 5.1. Unresolved records (JDT-synthetic
+//! nodes, Javadoc internals) are dropped and counted per JDT type under `--details`; **quote that
+//! resolution rate next to any precision or recall**.
 //!
-//! **Which of codediff's mappings are judged.** Codediff maps every node, including `;` tokens,
-//! `modifiers` wrappers and other tree-sitter-only structure the oracle has no record of. Counting
-//! those as false positives would measure the grammar, not the diff. A codediff pair is judged
-//! when the oracle *could* have an opinion about it: its left span is one the oracle maps on the
-//! left side, or its right span is one the oracle maps on the right side (`in-universe`), or its
-//! node kind is one that, across the whole run, resolves against oracle records nearly every time
-//! it appears (`whitelisted` - see `KindStats`). The second clause exists for the one error the
-//! first cannot see: codediff pairing a deleted node with an inserted one where the oracle maps
-//! neither. The whitelist is data-driven precisely so a kind like `modifiers` - which resolves
-//! only when a declaration has a single modifier - stays out of it.
+//! **Which codediff pairs are judged.** Codediff maps tree-sitter-only structure (`;`, `modifiers`)
+//! the oracle has no record of; counting that as false positives would measure the grammar. A pair
+//! is judged when its left span is one the oracle maps on the left, or its right span one it maps
+//! on the right, or its kind is whitelisted: a kind that resolves against the oracle nearly every
+//! time it appears (`KindStats`). The whitelist catches codediff pairing a deleted node with an
+//! inserted one where the oracle maps neither; it is data-driven so that a kind like `modifiers`,
+//! which resolves only with a single modifier, stays out.
 //!
-//! **The exclusion rule.** The oracle lists *every* mapping, identical subtrees included (one
-//! Joda-Time file has 11,087 records), and the paper excludes "all AST node mappings nested under
-//! unchanged program elements" before computing anything, because every tool gets those right.
-//! Implemented here as: a pair is excluded when the nearest enclosing program element (type,
-//! method, constructor, field, import, ... - `PROGRAM_ELEMENT_KINDS`) on the left has byte-identical
-//! text to the one on the right. Applied to both sets. A mapping with no enclosing element (the
-//! root, a top-level comment) is kept; that is one or two guaranteed true positives per file and
-//! the paper does the same.
+//! **The exclusion rule**, as in the paper: a pair is excluded from both sets when its nearest
+//! enclosing program element (`PROGRAM_ELEMENT_KINDS`) is byte-identical on both sides. A pair with
+//! no enclosing element is kept, as the paper does.
 //!
-//! **Two granularities**, as in the paper's Tables 11 and 12: `statement` keeps only oracle
-//! records whose JDT type is a statement, declaration or block (`is_statement_level`), `all` keeps
-//! everything that resolves. Codediff's side is filtered to the same population through the
-//! statement-level whitelist.
+//! **Two granularities**, as in the paper's Tables 11 and 12: `statement` (`is_statement_level`,
+//! and the statement-level whitelist on codediff's side) and `all`.
 //!
-//! Two passes over the data: the first resolves every oracle record to learn the kind whitelist,
-//! the second scores. Parsing is cheap; the ~2.2 GB of oracle JSON is what costs, and it is read
-//! twice rather than held in memory.
+//! Pass 1 learns the whitelist, pass 2 scores; the oracle JSON (gigabytes) is read twice rather
+//! than held in memory.
 
 use anyhow::{Context, Result, bail};
 use clap::Parser;
@@ -111,19 +95,11 @@ struct Args {
     /// ... and only when at least this many occurrences were seen.
     #[arg(long, default_value_t = 50)]
     whitelist_min: usize,
-    /// Score **our own hand-authored mapping** against the oracle instead of codediff's output,
-    /// over the compilation units this directory holds a solved fixture for.
+    /// Score our own hand-authored mappings against the oracle instead of codediff's output, over
+    /// the compilation units this fixture directory holds a solved fixture for. Their mapping stays
+    /// the reference, so precision and recall measure agreement, not a verdict.
     ///
-    /// This is the one measurement that puts two independently authored ground truths against
-    /// each other: ours was written by the people who built codediff, theirs by Alikhanifard and
-    /// Tsantalis for a different tool on a different AST. Precision and recall keep their usual
-    /// meaning with *their* mapping as the reference, so "precision" here is the share of our
-    /// pairs they also record and "recall" the share of theirs we do - neither is a score, since
-    /// neither is a verdict on the other.
-    ///
-    /// A unit is matched to a fixture by **content**, not by name: the fixture directories carry
-    /// the same before/after bytes the oracle's offsets index into (see their READMEs), and the
-    /// fixture naming is a Python script's business, not this one's.
+    /// A unit is matched to a fixture by content, not by name.
     #[arg(long)]
     human_mappings: Option<PathBuf>,
 }
@@ -182,10 +158,8 @@ fn human_fixture_for(index: &HumanIndex, before: &Side, after: &Side) -> Option<
         .cloned()
 }
 
-/// One record of an oracle JSON file. The `firstLabel`/`secondLabel`/`*ParentType` fields are
-/// left out deliberately: serde skips unknown fields, and the labels are the bulk of the 2.2 GB.
-/// `secondType` is left out too: in every record checked it equals `firstType` (the oracle maps
-/// same-typed nodes only), so the first type is *the* type of a record.
+/// One record of an oracle JSON file. The labels, the bulk of the data, are not deserialized.
+/// `secondType` always equals `firstType`: the oracle maps same-typed nodes only.
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 struct OracleRecord {
@@ -206,10 +180,9 @@ struct CaseId {
 type Span = (usize, usize);
 type SpanPair = (Span, Span);
 
-/// Tree-sitter kinds that count as a "program element" for the exclusion rule. JDT's
-/// `matchedElements` section - the paper's own notion - covers type, method, field and enum
-/// declarations; imports and the package line are added because they are the other top-level
-/// declarations every tool maps trivially when unchanged.
+/// Tree-sitter kinds that count as a "program element" for the exclusion rule: the paper's type,
+/// method, field and enum declarations, plus imports and the package line, which every tool also
+/// maps trivially when unchanged.
 const PROGRAM_ELEMENT_KINDS: &[&str] = &[
     "class_declaration",
     "interface_declaration",
@@ -228,12 +201,8 @@ const PROGRAM_ELEMENT_KINDS: &[&str] = &[
     "package_declaration",
 ];
 
-/// The paper's coarse granularity: "statement mappings" (its Table 11) against "statement and
-/// sub-expression mappings" (Table 12). JDT names make the split mechanical: statements end in
-/// `Statement`, declarations in `Declaration` (which sweeps in `SingleVariableDeclaration`, a
-/// parameter - a declaration to JDT, so kept), plus the handful of block-like kinds that carry
-/// statements. `VariableDeclarationFragment` is the name-and-initialiser half of a `int x = 1;`
-/// and is sub-expression level; it ends in `Fragment`, so it falls out naturally.
+/// The paper's "statement mappings" granularity (its Table 11), by JDT type name: statements,
+/// declarations (a parameter's `SingleVariableDeclaration` included) and block-like kinds.
 fn is_statement_level(jdt_type: &str) -> bool {
     jdt_type.ends_with("Statement")
         || jdt_type.ends_with("Declaration")
@@ -243,22 +212,17 @@ fn is_statement_level(jdt_type: &str) -> bool {
         )
 }
 
-/// Everything the scorer needs to know about one side of one file: the parsed code, a
-/// span -> nodes index, and the UTF-16 -> byte table when the file is not ASCII.
+/// One side of one file, indexed for the scorer.
 struct Side {
     code: Code,
-    /// Every node with this exact byte span. Usually one; `type_identifier` alone where JDT has
-    /// `SimpleType` over `SimpleName`, or an anonymous `public` token under a one-modifier
-    /// `modifiers` node, are the multi-node cases.
+    /// Every node with this exact byte span, outermost first. Several when a node has a single
+    /// child of the same extent, such as `public` under a one-modifier `modifiers`.
     by_span: HashMap<Span, Vec<usize>>,
-    /// Node id -> (kind, span, parent id). Indexed once so the scorer never walks the tree again.
     nodes: HashMap<usize, NodeInfo>,
-    /// `utf16_to_byte[i]` = byte offset of UTF-16 code unit `i`; `None` when the file is ASCII
-    /// and the identity applies. Length is units + 1 so an end offset resolves too.
+    /// Byte offset of each UTF-16 code unit, plus one past the end; `None` for ASCII files.
     utf16_to_byte: Option<Vec<usize>>,
-    /// Spans of every `block_comment` / `line_comment`, sorted by start - to tell an oracle
-    /// record that lives *inside* a Javadoc (JDT parses those; tree-sitter does not) from one
-    /// that failed to resolve for a reason worth looking at.
+    /// Comment spans, sorted by start. JDT parses Javadoc internals and tree-sitter does not, so
+    /// an unresolved record inside a comment is expected, not a problem to look at.
     comments: Vec<Span>,
 }
 
@@ -272,9 +236,7 @@ struct NodeInfo {
 impl Side {
     fn load(path: &Path) -> Result<Self> {
         let bytes = std::fs::read(path).with_context(|| format!("reading {}", path.display()))?;
-        // JDT read these files as text and reports `String` indices; if the bytes are not valid
-        // UTF-8 there is no way to know what it saw, so refuse rather than guess with a lossy
-        // conversion that would shift every offset after the first bad byte.
+        // Refuse invalid UTF-8: a lossy conversion would shift every JDT offset after it.
         let contents = String::from_utf8(bytes)
             .map_err(|_| anyhow::anyhow!("{} is not valid UTF-8", path.display()))?;
         let utf16_to_byte = if contents.is_ascii() {
@@ -331,22 +293,17 @@ impl Side {
         })
     }
 
-    /// The tree-sitter nodes standing for a JDT node with this byte span, and the span they
-    /// actually have. Exact match first; then the handful of systematic ways JDT and
-    /// tree-sitter-java draw the same node's boundary differently, each tried in turn:
+    /// The tree-sitter nodes standing for a JDT node with this byte span, and their actual span.
+    /// Exact match first, then the systematic boundary differences between JDT and
+    /// tree-sitter-java:
     ///
-    /// * **A body declaration starts at its Javadoc in JDT.** `MethodDeclaration[100-900]` where
-    ///   bytes 100..350 are `/** ... */` is tree-sitter's `method_declaration` at 350..900 (after
-    ///   any further comments and whitespace). Without this, every documented method, field and
-    ///   type is unresolvable - 315 methods in a four-file probe.
-    /// * **Trailing `;` / `:`.** JDT's `VariableDeclarationExpression` (a `for` initialiser) stops
-    ///   before the `;` that tree-sitter's `local_variable_declaration` includes; JDT's
-    ///   `SwitchCase` includes the `:` that tree-sitter's `switch_label` stops before.
-    /// * **`METHOD_INVOCATION_ARGUMENTS`** is JDT's synthetic span over the arguments alone;
-    ///   tree-sitter's `argument_list` includes the parentheses.
+    /// * JDT starts a documented declaration at its Javadoc; tree-sitter after it.
+    /// * A trailing `;` or `:` one side includes and the other does not (`for` initialisers,
+    ///   `switch` labels).
+    /// * JDT's `METHOD_INVOCATION_ARGUMENTS` excludes the parentheses `argument_list` includes.
     ///
-    /// Each tolerance widens or narrows by exactly the delimiter it names and only when that
-    /// delimiter is there in the text, so it cannot resolve a span to an unrelated node.
+    /// Each tolerance moves a boundary only over the delimiter it names, when that delimiter is in
+    /// the text, so it cannot resolve to an unrelated node.
     fn resolve(&self, start: usize, end: usize) -> Option<(Span, &[usize])> {
         let bytes = self.code.contents.as_bytes();
         if start > end || end > bytes.len() {
@@ -398,8 +355,6 @@ impl Side {
     }
 
     fn inside_comment(&self, span: Span) -> bool {
-        // `comments` is sorted by start; the enclosing comment, if any, is the last one starting
-        // at or before `span.0`.
         let idx = self.comments.partition_point(|c| c.0 <= span.0);
         idx > 0 && self.comments[idx - 1].1 >= span.1
     }
@@ -440,11 +395,9 @@ fn under_unchanged_element(before: &Side, after: &Side, before_id: usize, after_
     }
 }
 
-/// Per-kind evidence for the judged-pair whitelist: how often a node of this kind (under a
-/// changed program element, mapped by codediff to a real partner) had its span in the oracle's
-/// universe. A kind whose ratio is high is one JDT models one-to-one; a kind whose ratio is low
-/// is tree-sitter structure JDT slices differently, and a codediff mapping of it can never be
-/// judged either way.
+/// Per-kind evidence for the whitelist: of the codediff-paired nodes of this kind under changed
+/// program elements, how many have their span in the oracle's universe. A high ratio means JDT
+/// models the kind one-to-one.
 #[derive(Default, Debug, Clone)]
 struct KindStats {
     seen: usize,
@@ -453,14 +406,12 @@ struct KindStats {
 
 /// Everything learned about one compilation unit that both passes need.
 struct FileResolution {
-    /// Resolved oracle pairs, with the JDT type they came from (first type; the two always agree
-    /// in this oracle) and the node ids each end resolved to.
+    /// Resolved oracle pairs, with their JDT type and the node ids each end resolved to.
     oracle: Vec<(SpanPair, String, usize, usize)>,
-    /// How many records the JSON held, and which JDT types failed to resolve, with counts.
     records: usize,
     unresolved: BTreeMap<String, usize>,
-    /// Every left span / right span the oracle maps, resolved or not - the "universe" a codediff
-    /// pair is judged against. Indexed `[0]` for all records, `[1]` for statement-level ones.
+    /// Every span the oracle maps on each side, resolved or not: the universe a codediff pair is
+    /// judged against. `[0]` for all records, `[1]` for statement-level ones.
     left_universe: [HashSet<Span>; 2],
     right_universe: [HashSet<Span>; 2],
 }
@@ -495,9 +446,8 @@ fn resolve_oracle(json_path: &Path, before: &Side, after: &Side) -> Result<FileR
         };
         let left = before.resolve(ls, le);
         let right = after.resolve(rs, re);
-        // The universe is compared against codediff's tree-sitter spans, so it holds the span a
-        // record *resolved to*; an unresolved record contributes its raw span, which matches
-        // nothing and is harmless.
+        // The universe holds the span a record resolved to, since it is compared against
+        // tree-sitter spans; an unresolved record's raw span matches nothing.
         let pair: SpanPair = (
             left.map_or((ls, le), |(span, _)| span),
             right.map_or((rs, re), |(span, _)| span),
@@ -520,15 +470,12 @@ fn resolve_oracle(json_path: &Path, before: &Side, after: &Side) -> Result<FileR
                 .or_default() += 1;
             continue;
         };
-        // Several JDT records can collapse onto one span pair (`SimpleType` over `SimpleName`);
-        // keep the first, they are the same claim.
+        // Several JDT records can collapse onto one span pair; they are the same claim.
         if !seen.insert(pair) {
             continue;
         }
-        // Any node at the span serves for the exclusion rule - all nodes sharing a span share an
-        // enclosing element unless one of them *is* the element, in which case the outermost
-        // (last pushed = first in the vec, since the walk is a DFS pushing children after the
-        // parent) is the element itself and gives the right answer.
+        // The outermost node at the span (first in `by_span`) is the one to use for the
+        // exclusion rule, since it is the element itself when any of them is.
         resolution
             .oracle
             .push((pair, record.first_type.clone(), left_ids[0], right_ids[0]));
@@ -536,8 +483,8 @@ fn resolve_oracle(json_path: &Path, before: &Side, after: &Side) -> Result<FileR
     Ok(resolution)
 }
 
-/// Codediff's mapping as span pairs with the node ids and kinds behind them. Null mappings
-/// (insert/delete) are not pairs and are skipped.
+/// Codediff's mapping as span pairs with the node ids and kinds behind them. Inserts and deletes
+/// are not pairs.
 fn codediff_pairs(
     before: &Side,
     after: &Side,
@@ -616,8 +563,6 @@ fn score_file(
     human: Option<(&str, &codediff::test::helper::human_mapping::HumanMapping)>,
 ) -> Result<FileScore> {
     let started = Instant::now();
-    // In human mode the "tool" is our own ground truth, pushed through the same span-pair
-    // projection codediff's output goes through, so the two are compared on identical terms.
     let human_ast = match human {
         Some((_, mapping)) => Some(
             codediff::test::helper::human_mapping::as_ast_diff_for_mapping(
@@ -675,13 +620,9 @@ fn score_file(
                 {
                     return true;
                 }
-                // A whitelisted kind the oracle has no record of, either side. If the node did
-                // not move or change - same bytes at the same offsets - the oracle is silent
-                // about a node it simply did not list (RefactoringMiner records comments
-                // selectively: the probe's first "false positives" were four `// SECTION` line
-                // comments mapped to themselves), and there is nothing to judge. If it did move
-                // or change, the oracle's silence *is* its verdict - both ends are unmapped to
-                // it - and codediff's pair is the error the whitelist exists to catch.
+                // A whitelisted kind the oracle maps on neither side. Unmoved and unchanged, the
+                // oracle simply did not list it (it records comments selectively): nothing to
+                // judge. Otherwise its silence is its verdict, and codediff's pair is an error.
                 whitelist.contains(kind)
                     && (pair.0 != pair.1 || before.text(pair.0) != after.text(pair.1))
             })
@@ -832,11 +773,8 @@ fn main() -> Result<()> {
         total_files
     );
 
-    // Pass 1: resolve every oracle file once to learn which tree-sitter kinds JDT models
-    // one-to-one. Counted only under changed program elements and only for nodes codediff would
-    // actually pair, so the ratio measures "can the oracle judge this kind" and nothing else -
-    // which means pass 1 has to run the diff too. The oracle resolution itself is not kept
-    // (2.2 GB of JSON would be); pass 2 re-reads it.
+    // Pass 1: learn the kind whitelist. It counts only nodes codediff pairs, so this pass runs
+    // the diff too.
     let mut kind_all: HashMap<&'static str, KindStats> = HashMap::new();
     let mut kind_statement: HashMap<&'static str, KindStats> = HashMap::new();
     let mut unresolved_total: BTreeMap<String, usize> = BTreeMap::new();
@@ -952,8 +890,8 @@ fn main() -> Result<()> {
                 .and_then(|f| f.to_str())
                 .unwrap_or("?")
                 .to_string();
-            // In human mode a unit we have not solved has nothing to score - it is not a zero,
-            // it is silence, and counting it would report our coverage as our accuracy.
+            // In human mode an unsolved unit is skipped, not scored as zero: counting it would
+            // report our coverage as our accuracy.
             let mapping = match &human_index {
                 Some(index) => match human_fixture_for(index, &before, &after) {
                     Some(name) => {
@@ -1023,8 +961,7 @@ fn main() -> Result<()> {
     }
     writer.flush()?;
 
-    // Summary, by population and granularity. "Perfect" is per case, as in the paper's Table 13
-    // and 14: every compilation unit of the case has no FP and no FN.
+    // "Perfect" is per case, as in the paper's Tables 13 and 14: no FP and no FN in any unit.
     println!(
         "\n{} compilation units in {} cases scored ({} skipped); CSV: {}",
         scores.len(),
@@ -1098,4 +1035,113 @@ fn main() -> Result<()> {
          perfect 72.4%; GT greedy 99.2/98.4 perfect 75.4%; IJM 99.0/98.6; MTDiff 98.4/98.2."
     );
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+
+    fn side(java: &str) -> Side {
+        let mut file = tempfile::NamedTempFile::new().unwrap();
+        file.write_all(java.as_bytes()).unwrap();
+        Side::load(file.path()).unwrap()
+    }
+
+    fn span_of(side: &Side, text: &str) -> Span {
+        let start = side.code.contents.find(text).unwrap();
+        (start, start + text.len())
+    }
+
+    fn kinds_at(side: &Side, ids: &[usize]) -> Vec<&'static str> {
+        ids.iter().map(|id| side.nodes[id].kind).collect()
+    }
+
+    #[test]
+    fn resolve_skips_a_leading_javadoc() {
+        let s = side("class A {\n  /** Doc. */\n  // more\n  void f() {}\n}\n");
+        let start = s.code.contents.find("/**").unwrap();
+        let end = span_of(&s, "void f() {}").1;
+        let (span, ids) = s.resolve(start, end).unwrap();
+        assert_eq!(span, span_of(&s, "void f() {}"));
+        assert_eq!(kinds_at(&s, ids)[0], "method_declaration");
+    }
+
+    #[test]
+    fn resolve_tolerates_a_trailing_semicolon_or_colon() {
+        let s = side("class A { void f() { for (int i = 0; i < 1; i++) {} } }");
+        let (start, end) = span_of(&s, "int i = 0");
+        let (span, ids) = s.resolve(start, end).unwrap();
+        assert_eq!(span, (start, end + 1));
+        assert_eq!(kinds_at(&s, ids)[0], "local_variable_declaration");
+    }
+
+    #[test]
+    fn resolve_widens_arguments_to_their_parentheses() {
+        let s = side("class A { void f() { g(1, 2); } }");
+        let (start, end) = span_of(&s, "1, 2");
+        let (span, ids) = s.resolve(start, end).unwrap();
+        assert_eq!(span, (start - 1, end + 1));
+        assert_eq!(kinds_at(&s, ids)[0], "argument_list");
+    }
+
+    #[test]
+    fn resolve_rejects_a_span_no_tolerance_explains() {
+        let s = side("class A { void f() { g(1, 2); } }");
+        let (start, _) = span_of(&s, "1, 2");
+        assert!(s.resolve(start, start + 2).is_none());
+    }
+
+    #[test]
+    fn by_span_lists_the_outermost_node_first() {
+        let s = side("class A { public int x; }");
+        let ids = &s.by_span[&span_of(&s, "public")];
+        assert_eq!(kinds_at(&s, ids), ["modifiers", "public"]);
+    }
+
+    #[test]
+    fn byte_offset_converts_utf16_units_past_non_ascii_text() {
+        // 'é' is one UTF-16 unit and two bytes; '😀' is two units and four bytes.
+        let s = side("class A { String s = \"é😀\"; int x; }");
+        let x = s.code.contents.find("int x").unwrap();
+        let utf16 = s.code.contents[..x].encode_utf16().count();
+        assert_eq!(s.byte_offset(utf16), Some(x));
+        assert_eq!(
+            s.byte_offset(s.code.contents.encode_utf16().count()),
+            Some(s.code.contents.len())
+        );
+    }
+
+    #[test]
+    fn statement_level_keeps_parameters_but_not_declaration_fragments() {
+        assert!(is_statement_level("SingleVariableDeclaration"));
+        assert!(is_statement_level("ExpressionStatement"));
+        assert!(is_statement_level("Block"));
+        assert!(!is_statement_level("VariableDeclarationFragment"));
+        assert!(!is_statement_level("MethodInvocation"));
+    }
+
+    #[test]
+    fn a_pair_under_a_byte_identical_element_is_excluded() {
+        let before = side("class A { void f() { g(); } void h() { g(); } }");
+        let after = side("class A { void f() { g(); } void h() { k(); } }");
+        let call = |s: &Side, nth: usize| {
+            let start = s.code.contents.match_indices("g();").nth(nth).unwrap().0;
+            s.by_span[&(start, start + 3)][0]
+        };
+        assert!(under_unchanged_element(
+            &before,
+            &after,
+            call(&before, 0),
+            call(&after, 0)
+        ));
+        let k = after.code.contents.find("k()").unwrap();
+        let k_call = after.by_span[&(k, k + 3)][0];
+        assert!(!under_unchanged_element(
+            &before,
+            &after,
+            call(&before, 1),
+            k_call
+        ));
+    }
 }

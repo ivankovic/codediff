@@ -23,11 +23,8 @@ use crate::test::helper;
 
 use super::*;
 
-/// The property the whole structural definition exists for: the visible set of a file is a
-/// function of that file alone, so diffing it against two completely different counterparts -
-/// or against nothing - must yield the identical set. The previous, renderer-derived definition
-/// failed this by construction, which is what made it unusable as a metric (see
-/// `is_structurally_visible`'s doc comment).
+/// The property the structural definition exists for: the visible set is a function of the file
+/// alone.
 #[test]
 fn structural_visibility_does_not_depend_on_what_the_file_is_diffed_against() {
     let subject = Code::from_string(
@@ -53,10 +50,8 @@ fn structural_visibility_does_not_depend_on_what_the_file_is_diffed_against() {
     }
 }
 
-/// Pure containers are excluded and text-carrying nodes are kept - the distinction the metric
-/// is built on. `block` is the canonical container (everything readable in it belongs to a
-/// child); a Rust `line_comment` is the canonical interior-but-visible node, since its `//`
-/// marker is a separate child leaving the words on the parent.
+/// A Rust `line_comment` is interior but visible: its `//` is a separate child, leaving the words
+/// on the parent.
 #[test]
 fn structural_visibility_excludes_containers_and_keeps_text_carriers() {
     let code = Code::from_string(
@@ -98,16 +93,13 @@ fn structural_visibility_excludes_containers_and_keeps_text_carriers() {
     );
 }
 
-/// The bitmask form `UnitCostModel::ren` uses on the hot path must agree with the string-
-/// scanning `kinds_update_allowed` it replaced, for *every* pair of kinds either of them knows
-/// about, in every language. Exhaustive rather than sampled: the whole point of the mask is
-/// that it is a pure derivation of the same `const` arrays, so a disagreement anywhere is a
-/// bug in the derivation, and the cross product is small enough to just check outright.
+/// Exhaustive over every known kind pair and language: the cross product is small, and any
+/// disagreement is a bug in the mask derivation.
 #[test]
 fn operator_family_masks_agree_with_string_scanning_kinds_update_allowed() {
     let mut kinds: Vec<&str> = ALL_OPERATOR_FAMILIES.concat();
     kinds.extend_from_slice(IDENTIFIER_KINDS);
-    // A kind in no family at all, to pin the negative case too.
+    // A kind in no family, for the negative case.
     kinds.push("if_statement");
     kinds.sort_unstable();
     kinds.dedup();
@@ -170,7 +162,6 @@ fn kinds_update_allowed_same_kind_is_always_allowed() {
 
 #[test]
 fn kinds_update_allowed_cross_kind_identifiers() {
-    // Test that identifier-like kinds can match each other
     assert!(kinds_update_allowed(
         "identifier",
         "field_identifier",
@@ -197,7 +188,7 @@ fn kinds_update_allowed_cross_kind_identifiers() {
         &Language::JavaScript
     ));
 
-    // Test that it works across all languages
+    // Including languages with no families of their own.
     assert!(kinds_update_allowed(
         "identifier",
         "field_identifier",
@@ -214,8 +205,6 @@ fn kinds_update_allowed_cross_kind_identifiers() {
         &Language::Python
     ));
 
-    // scoped_type_identifier is NOT included in IDENTIFIER_KINDS because it represents
-    // qualified names where the qualification is part of the identity
     assert!(!kinds_update_allowed(
         "scoped_type_identifier",
         "type_identifier",
@@ -225,7 +214,6 @@ fn kinds_update_allowed_cross_kind_identifiers() {
 
 #[test]
 fn kinds_update_allowed_identifiers_do_not_match_non_identifiers() {
-    // Test that identifier kinds don't match non-identifier kinds
     assert!(!kinds_update_allowed("identifier", "+", &Language::C));
     assert!(!kinds_update_allowed("field_identifier", "(", &Language::C));
     assert!(!kinds_update_allowed(
@@ -237,15 +225,11 @@ fn kinds_update_allowed_identifiers_do_not_match_non_identifiers() {
 
 #[test]
 fn flow_control_similarity_of_sets_ignores_wildcards_and_scores_jaccard() {
-    // `solve_import_list_overlap` is the only caller, and it builds its sets from import symbols
-    // rather than from flow-control arm signatures - but the Jaccard scoring itself is generic and
-    // worth its own direct test.
     let before: std::collections::HashSet<&str> =
         ["asset", "ecmascript", "wasm"].into_iter().collect();
     let after: std::collections::HashSet<&str> =
         ["asset", "ecmascript", "json"].into_iter().collect();
 
-    // Shared: asset, ecmascript (2). Union: asset, ecmascript, wasm, json (4).
     let score = flow_control_similarity_of_sets(&before, &after);
     assert!(
         (score - 0.5).abs() < 1e-9,
@@ -263,7 +247,6 @@ fn flow_control_similarity_of_sets_is_zero_when_either_side_is_empty() {
 
 #[test]
 fn cpp_relational_operators_cross_match() {
-    // The motivating case: `for (...; i < size; ...)` -> `for (...; i <= size; ...)`.
     assert!(kinds_update_allowed("<", "<=", &Language::CPP));
     assert!(kinds_update_allowed("==", "!=", &Language::CPP));
     assert!(kinds_update_allowed(">=", "<=>", &Language::CPP));
@@ -283,7 +266,6 @@ fn cpp_increment_decrement_cross_match() {
 
 #[test]
 fn rust_range_operators_cross_match() {
-    // The classic Rust off-by-one fix: `0..n` -> `0..=n`.
     assert!(kinds_update_allowed("..", "..=", &Language::Rust));
     assert!(!kinds_update_allowed("..", "+", &Language::Rust));
 }
@@ -301,8 +283,6 @@ fn unknown_language_never_allows_cross_kind_matches() {
 
 #[test]
 fn python_excludes_keyword_comparisons_from_family() {
-    // `in`/`is`/`instanceof` double as other syntax elsewhere in the grammar, so they're
-    // deliberately excluded from the shared comparison family (see COMPARISON_OPS doc).
     assert!(!kinds_update_allowed("in", "==", &Language::Python));
     assert!(kinds_update_allowed("<", "<=", &Language::Python));
 }
@@ -327,13 +307,11 @@ fn generic_token_kind_excludes_content_bearing_leaves() {
 
 #[test]
 fn matching_allowed_rejects_whatever_kinds_update_allowed_rejects() {
-    // `+` and `<` are never kind-compatible, regardless of context.
     assert!(!matching_allowed("<", "+", &Language::CPP, || true));
 }
 
 #[test]
 fn matching_allowed_requires_context_for_generic_tokens_only() {
-    // Same identifier kind, not a generic token: context is never even consulted.
     assert!(matching_allowed(
         "identifier",
         "identifier",
@@ -341,11 +319,9 @@ fn matching_allowed_requires_context_for_generic_tokens_only() {
         || { panic!("must not evaluate parents_matched for a non-generic-token kind") }
     ));
 
-    // Generic token, kind-compatible (same kind): allowed only if context says so.
     assert!(matching_allowed("<", "<", &Language::CPP, || true));
     assert!(!matching_allowed("<", "<", &Language::CPP, || false));
 
-    // Generic token, cross-kind family swap: same rule applies.
     assert!(matching_allowed("<", "<=", &Language::CPP, || true));
     assert!(!matching_allowed("<", "<=", &Language::CPP, || false));
 }
@@ -361,32 +337,24 @@ fn leaf_texts_similar_accepts_clear_renames() {
 fn leaf_texts_similar_rejects_unrelated_and_tiny_texts() {
     assert!(!leaf_texts_similar("i", "numbers"));
     assert!(!leaf_texts_similar("min", "result"));
-    // Too short for bigram evidence - the context arm of the caller's OR handles these.
     assert!(!leaf_texts_similar("i", "j"));
     assert!(!leaf_texts_similar("0", "1"));
 }
-
-// Tests for is_reference
 
 #[test]
 fn root_nodes_are_reference_in_all_languages() -> Result<()> {
     let codes = helper::handmade_test_code()?;
 
-    // Test on all handmade code files
     for (filename, code) in &codes {
-        // Get the language from metadata
         let language_msg = format!("Language should be set for file: {}", filename);
         let language = code.metadata.language.as_ref().expect(&language_msg);
 
-        // Get the AST
         let ast_msg = format!("AST should be parsed for file: {}", filename);
         let ast = code.ast.as_ref().expect(&ast_msg);
 
-        // Get the root node
         let root_node = ast.root_node();
         let root_node_kind = root_node.kind();
 
-        // Check if the root node is a reference node
         assert!(
             is_reference(root_node_kind, language),
             "Root node '{}' should be a reference node for language {:?} in file {}",
@@ -399,8 +367,6 @@ fn root_nodes_are_reference_in_all_languages() -> Result<()> {
     Ok(())
 }
 
-// Tests for is_semantically_structural
-
 fn collect_matches(src: &str) -> Vec<(String, String)> {
     let code = Code::from_string(src, &Language::Rust);
     let ast = code.ast.as_ref().expect("AST should parse");
@@ -411,8 +377,7 @@ fn collect_matches(src: &str) -> Vec<(String, String)> {
         .collect()
 }
 
-/// Recursively collects every semantically-structural match in `node`'s subtree (unlike
-/// `collect_matches`, which only looks at direct children of the root).
+/// Every semantically structural match in `node`'s subtree, at any depth.
 fn collect_semantic_matches(
     node: tree_sitter::Node,
     lang: &Language,
@@ -463,21 +428,15 @@ fn rust_public_items_are_matched() {
 fn root_nodes_are_not_semantically_structural_in_all_languages() -> Result<()> {
     let codes = helper::handmade_test_code()?;
 
-    // Test on all handmade code files
     for (filename, code) in &codes {
-        // Get the language from metadata
         let language_msg = format!("Language should be set for file: {}", filename);
         let language = code.metadata.language.as_ref().expect(&language_msg);
 
-        // Get the AST
         let ast_msg = format!("AST should be parsed for file: {}", filename);
         let ast = code.ast.as_ref().expect(&ast_msg);
 
-        // Get the root node
         let root_node = ast.root_node();
 
-        // The root node is in principle NOT a semantically structural node.
-        // This is because it doesn't actually change the semantic of the code in any way.
         assert!(
             is_semantically_structural(&root_node, language, code).is_none(),
             "Root node should not be a semantically structural node in language {:?} in file {}",
@@ -522,9 +481,7 @@ type Handler interface { Handle() }
     assert!(is_semantically_structural(&ast.root_node(), &Language::Go, &code).is_none());
 }
 
-/// Regression guard for the 2026-07-23 fix (`go_subtest_call_name`): `t.Run("literal", ...)`-
-/// shaped calls (Go's standard subtest idiom, also used by quicktest/testify) get their own
-/// identity keyed on the literal name, regardless of which variable the call is made through.
+/// Keyed on the literal name, whatever the receiver.
 #[test]
 fn go_subtest_run_calls_are_matched_by_their_literal_name() {
     let src = r#"
@@ -553,9 +510,7 @@ func TestThings(t *testing.T) {
     }
 }
 
-/// Only a `.Run("string literal", ...)` call qualifies - a `.Run` call with a non-literal
-/// (variable) first argument, the table-driven-test idiom (`t.Run(tc.name, ...)`), and an
-/// unrelated call to some other method must not be misidentified as a named subtest.
+/// `t.Run(tc.name, ...)` has no literal name to key on.
 #[test]
 fn go_calls_that_are_not_literal_named_subtests_are_not_matched() {
     let src = r#"
@@ -579,11 +534,7 @@ func TestThings(t *testing.T) {
     );
 }
 
-/// A top-level `var`/`const` declaration gets an identity keyed on its own name, not just on its
-/// `var_spec`/`const_spec` child, so `solve_large_flat_subtrees`'s direct-children-only
-/// `top_level_identities` can see it. Without that, a large data literal assigned to a top-level
-/// `var` - Go's common table-driven-test-data idiom, `var tests = []T{...}` - has no identity
-/// signal at all.
+/// The declaration itself is keyed, not just its spec, so the root's direct-children walk sees it.
 #[test]
 fn go_top_level_var_and_const_declarations_are_matched() {
     let src = r#"
@@ -653,14 +604,10 @@ pass
             "missing ({kind}, {name}) in {matches:?}"
         );
     }
-    // Root (module) should not match
     assert!(is_semantically_structural(&ast.root_node(), &Language::Python, &code).is_none());
 }
 
-/// Node id of the first `(kind, name)` semantic match found in `root`'s subtree, or `None`.
-/// Test-only helper for looking up a specific named declaration without depending on the
-/// precomputed `ASTMetadata::semantically_structural_nodes` map (which the pipeline itself no
-/// longer populates or reads - see `TODO.md`'s final-cleanup notes).
+/// Node id of the first `(kind, name)` semantic match in `root`'s subtree.
 fn find_semantic_node(
     root: tree_sitter::Node,
     lang: &Language,
@@ -706,7 +653,6 @@ def subtract(self, a, b):
     let before_root = before.ast.as_ref().unwrap().root_node();
     let after_root = after.ast.as_ref().unwrap().root_node();
 
-    // Both methods should be matched.
     let matched_names: Vec<&str> = ["add", "subtract"]
         .iter()
         .copied()
@@ -1006,10 +952,8 @@ fn collect_all<'a>(node: tree_sitter::Node<'a>, kind: &str, out: &mut Vec<tree_s
     }
 }
 
-/// Parses `source` in `language`, finds the first node of kind `container_kind`, and asserts
-/// `is_commutative_container` recognizes it - proving the kind string actually occurs in a
-/// real parse tree instead of just matching a made-up name that no grammar ever produces
-/// (exactly the bug this whole function had for most languages before 2026-07-29).
+/// Asserts `container_kind` occurs in a real parse of `source` and is commutative: a kind string
+/// no grammar produces would make its arm silently dead.
 fn assert_recognizes(language: Language, source: &str, container_kind: &str) {
     let code = Code::from_string(source, &language);
     let root = code.ast.as_ref().unwrap().root_node();
@@ -1111,11 +1055,136 @@ fn swift_recognizes_enum_class_body() {
     assert_recognizes(Language::Swift, "enum E { case a, b }\n", "enum_class_body");
 }
 
-/// Kotlin has no commutative container at all - imports are unwrapped repeated children of
-/// `source_file`, so this must stay `false` for every kind, not just a made-up string.
+/// Kotlin imports are unwrapped children of `source_file`, so there is nothing to name.
 #[test]
 fn kotlin_has_no_commutative_container() {
     assert!(!is_commutative_container("import_list", &Language::Kotlin));
     assert!(!is_commutative_container("import", &Language::Kotlin));
     assert!(!is_commutative_container("source_file", &Language::Kotlin));
+}
+
+#[test]
+fn json_and_yaml_recognize_objects_and_both_mapping_shapes() {
+    assert_recognizes(Language::JSON, "{\"a\": 1, \"b\": 2}\n", "object");
+    assert_recognizes(Language::YAML, "a: 1\nb: 2\n", "block_mapping");
+    assert_recognizes(Language::YAML, "x: {a: 1, b: 2}\n", "flow_mapping");
+}
+
+#[test]
+fn cpp_googletest_blocks_are_keyed_by_suite_and_case() {
+    let src = "TEST(Parser, Empty) {}\nTEST_F(Parser, Nested) {}\n";
+    let code = Code::from_string(src, &Language::CPP);
+    let matches = collect_semantic_matches(
+        code.ast.as_ref().unwrap().root_node(),
+        &Language::CPP,
+        &code,
+    );
+    for name in ["TEST:Parser:Empty", "TEST_F:Parser:Nested"] {
+        assert!(
+            matches
+                .iter()
+                .any(|(k, n)| k == "function_definition" && n == name),
+            "missing {name} in {matches:?}"
+        );
+    }
+}
+
+#[test]
+fn cpp_function_named_test_with_named_parameters_keeps_its_own_name() {
+    let src = "bool TEST(int a, int b) { return a < b; }\n";
+    let code = Code::from_string(src, &Language::CPP);
+    let matches = collect_semantic_matches(
+        code.ast.as_ref().unwrap().root_node(),
+        &Language::CPP,
+        &code,
+    );
+    assert_eq!(
+        matches,
+        vec![("function_definition".to_string(), "TEST".to_string())]
+    );
+}
+
+#[test]
+fn js_top_level_const_is_keyed_only_when_single_declarator_and_top_level() {
+    let src = "const CONFIG = { a: 1 };\n\
+               export const EXPORTED = [1, 2];\n\
+               const a = 1, b = 2;\n\
+               const handler = () => 1;\n\
+               function f() { const local = 1; }\n";
+    let code = Code::from_string(src, &Language::JavaScript);
+    let matches = collect_semantic_matches(
+        code.ast.as_ref().unwrap().root_node(),
+        &Language::JavaScript,
+        &code,
+    );
+    let declarations: Vec<&str> = matches
+        .iter()
+        .filter(|(k, _)| k == "lexical_declaration")
+        .map(|(_, n)| n.as_str())
+        .collect();
+    assert_eq!(declarations, vec!["CONFIG", "EXPORTED"]);
+    assert!(
+        matches
+            .iter()
+            .any(|(k, n)| k == "arrow_function" && n == "handler"),
+        "a function value is keyed on the function itself: {matches:?}"
+    );
+}
+
+#[test]
+fn collect_unmatched_skips_mapped_subtrees_but_descends_into_collected_nodes() {
+    let code = Code::from_string(
+        "fn f() { g(h(1)); }\nfn mapped() { g(2); }\n",
+        &Language::Rust,
+    );
+    let root = code.ast.as_ref().unwrap().root_node();
+    let mut items = Vec::new();
+    collect_all(root, "function_item", &mut items);
+    let mapped_item = items
+        .iter()
+        .find(|n| {
+            n.child_by_field_name("name")
+                .unwrap()
+                .utf8_text(code.contents.as_bytes())
+                .ok()
+                == Some("mapped")
+        })
+        .unwrap();
+    let mut mapped = rustc_hash::FxHashMap::default();
+    mapped.insert(mapped_item.id(), 0);
+
+    let calls = collect_unmatched(root, &mapped, |n| n.kind() == "call_expression");
+
+    let texts: std::collections::BTreeSet<&str> = calls
+        .iter()
+        .map(|n| n.utf8_text(code.contents.as_bytes()).unwrap())
+        .collect();
+    assert_eq!(texts, ["g(h(1))", "h(1)"].into_iter().collect());
+}
+
+#[test]
+fn map_identical_descendants_leaves_an_already_mapped_child_and_its_subtree_alone() {
+    let before = Code::from_string("fn f() { a(1); }\n", &Language::Rust);
+    let after = Code::from_string("fn f() { a(1); }\n", &Language::Rust);
+    let before_root = before.ast.as_ref().unwrap().root_node();
+    let after_root = after.ast.as_ref().unwrap().root_node();
+    let before_block = helper::find_first_of_kind(before_root, "block").unwrap();
+    let before_call = helper::find_first_of_kind(before_root, "call_expression").unwrap();
+
+    let mut diff = crate::diff::ASTDiff::default();
+    diff.add_mapping(
+        before_block.id(),
+        0,
+        crate::diff::ASTMapping::deleted(crate::diff::ASTMappingReason::OptimalIDU),
+    );
+    map_identical_descendants(before_root, after_root, &mut diff);
+
+    assert_eq!(diff.before_node_map.get(&before_block.id()), Some(&0));
+    assert!(!diff.before_node_map.contains_key(&before_call.id()));
+    let before_fn = helper::find_first_of_kind(before_root, "function_item").unwrap();
+    assert!(
+        diff.before_node_map
+            .get(&before_fn.id())
+            .is_some_and(|a| *a != 0)
+    );
 }

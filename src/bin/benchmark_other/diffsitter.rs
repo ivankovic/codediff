@@ -16,9 +16,6 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-// Split out of benchmark_other.rs (the `diffsitter`-cluster functions) purely to shrink
-// that file's visible size - no behavior change.
-
 use anyhow::{Context, Result, bail};
 use codediff::code::{Code, Language};
 use codediff::diff::text_range::TextRange;
@@ -26,18 +23,14 @@ use std::process::Command;
 
 use super::{external_tool_bin, merge_spans, write_temp_pair};
 
-/// Path to the `diffsitter` binary, from the `DIFFSITTER_BIN` environment variable - see
-/// `difftastic_bin`. Install with
+/// Path to the `diffsitter` binary, from `DIFFSITTER_BIN`. Install with
 /// `cargo install --root /var/tmp/codediff-tools diffsitter`.
 pub(crate) fn diffsitter_bin() -> Result<std::path::PathBuf> {
     external_tool_bin("DIFFSITTER_BIN", "point it at a built `diffsitter` binary")
 }
 
-/// `-t <FILE_TYPE>` value diffsitter needs for `language`, confirmed live against `diffsitter
-/// list` (diffsitter v0.9.0, 2026-07) - a much narrower compiled-in language set than difftastic
-/// or GumTree: no `JavaScript`, `HTML`, `Kotlin`, `LUA`, `R`, `Scala`, `Swift`, `XML`, or `YAML`,
-/// none of which this build was compiled with a grammar for at all (`diffsitter list`'s output is
-/// the full, exhaustive set - there is no generic fallback parser).
+/// `-t <FILE_TYPE>` value for `language`, matching `diffsitter list`. `None` means diffsitter has
+/// no grammar for it; there is no generic fallback parser.
 pub(crate) fn diffsitter_file_type(language: Language) -> Option<&'static str> {
     match language {
         Language::ShellScript => Some("bash"),
@@ -59,11 +52,8 @@ pub(crate) fn diffsitter_file_type(language: Language) -> Option<&'static str> {
     }
 }
 
-/// Runs `diffsitter -r json` and reduces its output to the same per-line touched signal every
-/// other `ExternalTool` produces. `-t <file-type>` is passed explicitly (see
-/// `diffsitter_file_type`) rather than relying on the temp file's extension, the same reasoning as
-/// GumTree's explicit `-g <generator>` in `gumtree_line_labels` - an explicit choice documents
-/// exactly which parser ran, rather than leaving it to auto-detection.
+/// Per-line touched flags from `diffsitter -r json`. `-t` is explicit rather than inferred from the
+/// temp file's extension, so it is certain which parser ran.
 pub(crate) fn diffsitter_line_labels(
     before: &Code,
     after: &Code,
@@ -94,13 +84,8 @@ pub(crate) fn diffsitter_line_labels(
     diffsitter_touched_from_json(before, after, &json)
 }
 
-/// Diffsitter's JSON has one relevant field, `hunks`: a list of hunk objects, each with exactly
-/// one of two keys, `"Old"` or `"New"` (confirmed live, diffsitter v0.9.0: never both in the same
-/// hunk object, even for a same-line before/after change - that shows up as two separate hunks,
-/// one `Old` and one `New`). Each key holds a list of `{line_index, entries}`, `line_index`
-/// 0-indexed the same way as `difftastic_touched_from_json`'s `line_number`. `entries` (the
-/// character-level tokens changed on that line) is not needed here - `line_index`'s presence
-/// alone means diffsitter considers that line touched.
+/// Reads `hunks`: each hunk has an `"Old"` or `"New"` key holding `{line_index, entries}` lines,
+/// `line_index` 0-indexed. A listed line is touched.
 pub(crate) fn diffsitter_touched_from_json(
     before: &Code,
     after: &Code,
@@ -134,10 +119,8 @@ pub(crate) fn diffsitter_touched_from_json(
     Ok((before_touched, after_touched))
 }
 
-/// diffsitter's changed spans, from the same `-r json` output `diffsitter_line_labels` parses -
-/// but keeping each entry's `start_position`/`end_position` (row + column) instead of only its
-/// `line_index`. diffsitter emits one entry per *character*, so the spans come out extremely
-/// fine-grained; they're merged by `merge_spans` before scoring rather than tested one at a time.
+/// diffsitter's changed spans from each entry's `start_position`/`end_position`. diffsitter emits
+/// one entry per character, so spans are merged before scoring.
 pub(crate) fn diffsitter_node_spans(
     before: &Code,
     after: &Code,
@@ -201,4 +184,21 @@ pub(crate) fn diffsitter_node_spans(
         }
     }
     Ok((merge_spans(before_spans), merge_spans(after_spans)))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn diffsitter_touched_from_json_reads_old_and_new_hunks_as_zero_indexed_lines() {
+        let code = Code::from_string("a\nb\nc\n", &Language::Rust);
+        let json = serde_json::json!({"hunks": [
+            {"Old": [{"line_index": 0, "entries": []}]},
+            {"New": [{"line_index": 2, "entries": []}]},
+        ]});
+        let (before, after) = diffsitter_touched_from_json(&code, &code, &json).unwrap();
+        assert_eq!(before, vec![true, false, false, false]);
+        assert_eq!(after, vec![false, false, true, false]);
+    }
 }

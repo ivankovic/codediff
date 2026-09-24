@@ -27,12 +27,7 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // Zero disagreeing bytes, both modes. Clamped at 0.0, so this is a real assertion rather than a
-    // recorded distance: the first fixture in the corpus where codediff's rendering and the human
-    // painting agree byte for byte. A no-change pair is the easiest possible case - every byte is
-    // Identical and there is nothing to attribute - so read it as the floor working, not as the
-    // metric being solved. If this ever rises, something has broken in the unchanged path, which is
-    // worth a hard failure.
+    // A real assertion at 0.0: every byte is Identical, so a rise means the unchanged path broke.
     assert_matches_human_painting_within_limit("rust-no-change", 0.0)
 }
 

@@ -21,12 +21,8 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // All 18 are `fast_fallback`, and 15 of them are human Updates - a large comment block
-    // shrinks, and the surviving comment lines are matched to the wrong originals. Every
-    // mismatch is visible, so this one is fully user-facing.
-    // Known gap, characterized above but unfixed. Clamped at the observed count rather than
-    // requiring an exact match. Lower (or drop back to `assert_matches_human_mapping`) once
-    // a fix lands.
+    // A large comment block shrinks and `fast_fallback` matches the surviving lines to the wrong
+    // originals. All visible.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "vimscript-fholgado-minibufexpl-massive-comment-reduction",
         18,

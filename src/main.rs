@@ -29,11 +29,8 @@ mod configure_prompt;
 mod git_configure;
 mod jj_configure;
 
-/// Top-level subcommands. Optional and coexists with `Args::paths` below (clap resolves this
-/// correctly: `codediff a.rs b.rs` still parses as two paths, not an attempt at the `git`
-/// subcommand - only `codediff git ...` is - see `main.rs`'s own tests) - `git` becomes a
-/// reserved word for the first positional the same way `add`/`commit`/etc. are for git itself,
-/// an accepted tradeoff for the vanishingly rare case of a file literally named `git`.
+/// Top-level subcommands, coexisting with `Args::paths`: each subcommand name becomes a reserved
+/// word for the first positional path, so a file literally named `git` cannot be diffed directly.
 #[derive(Subcommand)]
 enum Command {
     /// git integration helpers.
@@ -47,12 +44,7 @@ enum Command {
         action: JjAction,
     },
     /// Generate packaging artifacts (shell completions, man page).
-    ///
-    /// Nested under `util` rather than sitting at the top level as `completions`/`man` for the
-    /// reason `Command`'s own doc comment gives: every top-level subcommand name becomes a
-    /// reserved word for the first positional path. One new reserved word (`util`, not a
-    /// plausible name for a file someone diffs) costs less than two, and `man` in particular is
-    /// short enough to be a real filename. Same shape as `jj util completion`.
+    // Nested under `util` so only one implausible filename is reserved, not `completions` and `man`.
     Util {
         #[command(subcommand)]
         action: UtilAction,
@@ -63,35 +55,28 @@ enum Command {
 enum UtilAction {
     /// Print a shell completion script for SHELL on stdout.
     ///
-    /// Written to stdout rather than installed anywhere: the four packaging recipes under
-    /// `packaging/` each redirect it to whatever path their distribution expects, and a user
-    /// without a package manager can `source <(codediff util completions bash)`.
+    /// For example: `source <(codediff util completions bash)`.
     Completions {
         /// The shell to generate for.
         shell: clap_complete::Shell,
     },
     /// Print a roff-formatted man page (section 1) on stdout.
-    ///
-    /// Generated from the same clap `Args` definition the `--help` output comes from, so it
-    /// cannot drift from the real flag list the way a hand-written `codediff.1` would.
     Man,
 }
 
 #[derive(Subcommand)]
 enum GitAction {
-    /// Interactively configure codediff as git's diff tool - the `git config` commands README's
-    /// "Git integration" section otherwise asks you to run by hand.
+    /// Interactively configure codediff as git's diff tool.
     Configure,
 }
 
 #[derive(Subcommand)]
 enum JjAction {
-    /// Interactively configure codediff as jj's diff tool - the `jj config set` commands README's
-    /// "Jujutsu (jj) integration" section otherwise asks you to run by hand.
+    /// Interactively configure codediff as jj's diff tool.
     Configure,
 }
 
-/// When headless output should be ANSI-colored - see `use_color` for how `Auto` resolves.
+/// When headless output should be ANSI-colored; see `use_color`.
 #[derive(clap::ValueEnum, Clone, Copy, PartialEq, Eq, Debug, Default)]
 enum ColorChoice {
     #[default]
@@ -102,10 +87,8 @@ enum ColorChoice {
 
 #[derive(Parser)]
 #[command(
-    // Explicit, not derived from a doc comment on `Args`. `Args` has none, and clap's derive then
-    // reaches for the nearest preceding doc comment - which is `Command`'s long internal note
-    // about `git` becoming a reserved positional. That note was silently the entire NAME and
-    // DESCRIPTION of both `--help` and (once `util man` existed to reveal it) the man page.
+    // Explicit: without it clap's derive takes the nearest preceding doc comment (`Command`'s)
+    // as the description in `--help` and the man page.
     about = "Fast, robust, syntax-aware code diffing using tree-sitter ASTs",
     long_about = "Fast, robust, syntax-aware code diffing.\n\n\
         With no arguments, opens an interactive two-panel terminal UI. With BEFORE and AFTER \
@@ -113,8 +96,6 @@ enum ColorChoice {
         JSON object (--mode json) for editor integrations. Also serves as a `git difftool` \
         backend and a `jj` diff formatter; see `codediff git configure` and `codediff jj \
         configure`.",
-    // Packagers and bug reports both need this, and it did not exist before: `codediff --version`
-    // failed with "unexpected argument". Sourced from CARGO_PKG_VERSION by clap's derive.
     version,
     after_help = "Exit codes: 0 on success, 2 on error. Pass --exit-code to additionally get \
     1 when the files differ (the diff(1) convention), which is off by default for the same \
@@ -125,97 +106,69 @@ struct Args {
     #[command(subcommand)]
     command: Option<Command>,
 
-    /// The files to diff, positionally. Two forms are accepted (see `resolve_before_after`):
-    /// `BEFORE AFTER` (also what `git difftool` invokes a `difftool.<tool>.cmd` of
-    /// `codediff "$LOCAL" "$REMOTE"` with), or git's 7-argument `GIT_EXTERNAL_DIFF` convention
-    /// (`path old-file old-hex old-mode new-file new-hex new-mode`). If either is given, the diff
-    /// is computed immediately instead of starting on an empty viewer.
+    /// The files to diff: `BEFORE AFTER`, or git's 7- or 9-argument `GIT_EXTERNAL_DIFF` list
+    /// (`path old-file old-hex old-mode new-file new-hex new-mode [new-path score]`). Without them
+    /// the viewer starts empty.
     paths: Vec<PathBuf>,
 
-    /// Mode (TUI/tui, Headless/headless, or Json/json - see `tui::json_output` for the JSON
-    /// schema). `json` needs BEFORE and AFTER, same as `headless`; unlike `headless`, it is never
-    /// entered implicitly just because stdout isn't a terminal.
+    /// Mode: tui, headless or json (case-insensitive). `headless` and `json` need BEFORE and
+    /// AFTER. `headless` is also chosen when stdout is not a terminal; `json` never is.
     #[arg(long, default_value = "TUI")]
     mode: String,
 
-    /// Shorthand for "mode=headless". `--batch` is a synonym - the two names people reach for
-    /// depend on which non-interactive use case brought them here (git integration/piping vs.
-    /// scripted/CI invocation), but they mean the same thing.
+    /// Shorthand for `--mode headless`. `--batch` is a synonym.
     #[arg(long, alias = "batch")]
     headless: bool,
 
-    /// Deprecated no-op, hidden from `--help` and kept only so existing scripts don't break: the
-    /// pipeline runs the same bounded, region-scoped analysis for every diff, so there is no
-    /// separate "exact" path to select. Remove at the next minor release.
+    // Deprecated no-op, hidden, kept so existing scripts don't break: every diff runs the same
+    // analysis, so there is no "exact" path to select. TODO: remove at the next minor release.
     #[arg(long, hide = true)]
     exact: bool,
 
     /// Paint only the ranges that carry meaning: drop standalone brackets/separators and trim
-    /// leading whitespace (the TUI's `M` panel's "everything off" preset, and its persisted
-    /// setting when neither this flag nor `--full` is given).
+    /// leading whitespace (the TUI's `M` panel's "everything off" preset). Without this or
+    /// `--full`, the panel's last saved setting applies.
     ///
-    /// Every reading of a diff this and `--full` produce is faithful to the same mapping - the
-    /// corpus's hand-authored ground truth records both extremes as separate paintings rather than
-    /// one answer plus a mistake. See `codediff::diff::text::RenderOptions`.
+    /// `--minimal` and `--full` are two faithful readings of the same diff, not a right and a
+    /// wrong one.
     #[arg(long, conflicts_with = "full")]
     minimal: bool,
 
-    /// The other extreme from `--minimal`: keep standalone brackets/separators and leading
-    /// whitespace (the `M` panel's "everything on" preset). Lets a script force the fullest
-    /// reading regardless of what's persisted, the same way `--minimal` forces the tightest one.
+    /// Keep standalone brackets/separators and leading whitespace (the `M` panel's "everything
+    /// on" preset).
     #[arg(long)]
     full: bool,
 
-    /// Highlight an `Update` node's own matched pair whole (e.g. both `argument` and
-    /// `i_am_an_argument`), instead of narrowing to just the part that actually differs.
+    /// Highlight an updated node's matched pair whole (e.g. both `argument` and
+    /// `i_am_an_argument`), instead of only the part that differs.
     ///
-    /// A separate axis from `--minimal`/`--full`, not a third value either one takes: this decides
-    /// which ranges the diff itself has (see `codediff::diff::text::RenderOptions::
-    /// whole_pair_updates`), not how much of an already-decided range list gets painted. The `M`
-    /// panel can toggle it too (it reloads the diff rather than just re-filtering, unlike the
-    /// other rows there), so this flag exists purely for batch mode. Combine freely with
-    /// `--minimal`/`--full` or neither.
+    /// Independent of `--minimal`/`--full`; combine freely.
     #[arg(long)]
     whole_updates: bool,
 
-    /// Paint a matched node's relocation as `Move` even when it's known to be a pure reindent
-    /// (nesting levels added/removed around otherwise-untouched content, e.g. Rust's `if
-    /// let`-chain collapse) - the `M` panel's "Paint reindent-only moves" row, forced on. See
-    /// `codediff::diff::text::RenderOptions::paint_reindent_only_moves`.
+    /// Paint a node as moved even when it only changed indentation (nesting added or removed
+    /// around untouched content) - the `M` panel's "Paint reindent-only moves" row, forced on.
     ///
-    /// A real axis `--minimal`/`--full` already disagree on (`--minimal` leaves it unpainted,
-    /// `--full` paints it - measured against the corpus's own separate `Minimal`/`Full` ground
-    /// truths for `rust-next-font-imports-generator`), so this flag only ever forces it *on* -
-    /// there's no `--minimal`-with-this-off to ask for, since that's already what `--minimal`
-    /// means. Combine freely with `--minimal`/`--full`/`--whole-updates` or neither.
+    /// Combine freely with the other render flags; it can only turn the option on.
     #[arg(long)]
     paint_reindent_moves: bool,
 
-    /// When to ANSI-color headless output: `always`, `never`, or `auto` (the default - color on
-    /// unless the `NO_COLOR` environment variable is set; see `use_color` for why auto is not
-    /// tied to stdout being a terminal). The flag beats the environment variable in both
-    /// directions: `--color always` colors even under `NO_COLOR`, `--color never` suppresses
-    /// color without needing the variable.
+    /// When to ANSI-color headless output. `auto` colors unless `NO_COLOR` is set, even when
+    /// stdout is a pipe (git's pager shows color); `always` and `never` override `NO_COLOR`.
     #[arg(long, value_enum, value_name = "WHEN", default_value_t = ColorChoice::Auto)]
     color: ColorChoice,
 
     /// Exit 1 when the files differ (0 when identical, 2 on error) - the `diff(1)` convention,
     /// for scripts and CI conditionals.
     ///
-    /// Off by default, deliberately, and for the same reason `git diff` defaults to exiting 0
-    /// even when files differ: codediff's main non-interactive callers are version control
-    /// systems driving it as a *display* tool, and every one of them reads a non-zero exit as
-    /// "the tool failed" rather than "the files differ". Measured consequences of defaulting
-    /// this on (which v0.0.8 briefly did): `jj` prints a `Tool exited with exit status: 1`
-    /// warning on every single file it renders, and `git difftool` with
-    /// `difftool.trustExitCode=true` aborts the whole diff after the first differing file with
-    /// "fatal: external diff died". Both go away when the default is 0; a script that wants the
-    /// `diff(1)` behavior asks for it explicitly.
+    /// Off by default because version control systems read any non-zero exit from a display
+    /// tool as a failure: jj warns on every file, and `git difftool` with
+    /// `difftool.trustExitCode=true` aborts the whole diff. Ignored under git's
+    /// `GIT_EXTERNAL_DIFF` argument form for the same reason.
     #[arg(long)]
     exit_code: bool,
 
-    /// How many unchanged lines to keep around each change in headless output before collapsing
-    /// the rest into an elision marker - same idea as `diff -U N`.
+    /// Unchanged lines to keep around each change in headless output, like `diff -U N`.
     #[arg(long, value_name = "N", default_value_t = tui::headless::CONTEXT_LINES)]
     context: usize,
 
@@ -249,37 +202,21 @@ async fn tui_main(args: &Args, before_after: Option<(PathBuf, PathBuf)>) -> Resu
     Ok(())
 }
 
-/// Whether to run headless (print text, `tui::headless::run`) instead of starting the
-/// interactive TUI: either the caller explicitly asked for it (`--headless`/`--mode headless`),
-/// or `stdout_is_terminal` is false. The latter is what makes `GIT_EXTERNAL_DIFF` usable without
-/// extra configuration (see `SPECS.md`'s "Git integration" entry): git's default pager leaves our
-/// stdout connected to a pipe, not a real terminal, and a full-screen TUI cannot draw onto a pipe
-/// regardless of *why* it isn't a terminal - the same fallback also covers `codediff a b > out`,
-/// CI, or any other non-interactive invocation, not just this one git-specific scenario.
+/// Whether to print text instead of starting the TUI: when asked to, or whenever stdout is not a
+/// terminal, which is what makes `GIT_EXTERNAL_DIFF` under git's pager work with no configuration.
 fn should_run_headless(args: &Args, stdout_is_terminal: bool) -> bool {
     args.headless || args.mode.eq_ignore_ascii_case("headless") || !stdout_is_terminal
 }
 
-/// Whether to print a single JSON diff object (`tui::json_output::run`) instead of anything else.
-/// Unlike `should_run_headless`, this is opt-in only via `--mode json` - a non-terminal stdout
-/// (git's pager, a redirect, CI) must still default to `headless`'s human-readable ANSI text, not
-/// silently switch formats just because it isn't a terminal, since that would break every existing
-/// `GIT_EXTERNAL_DIFF`/script integration that isn't asking for JSON.
+/// Whether to print a JSON diff object. Only `--mode json` selects it: a non-terminal stdout must
+/// keep getting headless text, or every pipe and git integration would change format.
 fn should_run_json(args: &Args) -> bool {
     args.mode.eq_ignore_ascii_case("json")
 }
 
-/// Which [`RenderOptions`](codediff::diff::text::RenderOptions) preset to paint with: `--minimal`
-/// or `--full` if either is given (`clap`'s `conflicts_with` rules out both at once), otherwise
-/// whatever the TUI's `M` panel last persisted - then `--whole-updates` layered on top
-/// independently of that choice, since it isn't part of the `--minimal`/`--full` axis at all (see
-/// `RenderOptions::whole_pair_updates`'s own doc comment).
-///
-/// A flag wins over the saved setting rather than toggling it, so a script that passes `--minimal`
-/// gets minimal regardless of how the machine it runs on happens to be configured - and passing
-/// neither flag keeps the two front ends agreeing about what the user last chose. `--whole-updates`
-/// has no saved-setting counterpart to defer to either way: it is never written by the `M` panel
-/// (see its own doc comment), so a script has to ask for it every time it wants it.
+/// The [`RenderOptions`](codediff::diff::text::RenderOptions) to paint with: a preset flag
+/// replaces the saved `M` panel setting outright (so a script's output doesn't depend on the
+/// machine), and the single-option flags layer on top of whichever applies.
 fn render_options(args: &Args) -> codediff::diff::text::RenderOptions {
     let mut options = if args.minimal {
         codediff::diff::text::RenderOptions::MINIMAL
@@ -295,14 +232,9 @@ fn render_options(args: &Args) -> codediff::diff::text::RenderOptions {
     options
 }
 
-/// Whether headless output should be ANSI-colored. `Auto` is deliberately not tied to
-/// `stdout_is_terminal`: the whole point of headless mode's main use case (`GIT_EXTERNAL_DIFF`
-/// under git's default pager) is that stdout is a pipe, not a terminal, yet the pager on the
-/// other end is generally perfectly capable of showing color (git configures `less` with
-/// `-R`-equivalent behavior for exactly this reason). Under `Auto`, the `NO_COLOR` convention
-/// (<https://no-color.org>) is the escape hatch for callers that don't want that - e.g.
-/// redirecting to a file; `--color always`/`--color never` beat the environment variable in
-/// either direction.
+/// Whether headless output should be ANSI-colored. `Auto` deliberately ignores whether stdout is a
+/// terminal: headless mode's main caller is git's pager, a pipe that shows color; `NO_COLOR`
+/// (<https://no-color.org>) is the opt-out.
 fn use_color(choice: ColorChoice) -> bool {
     match choice {
         ColorChoice::Always => true,
@@ -311,16 +243,9 @@ fn use_color(choice: ColorChoice) -> bool {
     }
 }
 
-/// Turns a completed non-interactive run into a process exit code. 0 unless the caller opted
-/// into the `diff(1)` convention with `--exit-code` (`want_exit_code`) *and* the files differ;
-/// errors exit 2, handled at the call sites. See `Args::exit_code` for why opt-in is the right
-/// default rather than the timid one.
-///
-/// The 7-argument `GIT_EXTERNAL_DIFF` form (recognized by `invoked_as_git_external_diff`) stays
-/// at 0 even under `--exit-code`: git reads a non-zero exit there as "external diff died" and
-/// aborts the *entire* multi-file diff, so honoring the flag in that position would break the
-/// caller rather than inform it. A script wanting per-file differ/same status has the direct
-/// `BEFORE AFTER` form available, which does honor it.
+/// The exit code of a completed non-interactive run (errors exit 2 at the call sites). The
+/// `GIT_EXTERNAL_DIFF` form always exits 0: git reads non-zero there as "external diff died" and
+/// aborts the entire multi-file diff.
 fn exit_code_for(differed: bool, want_exit_code: bool, invoked_as_git_external_diff: bool) -> i32 {
     if differed && want_exit_code && !invoked_as_git_external_diff {
         1
@@ -329,20 +254,9 @@ fn exit_code_for(differed: bool, want_exit_code: bool, invoked_as_git_external_d
     }
 }
 
-/// The one-line stand-in for a diff of a file codediff cannot parse as text. Wording follows
-/// `diff(1)`/git's own binary notice, since that is what a reader piping this through git's pager
-/// is used to seeing there.
-///
-/// Under the `GIT_EXTERNAL_DIFF` form both sides are git temp blobs
-/// (`/tmp/git-blob-XXXXXX/main.pdf`) - not paths the reader recognizes or can act on, and not two
-/// distinct files in any sense that matters - so that form names `path` (index 0, the
-/// repo-relative path git is actually diffing) once, exactly as git's own binary line does. Every
-/// other invocation has two real paths and names both.
-///
-/// `differed` is a raw byte comparison, not an assumption: git only ever calls an external diff
-/// for a pair it already knows differs, but `codediff a.pdf b.pdf` is under no such obligation,
-/// and reporting two identical files as differing because nothing could be parsed would be a
-/// wrong answer rather than an unavailable one.
+/// The one-line stand-in for a binary diff, worded like git's. Under `GIT_EXTERNAL_DIFF` both
+/// sides are temp blobs, so it names git's repo-relative `path` once instead. `differed` is a
+/// byte comparison: a direct invocation may pass identical files.
 fn binary_notice(
     paths: &[PathBuf],
     before: &std::path::Path,
@@ -363,28 +277,14 @@ fn binary_notice(
     }
 }
 
-/// Handles a pair where at least one side is binary, for every mode at once - this runs before
-/// the json/headless/TUI split below.
-///
-/// Why it has to exist: `Code::from_file` reads with `read_to_string`, so a binary side fails the
-/// UTF-8 decode and the error propagates out as exit 2. Under `GIT_EXTERNAL_DIFF` git reads any
-/// non-zero exit as "external diff died" and abandons the *whole* run, so without this one PDF in
-/// a commit takes every remaining file's diff down with it: `git diff` prints a `fatal:` and
-/// stops, leaving every source file after it in the sort order undiffed. There is nothing useful
-/// to show for a binary file, but "nothing useful" has to be reported as a successful diff of an
-/// unshowable file, not as a crash.
-///
-/// Only *one* side needs to be binary: git represents an added or deleted file with `/dev/null`
-/// on the missing side, which reads back as empty, perfectly valid UTF-8.
-///
-/// The exit code goes through `exit_code_for` like every other non-interactive path, so the
-/// `GIT_EXTERNAL_DIFF`-never-returns-non-zero invariant holds here too.
+/// Reports a pair with at least one binary side (the other may be git's empty `/dev/null`), in
+/// every mode. It must succeed: a UTF-8 decode error would exit 2, and under `GIT_EXTERNAL_DIFF`
+/// git then abandons every remaining file in the diff.
 fn run_binary(args: &Args, before: &std::path::Path, after: &std::path::Path) -> Result<i32> {
     let differed = std::fs::read(before)? != std::fs::read(after)?;
     if should_run_json(args) {
-        // A prose sentence on stdout would break every consumer of `--mode json` (see
-        // `json_output`'s module doc comment), so this stays a JSON object of the same shape,
-        // flagged with `binary` and carrying no hunks.
+        // Still a JSON object of the usual shape (flagged `binary`, no hunks): prose would break
+        // every `--mode json` consumer.
         println!("{}", tui::json_output::binary_diff_json(before, after)?);
     } else {
         print!("{}", binary_notice(&args.paths, before, after, differed));
@@ -396,20 +296,15 @@ fn run_binary(args: &Args, before: &std::path::Path, after: &std::path::Path) ->
     ))
 }
 
-/// Writes a shell completion script or a man page to stdout - see `UtilAction`.
-///
-/// Both are derived from the same `Args`/`Command` clap definition `--help` is, so neither can
-/// drift from the real flag list. Output goes to stdout so the caller decides the destination:
-/// the recipes under `packaging/` each redirect it to their distribution's own path.
+/// Writes a shell completion script or a man page to stdout, generated from the clap definition
+/// so neither can drift from the real flags. The `packaging/` recipes redirect it.
 fn run_util(action: &UtilAction) -> Result<()> {
     use clap::CommandFactory;
 
     let mut command = Args::command();
     match action {
         UtilAction::Completions { shell } => {
-            // `bin_name` matters: clap otherwise names the script after the *crate*, which here
-            // happens to match, but would silently generate completions for the wrong word the
-            // moment the package and the binary stop sharing a name.
+            // Explicit bin name: clap would otherwise use the crate name, which need not match.
             clap_complete::generate(*shell, &mut command, "codediff", &mut std::io::stdout());
         }
         UtilAction::Man => {
@@ -437,8 +332,6 @@ async fn main() -> Result<()> {
         return jj_configure::run();
     }
 
-    // Before `resolve_before_after` below, like the two configure wizards above: these generate
-    // packaging artifacts and take no BEFORE/AFTER pair at all.
     if let Some(Command::Util { action }) = &args.command {
         return run_util(action);
     }
@@ -446,13 +339,9 @@ async fn main() -> Result<()> {
     let before_after = resolve_before_after(&args.paths)?;
     let invoked_as_git_external_diff = invoked_as_git_external_diff(&args.paths);
 
-    // Ahead of the json/headless/TUI split: a binary side has the same non-answer in all three,
-    // and the interactive viewer cannot show one either. See `run_binary`.
     if let Some((before, after)) = before_after.as_ref() {
-        // Not `?`: a file that cannot be opened at all is a real error, and it has to keep
-        // leaving by the same door as every other non-interactive failure here ("codediff: ..."
-        // on stderr, exit 2). Propagating instead would hand it to `main`'s own `Result`, which
-        // prints a differently-formatted `Error:` and exits 1.
+        // Not `?`: an unreadable file must exit 2 with "codediff: ..." like every other
+        // non-interactive failure, not 1 via `main`'s `Result`.
         let either_is_binary = codediff::code::is_binary_file(before)
             .and_then(|binary| Ok(binary || codediff::code::is_binary_file(after)?));
         match either_is_binary
@@ -533,9 +422,6 @@ mod tests {
         );
     }
 
-    /// The `GIT_EXTERNAL_DIFF` convention: `path old-file old-hex old-mode new-file new-hex
-    /// new-mode`. `old-file`/`new-file` (indices 1 and 4) become before/after; `path` and the
-    /// hex/mode fields are ignored.
     #[test]
     fn resolve_before_after_with_seven_args_picks_out_old_file_and_new_file() {
         let paths = vec![
@@ -556,11 +442,8 @@ mod tests {
         );
     }
 
-    /// git appends `other` (the destination path) and a rename/copy score to the seven when it
-    /// detected the change as a rename or a copy - `diff.renames` defaults to on for `git diff`,
-    /// so this is the ordinary shape for any commit containing one. Rejecting it exits non-zero,
-    /// which git reads as "external diff died" and abandons the whole run - one rename taking
-    /// every file after it down with it. `old-file`/`new-file` stay at indices 1 and 4.
+    /// git appends the new path and a similarity score for a rename or copy, and `diff.renames`
+    /// is on by default, so rejecting this form would abort the whole `git diff`.
     #[test]
     fn resolve_before_after_accepts_gits_nine_argument_rename_form() {
         let paths = vec![
@@ -581,13 +464,9 @@ mod tests {
                 PathBuf::from("/tmp/git-blob-BBBB/README_tmp.md")
             ))
         );
-        // Same form, so the same exit-code and notice-wording rules apply as for 7 arguments.
         assert!(invoked_as_git_external_diff(&paths));
     }
 
-    /// A count that matches no convention is still an error rather than a silent
-    /// misinterpretation - the 9-argument form widened the accepted set, it did not remove the
-    /// guard.
     #[test]
     fn resolve_before_after_still_rejects_an_unrecognized_argument_count() {
         let paths: Vec<PathBuf> = (0..8).map(|n| PathBuf::from(n.to_string())).collect();
@@ -595,9 +474,7 @@ mod tests {
         assert!(!invoked_as_git_external_diff(&paths));
     }
 
-    /// `GIT_EXTERNAL_DIFF` represents an added or deleted file with `old-file`/`new-file` set to
-    /// `/dev/null` - `resolve_before_after` just passes it through; `compute_diff` is what
-    /// actually special-cases it.
+    /// An added or deleted file arrives as `/dev/null`; it is passed through, not special-cased.
     #[test]
     fn resolve_before_after_with_seven_args_passes_dev_null_through_for_add_delete() {
         let paths = vec![
@@ -638,9 +515,6 @@ mod tests {
         }
     }
 
-    /// `--whole-updates` layers onto whichever `--minimal`/`--full`/persisted choice is otherwise
-    /// in effect, rather than being folded into either preset - see `render_options`'s own doc
-    /// comment for why the two axes are independent.
     #[test]
     fn whole_updates_flag_layers_onto_minimal_and_full_alike() {
         let mut minimal = args_with("TUI", false);
@@ -708,14 +582,11 @@ mod tests {
 
     #[test]
     fn always_and_never_beat_the_no_color_environment_variable() {
-        // `use_color` never reads the environment for Always/Never, so this needs no env
-        // manipulation (which would race other tests in the same process).
+        // Always/Never never read the environment, so no env mutation (which races) is needed.
         assert!(use_color(ColorChoice::Always));
         assert!(!use_color(ColorChoice::Never));
     }
 
-    /// Without `--exit-code`, a differing pair still exits 0 - the default that keeps `jj` and
-    /// `git difftool --trust-exit-code` from treating a normal diff as a tool failure.
     #[test]
     fn without_the_flag_a_differing_pair_still_exits_zero() {
         assert_eq!(exit_code_for(true, false, false), 0);
@@ -728,25 +599,18 @@ mod tests {
         assert_eq!(exit_code_for(true, true, false), 1);
     }
 
-    /// Even opted in, the GIT_EXTERNAL_DIFF form stays at 0: git reads non-zero there as
-    /// "external diff died" and aborts the whole multi-file diff.
     #[test]
     fn the_git_external_diff_form_never_returns_one_even_with_the_flag() {
         assert_eq!(exit_code_for(true, true, true), 0);
         assert_eq!(exit_code_for(false, true, true), 0);
     }
 
-    /// The case this whole binary path exists for: `git diff` over a commit touching a PDF must
-    /// not die on the PDF and abandon every file after it. Whatever else changes, the git form
-    /// exits 0 for a binary pair.
     #[test]
     fn a_binary_pair_under_the_git_external_diff_form_still_exits_zero() {
         assert_eq!(exit_code_for(true, false, true), 0);
         assert_eq!(exit_code_for(true, true, true), 0);
     }
 
-    /// Under `GIT_EXTERNAL_DIFF` both sides are temp blob copies with generated directory names,
-    /// so the notice names `path` (index 0) instead - one file, one name, singular wording.
     #[test]
     fn the_binary_notice_names_gits_logical_path_not_its_temp_blobs() {
         let paths = vec![
@@ -765,8 +629,6 @@ mod tests {
         );
     }
 
-    /// The plain `BEFORE AFTER` form (also what `difftool.<tool>.cmd` uses) has two real paths
-    /// and names both.
     #[test]
     fn the_binary_notice_names_both_sides_for_the_two_argument_form() {
         let paths = vec![PathBuf::from("old.pdf"), PathBuf::from("new.pdf")];
@@ -777,9 +639,6 @@ mod tests {
         );
     }
 
-    /// git never asks an external diff about a pair it considers identical, but `codediff a.pdf
-    /// a.pdf` reaches the same code path, and "differ" would be a wrong answer there rather than
-    /// an unavailable one.
     #[test]
     fn the_binary_notice_does_not_claim_identical_files_differ() {
         let paths = vec![PathBuf::from("a.pdf"), PathBuf::from("b.pdf")];
@@ -812,10 +671,6 @@ mod tests {
         assert!(args.paths.is_empty());
     }
 
-    /// Regression guard for the `Option<Command>` + `Vec<PathBuf>` coexistence this binary
-    /// relies on: an ordinary two-file diff must still parse as `paths`, not get swallowed
-    /// attempting to match the `git` subcommand (clap resolves this correctly on its own, but
-    /// nothing else in this file would catch it silently breaking on a future clap upgrade).
     #[test]
     fn two_paths_still_parse_as_paths_not_a_subcommand() {
         let args = Args::try_parse_from(["codediff", "a.rs", "b.rs"]).unwrap();
@@ -826,8 +681,7 @@ mod tests {
         );
     }
 
-    /// The packaging recipes under `packaging/` all shell out to these two, so a rename or a
-    /// re-nesting here silently breaks every distribution package rather than failing a build.
+    /// The `packaging/` recipes call these, so a rename breaks them silently.
     #[test]
     fn util_generates_completions_and_a_man_page() {
         let args = Args::try_parse_from(["codediff", "util", "completions", "bash"]).unwrap();
@@ -849,9 +703,6 @@ mod tests {
         ));
     }
 
-    /// `about`/`long_about`/`version` are set explicitly on `Args` because clap otherwise reaches
-    /// for `Command`'s doc comment - an internal note about reserved positionals - and puts it in
-    /// `--help`, `--version` and the generated man page's NAME line. Guards that regression.
     #[test]
     fn the_help_text_describes_codediff_rather_than_a_doc_comment() {
         use clap::CommandFactory;
@@ -889,9 +740,6 @@ mod tests {
         assert!(should_run_headless(&args_with("TUI", true), true));
     }
 
-    /// Exercises real clap parsing (unlike `args_with`, which builds `Args` directly) - `alias`
-    /// is a clap-level detail that a struct built by hand can't accidentally get wrong, so this
-    /// is the only test that would actually catch `--batch` silently not working.
     #[test]
     fn batch_flag_is_a_clap_alias_for_headless() {
         let args = Args::try_parse_from(["codediff", "--batch"]).expect("--batch should parse");
@@ -916,8 +764,6 @@ mod tests {
 
     #[test]
     fn should_run_json_is_false_on_a_non_terminal_stdout_unless_explicitly_asked_for() {
-        // Unlike should_run_headless, a piped/redirected stdout must not silently switch to JSON
-        // - only an explicit `--mode json` does that (see should_run_json's own doc comment).
         assert!(!should_run_json(&args_with("TUI", false)));
     }
 

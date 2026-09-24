@@ -30,16 +30,10 @@ use super::Component;
 use crate::tui::actions::Action;
 use crate::tui::theme::OverlayTheme;
 
-/// Static reference sheet of every keybinding plus an About section (copyright, license,
-/// repository), kept in one place so the keybindings can't drift out of sync with individual
-/// handlers the way a comment scattered across several files could. Mirrors (and should be kept
-/// in sync with) README.md's "Using the TUI" section and `src/bin/human_solver/`'s own
-/// `HELP_TEXT`/`?` modal, which this is modeled on. The diff-color legend is *not* part of this
-/// static text: the actual colors are theme-dependent, so `draw` renders it from the live
-/// `OverlayTheme` palette instead (see `legend_lines`) - a fixed "Green means inserted"
-/// description would be wrong for most non-default themes.
-/// The keybinding reference, one source for both front ends: the TUI draws it in this modal and
-/// `web` serves it verbatim to the browser's `?` overlay, so the two cannot list different keys.
+/// The keybinding reference and About section, one source for both front ends: the TUI draws it
+/// in this modal and `web` serves it verbatim to the browser's `?` overlay. Keep it in sync with
+/// README.md's "Using the TUI". The color legend is not in here because it is theme-dependent;
+/// see `HelpModal::legend_lines`.
 pub const HELP_TEXT: &str = "\
 Navigation
   Tab              Switch the active panel (Before/After)
@@ -103,8 +97,7 @@ About
 ";
 
 /// The `?` popup: a scrollable keybinding reference plus a color legend rendered from the live
-/// theme. Modeled on `ThemeDialog`'s shape, but has no selection state of its own - the only
-/// state worth keeping is how far it's scrolled and which theme to render the legend with.
+/// theme.
 #[derive(Default)]
 pub struct HelpModal {
     scroll: u16,
@@ -116,9 +109,8 @@ impl HelpModal {
         Self { scroll: 0, theme }
     }
 
-    /// The color legend, built from the live palette rather than hardcoded color names - each
-    /// entry is a swatch painted in the actual background the viewer uses for that signal, so
-    /// the legend is correct for whichever of the eight themes is active.
+    /// Swatches painted in the live palette's backgrounds: a fixed "green means inserted" would be
+    /// wrong for most themes.
     fn legend_lines(&self) -> Vec<Line<'static>> {
         let palette = self.theme.palette();
         let swatch = |label: &str, bg: Color| -> Span<'static> {
@@ -147,9 +139,7 @@ impl HelpModal {
         ]
     }
 
-    /// The area the popup itself should occupy, centered within `area` - same shape as
-    /// `ThemeDialog::popup_area`, just generously sized (90%) since this is a full reference
-    /// sheet rather than a single-purpose picker.
+    /// Centered within `area`, at 90% of it.
     pub fn popup_area(&self, area: Rect) -> Rect {
         let width = (area.width * 9 / 10).min(area.width);
         let height = (area.height * 9 / 10).min(area.height);
@@ -176,9 +166,7 @@ impl Component for HelpModal {
     }
 
     fn draw(&mut self, frame: &mut Frame, area: Rect) -> Result<()> {
-        // `area` is already cleared by the caller (`app::draw_help_modal`, same as every other
-        // popup's own draw site) before this runs - clearing it a second time here would be a
-        // no-op, not a correctness issue, so this was only ever wasted work, not a visible bug.
+        // The caller has already cleared `area`.
         let block = Block::default()
             .title(
                 " Help - j/k scroll, ? or Esc to close "
@@ -188,8 +176,6 @@ impl Component for HelpModal {
             .borders(Borders::ALL)
             .border_style(Style::new().fg(Color::Cyan));
 
-        // The live color legend first (it's what a first-time user most needs decoded), then
-        // the static keybinding reference.
         let mut lines = self.legend_lines();
         lines.extend(HELP_TEXT.lines().map(|l| Line::from(l.to_string())));
 
@@ -244,9 +230,7 @@ mod tests {
         assert_eq!(modal.scroll, 0);
     }
 
-    /// Sized generously (well past `HELP_TEXT`'s longest line and line count) so nothing about
-    /// this test depends on the real terminal size - it's only checking that `draw` doesn't
-    /// panic and that the keybinding reference text actually ends up on screen somewhere.
+    /// Sized past `HELP_TEXT`'s extent so the result does not depend on scrolling or wrapping.
     #[test]
     fn help_modal_renders_keybindings() {
         let backend = TestBackend::new(120, 70);
@@ -267,10 +251,8 @@ mod tests {
         assert!(rendered.contains("Copyright"));
     }
 
-    /// The color legend renders from the live palette - swatch cells carry the theme's actual
-    /// diff backgrounds, so "what does this color mean" is answered correctly per theme rather
-    /// than by a hardcoded color-name list.
     #[test]
+
     fn help_modal_renders_a_legend_with_the_current_themes_backgrounds() {
         let backend = TestBackend::new(120, 70);
         let mut terminal = Terminal::new(backend).unwrap();

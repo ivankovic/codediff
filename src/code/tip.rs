@@ -18,17 +18,11 @@
 
 //! Path-based file classification into the four gross `Type` categories.
 //!
-//! Only the file name and extension are consulted - never the contents - so this stays cheap
-//! enough to run over a multi-million-file corpus (`file_stats`) before deciding which files are
-//! worth reading at all. The tables below were expanded on 2026-09-13 against a census of what the
-//! previous version left unclassified, measured with `reclassify_tips --db` (dry run) over the
-//! two corpus databases on the dev machine: the Full List snapshot (6.17M files) went from 29.3%
-//! unclassified to 6.6%, the Curated list (1.35M files) from 10.2% to 2.7%. The extensions and
-//! names listed are the ones that occur there in volume, identified by sampling real paths, not an
-//! attempt at completeness. Genuinely ambiguous extensions (`.in`, `.t`, `.raw`, `.mod`, `.res`,
-//! `.rc`, `.def`) are left unclassified on purpose: a wrong category is worse than none, because
-//! `stats::expand_from_code` reads every file classified as Code or Configuration and skips the
-//! rest.
+//! Only the file name and extension are consulted, never the contents, so it is cheap enough to
+//! decide which files of a multi-million-file corpus to read at all. The tables list what occurs in
+//! the corpus in volume, not everything. Ambiguous extensions (`.in`, `.t`, `.raw`, `.mod`, `.res`,
+//! `.rc`, `.def`) stay unclassified on purpose: a wrong category is worse than none, since the
+//! statistics read exactly the files classified as Code or Configuration.
 
 use crate::code::Type;
 use crate::code::language::language_for_extension;

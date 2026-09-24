@@ -22,21 +22,17 @@ pub mod language;
 pub mod metadata;
 pub mod similarity;
 mod similarity_corpus_tests;
-pub mod tip; // Since type is a reserved keyword in Rust, we use Croatian instead.
+pub mod tip; // `type` is a Rust keyword, so Croatian.
 
 use anyhow::{Result, anyhow};
 use std::fmt;
 
 /**
-* The main data structure. It owns and contains the actual code and all metadata.
+* Source code and everything derived from it.
 *
-* Any function that accepts this structure or any sub-field should not assume any fields are set
-* and should always first check that the required data is actually available, if not it should try
-* to construct it, and if that doesn't work it should fail-safe, ideally returning a safe zero
-* result. This allows the calling code to extremely efficiently process large files, and files that
-* only pretend to be code but are data or configuration. To help the compiler enforce this, most
-* leaf fields should be wrapped in Option. Ideally, the only non-Option wrapped field is the code
-* itself.
+* Consumers must not assume any derived field is set: check, compute it if possible, and otherwise
+* fail safe with a zero result. That keeps large files and data-that-looks-like-code cheap, and is
+* why the derived fields are `Option`s.
 */
 #[derive(Debug, Default)]
 pub struct Code {
@@ -49,24 +45,9 @@ pub struct Code {
 }
 
 /**
-* Hand-written, not `#[derive(Clone)]`: `tree_sitter::Tree::clone()` does not preserve the root
-* node's `id()` (confirmed empirically 2026-07-26 - out of 33 nodes in a small fixture, exactly 32
-* kept their id across a clone; only the root changed, every time, deterministically). Every other
-* `Metadata` field is a pure function of `contents`/the parsed structure, so it survives a clone
-* fine, but `ast_metadata` is a `HashMap`-of-maps keyed by node id (`ASTMetadata::node_info` and
-* friends) - if it were cloned verbatim alongside a freshly-recloned `ast`, its cached root-id
-* entries would silently point at a node that no longer exists in the clone's own tree, corrupting
-* any lookup keyed on the old root id (this is exactly what `diff_identical_rust_code` and 111
-* other tests caught when `ensure_parsed` was first tried in the test fixture loader - see
-* TODO.md's "Found the real bottleneck" entry).
-*
-* Dropping `ast_metadata` back to `None` on every clone makes "an `ast_metadata`'s node ids always
-* match its own `ast`'s node ids" hold by construction, for every one of this codebase's ~85 call
-* sites, rather than trusting each one individually to re-derive metadata after cloning. The cost:
-* a clone that goes on to get diffed pays one `ensure_parsed`-style recompute the first time
-* `metadata_of` needs it (same as an un-cached `Code` always has) - callers that never clone at all
-* (e.g. `benchmark_other`'s hot path, which reads `&Code` straight out of its fixture cache) are
-* unaffected and keep the full caching benefit.
+* Hand-written, not derived: `tree_sitter::Tree::clone()` gives the root node a new `id()`, so
+* id-keyed `ast_metadata` would point at a node the clone does not have. The clone drops it, so
+* `ast_metadata` ids match its own `ast` by construction; it is recomputed on first use.
 */
 impl Clone for Code {
     fn clone(&self) -> Self {
@@ -82,9 +63,7 @@ impl Clone for Code {
 }
 
 impl Code {
-    /**
-     * Parse the contents of the Code and fill out the AST.
-     */
+    /// Parses `contents` into `ast`; a no-op when the language is unset or has no grammar.
     pub fn parse(&mut self, parser: &mut tree_sitter::Parser) {
         let language = match self.metadata.language.as_ref() {
             Some(lang) => lang,
@@ -100,41 +79,21 @@ impl Code {
         self.ast = parser.parse(&self.contents, None);
     }
 
-    /**
-     * Ensure the code is parsed and metadata is computed.
-     *
-     * This function provides a convenient way to ensure that a Code structure has both its AST
-     * parsed and its metadata computed. It follows these steps:
-     *
-     * 1. If the code is already parsed and metadata is set: Do nothing (early return)
-     * 2. If the code is parsed but metadata is not computed: Compute the metadata (especially ASTMetadata)
-     * 3. If the code is not parsed: Parse the code first, then compute metadata
-     *
-     * This is useful when you want to guarantee that all computable metadata is available
-     * without having to manually check and call parse() and metadata computation separately.
-     *
-     * Returns an error if the language is not set in the metadata or if the language is not
-     * supported by tree-sitter.
-     */
+    /// Parses and computes `ast_metadata` where either is missing.
+    ///
+    /// Errors if the language is unset or has no tree-sitter grammar.
     pub fn ensure_parsed(&mut self) -> Result<()> {
-        // Return error if language is not set
         let language = match self.metadata.language.as_ref() {
             Some(lang) => lang,
             None => return Err(anyhow!("Language must be set to parse code")),
         };
 
-        // Check if we need to parse
         let needs_parsing = self.ast.is_none();
-
-        // Check if we need to compute metadata
         let needs_metadata = self.metadata.ast_metadata.is_none();
-
-        // If nothing needs to be done, return early
         if !needs_parsing && !needs_metadata {
             return Ok(());
         }
 
-        // Parse if needed
         if needs_parsing {
             let ts_language = match crate::code::language::to_treesitter(language) {
                 Some(ts_lang) => ts_lang,
@@ -152,7 +111,6 @@ impl Code {
             self.ast = parser.parse(&self.contents, None);
         }
 
-        // Compute metadata if needed (and if we have a valid AST)
         if needs_metadata && self.ast.is_some() {
             self.metadata.ast_metadata = Some(crate::code::metadata::compute_ast_metadata(self)?);
         }
@@ -160,17 +118,9 @@ impl Code {
         Ok(())
     }
 
-    /**
-     * Constructs a Code structure from the given string and language.
-     *
-     * Note that the metadata type will be assumed to be Code. If for some reason you want to use this
-     * to construct configuration, data or documentation, make sure to update the metadata accordingly
-     * after construction.
-     *
-     * TODO: Make this code auto-recognize type based on contents to correctly construct Code objects
-     * that are actually Configuration, e.g. docker-compose YAML files. It will require expanding the
-     * language.rs detection to support content aware metadata expansion.
-     */
+    /// Parses `contents` as `language`, with `tip` set to `Type::Code` whatever the content is.
+    // TODO: recognize configuration (e.g. docker-compose YAML) by content; needs content-aware
+    // detection in language.rs.
     pub fn from_string(contents: &str, language: &Language) -> Self {
         let mut code = Code {
             contents: contents.to_string(),
@@ -183,22 +133,11 @@ impl Code {
             ..Default::default()
         };
 
-        // Parse the code to populate the AST
         let mut parser = tree_sitter::Parser::new();
         code.parse(&mut parser);
 
-        // Compute AST metadata, but only once there's an AST to compute it from: an unrecognized
-        // language (or a grammar `to_treesitter` doesn't map, see `Code::parse`) leaves `ast` as
-        // `None`, which is an expected, valid state - not a bug - and matches how `ensure_parsed`
-        // and `metadata::metadata_of` both already treat a parse-less `Code` elsewhere. Without
-        // the guard, every `Code::from_string`/`from_file` call for such a language logs "Failed
-        // to compute AST metadata: AST must be parsed before hashing" to stderr with nothing
-        // actually wrong.
-        //
-        // `from_string` is infallible by signature (unlike `ensure_parsed`, which propagates this
-        // same error), so a genuine failure here still can't be returned - it's surfaced via
-        // `eprintln!` instead of being swallowed silently, so a real `compute_ast_metadata` bug
-        // (as opposed to this expected no-AST case) stays visible.
+        // No AST (no grammar) is a valid state, not an error to log. A real failure cannot be
+        // returned from this infallible constructor, so it is printed rather than swallowed.
         if code.ast.is_some() {
             match crate::code::metadata::compute_ast_metadata(&code) {
                 Ok(ast_metadata) => code.metadata.ast_metadata = Some(ast_metadata),
@@ -209,25 +148,15 @@ impl Code {
         code
     }
 
-    /**
-     * Constructs a Code structure from the given file path.
-     *
-     * The language is automatically detected from the file extension. If the extension is not
-     * recognized, the language will be set to Unknown.
-     *
-     * Note that the metadata type will be assumed to be Code. The path will be stored in the metadata.
-     *
-     * TODO: Use the hermetic expansion from metadata.rs to expand the metadata.
-     */
+    /// Reads and parses `path`, detecting the language from its path and content (`Unknown` if
+    /// unrecognized). Errors if the file cannot be read as UTF-8 text.
+    // TODO: use the hermetic expansion from metadata.rs to expand the metadata.
     pub fn from_file(path: &std::path::Path) -> Result<Self> {
         use std::fs;
 
         let contents = fs::read_to_string(path)
             .map_err(|e| anyhow!("Failed to read file {}: {}", path.display(), e))?;
 
-        // Determine language from file extension, refined by content where that's cheap and
-        // unambiguous (e.g. a `.ts` file that's actually Qt Linguist XML, not TypeScript) - see
-        // `language_for_path_and_content`'s doc comment.
         let language =
             language::language_for_path_and_content(path, &contents).unwrap_or(Language::Unknown);
 
@@ -239,17 +168,10 @@ impl Code {
 }
 
 /**
- * Whether `path` holds bytes `Code::from_file` cannot read as text - i.e. a binary file.
+ * Whether `path` holds bytes `Code::from_file` cannot read as text. I/O failures propagate.
  *
- * Deliberately not a heuristic of its own (a NUL byte in the first few KB, the check git uses):
- * this must agree with `Code::from_file` on *every* input, and two independent heuristics only
- * agree by coincidence. A Latin-1-encoded source file has no NUL byte, so git's heuristic calls
- * it text, while `read_to_string` still fails on it - a disagreement that would put a caller
- * right back on the error path this exists to keep it off. So the test *is* `from_file`'s own
- * failure condition, run against the same bytes: valid UTF-8 or not.
- *
- * An I/O failure (missing file, no permission) is a genuine error and propagates; only the
- * decode failure means "binary".
+ * Deliberately `from_file`'s own failure condition (invalid UTF-8), not git's NUL-byte heuristic:
+ * the two must agree on every input, and a Latin-1 source file has no NUL yet fails to decode.
  */
 pub fn is_binary_file(path: &std::path::Path) -> Result<bool> {
     let bytes = std::fs::read(path)
@@ -258,90 +180,51 @@ pub fn is_binary_file(path: &std::path::Path) -> Result<bool> {
 }
 
 /**
-* The metadata around the code, but not the code itself.
-*
-* This is only the metadata that is necessary for the diffing. Statistics and test data should not
-* be added here.
-*
-* Most fields in this class should be optional, to allow for efficient computation.
+* What diffing needs to know about the code, beyond the code itself. Statistics and test data do
+* not belong here.
 */
 #[derive(Debug, Clone, Default)]
 pub struct Metadata {
-    /// The path to the code, if one exists.
     pub path: Option<std::path::PathBuf>,
-    /// The gross type of the "code".
-    /// Since type is a reserved keyword in Rust, we use Croatian instead.
+    /// Whether this is code, configuration, data or documentation (`type` is a keyword).
     pub tip: Option<Type>,
-    /// The language.
     pub language: Option<Language>,
-    /// AST metadata including hashes and reference nodes.
     pub ast_metadata: Option<ASTMetadata>,
 }
 
-/// Node information for AST nodes
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct ASTNodeMetadata {
-    /// Node kind (type)
     pub kind: String,
-    /// The node's text, for leaves; empty for an internal node (whose text is its children's, and
-    /// whose only text of its own is hashed into `owned_text_hash`). Every consumer compares two
-    /// leaves' text, and copying every internal node's whole subtree text here was the largest
-    /// single cost of building metadata on a large file.
+    /// The node's text, for leaves; empty for an internal node, whose own text is only hashed
+    /// into `owned_text_hash` - copying every subtree's text would dominate metadata build time.
     pub text: String,
-    /// A hash of the text this node owns *directly*: the non-whitespace content of the gaps
-    /// before, between and after its children. 0 for leaves (whose whole span is already in
-    /// `text`) and for the great majority of internal nodes, whose bytes their children cover
-    /// entirely.
+    /// A hash of the non-whitespace text this node owns *directly*, in the gaps around its
+    /// children; 0 for leaves and for nodes whose children cover every byte.
     ///
-    /// Exists because grammars disagree about whether a construct's payload is a child node or
-    /// text the parent owns, and for several important ones it is the latter - XML's `AttValue`,
-    /// CSS's `integer_value`/`color_value`, Rust's comments, YAML's quoted scalars. Without it
-    /// `UnitCostModel::ren` prices a change to any of those at zero. See
-    /// `metadata::owned_text_hash_of` for the corpus-wide census.
-    ///
-    /// Hashed rather than stored as text because its consumer is an equality test inside APTED's
-    /// per-DP-cell `ren` - the same hot path [`KindCostClass`] exists to keep free of string work.
+    /// Some grammars keep a construct's payload as parent-owned text (XML's `AttValue`, CSS's
+    /// `integer_value`, YAML's quoted scalars); without this `UnitCostModel::ren` prices changing
+    /// it at zero. A hash, not text, because `ren` runs per APTED DP cell.
     pub owned_text_hash: u64,
-    /// Children IDs
     pub children: Vec<usize>,
     /// Byte offset where this node starts in the source.
     ///
-    /// Tree-sitter node ids are arena slots - stable within one parse, but not across separate
-    /// parses of identical source (allocator/arena layout can differ run to run). Any tie-break
-    /// that needs to be reproducible *across* parses (and therefore across process launches) must
-    /// sort by a property of the source text, not by node id. `start_byte` is exactly that: a
-    /// pure function of the parse tree's shape, identical for the "same" node no matter which
-    /// process or arena produced it.
-    ///
-    /// Not unique on its own: an ancestor and its leftmost descendant (e.g. an
-    /// `expression_statement` and the `call_expression` that starts it) always share a
-    /// `start_byte`. Pair with `preorder_index` wherever a tie-break needs to be both parse-stable
-    /// *and* guaranteed unique.
+    /// Node ids are arena slots that differ between parses of identical source, so a tie-break
+    /// that must be reproducible sorts by this instead. Not unique (an ancestor shares it with its
+    /// leftmost descendant): pair with `preorder_index` when uniqueness matters.
     pub start_byte: usize,
-    /// This node's index in a preorder (root, then children left to right) walk of the tree.
-    /// Unique per node and, like `start_byte`, a pure function of the tree's shape - not the
-    /// arena that happened to produce it - so it's safe to use across separate parses.
+    /// Index in a preorder walk of the tree: unique, and stable across parses like `start_byte`.
     pub preorder_index: usize,
-    /// tree-sitter's `Node::is_named` for this node: `false` for the anonymous tokens a grammar
-    /// spells by their own text (`import`, `{`, `->`), `true` for every rule with a name of its
-    /// own. Reference-node discovery needs it because a keyword token can share its kind string
-    /// with the statement it introduces (Kotlin's `import` statement *and* its `import` keyword
-    /// are both kind `"import"`), and a leaf keyword must never become a hash-matching candidate
-    /// in its own right - see `is_reference`'s two call sites.
+    /// tree-sitter's `Node::is_named`: `false` for anonymous tokens (`import`, `{`, `->`). A
+    /// keyword can share its kind with its statement (Kotlin's `import`), and reference-node
+    /// discovery must not make the keyword a hash-matching candidate.
     pub is_named: bool,
-    /// Precomputed answers to the kind-membership questions
-    /// [`crate::diff::nodes::kinds_update_allowed`] and [`crate::diff::nodes::is_literal_kind`]
-    /// would otherwise re-derive by string scanning - see [`KindCostClass`] for why this is
-    /// precomputed rather than computed on demand.
+    /// Precomputed kind-membership answers; see [`KindCostClass`].
     pub kind_cost_class: KindCostClass,
 }
 
 impl ASTNodeMetadata {
-    /// Builds a node's metadata with [`kind_cost_class`](ASTNodeMetadata::kind_cost_class) derived
-    /// from `kind`, so no caller has to know how that derivation works (or can get it wrong by
-    /// hand). The production builder (`code::metadata::compute_node_info`) fills the struct
-    /// literally, field by field, because it already computes each field from the tree-sitter node
-    /// - this is for everything else, principally test fixtures.
+    /// A hand-built node (for test fixtures) with `kind_cost_class` derived from `kind`, owning no
+    /// text and named. The production builder is `code::metadata::compute_node_info`.
     pub fn new(
         kind: String,
         text: String,
@@ -357,13 +240,10 @@ impl ASTNodeMetadata {
         ASTNodeMetadata {
             kind,
             text,
-            // Hand-built nodes (test fixtures) have no source to carve gaps out of, so they own
-            // nothing; the production builder computes this from real byte ranges.
             owned_text_hash: 0,
             children,
             start_byte,
             preorder_index,
-            // Hand-built nodes are always meant as real syntax nodes, not keyword tokens.
             is_named: true,
             kind_cost_class,
         }
@@ -373,22 +253,12 @@ impl ASTNodeMetadata {
 /// The parts of a node's *kind* that [`crate::diff::apted`]'s rename-cost model needs, reduced to
 /// integer/boolean form once per node at metadata-build time.
 ///
-/// Purely a performance representation - it answers exactly the questions
-/// [`crate::diff::nodes::kinds_update_allowed`] and [`crate::diff::nodes::is_literal_kind`]
-/// already answer from the kind string, and is derived from the very same `const` family arrays
-/// (see [`crate::diff::nodes::operator_family_mask`]), so the two can't disagree.
+/// Purely a performance representation of what [`crate::diff::nodes::kinds_update_allowed`] and
+/// [`crate::diff::nodes::is_literal_kind`] answer from the kind string, derived from the same
+/// arrays: `ren` runs once per DP cell, and this moves the string scans to an O(n) precompute.
 ///
-/// Why it exists: `UnitCostModel::ren` is evaluated once per tree-edit-distance DP cell - O(n1*n2)
-/// times and more - and answering those questions from the kind string means walking
-/// `IDENTIFIER_KINDS` and up to six operator family arrays comparing `&str`s, tens of string
-/// comparisons per cell. Every input to those scans depends only on the node's kind, never on the
-/// pair, so the whole cost moves from the O(n^2) inner loop to an O(n) precompute - and `ren`
-/// plus the containment adjustment it feeds is a large share of all APTED time.
-///
-/// Language-independent by construction: `operator_families` records membership in *every* family,
-/// and which subset applies is decided at comparison time from the cost model's own language (see
-/// [`crate::diff::nodes::language_operator_family_mask`]). That keeps this correct even when a
-/// node's own tree was parsed as a different language than the comparison is being run under.
+/// Language-independent: `operator_families` records every family, and the comparison picks the
+/// subset for its own language ([`crate::diff::nodes::language_operator_family_mask`]).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct KindCostClass {
     /// `IDENTIFIER_KINDS.contains(kind)` - name-like leaves that may match each other across
@@ -402,119 +272,53 @@ pub struct KindCostClass {
 }
 
 /**
-* Metadata about the AST.
+* Per-tree hashes and indexes, keyed by tree-sitter node id.
 *
-* Note that hashes don't make sense for all nodes. E.g., the semicolon in Rust and C++ will have a
-* leaf node that is repeated dozens or hundreds of times across a file. Those nodes will all have
-* the exact same hash.
+* Every map is an `FxHashMap`: SipHash's per-process reseed makes lookup time on these small
+* integer keys vary by an order of magnitude between runs, and the ancestor walk in APTED's DP does
+* a lookup per step. Reverse maps hold a `Vec` in deterministic traversal order, not a set, so the
+* duplicate a caller picks first is reproducible; many nodes share a hash (every `;`).
 */
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct ASTMetadata {
-    /// Map of node->hash. The hash is a full hash, hashing both the structure (types) and the
-    /// values of the node and it's entire subtree, in order. The nodes are identified by their
-    /// treesitter node id.
-    ///
-    /// `FxHashMap`, not `std::collections::HashMap`: see `node_to_parent`'s doc comment below for
-    /// the measured rationale (SipHash's per-process random reseed causes real, confirmed 10x
-    /// run-to-run wall-time variance on this exact key shape). Every `ASTMetadata` map keyed by
-    /// node id or hash value shares that same small-integer-key shape, so all of them got the same
-    /// treatment (2026-07-26) once the pattern was found not to be applied consistently -
-    /// `node_to_parent` was the only one converted at the time the variance was first diagnosed.
+    /// Full hash: kinds and values of the whole subtree, in order.
     pub node_to_full_hash: rustc_hash::FxHashMap<usize, u64>,
-    /// Reverse map to node_to_full_hash, going from <full hash> -> <treesitter node ids>.
-    /// Note that as mentioned above, many nodes will have the same hash, e.g. any variable
-    /// declaration called "i" will hash to the same hash. Therefore, the map is actually going from
-    /// a hash to a list of nodes.
-    ///
-    /// Deliberately a `Vec`, not a `HashSet`: nodes are pushed in the same deterministic traversal
-    /// order every time (see `hash::hash_code`), so which duplicate a caller picks first (e.g.
-    /// `hash_tree_matching::solve_with_hash_map`'s candidate selection) is reproducible run to
-    /// run. A `HashSet` here would make that choice depend on the hasher's per-instance random
-    /// seed, silently changing codediff's output between otherwise-identical runs whenever a hash
-    /// has more than one node (see `describe_nondeterminism` in test/helper/human_mapping.rs).
-    /// There are never true duplicate entries within one list (each node is visited exactly once),
-    /// so a `Vec` gives up nothing a `HashSet` would provide. See `node_to_full_hash` for why the
-    /// outer map itself is `FxHashMap`; nothing here ever iterates that map directly in an
-    /// order-sensitive way.
+    /// Reverse of `node_to_full_hash`, in `hash::hash_code`'s traversal order.
     pub full_hash_to_node: rustc_hash::FxHashMap<u64, Vec<usize>>,
-    /// Map of node->hash. The hash is a structural hash, hashing only the types of AST nodes in
-    /// the subtree, not the value of the nodes. This hash is robust to changes like constant value
-    /// changes. The nodes are identified by their treesitter node id.
+    /// Structural hash: the subtree's kinds only, in order, so a changed value keeps it.
     pub node_to_structural_hash: rustc_hash::FxHashMap<usize, u64>,
-    /// Reverse map to node_to_structural_hash, going from <structural hash> -> <node ids>. See
-    /// `full_hash_to_node` for why this is a `Vec`, not a `HashSet`.
     pub structural_hash_to_node: rustc_hash::FxHashMap<u64, Vec<usize>>,
-    /// Kind+value hash, order-independent per `nodes::is_commutative_container` at *every*
-    /// recursion level (not just the top - see `hash::compute_kind_and_value_hash`'s doc comment
-    /// for the propagation-bug fix this depends on, and `TODO.md` for the pipeline rework this
-    /// hash was built for). Used for byte-identical-subtree matching (`solve_hash_descent`),
-    /// alongside `node_to_full_hash` (the order-*dependent* full hash, still used wherever
-    /// document-order-sensitive content equality is needed - APTED's own cost model
-    /// (`apted/common`), `solve_moved_subtrees`, `solve_greedy_anchor_blocks`,
-    /// `solve_identical_diagnostic_statements`).
+    /// Kind+value hash, order-independent inside `nodes::is_commutative_container` at every
+    /// level. For identical-subtree matching (`solve_hash_descent`); order-sensitive equality
+    /// uses `node_to_full_hash`.
     pub node_to_kind_and_value_hash: rustc_hash::FxHashMap<usize, u64>,
-    /// Reverse map for `node_to_kind_and_value_hash`. See `full_hash_to_node` for why this is a
-    /// `Vec`, not a `HashSet`.
     pub kind_and_value_hash_to_node: rustc_hash::FxHashMap<u64, Vec<usize>>,
-    /// Structural (kind-only) hash, order-independent per `nodes::is_commutative_container` at
-    /// every recursion level. Used for same-shape/differing-leaves matching (`solve_hash_descent`)
-    /// - see `TODO.md`'s "New hash algorithms" section for the design.
+    /// Kind-only hash, order-independent like `node_to_kind_and_value_hash`. For same-shape,
+    /// differing-leaves matching (`solve_hash_descent`).
     pub node_to_kind_only_hash: rustc_hash::FxHashMap<usize, u64>,
-    /// Reverse map for `node_to_kind_only_hash`.
     pub kind_only_hash_to_node: rustc_hash::FxHashMap<u64, Vec<usize>>,
-    /// node.id() -> a bottom-k MinHash sketch of the *leaf* hashes in that node's subtree.
-    ///
-    /// The one map here that does not answer "identical?". All four hashes above are Merkle
-    /// hashes: one changed token makes them differ, and they then say nothing about *how much*
-    /// differs. This answers "how nearly the same?" in O(k) for any two nodes, without touching
-    /// either subtree - see [`crate::code::similarity`] for why that question keeps coming up and
-    /// why the sketch covers leaves rather than all descendants. There is deliberately no reverse
-    /// map: a sketch is for comparing two known nodes, not for looking a node up by content
-    /// (which is what `full_hash_to_node` and friends are for).
+    /// A bottom-k MinHash sketch of the leaf hashes in the subtree: "how nearly the same?" for two
+    /// known nodes in O(k), where the Merkle hashes above only answer "identical?". See
+    /// [`crate::code::similarity`].
     pub node_to_similarity_sketch:
         rustc_hash::FxHashMap<usize, crate::code::similarity::SimilaritySketch>,
-    /// node.id() -> subtree size
     pub node_to_subtree_size: rustc_hash::FxHashMap<usize, usize>,
-    /// node.id() -> `(count, node_id)` of the node with the most *direct* children found
-    /// anywhere in this node's own subtree (inclusive of itself). Lets
-    /// `solve_large_flat_subtrees::largest_flat_container_in` answer "does this subtree contain
-    /// a node with >= N direct children, and which one" in O(1) instead of a per-query BFS -
-    /// `node_to_subtree_size` alone isn't enough for that (a node's *total* descendant count
-    /// says nothing about whether any single one of them has many *direct* children; a subtree
-    /// can easily have hundreds of nodes while every individual node in it has only 2-3
-    /// children).
+    /// `(count, node_id)` of the node with the most *direct* children in this subtree (inclusive),
+    /// for `solve_large_flat_subtrees::largest_flat_container_in` in O(1).
     pub node_to_widest_subtree_node: rustc_hash::FxHashMap<usize, (usize, usize)>,
     /// node.id() -> depth (root = 0, its children = 1, ...)
     pub node_to_depth: rustc_hash::FxHashMap<usize, usize>,
-    /// child node.id() -> parent node.id(), covering every non-root node. `ASTNodeMetadata` has
-    /// no parent pointer, so this is derived once here from `node_info`'s children lists, rather
-    /// than every ancestor/containment check re-deriving its own copy from scratch.
-    ///
-    /// `FxHashMap`, not `std::collections::HashMap`: this map backs `ContainmentCtx`'s
-    /// `is_ancestor_or_self` ancestor walk (`apted/common/slots.rs`), which does a `.get()` per step of
-    /// an O(depth) walk on every `vren_adjusted` call inside APTED's core DP - an enormous number
-    /// of lookups on any fixture with real containment. The default hasher (`SipHash`) is
-    /// correctness-fine but randomly reseeded per process, so its collision behavior for this
-    /// specific integer key set varies run to run - confirmed empirically (2026-07-16): identical
-    /// input/output (same residual forest, fingerprinted by sorted `start_byte`, byte-identical
-    /// across runs) but wall time on `kotlin-nextcloud-a-few-small-removals` ranged 2.8s-26.4s
-    /// across separate process invocations, CPU-bound the whole time (`User time` ≈ `Elapsed`,
-    /// ruling out scheduling/IO noise). `FxHashMap` is unseeded (deterministic performance) and
-    /// faster on small integer keys regardless.
+    /// Child id -> parent id for every non-root node.
     pub node_to_parent: rustc_hash::FxHashMap<usize, usize>,
-    /// Set of reference nodes in this tree, ordered by subtree size.
+    /// Reference nodes, ordered by subtree size.
     pub reference_nodes_ordered: Vec<usize>,
-    /// Node information for each node, indexed by node_id.
     pub node_info: rustc_hash::FxHashMap<usize, ASTNodeMetadata>,
-    /// The language this tree was parsed as, so the cost model can consult
-    /// [`crate::diff::nodes::kinds_update_allowed`] without threading a separate parameter
-    /// through every APTED call site.
+    /// The language this tree was parsed as, for the cost model.
     pub language: Language,
 }
 
 impl ASTMetadata {
-    /// Whether `id` is a leaf (has no children) in this tree. `false` for an id with no
-    /// `node_info` entry, which is the conservative answer every call site wants.
+    /// Whether `id` has no children; `false` for an unknown id.
     pub fn is_leaf(&self, id: usize) -> bool {
         self.node_info
             .get(&id)
@@ -522,12 +326,8 @@ impl ASTMetadata {
     }
 }
 
-/**
-* The programming language.
-*
-* Implemented as a crate enum instead of reusing something like TreeSitter language to allow for
-* better error handling of unknown or not-supported languages.
-*/
+/// The programming language: a crate enum rather than a tree-sitter language, so unknown and
+/// grammar-less languages are representable.
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub enum Language {
     #[default]
@@ -571,14 +371,7 @@ impl std::fmt::Display for Language {
     }
 }
 
-/**
-* The type of "code". Very often, code files are not actually code, but rather configuration or
-* data, or, much more rarely, documentation.
-*
-* The enums gross values separate the four big areas. Each instantiation can further contain an
-* arbitrary string that provides fine grained information on what type of code, configuration,
-* data or documentation exactly the file contents are.
-*/
+/// What a "code" file really is; the string refines the variant (e.g. which configuration).
 #[derive(Debug, Clone, Default, PartialEq)]
 pub enum Type {
     #[default]
@@ -597,9 +390,6 @@ impl std::fmt::Display for Type {
 
 #[cfg(test)]
 mod tests {
-    /// `is_binary_file` must answer exactly as `Code::from_file` would, on the same bytes - see
-    /// its doc comment for why an independent heuristic is the wrong shape here. These two cases
-    /// assert the agreement directly rather than the classification alone.
     #[test]
     fn is_binary_file_agrees_with_from_file_on_valid_utf8() {
         let mut file = tempfile::NamedTempFile::new().expect("create temp file");
@@ -611,23 +401,18 @@ mod tests {
     #[test]
     fn is_binary_file_agrees_with_from_file_on_invalid_utf8() {
         let mut file = tempfile::NamedTempFile::new().expect("create temp file");
-        // A PDF header followed by a byte no UTF-8 sequence can start with - the shape of the
-        // real input this was written for.
         std::io::Write::write_all(&mut file, b"%PDF-1.7\n\xff\xfe\x00binary").expect("write");
         assert!(is_binary_file(file.path()).expect("classify"));
         assert!(Code::from_file(file.path()).is_err());
     }
 
-    /// git hands `/dev/null` to the side an added or deleted file is missing from. It reads back
-    /// as empty and valid, so a binary file being *added* still classifies on its real side only.
+    /// git passes `/dev/null` for the missing side of an added or deleted file.
     #[test]
     fn is_binary_file_says_dev_null_is_not_binary() {
         assert!(!is_binary_file(std::path::Path::new("/dev/null")).expect("classify"));
     }
 
-    /// A NUL byte inside otherwise valid UTF-8 is text as far as parsing is concerned, even
-    /// though git's own binary heuristic would call this file binary. Asserting the disagreement
-    /// keeps anyone from "simplifying" `is_binary_file` into that cheaper check later.
+    /// git's NUL-byte heuristic would call this binary; `from_file` reads it fine.
     #[test]
     fn is_binary_file_says_valid_utf8_containing_a_nul_byte_is_not_binary() {
         let mut file = tempfile::NamedTempFile::new().expect("create temp file");
@@ -649,18 +434,28 @@ mod tests {
         assert!(code.ast.is_some());
     }
 
-    /// `Language::Unknown` has no tree-sitter grammar (`to_treesitter` returns `None`), so
-    /// `Code::parse` leaves `ast` unset - an expected, valid outcome (e.g. every add/delete-file
-    /// diff run through `tui::app::compute_diff`'s `/dev/null` fallback starts from exactly this
-    /// state before it's corrected to the other side's language). `compute_ast_metadata` must not
-    /// even be attempted in that case: it requires a parsed AST, and attempting it logs a spurious
-    /// "Failed to compute AST metadata" error to stderr with nothing actually wrong.
     #[test]
     fn code_from_string_skips_ast_metadata_when_the_language_has_no_grammar() {
         let code = Code::from_string("", &Language::Unknown);
 
         assert!(code.ast.is_none());
         assert!(code.metadata.ast_metadata.is_none());
+    }
+
+    #[test]
+    fn cloning_code_drops_ast_metadata_so_its_ids_cannot_outlive_the_tree() -> Result<()> {
+        let code = Code::from_string("fn main() { let x = 1; }", &Language::Rust);
+        assert!(code.metadata.ast_metadata.is_some());
+
+        let mut clone = code.clone();
+        assert!(clone.ast.is_some());
+        assert!(clone.metadata.ast_metadata.is_none());
+
+        clone.ensure_parsed()?;
+        let root = clone.ast.as_ref().unwrap().root_node().id();
+        let metadata = clone.metadata.ast_metadata.as_ref().unwrap();
+        assert!(metadata.node_info.contains_key(&root));
+        Ok(())
     }
 
     #[test]
@@ -737,7 +532,6 @@ mod tests {
         assert!(!ast_metadata.node_to_structural_hash.is_empty());
         assert!(!ast_metadata.structural_hash_to_node.is_empty());
 
-        // Test that reference nodes are discovered and ordered
         assert!(!ast_metadata.reference_nodes_ordered.is_empty());
 
         Ok(())
@@ -750,23 +544,18 @@ mod tests {
             .get("hello-world.rs")
             .expect("hello-world.rs should exist in test data");
 
-        // Read the file content
         let content = std::fs::read_to_string(hello_world_path)?;
 
-        // Create code from file
         let code_from_file = Code::from_file(hello_world_path)?;
 
-        // Create code from string
         let code_from_string = Code::from_string(&content, &Language::Rust);
 
-        // Both should have AST metadata
         assert!(code_from_file.metadata.ast_metadata.is_some());
         assert!(code_from_string.metadata.ast_metadata.is_some());
 
         let metadata_from_file = code_from_file.metadata.ast_metadata.as_ref().unwrap();
         let metadata_from_string = code_from_string.metadata.ast_metadata.as_ref().unwrap();
 
-        // The metadata should be identical (same content, same language)
         assert_eq!(
             metadata_from_file.node_to_full_hash.len(),
             metadata_from_string.node_to_full_hash.len()
@@ -789,20 +578,15 @@ mod tests {
 
     #[test]
     fn ensure_parsed_already_parsed_and_metadata_set() -> Result<()> {
-        // Test case 1: Code is already parsed and metadata is set
         let mut code = Code::from_string("fn main() { println!(\"Hello\"); }", &Language::Rust);
 
-        // Both AST and metadata should already be set by from_string
         assert!(code.ast.is_some());
         assert!(code.metadata.ast_metadata.is_some());
 
-        // Store original metadata for comparison
         let original_metadata = code.metadata.ast_metadata.clone();
 
-        // Call ensure_parsed - should do nothing and return Ok
         code.ensure_parsed()?;
 
-        // Verify nothing changed (AST should still be Some, metadata should be unchanged)
         assert!(code.ast.is_some());
         assert_eq!(code.metadata.ast_metadata, original_metadata);
 
@@ -811,30 +595,25 @@ mod tests {
 
     #[test]
     fn ensure_parsed_parsed_but_no_metadata() -> Result<()> {
-        // Test case 2: Code is parsed but metadata is not computed
         let mut code = Code {
             contents: "fn main() { println!(\"Hello\"); }".to_string(),
             metadata: Metadata {
                 path: None,
                 tip: Some(Type::Code("Code".to_string())),
                 language: Some(Language::Rust),
-                ast_metadata: None, // Metadata not set
+                ast_metadata: None,
             },
             ..Default::default()
         };
 
-        // Parse the code manually
         let mut parser = tree_sitter::Parser::new();
         code.parse(&mut parser);
 
-        // AST should be set, but metadata should not be
         assert!(code.ast.is_some());
         assert!(code.metadata.ast_metadata.is_none());
 
-        // Call ensure_parsed - should compute metadata
         code.ensure_parsed()?;
 
-        // Verify AST is still set and metadata is now computed
         assert!(code.ast.is_some());
         assert!(code.metadata.ast_metadata.is_some());
 
@@ -847,7 +626,6 @@ mod tests {
 
     #[test]
     fn ensure_parsed_not_parsed() -> Result<()> {
-        // Test case 3: Code is not parsed at all
         let mut code = Code {
             contents: "fn main() { println!(\"Hello\"); }".to_string(),
             metadata: Metadata {
@@ -859,14 +637,11 @@ mod tests {
             ..Default::default()
         };
 
-        // Neither AST nor metadata should be set
         assert!(code.ast.is_none());
         assert!(code.metadata.ast_metadata.is_none());
 
-        // Call ensure_parsed - should parse and compute metadata
         code.ensure_parsed()?;
 
-        // Verify both AST and metadata are now set
         assert!(code.ast.is_some());
         assert!(code.metadata.ast_metadata.is_some());
 
@@ -879,22 +654,19 @@ mod tests {
 
     #[test]
     fn ensure_parsed_no_language() {
-        // Test case 4: Code has no language set - should return error
         let mut code = Code {
             contents: "fn main() { println!(\"Hello\"); }".to_string(),
             metadata: Metadata {
                 path: None,
                 tip: Some(Type::Code("Code".to_string())),
-                language: None, // No language set
+                language: None,
                 ast_metadata: None,
             },
             ..Default::default()
         };
 
-        // Call ensure_parsed - should return error
         let result = code.ensure_parsed();
 
-        // Verify it returns an error
         assert!(result.is_err());
         assert!(
             result
@@ -903,14 +675,12 @@ mod tests {
                 .contains("Language must be set")
         );
 
-        // Verify nothing changed
         assert!(code.ast.is_none());
         assert!(code.metadata.ast_metadata.is_none());
     }
 
     #[test]
     fn ensure_parsed_unsupported_language() {
-        // Test case 5: Code has unsupported language - should return error
         let mut code = Code {
             contents: "fn main() { println!(\"Hello\"); }".to_string(),
             metadata: Metadata {
@@ -922,10 +692,8 @@ mod tests {
             ..Default::default()
         };
 
-        // Call ensure_parsed - should return error for unsupported language
         let result = code.ensure_parsed();
 
-        // Verify it returns an error
         assert!(result.is_err());
         assert!(
             result
@@ -934,7 +702,6 @@ mod tests {
                 .contains("not supported by tree-sitter")
         );
 
-        // Verify nothing changed
         assert!(code.ast.is_none());
         assert!(code.metadata.ast_metadata.is_none());
     }

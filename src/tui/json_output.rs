@@ -16,10 +16,8 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-//! Machine-readable counterpart to `tui::headless`: prints a diff as a single JSON object on
-//! stdout instead of ANSI text or an interactive TUI. Exists for editor/tool integrations (e.g. a
-//! Neovim plugin) that want to place highlights/signs on their own already-open buffers rather
-//! than parse ANSI escape codes back out of `headless`'s output.
+//! Machine-readable counterpart to `tui::headless`: prints a diff as one JSON object on stdout,
+//! for editor/tool integrations that place highlights on their own buffers.
 //!
 //! Schema (see `JsonDiff`/`JsonSide`/`JsonHunk`/`JsonRange` below for the authoritative field
 //! list):
@@ -39,43 +37,21 @@
 //! }
 //! ```
 //!
-//! One pair never reaches the diff engine: if either side is binary (`code::is_binary_file`),
-//! `main.rs` answers with `binary_diff_json` instead - the same object, with `"binary": true`,
-//! empty `hunks`, and no `summary`. That field is omitted for every ordinary text diff.
+//! If either side is binary, `main.rs` answers with `binary_diff_json` instead: the same object
+//! with `"binary": true`, empty `hunks` and no `summary`. `binary` is omitted for text diffs.
 //!
-//! Each side's `hunks` list is that side's own complete account of its changes (`before`'s hunks
-//! are ranges in the before file, `after`'s are ranges in the after file) - the same per-side
-//! split `headless.rs` renders as two separate blocks, just serialized instead of printed. Rows
-//! and columns are 0-indexed, matching `diff::text_range::TextRange`'s own convention.
+//! Each side's `hunks` are ranges in that side's own file. Rows and columns are 0-indexed.
 //!
-//! **Columns are byte offsets within their row, not character or code-unit offsets.** That is
-//! `SourceColumn`'s documented meaning throughout this crate (see `diff::text_range`) and it is
-//! what tree-sitter's own `Point::column` reports, so it is the right thing to serialize - but it
-//! is the single most likely thing for an integration to get wrong, because it is invisible until
-//! a line contains a non-ASCII character and then every range on that line lands in the wrong
-//! place. Editors differ on what they want:
+//! **Columns are byte offsets within their row**, as tree-sitter reports them. Neovim takes them
+//! directly; VS Code / LSP need UTF-16 code units and character-offset consumers must decode the
+//! row, both per line. No second coordinate space is offered: it could disagree with the first,
+//! and every consumer already has the line's text.
 //!
-//! * **Neovim** takes byte columns directly (`nvim_buf_add_highlight`, extmarks). No conversion.
-//! * **VS Code / LSP** want UTF-16 code units in `Position.character`. Convert per line, e.g.
-//!   `Buffer.from(line).subarray(0, byteColumn).toString('utf8').length` for UTF-16-safe JS
-//!   string indices.
-//! * **Anything using character offsets** (Python `str`, Go runes) must decode the row's bytes up
-//!   to the column and count from there.
+//! `summary` is the diff's overall shape (`no_changes`, `new_file`, `deleted_file`,
+//! `whitespace_only`, `comment_only`, `refactor_moved_only`), omitted for an ordinary mix of edits.
 //!
-//! Deliberately not offered as a flag: emitting a second coordinate space would mean this file
-//! could disagree with itself, and every consumer already has the line's text (see the note on
-//! not embedding file contents, below) so the conversion is local and cheap.
-//!
-//! `summary` is the diff's overall shape (see `JsonDiffSummary`/`diff::text::DiffSummary`) -
-//! `no_changes`, `new_file`, `deleted_file`, `whitespace_only`, `comment_only`, or
-//! `refactor_moved_only` - omitted entirely for the ordinary case of a genuine mix of edits that
-//! doesn't cleanly fit one of those, the same "print nothing extra" convention `headless::run`
-//! follows for its own header line.
-//!
-//! Deliberately does not embed file contents: `main.rs`'s own doc comment on `GIT_EXTERNAL_DIFF`
-//! notes both positional arguments are always real files (working-tree paths or git's temp blob
-//! copies) - a caller like a Neovim plugin already has (or can open) that file itself, so
-//! duplicating its content here would just be a second copy to keep in sync.
+//! File contents are not embedded: both paths are always real files the caller can open, and a
+//! second copy would be one more thing to keep in sync.
 
 use std::path::{Path, PathBuf};
 
@@ -93,9 +69,7 @@ use crate::tui::actions::DiffSessionData;
 use crate::tui::app::compute_diff_with_options;
 use crate::tui::headless::nearest_reference_line;
 
-/// A `TextRange`, reshaped for JSON. Kept as a local type rather than `#[derive(Serialize)]` on
-/// `TextRange` itself - that keeps `diff::text_range` free of a serde dependency on its public
-/// type, the same boundary `headless.rs` already draws around ANSI concerns and `diff::text`.
+/// A `TextRange` for JSON. Local, like the other `Json*` types, so `diff` stays serde-free.
 #[derive(Debug, Serialize, PartialEq, Eq)]
 struct JsonRange {
     start_row: usize,
@@ -115,9 +89,7 @@ impl From<&TextRange> for JsonRange {
     }
 }
 
-/// Mirrors `TextOperation`, minus `Identical`/`NotYetSet`: unchanged text gets no hunk at all (see
-/// this module's doc comment on why file contents aren't embedded), so there is nothing to report
-/// for either sentinel.
+/// `TextOperation` minus `Identical`/`NotYetSet`: unchanged text gets no hunk.
 #[derive(Debug, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 enum JsonOperation {
@@ -139,11 +111,7 @@ impl JsonOperation {
     }
 }
 
-/// Mirrors `diff::text::DiffSummary` - the same overall-shape classification the interactive TUI
-/// shows in its status bar and `headless::run` prints as a header line, serialized here as a tag a
-/// script can match on instead of a prose label meant for a human. Kept as a local type rather than
-/// `#[derive(Serialize)]` on `DiffSummary` itself, the same boundary `JsonRange`/`JsonOperation`
-/// already draw around `diff::text`'s serde-free public types.
+/// `diff::text::DiffSummary` as a snake_case tag a script can match on.
 #[derive(Debug, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 enum JsonDiffSummary {
@@ -172,18 +140,11 @@ impl From<DiffSummary> for JsonDiffSummary {
 struct JsonHunk {
     operation: JsonOperation,
     range: JsonRange,
-    /// Only set for `Move`: the real counterpart range in the *other* file, computed the same way
-    /// as an `Identical` mapping's destination (see `diff::text::ranges`'s `Identical` match arm -
-    /// a `Move` is exactly that same "found the matching node" case, just relocated). Every other
-    /// operation has `RangeMatch::destination` filled with a synthetic bookkeeping anchor instead
-    /// (`diff::text::advance_and_build_range`'s `last_non_move_range.right_limit()`), not a real
-    /// position in the other file - surfacing that here would look like a jump target but isn't
-    /// one, so it is deliberately omitted rather than included and mislabeled.
+    /// Only set for `Move`. Other operations carry a synthetic bookkeeping anchor in
+    /// `destination`, not a real position, which would look like a jump target but is not one.
     #[serde(skip_serializing_if = "Option::is_none")]
     move_target: Option<JsonRange>,
-    /// The row of the nearest enclosing named declaration (function, struct, ...) - same idea as
-    /// `headless.rs`'s `@` breadcrumb, reusing its exact `nearest_reference_line` walk, just
-    /// surfaced as a field instead of printed as a line.
+    /// The row of the nearest enclosing named declaration, as in `headless`'s `@` breadcrumb.
     #[serde(skip_serializing_if = "Option::is_none")]
     reference_line: Option<usize>,
 }
@@ -199,30 +160,20 @@ struct JsonSide {
 struct JsonDiff {
     before: JsonSide,
     after: JsonSide,
-    /// Whether the diff left an unusually large unmatched residual after the heuristic passes
-    /// (`PendingDiff::large_residual`), so the terminal pass's coarser whole-subtree matching
-    /// covered more of the file than usual. `headless::run` reports this as a one-line stderr
-    /// note; JSON mode is meant for machine consumption, so it is a field here instead - a script
-    /// parsing stdout as JSON shouldn't also have to watch stderr for a caveat.
+    /// The diff left an unusually large unmatched residual. `headless` prints this to stderr; here
+    /// it is a field so a JSON consumer need not watch stderr.
     large_residual: bool,
-    /// The diff's overall shape (see `JsonDiffSummary`) - `None` for the ordinary case (a genuine
-    /// mix of edits that doesn't cleanly fit one of `DiffSummary`'s special cases), same as
-    /// `headless::run` printing no header line at all in that case.
+    /// `None` for an ordinary mix of edits.
     #[serde(skip_serializing_if = "Option::is_none")]
     summary: Option<JsonDiffSummary>,
-    /// Set when at least one side is a file codediff cannot read as text, so no diff was computed
-    /// at all (see `binary_diff_json`). Both sides' `hunks` are empty in that case, which is
-    /// otherwise indistinguishable from "the files are identical" - hence a flag rather than
-    /// leaving the consumer to infer it. Omitted entirely for the ordinary text case, so an
-    /// existing consumer sees the object shape it already knows.
+    /// At least one side is binary and no diff was computed. A flag, because empty hunks alone
+    /// look like identical files.
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     binary: bool,
 }
 
-/// Builds one side's `JsonSide` from its own complete `RangeMatch` list (`DiffSessionData::
-/// before_ranges`/`after_ranges` - see `diff::text::TextDiff::all`'s doc comment), re-parsing
-/// `contents` to walk it for `nearest_reference_line`, same trade-off `headless::render_side`
-/// already makes (see its own doc comment: not on any hot path, so a redundant parse is fine).
+/// Re-parses `contents` for `nearest_reference_line`; not on a hot path, so the redundant parse
+/// is fine.
 fn build_side(contents: &str, path: &Path, ranges: &[RangeMatch]) -> JsonSide {
     let language = language_for_path_and_content(path, contents);
     let parsed = language.map(|lang| Code::from_string(contents, &lang));
@@ -278,15 +229,9 @@ fn build_diff(data: &DiffSessionData, large_residual: bool) -> JsonDiff {
     }
 }
 
-/// The `--mode json` answer for a pair `main.rs` refused to diff because a side is binary: the
-/// same object shape as any other run, with `binary` set, no hunks on either side, and no
-/// `summary` (none of `DiffSummary`'s shapes apply when no diff was computed). Returns the
-/// serialized text rather than printing it, so the single `println!` for JSON output stays at
-/// `main.rs`'s own call site alongside the text-mode notice it replaces.
-///
-/// `language` is still filled in per side from the path's extension, exactly as `build_side`
-/// would: it describes the file, not the diff, and a consumer keying on it should not see it
-/// vanish just because this pair was unreadable.
+/// The `--mode json` answer when a side is binary: the usual shape with `binary` set, no hunks
+/// and no `summary`. `language` is still filled in, since it describes the file, not the diff.
+/// Returns the text so `main.rs` keeps the single print site.
 pub fn binary_diff_json(before: &Path, after: &Path) -> Result<String> {
     let side = |path: &Path| JsonSide {
         path: path.to_path_buf(),
@@ -303,15 +248,11 @@ pub fn binary_diff_json(before: &Path, after: &Path) -> Result<String> {
     Ok(serde_json::to_string_pretty(&diff)?)
 }
 
-/// Entry point for `--mode json` (`main.rs`): computes the diff exactly like `headless::run` and
-/// the interactive TUI do (same `compute_diff` - same parsing, same `ASTDiff`, same `TextDiff`),
-/// then prints it as one pretty-printed JSON object on stdout. See this module's doc comment for
-/// the schema.
-/// Returns whether the two files differ at all (raw byte comparison, same convention as
-/// `headless::run`) so `main.rs` can turn it into a `diff`-style exit code.
+/// Entry point for `--mode json`: computes the diff as `headless::run` does and prints it.
+/// Returns whether the files differ byte-wise, for `main.rs`'s exit code.
 pub fn run(before: &Path, after: &Path, render_options: RenderOptions) -> Result<bool> {
     let (mut data, large_residual) = compute_diff_with_options(before, after, render_options)?;
-    // See `headless::run`'s note: a presentation filter over a finished diff, not a different one.
+    // A presentation filter over the finished diff, not a different diff.
     data.before_ranges =
         ranges_for_options(&data.before_ranges, &data.before_contents, render_options);
     data.after_ranges =
@@ -326,8 +267,7 @@ mod tests {
     use super::*;
     use crate::tui::app::compute_diff;
 
-    /// Same synthetic 4-line change `headless.rs`'s own tests use (one line changed, modeled as a
-    /// Delete on the before side paired with an Insert on the after side).
+    /// One changed line: a Delete on the before side paired with an Insert on the after side.
     fn sample_data() -> DiffSessionData {
         DiffSessionData {
             before_path: PathBuf::from("before.rs"),
@@ -427,8 +367,6 @@ mod tests {
 
     #[test]
     fn build_diff_omits_summary_for_an_ordinary_mixed_edit() {
-        // Same synthetic data used throughout this module's tests - a real Delete+Insert pair
-        // alongside Identical ranges, which shouldn't classify as any `DiffSummary` special case.
         assert!(build_diff(&sample_data(), false).summary.is_none());
     }
 
@@ -474,9 +412,7 @@ mod tests {
         assert!(json.get("before").is_some());
         assert!(json.get("after").is_some());
         assert!(json.get("large_residual").is_some());
-        // `old()` -> `new()` is a single-identifier rename, which the diff pipeline reports as an
-        // Update (not a Delete+Insert pair) - same real-file behavior `headless.rs`'s own
-        // equivalent test observes by checking rendered content rather than assuming an operation.
+        // Only assert that hunks exist; which operation the rename becomes is the engine's call.
         assert!(
             !json["before"]["hunks"]
                 .as_array()
@@ -510,5 +446,23 @@ mod tests {
             Some(2),
             "row 3 (`let x = 1;`) is inside `fn parse_args` at row 2"
         );
+    }
+
+    #[test]
+    fn binary_diff_json_keeps_language_but_has_no_hunks_or_summary() -> Result<()> {
+        let json: serde_json::Value =
+            serde_json::from_str(&binary_diff_json(Path::new("a.rs"), Path::new("b.png"))?)?;
+        assert_eq!(json["binary"], true);
+        assert_eq!(json["before"]["language"], "Rust");
+        assert!(json["before"]["hunks"].as_array().unwrap().is_empty());
+        assert!(json["after"]["hunks"].as_array().unwrap().is_empty());
+        assert!(json.get("summary").is_none(), "{json}");
+        Ok(())
+    }
+
+    #[test]
+    fn text_diff_json_omits_the_binary_field() {
+        let json = serde_json::to_value(build_diff(&sample_data(), false)).unwrap();
+        assert!(json.get("binary").is_none(), "{json}");
     }
 }

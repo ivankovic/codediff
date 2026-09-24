@@ -20,66 +20,27 @@ use crate::diff::PassCtx;
 use crate::diff::nodes::{anchor_pair_via_apted, kinds_update_allowed};
 use crate::diff::{ASTDiff, ASTMapping, ASTMappingOperation, ASTMappingReason, COST_DELETE};
 
-/// Phase-2 of the phases-4-7 rearchitecture (`TODO.md`,
-/// `~/.claude/plans/iterative-herding-panda.md`): a strict, unconditional bottom-up propagation
-/// rule, replacing (once measured net-positive-or-neutral and made the default -
-/// `HeuristicConfig::solver_bottom_up_propagation`) the Dice-threshold `solve_bottom_up_expansion`
-/// (since deleted) for this same "a parent's children are already resolved enough to resolve the parent too" role.
+/// Strict bottom-up propagation. An unmatched before-node `B` with children resolves only when its
+/// children force a single answer:
 ///
-/// For an unmatched before-node `B` with children `c1..ck` (`k >= 1`):
-/// 1. Every direct child of `B` must already have a decision (matched or deleted) - if any child
-///    is still undecided, `B` is skipped this round (it may resolve on a later call once its
-///    child resolves).
-/// 2. If every child is deleted, `B` becomes `DeleteWithChildren` (mirrored on the after side for
-///    `InsertWithChildren`).
-/// 3. If every child is matched, and every one of them maps into the exact same direct after-side
-///    parent `P` (via `after_metadata.node_to_parent`, not "somewhere under `P`"), and `P` is
-///    itself unmapped, and `kind(B)`/`kind(P)` are compatible per `kinds_update_allowed`, `B` is
-///    proposed to real (but now trivially cheap, since every descendant is already resolved)
-///    APTED via `anchor_pair_via_apted` - the same "propose a pair, let real tree-edit-distance
-///    confirm and cost it" idiom `solve_greedy_anchor_blocks` uses, so
-///    the result's cost/operation is never invented.
-/// 4. Any other case - mixed matched/deleted children, disagreeing after-parents, or kind
-///    incompatibility - blocks `B` unconditionally. No partial credit, no threshold, no vote.
+/// 1. Any undecided child: `B` is skipped.
+/// 2. Every child deleted: `B` is `DeleteWithChildren` (mirrored as `InsertWithChildren`).
+/// 3. Every child matched into the same direct after-parent `P`, `P` unmapped and the kinds
+///    compatible per `kinds_update_allowed`: `B`/`P` is proposed to APTED via
+///    `anchor_pair_via_apted`, so the cost and operation are never invented.
+/// 4. Anything else (mixed children, disagreeing parents, incompatible kinds) blocks `B`: no
+///    threshold, no vote.
 ///
-/// This only ever fires on a child-forced, 100%-consistent answer, so - unlike the deleted
-/// `solve_bottom_up_expansion`'s Dice-threshold rule, which accepted a parent on 90% descendant
-/// coverage and then lets APTED *improvise* a verdict for the uncovered remainder - it never has
-/// an invented decision to fight a later, more precise pass over. Consistent with
-/// `UnitCostModel::ren`'s own premise (`apted/common`): a parent's correctness is validated
-/// bottom-up by its children's real costs, never asserted top-down by a heuristic guess.
-///
-/// Runs once, at the top of `PendingDiff::finish`, before the terminal Myers-LCS fallback
-/// (`apted::for_roots_fallback`) - shrinking what that lossy, whole-subtree-only fallback has to
-/// guess at. The `DeleteWithChildren`/`InsertWithChildren` branches (step 2) can't fire yet at
-/// this point in the still-partial rearchitecture: nothing before the terminal fallback marks a
-/// node deleted or inserted today, so no child ever has that decision to propagate. They start
-/// mattering once Phase 3 (per-region dispatch) introduces intermediate-granularity deletes/
-/// inserts ahead of the terminal catch-all - implemented now so this module doesn't need
-/// revisiting when that lands.
+/// Firing only on a fully consistent answer means it never leaves a guess for a later, more precise
+/// pass to fight; a parent is validated by its children, never asserted over them.
 pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
     let before_metadata = ctx.before_metadata();
     let after_metadata = ctx.after_metadata();
     let language = before_metadata.language;
 
-    // Deepest nodes first (ties broken by `preorder_index`, not node id - see
-    // `ASTNodeMetadata::start_byte`'s doc comment on why raw ids aren't parse-stable), same
-    // ordering convention as `solve_greedy_anchor_blocks` - by the time an ancestor is considered,
-    // every descendant already had its chance to resolve in this same call, so one call can
-    // propagate a resolution several levels up the tree.
-    //
-    // Filtered to the nodes that could possibly resolve *before* sorting, not just skipped inside
-    // the loop: on a large, mostly-unchanged file the overwhelming majority of nodes are already
-    // matched or are childless leaves, and sorting all of them was the pass's dominant cost (this
-    // pass runs twice per diff - see `PendingDiff::finish` - and was measured 2026-08-17 at ~260ms
-    // of a 907ms diff on a 258k-node fixture). Filtering first makes the sort proportional to the
-    // unresolved residual instead of the whole file.
-    //
-    // Behaviour-preserving: both conditions are exactly the two `continue` guards that opened the
-    // loop body. A node already matched here can never become unmatched later (matching only adds
-    // entries), and `children` is immutable, so no node dropped here could have become eligible
-    // mid-loop. Nodes that become matched *during* the loop are still caught by the in-loop check
-    // below, which stays.
+    // Deepest first, so one call propagates several levels. Filtered before sorting so the sort is
+    // proportional to the unresolved residual; safe because matching only adds entries and
+    // `children` is immutable, so no dropped node could become eligible mid-loop.
     let mut before_candidates: Vec<usize> = before_metadata
         .node_to_depth
         .keys()
@@ -111,14 +72,11 @@ pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
         for &child_id in &before_info.children {
             match diff.before_node_map.get(&child_id) {
                 None => {
-                    // Undecided child - `B` isn't resolvable yet this round.
                     consistent = false;
                     all_deleted = false;
                     break;
                 }
-                Some(&0) => {
-                    // Deleted child.
-                }
+                Some(&0) => {}
                 Some(&after_child_id) => {
                     all_deleted = false;
                     let Some(&after_parent_id) = after_metadata.node_to_parent.get(&after_child_id)
@@ -180,11 +138,8 @@ pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
         );
     }
 
-    // Symmetric after-side sweep: an unmatched after-node whose every direct child is inserted
-    // becomes `InsertWithChildren`. The "all matched into the same before-parent" case never
-    // needs a separate after-side pass - it's already fully covered by the before-side sweep
-    // above (matching `B` to `P` sets both `before_node_map[B]` and `after_node_map[P]` via
-    // `ASTDiff::add_mapping`).
+    // Only the insert case needs an after-side sweep: matching `B` to `P` above already sets both
+    // sides.
     let mut after_candidates: Vec<usize> = after_metadata.node_to_depth.keys().copied().collect();
     sort_deepest_first(&mut after_candidates, after_metadata);
 
@@ -222,12 +177,8 @@ pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
     }
 }
 
-/// Deepest-first, ties broken by `preorder_index` for determinism regardless of `FxHashMap`
-/// iteration order - see `ASTNodeMetadata::start_byte`'s doc comment on why raw node ids aren't
-/// parse-stable sort/tiebreak keys.
+/// Deepest first, ties broken by `preorder_index`: raw node ids are not parse-stable.
 fn sort_deepest_first(candidates: &mut [usize], metadata: &crate::code::ASTMetadata) {
-    // The key is looked up once per candidate, not once per comparison: with two hash lookups
-    // per comparison this sort was 6.7% of a 75k-node file's whole diff (callgrind, 2026-09-06).
     candidates.sort_by_cached_key(|&id| {
         let depth = metadata.node_to_depth.get(&id).copied().unwrap_or(0);
         let preorder = metadata
@@ -299,5 +250,50 @@ mod tests {
             "container's two statements match into two different before-functions' bodies, not \
              one - it must stay unmatched, not get force-matched to either"
         );
+    }
+
+    fn deletion() -> ASTMapping {
+        ASTMapping {
+            cost: COST_DELETE,
+            operation: ASTMappingOperation::Delete,
+            reason: ASTMappingReason::BottomUpPropagation,
+        }
+    }
+
+    /// Runs only this pass on `x;`, with the given children of the `expression_statement`
+    /// pre-marked deleted, and returns the statement's resulting mapping.
+    fn statement_after_deleting(children: usize) -> Option<ASTMapping> {
+        let before = Code::from_string("x;\n", &Language::Rust);
+        let after = Code::from_string("\n", &Language::Rust);
+        let node_cache = NodeCache::build(&before, &after);
+        let statement = crate::test::helper::find_first_of_kind(
+            before.ast.as_ref().unwrap().root_node(),
+            "expression_statement",
+        )
+        .unwrap();
+        let mut diff = ASTDiff::default();
+        let mut cursor = statement.walk();
+        for child in statement.children(&mut cursor).take(children) {
+            diff.add_mapping(child.id(), 0, deletion());
+        }
+        solve(
+            &crate::diff::PassCtx::new(&before, &after, &node_cache),
+            &mut diff,
+        );
+        diff.mapping
+            .iter()
+            .find(|((b, _), _)| *b == statement.id())
+            .map(|(_, m)| m.clone())
+    }
+
+    #[test]
+    fn parent_of_only_deleted_children_is_deleted_with_children() {
+        let mapping = statement_after_deleting(2).expect("statement should be decided");
+        assert_eq!(mapping.operation, ASTMappingOperation::DeleteWithChildren);
+    }
+
+    #[test]
+    fn parent_with_an_undecided_child_is_left_undecided() {
+        assert!(statement_after_deleting(1).is_none());
     }
 }

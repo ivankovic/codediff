@@ -23,12 +23,8 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // A rare example of a true move
-    // The same rotated-comment-run shape as `ruby-mastodon-mastodon-move`, and the fixture the
-    // corpus keeps for it being a *true* move: `StructurallyIdenticalAncestor` pairs the three
-    // comments by position and calls them `Update`, the human follows each comment's text to
-    // where it went. Not attempted - see that fixture's comment for why position is the only
-    // signal available inside a run of same-kind siblings.
+    // A rare example of a true move: the rotated-comment-run shape of
+    // `ruby-mastodon-mastodon-move`, mis-paired by position.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "ruby-mastodon-mastodon-rare-example-of-true-move",
         3,

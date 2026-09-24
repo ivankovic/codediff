@@ -15,15 +15,19 @@
  *  You should have received a copy of the GNU Affero General Public License
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
+//! Syntax-aware code diffing on tree-sitter ASTs.
+//!
+//! [`diff_strings`] is the entry point: it parses both sides into [`code::Code`] and returns a
+//! [`diff::Diff`]: the mapping between the two syntax trees plus the changed text ranges it implies.
+//! The `tui` and `web` features add the terminal and browser viewers built on it.
 #[cfg(feature = "stats")]
 pub mod anomalous_paths;
 pub mod code;
 pub mod diff;
 #[cfg(feature = "stats")]
 pub mod stats;
-// Git-backed review needs no TUI dependency of its own, but both of its consumers (the TUI
-// picker and the web session) are behind `tui` (`web` implies it), so it rides the same gate
-// rather than widening a `default-features = false` library consumer's surface.
+// Needs no TUI dependency itself, but both consumers (TUI picker, web session) are behind `tui`, so
+// it shares that gate rather than widen a `default-features = false` consumer's surface.
 #[cfg(feature = "tui")]
 pub mod review;
 #[cfg(feature = "tui")]
@@ -31,12 +35,8 @@ pub mod tui;
 #[cfg(feature = "web")]
 pub mod web;
 
-// `test` also (not just `feature = "test-fixtures"`) whenever compiling under `cfg(test)`:
-// dozens of ordinary `#[cfg(test)] mod tests` blocks throughout the crate (diff/, code/, tui/)
-// use `crate::test::helper` for their own fixtures, entirely independent of which Cargo features
-// happen to be enabled - `cargo test` must always see this module. `feature = "test-fixtures"`
-// covers the other, non-test case: the three src/bin/ tools (human_solver.rs,
-// benchmark_optimal_solutions.rs, benchmark_other.rs) that need it as a real, non-test dependency.
+// Unit tests across the crate use `crate::test::helper` whatever the features, so `cfg(test)` always
+// sees it; `test-fixtures` exposes it to the src/bin/ tools that depend on it outside tests.
 #[cfg(any(test, feature = "test-fixtures"))]
 pub mod test;
 
@@ -46,12 +46,8 @@ use crate::{
     diff::diff_code,
 };
 
-/**
-* Compute the difference between two programs, given as strings in a given language.
-*
-* TODO: If the language is Unknown, try to auto-detect it. That should be done in from_string.
-* Also, when doing that, check that both strings are in the same language.
-*/
+/// Diffs two programs given as source strings in `language`.
+// TODO: auto-detect an Unknown language (in `Code::from_string`), checking both sides agree.
 pub fn diff_strings(before: &str, after: &str, language: &Language) -> Diff {
     let code_before = Code::from_string(before, language);
     let code_after = Code::from_string(after, language);

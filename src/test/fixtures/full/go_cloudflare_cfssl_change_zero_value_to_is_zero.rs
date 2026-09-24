@@ -21,9 +21,7 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // Known, unreviewed gap against the human-authored mapping - not yet root-caused. Clamped at
-    // the observed count rather than requiring an exact match. Lower (or drop back to
-    // `assert_matches_human_mapping`) once a fix lands.
+    // Residual not yet root-caused.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "go-cloudflare-cfssl-change-zero-value-to-is-zero",
         5,

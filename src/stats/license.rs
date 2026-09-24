@@ -15,52 +15,34 @@
  *  You should have received a copy of the GNU Affero General Public License
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
-//! Attribution/licensing metadata for a single-file sample pulled from a third-party repository
-//! (via `sample_test_diffs`/`materialize_test_diffs`). A sampled before/after pair is a verbatim
-//! excerpt of someone else's code, not codediff's own - it isn't covered by codediff's own
-//! AGPL-3.0 license, and reusing it (even just as test-fixture input committed to this repo)
-//! needs its own provenance and license terms recorded alongside it. `render_readme` records that
-//! as a commit-pinned link to the license file (`blob_url`) plus a best-effort label
-//! (`classify_license`), not a copy of the license text itself - see `materialize_test_diffs`'s
-//! module docs and `README.md`'s "Third-party test fixtures" section.
+//! Attribution for a sample taken from a third-party repository: it is someone else's code, not
+//! under codediff's AGPL, so its provenance and license travel with it. `render_readme` records a
+//! commit-pinned link to the license file plus a best-effort label, not the license text. See
+//! `README.md`'s "Third-party test fixtures".
 
 use git2::{Repository, Tree};
 use std::fmt::Write as _;
 
-/// A license/notice file found at the root of a sampled repository's tree, at the exact commit
-/// the sample was taken from - not HEAD, and not a fresh fetch, so this always matches what the
-/// sampled file itself actually shipped under at the time. `text` is only ever used to feed
-/// `classify_license` - `render_readme` links to the file (via `blob_url`) rather than
-/// reproducing `text` itself.
+/// A license/notice file in a sampled repository at the sampled commit (not HEAD), so it is what
+/// the sample shipped under. `text` only feeds `classify_license`.
 pub struct LicenseFile {
     pub filename: String,
     pub label: &'static str,
     pub text: String,
 }
 
-/// Filenames this repo's root is checked against, case-insensitively, matched as a prefix so
-/// `LICENSE.md`/`LICENSE-MIT`/`COPYING.LGPLv2.1`/etc. all match their base name. `NOTICE` is
-/// included even though it's not itself a license: Apache-2.0 (the license most likely to ship
-/// one) requires any NOTICE file's attribution content be reproduced by downstream redistributors,
-/// so it needs to travel with the sample for the same reason the license text itself does.
+/// Case-insensitive filename prefixes (`LICENSE-MIT`, `COPYING.LGPLv2.1`). `NOTICE` is not a
+/// license, but Apache-2.0 requires redistributors to carry it.
 const LICENSE_FILENAME_PREFIXES: &[&str] =
     &["license", "licence", "copying", "unlicense", "notice"];
 
-/// Top-level directory names (case-insensitive) whose contents get the same
-/// `LICENSE_FILENAME_PREFIXES` scan as the repository root itself - some projects (e.g.
-/// JetBrains/kotlin) keep licensing under a `license/` subdirectory instead of root-level files.
-/// One level deep only, matching `find_license_files`'s own non-recursive root scan.
+/// Top-level directories (case-insensitive) scanned like the root, for projects such as
+/// JetBrains/kotlin that keep licenses in `license/`.
 const LICENSE_DIRECTORY_NAMES: &[&str] = &["license", "licenses", "licence", "licences"];
 
-/// Every blob matching `LICENSE_FILENAME_PREFIXES`, either at `tree`'s root or one level inside
-/// a `LICENSE_DIRECTORY_NAMES` directory, read as lossy UTF-8 (license text is always
-/// human-readable prose; lossy conversion is fine here even though `blob_text` elsewhere in this
-/// codebase requires strict UTF-8, since a mangled byte in a license file's text shouldn't block
-/// recording the rest of it) and classified by `classify_license`. No deeper recursion than that:
-/// walking every subdirectory of a large repo is expensive, and a project that splits licensing
-/// further than one directory down is rare enough not to be worth it. A sample from a repo with
-/// genuinely no license file found this way gets an empty `Vec` back, which `render_readme` turns
-/// into an explicit "not found" warning rather than silently omitting licensing information.
+/// Every license blob at `tree`'s root or directly inside a `LICENSE_DIRECTORY_NAMES` directory,
+/// sorted by path. Read as lossy UTF-8, so one bad byte does not lose the rest. Empty means none
+/// was found, which `render_readme` reports explicitly.
 pub fn find_license_files(repo: &Repository, tree: &Tree) -> Vec<LicenseFile> {
     let mut found = Vec::new();
     collect_license_files_in(repo, tree, "", &mut found);
@@ -80,17 +62,12 @@ pub fn find_license_files(repo: &Repository, tree: &Tree) -> Vec<LicenseFile> {
         };
         collect_license_files_in(repo, subtree, name, &mut found);
     }
-    // Deterministic order (tree.iter() already yields entries sorted by name, but pinning this
-    // explicitly means render_readme's output doesn't depend on git2's iteration order staying
-    // stable across versions).
+    // Explicit, rather than relying on git2's iteration order.
     found.sort_by(|a, b| a.filename.cmp(&b.filename));
     found
 }
 
-/// Scans `tree`'s direct entries (no further recursion) for blobs matching
-/// `LICENSE_FILENAME_PREFIXES`, appending matches to `found`. `dir_prefix` (e.g. `"license"`, or
-/// `""` for the repository root itself) is prepended to each recorded filename so `render_readme`
-/// can show a reader exactly where in the repository each license text came from.
+/// Appends `tree`'s direct license blobs to `found`, named with `dir_prefix` (`""` for the root).
 fn collect_license_files_in(
     repo: &Repository,
     tree: &Tree,
@@ -127,11 +104,8 @@ fn collect_license_files_in(
     }
 }
 
-/// Best-effort SPDX-style label for `text`, by matching each license's own distinctive
-/// boilerplate phrasing - not a general-purpose license classifier, just enough precision to
-/// give a human a useful hint without having to follow `render_readme`'s link and read the
-/// license file itself. Ordered most-specific first (e.g.
-/// LGPL/AGPL checked before the plain GPL phrase they'd otherwise also match).
+/// Best-effort SPDX-style label from each license's boilerplate, a hint for the reader rather than
+/// a classifier. Most specific first: LGPL/AGPL would also match the GPL phrase.
 fn classify_license(text: &str) -> &'static str {
     let has = |needle: &str| text.contains(needle);
 
@@ -144,8 +118,7 @@ fn classify_license(text: &str) -> &'static str {
     } else if has("GNU LESSER GENERAL PUBLIC LICENSE") && has("Version 2.1") {
         "GNU Lesser General Public License v2.1"
     } else if has("GNU LIBRARY GENERAL PUBLIC LICENSE") {
-        // The LGPL's original name before FSF renamed it "Lesser" at v2.1 - functionally the
-        // predecessor to LGPL-2.1, commonly labeled LGPL-2.0 by SPDX and license scanners.
+        // LGPL-2.0's name before "Lesser".
         "GNU Library General Public License v2.0 (LGPL predecessor)"
     } else if has("GNU GENERAL PUBLIC LICENSE") && has("Version 3") {
         "GNU General Public License v3.0"
@@ -178,22 +151,16 @@ fn classify_license(text: &str) -> &'static str {
     }
 }
 
-/// The `origin` remote's URL, if configured - the same URL `research/sampling/dataset.sh`
-/// originally cloned from, so this always points a reader back at the actual upstream project
-/// rather than at this local checkout path.
+/// The `origin` remote's URL, if configured: the upstream, not the local checkout.
 pub fn origin_remote_url(repo: &Repository) -> Option<String> {
     repo.find_remote("origin")
         .ok()
         .and_then(|remote| remote.url().map(str::to_string))
 }
 
-/// A direct link to `path` inside `repo_url`'s hosted repository at `commit` - pinned to that
-/// exact commit (not a branch) so the link keeps pointing at the license text as it actually read
-/// when the sample was taken, even if the file is later moved, edited, or removed upstream. Only
-/// handles the three hosts `research/sampling/dataset.sh` actually clones from (each uses a
-/// different blob-URL scheme); any other host - or a URL that doesn't parse - returns `None`
-/// rather than guessing, since a wrong link is worse than no link (the repository/commit already
-/// recorded above `render_readme`'s license section is still enough to find the file by hand).
+/// A link to `path` in `repo_url` pinned to `commit`, so it survives upstream edits. Only the
+/// hosts `research/sampling/dataset.sh` clones from; anything else is `None`, since a wrong link
+/// is worse than none.
 fn blob_url(repo_url: &str, commit: &str, path: &str) -> Option<String> {
     let without_scheme = repo_url.trim_end_matches('/').split_once("://")?.1;
     let (host, rest) = without_scheme.split_once('/')?;
@@ -208,18 +175,12 @@ fn blob_url(repo_url: &str, commit: &str, path: &str) -> Option<String> {
     }
 }
 
-/// Renders the `README.md` written into every sample directory (and, on promotion, copied
-/// alongside its `diffs/` fixture - see `human_solver::action_promote`): where the before/after
-/// content came from, and a link to the license it's actually under (via `blob_url`, pinned to
-/// the sampled commit) rather than a copy of the license text itself - `classify_license` already
-/// gives a same-file label, and linking avoids duplicating (and letting drift) potentially long
-/// license text across hundreds of fixture directories.
+/// Renders the `README.md` of a sample (and its promoted fixture): provenance plus a
+/// commit-pinned license link and label, not the license text.
 ///
-/// `unverifiable_reason`, when set, means the local repository checkout couldn't actually be
-/// inspected at this commit (see `materialize_test_diffs::backfill_promoted_readme` - typically a
-/// commit that's fallen outside a shallow clone's `--depth` window since the sample was first
-/// promoted) - distinct from `license_files` being empty, which means the checkout *was*
-/// inspected and genuinely has no license file. `license_files` is ignored when this is set.
+/// `unverifiable_reason` means the commit could not be inspected (e.g. it left a shallow clone's
+/// window), unlike an empty `license_files`, which means it was and has none. When set,
+/// `license_files` is ignored.
 pub fn render_readme(
     repo_url: Option<&str>,
     repository: &str,

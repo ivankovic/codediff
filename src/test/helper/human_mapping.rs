@@ -17,21 +17,12 @@
  */
 
 /**
-* Human-authored ground-truth AST mappings, used to check codediff's output against what a human
-* considers the optimal diff.
+* Human-authored ground truth for a fixture, `<fixture dir>/human_mapping.json`, written by the
+* `human_solver` binary: a node mapping (`entries`, `groups`) and independent text paintings
+* (`text_mappings`), plus the checks that grade codediff against them.
 *
-* These are produced by the `human_solver` binary (src/bin/human_solver/), which lets a human
-* walk the before/after ASTs of a test case side by side and mark nodes as matching, deleted or
-* inserted. The result is stored as JSON in
-* `src/test/data/diffs/{handmade,small,full,stratified}/<name>/human_mapping.json` - see
-* [`super::DIFF_DATASETS`] for what each folder means; [`mapping_path`] is the one place that
-* resolves which of them holds a given `name`.
-*
-* Nodes are identified by *path* (see [`super::path_for_node`] / [`super::node_for_path`]) rather
-* than by TreeSitter node ID, because node IDs are arena slots that are not stable across separate
-* parses of the same source: the human_solver process parses the code once to build the mapping,
-* and the test that later verifies it parses the code again to compute the diff. Paths, being
-* derived purely from node kind and sibling position, are stable across both parses.
+* Nodes are identified by *path* (see [`super::path_for_node`]), not node id: ids are not stable
+* across the separate parses that write and later check a mapping.
 */
 use anyhow::{Context, Result, bail, ensure};
 use serde::{Deserialize, Serialize};
@@ -45,28 +36,22 @@ use crate::diff::cost::operation_cost;
 use crate::diff::{ASTDiff, ASTMapping, ASTMappingOperation, ASTMappingReason, NodeCache};
 use crate::test::helper::{PathCache, path_for_node};
 
-/// Properties the ground truth must hold on its own, independently of what codediff does with it -
-/// see the module's own doc comment.
+/// Properties the ground truth must hold on its own, independently of what codediff does with it.
 pub mod invariants;
 
-/// What a human decided should happen to a node (or pair of nodes) between before and after.
-///
-/// `Identical`, `Update` and `MatchButNotIdentical` all pair a before node with an after node, and
-/// each also pins down *which* [`ASTMappingOperation`] codediff is expected to have chosen for
-/// that pair, not just that the pair is mapped together.
+/// What a human decided should happen to a node (or pair of nodes) between before and after. The
+/// three pairing operations also pin *which* [`ASTMappingOperation`] codediff must have chosen.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum HumanOperation {
-    /// The before and after nodes are the same node, with no difference at all: same kind, no
-    /// children, and identical text (or, if either has children, the human confirmed the whole
-    /// subtree is unchanged). Expects codediff to have chosen [`ASTMappingOperation::Identical`].
+    /// Same node, no difference at all (for a node with children, the human confirmed the whole
+    /// subtree is unchanged). Expects [`ASTMappingOperation::Identical`].
     Identical,
     /// The before and after nodes have the same kind and no children, but different text (e.g. a
     /// changed string literal). Expects [`ASTMappingOperation::Update`].
     Update,
-    /// The before and after nodes are matched, but not identical: either they have children and
-    /// the human confirmed the subtree differs somewhere, or they have different kinds and the
-    /// human confirmed the mapping anyway. Expects [`ASTMappingOperation::MatchButNotIdentical`].
+    /// Matched but not identical: the subtree differs somewhere, or the kinds differ and the human
+    /// confirmed the pairing anyway. Expects [`ASTMappingOperation::MatchButNotIdentical`].
     MatchButNotIdentical,
     /// The before node was removed; its children, if any, are handled by other entries.
     Delete,
@@ -93,27 +78,18 @@ pub struct HumanMappingEntry {
     pub after_path: Option<Vec<String>>,
 }
 
-/// How the members of a [`MultiMapGroup`] correspond to each other - the one thing a group of N
-/// before nodes and M after nodes leaves to be said once "these belong together" is settled.
+/// How the members of a [`MultiMapGroup`] correspond to each other.
 ///
-/// Two answers exist because two different situations produce a set of nodes rather than a pair:
-///
-/// * Several *interchangeable* nodes, where each before node is really one after node but nobody
-///   can say which - three identical `foo()` calls become two. That is [`Self::AnyOneToOne`]:
-///   some one-to-one pairing is the truth, and any of them is as good as any other.
-/// * One piece of code that *became* several, or several that became one - a statement split in
-///   two, two conditions merged into one, a function body duplicated three times. That is
-///   [`Self::AllToAll`]: there is no hidden one-to-one truth to find, because every before node
-///   genuinely corresponds to every after node, and none of them is gone or new.
-///
-/// The second is what a painting's N:M `Match` ([`HumanTextEntry`]) already says about text. This
-/// is its counterpart for the tree.
+/// * [`Self::AnyOneToOne`]: several *interchangeable* nodes (three identical `foo()` calls become
+///   two). Some one-to-one pairing is the truth and any of them is as good as another.
+/// * [`Self::AllToAll`]: one piece of code *became* several, or several became one (a statement
+///   split in two). Every before member corresponds to every after member; none is gone or new.
+///   The tree counterpart of a painting's N:M `Match`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum GroupPairing {
     /// Some one-to-one pairing of `min(N, M)` pairs is correct, and any of them counts. The rest
-    /// of the larger side is deleted/inserted. The original meaning of a group, and the default,
-    /// so a file written before the distinction existed reads and re-saves unchanged.
+    /// of the larger side is deleted/inserted. The default, and left out of the file.
     #[default]
     AnyOneToOne,
     /// Every before member corresponds to every after member. No member is deleted or inserted,
@@ -122,8 +98,6 @@ pub enum GroupPairing {
 }
 
 impl GroupPairing {
-    /// For `skip_serializing_if`: the default is left out of the file, so only a group that says
-    /// something new carries the key.
     pub fn is_any_one_to_one(&self) -> bool {
         *self == Self::AnyOneToOne
     }
@@ -132,49 +106,28 @@ impl GroupPairing {
 /// A set of `before_paths` nodes that correspond to a set of `after_paths` nodes as a whole, in
 /// one of the two senses [`GroupPairing`] names.
 ///
-/// With [`GroupPairing::AnyOneToOne`] - the original and default meaning - the group records
-/// genuine, human-confirmed ambiguity about which specific node pairs with which (e.g. several
-/// interchangeable/near-duplicate statements). Any pairing codediff's own diff produces counts as
-/// correct, as long as it uses `min(before_paths.len(), after_paths.len())` pairs and leaves the
-/// rest of the larger side deleted/inserted.
+/// `AnyOneToOne`: any pairing codediff produces counts, as long as it uses `min(N, M)` pairs and
+/// leaves the rest deleted/inserted. `AllToAll`: every member must be matched inside the group, so
+/// a one-to-one diff necessarily scores at least `|N - M|` mismatches. That is deliberate: it is
+/// the distance between what the ground truth says and what the algorithm can express.
 ///
-/// With [`GroupPairing::AllToAll`] the group records an N:M correspondence with nothing left over:
-/// every before member is matched, every after member is matched, and each to all of the others.
-/// codediff's diff, which today only expresses one-to-one pairs, is graded on the part of that it
-/// *can* express - every member must be matched inside the group, and a member it deletes or
-/// inserts is a mismatch. An N:M group with N ≠ M therefore costs the current algorithm at least
-/// `|N - M|` mismatches, deliberately: that count is the distance between what the ground truth
-/// says and what the algorithm can say, and closing it is the algorithm's job, not the grader's.
-///
-/// See [`check_group_entry`] for the actual validation, and [`representative_entries`] for the one
-/// concrete pairing used for *display*/cost purposes (never for validation).
+/// Validated by [`check_group_entry`]; [`representative_entries`] picks one concrete pairing for
+/// display and cost only, never for validation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MultiMapGroup {
-    /// Paths to every before-side candidate node (N of them). Order is insertion order only -- it
-    /// carries no meaning for validation, since any pairing is valid.
+    /// Paths to every before-side candidate node (N of them). Order carries no meaning.
     pub before_paths: Vec<Vec<String>>,
     /// Paths to every after-side candidate node (M of them).
     pub after_paths: Vec<Vec<String>>,
-    /// The operation every *realized* pair (whichever specific pairing codediff's diff actually
-    /// produces) is expected to have chosen. Deliberately excludes `Update`/`Delete`/`Insert`/
-    /// `DeleteWithChildren`/`InsertWithChildren`: `Update` means "same kind, no children,
-    /// different text" for one fixed pair, which doesn't have a coherent meaning across an
-    /// ambiguous N-to-M group, and the other four aren't matches at all (an `AnyOneToOne` group's
-    /// own leftover members are how deletion/insertion is expressed -- see
-    /// [`with_children`](Self::with_children) -- and an `AllToAll` group has none).
+    /// The operation every realized pair must have chosen. Only `Identical` or
+    /// `MatchButNotIdentical`: `Update` has no coherent meaning across an ambiguous group, and
+    /// deletion/insertion is expressed by leftover members.
     pub operation: HumanOperation,
-    /// Whether a matched pair's entire subtree must also close within itself (every descendant of
-    /// one side maps to a descendant of the other, and vice versa -- see
-    /// [`check_subtree_maps_within`]), and a leftover (unmatched) member's entire subtree must be
-    /// deleted/inserted rather than just its own top node -- the group's equivalent of `M` vs `m`
-    /// / of `*WithChildren` vs the bare operation for a plain [`HumanMappingEntry`].
-    ///
-    /// For an `AllToAll` group the closure is over the *union*: every descendant of any before
-    /// member maps inside some after member's subtree, and vice versa. Which member it lands in is
-    /// not constrained, for the same reason the members themselves are not paired off.
+    /// Whether matched members' subtrees must close within each other (see
+    /// [`check_subtree_maps_within`]) and leftover members' whole subtrees be deleted/inserted - the
+    /// group's `*WithChildren`. For `AllToAll` the closure is over the union of the members.
     pub with_children: bool,
-    /// How the members correspond - see [`GroupPairing`]. Absent from the file when it is the
-    /// default, so every group written before the field existed stays byte-for-byte the same.
+    /// How the members correspond - see [`GroupPairing`].
     #[serde(default, skip_serializing_if = "GroupPairing::is_any_one_to_one")]
     pub pairing: GroupPairing,
 }
@@ -183,42 +136,24 @@ pub struct MultiMapGroup {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct HumanMapping {
     pub entries: Vec<HumanMappingEntry>,
-    /// Multi-map groups (see [`MultiMapGroup`]) -- absent from any `human_mapping.json` with no
-    /// groups in it, which keeps such a file parsing and re-saving byte-for-byte unchanged.
+    /// Multi-map groups (see [`MultiMapGroup`]).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub groups: Vec<MultiMapGroup>,
-    /// The human-painted *text* accounts of the same diff (see [`HumanTextMapping`]) - a second,
-    /// independent ground truth, deliberately not derived from `entries`.
+    /// Named human paintings of the same diff as *text* (see [`HumanTextMapping`]) - an
+    /// independent ground truth, not derived from `entries`.
     ///
-    /// A **list of named paintings**, not one painting, because a diff's text rendering often has
-    /// several equally defensible answers where its node mapping has one. Wrapping two statements
-    /// in an `if` can be painted as two moves into a new block or as one update of the enclosing
-    /// region; neither is wrong. This is the text-level counterpart of what [`MultiMapGroup`] does
-    /// for the tree, and it is stored the same way: record every valid answer, and let a checker
-    /// accept a diff that matches any one of them.
-    ///
-    /// An empty list means nobody has painted this fixture. A named painting with no entries means
-    /// somebody painted it and there was nothing to paint (two identical files) - the distinction
-    /// a completeness count needs, carried by the name's presence rather than by an `Option`.
-    ///
-    /// As with `groups`, a file with no paintings parses and re-saves byte-for-byte unchanged.
+    /// A list because a text rendering often has several equally defensible answers (two moves
+    /// into a new block, or one update of the region); a checker accepts any one of them. Empty
+    /// means unpainted; a named painting with no entries means painted and nothing changed.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub text_mappings: Vec<NamedTextMapping>,
 }
 
 // ─── Human-painted text ranges ──────────────────────────────────────────────────────────────
-//
-// A second, independent ground truth living in the same file as the tree mapping above, and
-// deliberately not derived from it. See [`HumanTextMapping`] for why both exist.
 
-/// One span of source text, in exactly the row/**byte**-column space
-/// [`crate::diff::text_range::TextRange`] uses everywhere else in this codebase: rows and columns
-/// are 0-based, the end is exclusive, and an end column of 0 means "up to, not including, this
-/// row".
-///
-/// Not a `TextRange` directly, for the same reason `generate_mapping_site`'s `JsonRange` isn't:
-/// that keeps `diff::text_range` free of a serde dependency on its public type. Convert with
-/// [`HumanTextSpan::to_text_range`].
+/// One span of source text, in [`crate::diff::text_range::TextRange`]'s space: 0-based rows and
+/// **byte** columns, exclusive end, an end column of 0 meaning "up to, not including, this row".
+/// A separate type so `diff::text_range` needs no serde.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct HumanTextSpan {
     pub start_row: usize,
@@ -242,19 +177,12 @@ impl HumanTextSpan {
     }
 }
 
-/// What a human said about one painted span, and *only* what a human should have to say about it.
-///
-/// Deliberately three variants, not the five [`HumanOperation`] carries. A person reading a diff
-/// can reliably answer "this text is gone", "this text is new" and "this text corresponds to that
-/// text". Asking them to further split a correspondence into moved-versus-updated is asking them
-/// to do something a machine does better and more consistently: the two differ precisely by
-/// whether the two spans' contents are byte-identical, which [`HumanTextEntry::verdict`] decides
-/// by looking. Recording a human judgement there would add a second, less reliable source for a
-/// fact already determined by the spans themselves.
+/// What a human said about one painted span. Three variants, not five: whether a correspondence is
+/// a move or an update is decided by comparing the spans' bytes (see [`HumanTextEntry::verdict`]),
+/// which a machine does more reliably than a person.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum HumanTextOperation {
-    /// The before span and the after span are the same code. Whether that renders as a move or an
-    /// update is derived, not recorded - see [`HumanTextEntry::verdict`].
+    /// The before span and the after span are the same code; move vs update is derived.
     Match,
     /// The before span is gone from the after side.
     Delete,
@@ -265,16 +193,9 @@ pub enum HumanTextOperation {
 /// One human-painted decision: a `Match` carries spans on both sides, a `Delete` only `before`, an
 /// `Insert` only `after`.
 ///
-/// **Both sides are lists, so a `Match` can be N:M.** Several occurrences of a token on the before
-/// side corresponding to several on the after side is a real and common shape - and, exactly as
-/// for [`MultiMapGroup`] in the tree, which specific occurrence pairs with which is not a question
-/// the painter can answer or the reader cares about. The group asserts the correspondence whole. A
-/// 1:1 match is just the case where both lists hold one span, so there is one entry type, not two.
-///
-/// For a `Match`, **every span on a side must cover identical text**. That invariant is what makes
-/// an N:M group meaningful rather than a bag of unrelated ranges: if all three before spans read
-/// `foo` and both after spans read `bar`, any pairing of them says the same thing, which is
-/// precisely why the pairing can be left unspecified. [`HumanTextEntry::verdict`] enforces it.
+/// Both sides are lists, so a `Match` can be N:M: which occurrence pairs with which is left
+/// unspecified, which is only sound because every span on one side of a `Match` must cover
+/// identical text ([`HumanTextEntry::verdict`] enforces it).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HumanTextEntry {
     pub operation: HumanTextOperation,
@@ -292,14 +213,8 @@ pub struct HumanTextEntry {
     pub after: Vec<HumanTextSpan>,
 }
 
-/// Reads a side's spans from either shape: a bare span object, or a list of them.
-///
-/// Committed fixtures carry the bare-span form, from before an N:M match needed a list. Rejecting
-/// it would turn every one of those into a parse error - the loudest possible failure for data
-/// that is perfectly readable and that nobody can re-paint from memory. A single span is exactly a
-/// one-element list, so accepting both costs one adaptor and no ambiguity.
-///
-/// Serialization is always a list, so a file re-saved by the solver comes out in the list form.
+/// Reads a side's spans as either a bare span object (the form older committed fixtures carry) or
+/// a list. Always serialized as a list.
 fn spans_from_one_or_many<'de, D>(
     deserializer: D,
 ) -> std::result::Result<Vec<HumanTextSpan>, D::Error>
@@ -320,8 +235,7 @@ where
     })
 }
 
-/// What a [`HumanTextEntry`] actually asserts once its spans have been read - the four operations
-/// a renderer needs, from the three a human is asked for.
+/// What a [`HumanTextEntry`] asserts once its spans have been read.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum HumanTextVerdict {
     /// A `Match` whose two spans hold byte-identical text: the same code, somewhere else.
@@ -333,12 +247,8 @@ pub enum HumanTextVerdict {
 }
 
 impl HumanTextEntry {
-    /// Resolves this entry against the actual source, deriving `Move` vs `Update` for a `Match`.
-    ///
-    /// `Err` if the entry is malformed for its operation (a `Match` missing a side, a `Delete`
-    /// with no before span) or if a span doesn't land inside its file - both of which mean the
-    /// file was hand-edited or the fixture text changed underneath it, and neither is something
-    /// to paper over with a default.
+    /// Resolves this entry against the source, deriving `Move` vs `Update` for a `Match`. `Err` if
+    /// the entry is malformed for its operation or a span falls outside its file.
     pub fn verdict(&self, before: &str, after: &str) -> Result<HumanTextVerdict> {
         match self.operation {
             HumanTextOperation::Delete => {
@@ -373,10 +283,8 @@ impl HumanTextEntry {
                 ensure!(!self.after.is_empty(), "a Match entry has no `after` span");
                 let before_text = self.side_text(before, &self.before, "Match", "before")?;
                 let after_text = self.side_text(after, &self.after, "Match", "after")?;
-                // The whole derivation, and the reason a human is never asked: byte-identical
-                // means the code was relocated, anything else means it was edited. Well defined
-                // for an N:M group precisely because `side_text` has already established that
-                // every span on a side reads the same.
+                // Byte-identical means relocated, anything else means edited. Sound for N:M
+                // because `side_text` checked every span on a side reads the same.
                 Ok(if before_text == after_text {
                     HumanTextVerdict::Move
                 } else {
@@ -386,10 +294,8 @@ impl HumanTextEntry {
         }
     }
 
-    /// Every span reads back from the source. Used for the one-sided operations, which carry no
-    /// identity constraint: with nothing to pair against, spans that read differently assert
-    /// nothing unsound - the same token deleted in three places is one decision, and so is three
-    /// different tokens deleted together.
+    /// Every span reads back from the source. One-sided operations need no identity constraint:
+    /// three different tokens deleted together is still one decision.
     fn check_readable(
         source: &str,
         spans: &[HumanTextSpan],
@@ -405,10 +311,6 @@ impl HumanTextEntry {
     }
 
     /// The text one side's spans cover, checking they all cover the *same* text.
-    ///
-    /// Returning one string for a whole side is only sound because of that check, and the check is
-    /// what an N:M group means: spans that read differently are unrelated ranges wearing a group's
-    /// clothes, and pairing them would assert a correspondence nobody established.
     fn side_text<'a>(
         &self,
         source: &'a str,
@@ -434,41 +336,24 @@ impl HumanTextEntry {
     }
 }
 
-/// A human-painted account of a diff *as text*, stored alongside - and deliberately independent
-/// of - the tree mapping in the same [`HumanMapping`].
+/// A human-painted account of a diff *as text*, independent of the tree mapping in the same
+/// [`HumanMapping`].
 ///
-/// **Why a second ground truth rather than one derived from the other.** The tree mapping records
-/// which AST nodes correspond. That is not enough to determine what a reader should see, for two
-/// separate reasons this project has now hit in practice:
+/// The tree mapping does not determine what a reader should see: many nodes carry no visible text,
+/// and a reorder ("one line moved past five" vs "five moved past one") is the same set of matched
+/// pairs either way. So this records what the diff *looks like*; checking the two against each
+/// other is [`text_mapping_disagreements`].
 ///
-/// * Many nodes carry no visible text of their own (`expression_statement` wrappers and the like),
-///   so a node-level answer cannot be checked against what appears on screen without an extra,
-///   unvalidated projection step - the same visible-versus-scaffolding split
-///   `structurally_visible_node_ids` draws for mismatch counting.
-/// * Even a mapping that is not in doubt anywhere leaves the *rendering* underdetermined. For a
-///   reorder, "one line moved past five" and "five lines moved past one" describe the identical
-///   set of matched pairs; the mapping, and any cost function over it, is indifferent between
-///   them. See `research/data/quality/move_attribution.md`.
-///
-/// So this records what a person says the diff *looks like*, and the tree mapping records what
-/// corresponds to what. Neither is derivable from the other, which is exactly what makes checking
-/// one against the other worth doing - see [`text_mapping_disagreements`].
-///
-/// **Unpainted text is unchanged.** A person paints only what changed, so the absence of a span
-/// is a positive claim that the text there is identical and in place. That is what makes a `Match`
-/// whose two spans hold identical text meaningful rather than redundant: it says "this same code
-/// is somewhere else", which is precisely a move.
+/// **Unpainted text is unchanged.** The absence of a span claims the text is identical and in
+/// place, which is what makes a `Match` of identical text mean "moved".
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct HumanTextMapping {
     pub entries: Vec<HumanTextEntry>,
 }
 
-/// One painting under a name.
-///
-/// The name is free text. `human_solver` offers `Minimal`, `Full` and `Only one solution` as
-/// starting points - the first two for the common case where a region can be painted tightly or
-/// generously, the third to record that a fixture genuinely has one answer - but nothing requires
-/// those, requires all of them, or requires more than one.
+/// One painting under a free-text name. `Minimal`/`Full` (optionally qualified, see
+/// [`designates_preset`]) tie it to a render preset; `Only one solution` is the conventional name
+/// for a lone painting.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct NamedTextMapping {
     pub name: String,
@@ -476,11 +361,8 @@ pub struct NamedTextMapping {
     pub mapping: HumanTextMapping,
 }
 
-/// The text a span covers, or `None` if it falls outside `contents`.
-///
-/// Rows are split on `'\n'` and columns are byte offsets into a row, matching `TextRange`. A span
-/// ending at column 0 of row *r* ends just before row *r* begins, i.e. it includes row *r-1*'s
-/// newline - the convention `line_operations` and `columns_on_row` already use.
+/// The text a span covers, or `None` if it falls outside `contents`. A span ending at column 0 of
+/// row *r* includes row *r-1*'s newline, as in `line_operations` and `columns_on_row`.
 pub fn span_text(contents: &str, span: HumanTextSpan) -> Option<&str> {
     let start = byte_offset(contents, span.start_row, span.start_column)?;
     let end = byte_offset(contents, span.end_row, span.end_column)?;
@@ -506,11 +388,8 @@ fn byte_offset(contents: &str, row: usize, column: usize) -> Option<usize> {
     None
 }
 
-/// One byte-granular label for a side of the diff, shared by both the painted text mapping and
-/// the tree mapping projected down to text, so the two can be compared on equal footing.
-///
-/// `None` (absent from a label vector) is "unchanged and in place", which both sources express by
-/// saying nothing about that byte.
+/// One byte-granular label for a side, shared by the painted text mapping and the tree mapping
+/// projected to text so the two compare on equal footing. `None` means unchanged and in place.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TextLabel {
     Move,
@@ -555,7 +434,7 @@ impl TextLabel {
 pub struct TextMappingDisagreement {
     /// `0` = before, `1` = after, matching `TextDiff::all`'s own side convention.
     pub side: usize,
-    /// The run of bytes over which both sources hold the same pair of opinions.
+    /// Start of a run of bytes over which both sources hold the same pair of opinions.
     pub start_byte: usize,
     pub end_byte: usize,
     /// 0-based row the run starts on, for a human-readable report.
@@ -567,21 +446,11 @@ pub struct TextMappingDisagreement {
 }
 
 /// Per-byte labels for one side, from a list of `(span, label)`. Later spans win on overlap, which
-/// only matters for a malformed painting - the solver never produces overlapping spans.
+/// only a malformed painting has.
 ///
-/// A literal `\n` byte is never labeled, regardless of what span covers it: the real renderer
-/// (`code_viewer`/`headless`, via `TextRange::columns_on_row`) bounds every row's painted columns
-/// to that row's own content length, which `str::split('\n')`-derived `lines` (what `row_len`
-/// always is at both call sites) excludes the newline from by construction - so a multi-row range
-/// never actually highlights the seam between its rows in the product, only in a naive byte-fill
-/// that doesn't know rows exist. Without this, comparing raw byte spans reported a fixture-measured
-/// disagreement for something no reader of the real output could ever see - confirmed as the whole
-/// of `rust-adding-to-a-list-of-identical-attributes-should-favour-near-matches`'s residual and
-/// part of several others' (see the "connecting-newline seam" pattern in
-/// `painting_disagreement_census_2026_09_01.md`). Applied here rather than only to codediff's own
-/// side so a human's own multi-row entry (Rule 4: "whitespace inside a range is usually kept") is
-/// held to the same never-the-newline floor Rule 1 states unconditionally, not just to whatever
-/// `label_bytes_from_ranges` also happens to call this.
+/// Line terminators are never labeled: the renderer bounds each row's painted columns to the row's
+/// content, so a multi-row range never visibly paints the seam between rows. Applies to the human's
+/// spans and codediff's ranges alike.
 fn label_bytes(contents: &str, spans: &[(HumanTextSpan, TextLabel)]) -> Vec<Option<TextLabel>> {
     let mut labels = vec![None; contents.len()];
     for &(span, label) in spans {
@@ -595,14 +464,9 @@ fn label_bytes(contents: &str, spans: &[(HumanTextSpan, TextLabel)]) -> Vec<Opti
             *slot = Some(label);
         }
     }
-    // A line terminator is never painted, whichever one the file uses. A span written as ending at
-    // column 0 of the next row swallows the break - 28 of them in the corpus, an artifact of how
-    // `from_treesitter_range` normalises a range that ends at end of row - and nothing downstream
-    // paints it. On a CRLF file that break is **two** bytes: dropping only the `\n` left the `\r`
-    // painted, so the very span shape that is unremarkable on a Unix file reported as painted
-    // trailing whitespace on a Windows one (`javascript-microsoft-typescript-small-change-2`,
-    // invariant 1). Applies to codediff's ranges and the human's spans alike, since both arrive
-    // here.
+    // A span ending at column 0 of the next row swallows the break; on a CRLF file that is two
+    // bytes, so `\r` is skipped as well as `\n`
+    // (`javascript-microsoft-typescript-small-change-2`).
     let bytes = contents.as_bytes();
     for index in 0..labels.len() {
         if bytes[index] == b'\n' {
@@ -648,46 +512,21 @@ pub struct TextMappingCheck {
     pub disagreements: Vec<TextMappingDisagreement>,
 }
 
-/// Checks the tree mapping against every painted text solution, and returns the one that agrees
-/// with it best - fewest disagreeing **bytes**, ties broken by list order.
+/// Checks the tree mapping against every painted text solution and returns the one that agrees
+/// best - fewest disagreeing **bytes** (the quantity callers report), ties broken by list order.
+/// `Ok(None)` when nothing is painted, which is not agreement.
 ///
-/// **Best, not all, and deliberately.** The paintings are alternatives, not conjuncts: a fixture
-/// carrying `Minimal` and `Full` is asserting that either is a correct rendering of the same edit,
-/// exactly as a [`MultiMapGroup`] asserts that any consistent pairing is correct. Requiring the
-/// tree mapping to agree with all of them would fail every fixture that records more than one
-/// answer, which is the opposite of what recording them is for. So a diff is judged against the
-/// answer it came closest to, and the name of that answer comes back with the result so a reader
-/// knows which one was used.
+/// Best, not all: the paintings are alternatives, like a [`MultiMapGroup`].
 ///
-/// **Deliberately not mode-aware** ([`paintings_for_mode`]/[`crate::diff::text::ranges_for_options`]
-/// are the wrong tools here, unlike in [`compare_painting`]). Those exist to validate a *real
-/// product feature* - codediff's own Minimal/Full rendering modes - against the paintings written
-/// for them, which is exactly right when the tree side is `diff_code`'s real output. This function
-/// compares two human-authored ground truths against each other; the tree side never comes from
-/// `diff_code`, only from the human's own `entries` (via [`as_ast_diff_for_mapping`]). Routing that
-/// comparison through `paintings_for_mode`/`ranges_for_options` anyway would make a bug or even just a
-/// debatable design choice in either function indistinguishable, in the result, from a genuine
-/// disagreement between the two ground truths - the same kind of contamination as using
-/// `diff_code` itself, just relocated into the mode-selection machinery instead of the matcher.
-/// "Best of all paintings, by bytes" needs neither function, so it cannot inherit either one's
-/// bugs.
+/// Not mode-aware, unlike [`compare_painting`]: both sides here are human-authored (the tree side
+/// is built from `entries`, not `diff_code`), and routing them through
+/// [`paintings_for_mode`]/`ranges_for_options` would let a bug in those look like a disagreement
+/// between the two ground truths.
 ///
-/// **Byte count, not run count.** Selecting on `disagreements.len()` lets one huge disagreeing run
-/// beat two tiny ones. Byte count is what every caller that reports a percentage actually sums, so
-/// the selection optimizes the same quantity being reported.
-///
-/// One rendering choice from [`crate::diff::text::TextDiff::from`] is still unavoidably present:
-/// turning a tree-level node mapping into byte-level labels requires *some* decision about which
-/// matched nodes render as `Move`, and `TextDiff::from`'s column-shift heuristic is that decision.
-/// Neither ground truth expresses `Move` positionally (`HumanOperation` has no `Move` variant;
-/// `HumanTextEntry::verdict` derives it from content identity alone), so no renderer setting
-/// recovers it correctly - including a `crossed_backwards`-only variant, real reorders and never
-/// column shift, which trades one fixture's artifact for another's. Use
-/// [`disagreement_is_move_only`] to separate that unavoidable rendering artifact from genuine
-/// structural disagreement, rather than trusting the raw count.
-///
-/// `Ok(None)` when nothing has been painted - not the same as agreement, and callers counting
-/// fixtures should test `text_mappings.is_empty()` themselves rather than read `None` as a pass.
+/// One rendering choice is unavoidable: projecting a node mapping to bytes needs *some* decision
+/// about which matched nodes render as `Move`, and `TextDiff::from`'s column-shift heuristic is
+/// it. Neither ground truth records `Move` positionally, so use [`disagreement_is_move_only`] to
+/// separate that artifact from structural disagreement.
 pub fn text_mapping_disagreements(
     mapping: &HumanMapping,
     before: &crate::code::Code,
@@ -697,7 +536,6 @@ pub fn text_mapping_disagreements(
         return Ok(None);
     }
 
-    // The tree side is the same for every painting, so it is built once rather than per solution.
     let ast_diff = as_ast_diff_for_mapping(mapping, before, after)?;
     let node_cache = crate::diff::NodeCache::build(before, after);
     let text_diff = crate::diff::text::TextDiff::from(before, after, &ast_diff, &node_cache);
@@ -730,11 +568,8 @@ pub fn text_mapping_disagreements(
     Ok(best)
 }
 
-/// Whether a disagreement is purely about `Move` vs "unchanged in place" - the one rendering
-/// artifact [`text_mapping_disagreements`] cannot avoid (see its doc comment). Excluded from the
-/// headline structural-disagreement figure so that number reflects only what the two
-/// human-authored ground truths themselves actually disagree about, with the `Move`-attributable
-/// share reported separately rather than silently folded in.
+/// Whether a disagreement is purely `Move` vs "unchanged in place" - the rendering artifact
+/// [`text_mapping_disagreements`] cannot avoid, reported apart from structural disagreement.
 pub fn disagreement_is_move_only(d: &TextMappingDisagreement) -> bool {
     matches!(
         (d.painted, d.from_tree),
@@ -806,8 +641,7 @@ pub struct PaintingComparison {
     pub solution: String,
     /// Bytes where the two disagree about what happened to that text, summed over both sides.
     pub mismatched_bytes: usize,
-    /// Bytes in both files - the denominator, so the rate is comparable across fixtures of wildly
-    /// different sizes.
+    /// Bytes in both files - the denominator.
     pub total_bytes: usize,
 }
 
@@ -822,12 +656,7 @@ impl PaintingComparison {
 }
 
 /// The ground-truth painting name `options` is answerable to, or `None` if it is neither of the
-/// two named presets this corpus's paintings are keyed by.
-///
-/// The corpus only ever pins ground truth to the two extremes - see
-/// `assert_matches_human_painting_within_limit`, this function's only caller with a concrete
-/// value - so an arbitrary in-between combination of options has no painting to compare against,
-/// by construction rather than by omission.
+/// two presets: ground truth pins only the two extremes.
 fn preset_name(options: crate::diff::text::RenderOptions) -> Option<&'static str> {
     if options == crate::diff::text::RenderOptions::MINIMAL {
         Some("Minimal")
@@ -838,13 +667,6 @@ fn preset_name(options: crate::diff::text::RenderOptions) -> Option<&'static str
     }
 }
 
-/// Which painting a given options preset is answerable to.
-///
-/// A fixture painted twice has one answer per preset. A fixture painted once is asserting that its
-/// rendering is *unambiguous* - the painter looked and judged there to be a single defensible
-/// answer - so both presets are held to it, which is exactly the property a single painting
-/// claims. That is why the name matters less than the count: `Only one solution` is the
-/// conventional name for the single case, but any single painting means the same thing.
 /// Whether `name` designates the `Minimal` preset - see [`designates_preset`].
 fn designates_minimal(name: &str) -> bool {
     designates_preset(name, "Minimal")
@@ -855,6 +677,10 @@ fn designates_full(name: &str) -> bool {
     designates_preset(name, "Full")
 }
 
+/// The paintings `options` is answerable to. A lone painting claims the rendering is unambiguous,
+/// so both presets are held to it whatever its name. With several, those named for the preset;
+/// if none names *any* preset they are alternatives for every preset. A fixture with a misspelled
+/// preset (`Minimal` beside `Ful`) is an error, not a set of alternatives.
 pub fn paintings_for_mode(
     mapping: &HumanMapping,
     options: crate::diff::text::RenderOptions,
@@ -875,17 +701,8 @@ pub fn paintings_for_mode(
                 .filter(|named| designates_preset(&named.name, wanted))
                 .collect();
             if candidates.is_empty() {
-                // **No painting names a preset: they are alternatives, and the fixture has no
-                // unique solution.** Some edits are ambiguous on an axis that has nothing to do
-                // with Minimal/Full - which of two equally good moves to prefer, say - and both
-                // readings are correct under *either* preset. Such a fixture answers every preset
-                // with all of its paintings, exactly as a lone painting answers both, and
-                // `compare_painting_with_diff` already scores several candidates as alternatives
-                // rather than as a conjunction: agreeing with any one of them is agreement.
-                //
-                // Only when *nothing* names a preset. A fixture holding `Minimal` beside `Ful`
-                // still fails for `Full`, which is the typo this check was written for - see
-                // `paintings_with_labels` on the six fixtures that were once misnamed this way.
+                // Only when *nothing* names a preset: `Minimal` beside a misspelled `Ful` must
+                // still fail for `Full`.
                 if mapping
                     .text_mappings
                     .iter()
@@ -910,14 +727,9 @@ pub fn paintings_for_mode(
     }
 }
 
-/// Whether a painting named `name` is an answer for the `preset` preset.
-///
-/// Exactly the preset, or the preset followed by a qualifier: `Minimal`, `Minimal (left)`,
-/// `Minimal (right)`. The qualified form is how a painter records that an edit has **more than one
-/// defensible rendering under the same preset** - deleting one of two identical substrings can be
-/// read as deleting either, and both are correct. `human_solver`'s own help promises that a check
-/// passes on any of them, so a lookup wanting one exact name would fail a fixture with "no
-/// 'Minimal' painting" for having been painted more carefully than one that passes.
+/// Whether a painting named `name` is an answer for the `preset` preset: exactly the preset, or
+/// the preset, a space and a qualifier (`Minimal (left)`). The qualified form records several
+/// defensible renderings under one preset; any of them passes.
 pub(crate) fn designates_preset(name: &str, preset: &str) -> bool {
     name == preset
         || name
@@ -926,15 +738,8 @@ pub(crate) fn designates_preset(name: &str, preset: &str) -> bool {
 }
 
 /// Compares codediff's rendering under `options` against the painting that preset is answerable
-/// to.
-///
-/// Both sides are reduced to **per-byte labels** and compared byte for byte, the same projection
-/// [`text_mapping_disagreements`] uses and for the same reason: the two sources chunk one edit
-/// completely differently - a painted `Match` covering five lines against a dozen node-derived
-/// ranges - so comparing ranges would report bookkeeping differences as disagreements.
-///
-/// The result is a *rate*, not a count, because the fixtures span three orders of magnitude in
-/// size and a count would make one large fixture's residual dwarf every small fixture's exactness.
+/// to, byte for byte (ranges chunk one edit too differently to compare directly). The result is a
+/// rate because fixture sizes span three orders of magnitude.
 pub fn compare_painting(
     name: &str,
     options: crate::diff::text::RenderOptions,
@@ -944,27 +749,17 @@ pub fn compare_painting(
     compare_painting_with_diff(name, options, before, after, &diff)
 }
 
-/// codediff's side of a painting comparison: a real diff, so that every preset is projected from
-/// the same mapping. Built once per fixture and handed to [`compare_painting_with_diff`] for each
-/// preset, since the diff is the expensive half and does not depend on the preset.
+/// codediff's side of a painting comparison, built once per fixture and projected per preset by
+/// [`compare_painting_with_diff`].
 pub enum PaintingDiff {
     /// The ordinary case: a tree mapping, projected to text by [`crate::diff::text::TextDiff`].
     Ast {
         ast: crate::diff::ASTDiff,
         node_cache: crate::diff::NodeCache,
     },
-    /// A fixture whose language tree-sitter has no grammar for, so there is no tree to project
-    /// from. **This is not a degraded comparison - it is the right one.** The product itself
-    /// renders such a pair with [`crate::diff::text::plain_text_line_diff`] (see
-    /// `app::compute_diff`), so what the human paints against, and what a reader sees, is that
-    /// fallback; grading the painting against anything else would be grading a rendering the
-    /// product never produces. Erroring out with "codediff produced no AST diff for ..." instead
-    /// would leave such a fixture unable to carry a painting at all.
-    ///
-    /// The two range lists go through exactly the same `ranges_for_options` filtering the AST
-    /// side does, so the `Minimal`/`Full` presets still mean what they mean everywhere else -
-    /// with the one difference that the fallback never emits `Move`, so the options that only
-    /// govern moves have nothing to act on here and the two presets can legitimately coincide.
+    /// No tree-sitter grammar for the language. Grades against
+    /// [`crate::diff::text::plain_text_line_diff`] because that is what the product renders for
+    /// such a pair. It never emits `Move`, so the two presets can legitimately coincide.
     PlainText {
         before: Vec<crate::diff::text::RangeMatch>,
         after: Vec<crate::diff::text::RangeMatch>,
@@ -976,10 +771,8 @@ pub fn codediff_diff_for_painting(
     before: &crate::code::Code,
     after: &crate::code::Code,
 ) -> Result<PaintingDiff> {
-    // Keyed on the *code*, not on `diff_code`'s result, because that is what the product keys on
-    // (`app::compute_diff_with_options`) - and because `diff_code` hands back a `Some(ASTDiff)`
-    // for a pair with no trees at all rather than `None`, so testing the diff would silently
-    // grade this fixture against an empty tree mapping instead of the fallback a reader sees.
+    // Keyed on the code, as the product is: `diff_code` returns `Some(ASTDiff)` even with no
+    // trees, which would grade against an empty mapping instead of the fallback a reader sees.
     if before.ast.is_none() || after.ast.is_none() {
         let (before_ranges, after_ranges) =
             crate::diff::text::plain_text_line_diff(&before.contents, &after.contents);
@@ -996,16 +789,9 @@ pub fn codediff_diff_for_painting(
     Ok(PaintingDiff::Ast { ast, node_cache })
 }
 
-/// codediff's own side of a painting comparison, as per-byte labels, `[before, after]`.
-///
-/// Goes through exactly the pipeline the TUI renders: a real diff, projected to text ranges, then
-/// filtered by `options`. Not a re-derivation - what is compared is what a reader would actually
-/// see. For a fixture tree-sitter has no grammar for, that projection is the product's own
-/// plain-text fallback, for the same reason (see [`PaintingDiff::PlainText`]); both variants meet
-/// again at `ranges_for_options`, so the presets mean the same thing on either.
-///
-/// Not `TextDiff::from` (which builds under `FULL`): `paint_reindent_only_moves` genuinely differs
-/// between `MINIMAL`/`FULL`, so this must build under `options` itself.
+/// codediff's own side of a painting comparison, as per-byte labels, `[before, after]`: the ranges
+/// the TUI renders under `options`. Built under `options` rather than via `TextDiff::from`
+/// (which builds under `FULL`), because some options change the build itself.
 pub fn codediff_painting_labels(
     diff: &PaintingDiff,
     before: &crate::code::Code,
@@ -1036,8 +822,7 @@ pub fn codediff_painting_labels(
     })
 }
 
-/// [`compare_painting`] over an already computed diff - see [`PaintingDiff`] for why the two are
-/// separate.
+/// [`compare_painting`] over an already computed diff.
 pub fn compare_painting_with_diff(
     name: &str,
     options: crate::diff::text::RenderOptions,
@@ -1048,14 +833,10 @@ pub fn compare_painting_with_diff(
     let mapping = load(name)?;
     let candidates = paintings_for_mode(&mapping, options)?;
 
-    // codediff's side does not depend on which candidate painting is being compared, so it is
-    // labelled once and reused.
     let ours = codediff_painting_labels(diff, before, after, options);
     let total_bytes = before.contents.len() + after.contents.len();
 
-    // The best of the preset's candidates. Several paintings under one preset are *alternative*
-    // readings of an ambiguous edit, not a conjunction to satisfy at once, so agreeing with any
-    // one of them is agreement - and the closest is also the most useful one to name in a failure.
+    // Several paintings under one preset are alternatives: the closest one is the verdict.
     let mut best: Option<PaintingComparison> = None;
     for painting in candidates {
         let mut painted: [Vec<(HumanTextSpan, TextLabel)>; 2] = [Vec::new(), Vec::new()];
@@ -1097,20 +878,10 @@ pub fn compare_painting_with_diff(
 }
 
 /// Asserts codediff's rendering matches the human painting under **both** presets, within
-/// `max_percent` of the fixture's bytes.
-///
-/// One assertion covering both presets, rather than two tests per fixture: `Minimal`/`Full` are two
-/// readings of one mapping, and a fixture where they disagree in opposite directions is one
-/// finding, not two. The failure message reports both so the shape is visible at a glance.
-///
-/// `max_percent` is a clamp in exactly the sense
-/// [`assert_matches_human_mapping_within_limit`] is one - a recorded distance, not a target. `0.0`
-/// means exact agreement.
+/// `max_percent` of the fixture's bytes - a recorded distance, not a target.
 pub fn assert_matches_human_painting_within_limit(name: &str, max_percent: f64) -> Result<()> {
     use crate::diff::text::RenderOptions;
 
-    // One diff for both presets: they are two renderings of one mapping, and the diff is the
-    // expensive half of each comparison.
     let (before, after) = &*super::handmade_test_code_pair(name)?;
     let diff = codediff_diff_for_painting(before, after)?;
     let mut failures = Vec::new();
@@ -1162,14 +933,8 @@ impl RowIndex {
     }
 }
 
-/// Path to the `human_mapping.json` file for a given test case name (e.g. "rust-add-if"),
-/// resolved across `DIFF_DATASETS` (`super::diffs_case_dir`) like every other per-name lookup.
-/// Every caller (`load`/`save`, and the `.exists()` checks in `benchmark_optimal_solutions`/
-/// `benchmark_other`) runs after the case directory already exists - either it's an already-open
-/// case, or `human_solver`'s promote flow just created it - except when checking whether a
-/// *candidate* name is free of a mapping at all, where "doesn't exist under any dataset" is
-/// exactly the desired answer. `small` is an arbitrary but harmless fallback for a name that
-/// resolves to nothing: `.exists()` on it is still `false`, the only thing every caller checks.
+/// Path to `name`'s `human_mapping.json`. For a name no dataset holds, a path under `small` that
+/// does not exist, which is what a "is this name free" check wants.
 pub fn mapping_path(name: &str) -> PathBuf {
     super::diffs_case_dir(name)
         .unwrap_or_else(|| {
@@ -1205,21 +970,13 @@ pub fn save(name: &str, mapping: &HumanMapping) -> Result<()> {
     Ok(())
 }
 
-/// `pub`, not private: `src/bin/human_solver/` (a separate binary crate that depends on this
-/// one, so `pub(crate)` wouldn't reach it) needs the identical `Vec<String>` -> `Vec<&str>`
-/// conversion, for the same `node_for_path`/`PathCache::resolve` calls this module makes.
+/// `pub` for `human_solver`, a separate crate.
 pub fn path_refs(path: &[String]) -> Vec<&str> {
     path.iter().map(String::as_str).collect()
 }
 
 /// What kind of human-authored removal a node is marked with: `Deleted` from the before tree, or
 /// `Inserted` in the after tree.
-///
-/// Shared between `human_solver` (which lets a human create/edit a `HumanMapping`) and any
-/// read-only consumer that just needs to interpret one (e.g. a static site generator) - moved
-/// here, rather than kept private to `human_solver.rs`, specifically so a second consumer doesn't
-/// have to carry its own copy of what matched/deleted/inserted/inherited means and risk it
-/// silently drifting from the TUI's.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MarkKind {
     Deleted,
@@ -1241,46 +998,26 @@ pub enum NodeStatus {
     },
 }
 
-/// Resolved node IDs for every entry in a [`HumanMapping`], used to look up a node's
-/// [`NodeStatus`] in O(1) (plus a bounded ancestor walk for inheritance) - see [`rebuild_caches`].
+/// Resolved node IDs for every entry in a [`HumanMapping`], for O(1) [`NodeStatus`] lookups - see
+/// [`rebuild_caches`].
 #[derive(Default)]
 pub struct Caches {
     pub before_match: HashMap<usize, usize>,
     pub after_match: HashMap<usize, usize>,
     pub before_removed: HashMap<usize, bool>,
     pub after_removed: HashMap<usize, bool>,
-    /// The exact [`HumanOperation`] (`Identical`/`Update`/`MatchButNotIdentical`) a matched node's
-    /// pair was recorded as. `before_match`/`after_match` alone can't tell these apart - both write
-    /// the same node-id pair into those maps regardless of which of the three operations produced
-    /// them - so a consumer that cares whether a match is a real edit or genuinely unchanged (e.g.
-    /// `generate_mapping_site`'s "hide identical matches" toggle, which treats anything other than
-    /// `Identical` as a real edit; or its `Update`-vs-`MatchButNotIdentical` coloring, which needs
-    /// the exact operation) reads this map, not `before_match`/`after_match` directly. Absent key
-    /// means "not recorded" (e.g. a `Caches` built by hand rather than via `rebuild_caches`), which
-    /// [`is_identical_before`]/[`is_identical_after`] treat as identical, to match matched nodes'
-    /// pre-existing default rendering/quietness.
+    /// The exact [`HumanOperation`] a matched node's pair was recorded as (`before_match` cannot
+    /// tell the three match operations apart). A missing key reads as `Identical`.
     pub before_operation: HashMap<usize, HumanOperation>,
     pub after_operation: HashMap<usize, HumanOperation>,
-    /// Whether a matched node's `before_path` and `after_path` differ - i.e. the node sits at a
-    /// different position (different ancestor chain and/or sibling index) after the edit than
-    /// before it. Populated for every match-type entry, not just `Identical` ones, but the only
-    /// caller that reads it (`generate_mapping_site`'s "moved without change" coloring) only ever
-    /// consults it for `Identical` pairs - an `Update`/`MatchButNotIdentical` pair that also moved
-    /// doesn't get a separate visual treatment, since that hasn't come up in the fixture corpus.
+    /// Whether a matched node's `before_path` and `after_path` differ.
     pub before_moved: HashMap<usize, bool>,
     pub after_moved: HashMap<usize, bool>,
-    /// Number of entries that couldn't be resolved against the current trees (e.g. a
-    /// hand-edited or stale mapping file). Surfaced by callers (e.g. `human_solver`'s footer)
-    /// rather than treated as fatal, so a bad mapping file doesn't block the caller outright.
+    /// Entries that do not resolve against the current trees - counted and reported, not fatal.
     pub unresolved: usize,
-    /// Node id -> index into `HumanMapping::groups`, for every node listed in a group's
-    /// `before_paths` (whichever side the id belongs to has its own map) - both the members a
-    /// group's representative pairing actually matched *and* its leftover members, unlike
-    /// `before_match`/`before_removed` above, which only see whichever single outcome
-    /// [`representative_entries`] picked. Populated only by [`rebuild_caches_for_mapping`] (plain
-    /// [`rebuild_caches`] has no `groups` to read), used so a consumer can render a group-derived
-    /// node distinctly from a plain one, and so `u` (in `human_solver`) can find and remove a
-    /// whole group by any one of its members rather than just the one representative pair.
+    /// Node id -> index into `HumanMapping::groups`, for every member of a group, matched or
+    /// leftover (`before_match` only sees the [`representative_entries`] outcome). Only filled
+    /// by [`rebuild_caches_for_mapping`].
     pub before_group: HashMap<usize, usize>,
     pub after_group: HashMap<usize, usize>,
 }
@@ -1293,12 +1030,8 @@ pub fn rebuild_caches(
     after_root: Node,
 ) -> Caches {
     let mut caches = Caches::default();
-    // A `PathCache` per side, not a fresh `node_for_path` scan per entry: this runs on every
-    // fixture, on every keystroke, in `human_solver`'s live editor, and (via `rebuild_caches_for_mapping`)
-    // once per fixture across the whole corpus for `o`'s incomplete-only filter - a heavily
-    // annotated fixture (tens of thousands of entries sharing high-fanout parents) turned the
-    // per-entry rescan into several seconds each, measured up to ~2s on a single ~54k-entry
-    // fixture alone.
+    // A `PathCache` per side: entries sharing high-fanout parents make a fresh scan per entry
+    // quadratic, and this runs on every keystroke in `human_solver`.
     let mut before_cache = PathCache::new();
     let mut after_cache = PathCache::new();
 
@@ -1356,24 +1089,8 @@ pub fn rebuild_caches(
     caches
 }
 
-/// Same as [`rebuild_caches`], but also folds in `mapping.groups`: every group's members are
-/// flattened into one concrete representative pairing via [`representative_entries`] first, so a
-/// grouped node's [`NodeStatus`] (`Matched`, or `Marked` deleted/inserted for a leftover member)
-/// comes back exactly like a plain entry's would. On top of that, `before_group`/`after_group` are
-/// populated for *every* listed member of every group - not just whichever one
-/// `representative_entries` happened to pair - by resolving `before_paths`/`after_paths` directly.
-///
-/// If a group's paths fail to resolve against the current trees (a stale or hand-edited mapping
-/// file), [`representative_entries`] is skipped in favor of `mapping.entries` alone rather than
-/// failing outright - same "don't let one bad group block the whole caller" posture
-/// [`rebuild_caches`] already takes for a single bad entry (`unresolved`), just without a precise
-/// per-group count, since there's no single caller today that needs one.
-/// Nodes in `root`'s tree the mapping says nothing about - the size of what is left to decide.
-///
-/// Pass [`status_before`] or [`status_after`] as `status_fn`, matching the side `root` is from.
-/// A mapping that resolves nothing at all reports every node, which is exactly true rather than an
-/// error: an unsolved fixture and a fixture with no `human_mapping.json` are the same state to a
-/// completeness count.
+/// Nodes in `root`'s tree the mapping says nothing about. Pass [`status_before`] or
+/// [`status_after`], matching `root`'s side. An empty mapping reports every node.
 pub fn unmarked_node_count(
     root: Node,
     caches: &Caches,
@@ -1393,6 +1110,9 @@ pub fn unmarked_node_count(
     count
 }
 
+/// [`rebuild_caches`] with `mapping.groups` folded in through [`representative_entries`], plus
+/// `before_group`/`after_group` for every group member. If a group does not resolve, falls back to
+/// `mapping.entries` alone rather than failing.
 pub fn rebuild_caches_for_mapping(
     mapping: &HumanMapping,
     before_root: Node,
@@ -1433,7 +1153,7 @@ pub fn is_inherited_removed(node: Node, removed: &HashMap<usize, bool>) -> bool 
 }
 
 /// The exact [`HumanOperation`] a matched before-node's pair was recorded as, or `None` if `node`
-/// isn't matched at all (or `caches` was built by hand rather than via [`rebuild_caches`]).
+/// isn't matched (or `caches` was built by hand).
 pub fn match_operation_before(node: Node, caches: &Caches) -> Option<HumanOperation> {
     caches.before_operation.get(&node.id()).copied()
 }
@@ -1443,12 +1163,8 @@ pub fn match_operation_after(node: Node, caches: &Caches) -> Option<HumanOperati
     caches.after_operation.get(&node.id()).copied()
 }
 
-/// Whether a `Matched` before-node's pair was recorded as `Identical` rather than
-/// `Update`/`MatchButNotIdentical`. Meaningless (and unconsulted) for any other [`NodeStatus`].
-/// Defaults to `true` when [`match_operation_before`] returns `None` - either because `node` isn't
-/// matched, or because `caches` was built by hand rather than via [`rebuild_caches`] (as several
-/// tests do), in which case treating it as identical preserves those matched nodes' existing
-/// "quiet"/undecorated rendering.
+/// Whether a `Matched` before-node's pair was recorded as `Identical`. `true` when
+/// [`match_operation_before`] is `None`, so hand-built caches render matched nodes as unchanged.
 pub fn is_identical_before(node: Node, caches: &Caches) -> bool {
     match_operation_before(node, caches).is_none_or(|op| op == HumanOperation::Identical)
 }
@@ -1458,9 +1174,8 @@ pub fn is_identical_after(node: Node, caches: &Caches) -> bool {
     match_operation_after(node, caches).is_none_or(|op| op == HumanOperation::Identical)
 }
 
-/// Whether a matched before-node's `before_path` differed from its pair's `after_path` - see
-/// `Caches::before_moved`. Defaults to `false` (not moved) when absent, the same "assume nothing
-/// noteworthy" convention [`is_identical_before`] uses for its own default.
+/// Whether a matched before-node's path differs from its pair's (see `Caches::before_moved`);
+/// `false` when unknown.
 pub fn is_moved_before(node: Node, caches: &Caches) -> bool {
     caches
         .before_moved
@@ -1523,16 +1238,10 @@ pub enum Side {
     After,
 }
 
-/// One disagreement between the human mapping and codediff's actual output, tagged with the node
-/// most directly responsible for it. `node_id` is `0` for a mismatch that isn't about any single
-/// node (the nondeterminism check, `ASTDiff::is_valid`, a malformed multi-map group config) - a
-/// real tree-sitter `Node::id()` is never `0`, matching the sentinel `before_node_map`/
-/// `after_node_map` already use for "no counterpart" elsewhere in this codebase.
-///
-/// Exists so a caller can cross-reference `node_id`/`side` against
-/// [`crate::diff::nodes::structurally_visible_node_ids`] and tell a mismatch on a rendered, user-visible node
-/// apart from one on invisible structural scaffolding (a `block`, a `declaration_list`, ...) whose
-/// misclassification has no independent effect on what the diff actually shows.
+/// One disagreement between the human mapping and codediff's output, tagged with the node most
+/// responsible, so callers can tell a mismatch on a visible node from one on invisible scaffolding
+/// (see [`crate::diff::nodes::structurally_visible_node_ids`]). `node_id` is `0` (never a real
+/// id) for a mismatch about no single node.
 #[derive(Debug, Clone)]
 pub struct Mismatch {
     pub message: String,
@@ -1560,9 +1269,8 @@ fn node_kind_for_id(root: Node, node_id: usize) -> String {
     "None".to_string()
 }
 
-/// Pushes a mismatch for every node in `node`'s subtree (inclusive) that isn't mapped to zero
-/// (i.e. deleted, if `node` is in the before tree, or inserted, if in the after tree) in `node_map`.
-/// `side` is which side `node` (and therefore every descendant tagged here) is on.
+/// Pushes a mismatch for every node in `node`'s subtree (inclusive) that `node_map` does not map
+/// to zero. `side` is `node`'s side.
 fn check_subtree_maps_to_zero(
     node: Node,
     node_map: &rustc_hash::FxHashMap<usize, usize>,
@@ -1614,11 +1322,9 @@ fn subtree_ids(node: Node) -> std::collections::HashSet<usize> {
     ids
 }
 
-/// Pushes a mismatch for every node in `subtree_root`'s subtree (inclusive) whose mapped
-/// counterpart (via `node_map`) doesn't land inside `counterpart_ids` - the one-sided half of
-/// [`check_subtree_maps_within`]'s closure check. `counterpart_lookup_root` is the *other* side's
-/// full tree root, used only to describe what a wrongly-mapped-to node actually is (same role
-/// `check_subtree_maps_to_zero`'s `lookup_root` plays). `side` is which side `subtree_root` is on.
+/// Pushes a mismatch for every node in `subtree_root`'s subtree (inclusive) whose counterpart via
+/// `node_map` is not in `counterpart_ids` - one half of [`check_subtree_maps_within`].
+/// `counterpart_lookup_root` is only for describing the wrongly-mapped-to node.
 fn check_subtree_closed_within(
     subtree_root: Node,
     node_map: &rustc_hash::FxHashMap<usize, usize>,
@@ -1657,14 +1363,9 @@ fn check_subtree_closed_within(
     }
 }
 
-/// Pushes a mismatch for every node in `before_node`'s subtree (inclusive) that isn't mapped to a
-/// node within `after_node`'s subtree (inclusive), and vice versa - i.e. the two subtrees form a
-/// *closed* pairing under `before_node_map`/`after_node_map`, with no leakage to nodes outside the
-/// pair. This is a [`MultiMapGroup`] with `with_children` set's validation for a pair that
-/// actually matched: unlike [`check_subtree_maps_to_zero`] (a fixed target, "maps to 0"), *which*
-/// pair matched is only known after the fact here - it's whichever specific before/after pair
-/// codediff's own diff happened to produce, out of the many a group allows - so this checks a
-/// structural closure property instead of a fixed set of expected node ids.
+/// Pushes a mismatch for every node in either subtree that is not mapped into the other subtree:
+/// the two form a *closed* pairing. For a [`MultiMapGroup`] with `with_children`, where which pair
+/// matched is only known after the fact, so a closure property replaces fixed expected ids.
 #[allow(clippy::too_many_arguments)]
 fn check_subtree_maps_within(
     before_node: Node,
@@ -1698,9 +1399,8 @@ fn check_subtree_maps_within(
     );
 }
 
-/// Formats " (op X, reason Y)" for the mapping the before node actually landed in, so a mismatch
-/// message identifies which pass produced the wrong mapping (via `ASTMappingReason`), not just
-/// what it mapped to. Empty string when there's no mapping to describe.
+/// " (op X, reason Y)" for the mapping the before node landed in, naming the pass responsible.
+/// Empty when there is none.
 fn actual_mapping_info(
     diff_ast: &ASTDiff,
     before_id: usize,
@@ -1744,9 +1444,8 @@ fn expected_ast_operation(operation: HumanOperation) -> Option<ASTMappingOperati
     }
 }
 
-/// A node's `owned_text_hash`, or 0 when the node has no metadata entry - the same "absent means
-/// owns nothing" convention `ASTNodeMetadata::owned_text_hash` uses, so a missing entry can never
-/// be mistaken for a change.
+/// A node's `owned_text_hash`, or 0 without a metadata entry ("owns nothing", so a missing entry
+/// never reads as a change).
 fn owned_text_hash(metadata: &ASTMetadata, id: usize) -> u64 {
     metadata
         .node_info
@@ -1756,25 +1455,12 @@ fn owned_text_hash(metadata: &ASTMetadata, id: usize) -> u64 {
 }
 
 /**
-* Total edit cost of a human-authored `HumanMapping` under the same unit-cost model as
-* `crate::diff::cost::diff_cost`, so the two numbers are directly comparable -
-* `benchmark_optimal_solutions` prints both per fixture.
+* Total edit cost of a `HumanMapping` under the unit-cost model of `crate::diff::cost::diff_cost`,
+* via the same `operation_cost` table so the two stay comparable. The metadata must come from the
+* same parse as the roots (node ids are per-parse).
 *
-* Reuses `operation_cost` for the per-entry cost table rather than reimplementing it, so codediff's
-* cost and the human's cost can never silently drift apart from having two separate copies of the
-* same table. `before_metadata`/`after_metadata` must come from the same parsed `Code` as
-* `before_root`/`after_root` (tree-sitter node ids are only stable within one parse - see
-* `ASTNodeMetadata::start_byte`'s doc comment) so `node_for_path`'s resolved ids can look up subtree
-* sizes in them for `DeleteWithChildren`/`InsertWithChildren` entries.
-*
-* Only sums entries actually present in `mapping` - an unannotated node contributes nothing. That's
-* fine as long as the mapping is *complete over every actual change* (every unannotated node is
-* genuinely unchanged, and therefore costs 0 whether or not it's written down): most fixtures'
-* `human_mapping.json` only has a few hundred entries against many thousands of nodes precisely
-* because the rest is untouched code, not because the human skipped grading real edits. If a fixture
-* ever *does* leave a real change unannotated, this will silently undercount the human side and
-* inflate `diff_cost - human_mapping_cost` for a reason that has nothing to do with the algorithm -
-* worth checking with `--details` before trusting a surprising gap on an unfamiliar fixture.
+* Sums only annotated entries, which is correct only while the mapping covers every real change:
+* an unannotated edit silently undercounts the human side.
 */
 pub fn human_mapping_cost(
     mapping: &HumanMapping,
@@ -1783,29 +1469,14 @@ pub fn human_mapping_cost(
     before_metadata: &ASTMetadata,
     after_metadata: &ASTMetadata,
 ) -> Result<u64> {
-    // Same one-cache-per-root-per-loop pattern as `check_entry`'s caller - see `PathCache`'s own
-    // doc comment for why a fixture with many DeleteWithChildren/InsertWithChildren entries under
-    // one large flat parent (e.g. a big JSON object) needs this to stay linear.
     let mut before_cache = PathCache::new();
     let mut after_cache = PathCache::new();
 
-    // Groups contribute too, via one concrete (if arbitrary) representative pairing - see
-    // `representative_entries`'s own doc comment for why an arbitrary example is fine here even
-    // though it would never be for validation.
-    //
-    // That "arbitrary is fine" became *conditional* when `MatchButNotIdentical` stopped always
-    // costing 0 (2026-08-18): for a group over nodes that own text directly, which representative
-    // gets paired with which now decides how many pairs are charged `COST_UPDATE`, so the total
-    // would depend on a pairing that means nothing. Checked at the time and it does not arise -
-    // of the corpus's 55 `match_but_not_identical` groups, zero resolve to a gap-owning kind. If a
-    // group over XML `AttValue`s (or CSS values, or comments - see `ASTNodeMetadata::owned_text_
-    // hash`) ever appears, revisit this rather than assuming the cost is still well-defined.
-    //
-    // An `AllToAll` group's surplus members arrive here as extra pairs (see
-    // `representative_entries`), each charged as a match rather than as a whole-subtree
-    // delete/insert. That is the cheaper reading, and the right one: the group says the surplus
-    // is not gone. What an N:M correspondence *should* cost under a unit model is a question for
-    // the algorithm work, not settled here.
+    // Groups contribute via one representative pairing, which is only well defined while no
+    // `MatchButNotIdentical` group spans nodes that own text directly (see
+    // `ASTNodeMetadata::owned_text_hash`): there the pairing would decide how many pairs pay
+    // `COST_UPDATE`. An `AllToAll` group's surplus members are charged as matches, not as
+    // deletes/inserts: the group says they are not gone.
     let entries = representative_entries(mapping, before_root, after_root)?;
 
     let mut total = 0u64;
@@ -1814,13 +1485,9 @@ pub fn human_mapping_cost(
             HumanOperation::Identical => (ASTMappingOperation::Identical, 1, false),
             HumanOperation::Update => (ASTMappingOperation::Update, 1, false),
             HumanOperation::MatchButNotIdentical => {
-                // The one operation that has to look at the nodes themselves: a node owning text
-                // directly (an XML attribute value, a YAML quoted scalar - see
-                // `ASTNodeMetadata::owned_text_hash`) carries a difference that no descendant
-                // entry accounts for, so it must be charged here or it is charged nowhere. Both
-                // paths are always present for a match; a missing one can only mean a malformed
-                // mapping, and treating it as "unchanged" keeps this a cost function rather than
-                // a validator (`check_entry` is what rejects malformed entries).
+                // A node owning text directly carries a difference no descendant entry accounts
+                // for, so it is charged here or nowhere. A missing path reads as unchanged: this is
+                // a cost function, and `check_entry` rejects malformed entries.
                 let changed = match (entry.before_path.as_ref(), entry.after_path.as_ref()) {
                     (Some(before_path), Some(after_path)) => {
                         let before = before_cache.resolve(before_root, &path_refs(before_path));
@@ -1875,13 +1542,7 @@ pub fn human_mapping_cost(
     Ok(total)
 }
 
-/**
-* Loads the human mapping for `name` and computes its total edit cost (see
-* [`human_mapping_cost`]), resolving paths against a fresh parse of `before`/`after`.
-*
-* Convenience wrapper for callers (like `benchmark_optimal_solutions`) that only have a fixture
-* name and a `Code` pair, not an already-loaded `HumanMapping`/already-built `ASTMetadata`.
-*/
+/// [`human_mapping_cost`] for fixture `name`, resolved against a fresh parse of `before`/`after`.
 pub fn human_mapping_cost_for(
     name: &str,
     before: &crate::code::Code,
@@ -1901,20 +1562,12 @@ pub fn human_mapping_cost_for(
     )
 }
 
-/// Builds a synthetic `ASTDiff` from `name`'s human mapping, resolving every entry's path(s)
-/// against a fresh parse of `before`/`after` and feeding them through `ASTDiff::add_mapping` -
-/// same shape as `human_mapping_cost`, but producing the full `ASTDiff` rather than just a total
-/// cost, so any machinery that only knows how to consume a real `ASTDiff` (e.g.
-/// `diff::text::TextDiff`) can treat the human-authored mapping exactly like codediff's own
-/// output. Used by `benchmark_other` to project the human mapping down to per-line labels via the
-/// same `TextDiff`/`line_operations` path codediff's own diff goes through, so the two are
-/// comparable on equal footing.
+/// A synthetic `ASTDiff` from `name`'s human mapping, so machinery that consumes an `ASTDiff`
+/// (e.g. `diff::text::TextDiff`) treats the human mapping like codediff's output.
 ///
-/// `cost`/`reason` on the resulting `ASTMapping`s are placeholders, because the human format
-/// records neither. `reason` is not inert, though: `diff::text`'s `identical_or_move` reads it to
-/// keep a verified pure reindent or heritage-clause shift unpainted, so a synthetic diff renders
-/// those as `Move`. `painting_failure_census` borrows codediff's reason for every pair the two
-/// mappings share before rendering.
+/// `cost`/`reason` are placeholders; the human format records neither. `reason` is not inert:
+/// `diff::text`'s `identical_or_move` reads it, so `painting_failure_census` borrows codediff's
+/// reason for shared pairs before rendering.
 pub fn as_ast_diff(
     name: &str,
     before: &crate::code::Code,
@@ -1924,11 +1577,7 @@ pub fn as_ast_diff(
     as_ast_diff_for_mapping(&mapping, before, after)
 }
 
-/// Same as [`as_ast_diff`], but takes an already-loaded [`HumanMapping`] instead of loading (and
-/// JSON-parsing) `name`'s file itself. Callers that already have the mapping in hand for another
-/// reason (e.g. `generate_mapping_site`'s per-fixture loop, which loads it once to render that
-/// fixture's own page) should call this directly rather than [`as_ast_diff`], which would
-/// otherwise re-read and re-parse the same `human_mapping.json` a second time.
+/// [`as_ast_diff`] for an already-loaded [`HumanMapping`].
 pub fn as_ast_diff_for_mapping(
     mapping: &HumanMapping,
     before: &crate::code::Code,
@@ -1942,8 +1591,6 @@ pub fn as_ast_diff_for_mapping(
     let mut before_cache = PathCache::new();
     let mut after_cache = PathCache::new();
 
-    // Groups contribute too, via one concrete representative pairing - see
-    // `representative_entries`'s own doc comment.
     let entries = representative_entries(mapping, before_root, after_root)?;
 
     let mut diff = ASTDiff::default();
@@ -1985,28 +1632,16 @@ pub fn as_ast_diff_for_mapping(
 }
 
 /**
-* `mapping.entries` plus, for each of `mapping.groups`, one *deterministic* representative
-* pairing flattened into plain [`HumanMappingEntry`] values - matched pairs (sorted by each
-* side's node start byte, then zipped pairwise) become `Identical`/`MatchButNotIdentical` entries
-* per the group's own `operation`; any leftover on the larger side becomes
-* `Delete`/`DeleteWithChildren` or `Insert`/`InsertWithChildren` per `with_children`.
+* `mapping.entries` plus one *deterministic* representative pairing per group, flattened into
+* plain entries: members sorted by start byte and zipped pairwise under the group's `operation`,
+* the larger side's leftovers deleted/inserted per `with_children`.
 *
-* An [`GroupPairing::AllToAll`] group has no leftovers, so its surplus members are paired too -
-* each with the last member of the shorter side - rather than deleted/inserted. That puts one
-* node in several entries, which a plain mapping never does; it is the closest a list of pairs
-* can come to "one became three", and every consumer of this list (a [`Caches`] status, an
-* `ASTDiff` walked node by node, a cost total) reads pairs one at a time and copes. Deleting
-* the surplus instead would be a plain lie about the ground truth, visible as a false
-* disagreement with any painting of the same edit.
+* An [`GroupPairing::AllToAll`] group has no leftovers: its surplus members each pair with the last
+* member of the shorter side, putting one node in several entries. Deleting them would misstate
+* the ground truth.
 *
-* This is explicitly *a* valid solution, not *the* solution: a [`MultiMapGroup`] exists precisely
-* because many pairings are equally correct, and this function has to pick just one to produce
-* something concrete. It's used only where a single concrete example is good enough -
-* [`human_mapping_cost`] (so a group contributes to the printed cost total) and
-* [`as_ast_diff_for_mapping`] (so a group shows up in a synthetic `ASTDiff`, e.g. for
-* `benchmark_other`'s comparisons) - **never** for the actual pass/fail check, which is
-* [`check_group_entry`] instead: that one checks the real question ("does codediff's actual
-* mapping use *some* valid pairing"), not whether it happened to pick this particular one.
+* *A* valid solution, not *the* solution: used for cost and display ([`human_mapping_cost`],
+* [`as_ast_diff_for_mapping`]), **never** for pass/fail, which is [`check_group_entry`].
 */
 pub fn representative_entries(
     mapping: &HumanMapping,
@@ -2041,9 +1676,7 @@ pub fn representative_entries(
             })
             .collect::<Result<_>>()?;
 
-        // Sorted purely so the representative pairing is deterministic (stable across repeated
-        // calls, not dependent on `before_paths`/`after_paths`' original JSON order) - it doesn't
-        // need to mean anything beyond that.
+        // Sorted only for determinism.
         before_nodes.sort_by_key(|n| n.start_byte());
         after_nodes.sort_by_key(|n| n.start_byte());
 
@@ -2261,35 +1894,20 @@ fn check_entry<'b, 'a>(
 }
 
 /**
-* Checks one [`MultiMapGroup`] against `diff_ast`'s actual output: *any* pairing between the
-* group's before/after nodes counts as correct, as long as it uses exactly `min(N, M)` pairs and
-* the rest of the larger side ends up deleted/inserted - see the struct's own doc comment.
+* Checks one [`MultiMapGroup`] against `diff_ast`. For `AnyOneToOne`:
 *
-* 1. Every before-group node must be either matched to an after-group node (recorded as a pair)
-*    or mapped to 0 (deleted) - anything else (matched to a node outside the group) is a mismatch.
-* 2. Every after-group node not already claimed by a pair from step 1 must be mapped to 0
-*    (inserted) - anything else is a mismatch, symmetric to step 1. (A leftover after-node whose
-*    actual partner *is* a before-group member can't happen without step 1 already having found
-*    that pair, given `ASTDiff`'s own before/after maps agree with each other - see
-*    `compute_mismatches_for_with_config`'s separate `is_valid` check.)
-* 3. The number of pairs actually found must equal `min(N, M)` exactly - this is what catches
-*    codediff deleting *and* inserting instead of matching when it could have: each individual
-*    node's fate can look locally valid (deleted is a valid fate, inserted is a valid fate) while
-*    the group as a whole still under-matched, which steps 1-2 alone wouldn't catch.
-* 4. Every pair found must use the group's declared `operation` - not skipped, so a group can't
-*    quietly stop caring whether codediff chose the right kind of match.
-* 5. If `with_children`: every matched pair's whole subtree must close within itself
-*    ([`check_subtree_maps_within`]), and every leftover member's whole subtree must be
-*    deleted/inserted ([`check_subtree_maps_to_zero`]) - not just its own top node.
+* 1. Every before member is matched to an after member or deleted; matched outside the group is a
+*    mismatch.
+* 2. Every unclaimed after member is inserted.
+* 3. Exactly `min(N, M)` pairs are found. This catches deleting *and* inserting where a match was
+*    possible, which steps 1-2 accept node by node.
+* 4. Every pair uses an operation the group's `operation` allows.
+* 5. With `with_children`: matched pairs close within each other ([`check_subtree_maps_within`])
+*    and leftovers' whole subtrees are deleted/inserted.
 *
-* An [`GroupPairing::AllToAll`] group is graded on the same walk with two differences. Deleted
-* and inserted are *not* valid fates - step 1 and step 2 report every member that ended up
-* mapped to 0, since the group says none of them is gone or new - and step 3 has nothing to
-* count, because there is no expected number of one-to-one pairs. Step 5's closure is over the
-* union of the members' subtrees on the other side (see [`MultiMapGroup::with_children`]),
-* and step 5's leftover half never applies. codediff's one-to-one output cannot satisfy an
-* N:M group with N ≠ M, so such a group always reports at least `|N - M|` mismatches today;
-* that is the algorithm's distance from the ground truth, reported rather than hidden.
+* For `AllToAll`, deleted and inserted are not valid fates in steps 1-2, step 3 does not apply,
+* and step 5's closure is over the union of the members (no leftovers exist). A one-to-one diff
+* therefore always reports at least `|N - M|` mismatches for such a group.
 */
 fn check_group_entry<'b, 'a>(
     group: &MultiMapGroup,
@@ -2319,11 +1937,7 @@ fn check_group_entry<'b, 'a>(
         })
         .collect::<Result<_>>()?;
 
-    // A representative node for the group as a whole, used only for mismatches that describe the
-    // group's own aggregate state (a malformed `operation`, a wrong pair count) rather than one
-    // specific node - the first before-group node if there is one, else the first after-group node.
-    // `MultiMapGroup`'s own invariant (at least one of `before_paths`/`after_paths` non-empty) means
-    // the `(0, Side::Before)` fallback is unreachable in practice.
+    // Stands for the group as a whole in aggregate mismatches (bad `operation`, wrong pair count).
     let (group_node_id, group_side) = before_nodes
         .first()
         .map(|n| (n.id(), Side::Before))
@@ -2348,25 +1962,10 @@ fn check_group_entry<'b, 'a>(
         }
     );
 
-    // The operations a realized pair may legitimately carry - a *set*, not one value, because a
-    // group exists precisely to leave the pairing open, and which operation is correct depends on
-    // which pairing the algorithm realized.
-    //
-    // An `Identical` group is annotated that way only when every member hashes equal, so whichever
-    // pair is realized must be `Identical`; that stays strict.
-    //
-    // A `MatchButNotIdentical` group means "not all members are equal", which says nothing about
-    // the specific pair realized: a pairing may land on two byte-identical members (`Identical`) or
-    // two differing ones. Demanding literal `MatchButNotIdentical` was unsatisfiable for the common
-    // case of same-kind leaves - `classify_match` returns only `Identical`/`Update` for a childless
-    // pair (`apted/common.rs`, the `children.is_empty()` arm) while `human_solver`'s
-    // `multi_map_group_operation` only ever emits `Identical`/`MatchButNotIdentical`, so such a
-    // group could never be satisfied by any algorithm output. That was 67 false mismatches over 25
-    // fixtures, five of which had no other mismatch at all (2026-09-02 audit).
-    //
-    // The listed set is exactly what `classify_match` can return for a *matched* pair; delete and
-    // insert cannot appear here because `matched_pairs` is built from realized pairings only, and
-    // the group's cardinality is already checked separately above.
+    // A *set*: which operation is right depends on which pairing was realized. An `Identical`
+    // group means every member hashes equal, so any pair must be `Identical`. A
+    // `MatchButNotIdentical` group only says the members are not all equal, so a realized pair may
+    // be `Identical`, and a childless pair can only ever be `Identical`/`Update` (`classify_match`).
     let accepted_ops: &[ASTMappingOperation] = match group.operation {
         HumanOperation::Identical => &[ASTMappingOperation::Identical],
         HumanOperation::MatchButNotIdentical => &[
@@ -2567,20 +2166,12 @@ fn check_group_entry<'b, 'a>(
     Ok(())
 }
 
-/// One `diff_code` run's mapping, keyed by node *path* rather than node ID.
-///
-/// Node IDs are tree-sitter arena slots: stable within one parse, but not across separate parses
-/// of identical source (allocator/arena layout can differ run to run, even within the same
-/// process). A determinism check that reuses a single parse for every run can't see that class of
-/// bug at all - both runs would agree on IDs trivially. Keying by path (derived purely from node
-/// kind and sibling position, see [`super::path_for_node`]) makes two independently-parsed runs
-/// directly comparable.
+/// One `diff_code` run's mapping, keyed by node *path*: node ids can differ between separate
+/// parses of identical source, so only paths make independently parsed runs comparable.
 type PathKeyedMapping = HashMap<(Vec<String>, Vec<String>), ASTMappingOperation>;
 
-/// Runs `diff_code_with_config` on a *fresh* parse of `before_source`/`after_source` and returns
-/// its mapping keyed by path. Parsing fresh (rather than reusing an already-parsed `Code`) is the
-/// point: it's what actually reproduces the arena-layout variation a separate process launch
-/// would see. See [`crate::diff::HeuristicConfig`] for what `config` is for.
+/// Runs `diff_code_with_config` on a *fresh* parse, which is the point: it reproduces the
+/// arena-layout variation a separate process would see.
 fn diff_paths_with_config(
     before_source: &str,
     after_source: &str,
@@ -2593,10 +2184,6 @@ fn diff_paths_with_config(
     let node_cache = NodeCache::build(&before, &after);
     let diff_ast = diff.ast.expect("Diff has no AST");
 
-    // One cache per side, reused across every mapping entry below - see `PathCache`'s own doc
-    // comment for why a fresh `path_for_node` per entry would be quadratic here: this walks
-    // *every* mapped node in the whole diff (not just human-annotated ones), and for a large flat
-    // container (e.g. a big JSON object) many thousands of them share the same huge-fanout parent.
     let mut before_cache = PathCache::new();
     let mut after_cache = PathCache::new();
 
@@ -2611,9 +2198,8 @@ fn diff_paths_with_config(
         .collect()
 }
 
-/// Compares two path-keyed mappings and describes every pair whose presence or
-/// `ASTMappingOperation` differs between them - i.e. every sign that `diff_code` is not a pure
-/// function of its inputs. Empty when the runs fully agree.
+/// Describes every pair whose presence or operation differs between two runs. Empty when they
+/// agree.
 fn describe_path_map_differences(
     run_number: usize,
     baseline: &PathKeyedMapping,
@@ -2661,8 +2247,7 @@ fn describe_nondeterminism(
     )
 }
 
-/// Same as [`describe_nondeterminism`], but computes each of the three independent runs via
-/// [`diff_paths_with_config`] - see [`crate::diff::HeuristicConfig`] for what `config` is for.
+/// [`describe_nondeterminism`] with `config`.
 fn describe_nondeterminism_with_config(
     before_source: &str,
     after_source: &str,
@@ -2681,32 +2266,18 @@ fn describe_nondeterminism_with_config(
 }
 
 /**
-* Loads the human mapping for `name`, computes codediff's own diff for the same test case, and
-* returns every point of disagreement between the two (empty if they fully agree).
+* Every disagreement between `name`'s human mapping and codediff's diff (empty if they agree).
 *
-* For fixtures in [`crate::test::helper::UNIT_TEST_FIXTURES`], also re-parses the before/after
-* source two more times from scratch and re-diffs, comparing all three results by node *path* (not
-* ID - see [`describe_nondeterminism`]) against each other: `diff_code` is supposed to be a pure
-* function of its source text, so any difference between independently-parsed runs means some pass
-* is relying on something other than the source text (e.g. an unordered `HashMap`/`HashSet`
-* iteration, or a tree-sitter arena node ID used as a sort key) to pick a winner - which would
-* otherwise silently make every mismatch count in this suite, and in `benchmark_optimal_solutions`
-* (which shares this function), unreliable from run to run. Sampled rather than run for every
-* fixture (2026-08-08): this quadruples the diff pipeline's cost per fixture it runs on, and a
-* nondeterminism bug is a property of a code path, not a specific fixture - the per-language sample
-* exercises every language's pipeline the same way the full corpus would.
-*
-* Shared by `assert_matches_human_mapping` (which just turns a non-empty result into a test
-* failure) and the `benchmark_optimal_solutions` binary (which wants the raw count across every
-* fixture, not a single pass/fail).
+* For [`crate::test::helper::UNIT_TEST_FIXTURES`], also diffs two more fresh parses and compares
+* all three runs by path: `diff_code` must be a pure function of its source, and a difference
+* means some pass depends on hash iteration order or node ids. Sampled because it quadruples the
+* cost, and nondeterminism belongs to a code path, which the per-language sample exercises.
 */
 pub fn compute_mismatches(name: &str) -> Result<Vec<String>> {
     compute_mismatches_with_config(name, &crate::diff::HeuristicConfig::default())
 }
 
-/// Same as [`compute_mismatches`], but forwards `config` to [`compute_mismatches_for_with_config`]
-/// - see [`crate::diff::HeuristicConfig`] for what it's for. Used by
-///   `benchmark_optimal_solutions --details --no-solver-X`.
+/// [`compute_mismatches`] with `config` (`benchmark_optimal_solutions --no-solver-X`).
 pub fn compute_mismatches_with_config(
     name: &str,
     config: &crate::diff::HeuristicConfig,
@@ -2715,8 +2286,7 @@ pub fn compute_mismatches_with_config(
     compute_mismatches_for_with_config(name, before, after, config)
 }
 
-/// Same as [`compute_mismatches_with_config`], but via [`compute_visible_mismatches_for_with_config`]
-/// - loads `name`'s before/after pair itself rather than requiring the caller to already have it.
+/// [`compute_mismatches_with_config`] reporting only visible mismatches.
 pub fn compute_visible_mismatches_with_config(
     name: &str,
     config: &crate::diff::HeuristicConfig,
@@ -2725,42 +2295,24 @@ pub fn compute_visible_mismatches_with_config(
     compute_visible_mismatches_for_with_config(name, before, after, config)
 }
 
-/**
-* Total number of AST nodes across both `before` and `after` - the denominator
-* `benchmark_optimal_solutions` uses to turn a fixture's absolute mismatch count into a relative
-* percentage, so a 3-mismatch fixture with 20 nodes and a 3-mismatch fixture with 2000 nodes don't
-* read as equally bad.
-*/
+/// Total AST nodes across `before` and `after` - the denominator of a mismatch percentage.
 pub fn total_node_count_for(before: &crate::code::Code, after: &crate::code::Code) -> usize {
     let node_cache = NodeCache::build(before, after);
     node_cache.before.len() + node_cache.after.len()
 }
 
 /**
-* How many node slots the human mapping actually *grades*, in the same "before nodes + after
-* nodes" unit as [`total_node_count_for`].
+* How many node slots the human mapping actually *grades*, in the unit of
+* [`total_node_count_for`].
 *
-* This exists because the two are not the same number, and the mismatch percentage divides one by
-* the other. A mismatch can only ever arise on a node the annotation names, but the denominator is
-* every node in both trees - and the ground-truth vocabulary grades its two ends asymmetrically:
-* `DeleteWithChildren`/`InsertWithChildren` are validated across the whole subtree
-* (`check_subtree_maps_to_zero`), while `Identical`/`Update`/`MatchButNotIdentical` check only the
-* single pair named, no descendants. So one depth-1 `identical` entry over a 5,000-node function
-* grades one pair and puts 10,000 nodes into the denominator.
+* The two differ because grading is asymmetric: `*WithChildren` entries are checked over their
+* whole subtree, pair entries only for the pair named. One `identical` entry over a large
+* function grades one pair and puts the whole function in the denominator, so a low mismatch rate
+* can mean "barely graded" rather than "nearly perfect".
 *
-* The effect is large and uneven: on 2026-09-02, `rust-real-logic-change-in-a-huge-75k-node-file`
-* named 462 entries against 153,129 nodes and reported 0.01%, while its own row showed an
-* algorithm cost of 6506 against a human cost of 7. 42 of 512 fixtures grade under 90%. Reporting
-* this alongside the percentage is what makes a low rate readable as "barely graded" rather than
-* "nearly perfect" - notably for `VISIBLE_RATE_GOAL`, which such a fixture passes for free.
-*
-* Counted per entry the same way the grading does, so the two stay in step:
-* `Identical`/`Update`/`MatchButNotIdentical` grade one node on each side (2 slots); `Delete` and
-* `Insert` grade one; the `*WithChildren` forms grade their whole subtree. Groups arrive already
-* expanded into representative entries, exactly as in [`human_mapping_cost`].
-*
-* This is a coverage measure, not a validator: an unresolvable path contributes what it can rather
-* than failing, since `check_entry` is what rejects a malformed mapping.
+* Counted per entry as grading counts it: pairs 2 slots, `Delete`/`Insert` 1, `*WithChildren`
+* their subtree; groups via representative entries. A coverage measure, not a validator: an
+* unresolvable path contributes what it can.
 */
 pub fn graded_node_count(
     mapping: &HumanMapping,
@@ -2780,9 +2332,8 @@ pub fn graded_node_count(
             | HumanOperation::Update
             | HumanOperation::MatchButNotIdentical => 2,
             HumanOperation::Delete | HumanOperation::Insert => 1,
-            // Inlined rather than shared through a helper: `PathCache` is invariant over its tree
-            // lifetime, so a closure taking both a `&mut PathCache` and a `Node` cannot tie the
-            // two without threading the lifetime by hand for two call sites.
+            // Inlined: `PathCache` is invariant over its tree lifetime, so a shared closure would
+            // need the lifetime threaded by hand.
             HumanOperation::DeleteWithChildren => match entry.before_path.as_ref() {
                 None => 1,
                 Some(path) => match before_cache.resolve(before_root, &path_refs(path)) {
@@ -2810,8 +2361,7 @@ pub fn graded_node_count(
     Ok(graded)
 }
 
-/// [`graded_node_count`] for a caller that has only a fixture name and a `Code` pair - same
-/// convenience wrapper shape as [`human_mapping_cost_for`].
+/// [`graded_node_count`] for fixture `name`.
 pub fn graded_node_count_for(
     name: &str,
     before: &crate::code::Code,
@@ -2831,9 +2381,8 @@ pub fn graded_node_count_for(
     )
 }
 
-/// Reduces one side's `TextOperation`s to "touched or not" - the only signal comparable against a
-/// line-only external tool (e.g. Unix `diff`), which has no notion of an AST node at all, only
-/// "this line differs."
+/// Reduces one side's `TextOperation`s to "touched or not", the only signal a line-only tool
+/// also has.
 fn touched(ops: &[crate::diff::text::TextOperation]) -> Vec<bool> {
     ops.iter()
         .map(|op| *op != crate::diff::text::TextOperation::Identical)
@@ -2841,14 +2390,8 @@ fn touched(ops: &[crate::diff::text::TextOperation]) -> Vec<bool> {
 }
 
 /**
-* Projects `ast_diff` down to per-line touched masks for both sides, via `TextDiff`/
-* `line_operations` - the same path both codediff's own diff and a synthetic human-mapping diff
-* (see [`as_ast_diff`]) go through, so any two diffs of the same before/after pair reduce to line
-* labels identically and are safe to compare with [`line_disagreement_count`].
-*
-* Shared by `benchmark_other` (scores several external line-only tools this way) and
-* [`line_mismatches_for`] below (the "codediff mismatches"/"unix diff mismatches" columns
-* `generate_mapping_site` puts on its index page) - kept in one place so the two can't drift.
+* Per-line touched masks for both sides of `ast_diff`, via `TextDiff`/`line_operations`, so any
+* two diffs of one pair reduce to line labels identically (see [`line_disagreement_count`]).
 */
 pub fn touched_lines(
     before: &crate::code::Code,
@@ -2864,9 +2407,7 @@ pub fn touched_lines(
     (touched(&before_ops), touched(&after_ops))
 }
 
-/// Number of positions where `a` and `b` disagree. Panics on a length mismatch - `a`/`b` always
-/// come from splitting the exact same `contents` string on `'\n'`, so their lengths can never
-/// legitimately differ.
+/// Number of positions where `a` and `b` disagree. Panics on a length mismatch.
 pub fn line_disagreement_count(a: &[bool], b: &[bool]) -> usize {
     assert_eq!(
         a.len(),
@@ -2876,38 +2417,22 @@ pub fn line_disagreement_count(a: &[bool], b: &[bool]) -> usize {
     a.iter().zip(b).filter(|(x, y)| x != y).count()
 }
 
-/// One AST node's extent, for the node-granularity counterpart of [`touched_lines`].
-///
-/// `range` is in the same row/column space `TextRange` uses everywhere else in this codebase -
-/// tree-sitter's own rows and *byte* columns, passed through unchanged by
-/// [`TextRange::from_treesitter_range`].
+/// One AST node's extent, in `TextRange`'s row/byte-column space, for the node-granularity
+/// counterpart of [`touched_lines`].
 pub struct NodeExtent {
     pub range: crate::diff::text_range::TextRange,
-    /// Whether this node has no children. Leaves are the granularity every AST-aware external
-    /// tool in `benchmark_other` actually reports at, and the only nodes whose extents don't
-    /// nest, so they're scored separately from the all-nodes count - see
-    /// [`nodes_touched_by`]'s doc comment.
+    /// Whether this node has no children. Leaves are what AST-aware external tools report at and
+    /// the only extents that do not nest, so they are scored separately.
     pub is_leaf: bool,
-    /// This node's own tree-sitter id, so a caller can cross-reference the extent against an
-    /// id-keyed set - specifically [`crate::diff::nodes::structurally_visible_node_ids`], for the
-    /// visible-only view of the same scoring (see `benchmark_other`'s `visible_filter`).
-    /// Carried on the extent rather than left to the caller to recompute by re-walking in the
-    /// same order: [`node_extents`]'s traversal pushes children reversed onto a stack, which is
-    /// *not* the order `structurally_visible_node_ids`'s own walk uses, so any attempt to zip the two by
-    /// position would silently misattribute visibility to the wrong node.
+    /// This node's tree-sitter id, for cross-referencing
+    /// [`crate::diff::nodes::structurally_visible_node_ids`]. Carried here because that walk's order
+    /// differs from [`node_extents`]', so zipping by position would misattribute visibility.
     pub node_id: usize,
 }
 
-/// Every node of `code`'s AST, in a deterministic preorder walk.
-///
-/// The same node *set* [`crate::diff::NodeCache`] caches (every node, named and anonymous), so
-/// `node_extents(before).len() + node_extents(after).len()` equals
-/// [`total_node_count_for`]`(before, after)` - the two are used as numerator and denominator of
-/// the same ratio, so they must agree on what counts as a node. Deliberately preorder (not
-/// `NodeCache`'s own iteration order, which is an unordered `FxHashMap`): two labelings of the
-/// same file have to be index-comparable, which a hash map can't guarantee.
-///
-/// Empty (no AST parsed) for a `Code` with no tree-sitter grammar.
+/// Every node of `code`'s AST, in deterministic preorder (so two labelings are index-comparable).
+/// The same node set as [`crate::diff::NodeCache`], so both sides' lengths sum to
+/// [`total_node_count_for`]. Empty without an AST.
 pub fn node_extents(code: &crate::code::Code) -> Vec<NodeExtent> {
     let Some(ast) = code.ast.as_ref() else {
         return Vec::new();
@@ -2937,21 +2462,12 @@ pub fn node_extents(code: &crate::code::Code) -> Vec<NodeExtent> {
     extents
 }
 
-/// One bool per entry of `extents`: whether any range in `spans` overlaps that node's extent -
-/// the node-granularity counterpart of [`touched_lines`]'s per-line bools.
+/// One bool per entry of `extents`: whether any range in `spans` overlaps that node's extent.
 ///
-/// Deliberately a "touched or not" projection, exactly like [`touched_lines`], **not** the
-/// mapping-fidelity metric `benchmark_optimal_solutions` reports for codediff. An external tool
-/// reports changed *regions* of text, not a node-to-node mapping over this codebase's AST (it
-/// has its own tree, with its own node identities), so "which node did this one become" is not a
-/// question any of them can be asked. What they can all be asked is "did you consider this node's
-/// text changed", and that is what this scores - for codediff and the external tools alike, so
-/// the resulting columns are comparable to each other and *not* to the optimal-solutions number.
-///
-/// Whole-extent overlap, so an interior node counts as touched when a change lands anywhere
-/// inside it. That makes every ancestor of a change touched, up to the root - which is why the
-/// all-nodes count is reported alongside a leaves-only one (`is_leaf`): the leaf count isolates
-/// "which tokens did the tool think changed" from "how deep is this grammar's tree."
+/// A "touched or not" projection, **not** the mapping-fidelity metric: external tools report
+/// changed regions over their own trees, so "which node did this become" cannot be asked of them.
+/// Whole-extent overlap makes every ancestor of a change touched, which is why a leaves-only
+/// count is reported beside it.
 pub fn nodes_touched_by(
     extents: &[NodeExtent],
     spans: &[crate::diff::text_range::TextRange],
@@ -2962,13 +2478,9 @@ pub fn nodes_touched_by(
         .collect()
 }
 
-/// The changed (non-`Identical`) ranges on each side of `ast_diff`, as `(before, after)` -
-/// the representation an external tool's own reported regions are normalized into so both can be
-/// fed to [`nodes_touched_by`] and compared.
-///
-/// Used for both the ground truth (a synthetic `ASTDiff` from [`as_ast_diff`]) and codediff's own
-/// output, so the two go through identical machinery and any asymmetry is in the diff itself, not
-/// in how it was measured.
+/// The changed (non-`Identical`) ranges on each side of `ast_diff`, as `(before, after)`, for
+/// [`nodes_touched_by`]. Used for the ground truth and codediff alike, so any asymmetry is in the
+/// diff, not the measurement.
 pub fn changed_spans(
     before: &crate::code::Code,
     after: &crate::code::Code,
@@ -2996,15 +2508,9 @@ pub fn changed_spans(
 }
 
 /**
-* Shells out to the real `diff`, not a reimplementation - the whole point of comparing against it
-* is comparing against the actual tool people run. Writes `before`/`after`'s contents to fresh temp
-* files rather than trusting a fixture's on-disk `before.<lang>.test`/`after.<lang>.test` naming, so
-* this works for any `Code` pair, not just ones that came from a fixture directory.
-*
-* Uses GNU diffutils' `--old-line-format`/`--new-line-format`/`--unchanged-line-format` (`%dn`
-* prints a line's 1-indexed line number) instead of parsing unified-diff hunk headers by hand - two
-* invocations (one per side), each printing exactly the touched line numbers on that side and
-* nothing else.
+* Per-line touched masks from the real GNU `diff` (the tool people actually run), via
+* `--*-line-format` with `%dn` rather than parsing hunk headers. Writes `before`/`after` to temp
+* files, so any `Code` pair works.
 */
 pub fn unix_diff_line_labels(
     before: &crate::code::Code,
@@ -3044,9 +2550,8 @@ pub fn unix_diff_line_labels(
     Ok((before_touched, after_touched))
 }
 
-/// Runs `diff` with the given `--*-line-format` flags (see [`unix_diff_line_labels`]) and turns
-/// its stdout - one 1-indexed line number per line - into a 0-indexed `line_count`-long touched
-/// mask.
+/// Runs `diff` with the given `--*-line-format` flags and turns its 1-indexed line numbers into a
+/// 0-indexed `line_count`-long touched mask.
 fn touched_line_numbers(
     format_flags: &[&str],
     before_path: &std::path::Path,
@@ -3059,8 +2564,7 @@ fn touched_line_numbers(
         .arg(after_path)
         .output()
         .context("running `diff` - is diffutils installed?")?;
-    // diff exits 0 for "no differences" and 1 for "differences found" - both are success for our
-    // purposes. 2+ is a real error (bad flags, unreadable file, ...).
+    // Exit 1 means "differences found"; 2+ is a real error.
     if output.status.code().is_none_or(|c| c > 1) {
         bail!(
             "diff exited with {:?}: {}",
@@ -3085,30 +2589,18 @@ fn touched_line_numbers(
     Ok(touched)
 }
 
-/// Line-level mismatch counts for one fixture, both against the human-authored mapping's own
-/// per-line projection (see [`touched_lines`]) - `codediff` and `unix_diff` are directly
-/// comparable to each other (same `total_lines` denominator, same projection method), which is the
-/// whole point: unlike an AST-node mismatch count, a line mismatch count is meaningful for a
-/// line-only tool like Unix `diff` too.
+/// Line-level mismatch counts for one fixture against the human mapping's per-line projection.
+/// Unlike node mismatches, meaningful for a line-only tool like Unix `diff` too.
 pub struct LineMismatches {
     pub codediff: usize,
     pub unix_diff: usize,
-    /// `before`'s line count plus `after`'s - the denominator both `codediff` and `unix_diff` are
-    /// counted out of.
+    /// `before`'s line count plus `after`'s - the denominator of both counts.
     pub total_lines: usize,
 }
 
 /**
-* The human mapping's own per-line touched/untouched projection (see [`touched_lines`]), plus the
-* [`NodeCache`] built along the way - handed back, not just consumed internally, because every
-* caller of this function goes on to project a *second* diff (codediff's own, or an external
-* tool's) onto the same `before`/`after` pair via [`touched_lines`], which also needs a
-* `NodeCache` - returning the one already built here means that second projection doesn't need its
-* own separate `NodeCache::build` call.
-*
-* Shared by `benchmark_other`'s `score_fixture`/`print_details` and [`line_mismatches_for_mapping`]
-* below, which otherwise each repeated this exact "resolve the human mapping against a fresh
-* `ASTDiff`, then reduce it to per-line labels" recipe independently.
+* The human mapping's per-line projection (see [`touched_lines`]), plus the [`NodeCache`] built
+* for it, which the caller reuses to project a second diff onto the same pair.
 */
 pub fn human_touched_lines_for_mapping(
     mapping: &HumanMapping,
@@ -3121,10 +2613,7 @@ pub fn human_touched_lines_for_mapping(
     Ok((human_before, human_after, node_cache))
 }
 
-/// Same as [`human_touched_lines_for_mapping`], but loads `name`'s `human_mapping.json` itself
-/// rather than taking an already-loaded [`HumanMapping`] - see [`as_ast_diff_for_mapping`]'s doc
-/// comment for why a caller that already has the mapping in hand should prefer the `_for_mapping`
-/// form instead.
+/// [`human_touched_lines_for_mapping`] loading `name`'s mapping itself.
 pub fn human_touched_lines_for(
     name: &str,
     before: &crate::code::Code,
@@ -3135,16 +2624,8 @@ pub fn human_touched_lines_for(
 }
 
 /**
-* Computes [`LineMismatches`] for one fixture: codediff's own diff and Unix `diff`, each reduced to
-* per-line touched/untouched labels and compared against the human mapping's own projection of the
-* same shape (see [`touched_lines`]/[`as_ast_diff`]).
-*
-* This is deliberately narrower than `benchmark_other`'s full `ExternalTool` comparison (which also
-* covers GumTree, difftastic, and diffsitter) - those each need a separately-installed, non-Cargo
-* binary pointed at by an environment variable, which `generate_mapping_site` (the only caller of
-* this function, for its index page's sortable "codediff mismatches"/"unix diff mismatches"
-* columns) can't assume is present. Unix `diff` alone needs nothing beyond the `diff` binary every
-* CI runner and dev machine already has.
+* [`LineMismatches`] for one fixture: codediff and Unix `diff` against the human mapping. Only
+* Unix `diff`, since other external tools need binaries a caller cannot assume.
 */
 pub fn line_mismatches_for(
     name: &str,
@@ -3155,9 +2636,7 @@ pub fn line_mismatches_for(
     line_mismatches_for_mapping(&mapping, before, after)
 }
 
-/// Same as [`line_mismatches_for`], but takes an already-loaded [`HumanMapping`] instead of
-/// loading `name`'s file itself - see [`as_ast_diff_for_mapping`]'s doc comment for why a caller
-/// that already has the mapping in hand should prefer this.
+/// [`line_mismatches_for`] for an already-loaded [`HumanMapping`].
 pub fn line_mismatches_for_mapping(
     mapping: &HumanMapping,
     before: &crate::code::Code,
@@ -3187,16 +2666,7 @@ pub fn line_mismatches_for_mapping(
     })
 }
 
-/**
-* Same as [`compute_mismatches`], but takes an already-loaded before/after pair instead of looking
-* it up via [`crate::test::helper::handmade_test_code_pair`].
-*
-* Callers that check many fixtures in a loop (e.g. `benchmark_optimal_solutions`) should load the
-* full `handmade_test_code_pairs()` map once and call this directly with a borrowed pair, rather
-* than going through `compute_mismatches` once per fixture - that map clone is O(fixture count)
-* work just to reach a single entry, whereas `handmade_test_code_pair` only pays for the one
-* fixture it's asked for.
-*/
+/// [`compute_mismatches`] for an already-loaded before/after pair.
 pub fn compute_mismatches_for(
     name: &str,
     before: &crate::code::Code,
@@ -3210,9 +2680,7 @@ pub fn compute_mismatches_for(
     )
 }
 
-/// Same as [`compute_mismatches_for`], but computes codediff's diff (and its determinism check)
-/// via [`crate::diff::diff_code_with_config`] - see [`crate::diff::HeuristicConfig`] for what
-/// `config` is for. Used by `benchmark_optimal_solutions --no-solver-X`'s ablation study.
+/// [`compute_mismatches_for`] with `config` (`benchmark_optimal_solutions --no-solver-X`).
 pub fn compute_mismatches_for_with_config(
     name: &str,
     before: &crate::code::Code,
@@ -3227,12 +2695,8 @@ pub fn compute_mismatches_for_with_config(
     )
 }
 
-/// Same as [`compute_mismatches_for_with_config`], but keeps each mismatch's [`Mismatch::node_id`]/
-/// [`Mismatch::side`] instead of collapsing straight to its message - what
-/// `compute_mismatches_for_with_config` itself is now a thin wrapper around. Exists so a caller
-/// (e.g. `benchmark_optimal_solutions`) can cross-reference each mismatch against
-/// [`crate::diff::nodes::structurally_visible_node_ids`] to separate mismatches on rendered, user-visible nodes
-/// from ones on invisible structural scaffolding - see [`Mismatch`]'s own doc comment.
+/// [`compute_mismatches_for_with_config`] keeping each mismatch's [`Mismatch::node_id`] and
+/// [`Mismatch::side`], so a caller can separate visible mismatches from scaffolding.
 pub fn compute_mismatches_detailed_for_with_config(
     name: &str,
     before: &crate::code::Code,
@@ -3245,12 +2709,8 @@ pub fn compute_mismatches_detailed_for_with_config(
     compute_mismatches_detailed_with_diff(name, before, after, &diff_ast, &node_cache, config)
 }
 
-/// [`compute_mismatches_detailed_for_with_config`]'s actual body, taking an already-computed
-/// `diff_ast`/`node_cache` instead of running `diff_code_with_config` itself - lets
-/// [`compute_visible_mismatches_for_with_config`] reuse the one diff run for both the mismatch
-/// check and [`crate::diff::nodes::structurally_visible_node_ids`], rather than paying for `diff_code_with_config`
-/// twice. `compute_mismatches_detailed_for_with_config` itself stays the entry point for a caller
-/// that doesn't already have a diff to hand.
+/// [`compute_mismatches_detailed_for_with_config`]'s body over an already computed diff, so
+/// [`compute_visible_mismatches_for_with_config`] diffs once.
 fn compute_mismatches_detailed_with_diff(
     name: &str,
     before: &crate::code::Code,
@@ -3261,15 +2721,8 @@ fn compute_mismatches_detailed_with_diff(
 ) -> Result<Vec<Mismatch>> {
     let mapping = load(name)?;
     let language = before.metadata.language.unwrap_or_default();
-    // Sampled, not run for every fixture: the determinism check alone triples the diff pipeline's
-    // cost (3 extra full runs on top of the real one above), and a nondeterminism bug (unordered
-    // HashMap/HashSet iteration, an arena node ID used as a sort key) is a property of a *code
-    // path*, not a specific fixture - the per-language `UNIT_TEST_FIXTURES` sample exercises every
-    // language's pipeline the same way the full corpus would, at a fraction of the cost. See
-    // TODO.md's 2026-08-08 entry for the corpus-wide timing that motivated this.
-    //
-    // Neither of these two checks is about any one node, so both get the `(0, Side::Before)`
-    // sentinel - see `Mismatch`'s own doc comment.
+    // Determinism check sampled - see `compute_mismatches`. Neither check is about one node, so
+    // both use the `(0, Side::Before)` sentinel.
     let mut mismatches: Vec<Mismatch> = if crate::test::helper::UNIT_TEST_FIXTURES.contains(&name) {
         describe_nondeterminism_with_config(&before.contents, &after.contents, &language, config)
             .into_iter()
@@ -3283,7 +2736,6 @@ fn compute_mismatches_detailed_with_diff(
         Vec::new()
     };
 
-    // Check that the produced diff is valid
     if !diff_ast.is_valid(before, after, node_cache) {
         mismatches.push(Mismatch {
             message: "The produced diff is not valid according to ASTDiff::is_valid".to_string(),
@@ -3325,12 +2777,10 @@ fn compute_mismatches_detailed_with_diff(
     Ok(mismatches)
 }
 
-/// [`compute_mismatches_detailed_for_with_config`]'s mismatches, split by whether each one's node
-/// is *visible* - i.e. it carries text of its own, per
-/// [`crate::diff::nodes::is_structurally_visible`] - plus the total visible node count on each
-/// side, the denominator a raw visible-mismatch count needs to be read as a rate rather than an
-/// absolute. Structural, so nothing about the diff being scored can move either number. A mismatch with the `node_id: 0` sentinel (not about any single node - the
-/// nondeterminism check, `ASTDiff::is_valid`, a malformed multi-map group) is never visible.
+/// [`compute_mismatches_detailed_for_with_config`]'s mismatches split by whether each one's node
+/// is *visible* (carries text of its own, per [`crate::diff::nodes::is_structurally_visible`]),
+/// plus each side's visible node count as the denominator. A `node_id: 0` mismatch is never
+/// visible.
 pub struct VisibleMismatches {
     pub visible: Vec<Mismatch>,
     pub invisible: Vec<Mismatch>,
@@ -3338,13 +2788,9 @@ pub struct VisibleMismatches {
     pub after_visible_node_count: usize,
 }
 
-/// Runs a single `diff_code_with_config`/`NodeCache::build` and shares it between the mismatch
-/// check and [`crate::diff::nodes::structurally_visible_node_ids`] - unlike `benchmark_optimal_solutions`'s own
-/// "each computation gets its own independent diff_code call" convention (see that binary's
-/// `algorithm_cost_for`/`elapsed_ms_for` doc comments), this function is also the body of every
-/// generated `optimal_solutions/<name>.rs` test (via [`assert_matches_human_mapping_within_limit`]),
-/// so it runs once per fixture on every `cargo test` - doubling the diff cost there isn't a
-/// negotiable "interactive tool" trade-off the way it is in that benchmark binary.
+/// Runs one diff and shares it between the mismatch check and
+/// [`crate::diff::nodes::structurally_visible_node_ids`]: this is the body of every fixture test,
+/// so a second diff would double the suite's cost.
 pub fn compute_visible_mismatches_for_with_config(
     name: &str,
     before: &crate::code::Code,
@@ -3383,33 +2829,21 @@ pub fn compute_visible_mismatches_for_with_config(
 }
 
 /**
-* Loads the human mapping for `name`, computes codediff's own diff for the same test case, and
-* checks that every human-authored decision holds in codediff's output.
-*
-* This is the whole body of the generated `optimal_solutions/<name>.rs` tests: `human_solver`
-* writes a human_mapping.json file, and each of those tests just calls this function. Reports every
-* mismatch at once (rather than failing on the first one), since the point of these tests is to see
-* the full extent of any disagreement between codediff and the human-authored optimum.
+* Checks that every decision in `name`'s human mapping holds in codediff's diff, reporting every
+* mismatch at once.
 */
 pub fn assert_matches_human_mapping(name: &str) -> Result<()> {
     assert_matches_human_mapping_within_limit(name, 0, 0)
 }
 
 /**
-* Same as [`assert_matches_human_mapping`], but allows up to `upper_limit_of_mismatched_nodes`
-* total mismatches and up to `upper_limit_of_visible_mismatched_nodes` *visible* mismatches
-* (see [`VisibleMismatches`]/[`crate::diff::nodes::structurally_visible_node_ids`]) instead of requiring an exact
-* match. Fails if *either* limit is exceeded - the two are independent bars, not one derived from
-* the other, since a fixture can regress on one without moving the other at all (e.g. a fix that
-* turns invisible mismatches visible without changing the total).
+* [`assert_matches_human_mapping`] allowing up to `upper_limit_of_mismatched_nodes` total and
+* `upper_limit_of_visible_mismatched_nodes` *visible* mismatches (see [`VisibleMismatches`]).
+* Either limit failing fails: they are independent, since a change can turn invisible mismatches
+* visible without moving the total.
 *
-* For fixtures where codediff's mapping has a known, understood gap against the human-authored
-* mapping (documented in `TODO.md` - an objective-wall gap, a premature-pruning architecture
-* issue, etc. - not a bug that's simply unfixed), pin both limits to today's actual counts. The
-* test still catches *regressions* (either count increasing past its limit) without blocking the
-* suite on a fix that doesn't exist yet. When a fix does land for one of these gaps, lower the
-* limit(s) (or switch back to [`assert_matches_human_mapping`] if both reach 0) so the test keeps
-* the new bar.
+* A clamp records today's count for a known gap, so the test still catches regressions. Lower it
+* when a fix lands, and switch to [`assert_matches_human_mapping`] at zero.
 */
 pub fn assert_matches_human_mapping_within_limit(
     name: &str,
@@ -3456,28 +2890,16 @@ pub fn assert_matches_human_mapping_within_limit(
     Ok(())
 }
 
-/// The mapping limit every fixture test file records for its fixture, read straight out of
-/// the stub sources.
+/// The mapping limit each fixture stub records, read from the stub sources - the single source
+/// of truth, which `benchmark_optimal_solutions --write-baseline` projects into
+/// `quality_baseline.csv` so a limit only moves by editing its stub.
 ///
-/// **The stubs are the single source of truth for how far codediff may be from the human mapping**,
-/// and this is what lets everything else be a projection of them rather than a second copy.
-/// Hand-maintained alongside these limits, `quality_baseline.csv`'s two accuracy columns drift
-/// from them and have to be edited in lockstep. `benchmark_optimal_solutions --write-baseline`
-/// fills those columns from here instead, so the only way to move a limit is to edit the stub -
-/// the file that also holds the prose explaining *why* it moved, and that no tool rewrites.
-///
-/// Two call shapes, both written by `human_solver`'s own `ensure_stub_test`, so the parse is
-/// against generated text rather than free-form code:
-///
-///   * `assert_matches_human_mapping("name")` - an exact fixture, limit `(0, 0)`.
-///   * `assert_matches_human_mapping_within_limit("name", total, visible)` - a clamped one.
-///
-/// A stub matching neither is skipped rather than guessed at: `rust_hash_optimization.rs` is
-/// hand-written and asserts specific mappings directly, so it has no single limit to report and is
-/// not gated by one.
+/// Parses the two call shapes `human_solver`'s `ensure_stub_test` writes:
+/// `assert_matches_human_mapping("name")` -> `(0, 0)`, and
+/// `assert_matches_human_mapping_within_limit("name", total, visible)`. A stub matching neither
+/// (the hand-written `rust_hash_optimization.rs`) is skipped, not guessed at.
 pub fn stub_mapping_limits() -> Result<HashMap<String, (usize, usize)>> {
-    // Deliberately whitespace-tolerant on either side of the arguments: rustfmt breaks the call
-    // across lines once the fixture name is long enough, which is most of them.
+    // Whitespace-tolerant: rustfmt breaks long calls across lines.
     let exact = regex::Regex::new(r#"assert_matches_human_mapping\(\s*"([^"]+)"\s*,?\s*\)"#)
         .expect("valid regex");
     let clamped = regex::Regex::new(
@@ -3540,8 +2962,7 @@ mod tests {
         }
     }
 
-    /// Columns are **byte** offsets, matching `TextRange` - the trap a char/byte mix-up sets is
-    /// invisible on ASCII and silently shifts every span past the first multi-byte character.
+    /// Columns are **byte** offsets: a char/byte mix-up is invisible on ASCII.
     #[test]
     fn span_text_uses_byte_columns_and_an_exclusive_end() {
         let contents = "let é = 1;\nsecond line\nthird\n";
@@ -3553,15 +2974,13 @@ mod tests {
         assert_eq!(span_text(contents, span(1, 0, 2, 0)), Some("second line\n"));
         // Multi-row.
         assert_eq!(span_text(contents, span(0, 9, 1, 6)), Some("1;\nsecond"));
-        // Past the end of a row, and past the end of the file, are both absent rather than
-        // clamped - a span that doesn't fit means the file changed underneath the mapping.
+        // Absent rather than clamped: a span that does not fit means the file changed.
         assert_eq!(span_text(contents, span(2, 0, 2, 99)), None);
         assert_eq!(span_text(contents, span(99, 0, 99, 1)), None);
         // Mid-character is refused rather than panicking on the slice.
         assert_eq!(span_text(contents, span(0, 5, 0, 6)), None);
     }
 
-    /// The derivation that is the whole reason a human is only asked for three operations.
     #[test]
     fn a_match_derives_move_from_identical_text_and_update_from_differing_text() {
         let before = "alpha\nbeta\n";
@@ -3590,8 +3009,6 @@ mod tests {
         );
     }
 
-    /// The shape this entry type exists for: several occurrences on one side corresponding to
-    /// several on the other, with no claim about which pairs with which.
     #[test]
     fn a_match_may_be_n_to_m_when_each_side_reads_the_same() {
         let before = "foo\nfoo\nfoo\n";
@@ -3627,9 +3044,8 @@ mod tests {
         );
     }
 
-    /// The invariant that makes an unspecified pairing sound. Spans that read differently are
-    /// unrelated ranges wearing a group's clothes, and pairing them would assert a correspondence
-    /// nobody established - so this is an error, not a silently-picked first span.
+    /// The invariant that makes an unspecified pairing sound: an error, not a silently picked
+    /// first span.
     #[test]
     fn a_match_whose_spans_disagree_within_one_side_is_rejected() {
         let before = "foo\nqux\n";
@@ -3649,9 +3065,6 @@ mod tests {
         assert!(err.contains("foo") && err.contains("qux"), "got: {err}");
     }
 
-    /// A one-sided entry may also cover several spans - the same token removed in three places is
-    /// one decision. No identity constraint there: with nothing to pair against, spans that read
-    /// differently assert nothing unsound.
     #[test]
     fn a_delete_may_cover_several_spans() {
         let before = "foo\nbar\n";
@@ -3663,7 +3076,7 @@ mod tests {
             after: vec![],
         };
 
-        // Deliberately differing text, to pin that the Match-only invariant is not applied here.
+        // Differing text: the Match-only identity invariant does not apply here.
         assert_eq!(
             entry.verdict(before, after).unwrap(),
             HumanTextVerdict::Delete
@@ -3690,8 +3103,7 @@ mod tests {
         assert!(outside.verdict(before, after).is_err());
     }
 
-    /// A file with no text mapping must still round-trip byte-for-byte: every fixture in the
-    /// corpus predates this field, and re-saving one from the solver must not rewrite them all.
+    /// A file with no text mapping round-trips byte-for-byte.
     #[test]
     fn a_mapping_without_a_text_painting_serializes_without_the_key() {
         let mapping = HumanMapping {
@@ -3725,9 +3137,8 @@ mod tests {
         }
     }
 
-    /// A preset may carry several *alternative* readings, named `Minimal (left)` and
-    /// `Minimal (right)`. Deleting one of two identical substrings is the shape that needs it:
-    /// both readings are correct and nothing in the text can choose between them.
+    /// A preset may carry several *alternative* readings (`Minimal (left)`, `Minimal (right)`),
+    /// e.g. deleting one of two identical substrings.
     #[test]
     fn a_preset_collects_every_alternative_named_for_it() {
         let mapping = named(&["Minimal (left)", "Minimal (right)", "Full"]);
@@ -3748,15 +3159,12 @@ mod tests {
         assert!(designates_preset("Minimal", "Minimal"));
         assert!(designates_preset("Minimal (left)", "Minimal"));
         assert!(designates_preset("Minimal but only the strings", "Minimal"));
-        // Not a qualifier - a different word that merely starts the same way. Without this,
-        // "Minimalist" would be graded as an answer for `Minimal`.
+        // Not a qualifier: a different word that starts the same way.
         assert!(!designates_preset("Minimalist", "Minimal"));
         assert!(!designates_preset("Full", "Minimal"));
         assert!(!designates_preset("", "Minimal"));
     }
 
-    /// A single painting still answers for both presets - that is what painting a fixture once
-    /// claims - and the name it happens to carry is irrelevant to that.
     #[test]
     fn a_single_painting_answers_for_either_preset_whatever_it_is_called() {
         let mapping = named(&["Only one solution"]);
@@ -3780,8 +3188,7 @@ mod tests {
         assert!(message.contains("Something else"), "got: {message}");
     }
 
-    /// `None` and `Some(empty)` have to stay distinguishable: "nobody has painted this" is not
-    /// "somebody painted it and there was nothing to paint".
+    /// "Nobody has painted this" is not "painted, and nothing to paint".
     #[test]
     fn a_named_but_empty_painting_is_distinguishable_from_no_painting_at_all() {
         let mapping = HumanMapping {
@@ -3804,8 +3211,7 @@ mod tests {
 
     #[test]
     fn text_mapping_disagreements_reports_nothing_when_the_two_accounts_agree() {
-        // A one-token edit: `1` becomes `2`. The tree mapping calls the integer an Update; the
-        // painted mapping says the same thing about the same bytes.
+        // `1` becomes `2`: the tree mapping and the painting both call the integer an Update.
         let before = crate::code::Code::from_string("let x = 1;\n", &crate::code::Language::Rust);
         let after = crate::code::Code::from_string("let x = 2;\n", &crate::code::Language::Rust);
         let mut mapping = build_full_identical_mapping(&before, &after);
@@ -3858,8 +3264,7 @@ mod tests {
             !disagreements.is_empty(),
             "painting the wrong token should disagree with the tree mapping"
         );
-        // Both directions show up: text the painter called changed and the tree did not, and text
-        // the tree called changed and the painter did not.
+        // Both directions: changed per the painter only, and per the tree only.
         assert!(
             disagreements
                 .iter()
@@ -3874,8 +3279,8 @@ mod tests {
         );
     }
 
-    /// A tree mapping pairing each side's root, used by the disagreement tests above so they
-    /// exercise the real `as_ast_diff_for_mapping` -> `TextDiff` projection rather than a stub.
+    /// A tree mapping pairing each side's root, so the disagreement tests exercise the real
+    /// `as_ast_diff_for_mapping` -> `TextDiff` projection.
     fn build_full_identical_mapping(
         before: &crate::code::Code,
         after: &crate::code::Code,
@@ -3918,9 +3323,6 @@ mod tests {
         }
     }
 
-    /// Same convention as `generate_mapping_site.rs`'s and `human_solver.rs`'s own `parse_rust`
-    /// test helpers - a one-line stand-in for the `Parser::new`/`set_language`/`parse` sequence
-    /// this module's tests would otherwise repeat by hand.
     fn parse_rust(source: &str) -> tree_sitter::Tree {
         let mut parser = tree_sitter::Parser::new();
         parser
@@ -3967,8 +3369,7 @@ mod tests {
 
     #[test]
     fn deserializes_legacy_json_with_no_groups_key_as_empty_groups() -> Result<()> {
-        // The exact shape every `human_mapping.json` had before `groups` existed - every one of
-        // the 220+ files on disk right now looks like this.
+        // A mapping file without `groups`, as most fixtures' are.
         let json = r#"{"entries":[]}"#;
         let mapping: HumanMapping = serde_json::from_str(json)?;
         assert!(mapping.groups.is_empty());
@@ -3977,8 +3378,7 @@ mod tests {
 
     #[test]
     fn serializing_a_mapping_with_no_groups_omits_the_groups_key() -> Result<()> {
-        // The other half of backward compatibility: an untouched fixture must re-save
-        // byte-for-byte identical to before `groups` existed, not grow a `"groups": []` no-op.
+        // An untouched fixture must not grow a `"groups": []` on re-save.
         let mapping = HumanMapping::default();
         let json = serde_json::to_string(&mapping)?;
         assert!(
@@ -3990,8 +3390,7 @@ mod tests {
 
     #[test]
     fn resaving_an_existing_fixture_produces_byte_identical_json() -> Result<()> {
-        // The concrete proof that adding `groups` doesn't touch any of the 220+ fixtures that
-        // don't use it: load a real one, re-serialize it the same way `save()` does, and diff.
+        // A real fixture re-serialized the way `save()` does.
         let original = fs::read_to_string(mapping_path("rust-add-if"))?;
         let mapping: HumanMapping = serde_json::from_str(&original)?;
         assert!(
@@ -4069,8 +3468,7 @@ mod tests {
 
     #[test]
     fn line_mismatches_for_is_zero_for_a_fixture_codediff_solves_exactly() -> Result<()> {
-        // rust-no-change is fully identical before/after, so codediff and Unix diff both agree
-        // with the (trivially all-untouched) human mapping perfectly.
+        // rust-no-change is fully identical, so both agree with the all-untouched human mapping.
         let (before, after) = &*crate::test::helper::handmade_test_code_pair("rust-no-change")?;
 
         let result = line_mismatches_for("rust-no-change", before, after)?;
@@ -4148,9 +3546,7 @@ mod tests {
         assert!(!is_identical_after(after_statements[1], &caches));
         assert!(!is_identical_before(match_but_not_identical_stmt, &caches));
         assert!(!is_identical_after(after_statements[2], &caches));
-        // A node with no entry at all defaults to identical (matches matched nodes' pre-existing
-        // quiet/undecorated rendering when a `Caches` is built by hand rather than via
-        // `rebuild_caches`).
+        // A node with no entry defaults to identical.
         assert!(is_identical_before(before_root, &caches));
 
         assert_eq!(
@@ -4234,9 +3630,7 @@ mod tests {
         let before_ast = before.ast.as_ref().unwrap();
         let root = before_ast.root_node();
 
-        // Build an Identical entry for the root: since before == after, before_root and
-        // after_root are the same path ("source_file:1"), and codediff should have hashed the
-        // whole tree as an identical match.
+        // before == after, so the root is "source_file:1" on both sides.
         let entries = vec![HumanMappingEntry {
             operation: HumanOperation::Identical,
             before_path: Some(path_for_node(root)),
@@ -4315,8 +3709,7 @@ mod tests {
         Ok(())
     }
 
-    /// The `block` directly inside the first (only) function in `root` - a small, reusable stand
-    /// in for "the body of `fn main() { ... }`" that several multi-map tests below need.
+    /// The `block` of the first function in `root`.
     fn function_block(root: Node) -> Node {
         let function_item = root.child(0).unwrap();
         let mut c = function_item.walk();
@@ -4336,8 +3729,7 @@ mod tests {
             .collect()
     }
 
-    /// First node of kind `kind` found by a preorder walk from `root` (`root` itself included).
-    /// Panics if there isn't one - a test-only convenience, not a general-purpose lookup.
+    /// First node of `kind` in preorder from `root` (inclusive). Panics if there is none.
     fn find_first<'a>(root: Node<'a>, kind: &str) -> Node<'a> {
         let mut stack = vec![root];
         while let Some(n) = stack.pop() {
@@ -4352,12 +3744,8 @@ mod tests {
         panic!("no node of kind {kind:?} found under {:?}", root.kind());
     }
 
-    /// Walks `before`'s and `after`'s subtrees in lockstep (same shape, since both come from
-    /// parsing the *same* source text) and adds an `Identical` mapping for every corresponding
-    /// node pair - builds a fully self-consistent baseline `ASTDiff` for
-    /// `check_subtree_maps_within` tests, which (like a real diff that's already passed
-    /// `ASTDiff::is_valid`) need every single descendant, not just the top pair, to have an
-    /// entry - not just the ones a test cares about.
+    /// Maps `before`'s and `after`'s same-shaped subtrees `Identical` node by node, a fully
+    /// self-consistent baseline for closure tests, which need every descendant mapped.
     fn map_identical_subtrees(diff: &mut ASTDiff, before: Node, after: Node) {
         let mut stack = vec![(before, after)];
         while let Some((b, a)) = stack.pop() {
@@ -4379,9 +3767,7 @@ mod tests {
         }
     }
 
-    /// Marks every node in `node`'s subtree (inclusive) deleted (mapped to 0) - the before-side
-    /// counterpart of `map_identical_subtrees`, for building a fully self-consistent "this whole
-    /// subtree is gone" baseline.
+    /// Maps every node in `node`'s subtree (inclusive) to 0.
     fn map_before_subtree_deleted(diff: &mut ASTDiff, node: Node) {
         let mut stack = vec![node];
         while let Some(n) = stack.pop() {
@@ -4674,9 +4060,8 @@ mod tests {
     #[test]
     fn check_group_entry_passes_for_a_real_diff_that_matches_duplicates_within_the_group()
     -> Result<()> {
-        // The motivating case: three identical foo() calls before, two after - codediff (the
-        // real algorithm, not a hand-rolled diff) has to pick *some* two of the three to match
-        // and delete the third, and whichever two it picks should be accepted.
+        // Three identical foo() calls before, two after: whichever two the real algorithm
+        // matches must be accepted.
         let before_source = "fn main() {\n    foo();\n    foo();\n    foo();\n    bar();\n}\n";
         let after_source = "fn main() {\n    bar();\n    foo();\n    foo();\n}\n";
         let before = crate::code::Code::from_string(before_source, &Language::Rust);
@@ -4734,9 +4119,7 @@ mod tests {
     #[test]
     fn check_group_entry_fails_when_codediff_deletes_and_inserts_instead_of_matching() -> Result<()>
     {
-        // Both before foo()s deleted, both after foo()s inserted - each individual node's fate is
-        // locally valid (deleted and inserted are both allowed fates), but the group as a whole
-        // under-matched: with N == M == 2, zero pairs should be left over.
+        // Every node's fate is locally valid, but with N == M == 2 the group under-matched.
         let source = "fn main() {\n    foo();\n    foo();\n}\n";
         let before_tree = parse_rust(source);
         let after_tree = parse_rust(source);
@@ -4879,9 +4262,7 @@ mod tests {
         let mut diff = ASTDiff::default();
         map_identical_subtrees(&mut diff, block_before, block_after);
 
-        // Corrupt: bar();'s own top-level entry now claims it was deleted, even though it's still
-        // sitting inside the matched block's subtree - exactly the leak
-        // `check_subtree_maps_within` exists to catch.
+        // Corrupt: bar(); is marked deleted while still inside the matched block's subtree.
         let bar_before = function_body_statements(before_root)[1];
         diff.add_mapping(
             bar_before.id(),
@@ -4944,9 +4325,8 @@ mod tests {
         map_identical_subtrees(&mut diff, f0, g0);
         map_before_subtree_deleted(&mut diff, f1);
 
-        // Corrupt: f1's own "foo" identifier is left mapped to the survivor's identifier instead
-        // of being deleted along with the rest of f1's subtree - a leftover member under
-        // `with_children` must be *fully* swept, not just its own top node.
+        // Corrupt: a leftover member under `with_children` must be *fully* deleted, not just its
+        // top node.
         let f1_ident = find_first(f1, "identifier");
         let g0_ident = find_first(g0, "identifier");
         diff.add_mapping(
@@ -5106,10 +4486,8 @@ mod tests {
     #[test]
     fn rebuild_caches_for_mapping_reports_group_membership_and_status_for_every_member()
     -> Result<()> {
-        // 3 before foo()s, 2 after foo()s, with_children - one before-foo is a leftover delete,
-        // the other two are matched. `rebuild_caches_for_mapping` should report NodeStatus for all
-        // three the way a plain entry would (Matched or Marked-deleted), AND list all three (not
-        // just the matched pair) in `before_group`/`after_group`.
+        // 3 before, 2 after, with_children: one before-foo is a leftover delete. Every member gets
+        // a plain-entry NodeStatus and appears in `before_group`/`after_group`.
         let before_source = "fn main() {\n    foo();\n    foo();\n    foo();\n}\n";
         let after_source = "fn main() {\n    foo();\n    foo();\n}\n";
         let before_tree = parse_rust(before_source);
@@ -5172,6 +4550,56 @@ mod tests {
         assert_eq!(matched_count, 2);
         assert_eq!(deleted_count, 1);
         Ok(())
+    }
+
+    #[test]
+    fn rebuild_caches_for_mapping_keeps_plain_entries_when_a_group_does_not_resolve() {
+        let source = "fn main() {\n    foo();\n}\n";
+        let before_tree = parse_rust(source);
+        let after_tree = parse_rust(source);
+        let before_root = before_tree.root_node();
+        let after_root = after_tree.root_node();
+        let statement_path = path_for_node(function_body_statements(before_root)[0]);
+
+        let mapping = HumanMapping {
+            entries: vec![HumanMappingEntry {
+                before_path: Some(statement_path.clone()),
+                after_path: Some(statement_path),
+                operation: HumanOperation::Identical,
+            }],
+            groups: vec![MultiMapGroup {
+                before_paths: vec![vec!["no_such_kind:1".to_string()]],
+                after_paths: vec![],
+                operation: HumanOperation::Identical,
+                with_children: false,
+                pairing: GroupPairing::AnyOneToOne,
+            }],
+            text_mappings: vec![],
+        };
+
+        let caches = rebuild_caches_for_mapping(&mapping, before_root, after_root);
+        let statement = function_body_statements(before_root)[0];
+        assert_eq!(status_before(statement, &caches), NodeStatus::Matched);
+        assert!(caches.before_group.is_empty());
+    }
+
+    #[test]
+    fn unmarked_node_count_of_an_empty_mapping_is_every_node() {
+        let tree = parse_rust("fn main() {\n    foo();\n}\n");
+        let root = tree.root_node();
+        let caches = rebuild_caches(&[], root, root);
+
+        let mut every_node = 0;
+        let mut stack = vec![root];
+        while let Some(node) = stack.pop() {
+            every_node += 1;
+            let mut cursor = node.walk();
+            stack.extend(node.children(&mut cursor));
+        }
+        assert_eq!(
+            unmarked_node_count(root, &caches, status_before),
+            every_node
+        );
     }
 
     #[test]
@@ -5263,8 +4691,7 @@ mod tests {
         assert!(report[0].contains("unmapped"), "{}", report[0]);
     }
 
-    /// End-to-end sanity check for `describe_nondeterminism` itself (not just the pure
-    /// comparator): identical source parsed three independent times must fully agree.
+    /// Identical source parsed three independent times must fully agree.
     #[test]
     fn describe_nondeterminism_is_empty_for_stable_source() {
         let report =
@@ -5272,9 +4699,7 @@ mod tests {
         assert!(report.is_empty(), "{report:?}");
     }
 
-    /// `node_extents` must enumerate exactly the node set `total_node_count_for` counts - they're
-    /// used as numerator and denominator of the same ratio, so a disagreement would silently
-    /// scale every node-mismatch rate.
+    /// `node_extents` and `total_node_count_for` are numerator and denominator of one ratio.
     #[test]
     fn node_extents_matches_the_total_node_count_denominator() {
         let before = crate::code::Code::from_string(
@@ -5291,8 +4716,6 @@ mod tests {
         );
     }
 
-    /// Leaves are a strict, non-empty subset of all nodes - the leaves-only denominator would be
-    /// meaningless if `is_leaf` were never (or always) set.
     #[test]
     fn node_extents_marks_a_real_subset_as_leaves() {
         let code = crate::code::Code::from_string(
@@ -5308,8 +4731,7 @@ mod tests {
         );
     }
 
-    /// A `Code` with no grammar has no AST to walk - empty, not a panic, since the corpus
-    /// contains extension-less fixtures (a `Makefile`, say) that reach this code path.
+    /// The corpus has grammar-less fixtures (a `Makefile`), so this is empty, not a panic.
     #[test]
     fn node_extents_is_empty_without_an_ast() {
         let file = tempfile::NamedTempFile::new().expect("temp file");
@@ -5319,8 +4741,6 @@ mod tests {
         assert!(node_extents(&code).is_empty());
     }
 
-    /// The touched projection's two ends: a span covering a node's text marks it, a span nowhere
-    /// near it does not, and no spans at all marks nothing.
     #[test]
     fn nodes_touched_by_marks_only_overlapping_nodes() {
         let code = crate::code::Code::from_string(
@@ -5351,15 +4771,8 @@ mod tests {
         );
     }
 
-    /// A pair with no tree-sitter grammar is graded against the product's own plain-text
-    /// fallback, not rejected.
-    ///
-    /// The shape this exists for is a Bazel `BUILD` file: `diff_code` returns no `ASTDiff` for it,
-    /// and a bail in `codediff_diff_for_painting` would leave the fixture unable to carry a
-    /// painting at all. What codediff *renders* for such a pair is `plain_text_line_diff`
-    /// (`app::compute_diff`), so that is what its painting is answerable to - checked here by
-    /// comparing against that function directly rather than against a recorded range list, so the
-    /// two cannot drift.
+    /// A pair with no tree-sitter grammar (a Bazel `BUILD` file) is graded against the product's
+    /// own `plain_text_line_diff` fallback, compared directly so the two cannot drift.
     #[test]
     fn a_pair_with_no_grammar_paints_from_the_plain_text_fallback() -> Result<()> {
         let before_text = "cc_library(\n    name = \"a\",\n    srcs = [\"a.cc\"],\n)\n";
@@ -5384,14 +4797,9 @@ mod tests {
         assert_eq!(before_ranges.len(), expected_before.len());
         assert_eq!(after_ranges.len(), expected_after.len());
 
-        // And the fallback actually reaches the scorer: the one changed character is labelled on
-        // both sides, which is what makes a painting for this fixture gradeable rather than
-        // compared against nothing. `plain_text_line_diff` narrows a rewritten line to its
-        // changed part (`intra_line_ranges`), so this is a single byte, not the whole row.
-        //
-        // Both presets give the same answer here, which is correct rather than a missing
-        // distinction: every `RenderOptions` field that could differ governs how a *move* is
-        // painted, and the fallback never emits one.
+        // The fallback reaches the scorer: the one changed character is labelled on both sides
+        // (`intra_line_ranges` narrows the line). Both presets agree because every option that
+        // could differ governs moves, which the fallback never emits.
         for options in [
             crate::diff::text::RenderOptions::MINIMAL,
             crate::diff::text::RenderOptions::FULL,

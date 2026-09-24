@@ -17,20 +17,10 @@
  */
 
 //! One row per test fixture, written to `src/test/data/diffs.csv`: where it came from, how big it
-//! is, and how far its two ground truths have been taken.
+//! is, and how far its two independent ground truths (tree mapping, text painting) have been taken.
 //!
-//! An *inventory*, not an analysis - and the distinction is what justifies a separate binary next
-//! to the two that already read this corpus. `analyze_human_mappings` answers questions about the
-//! corpus's shape (operation mix, reparent rate, reorder rate) and `benchmark_optimal_solutions`
-//! scores codediff against it. Neither answers "what have we got, and what still needs work",
-//! which is the question you ask when deciding what to open next - and which now has two separate
-//! answers per fixture, since the tree mapping and the text painting are independent ground truths
-//! completed at different times (see `HumanTextMapping`).
-//!
-//! Deliberately written into `src/test/data/`, beside `sample.csv`, rather than under
-//! `research/data/`: this describes the fixtures themselves, not a measurement over them, and it is
-//! the same kind of file as the sample manifest it joins against. Everything in it is cheap and
-//! derived, so it is safe to regenerate at any time and never needs hand-editing.
+//! It lives in `src/test/data/`, not `research/data/`, because it describes the fixtures rather
+//! than measuring them. Everything in it is derived; regenerate it rather than editing it.
 
 use std::path::{Path, PathBuf};
 
@@ -57,10 +47,8 @@ struct Args {
 
 /// How far a fixture's text painting has been taken (see `HumanMapping::text_mappings`).
 ///
-/// The three states the painter actually distinguishes, plus a catch-all. `MinimalAndFull` and
-/// `Single` are not "more" and "less" work on the same thing: a single painting means the painter
-/// judged this fixture's rendering unambiguous, and two means they judged it genuinely forked -
-/// so the distinction is a finding about the fixture, not a progress bar. See
+/// `Single` vs `MinimalAndFull` is a finding about the fixture, not progress: one painting means
+/// the painter judged its rendering unambiguous, two that it genuinely forks. See
 /// `research/data/quality/text_painting_findings.md`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum PaintingState {
@@ -95,55 +83,34 @@ impl PaintingState {
 #[derive(Debug, serde::Serialize)]
 struct Row {
     name: String,
-    /// Repository-relative directory, so a reader can open it without reconstructing the path from
-    /// `dataset` and `name` themselves.
+    /// Repository-relative directory.
     path: String,
     dataset: String,
     language: String,
-    // ── provenance, read from the fixture's own README.md ────────────────────────────────────
-    // Blank for a handmade fixture, which is not missing data: it was written by hand rather than
-    // sampled, so it has no upstream commit to point at and no README to record one.
-    // Deliberately *not* joined against sample.csv any more - a fixture that needs a row in a file
-    // outside itself to say what it is is not self-describing (see `helper::readme_provenance`).
+    // Provenance, from the fixture's own README.md (blank for a handmade fixture), not from
+    // sample.csv: a fixture must be self-describing.
     repository: String,
     commit: String,
     source_path: String,
     comment: String,
-    // ── size ────────────────────────────────────────────────────────────────────────────────
     before_lines: usize,
     before_nodes: usize,
     after_lines: usize,
     after_nodes: usize,
-    /// Nodes across *both* trees that the tree mapping says nothing about (`NodeStatus::Unmarked`)
-    /// - i.e. how much annotation work is left. `0` means the tree side is finished.
+    /// `NodeStatus::Unmarked` nodes across both trees. `0` means the tree mapping is finished.
     unmatched_nodes: usize,
-    /// tree-sitter `ERROR` nodes across both trees: places the grammar could not parse. 13.3% of
-    /// the corpus has at least one (measured 2026-08-28), heavily concentrated by language - four
-    /// in five C fixtures, against one in fifty for Rust.
+    /// tree-sitter `ERROR` nodes across both trees (see [`count_error_nodes`]).
     ///
-    /// **Not a quality signal, despite looking like one.** Fixtures with parse errors are very
-    /// slightly *less* likely to disagree with their human mapping than clean ones (26% vs 30%,
-    /// at a 0.8x lower mismatch rate), and seven of the eight most shredded parses in the corpus
-    /// score exactly zero mismatches. An `ERROR` wraps a run of text as a flat blob, and a flat
-    /// blob matches another identical flat blob easily - the tree carries less information, so
-    /// there is less to disagree about. This column is here to find grammar problems, not to
-    /// predict accuracy ones.
-    ///
-    /// `MISSING` nodes are deliberately not counted here: they are zero-width nodes the parser
-    /// *inserts* to recover from a small slip, not regions it failed to read, and 32 fixtures have
-    /// one without having any `ERROR` at all.
+    /// For finding grammar problems, **not** a quality signal: an `ERROR` is a flat blob that
+    /// matches an identical blob easily, so badly parsed fixtures disagree with their human
+    /// mapping no more often than clean ones.
     error_nodes: usize,
-    /// `error_nodes` as a percentage of `before_nodes + after_nodes`, to 3 decimal places.
-    ///
-    /// Worth having next to the count because the two say different things: one `ERROR` wrapping
-    /// an otherwise well-formed file (`c-microsoft-terminal-add-function`, 761 of 10,966 nodes) is
-    /// nearly harmless, while one `ERROR` per 2.3 nodes (`css-shadcn-ui-ui-completely-broken-
-    /// treesitter-parsing`, 13,933 of 32,682) means the grammar gave up. The count alone cannot
-    /// tell those apart on files of different sizes.
+    /// `error_nodes` as a percentage of `before_nodes + after_nodes`, to 3 decimal places; blank
+    /// when there is no tree. Separates "one bad region" from "the grammar gave up" across sizes.
     error_pct: String,
     /// `none`, `single`, `minimal+full` or `other` - see [`PaintingState`].
     painting: String,
-    /// The painting names themselves, `|`-separated, since `painting` deliberately collapses them.
+    /// The painting names, `|`-separated.
     painting_names: String,
 }
 
@@ -157,8 +124,6 @@ fn main() -> Result<()> {
     for dataset in DIFF_DATASETS {
         let root = diffs_root().join(dataset);
         let Ok(entries) = std::fs::read_dir(&root) else {
-            // A dataset directory that doesn't exist is normal - `DIFF_DATASETS` lists every split
-            // this repository has ever used, and `stratified` is currently empty.
             continue;
         };
         for entry in entries {
@@ -169,15 +134,13 @@ fn main() -> Result<()> {
             let name = entry.file_name().to_string_lossy().into_owned();
             match row_for(&name, dataset, &entry.path()) {
                 Ok(Some(row)) => rows.push(row),
-                // A directory with no readable before/after pair isn't a fixture at all.
                 Ok(None) => {}
                 Err(err) => unreadable.push((name, format!("{err:#}"))),
             }
         }
     }
 
-    // Sorted by dataset then name, so a regenerated file diffs cleanly against the last one rather
-    // than reshuffling with whatever order the filesystem handed back.
+    // A stable order, so a regenerated file diffs cleanly against the last one.
     rows.sort_by(|a, b| (&a.dataset, &a.name).cmp(&(&b.dataset, &b.name)));
 
     if let Some(parent) = out.parent() {
@@ -213,8 +176,6 @@ fn main() -> Result<()> {
             100.0 * error_nodes as f64 / all_nodes as f64
         },
     );
-    // Reported, never silently skipped: a fixture this couldn't read is exactly the kind of thing
-    // an inventory exists to surface.
     if !unreadable.is_empty() {
         println!("  {} unreadable:", unreadable.len());
         for (name, err) in &unreadable {
@@ -225,15 +186,12 @@ fn main() -> Result<()> {
 }
 
 fn row_for(name: &str, dataset: &str, dir: &Path) -> Result<Option<Row>> {
-    // Tree only: nothing below diffs, so the hashes and sizes `code_pair_from_dir` would add
-    // are three quarters of a load that nothing reads.
+    // Nothing here diffs, so the metadata `code_pair_from_dir` computes would be wasted.
     let Some((before, after)) = code_pair_from_dir_without_metadata(dir)? else {
         return Ok(None);
     };
 
-    // `unwrap_or_default` rather than `?`: a fixture with no `human_mapping.json` yet is an
-    // ordinary state this file exists to report, not an error. It reads as every node unmarked,
-    // which is exactly true.
+    // No `human_mapping.json` yet is a state to report, not an error: every node reads unmarked.
     let mapping = human_mapping::load(name).unwrap_or_default();
 
     let (before_nodes, after_nodes, unmatched_nodes, error_nodes) =
@@ -250,9 +208,7 @@ fn row_for(name: &str, dataset: &str, dir: &Path) -> Result<Option<Row>> {
                     count_error_nodes(before_root) + count_error_nodes(after_root),
                 )
             }
-            // No grammar for this extension: the file pair is still real and still worth inventorying,
-            // it just has no tree to count. Zeroes here mean "no AST", and `before_lines` still says
-            // how big it is.
+            // No grammar for this extension: still inventoried, with zero nodes.
             _ => (0, 0, 0, 0),
         };
 
@@ -273,10 +229,8 @@ fn row_for(name: &str, dataset: &str, dir: &Path) -> Result<Option<Row>> {
         repository: sample.map(|s| s.repository.clone()).unwrap_or_default(),
         commit: sample.map(|s| s.commit.clone()).unwrap_or_default(),
         source_path: sample.map(|s| s.path.clone()).unwrap_or_default(),
-        // `description.md` is the only place a promoted fixture's note lives: promotion moves the
-        // note into the file and clears the sample.csv cell, so there is nothing to fall back to
-        // and no way for two copies to disagree (see `action_promote`, and the
-        // `no_promoted_row_carries_a_comment` test that pins it).
+        // `description.md` is the only home of a promoted fixture's note; promotion clears the
+        // sample.csv cell (pinned by `no_promoted_row_carries_a_comment`).
         comment: read_note(name)
             .map(|note| note_as_csv_cell(&note))
             .unwrap_or_default(),
@@ -286,8 +240,7 @@ fn row_for(name: &str, dataset: &str, dir: &Path) -> Result<Option<Row>> {
         after_nodes,
         unmatched_nodes,
         error_nodes,
-        // Blank rather than "0.000" when there is no tree to measure, so a fixture with no grammar
-        // reads as "not applicable" instead of "parsed cleanly".
+        // Blank, not "0.000", so no grammar does not read as "parsed cleanly".
         error_pct: if before_nodes + after_nodes == 0 {
             String::new()
         } else {
@@ -303,10 +256,8 @@ fn row_for(name: &str, dataset: &str, dir: &Path) -> Result<Option<Row>> {
 
 /// tree-sitter `ERROR` nodes in a subtree, root inclusive.
 ///
-/// `is_error()` only - not `is_missing()`. The two mean different things: an `ERROR` is a region
-/// the grammar could not read, while a `MISSING` is a zero-width node the parser *inserted* to
-/// recover from something small (a forgotten semicolon). Counting them together would put a file
-/// with one missing brace in the same bucket as one the grammar gave up on. See `Row::error_nodes`.
+/// `MISSING` nodes are not counted: they are zero-width recoveries from a small slip (a
+/// forgotten semicolon), not regions the grammar could not read.
 fn count_error_nodes(root: tree_sitter::Node) -> usize {
     let mut count = 0;
     let mut stack = vec![root];
@@ -322,10 +273,8 @@ fn count_error_nodes(root: tree_sitter::Node) -> usize {
     count
 }
 
-/// Counts a tree-sitter subtree's size, root inclusive - a local copy of
-/// `codediff::stats::count_nodes` for the same reason `analyze_human_mappings` keeps one: that
-/// function is behind the `stats` feature (git2/rusqlite and the rest of its build cost), which
-/// this binary has no other reason to pull in.
+/// A subtree's node count, root inclusive. A local copy of `codediff::stats::count_nodes`, which
+/// sits behind the `stats` feature this binary otherwise does not need.
 fn count_nodes(root: tree_sitter::Node) -> usize {
     let mut count = 0;
     let mut stack = vec![root];
@@ -369,8 +318,6 @@ mod tests {
             PaintingState::of(&["Full".to_string(), "Minimal".to_string()]),
             PaintingState::MinimalAndFull
         );
-        // Two paintings that aren't that pair, or three of anything, are real but not one of the
-        // states the painter converged on - reported as `other` rather than squeezed into one.
         assert_eq!(
             PaintingState::of(&["Full".to_string(), "Tight".to_string()]),
             PaintingState::Other
@@ -381,9 +328,6 @@ mod tests {
         );
     }
 
-    /// The inventory has to describe the corpus it is run against, so this checks the real one
-    /// rather than a constructed pair - a fixture that fails to read is exactly what it exists to
-    /// surface, and a stub would never catch that.
     #[test]
     fn every_fixture_in_the_corpus_produces_a_row() {
         let mut seen = 0usize;
@@ -422,16 +366,12 @@ mod tests {
             row.path, "src/test/data/diffs/handmade/cpp-add-templates",
             "the path should be openable as written"
         );
-        // Never promoted from a sample, so it has no upstream commit to point at - blank, not
-        // absent, since the fixture itself is perfectly real.
         assert!(row.repository.is_empty());
         assert!(row.commit.is_empty());
         assert!(row.before_nodes > 0 && row.after_nodes > 0);
     }
 
-    /// Both ends of the error columns, against two real fixtures - one the grammar gave up on and
-    /// one it read cleanly. A count without a known-zero case would pass just as happily if the
-    /// walk counted every node.
+    /// The known-zero case guards against a walk that counts every node.
     #[test]
     fn error_nodes_and_their_percentage_come_from_the_real_parse() {
         let row_of = |name: &str, dataset: &str| {
@@ -451,14 +391,30 @@ mod tests {
         );
         let pct: f64 = broken.error_pct.parse().expect("a number");
         assert!((10.0..=100.0).contains(&pct), "got {pct}");
-        // The percentage has to be of this fixture's own nodes, not of anything global.
         let expected =
             100.0 * broken.error_nodes as f64 / (broken.before_nodes + broken.after_nodes) as f64;
         assert!((pct - expected).abs() < 0.001, "{pct} vs {expected}");
 
-        // And a fixture that parses cleanly reads as exactly zero, not as blank or absent.
         let clean = row_of("cpp-add-templates", "handmade");
         assert_eq!(clean.error_nodes, 0);
         assert_eq!(clean.error_pct, "0.000");
+    }
+
+    #[test]
+    fn missing_nodes_are_not_counted_as_errors() {
+        let code = codediff::code::Code::from_string(
+            "fn f() { let x = 1 }\n",
+            &codediff::code::Language::Rust,
+        );
+        let root = code.ast.as_ref().expect("a tree").root_node();
+        let mut has_missing = false;
+        let mut stack = vec![root];
+        while let Some(node) = stack.pop() {
+            has_missing |= node.is_missing();
+            let mut cursor = node.walk();
+            stack.extend(node.children(&mut cursor));
+        }
+        assert!(has_missing, "the fixture should parse with a MISSING node");
+        assert_eq!(count_error_nodes(root), 0);
     }
 }

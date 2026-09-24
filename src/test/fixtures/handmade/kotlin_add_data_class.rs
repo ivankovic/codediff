@@ -27,11 +27,8 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // A genuine matching gap, not a rendering-option question - human marks shifted name/age
-    // parameter names Move, codediff leaves them Identical - not attempted. minimal 3.310%, full
-    // 8.983% - four bytes of the gap above were a relocation the after side had not been told
-    // about, see `reconcile_moves`. The matching gap described above is the rest and is still not
-    // attempted.
+    // A matching gap: the human marks the shifted name/age parameters Move, codediff leaves them
+    // Identical.
     assert_matches_human_painting_within_limit("kotlin-add-data-class", 9.0)
 }
 

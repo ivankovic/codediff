@@ -23,9 +23,8 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // First baseline, a measured gap and not a regression: rewriting `"a" + x + "b"` as a template
-    // literal moves both string_fragments under a template_string, and the qualified_name APTED
-    // pass deletes them instead of matching them across the rewrite.
+    // Rewriting `"a" + x + "b"` as a template literal moves both string fragments under a
+    // `template_string`; the qualified_name APTED pass deletes them instead of matching them.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "javascript-microsoft-typescript-concat-to-template",
         2,

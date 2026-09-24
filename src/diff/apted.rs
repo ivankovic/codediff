@@ -16,17 +16,14 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-//! Tree-edit-distance computation. `common` holds the shared infrastructure - the cost model
-//! and indexing (`common.rs`), the residual-forest fallback (`common/residual.rs`), the
-//! `resolve_forest` entry point and backtrace (`common/resolve.rs`), the containment-pruned
-//! slot bookkeeping (`common/slots.rs`), the Myers flat-tree path (`common/myers.rs`) and the
-//! pre-matching of uniquely named locals (`common/prematch.rs`); `engine` is the APTED
-//! algorithm (`gted`/`spfL`/`spfR`/`spfA` plus optimal-strategy computation); `zhang_shasha`
-//! is the classic algorithm, kept as the test oracle.
+//! Tree-edit-distance computation. `common` holds the cost model, indexing, the residual-forest
+//! fallback, the containment-pruned slot bookkeeping, the Myers flat-tree path and the
+//! pre-matching passes; `engine` is APTED; `zhang_shasha` is the classic algorithm, kept as the
+//! test oracle.
 
 mod common;
 mod engine;
-// Test oracle only: the fuzz tests in `common/tests.rs` compare the APTED engine against it.
+// Test oracle for the fuzz tests in `common/tests.rs`.
 #[cfg(test)]
 mod zhang_shasha;
 
@@ -38,12 +35,10 @@ pub(crate) use common::{
 use crate::code::Code;
 use crate::diff::ASTDiff;
 
-/// The phase-6 terminal fallback, cheaper than [`for_roots`]'s whole-tree APTED and run
-/// unconditionally: a Myers-LCS alignment of the still-unmatched residual
-/// forest instead of full tree-edit-distance. See `common::resolve_residual_forest_via_myers_lcs`
-/// for how the residual is collected and aligned.
+/// The phase-6 terminal fallback: a Myers-LCS alignment of the still-unmatched residual forest,
+/// cheaper than [`for_roots`]'s whole-tree APTED. A no-op when either side has no AST.
 pub fn for_roots_fallback(before: &Code, after: &Code, source: &'static str, diff: &mut ASTDiff) {
-    // See the identical guard/rationale on `for_roots` in `common.rs`.
+    // `ast: None` is a valid state (no grammar for the language), not a bug.
     if before.ast.is_none() || after.ast.is_none() {
         return;
     }

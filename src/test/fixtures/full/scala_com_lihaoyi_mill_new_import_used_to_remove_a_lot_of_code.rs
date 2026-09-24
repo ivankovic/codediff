@@ -22,10 +22,7 @@ use anyhow::Result;
 #[test]
 fn mapping() -> Result<()> {
     // A new import replaces a large block of code. The human keeps the surviving imports paired;
-    // `APTED("fast_fallback")` deletes them - the terminal Myers-LCS resolver, which cannot align a
-    // node whose position in the residual forest moved. Same owner and same shape as the
-    // reparenting gap recorded in `project_quality_goal_cost_anomaly_census`. Any counts above
-    // describe the older, larger residual.
+    // `APTED("fast_fallback")` cannot align nodes whose position in the residual forest moved.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "scala-com-lihaoyi-mill-new-import-used-to-remove-a-lot-of-code",
         53,

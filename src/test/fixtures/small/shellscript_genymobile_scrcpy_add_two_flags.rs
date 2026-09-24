@@ -21,9 +21,7 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // Resolved by `apted::prematch_unique_named_locals` (added for `shellscript-ansible-...`'s
-    // shift-due-to-insertion gap - see that fixture's own comment and `TODO.md`) - not
-    // independently investigated, but the same mechanism.
+    // Pins `apted::prematch_unique_named_locals` (shift due to insertion).
     test::helper::human_mapping::assert_matches_human_mapping(
         "shellscript-genymobile-scrcpy-add-two-flags",
     )

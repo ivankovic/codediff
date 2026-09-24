@@ -22,32 +22,17 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // In this test, we have several subjective quality decisions:
+    // Several subjective quality decisions:
     //
-    // 1. The theorethical lowest-cost solution uses some of the call_exprsion, identifier,
-    //    arguments and '(' and ')' from the before side, e.g. from "..nums.len()" and maps them as
-    //    Update/MatchButNotIdentical/Identical with the "HashSet::new()" call. However, this is
-    //    very low quality matching from a human perspective. It is extremely unlikely a human would
-    //    actually transform "..nums.len()" into HashSet::new(). It is far more likely it would be a
-    //    Delete + Insert. Since the cost is tied either way, this is modeled as a `MultiMapGroup`
-    //    (see `human_mapping.json`) rather than asserted as one specific answer - codediff's actual
-    //    tied-cost choice is accepted.
-    // 2. The "return Some(nums[i])" / "return Some(num)" pair however, is something we want to
-    //    match. While similar logic to 1. applies, showing to the human that the loop in both cases
-    //    contains the logically same return is valuable, so these nodes should match. Unlike 1.,
-    //    this is a genuine algorithm gap, not a cost tie: matching it would require bridging a
-    //    removed loop-nesting level (the before side has the if/return two `for_expression` levels
-    //    deep, the after side one), which the pipeline's structural matchers don't currently do.
-    //    The 42/28 limit below is this same nesting-bridging gap - every mismatch is tagged
-    //    APTED("qualified_name") and sits on the if/return chain or its ancestors - now covering
-    //    more of that chain than before because the human mapping got more thorough, not because
-    //    the gap grew. Left as a known, accepted gap rather than a broad "bridge removed nesting"
-    //    heuristic, which risks regressing the rest of the corpus the same way past attempts at
-    //    similar generalizations have (see `TODO.md`).
-    // 3. Two nested `for` loops become one: the `for`, `{` and `}` of both before loops are
-    //    all-to-all 2:1 groups (see `MultiMapGroup::pairing`) with the single after loop's. One
-    //    before member of each is unavoidably unmatched by a one-to-one output (three of the
-    //    five group mismatches); the other two are the same nesting-bridging gap as 2.
+    // 1. The lowest-cost solution reuses parts of `..nums.len()` for `HashSet::new()`, which no
+    //    human would do. The cost is tied, so it is a `MultiMapGroup` and codediff's choice is
+    //    accepted.
+    // 2. `return Some(nums[i])` / `return Some(num)` should match, which requires bridging a
+    //    removed loop-nesting level; the structural matchers do not. Every mismatch on the
+    //    if/return chain (`APTED("qualified_name")`) is this gap, left open rather than risk a
+    //    broad "bridge removed nesting" heuristic.
+    // 3. Two nested `for` loops become one: their `for`, `{` and `}` are all-to-all 2:1 groups,
+    //    each leaving one before member unavoidably unmatched.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "rust-algorithm-change",
         47,
@@ -57,18 +42,13 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // Minimal 17.078%, full 27.984%. `MINIMAL` is two bytes worse than it was the moment before,
-    // and this is the corpus's only fixture that `displaced_beside_an_edit_on_its_first_row` cost
-    // anything: it stops calling a multi-row node `Move` for a sideways shift on its own first row,
-    // and here two bytes of that span are ones the human does paint. Kept - the same rule is worth
-    // 2505 bytes across the corpus. `FULL` is untouched and still sets the limit. Residual
-    // unexamined beyond that.
+    // `FULL` sets the limit. `displaced_beside_an_edit_on_its_first_row` costs `MINIMAL` two bytes
+    // here that the human paints.
     assert_matches_human_painting_within_limit("rust-algorithm-change", 28.0)
 }
 
 #[test]
 fn invariants() -> Result<()> {
-    // Invariant 16: the Minimal/Full split for a renamed identifier is not painted this way yet
-    // (`num` against `nums`). Recorded as found.
+    // Invariant 16: the rename split is not painted (`num` against `nums`).
     assert_ground_truth_invariants_with_known_violations("rust-algorithm-change", 1)
 }

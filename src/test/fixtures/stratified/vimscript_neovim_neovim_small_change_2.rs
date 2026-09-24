@@ -23,11 +23,8 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // 0/0 -> 1/1 because the ground truth moved - the human mapping was re-annotated to pair `=`
-    // with the `.=` that replaced it. Exact again since: that note called it "a cross-kind operator
-    // match of exactly the kind `kinds_update_allowed` exists for", and the reason it did not work
-    // was that Vimscript reached `families_for_language`'s empty default and had no operator
-    // families at all. It has them now.
+    // Pins a cross-kind operator match: `=` against the `.=` that replaced it, which needs
+    // Vimscript's operator families in `families_for_language`.
     test::helper::human_mapping::assert_matches_human_mapping(
         "vimscript-neovim-neovim-small-change-2",
     )
@@ -35,17 +32,12 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // codediff splits into Insert+Delete what the human painting calls one Update. Note this
-    // fixture also has a known ground-truth invariant violation (see invariants() below), so part
-    // of this rate may be the data rather than the algorithm.
+    // codediff splits into Insert+Delete what the painting calls one Update.
     assert_matches_human_painting_within_limit("vimscript-neovim-neovim-small-change-2", 5.62)
 }
 
 #[test]
 fn invariants() -> Result<()> {
-    // Was pinned at 1: `Minimal` inserts `| ` on row 18 of the after side and the run ends on that
-    // space. It is mid-row - `setl com< cms<'` follows it - so this was the invariant over-firing,
-    // not a painting to repair. Back to 0 since `rows_end_on_visible_characters` was narrowed to
-    // genuinely trailing whitespace.
+    // `Minimal` inserts `| ` on row 18 ending on a space, but mid-row: invariant 1 must not fire.
     assert_ground_truth_invariants("vimscript-neovim-neovim-small-change-2")
 }

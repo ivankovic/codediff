@@ -22,10 +22,7 @@ use anyhow::Result;
 #[test]
 fn mapping() -> Result<()> {
     // The if-to-ternary rewrite turns `identifier` into `member_expression`/`property_identifier`;
-    // codediff's `qualified_name` pass keeps the old identifier pairing instead. Known gap,
-    // characterized above but unfixed. Clamped at the observed count rather than requiring an exact
-    // match. Lower (or drop back to `assert_matches_human_mapping`) once a fix lands. Any counts
-    // above describe the older, larger residual.
+    // codediff's `qualified_name` pass keeps the old identifier pairing instead.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "tsx-kong-insomnia-if-to-ternary-operator",
         5,

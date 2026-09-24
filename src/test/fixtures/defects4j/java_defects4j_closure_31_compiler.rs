@@ -23,12 +23,9 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // A condition grows a conjunct, and the two ground truths disagree about which `&&` of the
-    // resulting `binary_expression` chain is the new one. The human mapping deletes the inner
-    // `&&` and keeps the outer; codediff (reason `APTED("large_flat_subtree")`) does the reverse,
-    // pairing the inner one and deleting the outer. Both readings describe the same edit and
-    // neither is wrong about the code - they disagree only about which of two identical operators
-    // is "the same" one, which is the ambiguity a flat chain of equal tokens always carries.
+    // A condition grows a conjunct, and the two disagree about which `&&` of the chain is new: the
+    // human keeps the outer, codediff (`APTED("large_flat_subtree")`) the inner. The ambiguity a
+    // flat chain of equal tokens always carries.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "java-defects4j-closure-31-compiler",
         2,

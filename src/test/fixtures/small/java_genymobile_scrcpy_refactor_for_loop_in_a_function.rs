@@ -21,11 +21,9 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // A nested for-loop is pulled out of its surrounding try/if blocks (those containers are
-    // removed, not just their contents changed). codediff's APTED pass maps the emptied
-    // containers' own tokens (closing braces, parens, etc.) to Delete instead of following the
-    // human's cross-boundary correspondence into the flattened result - the same kind of
-    // structural-move objective-wall gap documented elsewhere in this suite.
+    // A nested for-loop is pulled out of removed try/if blocks. APTED deletes the removed
+    // containers' tokens instead of following the human's cross-boundary correspondence: the
+    // structural-move gap.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "java-genymobile-scrcpy-refactor-for-loop-in-a-function",
         46,

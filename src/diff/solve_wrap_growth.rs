@@ -20,43 +20,19 @@ use tree_sitter::Node;
 use crate::diff::PassCtx;
 use crate::diff::{ASTDiff, ASTMappingOperation, ASTMappingReason, NodeCache};
 
-/// Fixes up the same kind of phase-1 attribution gap as `solve_heritage_clause_growth`, for a
-/// different structural shape: wrapping existing code in a brand-new construct (Java/TypeScript's
-/// `try { EXISTING } catch (...) { NEW }`, Rust's `if COND { NEW } else if EXISTING_COND {
-/// EXISTING }`, Python's `if COND: NEW` around... - anywhere a node (or several sibling nodes)
-/// that already exist stay byte-identical but gain a brand-new parent chain around them, with
-/// nothing else about their own position among the *original* siblings changing).
+/// Re-tags an `Identical` match as `WrapGrowth` when existing code gained a brand-new parent chain
+/// (`try { EXISTING } catch ...`, an existing `if` becoming an `else if` branch). Never creates or
+/// moves a mapping; `ranges()` acts on the tag only under
+/// [`crate::diff::text::RenderOptions::paint_reindent_only_moves`], because rust-add-if's ground
+/// truth paints this shape `Move` under `Full` and not under `Minimal`.
 ///
-/// Phase 1 already matches the reused content correctly (`Identical`, by hash) - this pass only
-/// re-tags that match's `reason` so `ranges()` can recognize it as a verified pure repositioning,
-/// gated by [`crate::diff::text::RenderOptions::paint_reindent_only_moves`] the same way
-/// `solve_nested_condition_collapse` is (not unconditionally, like `solve_heritage_clause_growth` -
-/// `rust-add-if`'s own hand-painted ground truth wants this shape painted `Move` under `Full` and
-/// unpainted under `Minimal`, so both readings have to stay reachable). It never creates a new
-/// mapping and never moves anything.
-///
-/// **The verification, in one sentence**: climbing up from the after-side node through only
-/// brand-new ancestor levels (nothing else at any of those levels has an identity anywhere else in
-/// `before` except other content that *also* came from the node's own original parent) must land
-/// on a node already matched to that node's own real before-side parent.
-///
-/// **Why this is safe where two prior, more general attempts at the same idea were not** (see
-/// `solve_heritage_clause_growth`'s own doc comment for their history): both of those keyed on
-/// parent-match or sibling-adjacency alone, for *any* node, which is exactly what let `rust-add-if`
-/// (a case that should still sometimes paint `Move`) and a JS destructuring rewrite's coincidental
-/// duplicate literal slip through as false positives. This pass doesn't exclude `rust-add-if` by
-/// node kind (unlike `solve_heritage_clause_growth`'s kind whitelist) - it includes it, correctly,
-/// by gating the *rendering* consequence instead of the *tagging* decision: `rust-add-if` gets
-/// tagged, but `ranges()` only acts on the tag under `Full`, matching what that fixture's own
-/// ground truth wants either way. The sibling-purity check (`is_safe_wrapper_sibling`) is what
-/// guards against the JS-destructuring-style false positive: a sibling with an identity elsewhere
-/// in `before` that *isn't* the reused node's own original sibling disqualifies the whole climb.
+/// The verification: climbing from the after-side node through only brand-new levels must land on
+/// the node matched to its real before-side parent. Every other child along the climb must be new
+/// content or another relocated piece of the same original parent (`is_safe_wrapper_sibling`); a
+/// sibling with an identity elsewhere is evidence of a more complex restructuring.
 pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
     let node_cache = ctx.node_cache;
-    // `node_to_parent`, never `Node::parent()`: tree-sitter's parent lookup walks down from the
-    // root (O(depth) per call), and this pass asks for a parent once per shifted node in the
-    // file - on a 75k-node file that was half a million such walks, 10% of the whole diff
-    // (callgrind, 2026-09-06). The metadata already holds every parent id.
+    // `node_to_parent`, never `Node::parent()`, which walks down from the root on every call.
     let before_parents = &ctx.before_metadata().node_to_parent;
     let after_parents = &ctx.after_metadata().node_to_parent;
     let candidates: Vec<(usize, usize)> = diff
@@ -74,15 +50,11 @@ pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
             continue;
         };
 
-        // Only a real re-tag if the node's position actually moved - see
-        // `solve_heritage_clause_growth`'s identical guard for why.
         if before_node.start_position() == after_node.start_position() {
             continue;
         }
-        // Leaves (bare keywords, punctuation, single tokens) are deliberately out of scope: a
-        // leaf's own reindent verdict rarely drives `ranges()`'s Move/Identical choice for
-        // anything a reader would notice on its own, while tagging one - a rewritten `for`
-        // header's `in` keyword, say - can shift an unrelated match's rendering boundary.
+        // Leaves are out of scope: tagging one (a rewritten `for` header's `in`) can shift an
+        // unrelated match's rendering boundary.
         if before_node.child_count() == 0 {
             continue;
         }
@@ -108,18 +80,11 @@ pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
     }
 }
 
-/// How many ancestor levels above `after_node` this will climb before giving up - a real wrapper
-/// (`try`/`catch`, an `if`/`else if`) is a handful of syntax levels at most; a bound here is pure
-/// defensiveness against an unexpectedly deep or malformed tree, not a real limit any fixture in
-/// the corpus needs raised.
+/// Climb bound; a real wrapper is a handful of levels, so this is only defensive.
 const MAX_WRAP_DEPTH: usize = 6;
 
-/// Climbs from `after_node` through unmatched ancestor levels, verifying at each one that every
-/// *other* child is either genuinely new content or another piece of the same original container's
-/// content that also relocated here - see the module doc comment. Stops as soon as it reaches an
-/// ancestor that's already matched to something: success only if that something is exactly
-/// `before_parent_id` (the wrapper was inserted *exactly* between the node and its real original
-/// parent, nothing else changed structurally along the way).
+/// Climbs from `after_node` through unmatched ancestors, checking every other child with
+/// `is_safe_wrapper_sibling`. True only if the first matched ancestor is `before_parent_id`.
 fn verify_pure_wrap(
     after_node: Node,
     before_parent_id: usize,
@@ -150,24 +115,12 @@ fn verify_pure_wrap(
         if let Some(&matched_before_id) = diff.after_node_map.get(&parent.id())
             && matched_before_id != 0
         {
-            // `climbed == 0` means `after_node`'s own immediate parent is already matched, with no
-            // new wrapper level climbed through at all - an ordinary sibling shift (something
-            // inserted *before* this node at the *same* level it already had), not a wrap. That
-            // shape is the existing, deliberately-calibrated single-row column-shift territory
-            // `ranges()` already owns (see its own doc comment on `column_shift_is_meaningful`) -
-            // firing here too double-tagged it and, on `typescript-refactor-interface`, suppressed
-            // a shift that fixture's own `Full` ground truth wants painted `Move`, regressing it
-            // from ~0% to 75%. A wrap, by definition, needs at least one genuinely new level.
+            // `climbed == 0` is a sibling shift at the same level, not a wrap; that is
+            // `column_shift_is_meaningful`'s territory in `ranges()` (typescript-refactor-interface).
             return climbed > 0 && matched_before_id == before_parent_id;
         }
-        // `parent` has no mapping at all because it's the after-tree's own root - no root is ever
-        // individually recorded in `ASTDiff` (see `ASTDiff::is_complete`'s own root carve-out), so
-        // there is no `(before_id, after_id)` entry to find no matter how far this climbs. A
-        // top-level statement wrapped in a new `try`/`if` (e.g. `typescript-add-error-handling`'s
-        // module-level statements, which have no enclosing `block` at all - their real parent
-        // already *is* the file's root) needs this as its own success path: both files' roots
-        // correspond to each other by construction, the same trivial correspondence a real mapping
-        // entry would otherwise represent.
+        // The after root is never recorded in `ASTDiff`, but the two roots correspond by
+        // construction: success if the node's real parent was the before root.
         if !after_parents.contains_key(&parent.id()) {
             return climbed > 0 && !before_parents.contains_key(&before_parent_id);
         }
@@ -176,18 +129,9 @@ fn verify_pure_wrap(
     false
 }
 
-/// Whether `sibling` (some other child at a level this pass is climbing through) is consistent
-/// with a *pure* wrap: either it carries no identity anywhere in `before` at all (a brand-new part
-/// of the wrapper's own shell - a `catch` clause, a new `if`'s own condition and first branch), or
-/// it's matched to a node whose own before-side parent is `before_parent_id` - i.e. it's *another*
-/// piece of the same original container's content that got relocated into this same wrapper right
-/// alongside the node this pass is actually verifying (the shape a multi-statement wrap, like
-/// Java's `try` swallowing a whole run of a method's original statements, needs - each statement
-/// is its own independently-matched `Identical` pair, and every one of them is the others'
-/// `sibling` at the wrapper's body level).
-///
-/// A leaf (no children) is always safe without either check - punctuation and keywords carry no
-/// identity to verify.
+/// Whether `sibling` fits a pure wrap: a leaf, a subtree with no reused identity anywhere in it
+/// (the wrapper's own shell), or a node matched to another child of `before_parent_id` (a run of
+/// statements wrapped together).
 fn is_safe_wrapper_sibling(
     sibling: Node,
     diff: &ASTDiff,
@@ -202,9 +146,6 @@ fn is_safe_wrapper_sibling(
     {
         return before_parents.get(&before_id) == Some(&before_parent_id);
     }
-    // The sibling's own root carries no reused identity - every descendant must be equally free of
-    // one, or something with a real identity elsewhere in `before` would be smuggled through as
-    // "part of the wrapper's shell" when it's actually evidence of a more complex restructuring.
     let mut stack = vec![sibling];
     while let Some(node) = stack.pop() {
         if let Some(&before_id) = diff.after_node_map.get(&node.id())
@@ -228,8 +169,7 @@ mod tests {
     use crate::diff::diff_code;
     use crate::test::helper::find_first_of_kind;
 
-    /// `rust-add-if`'s own shape, minimized: an existing `if`/`else` becomes the `else if` branch
-    /// of a brand-new outer `if`. The reused inner `if_expression` must be tagged `WrapGrowth`.
+    /// rust-add-if, minimized.
     #[test]
     fn an_existing_if_else_becoming_an_else_if_branch_is_tagged() {
         let before = Code::from_string(
@@ -255,13 +195,6 @@ mod tests {
         );
     }
 
-    /// Java's `try { EXISTING } catch (...) { NEW }` wrap: several sibling statements, not one
-    /// node, all relocate together. Every one of the three top-level statements must be tagged -
-    /// each is independently `Identical`-matched by phase 1, and each climbs to the same verified
-    /// wrapper. Checked by counting `expression_statement` nodes specifically, not the mapping's
-    /// total tagged count - that count also includes non-leaf descendants inside each statement
-    /// (e.g. the `method_invocation` a leaf-only exclusion still leaves standing), which is fine
-    /// but not what this test is about.
     #[test]
     fn a_run_of_statements_wrapped_in_a_new_try_block_are_all_tagged() {
         let before = Code::from_string(
@@ -306,12 +239,6 @@ mod tests {
         result
     }
 
-    /// A node whose content also genuinely changed (the condition, `% 2` -> `% 3`) is itself never
-    /// an `Identical` candidate at all - its bytes differ, so this pass never even considers it.
-    /// Whatever *does* get tagged here - if anything, depending on how far phase 1's matching
-    /// descended given the changed condition - must still be byte-identical: the one property this
-    /// test actually enforces, the same belt-and-suspenders guarantee
-    /// `solve_heritage_clause_growth` checks for its own shape.
     #[test]
     fn only_byte_identical_content_is_ever_tagged_even_when_a_sibling_condition_changed() {
         let before_src = "fn f() {\n    if number % 2 == 0 {\n        even();\n    } else {\n        odd();\n    }\n}\n";
@@ -336,5 +263,48 @@ mod tests {
                 "a WrapGrowth-tagged pair must always be byte-identical"
             );
         }
+    }
+
+    fn wrap_growth_tagged(diff: &ASTDiff, root: Node, kind: &str) -> usize {
+        collect_of_kind(root, kind)
+            .into_iter()
+            .filter(|node| {
+                diff.after_node_map
+                    .get(&node.id())
+                    .and_then(|&before_id| diff.mapping.get(&(before_id, node.id())))
+                    .is_some_and(|m| m.reason == ASTMappingReason::WrapGrowth)
+            })
+            .count()
+    }
+
+    #[test]
+    fn a_sibling_shift_at_the_same_level_is_not_a_wrap() {
+        let before = Code::from_string("fn f() {\n    a();\n}\n", &Language::Rust);
+        let after = Code::from_string("fn f() {\n    z();\n    a();\n}\n", &Language::Rust);
+
+        let diff = diff_code(&before, &after).ast.expect("ast diff");
+
+        assert!(
+            diff.mapping
+                .values()
+                .all(|m| m.reason != ASTMappingReason::WrapGrowth)
+        );
+    }
+
+    #[test]
+    fn top_level_statements_wrapped_in_a_new_try_are_tagged() {
+        let before = Code::from_string("a();\nb();\n", &Language::TypeScript);
+        let after = Code::from_string(
+            "try {\n    a();\n    b();\n} catch (e) {\n    handle(e);\n}\n",
+            &Language::TypeScript,
+        );
+
+        let diff = diff_code(&before, &after).ast.expect("ast diff");
+        let after_root = after.ast.as_ref().unwrap().root_node();
+
+        assert_eq!(
+            wrap_growth_tagged(&diff, after_root, "expression_statement"),
+            2
+        );
     }
 }

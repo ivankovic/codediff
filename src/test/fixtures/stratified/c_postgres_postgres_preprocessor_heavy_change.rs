@@ -30,11 +30,7 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // The only fixture where Minimal disagrees more than Full. After
-    // `RenderOptions::paint_displaced_moves` stopped `MINIMAL` painting a span that kept its own
-    // text and its own place and shifted only because of an edit before it: minimal 0.725% ->
-    // 0.207%. The option is off under `FULL`, which this fix leaves byte-identical at 0.518%, so
-    // `FULL` sets the limit now.
+    // `FULL` sets the limit.
     assert_matches_human_painting_within_limit(
         "c-postgres-postgres-preprocessor-heavy-change",
         0.53,

@@ -35,9 +35,6 @@ fn painting() -> Result<()> {
 
 #[test]
 fn invariants() -> Result<()> {
-    // Two `Full` rows - the `@var IClientService` docblock line and the `private $clientService;`
-    // beside it - painted every visible character `Delete` but left their one leading tab
-    // unpainted, which invariant 4 reads as a line changed in whole but painted in part. Both tabs
-    // are painted, matching the deleted lines around them, so the fixture is at 0.
+    // Two `Full` rows deleted in whole have their leading tab painted too (invariant 4).
     assert_ground_truth_invariants("php-nextcloud-server-real-small-change")
 }

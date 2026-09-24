@@ -16,8 +16,6 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 //! Moving the cursor through the flattened trees.
-//!
-//! Split out of `main.rs` along the section banner that already marked this boundary.
 
 use crate::*;
 
@@ -41,8 +39,7 @@ pub(crate) fn jump_to_edge(panel: &mut PanelState, flat: &[(Node, usize)], to_st
     }
 }
 
-/// Moves `panel`'s cursor forward to the next node (strictly after the current position) with
-/// `NodeStatus::Unmarked`, if one exists. Leaves the cursor untouched otherwise.
+/// Moves the cursor to the next `Unmarked` node strictly after it; no wrap-around.
 pub(crate) fn advance_to_next_unmarked(
     panel: &mut PanelState,
     flat: &FlatIndex,
@@ -60,9 +57,7 @@ pub(crate) fn advance_to_next_unmarked(
     }
 }
 
-/// After a match finalizes, walks both panels' cursors forward to their own next unmarked node
-/// (independently), as a quality-of-life step-through-the-tree convenience. Recomputes caches
-/// fresh from `app.mapping`, since the caller's caches predate the change that was just applied.
+/// Recomputes caches from `app.mapping`, since the caller's caches predate the mark just applied.
 pub(crate) fn advance_both_to_next_unmarked(
     app: &mut App,
     before_flat: &FlatIndex,
@@ -75,9 +70,7 @@ pub(crate) fn advance_both_to_next_unmarked(
     advance_to_next_unmarked(&mut app.after, after_flat, &caches, status_after);
 }
 
-/// Same as [`advance_both_to_next_unmarked`], but for one panel only: used after a delete or an
-/// insert, which touch one side, so only that cursor should step forward. `flat` is that side's
-/// flat index.
+/// [`advance_both_to_next_unmarked`] for one side, after a delete or insert. `flat` is that side's.
 pub(crate) fn advance_side_to_next_unmarked(
     app: &mut App,
     side: Side,
@@ -93,9 +86,8 @@ pub(crate) fn advance_side_to_next_unmarked(
     advance_to_next_unmarked(panel, flat, &caches, status_fn);
 }
 
-/// Moves `panel`'s cursor to the next (`forward`) or previous node where `disagrees_fn` is true,
-/// relative to its current position, wrapping around the ends of `flat` like a `vim` `n`/`N`
-/// search. Returns the node landed on, or `None` if `disagrees_fn` is false for every node.
+/// Moves the cursor to the next (`forward`) or previous node where `disagrees_fn` holds, wrapping
+/// around like vim's `n`/`N`. `None`, cursor untouched, if it holds nowhere.
 pub(crate) fn advance_to_next_mismatch<'a>(
     panel: &mut PanelState,
     flat: &FlatIndex<'a>,
@@ -124,9 +116,7 @@ pub(crate) fn advance_to_next_mismatch<'a>(
     None
 }
 
-/// Implements `n`/`N`: moves the focused panel's cursor to the next/previous node where codediff's
-/// verdict (`p`) disagrees with the human mapping (the same condition that draws the trailing `*`
-/// in `render_panel`). Requires `p` to have been run at least once for the current case.
+/// `n`/`N`: the next/previous node drawn with a trailing `*`. Errors if `p` has not run.
 pub(crate) fn action_next_mismatch(
     app: &mut App,
     focus: Focus,
@@ -163,17 +153,9 @@ pub(crate) fn action_next_mismatch(
     }
 }
 
-/// Moves `panel`'s cursor to the next leaf node (in `flat`'s order, i.e. document order) whose own
-/// text contains `query`, wrapping around like `n`/`N`'s mismatch search
-/// (`advance_to_next_mismatch`, which this otherwise mirrors exactly - kept separate rather than
-/// generalized into one shared function, since the two predicates need different captured context,
-/// `Caches`+`ASTDiff` vs. `query`+`src`, and a bare `fn` pointer can't capture either).
-///
-/// Leaf nodes only (`child_count() == 0`), not "any node whose subtree's text contains query": a
-/// non-leaf node's own text is the concatenation of all its descendants', so almost every ancestor
-/// of a real match would *also* "match" under a naive whole-subtree check - starting from most
-/// cursor positions, that means landing on some enclosing container (often the file root) instead
-/// of the actual token, which is not what a human doing the AST-browser equivalent of Ctrl-F wants.
+/// Moves the cursor forward, wrapping, to the next leaf whose text contains `query`. Leaves only:
+/// an ancestor's text contains all its descendants', so a subtree match lands on the enclosing
+/// container instead of the token.
 pub(crate) fn advance_to_next_search_match<'a>(
     panel: &mut PanelState,
     flat: &FlatIndex<'a>,
@@ -196,9 +178,7 @@ pub(crate) fn advance_to_next_search_match<'a>(
     None
 }
 
-/// Implements `/`'s search: moves the focused panel's cursor to the next leaf node containing
-/// `query`, starting just after its current position and wrapping around. Case-sensitive, plain
-/// substring match - no regex, matching what was actually asked for.
+/// `/`: case-sensitive plain substring search, no regex.
 pub(crate) fn action_search(
     app: &mut App,
     focus: Focus,
@@ -258,9 +238,7 @@ pub(crate) fn ensure_visible(scroll: &mut usize, cursor_idx: usize, viewport_hei
     }
 }
 
-/// Finds the node with id `id` anywhere in `root`'s subtree, regardless of collapse state (unlike
-/// `flatten_visible`, which only sees expanded nodes). Used by `action_align` to locate a matched
-/// node that may currently be hidden under a collapsed ancestor.
+/// Finds `id` in `root`'s subtree regardless of collapse state, unlike `flatten_visible`.
 pub(crate) fn find_node_by_id_anywhere(root: Node, id: usize) -> Option<Node> {
     if root.id() == id {
         return Some(root);
@@ -274,8 +252,6 @@ pub(crate) fn find_node_by_id_anywhere(root: Node, id: usize) -> Option<Node> {
     None
 }
 
-/// Removes every strict ancestor of `node` from `collapsed`, so `node` is guaranteed to appear in
-/// that panel's `flatten_visible` output.
 pub(crate) fn expand_ancestors(collapsed: &mut std::collections::HashSet<usize>, node: Node) {
     let mut current = node;
     while let Some(parent) = current.parent() {
@@ -284,18 +260,10 @@ pub(crate) fn expand_ancestors(collapsed: &mut std::collections::HashSet<usize>,
     }
 }
 
-/// Puts `panel`'s cursor on `target_id` and makes sure it can actually be seen: expands every
-/// collapsed ancestor along its path, and - if it was not already on screen, whether because it
-/// was hidden or merely scrolled out of view - centers that panel's viewport on it.
-/// `idx.saturating_sub(half).min(max_scroll)` naturally clamps the centering at the start/end of
-/// the tree, where a true center isn't possible.
-///
-/// `None`, without moving anything, when no node in `root` has that id.
-///
-/// Shared by the two things that move a cursor somewhere it wasn't looking: `a`/`A`, which put the
-/// *other* panel on the node this one is matched with, and `A` in the text view, which puts *this
-/// side's* panel on the leaf under the text cursor. The panel is taken as a parameter rather than
-/// picked from `app` precisely because those two want different ones.
+/// Puts `panel`'s cursor on `target_id`, expanding its collapsed ancestors and, if it was not
+/// already on screen, centering the viewport on it (clamped at the tree's ends). `None`, nothing
+/// moved, when `root` has no such node. `a`/`A` move the other panel, `A` in the text view this
+/// side's, hence the explicit `panel`.
 pub(crate) fn reveal_node<'tree>(
     panel: &mut PanelState,
     root: Node<'tree>,
@@ -322,8 +290,7 @@ pub(crate) fn reveal_node<'tree>(
     Some(target_node)
 }
 
-/// Shared tail of `action_align`/`action_align_algo`: moves the *other* panel's cursor to
-/// `target_id`, via [`reveal_node`].
+/// Moves the panel opposite `focus` to `target_id`, via [`reveal_node`].
 pub(crate) fn align_cursor_to(
     app: &mut App,
     focus: Focus,
@@ -342,8 +309,7 @@ pub(crate) fn align_cursor_to(
     Ok(format!("Aligned to matched '{}'", target_node.kind()))
 }
 
-/// Implements `a`: aligns to the node the *human mapping* says the cursor node is matched with, if
-/// any. See [`align_cursor_to`] for how the target is made visible.
+/// `a`: aligns the other panel to the cursor node's partner in the human mapping.
 pub(crate) fn action_align(
     app: &mut App,
     focus: Focus,
@@ -363,10 +329,8 @@ pub(crate) fn action_align(
     align_cursor_to(app, focus, before_root, after_root, target_id)
 }
 
-/// Implements `A`: like `a`, but aligns to the node *codediff's own diff* (`p`) says the cursor
-/// node is mapped to, instead of the human mapping. Requires `p` to have been run at least once
-/// for the current case, and fails if codediff mapped the cursor node to nothing (i.e. it
-/// considers it deleted/inserted rather than matched).
+/// `A`: like `a`, but uses codediff's mapping from `p`. Errors if `p` has not run or codediff
+/// deleted/inserted the cursor node.
 pub(crate) fn action_align_algo(
     app: &mut App,
     focus: Focus,

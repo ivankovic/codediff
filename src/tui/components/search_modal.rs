@@ -30,21 +30,15 @@ use ratatui::{
 use super::Component;
 use crate::tui::actions::Action;
 
-/// A popup that reads a search query (the `/` key), same visual scaffold as `ThemeDialog`/
-/// `FileDialog` (bordered, cyan title, dim hint line) but text entry rather than a list, since
-/// there's nothing to list yet - matches only exist once a query has been typed.
-///
-/// Every keystroke also emits `Action::SearchQueryChanged`, which `App` answers by previewing
-/// the highlights and feeding the match count back in via `set_live_match_count` - so the title
-/// shows a live `N matches` while typing, before anything is submitted.
+/// The `/` search prompt. Every keystroke emits `Action::SearchQueryChanged`; `App` previews the
+/// highlights and feeds the count back through `set_live_match_count`, so the title shows live
+/// `N matches` before anything is submitted.
 #[derive(Default)]
 pub struct SearchModal {
     query: String,
-    /// The previously submitted query, if any - a bare Enter re-submits it (the hint line says
-    /// so), giving `/` `Enter` as "repeat last search".
+    /// Named in the hint line: `App` re-submits it on a bare Enter.
     last_query: Option<String>,
-    /// The focused panel's match count for the query typed so far, pushed back in by `App`
-    /// (`Action::SearchQueryChanged`'s handler). `None` until the first keystroke.
+    /// `None` until the first keystroke.
     live_match_count: Option<usize>,
 }
 
@@ -56,21 +50,16 @@ impl SearchModal {
         }
     }
 
-    /// `App` feeds the focused panel's match count for the current query back in here - see
-    /// `Action::SearchQueryChanged`.
     pub fn set_live_match_count(&mut self, count: usize) {
         self.live_match_count = Some(count);
     }
 
-    /// The query typed so far. Exposed at crate visibility only for `app.rs`'s own tests (e.g. the
-    /// double-dispatch regression guard) - nothing outside this module needs to read live input.
+    /// For `app.rs`'s tests only.
     #[cfg(test)]
     pub(crate) fn query(&self) -> &str {
         &self.query
     }
 
-    /// The area the popup itself should occupy, centered within `area` - same shape as
-    /// `ThemeDialog::popup_area`, sized for a single line of input rather than a list.
     pub fn popup_area(&self, area: Rect) -> Rect {
         let width = 50.min(area.width);
         let height = 4.min(area.height);
@@ -79,8 +68,7 @@ impl SearchModal {
         Rect::new(x, y, width, height)
     }
 
-    /// Where the text cursor should be drawn on screen within `area` (the same area passed to
-    /// `draw`), right after the typed query.
+    /// The on-screen cursor position, for the same `area` passed to `draw`.
     pub fn cursor_screen_position(&self, area: Rect) -> (u16, u16) {
         // +1 for the border, +1 for the leading "/" the input line is prefixed with.
         let col = area.x + 2 + self.query.chars().count() as u16;
@@ -111,8 +99,6 @@ impl Component for SearchModal {
             .constraints([Constraint::Min(1), Constraint::Length(1)])
             .split(area);
 
-        // Live match count in the title while typing - feedback *before* committing to a jump,
-        // instead of submitting blind and counting afterwards.
         let title = match self.live_match_count {
             Some(1) => " Search - 1 match ".to_string(),
             Some(n) => format!(" Search - {n} matches "),

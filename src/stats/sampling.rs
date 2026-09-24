@@ -17,20 +17,10 @@
  */
 use rand::Rng;
 
-/// LOC buckets for stratified sampling, keyed by the larger of a code pair's before/after line
-/// count. Shared here rather than duplicated so every caller that stratifies by size
-/// (`sample_code_pairs`, `sample_test_diffs --stratified`) provably uses the same buckets.
+/// LOC buckets for stratified sampling, keyed by the larger of a pair's before/after line count.
 ///
-/// Human-readable ranges by deliberate choice: "10-30 lines" means something to a person skimming
-/// a sample. Committed `research/data/samples/sampled_code_pairs_*.csv` files can still carry
-/// byte-based labels in their own `size_bucket` column - the column name is unchanged, see this
-/// module's `pub fn loc_bucket` - and are not retroactively relabeled; only a fresh
-/// `sample_code_pairs` run writes LOC-based ones.
-///
-/// LOC, not AST node count, even though node count is the truer cost driver for tree-edit-distance
-/// work (LOC-per-node varies widely by language): every caller here is picking candidates during a
-/// commit walk, where a blob's line count is a cheap read (`stats::git::text_loc_if_in_range`) and
-/// a node count would mean tree-sitter-parsing every candidate seen, not just the ones kept.
+/// Lines, not AST nodes, though nodes drive diff cost: candidates are bucketed during a commit
+/// walk, where a line count is cheap and a node count would mean parsing every candidate.
 pub const LOC_BUCKETS: &[(usize, &str)] = &[
     (10, "0-10"),
     (30, "10-30"),
@@ -41,15 +31,10 @@ pub const LOC_BUCKETS: &[(usize, &str)] = &[
     (usize::MAX, "3000+"),
 ];
 
-/// Which of [`LOC_BUCKETS`] `loc` falls into - the first bucket whose upper bound it's strictly
-/// less than, or `"3000+"` if it exceeds every bound (only reachable if `LOC_BUCKETS` is ever
-/// changed to not end in `usize::MAX`).
+/// Which of [`LOC_BUCKETS`] `loc` falls into: the first whose upper bound exceeds it.
 ///
-/// Written into a `size_bucket` CSV column by both callers - not renamed to `loc_bucket` even
-/// though the unit changed, because that column name is already baked into already-committed
-/// research CSVs and downstream readers' struct field names (`benchmark_diff_pairs.rs`,
-/// `apted_only_benchmark.rs`); renaming it would break deserializing every pre-existing file for
-/// no benefit besides internal naming purity.
+/// Callers write it to a CSV column named `size_bucket`, a name committed CSVs and their readers
+/// depend on; older files there hold byte-based labels.
 pub fn loc_bucket(loc: usize) -> &'static str {
     LOC_BUCKETS
         .iter()

@@ -21,12 +21,8 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // Deliberately pathological, like the CSS "completely broken treesitter parsing" fixture: this
-    // is TypeScript compiler test fixture data, not real code, and doesn't parse cleanly - ERROR
-    // nodes dominate the tree, and node correspondence through them is essentially undefined. Re-:
-    // the residual is gone. The delimiter fix in 974cc062 (`reclaim_slot_level_twins`, "Give a
-    // delimiter back to the construct it closes") settled the sibling-choice tie above, so this is
-    // exact now and asserts so with the exact call shape rather than a limit of zero.
+    // Deliberately pathological: compiler test data dominated by `ERROR` nodes. Pins
+    // `reclaim_slot_level_twins` settling the delimiter sibling-choice tie.
     test::helper::human_mapping::assert_matches_human_mapping(
         "javascript-microsoft-typescript-test-data-pretending-to-be-code-maybe-broken-parsing",
     )

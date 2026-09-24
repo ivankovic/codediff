@@ -23,9 +23,8 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // An `else` token: the mapping removes it, codediff pairs it with the `else` of a different
-    // `if`. Two mismatches, one from each side of that single token
-    // (reason `APTED("large_flat_subtree")`).
+    // An `else` the mapping removes, which codediff pairs with another `if`'s `else`
+    // (`APTED("large_flat_subtree")`).
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "java-defects4j-closure-11-typecheck",
         2,

@@ -23,11 +23,9 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // 6 mismatch(es), 4 visible. `new Foo(a, b)` became `absl::make_unique<Foo>(a, b)`. The human
-    // maps the old `argument_list` and its parens to nothing - the call is a different call - while
-    // APTED pairs them with the new call's `argument_list` on qualified_name, because the arguments
-    // inside really are identical. 4 of the 6 are the two paren pairs; this is the flat
-    // delimiter-pairing family, not something specific to this fixture.
+    // `new Foo(a, b)` became `absl::make_unique<Foo>(a, b)`. The human maps the old
+    // `argument_list` to nothing; APTED pairs it with the new one on qualified_name, since the
+    // arguments inside are identical. Mostly the two paren pairs: the delimiter-pairing family.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "cpp-tensorflow-tensorflow-new-to-make-unique",
         6,

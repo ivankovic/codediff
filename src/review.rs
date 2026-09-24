@@ -19,21 +19,13 @@
 //! and how to turn any one of those changes into the two files on disk the diff engine reads.
 //! Shared by both front ends (`tui::components::review_dialog`, `web::session`).
 //!
-//! Talks to the `git` binary, not to `git2`. `git2` is a `stats`-only dependency here on purpose
-//! (its OpenSSL/libssh2 build chain is not something `cargo install codediff` should pay for),
-//! and every user of this feature has `git` on `PATH` already - it is what invokes codediff as a
-//! difftool in the first place. Three plumbing commands cover everything: `diff --name-status`
-//! for the three file lists (one parser for all three), `log` for the commits, `show <rev>:<path>`
-//! for the blobs.
+//! Talks to the `git` binary, not `git2`, whose OpenSSL/libssh2 build `cargo install codediff`
+//! should not pay for; anyone reviewing has `git` on `PATH`.
 //!
-//! **A side is materialized under its repository-relative path**, in a temp workspace laid out
-//! as `<workspace>/<revision>/<path>`. Both halves of that matter: the basename picks the
-//! tree-sitter grammar (`blob-1234` gets a plain line diff, `theme.rs` gets Rust), and the
-//! directory keeps two same-named files at one revision (`mod.rs`, `index.ts`) from overwriting
-//! each other. The working tree's own file is never copied; the real path is diffed, so `e`
-//! edits the real file. An absent side (an added or deleted file) is an empty file at the same
-//! path, which parses as a whole-file insert or delete in the right language, rather than
-//! `/dev/null`, which does not exist everywhere.
+//! A side is materialized at `<workspace>/<revision>/<path>`: the basename picks the grammar, and
+//! the revision directory keeps same-named files apart. The working tree's file is diffed in place,
+//! so `e` edits the real file. An absent side is an empty file at the same path, which parses as a
+//! whole-file insert or delete in the right language, unlike `/dev/null`.
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -44,8 +36,7 @@ use serde::{Deserialize, Serialize};
 /// git's well-known empty tree, the base a root commit is diffed against.
 pub const EMPTY_TREE: &str = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
 
-/// How many commits [`load`] lists by default - a screenful, and enough to find the one that
-/// broke something yesterday.
+/// How many commits [`load`] lists by default: a screenful.
 pub const DEFAULT_COMMIT_LIMIT: usize = 20;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

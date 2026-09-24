@@ -23,13 +23,10 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // The edit rewrites a `typeof x === "undefined"` guard into a `isUndefined(x)` call. Both
-    // sides still hold a `binary_expression` in the same slot, and `APTED("fast_fallback")` pairs
-    // them on that alone - the human reads the old test as removed and the new call as new, since
-    // nothing inside survives (`parenthesized_expression`/`unary_expression` on one side,
-    // `call_expression`/`arguments` on the other). A same-kind container whose entire content was
-    // replaced costs less to rename than to delete-and-insert under a unit cost model, so this is
-    // the cost function speaking, not a search failure. Not attempted.
+    // A `typeof x === "undefined"` guard becomes `isUndefined(x)`. Both sides keep a
+    // `binary_expression` in the slot and `APTED("fast_fallback")` pairs them; the human reads old
+    // as removed and new as new. Renaming a gutted container is cheaper than delete-and-insert
+    // under unit costs: the cost function speaking, not a search failure.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "javascript-axios-axios-real-small-change",
         3,

@@ -27,17 +27,8 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // After `Full`'s Match over the untouched indentation of ` return response.json()` was dropped
-    // - it painted eight spaces on a row whose own text neither changed nor shifted, which is the
-    // one Full indentation entry here that was not an insert or a re-indent: minimal 1.047%, full
-    // 4.188% -> 3.141%. after the Full painting was repaired against the two new whitespace
-    // invariants (`full_paints_a_wholly_changed_line_whole`,
-    // `no_unpainted_whitespace_between_painted_regions`): minimal unchanged at 1.047%, full 3.141%
-    // -> 10.079%. The ground truth moved, not the algorithm - `Full` now claims the inserted line's
-    // own eight-space indentation, both `(user_id` parameter lists and both URL literals as Move,
-    // and codediff paints none of them. Every one of the 154 bytes is `theirs=Some(...) ours=None`
-    // or a narrowing disagreement, i.e. paint codediff does not produce, not paint it produces
-    // wrongly.
+    // `Full` claims the inserted line's indentation, both `(user_id` parameter lists and both URL
+    // literals as Move, none of which codediff paints: all paint codediff does not produce.
     assert_matches_human_painting_within_limit("python-api-change", 10.09)
 }
 

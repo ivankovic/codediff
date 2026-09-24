@@ -21,16 +21,10 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // Re-solved from 12039 unmarked nodes down to 27, and the fixture gained a `MultiMapGroup`. The
-    // 27 that remain are an N:M correspondence the format cannot express. This was an exact fixture
-    // only because the file was almost entirely ungraded; the 9 mismatches below are newly-graded
-    // nodes, not a regression. A limit above the measured number is a test that cannot fail, which
-    // is what `the_quality_baseline_accuracy_columns_are_a_projection_of_the_stub_limits` exists to
-    // catch - the baseline records the measurement, so the stub has to record it too.
+    // The remaining unmarked nodes are an N:M correspondence the format cannot express.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "lua-neovim-neovim-logic-change-with-some-code-re-use",
-        // 7/7 became 16/14 when the ground truth gained all-to-all groups: nine of the
-        // mismatches are group members a one-to-one output cannot reach, the N:M floor.
+        // Includes all-to-all group members a one-to-one output cannot reach: the N:M floor.
         16,
         14,
     )

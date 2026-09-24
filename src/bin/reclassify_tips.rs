@@ -17,24 +17,13 @@
  */
 
 //! Re-derives the `tip` (file type) column of a `file_stats` database from each row's path,
-//! using the current `code::tip::type_from_path`.
+//! using the current `code::tip::type_from_path`, so widened classification tables take effect
+//! without re-walking the corpus. The tip is the only `files` column computable from the path
+//! alone; a file that moves out of Unknown this way was never read, so it has no size or AST
+//! numbers, and per-category size percentiles stay wrong until the corpus is re-walked.
 //!
-//! `file_stats` classifies every file once, from its path, when it first walks a corpus; the
-//! category then sits in `stats.sqlite` and feeds the paper's file-type figure. Widening the
-//! classification tables therefore changes nothing on disk until either the whole corpus is
-//! re-walked (hours over the Full List, and the checkouts may be gone) or the tips are
-//! recomputed from the paths already stored. This does the latter, and it is the only part of a
-//! `files` row that *can* be recomputed without the file: everything else (bytes, LOC, AST
-//! counts) needs the contents.
-//!
-//! One consequence to keep in mind when reading the figure afterwards: a file that moves from
-//! Unknown to Code or Configuration this way was never read, so it has no size or AST numbers.
-//! The category shares are right; per-category size percentiles over such rows are not, until
-//! the corpus is re-walked.
-//!
-//! Dry-run by default. Prints the category counts before and after, the biggest category
-//! transitions, and the extensions that remain unclassified, so the tables in `code::tip` can be
-//! iterated against a real corpus. `--write` applies the change in one transaction.
+//! Dry-run by default: prints category counts before and after, the biggest transitions, and
+//! the extensions still unclassified. `--write` applies the change in one transaction.
 
 use anyhow::Result;
 use clap::Parser;

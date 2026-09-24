@@ -17,53 +17,25 @@
  */
 
 //! A *similarity*-preserving sketch, as opposed to the four *equality* hashes in
-//! [`crate::code::hash`].
+//! [`crate::code::hash`], which say nothing once two subtrees differ in one token.
 //!
-//! `node_to_full_hash` and friends answer "are these two subtrees exactly the same?" and say
-//! nothing at all once the answer is no. A great many of the open matching problems in
-//! `diff/TODO.md` need the other question - "how nearly the same are they?" - in a place where
-//! actually comparing the two subtrees is unaffordable: choosing between several equally
-//! hash-identical move targets, deciding whether two crossed siblings are the same entity
-//! relocated or two different entities, ranking candidates in a large rewrite. One changed token
-//! flips a Merkle hash completely, so "95% the same" and "entirely unrelated" are indistinguishable
-//! to every hash we have.
+//! A bottom-k MinHash sketch of the set of *leaf* hashes in a node's subtree, built bottom-up with
+//! the equality hashes and compared in O(k) whatever the subtree size. Leaves, not every
+//! descendant: one changed token flips the full hash of every ancestor, so a one-token edit would
+//! cost O(depth) elements instead of one.
 //!
-//! This module adds a bottom-k MinHash sketch of the set of *leaf* hashes in a node's subtree,
-//! computed bottom-up in the same walk that computes the equality hashes (so O(n) at metadata
-//! time), and comparable in O(k) - independent of subtree size - afterwards.
-//!
-//! # Why leaves, and not every descendant node
-//!
-//! Sketching every descendant's full hash sounds more discriminative and is in fact strictly
-//! worse for the cases this exists to serve. A single changed token flips the full hash of every
-//! *ancestor* of that token inside the subtree, so a one-token edit deep in a nested chain would
-//! remove O(depth) elements from the set rather than 1. Near-identical subtrees differing in one
-//! token are precisely the target, so the sketch is taken over leaves only, where one changed
-//! token costs exactly one element.
-//!
-//! # It is an estimate - rank and gate with it, never conclude equality
-//!
-//! [`SimilaritySketch::jaccard`] is exact whenever both subtrees have at most [`SKETCH_WIDTH`]
-//! distinct leaf hashes (the sketch *is* the set at that size, which happens to cover every small
-//! subtree - exactly where the estimator's variance would have hurt most) and an estimate above
-//! it. Use it to rank candidates and to gate decisions; the existing exact hashes already answer
-//! "are these identical" definitively and should keep doing so.
+//! [`SimilaritySketch::jaccard`] is exact when both subtrees have fewer than [`SKETCH_WIDTH`]
+//! distinct leaves and an estimate above. Rank and gate with it; never conclude equality from it.
 
-/// Number of retained bottom-k values. 16 keeps a sketch to 136 bytes per node and makes the
-/// sketch exact (not estimated) for any subtree with <= 16 distinct leaf hashes, which is most
-/// nodes in a real file.
+/// Number of retained bottom-k values: small per node, and exact for most real subtrees.
 pub const SKETCH_WIDTH: usize = 16;
 
-/// A fixed, hard-coded seed. It must never come from a per-process `RandomState`/`DefaultHasher`:
-/// the retained values decide which elements two sketches appear to share, so a per-run seed would
-/// make similarity - and therefore matching decisions downstream - differ between two runs on
-/// identical input. That failure mode is documented at length on `ASTMetadata::node_to_full_hash`
-/// and was a real, diagnosed bug in this codebase.
+/// Fixed, never per-process: a random seed would make similarity, and so matching, differ between
+/// runs on identical input.
 const SKETCH_SEED: u64 = 0x9E37_79B9_7F4A_7C15;
 
-/// SplitMix64. Used as the MinHash permutation: it spreads the Merkle hashes (which are already
-/// well distributed, but correlated in low bits for structurally similar nodes) so that "the k
-/// smallest images" is an unbiased random sample of the set.
+/// SplitMix64, the MinHash permutation: Merkle hashes of similar nodes correlate in their low
+/// bits, and the k smallest images must be an unbiased sample.
 fn mix(value: u64) -> u64 {
     let mut z = value.wrapping_add(SKETCH_SEED);
     z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
@@ -73,10 +45,7 @@ fn mix(value: u64) -> u64 {
 
 /// The k smallest *distinct* `mix`ed leaf hashes in a node's subtree, ascending.
 ///
-/// Distinct, not merely smallest-k-with-duplicates: keeping duplicates would make the retained
-/// values depend on the order children were merged in, i.e. on traversal details rather than on
-/// the subtree's content. Deduplicating makes a sketch a pure function of the *set* of leaf
-/// hashes, which is what [`jaccard`](Self::jaccard) is defined over.
+/// Distinct, so a sketch is a function of the leaf-hash *set*, not of merge order.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct SimilaritySketch {
     values: [u64; SKETCH_WIDTH],
@@ -94,10 +63,8 @@ impl SimilaritySketch {
 
     /// The sketch of an internal node: the bottom-k of the union of its children's sketches.
     ///
-    /// This is exactly the bottom-k of the union of the children's underlying *sets* whenever
-    /// every child sketch is itself a correct bottom-k, which is the standard bottom-k merge
-    /// property and is why the whole tree can be sketched in one bottom-up pass: an element small
-    /// enough to survive in the parent was small enough to survive in its child.
+    /// Equal to the bottom-k of the union of the children's sets (the bottom-k merge property),
+    /// which is why one bottom-up pass sketches the whole tree.
     pub fn merge(children: impl IntoIterator<Item = Self>) -> Self {
         let mut pool: Vec<u64> = Vec::new();
         for child in children {
@@ -128,23 +95,14 @@ impl SimilaritySketch {
 
     /// Estimated Jaccard similarity of the two subtrees' leaf-hash sets, in `[0.0, 1.0]`.
     ///
-    /// Standard bottom-k estimator: take `U`, the k smallest values of the union of the two
-    /// sketches, and report the fraction of `U` present in *both*. Because both sketches are
-    /// bottom-k of their own sets, `U` is the bottom-k of the union of the sets, and membership of
-    /// any element of `U` in either set is decidable from the sketches alone.
-    ///
-    /// The divisor is `|U|`, not `k`. When both subtrees have fewer than `k` distinct leaf hashes
-    /// `|U| < k`, and dividing by `k` would systematically under-report similarity - in the small-
-    /// subtree regime, which is where several intended callers (the move-detection ambiguity guard
-    /// above all) live exclusively.
+    /// Standard bottom-k estimator: the fraction of `U`, the k smallest values of the union, present
+    /// in both. The divisor is `|U|`, not `k`, or small subtrees would under-report similarity.
     pub fn jaccard(&self, other: &Self) -> f32 {
         let (a, b) = (self.as_slice(), other.as_slice());
         if a.is_empty() || b.is_empty() {
             return 0.0;
         }
 
-        // Merge-walk the two ascending slices, taking the k smallest distinct values of the union
-        // and counting how many of them appear in both.
         let (mut i, mut j) = (0usize, 0usize);
         let (mut union_size, mut shared) = (0usize, 0usize);
         while union_size < SKETCH_WIDTH && (i < a.len() || j < b.len()) {
@@ -184,9 +142,7 @@ mod tests {
 
     #[test]
     fn small_sets_are_exact_not_estimated() {
-        // 4 shared out of a 5-element union: exactly 0.8, no sampling error, because neither
-        // sketch is saturated. This is the regime the `|U|` divisor exists for - dividing by
-        // SKETCH_WIDTH would have reported 4/16 = 0.25 for two nearly identical subtrees.
+        // Dividing by SKETCH_WIDTH instead of `|U|` would report 4/16.
         let a = sketch_of(&[1, 2, 3, 4]);
         let b = sketch_of(&[1, 2, 3, 4, 5]);
         assert!(a.is_exact() && b.is_exact());
@@ -195,8 +151,6 @@ mod tests {
 
     #[test]
     fn one_changed_leaf_out_of_many_stays_near_one() {
-        // The motivating case: two subtrees differing in a single token must not read as
-        // "different", which is all any of the equality hashes can say about them.
         let shared: Vec<u64> = (0..40).collect();
         let mut changed = shared.clone();
         changed[7] = 1_000;
@@ -209,8 +163,6 @@ mod tests {
 
     #[test]
     fn merge_is_order_independent() {
-        // Sketches must be a function of the content, not of the order children were visited in -
-        // otherwise the same file could sketch differently depending on traversal details.
         let forward = sketch_of(&[5, 9, 1, 7, 3]);
         let backward = sketch_of(&[3, 7, 1, 9, 5]);
         assert_eq!(forward, backward);
@@ -218,8 +170,6 @@ mod tests {
 
     #[test]
     fn merging_is_associative_over_intermediate_nodes() {
-        // A parent's sketch must not depend on how its leaves were grouped into children: the
-        // bottom-k merge property is what makes one bottom-up pass correct.
         let flat = sketch_of(&(0..60).collect::<Vec<_>>());
         let nested = SimilaritySketch::merge([
             sketch_of(&(0..20).collect::<Vec<_>>()),
@@ -233,8 +183,6 @@ mod tests {
 
     #[test]
     fn saturated_sketches_estimate_large_set_similarity() {
-        // Above SKETCH_WIDTH distinct leaves the answer is sampled, so assert the estimate lands
-        // near the true Jaccard rather than on an exact value.
         let a: Vec<u64> = (0..1_000).collect();
         let b: Vec<u64> = (500..1_500).collect(); // true Jaccard = 500/1500 = 0.333...
         let estimate = sketch_of(&a).jaccard(&sketch_of(&b));

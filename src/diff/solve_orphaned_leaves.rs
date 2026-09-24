@@ -19,50 +19,8 @@ use crate::diff::PassCtx;
 use crate::diff::{ASTDiff, ASTMapping, ASTMappingOperation, ASTMappingReason};
 use std::collections::HashMap;
 
-/**
-* **A leaf deleted on one side and inserted on the other, under a parent pair everything else
-* already agrees on, and reading the same text.**
-*
-* The corpus-wide mismatch census (2026-09-17,
-* `research/data/quality/mismatch_census.csv`) put "the human pairs these two nodes and we drop
-* them both" at 39% of all visible mismatches, and found **47 fixtures whose *every* visible
-* mismatch is that shape** - a `,` here, a `.` there, a comment, an identifier. They come out of
-* four different residual paths (`fast_fallback`, `qualified_name`, `large_flat_subtree` and its
-* container variant), so the fix does not belong in any one of them: by the time they are wrong,
-* the mapping already says everything needed to see it.
-*
-* `TODO.md` has carried this as an open item under `fast_fallback` since 2026-08-20 - "pair
-* leftover trivial entries among themselves ... after the substantial ones are paired" - and names
-* the reason it was never just done: matching a `;` to "random other `;` in the code" is exactly
-* how this kind of pass goes wrong.
-*
-* So the rule keeps the two guards every neighbouring mechanism uses, and adds nothing else:
-*
-* * **The parents are already a matched pair.** Not "somewhere in the file" - the two leaves are
-*   direct children of nodes the pipeline already decided correspond. That is the same anchor
-*   [`crate::diff::solve_unique_type_matching`] requires, and this pass is that one's sibling:
-*   it keys on kind *and text* where that keys on kind alone, and runs after the terminal fallback
-*   rather than before it, so it sees the parent pairs the fallback itself produced.
-* * **No choice is being made.** A (kind, text) key is paired only when the two sides have the
-*   *same number* of leftovers under that pair - then any bijection between them is the same
-*   mapping, because the text is identical, and pairing in document order just picks the readable
-*   one. An unequal count means somebody would have to guess which leaf survived, and this pass
-*   does not guess: it leaves every one of them alone.
-* * **The neighbours correspond too.** Same parent pair and same text is still not enough, and
-*   `csharp-lidarr-call-different-function` is why: an `argument_list` whose arguments changed has
-*   a `,` on each side that this rule would happily pair, while the human deletes the old one and
-*   inserts the new one, because the argument it punctuates is gone. So every existing immediate
-*   sibling of the leaf must itself be matched to the corresponding sibling of the candidate. A
-*   comma between the same two things is the same comma; a comma between different things is not,
-*   whatever it reads.
-*
-* Pairing identical text is also strictly cheaper under `cost::operation_cost` (an `Identical` pair
-* costs 0 where a delete plus an insert costs `COST_DELETE + COST_INSERT`), so this only ever moves
-* codediff's own objective in the direction the human mapping already sits.
-*/
-/// Whether `before_id` and `after_id` sit between the same things: every immediate sibling either
-/// side of them that exists on both sides must already be matched to the other's. A leaf with no
-/// siblings at all trivially passes - there is nothing that could disagree.
+/// Whether `before_id` and `after_id` sit between the same things: no immediate sibling on either
+/// side is matched to something other than its counterpart.
 fn neighbours_correspond(
     before_id: usize,
     after_id: usize,
@@ -76,11 +34,8 @@ fn neighbours_correspond(
     ) else {
         return false;
     };
-    // Rejects only on *positive* evidence of disagreement: a neighbour that is matched, to
-    // something other than the candidate's neighbour. A neighbour nothing has matched yet says
-    // nothing either way - and holding that against the pair is what made the first cut of this
-    // guard useless, because `css-shadcn-ui-ui-completely-broken-treesitter-parsing`'s leaves sit
-    // in a region whose parse is broken enough that almost nothing around them is matched.
+    // Rejects only on positive evidence: an unmatched neighbour says nothing, and in a badly broken
+    // parse almost no neighbour is matched (css-shadcn-ui-ui-completely-broken-treesitter-parsing).
     let agrees = |before: Option<&usize>, after: Option<&usize>| match (before, after) {
         (Some(&before), Some(&after)) => match (
             diff.before_node_map.get(&before),
@@ -91,8 +46,6 @@ fn neighbours_correspond(
             _ => true,
         },
         (None, None) => true,
-        // One side has a neighbour here and the other does not: the leaf is not between the same
-        // things, so this is exactly the case the guard exists for.
         _ => false,
     };
     let previous = agrees(
@@ -110,19 +63,28 @@ fn neighbours_correspond(
     previous && next
 }
 
+/// Pairs a leaf deleted on one side with a leaf inserted on the other when their parents are a
+/// matched pair and they read the same. Such leaves come out of several residual paths, so the fix
+/// sits after all of them. Matching a `;` to a random other `;` is how this goes wrong, hence the
+/// guards:
+///
+/// * The parents already correspond, as in `solve_unique_type_matching` (which keys on kind alone).
+/// * Equal counts per (kind, text) under the pair, so any bijection is the same mapping; unequal
+///   counts would mean guessing which leaf survived.
+/// * [`neighbours_correspond`]: a `,` between different arguments is a different `,`
+///   (csharp-lidarr-call-different-function).
+///
+/// An `Identical` pair costs 0 against a delete plus an insert, so this only moves the objective
+/// toward the human mapping.
 pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
     let before_metadata = ctx.before_metadata();
     let after_metadata = ctx.after_metadata();
 
-    // Matched pairs, in before-side document order so the pass is deterministic regardless of the
-    // hash maps' own iteration order - the same reason `solve_unique_type_matching` sorts.
+    // Preorder for determinism; only pairs with a dropped child can produce anything.
     let mut pairs: Vec<(usize, usize)> = diff
         .before_node_map
         .iter()
         .filter_map(|(&before_id, &after_id)| (after_id != 0).then_some((before_id, after_id)))
-        // Only a pair with a dropped child can produce anything here, and on a large, mostly
-        // unchanged file almost none do - the same filter, for the same reason,
-        // `solve_unique_type_matching` documents at length.
         .filter(|(before_id, _)| {
             before_metadata
                 .node_info
@@ -150,7 +112,6 @@ pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
             continue;
         };
 
-        // Children this side dropped: a leaf whose whole mapping is "gone" (`-> 0`).
         let orphans = |ids: &[usize],
                        metadata: &crate::code::ASTMetadata,
                        map: &rustc_hash::FxHashMap<usize, usize>|
@@ -202,7 +163,6 @@ pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
             let Some(after_ids) = after_orphans.get(key) else {
                 continue;
             };
-            // Unequal counts mean choosing which leaf survived. See this module's doc comment.
             if before_ids.len() != after_ids.len() {
                 continue;
             }
@@ -229,5 +189,108 @@ pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
                 );
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::code::{Code, Language};
+    use crate::diff::NodeCache;
+    use crate::test::helper::find_first_of_kind;
+
+    /// Every leaf reading `text`, in document order.
+    fn leaves(code: &Code, text: &str) -> Vec<usize> {
+        let mut found = Vec::new();
+        let mut stack = vec![code.ast.as_ref().unwrap().root_node()];
+        while let Some(node) = stack.pop() {
+            if node.child_count() == 0 && code.contents.get(node.byte_range()) == Some(text) {
+                found.push((node.start_byte(), node.id()));
+            }
+            let mut cursor = node.walk();
+            for child in node.children(&mut cursor) {
+                stack.push(child);
+            }
+        }
+        found.sort_unstable();
+        found.into_iter().map(|(_, id)| id).collect()
+    }
+
+    /// Matches the two argument lists and the given identifier pairs, marks every `,` dropped on
+    /// both sides, and runs only this pass.
+    fn solve_calls(before_src: &str, after_src: &str, identifiers: &[(&str, &str)]) -> ASTDiff {
+        let before = Code::from_string(before_src, &Language::Java);
+        let after = Code::from_string(after_src, &Language::Java);
+        let node_cache = NodeCache::build(&before, &after);
+        let mut diff = ASTDiff::default();
+        let args = |code: &Code| {
+            find_first_of_kind(code.ast.as_ref().unwrap().root_node(), "argument_list")
+                .unwrap()
+                .id()
+        };
+        diff.add_mapping(
+            args(&before),
+            args(&after),
+            ASTMapping::matched_not_identical(ASTMappingReason::IdenticalHash),
+        );
+        for &(b, a) in identifiers {
+            diff.add_mapping(
+                leaves(&before, b)[0],
+                leaves(&after, a)[0],
+                ASTMapping::identical(ASTMappingReason::IdenticalHash),
+            );
+        }
+        for id in leaves(&before, ",") {
+            diff.add_mapping(id, 0, ASTMapping::deleted(ASTMappingReason::UnresolvedNode));
+        }
+        for id in leaves(&after, ",") {
+            diff.add_mapping(
+                0,
+                id,
+                ASTMapping::inserted(ASTMappingReason::UnresolvedNode),
+            );
+        }
+        solve(
+            &crate::diff::PassCtx::new(&before, &after, &node_cache),
+            &mut diff,
+        );
+        diff
+    }
+
+    fn orphans_paired(diff: &ASTDiff) -> usize {
+        diff.mapping
+            .values()
+            .filter(|m| m.reason == ASTMappingReason::OrphanedLeafUnderMatchedParent)
+            .count()
+    }
+
+    #[test]
+    fn a_dropped_comma_between_the_same_arguments_is_paired() {
+        let diff = solve_calls(
+            "class C { void f() { g(a, b); } }",
+            "class C { void f() { g(a, b); } }",
+            &[("a", "a"), ("b", "b")],
+        );
+        assert_eq!(orphans_paired(&diff), 1);
+    }
+
+    #[test]
+    fn unequal_orphan_counts_pair_nothing() {
+        let diff = solve_calls(
+            "class C { void f() { g(a, b, c); } }",
+            "class C { void f() { g(a, b); } }",
+            &[],
+        );
+        assert_eq!(orphans_paired(&diff), 0);
+    }
+
+    #[test]
+    fn a_comma_between_different_arguments_is_not_paired() {
+        let diff = solve_calls(
+            "class C { void f() { g(a, b); } }",
+            "class C { void f() { g(b, a); } }",
+            &[("a", "a"), ("b", "b")],
+        );
+        assert_eq!(orphans_paired(&diff), 0);
     }
 }

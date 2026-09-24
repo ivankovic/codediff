@@ -28,10 +28,7 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // After `RenderOptions::paint_displaced_moves` stopped `MINIMAL` painting a span that kept its
-    // own text and its own place and shifted only because of an edit before it: minimal 48.052% ->
-    // 20.779%. The option is off under `FULL`, which this fix leaves byte-identical at 59.091%, so
-    // `FULL` sets the limit now.
+    // `FULL` sets the limit.
     assert_matches_human_painting_within_limit("c-neovim-neovim-small-change", 59.11)
 }
 

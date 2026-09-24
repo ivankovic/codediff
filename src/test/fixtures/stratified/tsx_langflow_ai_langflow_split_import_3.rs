@@ -23,10 +23,8 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // Requires N:M mapping
-    // Exact until the ground truth gained all-to-all groups: nine of the ten mismatches are
-    // group members a one-to-one output cannot reach, the N:M floor (see `MultiMapGroup::
-    // pairing`). The tenth is an ordinary gap.
+    // Requires N:M mapping. Nine of the ten mismatches are all-to-all group members a one-to-one
+    // output cannot reach (see `MultiMapGroup::pairing`); the tenth is an ordinary gap.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "tsx-langflow-ai-langflow-split-import-3",
         10,

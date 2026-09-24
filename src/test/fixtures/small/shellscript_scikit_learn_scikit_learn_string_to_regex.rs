@@ -21,9 +21,7 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // `SHELL_STRING_BODY_KINDS` lets a `string_content` rewritten as a `regex` rename into it
-    // instead of being deleted and re-inserted - which is the entire edit this fixture is named
-    // for.
+    // Pins `SHELL_STRING_BODY_KINDS`: a `string_content` rewritten as a `regex` renames into it.
     test::helper::human_mapping::assert_matches_human_mapping(
         "shellscript-scikit-learn-scikit-learn-string-to-regex",
     )

@@ -24,7 +24,7 @@ use anyhow::{Ok, Result};
 
 #[test]
 fn mapping() -> Result<()> {
-    // Clamped at the measured residual; what the remainder is has not been analysed here.
+    // Residual not yet examined.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "rust-turbopack-module-rule",
         62,
@@ -439,10 +439,9 @@ fn mapping_details() -> Result<()> {
 
 #[test]
 fn invariants() -> Result<()> {
-    // What is left: invariant 3 on three delimiter pairs the mapping splits (after rows 201, 203
-    // and 204 open inserted while their closers are matched), invariant 11 on removed leaves the
-    // `Minimal` painting leaves unpainted (2 on before row 217, 81 across after rows 202 onward),
-    // and invariant 12 on one edited leaf neither side paints.
+    // Invariant 3 on three delimiter pairs the mapping splits (after rows 201, 203, 204 open
+    // inserted, closers matched), invariant 11 on removed leaves `Minimal` leaves unpainted (2 on
+    // before row 217, 81 from after row 202), invariant 12 on one edited leaf neither side paints.
     assert_ground_truth_invariants_with_known_violations("rust-turbopack-module-rule", 6)
 }
 

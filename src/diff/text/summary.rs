@@ -16,9 +16,8 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-// Split out of text.rs (its post-hoc diff summarization/analytics, consumed by the TUI
-// header/footer - a distinct concern from rendering itself) purely to shrink that file's
-// visible size. No behavior change.
+//! Whole-diff summaries of painted ranges: per-line operations, change counts, and the
+//! [`DiffSummary`] label.
 
 use tree_sitter::Node;
 
@@ -28,30 +27,20 @@ use crate::diff::{ASTDiff, NodeCache, nodes};
 use super::render_options::{RangeMatch, TextOperation};
 use super::{NodeChange, classify_node};
 
-/// Assigns one `TextOperation` to each of `line_count` lines, from one side's `RangeMatch` list
-/// (`TextDiff::all`).
+/// One `TextOperation` per line, from one side's ranges (`TextDiff::all`), for line-based consumers
+/// such as the headless plain-text renderer and the comparison against Unix `diff`.
 ///
-/// Deliberately row-granular, not column-precise: a range's column bounds are only used to decide
-/// whether it's a zero-width placeholder, never to split a single line between two operations.
-/// `diff::text` ranges are whitespace-insensitive and can leave small gaps (e.g. leading
-/// indentation - see `python_leetcode_1_added_if_block_all_ranges` below), so lining up exact
-/// sub-line spans for a plain-text consumer would be fragile; whole-line coloring instead picks,
-/// for each row, the *most specific* operation among all the ranges that touch it (see the
-/// precedence comment below). Used by both `tui::headless` (its plain-text fallback renderer -
-/// the TUI itself stays column-precise) and `benchmark_other` (reducing any `ASTDiff` - codediff's
-/// own or a synthetic one built from a human mapping - to a per-line signal comparable against an
-/// external line-based tool like Unix `diff`).
+/// Row-granular on purpose: the ranges are whitespace-insensitive and leave small gaps (leading
+/// indentation), so each row takes the most specific operation of any range touching it rather
+/// than sub-line spans. Zero-width placeholder ranges touch no row.
 pub fn line_operations(ranges: &[RangeMatch], line_count: usize) -> Vec<TextOperation> {
     let mut ops = vec![TextOperation::Identical; line_count];
     for rm in ranges {
         let r = &rm.source;
         if r.is_empty() {
-            // Zero-width placeholder: nothing on this side for this diff unit (see
-            // `TextRange`'s doc comment on symmetric insert/delete placeholders).
             continue;
         }
-        // `TextRange`'s convention: an end column of 0 already means "up to, not including, this
-        // row", so only a genuinely mid-row end column needs the extra +1.
+        // An end column of 0 already excludes the end row.
         let end_row = if r.end_column == 0 {
             r.end_row
         } else {
@@ -62,14 +51,8 @@ pub fn line_operations(ranges: &[RangeMatch], line_count: usize) -> Vec<TextOper
             .take(end_row.min(line_count))
             .skip(r.start_row)
         {
-            // A row can legitimately be touched by more than one range (e.g. a changed token
-            // shares its row with the identical whitespace/punctuation around it). Whichever
-            // range for that row is *not* Identical wins, regardless of iteration order -
-            // otherwise an Identical range for the same row ordered after the real change would
-            // silently overwrite it back to plain, hiding the change entirely. Two non-Identical
-            // ranges touching the same row is not expected to happen in practice (ranges are
-            // built from a non-overlapping tree traversal, see `diff/text.rs`), so last-wins
-            // between two of those is an arbitrary but harmless tiebreak.
+            // A non-`Identical` range wins over an `Identical` one on the same row whatever the
+            // order, or the whitespace around a changed token would hide it.
             if rm.operation != TextOperation::Identical || *row_op == TextOperation::Identical {
                 *row_op = rm.operation.clone();
             }
@@ -78,8 +61,7 @@ pub fn line_operations(ranges: &[RangeMatch], line_count: usize) -> Vec<TextOper
     ops
 }
 
-/// Line-level +/-/~ counts for a completed diff - e.g. for a compact status-bar summary like
-/// `+12 -4 ~2`.
+/// Line-level counts for a status-bar summary like `+12 -4 ~2`.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct ChangeCounts {
     pub insertions: usize,
@@ -88,12 +70,9 @@ pub struct ChangeCounts {
     pub moves: usize,
 }
 
-/// Counts each side's own [`line_operations`] output independently: `Insert` from the after side
-/// (a line that exists only in after), `Delete` from the before side (a line that exists only in
-/// before). `Update` is counted once, from the after side only - an updated line exists on both
-/// sides at the same row, so counting it from both sides would double it. `Move` is counted from
-/// the after side only for the same reason - a moved line exists on both sides (at different
-/// rows), so its destination is the single representative.
+/// Counts lines from each side's [`line_operations`]: deletions from the before side, and
+/// insertions, updates and moves from the after side, since an updated or moved line exists on
+/// both sides and must count once.
 pub fn change_counts(
     before_contents: &str,
     after_contents: &str,
@@ -123,58 +102,31 @@ pub fn change_counts(
     }
 }
 
-/// A quick, common-case classification of a diff's overall shape. Most variants are cheap enough
-/// to compute on every completed diff (see `summarize_diff`) from data `TextDiff` already
-/// produces, no extra tree-sitter/AST work needed - `CommentOnly` is the one exception, which
-/// needs AST-level node-kind access (`is_comment_only_diff`) and so is only ever added on by
-/// `summarize_diff_with_comment_check`, not `summarize_diff` itself. Deliberately
-/// presentation-agnostic (a label, not a color or an icon): callers like `tui::app` map each
-/// variant to their own styling, the same separation `tui::headless`'s `ansi_color`/`marker`
-/// already draw around `TextOperation`.
+/// A label for a diff's overall shape, when it has a common one. A label, not a style: callers map
+/// each variant to their own presentation. `CommentOnly` needs the AST and comes only from
+/// [`summarize_diff_with_comment_check`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DiffSummary {
-    /// The two sides are byte-for-byte identical. Deliberately *not* "no operations were
-    /// produced" - a pure reformat can also produce zero operations (see `summarize_diff`'s own
-    /// doc comment on why), but that case is `WhitespaceOnly`, not this.
+    /// The two sides are byte-identical. Not "no operations": a pure reformat can produce none,
+    /// and that is `WhitespaceOnly`.
     NoChanges,
-    /// Every changed range is an `Insert` - nothing on the before side was touched or survived.
+    /// Every range is an `Insert`.
     NewFile,
-    /// Every changed range is a `Delete` - nothing on the after side existed before.
+    /// Every range is a `Delete`.
     DeletedFile,
-    /// The before/after content is identical once every whitespace character is stripped out,
-    /// though the two sides are not byte-identical (that's `NoChanges`) - regardless of what
-    /// operations, if any, actually resulted. Checked before any operation-based case: a pure
-    /// reformat can produce many `Move` ranges (a node's column shifting is by itself enough to
-    /// reclassify an otherwise-`Identical` range as `Move` - see `ranges`'s own Identical/Move
-    /// branch), *or* zero ranges at all if the shifted node's own position happens to be
-    /// unaffected (see `summarize_diff`). Checking operations alone can't tell either of those
-    /// apart from a real reordering, but comparing whitespace-stripped content can, since real
-    /// reordering changes token order and a pure reformat never does.
+    /// Equal once all whitespace is removed, but not byte-identical, whatever the operations. A
+    /// reformat can produce many `Move`s or none at all; only the stripped content tells it apart
+    /// from a real reorder, which changes token order.
     WhitespaceOnly,
-    /// Every "real" change (an `Insert`, `Delete`, `DeleteWithChildren`, `InsertWithChildren`, or
-    /// `Update` at the AST-mapping level) touches only comment nodes (`nodes::is_comment`) - see
-    /// `is_comment_only_diff`. Checked after `NewFile`/`DeletedFile` (a wholly new file that
-    /// happens to be all comments is still more usefully reported as `NewFile`), but before
-    /// `RefactorMovedOnly`/no classification at all, since "only comments changed" is the more
-    /// specific and more useful claim of those two.
+    /// Every real change touches only comments ([`is_comment_only_diff`]). Loses to `NewFile` and
+    /// `DeletedFile`, beats `RefactorMovedOnly`.
     CommentOnly,
-    /// Every changed range is a `Move` (on top of whatever's `Identical`) - code relocated without
-    /// a single `Insert`, `Delete`, or `Update` anywhere. Checked after `WhitespaceOnly`, so a pure
-    /// reformat (which can also produce only `Move` ranges) is reported as that instead, since
-    /// "reformatted" is the more specific and more useful claim of the two.
-    ///
-    /// `TextOperation::Move` fires when a matched node's own *column* shifts (a re-indent), or
-    /// when a multi-row matched node's destination lands *before* the last sequential anchor (a
-    /// sibling reorder - see `ranges`'s `crossed_backwards`). A same-column row shift caused by
-    /// unrelated edits elsewhere in the file is deliberately not a `Move`. Before the
-    /// `crossed_backwards` check existed, a pure reorder of two top-level functions produced no
-    /// operations at all - the diff rendered as completely unchanged and this variant never fired
-    /// for the very case it names.
+    /// Every non-`Identical` range is a `Move`. Loses to `WhitespaceOnly`, the more specific claim.
     RefactorMovedOnly,
 }
 
 impl DiffSummary {
-    /// A short, human-readable label - presentation-agnostic (see this type's own doc comment).
+    /// A short human-readable label.
     pub fn label(self) -> &'static str {
         match self {
             DiffSummary::NoChanges => "No changes - files are identical",
@@ -187,42 +139,25 @@ impl DiffSummary {
     }
 }
 
-/// Whether `a` and `b` contain the same characters once every whitespace character is removed from
-/// each - the check behind `DiffSummary::WhitespaceOnly`. Compares via iterators rather than
-/// building two new `String`s, since this runs on full file contents on every completed diff.
+/// Whether `a` and `b` are equal once all whitespace is removed. Runs on whole files, so it
+/// compares iterators rather than building strings.
 pub(crate) fn whitespace_stripped_equal(a: &str, b: &str) -> bool {
     a.chars()
         .filter(|c| !c.is_whitespace())
         .eq(b.chars().filter(|c| !c.is_whitespace()))
 }
 
-/// Classifies a diff's overall shape into one of `DiffSummary`'s common cases, or `None` if it
-/// doesn't cleanly fit any of them (the ordinary case - most diffs are a genuine mix of edits).
-/// `before_ranges`/`after_ranges` are `TextDiff::all(0)`/`TextDiff::all(1)` (or the equivalent -
-/// `DiffSessionData`'s own fields, in `tui::app`), and `before_contents`/`after_contents` the full
-/// raw source each side was parsed from.
-///
-/// Checked in order from most to least specific, returning the first match - see each
-/// `DiffSummary` variant's own doc comment for why that particular order matters
-/// (`WhitespaceOnly` before `RefactorMovedOnly` in particular).
+/// The [`DiffSummary`] of a diff, or `None` for the ordinary mix of edits. The ranges are
+/// `TextDiff::all(0)`/`all(1)`; the contents are each side's full source. The most specific
+/// case wins (see each variant).
 pub fn summarize_diff(
     before_contents: &str,
     after_contents: &str,
     before_ranges: &[RangeMatch],
     after_ranges: &[RangeMatch],
 ) -> Option<DiffSummary> {
-    // Checked before anything operation-based, not after: a pure reformat can legitimately
-    // produce *zero* `TextOperation`s at all, not just `Move`s. Hash-based matching pairs the
-    // largest identical subtree it can (ignoring position), and `ranges` only checks a matched
-    // node's own start column against its match - once matched, it never descends into that
-    // node's children (`descend = false` in the `Identical` branch above). So a whole-file
-    // reformat that happens to match as one big subtree, whose own start position is unchanged
-    // (e.g. the file root, or a top-level item still at column 0), produces a single `Identical`
-    // range covering everything, with no `Move` anywhere - confirmed empirically against the real
-    // pipeline, not just reasoned about. Checking operation presence first would misreport that
-    // case as `NoChanges`, which is wrong: the files are not byte-identical, only AST-identical
-    // modulo whitespace. Only a literal content match earns `NoChanges`; everything else that's
-    // whitespace-stripped-equal is `WhitespaceOnly`, regardless of what operations (if any) resulted.
+    // Content first: a reformat matched as one subtree whose start did not move paints a single
+    // `Identical` range and no `Move`, and must still be `WhitespaceOnly`, not `NoChanges`.
     if before_contents == after_contents {
         return Some(DiffSummary::NoChanges);
     }
@@ -246,11 +181,8 @@ pub fn summarize_diff(
         }
     }
 
-    // `!has_identical` matters here, not just "only Insert/Delete present": without it, adding one
-    // line to an otherwise-untouched large file would also match "only Insert present" and get
-    // mislabeled NewFile - confirmed as a real, not hypothetical, misclassification by running the
-    // actual pipeline on exactly that case. A genuinely new/deleted file has nothing on the other
-    // side to have matched anything against, so no Identical range can exist for it either.
+    // One line added to an untouched file is not a new file: a real new file has nothing to be
+    // `Identical` to.
     if has_insert && !has_delete && !has_update && !has_move && !has_identical {
         return Some(DiffSummary::NewFile);
     }
@@ -264,27 +196,13 @@ pub fn summarize_diff(
     None
 }
 
-/// Whether every "real" change between `before` and `after` (per `diff`) touches only comment
-/// nodes (`nodes::is_comment`) - the check behind `DiffSummary::CommentOnly`. `false`, not an
-/// error, if either side has no AST (nothing to walk).
+/// Whether every real change between `before` and `after` touches only comments. `false` when
+/// either side has no AST, and when nothing changed at all (e.g. only `Move`s): "comment-only" is a
+/// claim about what changed.
 ///
-/// "Real" means the same handful of AST-mapping operations `ranges` itself treats as producing a
-/// visible change - `DeleteWithChildren`, `InsertWithChildren`, a childless `Delete`/`Insert`, an
-/// `Update`, or a `MatchButNotIdentical` whose `own_content` differs - checked with the exact same
-/// criteria `ranges` itself uses (mirrored deliberately, not reused: `ranges` also tracks positions
-/// and merges the two sides' ranges, work this doesn't need for a yes/no answer). Everything else -
-/// `Identical`, `Move`, a non-childless plain `Delete`/`Insert`, a `MatchButNotIdentical` whose
-/// `own_content` doesn't differ - is bookkeeping for an ancestor/container of the real change, not
-/// the change itself, so it's skipped by descending into it rather than required to be a comment.
-/// Returns `false`, not `true`, if no qualifying operation exists at all (e.g. a diff that's only
-/// `Move`s): "comment-only" is a claim about *what* changed, and is meaningless to assert about a
-/// diff where nothing did.
-///
-/// Checks comment-ness via `is_comment_or_inside_comment`, not a bare `nodes::is_comment(node.
-/// kind())`: at least one grammar (Rust's `line_comment`) represents a comment as a small node
-/// tree of its own rather than one opaque token (confirmed empirically - its `//` marker is a
-/// separate child node), so the specific node actually carrying the mapping can be a non-
-/// comment-kind piece *of* a comment.
+/// A real change is what [`classify_node`] says `ranges` paints; containers of one are descended.
+/// A node counts as a comment when it or an ancestor is one, because some grammars (Rust's
+/// `line_comment`) build a comment from child nodes such as its `//` marker.
 pub fn is_comment_only_diff(
     before: &Code,
     after: &Code,
@@ -295,14 +213,7 @@ pub fn is_comment_only_diff(
         return false;
     };
 
-    // `node` itself, or an ancestor of it, is a comment. Not just `nodes::is_comment(node.kind())`
-    // directly: at least one grammar (Rust's `line_comment`) represents a comment as a small node
-    // tree of its own (the `//` marker is its own child, confirmed empirically), so the specific
-    // node carrying an Insert/Delete/Update mapping can be a non-comment-kind piece *of* a
-    // comment, not the comment node itself. Walking up finds the enclosing comment either way.
-    //
-    // Walks `node_to_parent` ids rather than `Node::parent()`, which is an O(depth) descent from
-    // the root per call.
+    // Walks `node_to_parent` because `Node::parent()` descends from the root on every call.
     fn is_comment_or_inside_comment(node_id: usize, meta: &crate::code::ASTMetadata) -> bool {
         let mut current = Some(node_id);
         while let Some(id) = current {
@@ -318,9 +229,8 @@ pub fn is_comment_only_diff(
         false
     }
 
-    // Returns (found_any_qualifying_operation, every_one_of_them_was_a_comment). `own_bytes` is
-    // `root`'s own source, `other_bytes` its mapped counterpart's - i.e. (before, after) when
-    // `root` is the before-tree root, (after, before) when it's the after-tree root.
+    // `(found any real change, every one was a comment)`. `other_bytes` is the mapped side's
+    // source.
     fn scan(
         root: Node,
         diff: &ASTDiff,
@@ -342,8 +252,6 @@ pub fn is_comment_only_diff(
                 }
             };
 
-            // The same classification `ranges` paints from, so "is this a visible change" and
-            // "what gets painted" cannot drift apart.
             if let Some((mapped_id, mapping)) = diff.mapping_for_node(&node.id()) {
                 match classify_node(
                     node,
@@ -395,20 +303,14 @@ pub fn is_comment_only_diff(
         before_bytes,
     );
 
-    // At least one side must have actually found a qualifying operation - "comment-only" is
-    // meaningless to assert about a diff where nothing changed at all (e.g. a diff that's only
-    // Moves) - and whichever side(s) did find one must all agree it was comment-only.
     (before_found || after_found)
         && (!before_found || before_all_comments)
         && (!after_found || after_all_comments)
 }
 
-/// Same as `summarize_diff`, but folds in `DiffSummary::CommentOnly` too - checked with lower
-/// precedence than every other case (see that variant's own doc comment for the exact order).
-/// A separate function, not an extra parameter on `summarize_diff` itself: `is_comment_only` needs
-/// AST-level node-kind access (`is_comment_only_diff`, over `ASTDiff`+`Code`), which
-/// `summarize_diff`'s own inputs (`TextDiff`'s already-flattened `RangeMatch`es) don't carry -
-/// callers without that access, or that don't need it, can keep using `summarize_diff` directly.
+/// [`summarize_diff`] plus [`DiffSummary::CommentOnly`], which overrides only `None` and
+/// `RefactorMovedOnly`. Separate because `is_comment_only` needs the AST, which the flattened
+/// ranges do not carry.
 pub fn summarize_diff_with_comment_check(
     before_contents: &str,
     after_contents: &str,

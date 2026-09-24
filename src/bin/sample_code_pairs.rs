@@ -30,16 +30,12 @@ use codediff::stats::filesystem::{find_git_repositories, for_each_repository};
 use codediff::stats::git::{text_loc_if_in_range, walk_single_parent_commit_diffs};
 use codediff::stats::sampling::{LOC_BUCKETS, Reservoir, loc_bucket};
 
-// Files outside this range are excluded: near-empty files make trivial benchmark cases, and
-// anything above the upper bound is past the size `expand_from_code` itself treats as
-// "too large to parse" (see `stats::expand_from_code`), so diff_code couldn't use it anyway.
+// The upper bound is the size `stats::expand_from_code` refuses to parse.
 const MIN_BYTES: usize = 1;
 const MAX_BYTES: usize = 1024 * 1024;
 
-// Sampling is stratified across `LOC_BUCKETS` per language, rather than purely uniform, so that
-// large files (where tree-edit-distance cost grows super-linearly) aren't drowned out by the much
-// more common small ones - see that constant's doc comment (`stats::sampling`) for the buckets
-// themselves and why this is the same scheme `sample_test_diffs --stratified` uses.
+// Sampling is stratified across `LOC_BUCKETS` per language so the rare large files, where
+// tree-edit-distance cost grows super-linearly, are not drowned out by small ones.
 
 #[derive(Parser)]
 struct Args {
@@ -64,16 +60,13 @@ struct Args {
     #[arg(long)]
     language: Option<String>,
 
-    /// Stop after walking this many commits per repository (most-recent-first). Repos cloned
-    /// with `git fetch --depth=N` repeatedly can accumulate far more local history than N as
-    /// fetches deepen them over time, so an unbounded walk can take effectively forever on a
-    /// long-lived project; this keeps each repo's contribution bounded.
+    /// Stop after walking this many commits per repository (most-recent-first). Repeated
+    /// shallow fetches can deepen a clone far past its original depth.
     #[arg(long, default_value_t = 1000)]
     max_commits_per_repo: usize,
 }
 
-/// A pointer to a (before, after) code pair: the actual content lives in the repository
-/// checkout, not in this tool's output, so only enough is recorded to look it up again later.
+/// A pointer to a (before, after) code pair in a repository checkout.
 ///
 /// Reconstruction contract: before = blob at `old_path` in `commit`'s (single) parent tree,
 /// after = blob at `path` in `commit`'s tree. `old_path` equals `path` except for renames.
@@ -94,8 +87,6 @@ fn main() -> Result<()> {
     }
     println!("Found {} repositories", repo_paths.len());
 
-    // Capacity is per (language, size bucket), so each language's overall budget stays close to
-    // `count` while guaranteeing every size class gets a fair share regardless of how rare it is.
     let bucket_capacity = (args.count / LOC_BUCKETS.len()).max(1);
 
     let mut rng = StdRng::seed_from_u64(args.seed);
@@ -143,7 +134,7 @@ fn sample_repository(
         if !matches!(delta.status(), Delta::Modified | Delta::Renamed) {
             return Ok(());
         }
-        // A pure rename with no content change is a trivial, not a useful, diff pair.
+        // A pure rename is a trivial diff pair.
         if delta.old_file().id() == delta.new_file().id() {
             return Ok(());
         }
@@ -159,9 +150,8 @@ fn sample_repository(
         let Some(mut language) = language_for_path(path) else {
             return Ok(());
         };
-        // Refine a `.ts` guess by content (Qt Linguist vs. real TypeScript, see
-        // `language_for_path_and_content`'s doc comment) - gated to `TypeScript` specifically so
-        // this walk doesn't pay for a blob read on every other file it passes over.
+        // Only `.ts` needs content to disambiguate (Qt Linguist vs. TypeScript); gating on it
+        // avoids a blob read for every other file.
         if language == Language::TypeScript
             && let Ok(blob) = repo.find_blob(delta.new_file().id())
             && let Ok(text) = std::str::from_utf8(blob.content())
@@ -169,7 +159,6 @@ fn sample_repository(
         {
             language = refined;
         }
-        // Only sample languages diff_code can actually parse.
         if to_treesitter(&language).is_none() {
             return Ok(());
         }
@@ -179,8 +168,7 @@ fn sample_repository(
             return Ok(());
         }
 
-        // The larger of the before/after line counts decides the size bucket; `None` means either
-        // side is binary or outside the configured byte-size bounds.
+        // The larger side decides the bucket; a binary or out-of-range side skips the pair.
         let loc = text_loc_if_in_range(repo, delta.old_file().id(), MIN_BYTES, MAX_BYTES)
             .zip(text_loc_if_in_range(
                 repo,
@@ -270,9 +258,7 @@ mod tests {
             &mut rng,
         )?;
 
-        // Whichever LOC bucket(s) the handmade repository's small fixture files land in - not
-        // asserting a specific one, since that's a property of the fixture content's line count,
-        // not of this sampling logic.
+        // Any bucket: which one is a property of the fixture's line count, not of sampling.
         let rust_items: Vec<_> = reservoirs
             .iter()
             .filter(|((language, _), _)| language == "Rust")
@@ -291,6 +277,4 @@ mod tests {
 
         Ok(())
     }
-
-    // `loc_bucket`'s boundaries are tested once, in `stats::sampling` where it now lives.
 }

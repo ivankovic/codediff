@@ -22,12 +22,8 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // This test case has several corner cases:
-    //
-    // 1. Usual case of multiple possible valid mappings for chains of same node kind.
-    //
-    // In particular, the code "common.prim_rect.size()" changing to "common.prim_size" changes the
-    // AST from:
+    // Multiple valid mappings for chains of one node kind: `common.prim_rect.size()` becoming
+    // `common.prim_size` turns
     //
     // call_expression
     //   field_expression
@@ -38,18 +34,15 @@ fn mapping() -> Result<()> {
     //   .
     //   field_identifier "size"
     //
-    //  to:
+    // into
     //
-    //  field_expression
-    //    identifier "common"
-    //    .
-    //    field_identifier "prim_size"
+    // field_expression
+    //   identifier "common"
+    //   .
+    //   field_identifier "prim_size"
     //
-    // There is no optimal cost difference between mapping the field_expression on the after side to
-    // either of the field_expression nodes on the before side. The cost is the same either way.
-    // Modeled as a `MultiMapGroup` (see `human_mapping.json`): the outer call's own closing paren
-    // and the collapsed inner call's closing paren are equally valid matches for the after side's
-    // single closing paren, so either pairing is accepted.
+    // and either before `field_expression` costs the same. A `MultiMapGroup` accepts either closing
+    // paren for the after side's single one.
     test::helper::human_mapping::assert_matches_human_mapping("rust-firefox-webrenderer-borders")
 }
 

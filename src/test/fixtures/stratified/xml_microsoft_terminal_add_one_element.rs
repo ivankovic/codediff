@@ -23,14 +23,9 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // First baseline, not a regression: this fixture was promoted with its human mapping already
-    // written, so the stub's generated 0/0 never reflected a measurement. One `<test/>` element
-    // appended to a run of siblings, so the whitespace `CharData` that closes the list ("\r\n",
-    // with `</tests>` at column 0) now separates two elements and carries the new line's two-space
-    // indent instead. codediff and the human agree on both the pairing and on after `CharData:17`
-    // being the insert - the whole disagreement is the operation on that one pair, which the human
-    // reads as `Update` and codediff reports as `Identical`. One node, visible. Lower both numbers
-    // when a fix lands.
+    // One `<test/>` appended, so the closing whitespace `CharData` now separates two elements and
+    // carries a new indent. The pairing agrees; the human calls that pair `Update`, codediff
+    // `Identical`.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "xml-microsoft-terminal-add-one-element",
         1,

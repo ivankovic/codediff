@@ -23,12 +23,9 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // Impossible to map because of parse errors. Painting is correct.: 1 total, 0 visible - and the
-    // one mismatch is exactly that parse error. Both sides carry a tree-sitter `ERROR` node (its
-    // parse-failure placeholder); the human mapping pairs them, codediff deletes before's instead,
-    // because after's sits one level deeper - under an added `expression_statement` - and
-    // APTED("qualified_name") does not follow it down. Nothing a reader can see is affected:
-    // `ERROR` is scaffolding, which is why the visible count is 0 while the total is 1.
+    // Impossible to map because of parse errors; the painting is correct. The one mismatch: both
+    // sides carry an `ERROR` node, which the human pairs, but after's sits one level deeper and
+    // `APTED("qualified_name")` deletes before's. Scaffolding, so nothing visible.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "c-ladybirdbrowser-ladybird-small-parse-errors",
         1,

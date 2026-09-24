@@ -23,13 +23,9 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // 20 total, 14 visible. Every one of them is the same disagreement, reported as
-    // `MatchButNotIdentical, reason APTED("qualified_name")`: the human mapping pairs the first
-    // `call_expression` on each side, codediff pairs before's first with after's *second*, and the
-    // whole subtree under it (member_expression, arguments, ...) follows the parent into the wrong
-    // slot. That is the qualified_name family investigated and left unfixed, not a new bug - but
-    // note it is NOT one of the gaps TODO.md writes up, so this comment is the whole record of it.
-    // Lower both numbers when a fix lands.
+    // All one disagreement (`APTED("qualified_name")`): the human pairs the first
+    // `call_expression` on each side, codediff pairs before's first with after's second, and the
+    // whole subtree follows. The qualified_name family; not written up in TODO.md.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "javascript-d3-d3-nice-small-change",
         20,
@@ -39,10 +35,8 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // The inverse Move asymmetry: 11 of the disagreements are `ours=None, theirs=Move`. Same
-    // fixture whose mapping() is clamped just above for the qualified_name family - the mapping
-    // pairs the wrong call_expression, so the painting inherits it. Fixing the mapping should move
-    // this number too.
+    // Mostly `ours=None, theirs=Move`, inherited from the wrong `call_expression` pairing the
+    // mapping clamp describes.
     assert_matches_human_painting_within_limit("javascript-d3-d3-nice-small-change", 15.26)
 }
 

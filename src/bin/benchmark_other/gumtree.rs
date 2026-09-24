@@ -16,9 +16,6 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-// Split out of benchmark_other.rs (the `gumtree`-cluster functions) purely to shrink that
-// file's visible size - no behavior change.
-
 use anyhow::{Context, Result, bail};
 use codediff::code::{Code, Language};
 use codediff::diff::text_range::TextRange;
@@ -28,34 +25,13 @@ use std::process::Command;
 
 use super::{char_offset_table, external_tool_bin, span_from_char_offsets, write_temp_pair};
 
-/// `(generator id, file extension)` for every corpus language the installed GumTree build has a
-/// registered generator for at all - confirmed live via `gumtree list GENERATORS` *and* by
-/// running each entry against a real fixture pair from this corpus (2026-08-20).
+/// `(generator id, file extension)` for every corpus language the installed GumTree build
+/// (v4.0.0-beta8) registers a generator for. Re-verify by running each entry against a real
+/// fixture whenever the build changes; `gumtree list GENERATORS` alone is not reliable.
 ///
-/// The installed build is **v4.0.0-beta8** (`/var/tmp/gumtree-installed/gumtree-4.0.0-beta8`),
-/// re-verified entry by entry on 2026-08-20. This table has been wrong about the installed build
-/// twice now, in both directions - it claimed beta8 while beta4 was installed, and mapped C++ to
-/// a generator beta4 does not register - so re-verify the whole table by running it whenever the
-/// build changes, rather than carrying any of these claims forward.
-///
-/// One backend picked per language, not the pick-by-priority-number default GumTree's own `-g`-
-/// less auto-detection would use: every entry here is passed via `-g <id>` explicitly (see
-/// `gumtree_line_labels`), both to sidestep a real bug in GumTree's own auto-detect regex for C#
-/// (`cs-treesitter-ng` is registered as `\.[cs]$` - a character class matching a lone "c" or "s",
-/// not the literal ".cs" - confirmed empirically: a `.cs` file never auto-selects it) and so this
-/// table is the one place that documents exactly which generator every language actually runs
-/// through, rather than leaving it to auto-detection's priority ordering.
-///
-/// `*-treesitter-ng` chosen over a `*-srcml` alternative (available for C/C++/C#/Java) wherever
-/// both exist: no extra external binary to install, and it keeps every non-Java language on the
-/// same parser family this codebase itself is built on, which is at least a more comparable
-/// unknown than mixing parser families per language. Per GumTree's own "Languages" wiki page
-/// (checked 2026-07), only `java-jdt` and `css-phcss` are marked "Stable" - every
-/// `*-treesitter-ng` entry below is still "Testing" by GumTree's own classification (see
-/// `ExternalTool::supports`'s doc comment for what that means for how to read results on them).
-///
-/// No entry for any language outside this match: confirmed no registered generator exists for it
-/// in this build.
+/// Passed explicitly via `-g` because GumTree's auto-detect regex for C# (`\.[cs]$`) never matches
+/// `.cs`. `*-treesitter-ng` is preferred over `*-srcml`: no extra binary, and the same parser family
+/// codediff uses.
 pub(crate) fn gumtree_generator(language: Language) -> Option<(&'static str, &'static str)> {
     match language {
         Language::Java => Some(("java-jdt", "java")), // Stable
@@ -68,43 +44,21 @@ pub(crate) fn gumtree_generator(language: Language) -> Option<(&'static str, &'s
         Language::TypeScript => Some(("ts-treesitter-ng", "ts")), // Testing
         Language::JavaScript => Some(("js-treesitter-ng", "js")), // Testing
         Language::CSharp => Some(("cs-treesitter-ng", "cs")), // Testing
-        // Added 2026-08-20, when this table listed only the ten entries above and GumTree was
-        // therefore being scored on a non-random 48% of the corpus that excluded whole language
-        // families. Each entry is verified by *running* it against a real fixture pair from this
-        // corpus (a `textdiff -g <id> -f JSON` run producing a non-empty `matches` array), never
-        // trusted from `gumtree list GENERATORS` alone - see the CPP note below for why that
-        // distinction has already cost this table its accuracy once.
         Language::PHP => Some(("php-treesitter-ng", "php")),
         Language::Ruby => Some(("ruby-treesitter-ng", "rb")),
         Language::Swift => Some(("swift-treesitter-ng", "swift")),
         Language::R => Some(("r-treesitter-ng", "r")),
         Language::XML => Some(("xml-jsoup", "xml")),
         Language::YAML => Some(("yaml-snakeyaml", "yaml")),
-        // Added 2026-08-20 in the same re-verification pass, when the installed build changed
-        // from beta4 to beta8 (the beta4 tree under /var/tmp/tools/ no longer exists; beta8 is
-        // what is installed, and is also what the paper's comparison section claims). beta8 ships
-        // both of these and beta4 did not, so this is a build difference, not a corrected
-        // oversight: 22 C++ and 19 TSX fixtures move from `unsupported` into GumTree's scored set.
         Language::CPP => Some(("cpp-treesitter-ng", "cpp")), // Testing
         Language::TSX => Some(("tsx-treesitter-ng", "tsx")), // Testing
-        // `Language::JSON` deliberately absent, and this is the *reverse* direction of the same
-        // build change: beta4 registered `json-jackson` and beta8 does not (verified by running
-        // it - the client errors out on argument parsing, exactly as `cpp-treesitter-ng` did
-        // under beta4). beta8's `gen.json` package registers only `xml-jsoup`. 18 JSON fixtures
-        // therefore leave GumTree's scored set. Do not re-add this from a generator listing
-        // alone; run it first.
-        //
-        // Still genuinely unsupported by beta8, and correctly absent: HTML, LUA, Vimscript,
-        // ShellScript, Scala.
+        // No JSON: beta8 does not register `json-jackson`, whatever a generator listing says.
         _ => None,
     }
 }
 
-/// Path to the GumTree CLI script (`bin/gumtree` in its built distribution), from the `GUMTREE_BIN`
-/// environment variable - not bundled or auto-installed, since it's a separate JVM project with
-/// its own build (JDK 17 + Gradle; see the project's own install docs). Deliberately errors loudly
-/// rather than silently skipping: unlike a language `ExternalTool::supports` excludes, a missing
-/// binary for a language it claims to support is a real configuration problem.
+/// Path to GumTree's built `bin/gumtree` script, from `GUMTREE_BIN`. Errors rather than skipping:
+/// a missing binary for a supported language is a configuration problem.
 pub(crate) fn gumtree_bin() -> Result<std::path::PathBuf> {
     external_tool_bin(
         "GUMTREE_BIN",
@@ -112,21 +66,13 @@ pub(crate) fn gumtree_bin() -> Result<std::path::PathBuf> {
     )
 }
 
-/// Runs the real GumTree CLI (`textdiff ... -f JSON`) and reduces its output to the same per-line
-/// touched signal every other `ExternalTool` produces.
+/// Per-line touched flags from `gumtree textdiff -f JSON`.
 ///
-/// GumTree's JSON has two top-level arrays:
-/// - `matches`: `{src, dest}` pairs, each a `"KIND[: text] [start,end]"` string with a *character*
-///   offset range into that side's source text (verified empirically against this project's own
-///   fixtures, 2026-07 - `[start,end]` is half-open, matching this codebase's own `TextRange`
-///   convention).
-/// - `actions`: the edit script. `insert-tree`/`insert-node`'s `tree` is a dest-side reference
-///   (no src counterpart exists yet); `delete-tree`/`delete-node`'s `tree` is src-side (no dest
-///   counterpart). `update-node`/`move-tree`/`move-node` are the tricky ones: `tree` is *always*
-///   src-side even though the node also has a dest-side position - getting the dest range means
-///   looking `tree`'s exact string up in `matches` to find its `dest` counterpart (confirmed
-///   empirically against `java-refactor-constants` and `java-fix-array-index`: a `move-tree`/
-///   `update-node` action's `tree` string always appears verbatim as some `matches[].src` entry).
+/// - `matches`: `{src, dest}` pairs of `"KIND[: text] [start,end]"` node references, `[start,end]`
+///   a half-open *character* range.
+/// - `actions`: `insert-*` name a dest-side node, `delete-*` a src-side one. `update-node` and
+///   `move-*` name the src-side node; its dest position is found by looking the same string up in
+///   `matches`.
 pub(crate) fn gumtree_line_labels(before: &Code, after: &Code) -> Result<(Vec<bool>, Vec<bool>)> {
     let language = before.metadata.language.unwrap_or_default();
     let (generator, ext) = gumtree_generator(language)
@@ -154,11 +100,7 @@ pub(crate) fn gumtree_line_labels(before: &Code, after: &Code) -> Result<(Vec<bo
     gumtree_touched_from_json(before, after, &json)
 }
 
-/// Shared by both ways of running GumTree - the CLI subprocess (`gumtree_line_labels`) and the
-/// batch driver (`gumtree_warm_batch`) - since both emit the exact same `{"matches": [...],
-/// "actions": [...]}` schema (the driver reuses GumTree's own `ActionsIoUtils.toJson`, see
-/// `research/drivers/gumtree-batch/BatchDriver.java`'s doc comment). See `gumtree_line_labels`'s
-/// doc comment for what `matches`/`actions` mean.
+/// The pure half of [`gumtree_line_labels`]; see its doc comment for the schema.
 pub(crate) fn gumtree_touched_from_json(
     before: &Code,
     after: &Code,
@@ -203,9 +145,7 @@ pub(crate) fn gumtree_touched_from_json(
                 mark(&mut before_touched, &before.contents, tree)?;
                 match src_to_dest.get(tree) {
                     Some(dest) => mark(&mut after_touched, &after.contents, dest)?,
-                    // Contradicts what every fixture checked during development showed (see this
-                    // function's doc comment) - not fatal, but real enough to want visible in
-                    // benchmark output rather than a silently under-counted after-side.
+                    // Not expected; reported rather than silently under-counting the after side.
                     None => eprintln!(
                         "gumtree: no `matches` entry for {kind} tree {tree:?}, after-side line(s) not marked"
                     ),
@@ -218,25 +158,12 @@ pub(crate) fn gumtree_touched_from_json(
     Ok((before_touched, after_touched))
 }
 
-/// Runs every GumTree-supported fixture through one persistent JVM instead of one `gumtree
-/// textdiff` subprocess per fixture (`gumtree_line_labels`) - see
-/// `research/drivers/gumtree-batch/BatchDriver.java`'s doc comment for why: a fresh subprocess
-/// pays JVM startup/JIT warmup on every single invocation, which dominates `gumtree_ms` for small
-/// files (see `benchmark_other_runtime.png`'s gumtree violin sitting almost flat regardless of
-/// file size). This isolates GumTree's own parse+match+edit-script cost from that overhead, as a
-/// second, additional timing column - not a replacement for `gumtree_ms`, which is still an honest
-/// number for "cost of invoking the CLI the way most users would."
+/// Per-fixture GumTree timings from one persistent JVM (`gumtree_warm_ms`), so JVM startup and
+/// JIT warmup do not dominate. An additional column; `gumtree_ms` stays the per-process cost.
 ///
-/// Returns `Ok(None)` (not an error) when the batch driver isn't available - `GUMTREE_BIN` unset,
-/// or `research/drivers/gumtree-batch/build.sh` hasn't been run yet - since this is an optional
-/// second data point on top of the required `ExternalTool::GumTree` pass, unlike `gumtree_bin()`'s
-/// own hard failure when a fixture claims GumTree support but its CLI binary is missing entirely.
-///
-/// Feeds the whole batch through the driver's stdin/stdout in one process (see the driver's doc
-/// comment for the line-delimited-JSON protocol), writing the request body from a second thread so
-/// a response stream larger than the OS pipe buffer can't deadlock against still-unwritten
-/// request lines - `Command::wait_with_output` already reads stdout/stderr off background threads
-/// for the same reason, this just extends that to stdin.
+/// `Ok(None)` when the batch driver is unavailable (`GUMTREE_BIN` unset or
+/// `research/drivers/gumtree-batch/build.sh` not run). Stdin is written from a second thread so
+/// a response larger than the pipe buffer cannot deadlock against unwritten requests.
 pub(crate) fn gumtree_warm_batch(
     fixtures: &[(&str, &Code, &Code)],
 ) -> Result<Option<HashMap<String, f64>>> {
@@ -255,8 +182,7 @@ pub(crate) fn gumtree_warm_batch(
         return Ok(None);
     }
 
-    // Kept alive until the JVM process below has read every one of them - the driver reads these
-    // paths lazily off its stdin, well after this loop returns.
+    // Kept alive until the driver, which reads these paths lazily, is done.
     let mut before_files = Vec::with_capacity(fixtures.len());
     let mut after_files = Vec::with_capacity(fixtures.len());
     let mut requests = String::new();
@@ -320,13 +246,8 @@ pub(crate) fn gumtree_warm_batch(
             .as_str()
             .context("batch driver response missing `id`")?
             .to_string();
-        // One fixture GumTree cannot parse is a per-fixture gap, not a run-ending failure: a
-        // `bail!` here lets a single `SyntaxException` from one of its generators kill a whole
-        // corpus run. The per-invocation GumTree path tolerates exactly this, recording the
-        // fixture as an `error` and moving on, and the warm-JVM path must agree with it - two
-        // measurements of the same tool should not differ on what counts as fatal. Omitted ids
-        // simply have no `gumtree_warm_ms`, which every consumer already handles as "not scored"
-        // rather than as a zero.
+        // A fixture GumTree cannot parse is a per-fixture gap, as on the per-process path;
+        // omitted ids read as "not scored", not zero.
         if let Some(error) = json["error"].as_str() {
             failures.push(format!("  {id}: {error}"));
             continue;
@@ -347,11 +268,8 @@ pub(crate) fn gumtree_warm_batch(
     Ok(Some(results))
 }
 
-/// Parses the `[start,end]` character-offset suffix off a GumTree node-reference string like
-/// `"SimpleName: foo [12,15]"` - the text before it (kind, optional `: text`) is irrelevant here,
-/// only the position matters. Anchored to the end of the string since a node's own text can itself
-/// contain brackets or commas (e.g. an array-literal leaf), which a naive first-bracket search
-/// would misparse.
+/// The `[start,end]` suffix of a node reference like `"SimpleName: foo [12,15]"`. Anchored to the
+/// end because a node's own text can contain brackets.
 pub(crate) fn gumtree_node_offsets(node_ref: &str) -> Result<(usize, usize)> {
     static RE: std::sync::OnceLock<regex::Regex> = std::sync::OnceLock::new();
     let re = RE.get_or_init(|| regex::Regex::new(r"\[(\d+),(\d+)\]$").unwrap());
@@ -363,20 +281,14 @@ pub(crate) fn gumtree_node_offsets(node_ref: &str) -> Result<(usize, usize)> {
     Ok((start, end))
 }
 
-/// 0-indexed line numbers `[start, end)` (a half-open character range into `contents`) touches,
-/// inclusive of the line containing `end`'s last character - a range landing exactly on a line
-/// boundary doesn't spuriously pull in the following, untouched line.
+/// 0-indexed lines the half-open character range `[start, end)` touches. An `end` on a line
+/// boundary does not pull in the next line; an `end` past the text clamps.
 pub(crate) fn gumtree_line_range(
     contents: &str,
     start: usize,
     end: usize,
 ) -> std::ops::RangeInclusive<usize> {
-    // `start`/`end` are *character* offsets (from GumTree's own `[start,end]` node reference, see
-    // `gumtree_node_offsets`), not byte offsets - slicing `contents` directly at these values
-    // panics ("not a char boundary") on any file containing multi-byte UTF-8 characters before the
-    // offset (confirmed empirically: a Thai-locale string constant change crashed here). Translate
-    // the character offset to its real byte offset first; a char offset past the end of `contents`
-    // (GumTree's own `end` can point one past the last character) clamps to `contents.len()`.
+    // Character offsets, not byte offsets: slicing at them directly panics on multi-byte text.
     let byte_offset_of_char = |char_offset: usize| -> usize {
         contents
             .char_indices()
@@ -392,9 +304,8 @@ pub(crate) fn gumtree_line_range(
     line_of(start)..=line_of(end.saturating_sub(1).max(start))
 }
 
-/// GumTree's changed spans, from the same `textdiff -f JSON` output `gumtree_line_labels` parses
-/// (see its doc comment for what `matches`/`actions` mean) - but keeping each action's real
-/// character range instead of collapsing it to the lines it touches.
+/// GumTree's changed spans: each action's character range, on the sides [`gumtree_line_labels`]
+/// documents.
 pub(crate) fn gumtree_node_spans(
     before: &Code,
     after: &Code,
@@ -445,9 +356,6 @@ pub(crate) fn gumtree_node_spans(
             continue;
         };
         let (start, end) = gumtree_node_offsets(tree)?;
-        // Same src/dest side rules as `gumtree_line_labels`: insert-* is dest-side, delete-* is
-        // src-side, and update/move name a src-side node whose dest counterpart has to be looked
-        // up in `matches`.
         match action_type {
             "insert-tree" | "insert-node" => {
                 after_spans.push(span_from_char_offsets(&after_table, start, end));
@@ -465,4 +373,36 @@ pub(crate) fn gumtree_node_spans(
         }
     }
     Ok((before_spans, after_spans))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn gumtree_node_offsets_reads_the_final_range_when_the_text_contains_brackets() {
+        assert_eq!(
+            gumtree_node_offsets("ArrayInit: [1,2] [30,35]").unwrap(),
+            (30, 35)
+        );
+    }
+
+    /// Positions are half-open character ranges: "b" is `[2,3]` on line 1 of both sides.
+    #[test]
+    fn gumtree_touched_from_json_marks_moves_on_the_dest_side_through_matches() {
+        let before = Code::from_string("a\nb\nc\n", &Language::Java);
+        let after = Code::from_string("c\nx\nb\n", &Language::Java);
+        let json = serde_json::json!({
+            "matches": [{"src": "Name: b [2,3]", "dest": "Name: b [4,5]"}],
+            "actions": [
+                {"action": "move-tree", "tree": "Name: b [2,3]"},
+                {"action": "insert-node", "tree": "Name: x [2,3]"},
+                {"action": "delete-node", "tree": "Name: a [0,1]"},
+            ],
+        });
+        let (before_touched, after_touched) =
+            gumtree_touched_from_json(&before, &after, &json).unwrap();
+        assert_eq!(before_touched, vec![true, true, false, false]);
+        assert_eq!(after_touched, vec![false, true, true, false]);
+    }
 }

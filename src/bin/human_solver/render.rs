@@ -16,8 +16,6 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 //! Drawing the two AST panels, the modals and the status line.
-//!
-//! Split out of `main.rs` along the section banner that already marked this boundary.
 
 use crate::*;
 use codediff::diff::text_range::{ScreenColumn, SourceRow, cell_width_of, row_cells_of};
@@ -26,8 +24,6 @@ use codediff::diff::text_range::{ScreenColumn, SourceRow, cell_width_of, row_cel
 // Rendering
 // ---------------------------------------------------------------------------------------------
 
-// The same two-variant enum `human_mapping` tags its mismatches with; one type, not a private
-// twin.
 pub(crate) use codediff::test::helper::human_mapping::Side;
 
 pub(crate) fn node_label(node: Node, src: &[u8]) -> String {
@@ -41,34 +37,15 @@ pub(crate) fn node_label(node: Node, src: &[u8]) -> String {
     }
 }
 
-/// A tab, replaced by a single space; every other character unchanged. A literal `\t` written
-/// into a ratatui cell desyncs the buffer from the terminal - ratatui has it occupying one cell,
-/// the terminal jumps the cursor to the next tab stop - so everything after it on the row lands in
-/// the wrong column, and the stale characters stay on screen when the modal is torn down. Tabs
-/// only reach a cell where raw source text is rendered character by character: `node_label`
-/// formats a leaf's text with `{:?}`, which escapes them, which is why the tree panels are
-/// unaffected and only the `t`/`T` views show it.
-///
-/// One space rather than an expansion to the next tab stop, because a character's screen column
-/// has to keep matching its byte offset: `render_paint_side` maps the paint cursor's column
-/// directly onto `line.char_indices()`, and every `HumanTextSpan` is stored in exactly those
-/// coordinates, so widening a tab would silently paint the wrong bytes. The product TUI's
-/// `display_safe` makes the same 1:1 trade for the same reason.
-///
-/// Not only `\t`: `\r` reaches this on every row of a Windows CRLF file, and a terminal receiving
-/// one returns its cursor to column 0 of the line it is drawing - so the row gets overwritten from
-/// its start, a louder version of the tab desync described above. `render_paint_side` walks a row
-/// from `split('\n')`, which keeps the `\r`, so this is where it has to be caught. Every C0
-/// `is_ascii_control`, not `is_control`: the C1 block (U+0080-U+009F) is two UTF-8 bytes per code
-/// point, and trading one of those for a one-byte space would break the byte-offset-for-screen-
-/// column correspondence this function exists to preserve. (`\n` cannot reach here: it is what the
-/// rows were split on.)
+/// Replaces an ASCII control character (a tab, a CRLF's `\r`) with one space. Written raw, a tab
+/// desyncs ratatui's buffer from the terminal and a `\r` overwrites the row from column 0. One
+/// space, not a tab stop, and C0 only (a C1 control is two bytes): a character's screen column
+/// must keep matching its byte offset, because paint cursors and `HumanTextSpan`s are stored in
+/// those coordinates. The product TUI's `display_safe` makes the same trade.
 pub(crate) fn display_safe_char(ch: char) -> char {
     if ch.is_ascii_control() { ' ' } else { ch }
 }
 
-/// [`display_safe_char`] over a whole string, for the views that render a prebuilt line rather
-/// than painting it character by character.
 pub(crate) fn display_safe_str(text: &str) -> String {
     text.chars().map(display_safe_char).collect()
 }
@@ -148,9 +125,7 @@ pub(crate) fn render_panel(
     let cursor_idx = flat.index_of(panel.cursor_id).unwrap_or(0);
     ensure_visible(&mut panel.scroll, cursor_idx, inner_height);
 
-    // Only the rows actually on screen get built into `ListItem`s and have their status computed
-    // -- `total_unmarked` (the header's "N unmarked" count) is the caller's `FrameState`'s, built
-    // once per `compute_frame_state` call rather than by scanning all of `flat` here on every draw.
+    // Only on-screen rows are built; `total_unmarked` comes from `FrameState`, not from `flat`.
     let visible_end = (panel.scroll + inner_height.max(1)).min(flat.len());
     let mut items: Vec<ListItem> = Vec::with_capacity(inner_height.max(1));
     for (idx, &(node, depth)) in flat.iter().enumerate().take(visible_end).skip(panel.scroll) {
@@ -160,11 +135,8 @@ pub(crate) fn render_panel(
         };
 
         let (glyph, mut style) = status_glyph_and_style(status);
-        // A "g" suffix marks a node whose match/delete/insert outcome came from a `MultiMapGroup`
-        // rather than a plain entry - `caches.before_group`/`after_group` cover every group
-        // member (matched *and* leftover), not just whichever pair `representative_entries`
-        // realized, so this is accurate for both. "G" is the all-to-all kind, where every
-        // member is matched and the status glyph is the whole truth rather than one reading.
+        // "g": the outcome came from a `MultiMapGroup` (the group caches cover every member,
+        // matched or leftover). "G": an all-to-all group, where every member is matched.
         let group_index = match side {
             Side::Before => caches.before_group.get(&node.id()),
             Side::After => caches.after_group.get(&node.id()),
@@ -203,8 +175,7 @@ pub(crate) fn render_panel(
             marker
         );
 
-        // Pending multi-map selection (`x`, not yet committed by `m`/`M`) - a distinct color so
-        // it reads as "about to become a group", separate from any already-committed status.
+        // A pending, uncommitted multi-map selection (`x`).
         if multi_selected.contains(&node.id()) {
             style = style.fg(Color::Magenta).add_modifier(Modifier::BOLD);
         }
@@ -240,21 +211,14 @@ pub(crate) fn render_panel(
     frame.render_widget(List::new(items).block(block), area);
 }
 
-/// Below this terminal width, `draw_ui` shows only the focused Before/After panel at full width
-/// instead of splitting the screen 50/50 - two half-width panels wrap almost every line and
-/// become unreadable on a narrow terminal. Shared with the main TUI's `DiffViewer`, which faces
-/// the same readability constraint.
+/// Below this width `draw_ui` shows only the focused panel: two half-width panels wrap almost every
+/// line. Shared with the main TUI's `DiffViewer`.
 pub(crate) const SINGLE_PANEL_WIDTH_THRESHOLD: u16 =
     codediff::tui::components::diff_viewer::SINGLE_PANEL_THRESHOLD;
 
-/// What the Before/After panels show for a pair tree-sitter has no grammar for: the same bordered
-/// blocks, holding one row saying why they are empty.
-///
-/// Deliberately drawn where the node list would be rather than as a status message, because the
-/// node list is exactly what is missing - a reader looking at two empty panels has no way to tell
-/// "nothing parsed" from "nothing matched". Everything else on screen (the footer, the `t`
-/// painting view, `T`'s unix diff) is unchanged and still works: the painting reads the raw text,
-/// which is present whether or not a grammar is.
+/// The Before/After panels for a language with no tree-sitter grammar: one row saying why they are
+/// empty. Drawn in the panels, not the status line, because two empty panels otherwise read as
+/// "nothing matched". The `t` and `T` views still work from the raw text.
 fn render_unsupported_language_panels(
     frame: &mut Frame,
     area: Rect,
@@ -274,8 +238,7 @@ fn render_unsupported_language_panels(
     };
 
     if single_panel {
-        // Only the focused panel is on screen at this width, so it is the focused one by
-        // definition - `Tab` swaps which side that is, exactly as it does with a tree.
+        // Only the focused panel is on screen at this width; `Tab` swaps sides as with a tree.
         let title = match focus {
             Focus::Before => "Before",
             Focus::After => "After",
@@ -300,15 +263,12 @@ fn render_unsupported_language_panels(
     );
 }
 
-/// The text [`render_unsupported_language_panels`] puts where the node list would be.
 pub(crate) const NO_GRAMMAR_MESSAGE: &str = "<Language not supported by TreeSitter>\n\nThere is \
     no AST for this file pair, so there is no tree mapping to record. Press t to paint the text \
     (which is graded against codediff's own plain-text fallback diff), T for a unix diff, s to \
     save, o to open another case.";
 
-// Each parameter is genuinely distinct rendering context (the frame, app state, both sides'
-// flattened node lists, the caches, both raw sources, both unmarked counts) - a params struct
-// here would just relocate the same fields, not reduce them.
+// A params struct would only relocate these fields.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn draw_ui(
     frame: &mut Frame,
@@ -321,9 +281,7 @@ pub(crate) fn draw_ui(
     before_unmarked: usize,
     after_unmarked: usize,
     name: &str,
-    // True when this pair's language has no tree-sitter grammar, so there are no nodes to list -
-    // see `FrameState::before_root`. The panels say so instead of drawing an empty list, which on
-    // its own would read as a bug rather than as a fact about the file.
+    // No grammar, so no nodes (see `FrameState::before_root`).
     text_only: bool,
 ) {
     let size = frame.size();
@@ -347,9 +305,7 @@ pub(crate) fn draw_ui(
         chunks[0],
     );
 
-    // Below `SINGLE_PANEL_WIDTH_THRESHOLD` columns, two 50%-wide panels wrap every line and become
-    // unreadable, so show only the focused panel at full width instead - `Tab` (which already
-    // toggles `app.focus`) becomes the way to see the other side.
+    // `Tab` is how to see the other side in single-panel mode.
     let single_panel = size.width < SINGLE_PANEL_WIDTH_THRESHOLD;
 
     if text_only {
@@ -467,7 +423,6 @@ pub(crate) fn draw_ui(
     }
 }
 
-/// A `percent_x` x `percent_y` box centered within `area`.
 pub(crate) fn centered_rect(percent_x: u16, percent_y: u16, area: Rect) -> Rect {
     let vertical = Layout::default()
         .direction(Direction::Vertical)
@@ -487,14 +442,8 @@ pub(crate) fn centered_rect(percent_x: u16, percent_y: u16, area: Rect) -> Rect 
         .split(vertical[1])[1]
 }
 
-/// Like `centered_rect`, but never shrinks the popup below `min_width`/`min_height` (still capped
-/// to `area` itself, since a terminal can be smaller than the popup's actual content needs) -
-/// effectively reducing the percentage-based margin/padding on a small terminal instead of just
-/// letting the content not fit. Real, not hypothetical: on a small terminal (an SSH client on a
-/// phone is the motivating case), `render_text_modal`'s `centered_rect(60, 30, area)` could come
-/// out short enough that the `> {input}` line - well past the first couple of lines of
-/// instructions - scrolled out of the visible area entirely, with no scroll indicator to hint why,
-/// since a plain `Paragraph` has no "not everything fit" affordance of its own.
+/// Like `centered_rect`, but at least `min_width`x`min_height` (capped to `area`). On a small
+/// terminal a plain percentage can hide a modal's input line with no sign that anything is cut off.
 pub(crate) fn centered_rect_at_least(
     percent_x: u16,
     percent_y: u16,
@@ -727,9 +676,8 @@ pub(crate) fn render_modal(
 }
 
 pub(crate) fn render_text_modal(frame: &mut Frame, area: Rect, title: &str, body: &str) {
-    // +2 on each for the block's own top/bottom and left/right borders; the width also leaves a
-    // little breathing room (+2 more) so text isn't set flush against the border, and considers
-    // the title too, since a title longer than the popup is silently truncated by ratatui.
+    // +2 for the borders each way, +2 more width for padding. The title counts too: ratatui
+    // truncates a title wider than the popup.
     let min_height = body.lines().count() as u16 + 2;
     let min_width = body
         .lines()
@@ -752,11 +700,8 @@ pub(crate) fn render_text_modal(frame: &mut Frame, area: Rect, title: &str, body
     );
 }
 
-/// Every painted span on one side, with the verdict its entry resolves to - the four operations a
-/// renderer needs, derived from the three a human paints (see `HumanTextEntry::verdict`).
-///
-/// A malformed entry is skipped rather than failing the render: the view is how a human would
-/// notice and fix it, so refusing to draw would take away the only tool for the job.
+/// Every painted span on one side, with its verdict (see `HumanTextEntry::verdict`). A malformed
+/// entry is skipped rather than failing the render: this view is how a human finds and fixes it.
 pub(crate) fn painted_spans(
     mapping: &HumanMapping,
     solution: &str,
@@ -779,8 +724,7 @@ pub(crate) fn painted_spans(
         .collect()
 }
 
-/// The four operation colours, taken from the shared overlay palette rather than hardcoded - so a
-/// painted range here looks exactly like the same range does in the `codediff` TUI.
+/// From the shared overlay palette, so a painted range looks as it does in the `codediff` TUI.
 pub(crate) fn verdict_style(verdict: HumanTextVerdict) -> Style {
     let palette = overlay_palette();
     let color = match verdict {
@@ -792,27 +736,21 @@ pub(crate) fn verdict_style(verdict: HumanTextVerdict) -> Style {
     Style::default().bg(color).fg(palette.overlay_fg)
 }
 
-/// What one byte of a row should be drawn as. Ordered so the highest-precedence class wins a
-/// simple `max`: the cursor must stay findable on top of a selection, and a selection on top of
-/// whatever is already painted underneath it.
+/// What one byte of a row is drawn as. Ordered so `max` picks the winner: the cursor above a
+/// selection, a selection above paint.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum PaintClass {
     Plain,
     Painted(HumanTextVerdict),
-    /// A range banked with `x`, waiting to be committed. Ranked below the live selection so the
-    /// one being edited right now stays the one that stands out.
+    /// Ranked below the live selection, so the one being edited stands out.
     Banked,
     Selected,
     Cursor,
 }
 
-/// Renders one side's source as styled lines, with painted spans, the active selection and the
-/// cursor drawn on top of each other in that order.
-///
-/// Built byte-class-first rather than by splitting on span boundaries: spans, selection and cursor
-/// overlap freely, and resolving that as a per-byte precedence is the only version that stays
-/// correct when they do. Iterating `char_indices` then groups the classes back into runs, so a
-/// multi-byte character is styled as one unit and never split.
+/// One side's source as styled lines: painted spans, then the selection, then the cursor on top.
+/// Resolved as a per-byte precedence because the three overlap freely; runs are then regrouped by
+/// `char_indices`, so a multi-byte character is never split.
 pub(crate) fn render_paint_side(
     source: &str,
     spans: &[(HumanTextSpan, HumanTextVerdict)],
@@ -827,17 +765,14 @@ pub(crate) fn render_paint_side(
     let focused = state.side == side;
     let top = state.scroll[side];
 
-    // Rows without their CRLF `\r`, matching `TextPaintState::row_text` - see its doc comment for
-    // why that byte is not a column. Every offset below (`char_indices`, `line.len()`, the
-    // `span_covers` row length) is then the reader's own column model.
+    // Rows without the CRLF `\r`, as in `TextPaintState::row_text`.
     let lines: Vec<&str> = source
         .split('\n')
         .map(|line| line.strip_suffix('\r').unwrap_or(line))
         .collect();
     let gutter_width = lines.len().to_string().len().max(3);
 
-    // Bucketed by row once, rather than scanning every span for every byte of every visible row.
-    // A file with a few hundred painted ranges made that inner loop the render's whole cost.
+    // Bucketed by row once; scanning every span per byte dominates render time with many spans.
     let mut spans_by_row: HashMap<usize, Vec<&(HumanTextSpan, HumanTextVerdict)>> = HashMap::new();
     for entry in spans {
         for row in entry.0.start_row..=entry.0.end_row {
@@ -869,13 +804,10 @@ pub(crate) fn render_paint_side(
         class
     };
 
-    // The columns a row's text actually gets, once the line-number gutter has taken its share. A
-    // terminal too narrow to fit even one character of content turns wrapping off rather than
-    // looping forever on a zero-width chunk.
+    // No room for content: no wrapping, rather than looping on zero-width chunks.
     let content_width = ScreenColumn::from_raw(width.saturating_sub(gutter_width + 1));
 
-    // How many screen rows one source row costs once wrapped. Never zero: an empty row still
-    // occupies the line it sits on.
+    // Never zero: an empty row still takes a line.
     let wrapped_height = |row: SourceRow| -> usize {
         if content_width.get() == 0 {
             return 1;
@@ -891,15 +823,10 @@ pub(crate) fn render_paint_side(
             .unwrap_or(1)
     };
 
-    // `scroll_into_view` keeps the cursor within a *source*-row window (`VIEWPORT_ROWS`), which
-    // stops being the same thing as a screen-row window the moment rows wrap - one 4000-column
-    // line can eat the whole viewport on its own. So the start row is walked forward here, for
-    // display only, until the cursor's row fits. Display-only because the renderer has no business
-    // mutating scroll state, and because leaving `state.scroll` alone keeps j/k behaving the same.
-    // `start`/`cursor_row` are *source* rows; `used`/`height` count *screen* rows. Conflating the
-    // two is what made this walk necessary in the first place - `scroll_into_view` bounds the
-    // cursor in source rows while the viewport is measured in screen rows - so the two spaces are
-    // named apart here rather than being four `usize`s that happen to mean different things.
+    // `scroll_into_view` bounds the cursor in *source* rows, but wrapped rows cost several *screen*
+    // rows, so the start row is walked forward until the cursor fits. Display only: `state.scroll`
+    // is left alone, so j/k behave the same. `start`/`cursor_row` are source rows, `used`/`height`
+    // screen rows.
     let cursor_row = SourceRow::from_raw(cursor_row);
     let mut start = SourceRow::from_raw(top).min(cursor_row);
     if focused && content_width.get() > 0 {
@@ -943,19 +870,15 @@ pub(crate) fn render_paint_side(
         }
         push_run(&mut run, run_class, &mut spans_out);
 
-        // A cursor resting at end-of-line, or a blank row caught inside a multi-row span, has no
-        // character run to carry it - draw one space for it. `span_covers` stops a painted span
-        // one column short of this position on any *non*-empty row, so that space stays plain
-        // there: painting past the last real character would read as the trailing whitespace or
-        // the newline itself being part of the change.
+        // A cursor at end of line, or a blank row inside a multi-row span, has no character, so it
+        // gets one space. `span_covers` leaves that space plain on a non-empty row: painting past
+        // the last character would claim the newline as part of the change.
         let end_class = class_at(row, line.len(), line);
         if end_class != PaintClass::Plain {
             spans_out.push(Span::styled(" ".to_string(), paint_class_style(end_class)));
         }
 
-        // One screen row per `content_width` columns of this source row. The line number goes on
-        // the first of them and the rest get a blank gutter of the same width, so the numbers stay
-        // a readable column rather than repeating down a wrapped line.
+        // The line number goes on the first screen row only; continuations get a blank gutter.
         let gutter_style = Style::default().fg(Color::DarkGray);
         for (chunk_index, chunk) in wrap_spans(spans_out, content_width).into_iter().enumerate() {
             if out.len() >= height {
@@ -974,14 +897,8 @@ pub(crate) fn render_paint_side(
     out
 }
 
-/// Splits one source row's styled runs into screen rows of at most `width` columns, preserving
-/// each run's style across a split. A `width` of 0 means "do not wrap" - the caller has a terminal
-/// too narrow to fit any content beside the gutter, and returning one over-long row is better than
-/// dividing by zero.
-///
-/// Counts characters rather than bytes, matching `render_paint_side`'s own column model: every
-/// character it emits occupies one column, which is exactly what `display_safe_char` guarantees by
-/// mapping the one character that would not (a tab) to a space.
+/// Splits one row's styled runs into screen rows of at most `width` columns, keeping each run's
+/// style across a split. `width` 0 means no wrapping (no room beside the gutter).
 fn wrap_spans(spans: Vec<Span<'static>>, width: ScreenColumn) -> Vec<Vec<Span<'static>>> {
     let width = width.get();
     if width == 0 {
@@ -997,9 +914,8 @@ fn wrap_spans(spans: Vec<Span<'static>>, width: ScreenColumn) -> Vec<Vec<Span<'s
         let mut chunk = String::new();
         for ch in owned.chars() {
             let cells = cell_width_of(ch).get();
-            // A wide character that will not fit in the room left starts the next row whole: a
-            // terminal cannot render half an ideograph, and splitting one would desynchronise
-            // every column after it on that row.
+            // A wide character that does not fit starts the next row whole; a terminal cannot draw
+            // half of one.
             if used + cells > width && !chunk.is_empty() {
                 current.push(Span::styled(std::mem::take(&mut chunk), style));
             }
@@ -1024,13 +940,11 @@ pub(crate) fn paint_class_style(class: PaintClass) -> Style {
     match class {
         PaintClass::Plain => Style::default(),
         PaintClass::Painted(verdict) => verdict_style(verdict),
-        // Dimmer than the live selection, and the same hue: banked and selected are the same kind
-        // of thing at different stages, not two unrelated states.
+        // Same hue as the live selection, dimmer: banked and selected are stages of one thing.
         PaintClass::Banked => Style::default()
             .bg(overlay_palette().cross_highlight_bg)
             .add_modifier(Modifier::DIM),
-        // The same colour the TUI paints a cursor's counterpart with: both mean "this is the
-        // region you are pointing at", one live and one committed.
+        // The TUI's colour for a cursor's counterpart: both mean "the region you point at".
         PaintClass::Selected => {
             let palette = overlay_palette();
             Style::default()
@@ -1041,8 +955,7 @@ pub(crate) fn paint_class_style(class: PaintClass) -> Style {
     }
 }
 
-/// Whether `span` covers `(row, column)`, with `row_len` used to decide whether a span that ends
-/// on a later row runs to the end of this one.
+/// Whether `span` covers `(row, column)`; `row_len` bounds a row the span runs past.
 pub(crate) fn span_covers(span: HumanTextSpan, row: usize, column: usize, row_len: usize) -> bool {
     if row < span.start_row || row > span.end_row {
         return false;
@@ -1055,22 +968,19 @@ pub(crate) fn span_covers(span: HumanTextSpan, row: usize, column: usize, row_le
     let end = if row == span.end_row {
         span.end_column
     } else if row_len == 0 {
-        // A blank row inside a multi-row span has no character of its own to carry the paint -
-        // `render_paint_side`'s one-space fallback is what actually draws it, this just lets that
-        // fallback see the row as covered.
+        // A blank row has no character; `render_paint_side`'s one-space fallback draws it.
         1
     } else {
-        // Stop at the row's last real character. No human painting ever means to include a
-        // line's trailing whitespace or its newline, so a middle row of a multi-row span must
-        // not either - see the (row, len) checks below and in `render_paint_side`.
+        // Stop at the row's last real character: a painting never means a line's trailing
+        // whitespace or newline.
         row_len
     };
     column >= start && column < end
 }
 
 #[allow(clippy::too_many_arguments)]
-/// Renders the `t` text-painting modal: both sides' source, side by side, with the human's painted
-/// ranges on top and an independent cursor, selection and scroll per side.
+/// The `t` text-painting modal: both sides' source with painted ranges, and an independent cursor,
+/// selection and scroll per side.
 pub(crate) fn render_text_view_modal(
     frame: &mut Frame,
     area: Rect,
@@ -1091,14 +1001,12 @@ pub(crate) fn render_text_view_modal(
         .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
         .split(popup_area);
 
-    // Two rows go to the block's own borders.
     let height = popup_area.height.saturating_sub(2) as usize;
 
     let painted = solution_entries(mapping, solution).len();
     let others = mapping.text_mappings.len().saturating_sub(1);
 
-    // Built once for both panels: the disagreement overlay needs each side's human *and* algo
-    // spans together, so it can't be derived per panel inside the loop below.
+    // The disagreement overlay needs both sides' human and algo spans together.
     let human_spans = [
         painted_spans(mapping, solution, 0, before_src, after_src),
         painted_spans(mapping, solution, 1, before_src, after_src),
@@ -1148,8 +1056,6 @@ pub(crate) fn render_text_view_modal(
             },
         ),
     ] {
-        // Two columns go to the block's own borders, the same two rows `height` already accounts
-        // for above.
         let inner_width = columns[side].width.saturating_sub(2) as usize;
         let lines = render_paint_side(source, &shown[side], state, side, height, inner_width);
         let border_style = if state.side == side {
@@ -1172,8 +1078,7 @@ pub(crate) fn render_text_view_modal(
 }
 
 #[allow(clippy::too_many_arguments)]
-/// Renders the solution picker raised by `s`/`L` inside the text view: which named painting to
-/// save the current ranges under, or to switch to editing.
+/// The `s`/`L` solution picker inside the text view.
 pub(crate) fn render_solution_picker(
     frame: &mut Frame,
     area: Rect,
@@ -1220,8 +1125,7 @@ pub(crate) fn render_solution_picker(
         })
         .collect();
 
-    // The free-form entry always sits last, so its index is `names.len()` - the one position the
-    // key handler treats specially.
+    // The free-form entry is always last; the key handler treats index `names.len()` specially.
     let typing = new_name.is_some();
     let free_form = new_name.unwrap_or("");
     let free_label = if typing {
@@ -1267,17 +1171,13 @@ pub(crate) fn render_solution_picker(
     );
 }
 
-/// Renders the `T` (unix diff) modal: the already-computed output of `diff -u` between the before
-/// and after content, with `+`/`-` lines colored to match the rest of the UI's insert/delete
-/// convention and `@@` hunk headers highlighted.
+/// The `T` modal: `diff -u` output, `+`/`-` in the insert/delete colours, `@@` headers highlighted.
 pub(crate) fn render_unix_diff_modal(frame: &mut Frame, area: Rect, output: &str, scroll: u16) {
     let popup_area = centered_rect(92, 90, area);
     frame.render_widget(Clear, popup_area);
 
-    // `diff -u` reports positions only in its `@@ -a,b +c,d @@` headers, so a reader counting to
-    // the line a hunk mentions has to do it by hand. Tracking the two counters across the hunk and
-    // printing them per row turns that into reading. A deleted line has no after-side number and
-    // an inserted one has no before-side number, which the blank half says directly.
+    // Per-row before/after line numbers tracked across each hunk, so nobody counts from the `@@`
+    // header by hand. A deleted line has no after number and an inserted line no before number.
     let mut before_line = 0usize;
     let mut after_line = 0usize;
     let lines: Vec<Line> = output
@@ -1287,7 +1187,6 @@ pub(crate) fn render_unix_diff_modal(frame: &mut Frame, area: Rect, output: &str
                 (Style::default().add_modifier(Modifier::BOLD), String::new())
             } else if let Some(rest) = line.strip_prefix("@@") {
                 (Style::default().fg(Color::Cyan), {
-                    // `@@ -a,b +c,d @@` - the two starting positions, which reset both counters.
                     let mut numbers = rest.split_whitespace();
                     for (target, sign) in [(&mut before_line, '-'), (&mut after_line, '+')] {
                         if let Some(start) = numbers.next().and_then(|token| {
@@ -1339,7 +1238,7 @@ pub(crate) fn render_unix_diff_modal(frame: &mut Frame, area: Rect, output: &str
     );
 }
 
-/// Renders the `?` help modal: a static reference sheet of every keybinding (`HELP_TEXT`).
+/// The `?` help modal (`HELP_TEXT`).
 pub(crate) fn render_help_modal(frame: &mut Frame, area: Rect, scroll: u16) {
     let popup_area = centered_rect(90, 90, area);
     frame.render_widget(Clear, popup_area);
@@ -1359,14 +1258,8 @@ pub(crate) fn render_help_modal(frame: &mut Frame, area: Rect, scroll: u16) {
     );
 }
 
-/// Renders the `V` popup: every way this case's ground truth contradicts itself, one row each,
-/// with the selected row's sites spelled out underneath.
-///
-/// Two panes rather than one wide table: a violation's sentence is long (it has to be - it says
-/// what the rule is as well as what broke it) and its sites are several lines, so putting the list
-/// above and the detail below keeps both readable at any terminal width. The list shows the rule's
-/// number, the painting it is about, and the message; the detail shows each site's position, the
-/// text under it, and the node it falls in.
+/// The `V` popup: every self-contradiction in this case's ground truth, a list above and the
+/// selected row's sites below (the messages and site lists are too long for one wide table).
 pub(crate) fn render_invariant_list(
     frame: &mut Frame,
     area: Rect,
@@ -1390,8 +1283,7 @@ pub(crate) fn render_invariant_list(
     let inner = block.inner(popup_area);
     frame.render_widget(block, popup_area);
 
-    // The detail pane is sized to the selected entry but bounded, so one violation with twenty
-    // sites cannot squeeze the list it was chosen from off the screen.
+    // Bounded, so one violation with many sites cannot push the list off screen.
     let details = entries
         .get(selected)
         .map(|entry| entry.details.len())
@@ -1417,7 +1309,7 @@ pub(crate) fn render_invariant_list(
             Row::new(vec![
                 Cell::from(entry.violation.invariant.to_string()),
                 Cell::from(entry.violation.painting.clone().unwrap_or_else(|| {
-                    // The three rules that read only the tree mapping have no painting to name.
+                    // The rules that read only the tree mapping have no painting to name.
                     "(mapping)".to_string()
                 })),
                 Cell::from(entry.violation.message.clone()),
@@ -1426,8 +1318,7 @@ pub(crate) fn render_invariant_list(
         })
         .collect();
 
-    // Recomputed from `selected` every frame rather than carried on the modal, the same contract
-    // the two open pickers use: nothing to keep in sync, and the selection is always on screen.
+    // Scroll derives from `selected` each frame, as in the open pickers: nothing to keep in sync.
     let height = chunks[0].height.saturating_sub(1).max(1) as usize;
     let offset = selected
         .saturating_sub(height / 2)
@@ -1470,21 +1361,11 @@ pub(crate) fn render_invariant_list(
     );
 }
 
-/// Renders the `o` picker as a table, one row per case and one column per dimension of the corpus
-/// worth triaging on (see `DiffColumn`) - so what a filter is doing, and what the sort is ranking
-/// by, are both readable off the table itself rather than only inferable from the title bar. The
-/// header row carries the interaction state: the cursor column (what `s`/`f` act on) is shown in
-/// reverse video, the sorted column gets a `^`/`v` arrow, and a filtered column is marked with `*`
-/// and coloured, with the filters spelled out in full in the title.
-///
-/// Like `render_open_sample_picker`, the filtered/sorted view (`visible_diff_options`) is
-/// recomputed here from `options`/`view` rather than carried on the modal itself, so the two can
-/// never drift out of sync. Scroll position is recomputed fresh each frame from `selected` (no
-/// persisted state needed) by roughly centering it in the viewport, clamped to the list's extent.
-///
-/// `name_input` being `Some` means `f` on the `Name` column is mid-prompt: the title is replaced
-/// by the prompt, since that is where the reader's attention is and the table underneath still
-/// shows the pre-prompt filter until Enter commits.
+/// The `o` picker: one row per case and one column per `DiffColumn`. The header shows the cursor
+/// column in reverse video, the sort with `^`/`v`, and filtered columns with `*`. The view
+/// (`visible_diff_options`) and scroll are recomputed from `options`/`view`/`selected` each frame,
+/// never stored. `name_input` is `Some` while `f` on `Name` is prompting; the table keeps the old
+/// filter until Enter.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn render_open_diff_picker(
     frame: &mut Frame,
@@ -1501,10 +1382,7 @@ pub(crate) fn render_open_diff_picker(
     let popup_area = centered_rect(80, 70, area);
     frame.render_widget(Clear, popup_area);
 
-    // The note of whatever row is selected gets its own strip along the bottom. A note is
-    // free-form prose and the names here already run to sixty-odd characters, so there is no room
-    // to show one inline - the table carries a marker column saying a note exists, and this says
-    // what it is for the one row the reader is actually on.
+    // The selected row's note gets a strip at the bottom; the table only has room for a marker.
     let note = comments.and_then(|map| visible.get(selected).and_then(|name| map.get(name)));
     let (table_area, note_area) = if note.is_some() {
         let split = Layout::default()
@@ -1516,16 +1394,12 @@ pub(crate) fn render_open_diff_picker(
         (popup_area, None)
     };
 
-    // Derived from `table_area`, not `popup_area`: the footer takes rows away from the table, and
-    // scrolling computed against the full popup would push the selected row off the bottom by
-    // exactly the footer's height. One extra row for the header, on top of the two border rows.
+    // From `table_area`, not `popup_area`, or the footer hides the selected row. +1 for the header.
     let inner_height = table_area.height.saturating_sub(3) as usize;
     let max_scroll = visible.len().saturating_sub(inner_height);
     let scroll = selected.saturating_sub(inner_height / 2).min(max_scroll);
 
-    // `options`, not `visible`, carries each name's dataset - looked up per row rather than
-    // threading a second parallel list through `visible_diff_options`, since the table only ever
-    // needs it for the rows actually on screen (at most a few dozen), not the whole corpus.
+    // Datasets are looked up per visible row from `options`.
     let dataset_of = |name: &str| -> &'static str {
         options
             .iter()
@@ -1615,9 +1489,7 @@ pub(crate) fn render_open_diff_picker(
     } else {
         let filters = view.filters.labels();
         format!(
-            // Abbreviated deliberately: the popup is 80% of the terminal, so a fuller legend gets
-            // truncated by ratatui at ordinary widths - and the filter list on the left, which is
-            // the part that changes, is what must survive the truncation.
+            // Abbreviated so the filter list on the left survives ratatui's truncation.
             "Open diff [{}] sort:{}{} ({}/{}) — h/l col, j/k row, s sort, f filter, Esc",
             if filters.is_empty() {
                 "no filters".to_string()
@@ -1640,8 +1512,7 @@ pub(crate) fn render_open_diff_picker(
                 .add_modifier(Modifier::BOLD),
         );
 
-    // Same left-to-right order as `DiffColumn::ALL`, one width per column. Each is wide enough for
-    // its header plus the sort arrow and filter marker the header row can append to it.
+    // In `DiffColumn::ALL` order, each wide enough for its header, sort arrow and filter marker.
     let table = Table::new(
         rows,
         [
@@ -1675,16 +1546,8 @@ pub(crate) fn render_open_diff_picker(
     }
 }
 
-/// Renders the `O` picker as a table, one row per materialized sample and one column per
-/// dimension worth triaging on (see `SampleColumn`) - so what a filter is doing and what the sort
-/// is ranking by are readable off the table itself rather than only inferable from the title. The
-/// header carries the interaction state exactly as the `o` picker's does: the cursor column
-/// (what `s`/`f` act on) in reverse video, the sorted column with a `^`/`v` arrow, and a filtered
-/// column marked `*` and coloured, with the filters spelled out in the title.
-///
-/// Like `render_open_diff_picker`, the filtered/sorted view (`visible_sample_rows`) is recomputed
-/// here from `rows`/`view` rather than carried on the modal, so the two can never drift out of
-/// sync, and the scroll position is derived fresh each frame from `selected`.
+/// The `O` picker: one row per sample, one column per `SampleColumn`, with the same header markers
+/// and recompute-every-frame contract as [`render_open_diff_picker`].
 pub(crate) fn render_open_sample_picker(
     frame: &mut Frame,
     area: Rect,
@@ -1698,7 +1561,6 @@ pub(crate) fn render_open_sample_picker(
     let popup_area = centered_rect(80, 70, area);
     frame.render_widget(Clear, popup_area);
 
-    // One row for the header on top of the two border rows.
     let inner_height = popup_area.height.saturating_sub(3) as usize;
     let max_scroll = visible.len().saturating_sub(inner_height);
     let scroll = selected.saturating_sub(inner_height / 2).min(max_scroll);
@@ -1717,8 +1579,7 @@ pub(crate) fn render_open_sample_picker(
             Row::new(vec![
                 Cell::from(row.name.clone()),
                 Cell::from(row.language.clone()),
-                // `?` for a sample with no recorded stratum, the same "not known" glyph the `o`
-                // picker's unscanned columns use - and, like those, it is never filtered away.
+                // `?` for an unknown stratum, as in the `o` picker; never filtered away.
                 Cell::from(row.bucket.clone().unwrap_or_else(|| "?".to_string())),
                 Cell::from(row.status.label()),
                 Cell::from(row.size.to_string()),
@@ -1750,8 +1611,7 @@ pub(crate) fn render_open_sample_picker(
         format!("Filter Name by substring: {input}_ — [Enter] apply (empty clears), [Esc] cancel")
     } else {
         format!(
-            // Abbreviated for the same reason as the `o` picker's title: the filter list on the
-            // left is the part that changes, so it is what must survive ratatui's truncation.
+            // Abbreviated like the `o` picker's title.
             "Open sample [{}] sort:{}{} ({}/{}) — h/l col, j/k row, s sort, f filter, Esc",
             if view.filters.any_active() {
                 view.filters.describe()
@@ -1774,8 +1634,7 @@ pub(crate) fn render_open_sample_picker(
                 .add_modifier(Modifier::BOLD),
         );
 
-    // Same left-to-right order as `SampleColumn::ALL`, each wide enough for its header plus the
-    // sort arrow and filter marker the header row can append.
+    // In `SampleColumn::ALL` order, each wide enough for its header, sort arrow and filter marker.
     let table = Table::new(
         table_rows,
         [
@@ -1792,8 +1651,7 @@ pub(crate) fn render_open_sample_picker(
     frame.render_widget(table, popup_area);
 }
 
-/// Renders the `C` picker's first step: pick a commit from this repository's own `git log`
-/// (`list_repo_commits`'s `(hash, summary)` pairs, newest first).
+/// The `C` picker's first step: a commit from this repository's `git log`, newest first.
 pub(crate) fn render_open_commit_picker(
     frame: &mut Frame,
     area: Rect,
@@ -1841,8 +1699,7 @@ pub(crate) fn render_open_commit_picker(
     frame.render_widget(List::new(items).block(block), popup_area);
 }
 
-/// Renders the `C` picker's second step: pick which of `summary`'s changed files (only ones with
-/// a supported language - see `list_commit_files`) to open.
+/// The `C` picker's second step: one of the commit's files in a supported language.
 pub(crate) fn render_open_commit_file_picker(
     frame: &mut Frame,
     area: Rect,

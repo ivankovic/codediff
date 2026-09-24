@@ -23,9 +23,8 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // 1 mismatch(es), 1 visible. An `identifier` argument became the literal `0`. The human calls
-    // that an update of one node; codediff deletes the identifier instead, because the two share no
-    // text to match on and nothing else forces the pair.
+    // An `identifier` argument became the literal `0`. The human calls that an update; codediff
+    // deletes the identifier, since the two share no text and nothing forces the pair.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "c-openssl-openssl-identifier-to-literal-zero",
         1,

@@ -48,25 +48,19 @@ pub struct CodeStats {
     pub lines_of_code: u64,
     pub bytes: u64,
 
-    /// Per-node-kind stats (occurrence count and subtree-size histogram), keyed by TreeSitter
-    /// node kind (e.g. "function_item", "if_expression"). See [`KindStats`].
+    /// Keyed by tree-sitter node kind.
     pub kind_stats: std::collections::HashMap<String, KindStats>,
 
     // Errors.
     pub failed_to_convert_to_utf8: bool,
     pub failed_to_parse: bool,
+    /// Always false: there is no size cap. Kept so existing databases still load.
     pub too_large_to_parse: bool,
 }
 
 /**
-* Aggregated stats for a single TreeSitter node kind within one file: how many nodes of that kind
-* exist, and a log2-bucketed histogram of the size (node count) of the subtree rooted at each one.
-*
-* The subtree-size histogram uses `size.ilog2()` as the bucket key: bucket 0 is subtree size 1
-* (a leaf of this kind), bucket 1 is sizes 2-3, bucket 2 is sizes 4-7, and so on - bucket B covers
-* `[2^B, 2^(B+1))`. This keeps the histogram small (one entry per size *order of magnitude* seen,
-* not one per exact size) while still letting downstream analysis approximate percentiles or
-* answer "what fraction of `for_expression` subtrees are bigger than N nodes" questions.
+* One node kind's stats within one file: its count, and a histogram of its subtree sizes keyed by
+* `size.ilog2()` (bucket B covers `[2^B, 2^(B+1))`), small enough to store per file.
 */
 #[derive(Debug, Clone, Default)]
 pub struct KindStats {
@@ -82,13 +76,11 @@ pub struct DiffStats {
     pub commit_id: String,
     pub relative_file_path: String,
 
-    // Code objects for before and after versions
     pub before: Option<Code>,
     pub after: Option<Code>,
 
     pub git_reported_status: String,
 
-    // Absolute values
     pub bytes_before: u64,
     pub bytes_after: u64,
 
@@ -98,7 +90,6 @@ pub struct DiffStats {
     pub nodes_before: u64,
     pub nodes_after: u64,
 
-    // Measures of the difference
     pub unix_diff_script_bytes: u64,
 
     pub lines_added: u64,
@@ -113,9 +104,8 @@ pub struct DiffStats {
 /**
 * Count the nodes in a TreeSitter tree, the root included.
 *
-* Iterative, like [`visit_for_kind_stats`]: a tree nested thousands of levels deep - a minified
-* bundle, a data literal - overflowed a 256 MB thread stack in the recursive version on
-* 2026-09-19, and tree-sitter itself parses such trees without recursing.
+* Iterative, like [`visit_for_kind_stats`]: tree-sitter parses trees nested deep enough (minified
+* bundles, data literals) to overflow the stack of a recursive walk.
 */
 pub fn count_nodes(root: Node) -> usize {
     let mut count = 0;
@@ -129,10 +119,7 @@ pub fn count_nodes(root: Node) -> usize {
 }
 
 /**
-* Compute per-kind occurrence counts and subtree-size histograms for every node in a TreeSitter
-* tree, in a single post-order traversal. See [`KindStats`] for the histogram bucketing scheme.
-* Also returns the total node count (the root's own subtree size), so callers that need both
-* don't have to pay for a second traversal via [`count_nodes`].
+* Per-kind [`KindStats`] for every node in the tree, plus the total node count, in one traversal.
 */
 pub fn compute_kind_stats(root: Node) -> (std::collections::HashMap<String, KindStats>, usize) {
     let mut stats = std::collections::HashMap::new();
@@ -140,11 +127,10 @@ pub fn compute_kind_stats(root: Node) -> (std::collections::HashMap<String, Kind
     (stats, total_nodes)
 }
 
-/// Returns the subtree size (including `root` itself) so the caller can bucket it.
+/// Returns `root`'s subtree size.
 ///
-/// Post-order without recursion: every node is listed in pre-order with the index of its parent,
-/// then the list is walked backwards, which reaches every node after all of its descendants and
-/// lets each subtree size be added to its parent's. See [`count_nodes`] for why.
+/// Iterative post-order (see [`count_nodes`]): list nodes in pre-order with their parent's index,
+/// then walk the list backwards, which reaches each node after all its descendants.
 fn visit_for_kind_stats(
     root: Node,
     stats: &mut std::collections::HashMap<String, KindStats>,
@@ -200,28 +186,23 @@ pub fn is_generated(code: &str) -> bool {
     code.lines().take(50).any(|line| re.is_match(line))
 }
 
+/// How long one file may take to parse before the statistics give up on it: far above what any
+/// well-formed file needs.
+const PARSE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(60);
+
 /**
 * Expand existing statistics by parsing the code and processing the AST.
 */
-/// How long one file may take to parse before the statistics give up on it; see the note at the
-/// call site. Sixty seconds is two orders of magnitude above what the largest well-formed file in
-/// the corpus needs.
-const PARSE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(60);
-
 pub fn expand_from_code(stats: &mut CodeStats, parser: &mut TSParser) -> Result<()> {
     match &stats.code.metadata.tip {
-        Some(tip) => {
-            match tip {
-                code::Type::Data(_) | code::Type::Documentation(_) => {
-                    return Err(anyhow!(
-                        "Can't compute statistics for non-code pretending to be code"
-                    ));
-                }
-                _ => {
-                    // This is fine, proceed.
-                }
+        Some(tip) => match tip {
+            code::Type::Data(_) | code::Type::Documentation(_) => {
+                return Err(anyhow!(
+                    "Can't compute statistics for non-code pretending to be code"
+                ));
             }
-        }
+            _ => {}
+        },
         None => {
             return Err(anyhow!(
                 "Can't compute statistics for code that has no type"
@@ -230,63 +211,49 @@ pub fn expand_from_code(stats: &mut CodeStats, parser: &mut TSParser) -> Result<
     }
     stats.bytes = stats.code.contents.len() as u64;
 
-    // No size cap. Until 2026-09-19 a file over 1 MiB was recorded with `too_large_to_parse` and
-    // no node count - a guard from the initial commit with no measured reason behind it - which
-    // left the corpus's 4,014 largest code files (19.9 GB of source, up to 101 MB each) out of
-    // every AST-node figure, including the maximum the paper's Robust target was set from. The
-    // diff itself parses those files (the whole-corpus robustness run diffed them), so the
-    // statistics parse them too. The flag stays in the schema, always false, so a database from
-    // before the change still loads.
-
+    // No size cap: the diff parses files of any size, so the statistics must too, or the largest
+    // files drop out of every AST-node figure.
     if let Some(language) = &stats.code.metadata.language {
-        match language::to_treesitter(language) {
-            Some(language) => {
-                parser.set_language(&language)?;
+        // A known language without a grammar gets no AST statistics.
+        if let Some(language) = language::to_treesitter(language) {
+            parser.set_language(&language)?;
 
-                if is_generated(&stats.code.contents) {
-                    stats.automatically_generated = true;
-                    return Ok(());
-                }
-
-                stats.lines_of_code = stats.code.contents.matches('\n').count() as u64;
-
-                // Bounded: a file that is not the language its extension says - a `.h` holding
-                // nothing but a comma-separated byte array to be `#include`d into an initializer
-                // - keeps tree-sitter in error recovery for its whole length, which is its one
-                // super-linear path, and on 2026-09-19 five such files of 2-4 MB held seven
-                // workers for over an hour each. Past the budget the file counts as failed to
-                // parse, which for the statistics it is.
-                let contents = stats.code.contents.as_bytes();
-                let started = std::time::Instant::now();
-                let mut give_up = |_: &tree_sitter::ParseState| started.elapsed() > PARSE_TIMEOUT;
-                let options = tree_sitter::ParseOptions::new().progress_callback(&mut give_up);
-                let parsed = parser.parse_with_options(
-                    &mut |offset, _| &contents[offset.min(contents.len())..],
-                    None,
-                    Some(options),
-                );
-                match parsed {
-                    Some(tree) => {
-                        let (kind_stats, total_nodes) = compute_kind_stats(tree.root_node());
-                        stats.ast_nodes = total_nodes;
-                        stats.kind_stats = kind_stats;
-                    }
-                    None => {
-                        stats.failed_to_parse = true;
-                        eprintln!(
-                            "Parse gave up after {}s: {:?}",
-                            PARSE_TIMEOUT.as_secs(),
-                            stats.code.metadata.path
-                        );
-                    }
-                }
+            if is_generated(&stats.code.contents) {
+                stats.automatically_generated = true;
+                return Ok(());
             }
-            None => {
-                // We know what the langauge is, but we don't support TreeSitter parsing for this file.
+
+            stats.lines_of_code = stats.code.contents.matches('\n').count() as u64;
+
+            // Bounded: a file that is not the language its extension says (a `.h` that is one
+            // big byte array) keeps tree-sitter in error recovery, its super-linear path, for
+            // hours. Past the budget it counts as failed to parse.
+            let contents = stats.code.contents.as_bytes();
+            let started = std::time::Instant::now();
+            let mut give_up = |_: &tree_sitter::ParseState| started.elapsed() > PARSE_TIMEOUT;
+            let options = tree_sitter::ParseOptions::new().progress_callback(&mut give_up);
+            let parsed = parser.parse_with_options(
+                &mut |offset, _| &contents[offset.min(contents.len())..],
+                None,
+                Some(options),
+            );
+            match parsed {
+                Some(tree) => {
+                    let (kind_stats, total_nodes) = compute_kind_stats(tree.root_node());
+                    stats.ast_nodes = total_nodes;
+                    stats.kind_stats = kind_stats;
+                }
+                None => {
+                    stats.failed_to_parse = true;
+                    eprintln!(
+                        "Parse gave up after {}s: {:?}",
+                        PARSE_TIMEOUT.as_secs(),
+                        stats.code.metadata.path
+                    );
+                }
             }
         }
     } else {
-        // The language is not set...
         return Err(anyhow!(
             "Can't compute statistics for code that has no language"
         ));
@@ -296,24 +263,19 @@ pub fn expand_from_code(stats: &mut CodeStats, parser: &mut TSParser) -> Result<
 }
 
 /**
-* Generate statistics for the given path.
-*
-* Note that this function cannot error out because the CodeStats object must itself contain any
-* relevant error fields.
+* Generate statistics for the given path. Infallible: failures are recorded in `CodeStats`' error
+* fields.
 */
 pub fn for_path(path: &std::path::Path, parser: &mut TSParser) -> CodeStats {
     let mut stats = CodeStats {
         ..Default::default()
     };
 
-    // First we try to get as much metadata as possible from the path alone.
-    // This makes the code much faster because we can avoid reading data files.
+    // Classify from the path first, so data files are never read.
     stats.code.metadata.path = Some(std::path::PathBuf::from(path));
     metadata::hermetic_expand(&mut stats.code.metadata);
 
-    // We only read code and config files, to improve performance. Anything else is either a
-    // data/documentation file we don't need stats for, or a type we couldn't determine from the
-    // path alone (TODO: fold this up and read the file to determine the type from contents).
+    // TODO: read files the path alone could not classify, and classify them by content.
     if !matches!(
         stats.code.metadata.tip,
         Some(code::Type::Code(_)) | Some(code::Type::Configuration(_))
@@ -373,6 +335,19 @@ mod tests {
         assert_eq!(counted, total);
         assert!(total >= 2 * depth, "{total} nodes for {depth} levels");
         assert_eq!(kinds.values().map(|k| k.count).sum::<u64>(), total as u64);
+    }
+
+    #[test]
+    fn kind_stats_bucket_subtree_sizes_by_log2() {
+        // array = `[`, number, `,`, number, `]` plus itself: size 6, bucket 2 ([4, 8)).
+        let code = crate::code::Code::from_string("[1, 2]", &crate::code::Language::JSON);
+        let (kinds, _) = compute_kind_stats(code.ast.as_ref().unwrap().root_node());
+        let number = &kinds["number"];
+        assert_eq!(number.count, 2);
+        assert_eq!(number.subtree_size_histogram.get(&0), Some(&2));
+        let array = &kinds["array"];
+        assert_eq!(array.count, 1);
+        assert_eq!(array.subtree_size_histogram.get(&2), Some(&1));
     }
 
     #[test]

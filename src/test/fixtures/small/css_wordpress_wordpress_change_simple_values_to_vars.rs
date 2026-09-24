@@ -21,10 +21,8 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // A plain `integer_value` (e.g. `35px`) becomes a `float_value` wrapped in a new
-    // `call_expression`/`arguments` (e.g. `var(--x, 35px)`) - too structurally different (kind,
-    // depth, and container all change at once) for APTED to bridge, so it deletes the old value
-    // instead of matching it into the new wrapped position.
+    // `35px` becomes `var(--x, 35px)`: kind, depth and container all change at once, too much for
+    // APTED to bridge, so the old value is deleted.
     test::helper::human_mapping::assert_matches_human_mapping(
         "css-wordpress-wordpress-change-simple-values-to-vars",
     )

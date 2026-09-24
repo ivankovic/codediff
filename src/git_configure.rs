@@ -34,12 +34,8 @@ enum Scope {
 }
 
 impl Scope {
-    /// Always explicit, even for `Local` - `git config <key> <value>` with no scope flag at all
-    /// happens to *write* to the local repo config by default, but `git config --get <key>`
-    /// with no flag reads the *effective* (local-overrides-global) value instead. Passing
-    /// `--local` explicitly for both keeps reads and writes consistently scoped to the same
-    /// file - without it, `existing_value_note` would show an inherited global value as if it
-    /// were already set locally, when nothing local exists at all yet.
+    /// Always explicit, even for `Local`: an unscoped `git config --get` reads the effective
+    /// (global-inherited) value, so `existing_value_note` would report a global value as local.
     fn flag(self) -> &'static str {
         match self {
             Scope::Global => "--global",
@@ -55,9 +51,8 @@ impl Scope {
     }
 }
 
-/// Entry point for `codediff git configure`. Interactive only - bails with the manual commands
-/// (same ones README's "Git integration" section documents) if stdin isn't a real terminal,
-/// rather than hanging on a read that will never get an answer.
+/// Entry point for `codediff git configure`. Without a terminal on stdin it prints the manual
+/// commands and fails rather than block on a read nobody will answer.
 pub fn run() -> Result<()> {
     if !io::stdin().is_terminal() {
         print_manual_instructions();
@@ -117,9 +112,8 @@ pub fn run() -> Result<()> {
     Ok(())
 }
 
-/// One line describing `key`'s current value under `scope`, or an empty string if it isn't set -
-/// shown before a prompt that would overwrite it, so re-running this wizard is safe rather than
-/// silently clobbering an existing setting without saying so.
+/// `key`'s current value under `scope` as a line to show before the prompt that would overwrite it,
+/// or an empty string if unset.
 fn existing_value_note(key: &str, scope: Scope) -> String {
     match get_config(scope, key) {
         Some(value) => format!("(currently: {key} = {value})\n"),
@@ -182,8 +176,7 @@ fn print_manual_instructions() {
     );
 }
 
-/// Parses `ask_scope`'s prompt input - `None` for anything that isn't a recognized answer, so the
-/// caller knows to reprompt rather than silently guessing.
+/// Parses `ask_scope`'s answer; `None` means reprompt.
 fn parse_scope(input: &str) -> Option<Scope> {
     match input.trim().to_lowercase().as_str() {
         "" | "g" | "global" => Some(Scope::Global),

@@ -15,70 +15,28 @@
  *  You should have received a copy of the GNU Affero General Public License
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
+
+//! GreedyAnchorBlock: pairs anonymous block containers (an `if` body, a loop body) by an estimated
+//! edit cost (`cost_ratio`), cheapest first, through `grouped_greedy_matcher`. The only matcher
+//! driven by cost rather than an identity signal; accepted pairs go to real APTED
+//! (`anchor_pair_via_apted`), so the cost and operation are never invented.
+//!
+//! Candidates are compared only when they share a positional key: the same corresponding
+//! nearest-matched ancestor and the same kind path down from it (the full root path when nothing
+//! above is matched). Content scoring alone cannot tell "same content, same place" from "same
+//! content, moved", and no `MAX_COST_RATIO` rejects a near-zero coincidental match without
+//! rejecting everything, so the position gate is the fix, not a stricter threshold.
+
 use crate::code::{ASTMetadata, Language};
 use crate::diff::PassCtx;
 use crate::diff::nodes::{anchor_pair_via_apted, is_block_container};
 use crate::diff::{ASTDiff, ASTMappingReason};
 
-/**
-* GreedyAnchorBlock: the pipeline's only *greedy, cost-estimate-driven* matcher. Every other
-* container-pairing heuristic (`solve_syntax_aware_matching`, `solve_bottom_up_propagation`) decides
-* "is this pair the same thing" from some form of identity signal - a shared name, a Dice
-* coefficient over already-matched descendants. This pass instead estimates the actual edit cost of
-* matching each candidate pair (see `sequence_edit_cost`) and accepts whichever pairs are cheap
-* enough, cheapest first,
-* exactly like a greedy weighted-matching algorithm - useful for containers (e.g. an `if` block, a
-* loop body, a function body) that have no name, no arm structure, and no already-matched children
-* for a Dice coefficient to count, but whose *content* is still obviously the same block with a few
-* edits.
-*
-* Candidate pairs are gated on a *positional* signal before cost is ever consulted:
-* `positional_key_before`/`positional_key_after` walk each candidate up to its nearest already-
-* matched ancestor (via `ASTMetadata::node_to_parent`) and record the kind of every node passed
-* along the way. Two candidates are only ever compared if that walk lands on a *corresponding*
-* ancestor pair (the before-side ancestor's counterpart, per `diff.before_node_map`, is exactly the
-* after-side ancestor) *and* the kind-path from that ancestor down to each candidate is identical.
-* Content-only scoring cannot tell "same content, same place" from "same content, moved", and no
-* `MAX_COST_RATIO` rejects a near-zero-ratio match without rejecting everything, so the position
-* gate is the fix, not a stricter threshold. Nodes with no matched ancestor at all fall back to
-* their full path from the file root: "no better anchor exists, so require literal structural
-* correspondence from the top." The all-pairs version this replaced, and the two regressions that
-* forced the gate, are in `src/diff/TODO.md` under "Design history moved out of source".
-*
-* Candidate generation (`collect_candidates` + the two `positional_key_*` functions above) is this
-* pass's own; the grouping, scoring, greedy assignment, and defensive re-check against pairs
-* claimed mid-run by an earlier accepted pair's real APTED resolution are all handled generically
-* by `grouped_greedy_matcher::solve` (`TODO.md`'s "generalization of phase 4" analysis, 2026-07-18)
-* - this pass just supplies the positional key as `grouped_greedy_matcher`'s compatibility key `K`
-*   and `cost_ratio` as its cost function, gated by `MAX_COST_RATIO`.
-*
-* Called from phase 4 (`solve_syntax_aware_matching`), after named-group matching has had its
-* chance: by that point every named/keyed anchor is already resolved, so whatever's left is
-* genuinely anonymous containers - exactly the case this pass targets. Running before the final
-* full-tree APTED pass lets it anchor big blocks cheaply first, shrinking the residual forest the
-* much slower exact tree edit distance then has to grind through - the same "the more nodes are
-* already matched, the faster it is" rationale documented on the APTED call site in `diff.rs`.
-*
-* Accepted pairs are handed to `apted::for_nodes` (via `anchor_pair_via_apted`), the same
-* "pre-match, then diff for real" idiom every other heuristic pass uses: it guarantees a real
-* edit-distance-based cost/operation instead of an invented one, and guarantees completeness
-* (nothing under the pair is left unmapped for a later pass to miss). Only the `reason` on the
-* resulting root mapping is overwritten afterward, to `GreedyAnchorBlock`, for provenance/
-* explainability - and only when `for_nodes` actually matched the pair (it may still choose a
-* from-scratch delete+insert if the true edit-distance cost turns out cheaper than reuse, in which
-* case there's no root mapping entry to relabel).
-*/
 const MIN_CHILDREN: usize = 2;
 const MIN_SUBTREE_SIZE: usize = 4;
-/// Maximum accepted `cost_ratio` (estimated edit cost / combined subtree size) for a candidate
-/// pair - 0.0 means "identical children sequence", higher means "more of the block had to be
-/// deleted/inserted to align it". Only a secondary filter now that positional anchoring (see the
-/// module doc comment) does the heavy lifting of rejecting structurally-unrelated pairs.
-///
-/// Sits in the middle of a plateau rather than on an edge, both cliffs being real: too tight a
-/// filter rejects legitimate anchors and pushes work onto the terminal APTED pass, while too loose
-/// a one lets a candidate buy a cheaper-but-wronger reuse. `benchmark_optimal_solutions` is what
-/// re-checks that; see `research/data/quality/` for the current numbers.
+/// Maximum accepted `cost_ratio`; a secondary filter behind the positional gate. Sits mid-plateau:
+/// tighter pushes legitimate anchors to the terminal APTED pass, looser buys cheaper-but-wronger
+/// reuse.
 const MAX_COST_RATIO: f64 = 0.8;
 
 pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
@@ -93,8 +51,7 @@ pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
         return;
     }
 
-    // (id, positional key) pairs, in `collect_candidates`' preorder-sorted order - satisfies
-    // `grouped_greedy_matcher`'s determinism contract directly, no extra sort needed here.
+    // `collect_candidates` is preorder-sorted, as `grouped_greedy_matcher` requires.
     let before_candidates: Vec<(usize, PositionalKey)> = before_candidate_ids
         .iter()
         .map(|&id| (id, positional_key_before(id, before_metadata, diff)))
@@ -127,18 +84,10 @@ pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
     );
 }
 
-/// `(nearest already-matched ancestor - expressed as an after-side id, or `None` if the walk
-/// reached the file root without finding one, kind path from that ancestor down to and including
-/// the candidate itself)`. See the module doc comment for why both sides express this in the same
-/// (after-side) coordinate space, and `positional_key_before`/`positional_key_after` for how each
-/// side computes it.
+/// `(nearest matched ancestor as an after-side id, or `None` at the file root; kind path from it
+/// down to the candidate)`. Both sides use after-side ids so the keys compare directly.
 type PositionalKey = (Option<usize>, Vec<String>);
 
-/// `PositionalKey` for a before-side candidate: walks `before_id` up via `before_metadata.
-/// node_to_parent`, collecting kinds, until it reaches a parent already present in
-/// `diff.before_node_map` - translated to that parent's after-side counterpart, so this is directly
-/// comparable to a `positional_key_after` result on the other side. Falls back to `None` (the file
-/// root) if no matched ancestor is found.
 fn positional_key_before(
     before_id: usize,
     before_metadata: &ASTMetadata,
@@ -160,10 +109,6 @@ fn positional_key_before(
     }
 }
 
-/// `PositionalKey` for an after-side candidate: the mirror of `positional_key_before`, walking
-/// `after_metadata.node_to_parent` until it reaches a parent already present in
-/// `diff.after_node_map` - used directly as the anchor id (no translation needed: it's already an
-/// after-side id, the same coordinate space `positional_key_before` translates into).
 fn positional_key_after(
     after_id: usize,
     after_metadata: &ASTMetadata,
@@ -193,11 +138,8 @@ fn node_kind(id: usize, metadata: &ASTMetadata) -> String {
         .unwrap_or_default()
 }
 
-/// Every not-yet-matched node in `metadata` that is both a recognized block container (see
-/// [`is_block_container`]) and big enough to bother anchoring (see `MIN_CHILDREN`/
-/// `MIN_SUBTREE_SIZE`), in a fixed, parse-stable order (`preorder_index`, not raw node id - see
-/// `ASTNodeMetadata::start_byte`'s doc comment) so grouping and assignment above are reproducible
-/// run to run regardless of the `HashMap` iteration order this starts from.
+/// Unmatched block containers large enough to anchor, in `preorder_index` order (ids are not
+/// parse-stable).
 fn collect_candidates(
     metadata: &ASTMetadata,
     mapped: &rustc_hash::FxHashMap<usize, usize>,
@@ -224,11 +166,8 @@ fn collect_candidates(
     candidates
 }
 
-/// `sequence_edit_cost`, normalized by the pair's combined subtree size so pairs of any size are
-/// comparable on one scale - `0.0` means the two blocks' direct children align perfectly by hash,
-/// higher means more of the block had to be paid for as a delete or an insert. Returns `None` if
-/// either node's subtree size is missing (should not happen for a `collect_candidates` output) or
-/// zero (nothing to compare).
+/// `sequence_edit_cost` over the pair's combined subtree size: `0.0` when the direct children align
+/// perfectly by hash. `None` when a size is missing or zero.
 pub(crate) fn cost_ratio(
     before_id: usize,
     after_id: usize,
@@ -245,27 +184,10 @@ pub(crate) fn cost_ratio(
     Some(cost as f64 / combined)
 }
 
-/**
-* Cheap "sequence edit distance" cost estimate for matching `before_id` <-> `after_id` as a whole:
-* treats each node's *direct* children as an alphabet of opaque tokens (no recursion into
-* grandchildren - this is what keeps it fast relative to a real tree edit distance, which is
-* exactly why this pass can afford to try many more candidate pairs than APTED itself could), where
-* two children are only considered "the same token" when their full subtree hashes are identical -
-* i.e. this is blind to a child that merely *resembles* its counterpart, by design: any softer
-* equality test would make the estimate as expensive as the tree edit distance it's meant to avoid.
-*
-* This is exactly a weighted longest-common-subsequence alignment: `dp[i][j]` is the minimum total
-* subtree-size paid to turn `before`'s first `i` children into `after`'s first `j` via deletes
-* (`before` child not reused) and inserts (`after` child not reused) - a matched pair costs
-* nothing, everything else costs the full subtree size of whichever child didn't survive. There is
-* deliberately no separate "substitute" move: aligning a non-identical pair diagonally would cost
-* exactly `size(before_child) + size(after_child)`, the same total as deleting one and inserting
-* the other via two separate steps, so omitting it changes nothing about the minimum while keeping
-* the recurrence to two cases instead of three.
-*
-* Returns `None` if either node's metadata can't be found (should not happen for a node that came
-* from `collect_candidates`, but this stays defensive rather than panicking on a corrupt candidate).
-*/
+/// Weighted LCS over the two nodes' *direct* children, compared only by full subtree hash: a
+/// reused child is free, any other costs its subtree size. Blind to a child that merely resembles
+/// its counterpart by design; a softer equality would cost as much as the tree edit distance this
+/// estimate avoids. No substitute move: it would cost exactly a delete plus an insert.
 fn sequence_edit_cost(
     before_id: usize,
     after_id: usize,
@@ -408,12 +330,7 @@ mod tests {
 
     #[test]
     fn anonymous_if_block_with_mostly_identical_body_is_anchored() {
-        // Neither `if` has a name or arm-signature overlap for the other heuristics to key on
-        // (single-arm `if`, no `else`), but the block's body is 4/5 identical statements - well
-        // under `MAX_COST_RATIO`. The enclosing function is matched first (so the `if`-blocks
-        // share a positional anchor), and the `block` node itself (not the enclosing
-        // `if_expression`) is the candidate that wins - see the equivalent comment this test had
-        // before positional anchoring, kept in `TODO.md`'s writeup, for why.
+        // A single-arm `if` has no identity signal; its body is 4/5 identical statements.
         let before_src = "fn f(x: i32) {\n    if x > 0 {\n        let a = 1;\n        let b = 2;\n        let c = 3;\n        let d = 4;\n        let e = 5;\n    }\n}\n";
         let after_src = "fn f(x: i32) {\n    if x > 0 {\n        let a = 1;\n        let b = 2;\n        let c = 3;\n        let d = 4;\n        let e = 99;\n    }\n}\n";
         let before = Code::from_string(before_src, &Language::Rust);
@@ -421,8 +338,6 @@ mod tests {
         let node_cache = NodeCache::build(&before, &after);
         let mut diff = ASTDiff::default();
 
-        // Match everything except the `if` block's own body - simulating an earlier pass having
-        // already resolved the function signature but not descended into an unnamed `if`.
         let before_fn =
             first_child_of_kind(before.ast.as_ref().unwrap().root_node(), "function_item").unwrap();
         let after_fn =
@@ -478,15 +393,7 @@ mod tests {
 
     #[test]
     fn blocks_in_unrelated_structural_positions_are_not_anchored_even_with_similar_content() {
-        // Two `if` blocks whose bodies happen to hash-coincide closely, but which sit under
-        // different (both unmatched) parents with no shared positional anchor - regression guard
-        // for the original bug (an unrelated `call_expression` pair matched via coincidental
-        // content similarity). Neither function is matched here, so each `if`-block's nearest
-        // matched ancestor walk reaches the file root with a *different* full path (different
-        // function names aren't part of the kind-path, but the two functions themselves are
-        // distinct un-matched nodes, so the two blocks are in different, uncorrelated groups only
-        // if their full root-relative kind-paths differ - construct the source so they do, via a
-        // different nesting depth on one side).
+        // Similar bodies, but different root-relative kind paths and no matched ancestor.
         let before_src = "fn f() {\n    if true {\n        let a = 1;\n        let b = 2;\n        let c = 3;\n    }\n}\n";
         let after_src = "fn g() {\n    if true {\n        if true {\n            let a = 1;\n            let b = 2;\n            let c = 3;\n        }\n    }\n}\n";
         let before = Code::from_string(before_src, &Language::Rust);

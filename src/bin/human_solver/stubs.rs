@@ -15,10 +15,8 @@
  *  You should have received a copy of the GNU Affero General Public License
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
-//! Generating and registering the per-fixture test files `src/test/fixtures/` holds.
-//!
-//! Split out of `main.rs` along the section banner that already separated it: these functions
-//! touch the *test tree* rather than the mapping being edited, and nothing here reads `App`.
+//! Generating and registering the per-fixture test files `src/test/fixtures/` holds. Nothing
+//! here reads `App`.
 
 use std::fs;
 use std::path::PathBuf;
@@ -52,9 +50,7 @@ pub(crate) fn module_name(name: &str) -> String {
     name.replace('-', "_")
 }
 
-/// `fixtures/` mirrors `diffs/`'s split by dataset (see `DIFF_DATASETS`): `dataset`'s
-/// fixtures get their stub test files here, alongside `fixtures/<dataset>.rs`'s mod-list
-/// (see `optimal_solutions_mod_file`).
+/// `fixtures/` mirrors `diffs/`'s split by dataset (see `DIFF_DATASETS`).
 pub(crate) fn fixtures_dir(dataset: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("src")
@@ -71,21 +67,12 @@ pub(crate) fn fixtures_mod_file(dataset: &str) -> PathBuf {
         .join(format!("{dataset}.rs"))
 }
 
-/// Creates `fixtures/<dataset>/<name>.rs` if it doesn't already exist, and makes sure
-/// it's registered in `fixtures/<dataset>.rs`. Returns whether the stub `.rs` file was
-/// newly created. `dataset` is resolved from `name`'s actual location under `diffs/`
-/// (`case_dataset`) - every caller (an already-open existing case, or `action_promote`, which
-/// creates the diffs/ directory before calling this) runs after that directory already exists, so
-/// there's always a real dataset to resolve, no separate parameter needed.
+/// Creates `fixtures/<dataset>/<name>.rs` if missing and registers it in `fixtures/<dataset>.rs`.
+/// Returns whether the file was created. The dataset comes from where `name` already lives under
+/// `diffs/`, so the case directory must exist first.
 ///
-/// `comment`, if non-empty once trimmed, is word-wrapped (`wrap_comment_lines`) into a leading `//`
-/// block right before the `assert_matches_human_mapping` call - only when the file is actually
-/// being created here for the first time; an already-existing stub is never rewritten, so a
-/// comment added or edited after promotion has no effect.
-///
-/// `text_only` is for a fixture whose language tree-sitter has no grammar for: it has no tree
-/// mapping, so the file written here carries no `mapping()` test to assert one. See
-/// [`stub_test_contents`].
+/// An existing stub is never rewritten: `comment` only reaches a newly created file. `text_only`
+/// is for a language with no tree-sitter grammar (see [`stub_test_contents`]).
 pub(crate) fn ensure_stub_test(name: &str, comment: Option<&str>, text_only: bool) -> Result<bool> {
     let dataset = case_dataset(name).unwrap_or_else(legacy_dataset);
     let module = module_name(name);
@@ -95,10 +82,7 @@ pub(crate) fn ensure_stub_test(name: &str, comment: Option<&str>, text_only: boo
     let created = if stub_path.exists() {
         false
     } else {
-        // `handmade`/`small`/`full` predate this dataset's `fixtures/<dataset>/`
-        // directory existing at all, so this was never exercised until `stratified` (or any
-        // future dataset) needed it fresh on first promotion - real gap, not defensive
-        // programming against something that can't happen.
+        // A dataset's first promoted fixture creates its directory.
         fs::create_dir_all(&dir).with_context(|| format!("creating {:?}", dir))?;
         fs::write(&stub_path, stub_test_contents(name, comment, text_only))
             .with_context(|| format!("writing stub test to {:?}", stub_path))?;
@@ -110,34 +94,19 @@ pub(crate) fn ensure_stub_test(name: &str, comment: Option<&str>, text_only: boo
     Ok(created)
 }
 
-/// Builds the full contents of a freshly-created `fixtures/<dataset>/<name>.rs` stub -
-/// split out from `ensure_stub_test` as a pure string-building function (no filesystem access) so
-/// it's directly unit-testable without writing into the real repo's `src/test/fixtures/`.
+/// The contents of a new `fixtures/<dataset>/<name>.rs`, without touching the filesystem.
 pub(crate) fn stub_test_contents(name: &str, comment: Option<&str>, text_only: bool) -> String {
     if text_only {
-        // No `mapping()` test, deliberately: `assert_matches_human_mapping` grades a tree mapping,
-        // and this fixture has no tree to have one. Writing the usual stub here would create a
-        // test that can only ever fail, for a fixture whose ground truth is entirely its painting.
-        //
-        // No `painting()` either, on the same terms `action_save` already applies to every other
-        // fixture: a stub for a painting nobody has painted yet fails rather than reporting a
-        // distance. `ensure_painting_stub_test` adds one on the first save that carries a
-        // painting, and `ensure_invariants_stub_test` adds the `invariants()` test - which does
-        // hold for a paint-only fixture, since it reads the paintings and the raw text and never
-        // the trees - unconditionally, right after this.
+        // No `mapping()`: with no tree it could only fail. No `painting()` yet either, as for any
+        // fixture; `ensure_painting_stub_test` adds it on the first save with a painting.
         let comment_block = match comment.map(str::trim) {
             Some(c) if !c.is_empty() => {
                 format!("//!\n{}", wrap_comment_lines_with_prefix(c, "//! "))
             }
             _ => String::new(),
         };
-        // Assembled line by line rather than as one `\n\`-continued literal: rustfmt collapses
-        // those back into a single line and keeps the source indentation inside the string, which
-        // silently wrote a stub with thirteen spaces in front of every `//!`.
-        //
-        // The fixture's name is deliberately not interpolated into it: the file is named after the
-        // fixture already, and a long name would push the first line past this codebase's comment
-        // width - which `cargo fmt` does not police, so nothing would catch it.
+        // Joined lines, not a `\`-continued literal: rustfmt re-indents those and the indentation
+        // lands inside the string. The name is left out so a long one cannot overflow the width.
         let module_doc = [
             "//! This fixture's language has no tree-sitter grammar, so there is no tree to map",
             "//! and no `mapping()` test here. codediff renders the pair with its plain-text",
@@ -156,17 +125,13 @@ pub(crate) fn stub_test_contents(name: &str, comment: Option<&str>, text_only: b
     )
 }
 
-/// Word-wraps `comment` into `    // <text>\n` lines - 4-space indent matching the generated
-/// stub's function body, `//` since this precedes a `#[test]` fn's own statement, not documenting
-/// an item (a `///` doc comment there would attach to nothing). Wraps at a width matching this
-/// codebase's own prose-comment convention (~96 columns including the prefix). `comment` is
-/// assumed already trimmed and non-empty - see `ensure_stub_test`'s only caller.
+/// Word-wraps `comment` into `    // ` lines for the stub's function body, 96 columns wide
+/// including the prefix. `comment` must already be trimmed and non-empty.
 pub(crate) fn wrap_comment_lines(comment: &str) -> String {
     wrap_comment_lines_with_prefix(comment, "    // ")
 }
 
-/// [`wrap_comment_lines`] with the line prefix chosen by the caller - `//! ` for the module-level
-/// note a text-only stub carries, since it has no `#[test]` body to sit inside.
+/// [`wrap_comment_lines`] with a caller-chosen prefix, e.g. `//! ` for a text-only stub.
 pub(crate) fn wrap_comment_lines_with_prefix(comment: &str, prefix: &str) -> String {
     const WIDTH: usize = 96;
     let max_content = WIDTH.saturating_sub(prefix.len());
@@ -197,18 +162,9 @@ pub(crate) fn wrap_comment_lines_with_prefix(comment: &str, prefix: &str) -> Str
         .collect()
 }
 
-/// Appends a `painting()` test to the fixture's own file, the painting counterpart of
-/// [`ensure_stub_test`]. Returns whether one was actually added.
-///
-/// **Appends rather than writing its own file.** Everything a fixture's two ground truths have
-/// been measured to lives in one place (see `test::fixtures`' module doc), so this edits the file
-/// `ensure_stub_test` created rather than starting a second one. Every caller runs after that
-/// call, so the file is always there; a fixture file that somehow is not is an error rather than a
-/// silent second home.
-///
-/// Idempotent: a file that already has a `painting()` test is left exactly as it is, which is the
-/// same "never rewrite an existing clamp" contract `ensure_stub_test` has - the recorded number and
-/// the prose next to it are the human's, not this tool's.
+/// Appends a `painting()` test to the file [`ensure_stub_test`] created; a missing file is an
+/// error, since a fixture's results live in one file. Returns whether one was added. A file that
+/// already has one is left alone: its recorded limit and prose belong to the human.
 pub(crate) fn ensure_painting_stub_test(name: &str) -> Result<bool> {
     let dataset = case_dataset(name).unwrap_or_else(legacy_dataset);
     let module = module_name(name);
@@ -219,8 +175,6 @@ pub(crate) fn ensure_painting_stub_test(name: &str) -> Result<bool> {
         return Ok(false);
     }
 
-    // The import goes next to the one `ensure_stub_test` already wrote, not at the end of the
-    // file, so rustfmt has nothing to move on the next run.
     const USE_LINE: &str =
         "use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;\n";
     let mut updated = insert_use_line(&existing, USE_LINE);
@@ -232,14 +186,8 @@ pub(crate) fn ensure_painting_stub_test(name: &str) -> Result<bool> {
     Ok(true)
 }
 
-/// Puts `use_line` next to the imports a fixture's stub already has rather than at the end of the
-/// file, so rustfmt has nothing to move on the next run - and returns `existing` untouched if the
-/// line is already there.
-///
-/// Two anchors, tried in order: the `use crate::test;` an ordinary stub opens with, and the
-/// `use anyhow::Result;` above it. The second exists for a text-only fixture, whose stub carries
-/// no `mapping()` test and therefore no `use crate::test;` to sit beside - without it the import
-/// landed *after* the tests, which compiles but reads as an accident.
+/// Puts `use_line` beside the stub's existing imports, not after its tests; a no-op if present.
+/// A text-only stub has no `use crate::test;`, hence the `use anyhow::Result;` fallback anchor.
 pub(crate) fn insert_use_line(existing: &str, use_line: &str) -> String {
     if existing.contains(use_line) {
         return existing.to_string();
@@ -253,8 +201,6 @@ pub(crate) fn insert_use_line(existing: &str, use_line: &str) -> String {
     format!("{existing}{use_line}")
 }
 
-/// The `painting()` test appended by [`ensure_painting_stub_test`] - pure string building, no
-/// filesystem access, so it is directly unit-testable.
 pub(crate) fn painting_test_block(name: &str) -> String {
     format!(
         "\n#[test]\nfn painting() -> Result<()> {{\n\
@@ -264,23 +210,9 @@ pub(crate) fn painting_test_block(name: &str) -> String {
     )
 }
 
-/// Appends an `invariants()` test to the fixture's own file, the third of the three a fixture
-/// carries. Returns whether one was actually added.
-///
-/// Unlike [`ensure_painting_stub_test`], this is written for **every** fixture, painted or not:
-/// the invariants it asserts cover the tree mapping as well as the painting (see
-/// `human_mapping::invariants`), and every saved fixture has a tree mapping. A fixture with no
-/// painting simply has nothing for the two painting invariants to look at, which is a pass rather
-/// than a gap.
-///
-/// Also unlike the painting stub, the generated call carries **no number to fill in**. Ground
-/// truth that contradicts itself is a defect rather than a distance, so the generated form is the
-/// strict one and a fixture that fails it is telling the truth about itself from the first run -
-/// there is no unconditionally-passing placeholder here to forget to replace. Clamping to a
-/// recorded count is a deliberate edit afterwards, with a note saying what the violations are.
-///
-/// Idempotent, on the same terms as the painting stub: a file that already has an `invariants()`
-/// test is left exactly as it is, clamp and prose included.
+/// Appends an `invariants()` test to every fixture, painted or not; an existing one is left alone.
+/// Returns whether one was added. Unlike the painting stub it is strict from the start, with no
+/// placeholder limit: self-contradicting ground truth is a defect, not a distance.
 pub(crate) fn ensure_invariants_stub_test(name: &str) -> Result<bool> {
     let dataset = case_dataset(name).unwrap_or_else(legacy_dataset);
     let module = module_name(name);
@@ -302,16 +234,13 @@ pub(crate) fn ensure_invariants_stub_test(name: &str) -> Result<bool> {
     Ok(true)
 }
 
-/// The `invariants()` test appended by [`ensure_invariants_stub_test`] - pure string building, no
-/// filesystem access, so it is directly unit-testable.
 pub(crate) fn invariants_test_block(name: &str) -> String {
     format!(
         "\n#[test]\nfn invariants() -> Result<()> {{\n    assert_ground_truth_invariants(\"{name}\")\n}}\n"
     )
 }
 
-/// Adds `#[cfg(test)]\nmod <module>;` to `fixtures/<dataset>.rs`, keeping the list
-/// sorted, unless it's already present.
+/// Adds `#[cfg(test)] mod <module>;` to `fixtures/<dataset>.rs` if absent, keeping the list sorted.
 pub(crate) fn insert_mod_declaration(dataset: &str, module: &str) -> Result<()> {
     let mod_file = fixtures_mod_file(dataset);
     let content =

@@ -29,10 +29,8 @@ pub struct DirEntryInfo {
     pub is_dir: bool,
 }
 
-/// Everything the diff viewer needs to display a completed before/after diff.
-///
-/// Holds the already-read file contents (not just paths) so the UI thread never has to do a
-/// blocking filesystem read after the background diff computation completes.
+/// Everything the diff viewer needs to display a completed diff. Holds the file contents, not
+/// just paths, so the UI thread never does a blocking read after the background diff finishes.
 #[derive(Debug, Clone, PartialEq)]
 pub struct DiffSessionData {
     pub before_path: PathBuf,
@@ -41,19 +39,11 @@ pub struct DiffSessionData {
     pub after_contents: String,
     pub before_ranges: Vec<RangeMatch>,
     pub after_ranges: Vec<RangeMatch>,
-    /// Whether every real change between before/after touches only comment nodes (see
-    /// `diff::text::is_comment_only_diff`). Computed once, while the AST is still available
-    /// (`tui::app::assemble_diff_session_data`) - by the time `DiffSessionData` exists, the AST
-    /// itself is gone, so this can't be recomputed later from `before_ranges`/`after_ranges` alone
-    /// the way `diff::text::summarize_diff`'s other cases can.
+    /// Whether every real change touches only comment nodes. Computed while the AST still
+    /// exists; it cannot be recovered from the ranges alone.
     pub comment_only: bool,
-    /// Set when either side has no tree-sitter grammar (e.g. an extension-less `Makefile`), so
-    /// `before_ranges`/`after_ranges` came from `diff::text::plain_text_line_diff` (a plain
-    /// line-level Myers diff) instead of the AST-aware pipeline - see `app::compute_diff`'s
-    /// branch. Everything downstream (overlay rendering, `headless`, `json_output`,
-    /// `change_counts`, `DiffSummary`) already works on a plain `RangeMatch` list regardless of
-    /// where it came from; this field exists purely so `app.rs`'s footer can show `[plain text]`
-    /// instead of nothing, which would otherwise imply a structural diff ran.
+    /// Either side has no grammar, so the ranges come from `plain_text_line_diff`. Only the
+    /// footer's `[plain text]` label reads it; everything else works on ranges from either source.
     pub plain_text_fallback: bool,
 }
 
@@ -70,15 +60,11 @@ pub enum Action {
     Render,
     Resize(u16, u16),
     Quit,
-    /// Ctrl-Z: hand the terminal back to the shell and stop, as any other program would.
-    ///
-    /// Deferred rather than acted on where it is raised, because suspending has to release and
-    /// re-acquire the terminal and therefore needs `&mut UI` - the same reason `e` (open an
-    /// editor) goes through `App::pending_editor`.
+    /// Ctrl-Z. Deferred rather than handled where raised, because suspending needs `&mut UI` to
+    /// release and re-acquire the terminal.
     Suspend,
     ClearScreen,
-    /// A recoverable, non-fatal failure the user should be told about (e.g. a failed frame draw)
-    /// - surfaced via `App::last_error`, the same one-line banner `Action::DiffFailed` uses.
+    /// A recoverable failure, shown in the one-line `App::last_error` banner.
     Error(String),
     /// A directory listing for the file dialog finished loading.
     DirectoryListed(PathBuf, Vec<DirEntryInfo>),
@@ -86,59 +72,41 @@ pub enum Action {
     FileSelected(PathBuf),
     /// The user cancelled the file dialog.
     DialogCancelled,
-    /// The user picked a file in the git review picker (the `G` key): materialize its two sides
-    /// and open them. `index` is the file's position within its change set, so `]`/`[` know
-    /// where to step from.
+    /// A file picked in the git review picker. `index` is its position in the change set, so
+    /// `]`/`[` know where to step from.
     ReviewFileSelected {
         target: ReviewTarget,
         index: usize,
     },
-    /// Both before/after files are known; kick off the (background) diff computation.
+    /// Start the background diff of these two files.
     StartDiff(PathBuf, PathBuf),
-    /// A background diff computation returned - success or failure - tagged with the generation
-    /// counter `App::start_diff` captured when it launched. `App` compares it against the current
-    /// generation and simply drops a stale result: this is what makes Esc-during-Diffing a real
-    /// cancel (the `spawn_blocking` thread itself can't be killed, but its answer can be
-    /// discarded). A fresh result is re-dispatched as `DiffReady`/`DiffFailed` below, which is
-    /// what components actually consume.
+    /// A background diff result, tagged with the generation `App::start_diff` captured. A stale
+    /// result is dropped, which is how Esc cancels a diff whose thread cannot be killed. A fresh
+    /// one is re-dispatched as `DiffReady`/`DiffFailed`, which components consume.
     DiffComputed {
         generation: u64,
         outcome: DiffOutcome,
     },
-    /// The background diff computation finished successfully.
     DiffReady(DiffSessionData),
-    /// The background diff computation failed.
     DiffFailed(String),
-    /// The user picked a color theme in the theme dialog (Enter) - apply it and persist it.
+    /// Enter in the theme dialog: apply and persist.
     ThemeSelected(OverlayTheme),
-    /// The theme dialog's selection moved (Up/Down) - apply the highlighted theme to the live
-    /// viewer behind the dialog as a preview, without persisting anything. Esc reverts to the
-    /// last persisted choice; Enter (`ThemeSelected`) makes it stick.
+    /// The theme dialog's selection moved: apply to the viewer as a preview, without persisting.
     ThemePreviewed(OverlayTheme),
-    /// A live preview of a syntax-highlighting theme while the theme dialog's syntax dropdown
-    /// moves. Same contract as `ThemePreviewed` above: applied to the viewers behind the dialog,
-    /// persisted only when the dialog is accepted (which the dialog itself does, since no action
-    /// carries the value that far).
+    /// Live preview of a syntax theme; like `ThemePreviewed`, persisted only when the dialog is
+    /// accepted (by the dialog itself, since no action carries the value that far).
     SyntaxThemePreviewed(String),
-    /// The user confirmed a query in the search modal (the `/` key) - jump the focused panel's
-    /// cursor to the nearest match and highlight every match.
+    /// Jump the focused panel's cursor to the nearest match and highlight every match.
     SearchSubmitted(String),
-    /// The search modal's query changed while typing - `App` recomputes the focused panel's
-    /// match count for the modal's live `N matches` readout and previews the highlights, without
-    /// moving the cursor (that only happens on `SearchSubmitted`).
+    /// Recompute the live match count and preview highlights, without moving the cursor.
     SearchQueryChanged(String),
-    /// The user confirmed a line number in the jump-to-line prompt (the `g` key) - 1-indexed,
-    /// already parsed by the prompt itself.
+    /// A 1-indexed line number, already parsed by the prompt.
     JumpToLineSubmitted(usize),
-    /// A toggle or preset changed in the render-options panel (the `M` key) - apply it to the
-    /// viewer behind the dialog and persist it immediately, so the diff behind the panel shows
-    /// what the setting does while it is still open. Unlike `ThemePreviewed`, which previews
-    /// without persisting, this writes through: `DialogCancelled` is what puts the panel's opening
-    /// options back, and it has to do so actively because they are already on disk.
+    /// A render option changed: applied and persisted at once, so the diff behind the panel shows
+    /// its effect. Unlike the theme preview this writes through, so `DialogCancelled` must
+    /// actively restore the options the panel opened with.
     RenderOptionsChanged(RenderOptions),
-    /// `Enter` in the render-options panel: keep what is set and close. The counterpart of
-    /// `ThemeSelected`, and the same split - `Enter` accepts, `Esc` reverts - for the app's only
-    /// other dialog that writes to the viewer while it is open. Carries nothing, because
-    /// `RenderOptionsChanged` has already applied and persisted every change it would name.
+    /// Enter in the render-options panel. Carries nothing: `RenderOptionsChanged` has already
+    /// applied and persisted every change.
     RenderOptionsAccepted,
 }

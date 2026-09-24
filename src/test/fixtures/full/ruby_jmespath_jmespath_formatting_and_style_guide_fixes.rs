@@ -21,12 +21,9 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // A whole-file restyle: `while_modifier` rewritten as `while`, `%i[...]` symbol arrays
-    // rewritten as `[...]` arrays. The human pairs the constructs across those rewrites;
-    // `APTED("qualified_name")` deletes them, since the node kinds themselves changed on both
-    // sides. Also the fixture with the most residual move asymmetry after `reconcile_moves` - see
-    // `research/data/quality/move_attribution.md`, which names it for the same reason: many small
-    // independent reorders in one file. Any counts above describe the older, larger residual.
+    // A whole-file restyle (`while_modifier` to `while`, `%i[...]` to `[...]`): the node kinds
+    // change, so `APTED("qualified_name")` deletes. Also many small independent reorders (see
+    // `research/data/quality/move_attribution.md`).
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "ruby-jmespath-jmespath-formatting-and-style-guide-fixes",
         17,

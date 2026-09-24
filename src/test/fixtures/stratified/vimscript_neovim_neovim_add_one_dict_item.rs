@@ -30,10 +30,8 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // Was 47.800% until the `own_content_span` guard in `classify_node` landed the same day: this
-    // fixture's container separates its children with `\` line continuations, so every gap held a
-    // non-whitespace character and the whole container was painted `Update` for a one-line change.
-    // See that guard's doc comment in `diff::text`.
+    // A `\`-continued container holds a non-whitespace character in every gap; the
+    // `own_content_span` guard in `classify_node` keeps it from being painted whole.
     assert_matches_human_painting_within_limit("vimscript-neovim-neovim-add-one-dict-item", 0.02)
 }
 

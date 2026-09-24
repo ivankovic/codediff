@@ -21,11 +21,8 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // `val captor = argumentCaptor<FilesServiceCallback<OCFile>>()` is inserted twice, once per
-    // test method, replacing a single class-level `@Captor` field each old method referenced - two
-    // structurally-identical new local declarations with no earlier occurrence to anchor to, an
-    // inherently ambiguous near-duplicate-insert case. Any counts above describe the older, larger
-    // residual.
+    // `val captor = argumentCaptor<...>()` is inserted once per test method, replacing one
+    // class-level `@Captor` field: identical new declarations with nothing to anchor to.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "kotlin-nextcloud-android-move-from-one-mocking-library-to-other",
         24,

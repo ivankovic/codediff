@@ -23,16 +23,9 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // A `throw new ...` becomes an assignment. The mapping removes and inserts both statements
-    // whole; codediff pairs the class name across the replacement, matching the
-    // `type_identifier` of the old `object_creation_expression` to the `identifier` of the new
-    // assignment (reason `APTED("large_flat_subtree")`). Two mismatches, one per side of that one
-    // reused name.
-    //
-    // 2026-09-21, 4,4 -> 2,2: the ground-truth repair that cleared this fixture's invariant-1
-    // violation also halved the disagreement, so the old limit sat above the measurement. Caught
-    // by `the_quality_baseline_accuracy_columns_are_a_projection_of_the_stub_limits`, which is
-    // what keeps a clamp from outliving what it measured.
+    // A `throw new ...` becomes an assignment. The mapping replaces both statements whole;
+    // codediff pairs the class name across (`type_identifier` against `identifier`,
+    // `APTED("large_flat_subtree")`).
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "java-defects4j-cli-24-helpformatter",
         2,

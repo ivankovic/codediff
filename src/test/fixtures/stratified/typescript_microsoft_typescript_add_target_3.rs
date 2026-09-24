@@ -30,9 +30,7 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // Two instances of `ours=Move, theirs=None` - the same Move-vs-nothing family as
-    // css-wordpress-wordpress-one-line-to-multiline, at a far smaller scale. Minimal is exact; only
-    // Full disagrees, which is the axis those two presets are known to differ on.
+    // `ours=Move, theirs=None` twice - the Move-vs-nothing family. Only `Full` disagrees.
     assert_matches_human_painting_within_limit("typescript-microsoft-typescript-add-target-3", 8.74)
 }
 

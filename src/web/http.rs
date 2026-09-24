@@ -17,37 +17,26 @@
  */
 //! The HTTP/1.1 subset `codediff-web` speaks, over tokio's `TcpStream`.
 //!
-//! Hand-written rather than a server crate, and that is a deliberate trade, not an oversight.
-//! What the page needs is exactly this: a handful of `GET`s for static assets and `POST`s carrying
-//! a small JSON body, from one browser on the same machine, each answered with one response and a
-//! closed connection. That is a request line, a header block, and a `Content-Length` body -
-//! perhaps two hundred lines with tests. Every server crate that would do it for us brings its own
-//! dependency graph (`axum` roughly thirty crates, `tiny_http` a handful), and every crate in
-//! `Cargo.lock` is a line in packaging/gentoo's generated `CRATES=` block and an entry in its
-//! `LICENSE` enumeration, whether or not the feature that needs it is enabled. `tokio` is already
-//! there for the TUI. See `SPECS.md`'s decision log for the alternatives weighed.
+//! Hand-written rather than a server crate: the page only needs `GET`s and small JSON `POST`s from
+//! one local browser, one response per connection, and every crate in `Cargo.lock` costs packaging
+//! (gentoo's `CRATES=` and `LICENSE` lists) whether or not its feature is enabled. See `SPECS.md`.
 //!
-//! What is deliberately *not* here, because nothing sends it: chunked request bodies (a browser's
-//! `fetch` with a string body always sends `Content-Length`), keep-alive (every response says
-//! `Connection: close`, which every browser honours), pipelining, and anything but HTTP/1.x.
-//! Requests outside that subset are rejected with a 4xx rather than misread.
+//! Not supported, because no browser sends it here: chunked bodies, keep-alive, pipelining,
+//! anything but HTTP/1.x. Such requests get a 4xx rather than being misread.
 
 use serde::Serialize;
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
-/// Request line plus headers may not exceed this. Real requests from a browser are a few hundred
-/// bytes; anything near this bound is not one.
+/// Bound on request line plus headers; a browser's are a few hundred bytes.
 pub const MAX_HEAD_BYTES: usize = 64 * 1024;
 
-/// The largest body accepted. The API's bodies are file paths, option sets and a hex colour or
-/// two; the bound only has to stop an unbounded read, not accommodate anything.
+/// The largest body accepted; the API's bodies are small, so this only stops an unbounded read.
 pub const MAX_BODY_BYTES: usize = 1024 * 1024;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Request {
     pub method: String,
-    /// The path only - a query string, if any, is dropped at parse time. Every endpoint here takes
-    /// its parameters in a JSON body, so there is nothing to read from one.
+    /// The path only; a query string is dropped, since every endpoint takes a JSON body.
     pub path: String,
     pub headers: Vec<(String, String)>,
     pub body: Vec<u8>,
@@ -65,8 +54,7 @@ impl Request {
 
 #[derive(Debug)]
 pub enum HttpError {
-    /// Not HTTP/1.x as this module understands it - which status to answer with is the caller's
-    /// call, the message says what was wrong.
+    /// Outside the supported HTTP/1.x subset; the caller picks the status.
     Malformed(&'static str),
     /// Head or body over its bound.
     TooLarge,
@@ -140,7 +128,7 @@ pub fn parse_head(head: &str) -> Result<Head, HttpError> {
 }
 
 /// Reads one request. `Ok(None)` means the peer closed the connection before sending anything,
-/// which a browser does routinely (speculative preconnects) and which is not an error.
+/// which browsers do routinely (speculative preconnects).
 pub async fn read_request<R>(reader: &mut R) -> Result<Option<Request>, HttpError>
 where
     R: AsyncBufReadExt + Unpin,
@@ -158,15 +146,13 @@ where
         if head.len() > MAX_HEAD_BYTES {
             return Err(HttpError::TooLarge);
         }
-        // The blank line ending the head is `\r\n` on its own; a bare `\n` is tolerated the way
-        // most servers do.
+        // A bare `\n` is tolerated, as most servers do.
         let line = &head[before..];
         if line == b"\r\n" || line == b"\n" {
             break;
         }
     }
     let head = std::str::from_utf8(&head).map_err(|_| HttpError::Malformed("head is not UTF-8"))?;
-    // Lenient about a bare `\n` in the head too, for the same reason as above.
     let normalized = head.replace("\r\n", "\n").replace('\n', "\r\n");
     let head = parse_head(normalized.trim_end())?;
 
@@ -211,8 +197,7 @@ pub struct Response {
 impl Response {
     pub fn json<T: Serialize>(status: u16, value: &T) -> Self {
         let body = serde_json::to_vec(value).unwrap_or_else(|err| {
-            // A serialization failure here is a bug in a payload type, not a runtime condition;
-            // surface it to the page rather than answering with nothing.
+            // A bug in a payload type; show it on the page rather than answer with nothing.
             serde_json::to_vec(&serde_json::json!({ "error": err.to_string() }))
                 .expect("a one-field object serializes")
         });
@@ -266,10 +251,8 @@ impl Response {
         }
     }
 
-    /// The bytes on the wire. `Connection: close` because every request gets its own connection
-    /// (see the module comment); `no-store` because the page is generated with a per-run token
-    /// and the API's answers describe files that may change under it; `nosniff` so nothing here
-    /// is ever reinterpreted as a different type than it was served as.
+    /// The bytes on the wire. `no-store` because the page carries a per-run token and answers
+    /// describe files that may change; `nosniff` so nothing is reinterpreted as another type.
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut bytes = format!(
             "HTTP/1.1 {} {}\r\nContent-Type: {}\r\nContent-Length: {}\r\nConnection: close\r\n\

@@ -21,38 +21,17 @@ use std::hash::Hash;
 use crate::diff::ASTDiff;
 
 /**
-* The generic engine behind phase 4's candidate-group matching (`TODO.md`'s "what is the
-* generalization of phase 4" analysis, 2026-07-18). Three of phase 4's four mechanisms - named-
-* group matching, positional anchoring, and flow-control arm-overlap - turned out to be the same
-* algorithm with three different (candidate predicate, grouping key, cost function) tuples plugged
-* in:
-*
-* 1. Partition both sides' candidates into buckets by an exact, hashable compatibility key `K` -
-*    a before-candidate and an after-candidate are only ever compared if their keys are equal.
-* 2. Score every same-key pair with a caller-supplied, cheap (non-APTED) cost function - lower is
-*    better, `0.0` meaning "as good a match as this signal can express."
-* 3. Optionally reject pairs whose cost exceeds `max_cost` - `None` means no rejection threshold
-*    at all (the shared key alone already justifies the pair; cost only orders ties within a
-*    group, e.g. deciding which of several same-named overloads pairs with which).
-* 4. Greedily accept the cheapest remaining pair, cheapest first, each side claimable once.
-* 5. Hand every accepted pair to `on_accept`, which does the actual mapping (almost always a real
-*    `apted::for_nodes` call - the cheap cost function only ever decided *whether/who* to pair,
-*    never *how* the pair's internals map).
-*
-* The fourth mechanism, large flat subtrees, doesn't fit this shape at all - it isn't a matching
-* problem (no competing candidates, no scoring), it's a deterministic lookup executed *inside* an
-* already-established pair purely to pre-empt part of that pair's own APTED call. It stays a
-* separate, directly-called pass.
+* Greedy matching of candidates grouped by key, shared by phase 4's mechanisms. Only same-key
+* candidates are compared; each same-key pair is scored by `cost` (lower is better), pairs above
+* `max_cost` are dropped (`None`: the key alone justifies a pair, and cost only orders it), and
+* the cheapest remaining pairs are accepted first, each side at most once. `on_accept` does the
+* actual mapping; a pair already mapped by an earlier `on_accept` is skipped.
 *
 * # Determinism contract
 *
-* `before_candidates`/`after_candidates` must be supplied in a run-to-run deterministic order (a
-* DFS/preorder traversal of the tree - never raw node-id order or anything derived from `HashMap`
-* iteration). This function only ever uses a stable sort, and never iterates a `HashMap` to build
-* output, so the *only* remaining source of nondeterminism would be nondeterministic input order -
-* see `ASTNodeMetadata::start_byte`'s doc comment for why this matters (node ids are parse-unstable
-* arena slots, and per-process hash-seed-dependent iteration order has caused real, previously-
-* shipped nondeterminism bugs in this codebase).
+* The candidate slices must come in a run-to-run deterministic order (a tree traversal, never
+* node-id or `HashMap` order). Ties keep that order; nothing else here can introduce
+* nondeterminism.
 */
 pub(crate) fn solve<K: Eq + Hash>(
     diff: &mut ASTDiff,
@@ -67,10 +46,7 @@ pub(crate) fn solve<K: Eq + Hash>(
         after_by_key.entry(key).or_default().push(*after_id);
     }
 
-    // Score every before-candidate against same-key, not-yet-mapped after-candidates. Iteration
-    // order here is fully determined by `before_candidates`'/`after_candidates`' own (caller-
-    // guaranteed deterministic) order - `after_by_key`'s `Vec`s preserve `after_candidates`'
-    // insertion order, and looking a key up by reference never iterates the `HashMap` itself.
+    // `after_by_key` is only looked up, never iterated, so order comes from the inputs alone.
     let mut scored: Vec<(f64, usize, usize)> = Vec::new();
     for (before_id, key) in before_candidates {
         if diff.before_node_map.contains_key(before_id) {
@@ -91,7 +67,7 @@ pub(crate) fn solve<K: Eq + Hash>(
         }
     }
 
-    // Stable sort: ties preserve the deterministic pre-sort order established above.
+    // Must stay a stable sort, for the determinism contract.
     scored.sort_by(|a, b| a.0.total_cmp(&b.0));
 
     let mut before_claimed: HashSet<usize> = HashSet::new();
@@ -101,10 +77,7 @@ pub(crate) fn solve<K: Eq + Hash>(
         if before_claimed.contains(&before_id) || after_claimed.contains(&after_id) {
             continue;
         }
-        // Defensive re-check: an earlier-accepted pair's real APTED resolution may already have
-        // claimed one of these nodes as a matched descendant (e.g. an outer container matched
-        // first, whose real edit-distance resolution already covered a nested candidate that's
-        // also, independently, a candidate here).
+        // An earlier `on_accept` may have mapped a nested candidate as a descendant.
         if diff.before_node_map.contains_key(&before_id)
             || diff.after_node_map.contains_key(&after_id)
         {
@@ -141,8 +114,6 @@ mod tests {
     fn cheapest_pair_in_a_group_wins_and_each_side_is_claimed_once() {
         let mut diff = ASTDiff::default();
         let mut accepted = Vec::new();
-        // Two before-candidates and two after-candidates share one key - only the (2, 20) pair
-        // has a low enough cost, and once it's accepted, 2 and 20 must not be reused for 1/10.
         let cost = |before_id: usize, after_id: usize| match (before_id, after_id) {
             (2, 20) => 0.0,
             _ => 5.0,
@@ -166,8 +137,6 @@ mod tests {
             accepted.contains(&(2, 20)),
             "the cheapest pair must be accepted"
         );
-        // The remaining before/after ids (1 and 10) must pair with each other, not be dropped or
-        // re-paired with an already-claimed id.
         assert!(accepted.contains(&(1, 10)));
     }
 
@@ -256,8 +225,6 @@ mod tests {
     fn ties_are_broken_by_input_order_for_determinism() {
         let mut diff = ASTDiff::default();
         let mut accepted = Vec::new();
-        // Every pair costs the same - the stable sort must preserve the caller-supplied
-        // (deterministic traversal) order rather than reordering equal-cost entries arbitrarily.
         solve(
             &mut diff,
             &[(1, "k"), (2, "k")],
@@ -268,5 +235,29 @@ mod tests {
         );
 
         assert_eq!(accepted, vec![(1, 10), (2, 20)]);
+    }
+
+    #[test]
+    fn a_candidate_mapped_by_an_earlier_on_accept_is_not_paired_again() {
+        let mut diff = ASTDiff::default();
+        let mut accepted = Vec::new();
+
+        solve(
+            &mut diff,
+            &[(1, "outer"), (2, "inner")],
+            &[(10, "outer"), (20, "inner")],
+            |_, _| 0.0,
+            None,
+            |before_id, after_id, diff| {
+                accepted.push((before_id, after_id));
+                diff.add_mapping(
+                    2,
+                    20,
+                    crate::diff::ASTMapping::identical(crate::diff::ASTMappingReason::OptimalIDU),
+                );
+            },
+        );
+
+        assert_eq!(accepted, vec![(1, 10)]);
     }
 }

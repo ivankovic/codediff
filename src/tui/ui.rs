@@ -37,11 +37,8 @@ use tokio::time::{Interval, interval};
 use crate::tui::events::Event;
 
 /// Owns the terminal and its raw-mode/alternate-screen lifecycle, plus the merged input/tick/
-/// render event source.
-///
-/// Terminal input comes from `crossterm::event::EventStream`, an async epoll-driven stream, not
-/// from a dedicated polling thread: see `next_event` below and the "Async event loop" entry in
-/// `SPECS.md` for why a background thread/task was deliberately avoided.
+/// render event source. Input is an async `EventStream`, not a polling thread; see "Async event
+/// loop" in `SPECS.md` for why.
 pub struct UI {
     pub terminal: ratatui::Terminal<Backend<Stdout>>,
 
@@ -87,20 +84,17 @@ impl UI {
         self
     }
 
-    /// The current terminal size.
     pub fn size(&self) -> Result<Rect> {
         Ok(self.terminal.size()?)
     }
 
-    /// Resize the terminal's internal buffers to match a new size (call after a resize event).
+    /// Call after a resize event.
     pub fn resize(&mut self, area: Rect) -> Result<()> {
         self.terminal.resize(area)?;
         Ok(())
     }
 
-    /// Wait for the next tick, render timer, or terminal input event, merging all three into a
-    /// single source. Returns `None` only once the input stream itself has closed (e.g. stdin
-    /// was closed), since that means there will never be another event.
+    /// The next tick, render or input event. `None` only once the input stream has closed.
     pub async fn next_event(&mut self) -> Option<Event> {
         loop {
             let event = tokio::select! {
@@ -166,8 +160,7 @@ impl Drop for UI {
     }
 }
 
-/// Map a raw crossterm event onto our own `Event`, dropping the kinds the app has no use for
-/// (focus gained/lost, bracketed paste) rather than threading them through everywhere.
+/// Drops the event kinds the app has no use for (focus, bracketed paste).
 fn map_crossterm_event(event: CrosstermEvent) -> Option<Event> {
     match event {
         CrosstermEvent::Key(key) => Some(Event::Key(key)),

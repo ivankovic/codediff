@@ -23,10 +23,8 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // An assignment gains a cast around a method call, and the human treats the new expression as
-    // inserted whole; codediff carries the old right-hand side's leaves into it, partly through
-    // `qualified_name` and partly as a `MovedSubtree` of the argument list. Recorded as found, not
-    // examined.
+    // An assignment gains a cast around a call, which the human treats as inserted whole; codediff
+    // carries the old right-hand side's leaves into it (`qualified_name`, `MovedSubtree`).
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "java-defects4j-cli-15-writeablecommandlineimpl",
         37,

@@ -22,26 +22,17 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // 4 mismatches, all the same documented brace-attribution gap in the `if let`-chain collapse:
-    // `solve_nested_condition_collapse` deliberately leaves each wrapper level's own `{`/`}` tokens
-    // matched wherever phase 1's hash descent already put them (innermost), rather than
-    // re-attributing them to the outermost wrapper - a prior attempt at that re-attribution was
-    // reverted after measuring it disagreed with this fixture's own hand-painted ground truth in a
-    // way that wasn't simply "backwards" (see that module's own doc comment for the measurement and
-    // why a real fix needs a clearer picture of what the ground truth wants, not a second guess at
-    // the same theory). A limit above the measured number is a test that cannot fail, which is what
-    // `the_quality_baseline_accuracy_columns_are_a_projection_of_the_stub_limits` exists to catch -
-    // the baseline records the measurement, so the stub has to record it too.
+    // The brace-attribution gap in the `if let`-chain collapse: `solve_nested_condition_collapse`
+    // leaves each wrapper level's `{`/`}` where hash descent put them (innermost) rather than on
+    // the outermost wrapper; see that module's doc comment.
     test::helper::human_mapping::assert_matches_human_mapping("rust-next-font-imports-generator")
 }
 
 #[test]
 fn painting() -> Result<()> {
-    // Minimal 2.605%, full 6.897%. `FULL` depends on `reconcile_moves` not calling two overlapping
-    // accounts of the same relocation a disagreement: both walks called this file's de-indented `if
-    // let` chain a `Move`, over extents four columns apart, and the exact-extent lookup read that
-    // as a conflict - so the after side was blanked over sixty-one rows. This fixture alone was a
-    // quarter of the whole corpus's painting disagreement.
+    // `FULL` depends on `reconcile_moves` not calling two overlapping accounts of one relocation
+    // (the de-indented `if let` chain, four columns apart) a conflict, which would blank the after
+    // side over sixty-one rows.
     assert_matches_human_painting_within_limit("rust-next-font-imports-generator", 6.91)
 }
 

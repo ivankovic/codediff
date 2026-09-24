@@ -21,13 +21,8 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // Known, unreviewed gap in a real-world 75k-node file - not yet root-caused. Clamped at the
-    // observed count rather than requiring an exact match. Lower (or drop back to
-    // `assert_matches_human_mapping`) once a fix lands. NOT an algorithm regression: the human
-    // mapping for this fixture was only partially annotated when 18/15 was recorded, so the old
-    // limits scored codediff against a fraction of the file. The mapping was finished and the count
-    // is now measured against the whole of it. The residual is one shape: a `const_item` and a run
-    // of doc comments that `APTED("fast_fallback")` deletes rather than matching.
+    // One shape: a `const_item` and a run of doc comments that `APTED("fast_fallback")` deletes
+    // rather than matches.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "rust-real-logic-change-in-a-huge-75k-node-file",
         44,

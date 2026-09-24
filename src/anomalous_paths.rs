@@ -17,8 +17,7 @@
  */
 
 //! Paths the corpus tools skip on sight - vendored trees, minified bundles, generated files -
-//! so a sample is drawn from code somebody wrote. Was `src/metadata.rs`, a name that collided
-//! with `code::metadata` (the AST metadata) while describing neither.
+//! so a sample is drawn from code somebody wrote.
 use std::path::Path;
 
 static WELL_KNOWN_ANOMALOUS_PATHS: &[&str] = &[
@@ -43,15 +42,9 @@ static WELL_KNOWN_ANOMALOUS_PATHS: &[&str] = &[
     "swiftlang-swift.git/test",
 ];
 
-/**
-* Returns true if the path matches one of the well known problematic paths.
-*
-* Most of these are highly atypical code, usualy an extremely long array, that results in a very
-* unbalanced syntax tree with huge depth and can cause a panic.
-*
-* Or they are code we do not want to consider as code, notably /.git/ and similar dot-directories
-* and code that is vendored in the repository but is not owned by the repository.
-*/
+/// True if `path` contains one of the well-known anomalous path fragments: vendored or dot-directory
+/// code the repository does not own, or files (usually one huge array) whose tree is deep enough to
+/// panic the parser.
 pub fn is_anomalous(path: &Path) -> bool {
     WELL_KNOWN_ANOMALOUS_PATHS
         .iter()

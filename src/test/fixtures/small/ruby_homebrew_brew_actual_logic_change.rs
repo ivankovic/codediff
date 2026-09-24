@@ -21,9 +21,8 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // An `if` modifier moves from one assignment to a different (later) one; codediff maps most
-    // of the moved subtree to Delete/Insert instead of following the move, plus two multi-map
-    // group pairings it doesn't realize.
+    // An `if` modifier moves to a later assignment; codediff deletes and inserts most of it, and
+    // does not realize two multi-map group pairings.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "ruby-homebrew-brew-actual-logic-change",
         15,

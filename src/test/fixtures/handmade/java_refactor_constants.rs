@@ -22,11 +22,9 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // Two literal occurrences become one named constant: an all-to-all 2:1 group over the
-    // `decimal_floating_point_literal`s (see `MultiMapGroup::pairing`). One of the two before
-    // literals is unavoidably unmatched by a one-to-one output; codediff's `qualified_name` pass
-    // then deletes *both* and inserts the after one rather than pairing either, which is the
-    // other two. The N:M algorithm work is what closes the first; the second is an ordinary gap.
+    // Two literals become one named constant: an all-to-all 2:1 group (see
+    // `MultiMapGroup::pairing`). One before literal is unavoidably unmatched; codediff's
+    // `qualified_name` pass also deletes the other and inserts the after one, an ordinary gap.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "java-refactor-constants",
         3,
@@ -36,10 +34,7 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // After `RenderOptions::paint_displaced_moves` stopped `MINIMAL` painting a span that kept its
-    // own text and its own place and shifted only because of an edit before it: minimal 12.963% ->
-    // 3.872%. The option is off under `FULL`, which this fix leaves byte-identical at 12.795%, so
-    // `FULL` sets the limit now.
+    // `FULL` sets the limit.
     assert_matches_human_painting_within_limit("java-refactor-constants", 12.81)
 }
 

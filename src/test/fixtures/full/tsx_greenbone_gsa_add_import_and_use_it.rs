@@ -22,10 +22,8 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // Repairing the invariant-18 violation put this mismatch here: the mapping now pairs
-    // `type: undefined` with `type: GREENBONE_SENSOR_SCANNER_TYPE` across `pair.value`, and
-    // codediff deletes the `undefined` instead (reason `APTED("greedy_anchor_block")`). One
-    // mismatch, and it is the whole of the change.
+    // The invariant-18 pairing of `type: undefined` with `type: GREENBONE_SENSOR_SCANNER_TYPE`
+    // across `pair.value`; codediff deletes the `undefined` (`APTED("greedy_anchor_block")`).
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "tsx-greenbone-gsa-add-import-and-use-it",
         1,

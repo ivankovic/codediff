@@ -22,10 +22,9 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // Three identical `foo();` become two, recorded as all-to-all 3:2 groups over the statement
-    // and each of its six descendants (see `MultiMapGroup::pairing`). A one-to-one output must
-    // leave one before member of every group unmatched, so seven is exactly the floor - codediff
-    // matches everything it can express. Closing this is the N:M algorithm work, not a gap here.
+    // Three identical `foo();` become two: all-to-all 3:2 groups over the statement and its six
+    // descendants. A one-to-one output leaves one before member of each unmatched, so seven is the
+    // floor, and codediff reaches it.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "rust-multi-map-duplicate-calls",
         7,

@@ -22,32 +22,13 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // In this test, there are two interesting choices: 1. The .unwrap() to ? changes the AST from:
-    // call_expression field_expression call_expression field_expression to try_expression
-    // call_expression field_expression There is no difference in the optimal cost if the
-    // call_expression and field_expression in the after side matches to either of the two
-    // corresponding candidates on the before side. In any case, the cost is always 2 x COST_UPDATE
-    // (which is 0) + 2 x COST_DELETE. This is why the human solution originally left these nodes
-    // unmarked - a genuine "don't care", since `compute_mismatches_for_with_config` only checks
-    // nodes that have an entry. That is not true of the current mapping, which resolves the choice
-    // into an explicit multi-map group: the two before-side nodes map to the one after-side node as
-    // `MatchButNotIdentical`. Three of the eight mismatches below are that group, and they say
-    // codediff chose `Identical` for those pairs instead. Cost-tied is not the same as don't-care,
-    // and the human has now said which of the tied readings is the right one. 2. The "contents"
-    // changing to "OK(contents)". The AST changes from: identifier "contents" to call_expression
-    // identifier "Ok" arguments ( identifier "contents" ) This is quite a "deep" change, and
-    // heuristics that prevent changes across too many levels might not allow "contents" to match.
-    // However, for humans it is obviously correct to match them. Confirmed this is APTED's own
-    // tree-edit-distance ordering constraint, not a heuristic cutoff: both nodes reach APTED
-    // (reason `APTED("qualified_name")` on both the before-side Delete and the after-side Insert)
-    // and matching them is textually free (identical identifiers), but APTED's optimal solution
-    // still doesn't include the pair - matching them would violate the LCA-consistent ordering
-    // APTED's mapping model requires relative to the other already-fixed matches in the block. This
-    // is the same class of "objective wall" as other cost-tied APTED gaps documented in `TODO.md` -
-    // not attempted here. Clamp raised 1/1 -> 8/4, by the mapping gaining the group above rather
-    // than by anything in the differ changing: more nodes asserted means more of the existing
-    // disagreement is visible to the check. Not a regression. Any counts above describe the older,
-    // larger residual.
+    // Two interesting choices:
+    // 1. `.unwrap()` to `?`: the after `call_expression`/`field_expression` can match either
+    //    before candidate at equal cost. The mapping resolves the tie as a multi-map group of
+    //    `MatchButNotIdentical`, and codediff chooses `Identical`: cost-tied is not don't-care.
+    // 2. `contents` becoming `Ok(contents)` is a deep change a human obviously matches. APTED
+    //    reaches both nodes but its ordering constraint (LCA consistency with the block's other
+    //    matches) excludes the pair - an objective wall, not a heuristic cutoff.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "rust-error-handling",
         5,
@@ -57,9 +38,7 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // Byte counts, not just percentages, because the clamp is a 2dp ceiling of the true fraction
-    // and 43/698 is 6.16046% - a first pass recorded 6.16 from the displayed 6.160% and failed on
-    // the very run that set it.
+    // A 2dp ceiling of the true fraction: 43/698 is 6.16046%, so 6.16 fails.
     assert_matches_human_painting_within_limit("rust-error-handling", 4.88)
 }
 

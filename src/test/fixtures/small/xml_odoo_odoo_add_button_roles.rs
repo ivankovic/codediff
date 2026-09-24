@@ -21,11 +21,8 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // Same cascading-whitespace pattern documented on xml-nextcloud-android-add-few-translations:
-    // new <button> elements are inserted at scattered points, and XML's uniform inter-tag
-    // whitespace CharData nodes are frequently byte-identical to each other, so downstream of
-    // each insertion the ambiguous whitespace nodes get matched to a slightly different (but
-    // content-identical) sibling than the human's chosen correspondence.
+    // New <button> elements at scattered points: byte-identical whitespace `CharData` downstream
+    // of each insertion matches another sibling (see xml-nextcloud-android-add-few-translations).
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "xml-odoo-odoo-add-button-roles",
         109,

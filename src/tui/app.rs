@@ -55,24 +55,22 @@ use crate::tui::ui::UI;
 /// Which top-level screen is currently shown.
 #[derive(Default, Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum AppScreen {
-    /// The Before/After panels, populated or not, with the normal diff-viewer key bindings live.
+    /// The Before/After panels, populated or not.
     #[default]
     Viewer,
-    /// A file dialog is open, picking a file for `dialog_target`.
+    /// A file dialog is picking a file for `dialog_target`.
     SelectFile,
-    /// The theme picker popup is open, drawn over the (still-visible) viewer.
     SelectTheme,
-    /// The render-options panel (the `M` key) is open, drawn over the (still-visible) viewer.
+    /// The `M` render-options panel.
     RenderOptions,
-    /// The background diff computation is running.
     Diffing,
-    /// The `?` keybinding reference is open, drawn over the (still-visible) viewer.
+    /// The `?` keybinding reference.
     Help,
-    /// The `/` search modal is open, drawn over the (still-visible) viewer.
+    /// The `/` search modal.
     Search,
-    /// The `g` jump-to-line prompt is open, drawn over the (still-visible) viewer.
+    /// The `g` jump-to-line prompt.
     JumpToLine,
-    /// The `G` git review picker is open, drawn over the (still-visible) viewer.
+    /// The `G` git review picker.
     Review,
 }
 
@@ -86,17 +84,11 @@ struct ReviewPosition {
     index: usize,
 }
 
-/// Whether pressing Esc on `screen` should quit the app, rather than being handled by that
-/// screen's own dialog (via `Action::DialogCancelled`).
+/// Whether Esc on `screen` quits the app rather than closing that screen's own dialog. On
+/// `Diffing` it cancels the computation instead, so a reflexive Esc on a slow diff keeps the session.
 ///
-/// `Diffing` is deliberately *not* a quit screen: Esc there cancels the in-flight computation
-/// and returns to the viewer (see the Esc arm in `handle_events`), so a slow diff is not the one
-/// situation where a reflexive Esc loses the entire session.
-///
-/// Deliberately an exhaustive match, not a list of `!=` exclusions. A growing exclusion list is
-/// easy to forget to extend, and a screen missing from it lets Esc silently quit the whole app
-/// instead of closing that screen's own dialog. An exhaustive match makes the compiler force
-/// every future `AppScreen` variant to be considered here.
+/// An exhaustive match on purpose: a new `AppScreen` missing from an exclusion list would make
+/// Esc quit the app instead of closing its dialog.
 fn esc_should_quit(screen: AppScreen) -> bool {
     match screen {
         AppScreen::Viewer => true,
@@ -111,7 +103,7 @@ fn esc_should_quit(screen: AppScreen) -> bool {
     }
 }
 
-/// The codediff application. The state, but not the state machine or the UI, of the TUI.
+/// The state of the TUI, but not its state machine or its UI.
 pub struct App {
     tick_rate: f64,
     frame_rate: f64,
@@ -124,94 +116,58 @@ pub struct App {
     search_modal: Option<SearchModal>,
     line_prompt: Option<LinePrompt>,
     review_dialog: Option<ReviewDialog>,
-    /// Materialized blobs of reviewed changes; one per app, removed on drop. Created on the first
-    /// `ReviewFileSelected`.
+    /// Materialized blobs of reviewed changes, removed on drop.
     review_workspace: Option<review::Workspace>,
     review_position: Option<ReviewPosition>,
 
     action_tx: mpsc::UnboundedSender<Action>,
     action_rx: mpsc::UnboundedReceiver<Action>,
-    /// Incremented for every launched background diff; `start_diff` captures the current value
-    /// and tags its `Action::DiffComputed` with it. A result whose generation no longer matches
-    /// is silently dropped - which is all "cancelling" a `spawn_blocking` computation can mean
-    /// (the thread itself runs to completion; its answer just doesn't land). Bumped by Esc during
-    /// `Diffing` and by every new `StartDiff`, so a slow older diff can never overwrite a newer
-    /// one's result either.
+    /// Tags each background diff's `Action::DiffComputed`; a result whose generation no longer
+    /// matches is dropped. That is all "cancelling" a `spawn_blocking` computation can mean: the
+    /// thread runs to completion, its answer just never lands.
     diff_generation: u64,
-    /// Where to put the cursor back after the next `DiffReady` - set by the `r` reload and the
-    /// `e` editor round-trip so recomputing the same pair doesn't dump the cursor back at the
-    /// first change. `(panel, row, col)`, applied clamped (the file may have changed under a
-    /// reload).
+    /// `(panel, row, col)` to restore after the next `DiffReady` instead of jumping to the first
+    /// change. Applied clamped, since the file may have changed under a reload.
     restore_after_reload: Option<(Panel, usize, usize)>,
-    /// The last submitted search query - `/` then a bare Enter repeats it (see `SearchModal`).
+    /// `/` then a bare Enter repeats it.
     last_search_query: Option<String>,
-    /// Set by the `e` key: leave the TUI, run `$VISUAL`/`$EDITOR` on this `(path, 1-indexed
-    /// line)`, then re-enter and re-diff - serviced by the `run` loop between event batches,
-    /// since only it holds the `UI` needed to release and re-acquire the terminal.
+    /// `(path, 1-indexed line)` for the `e` key. Serviced by the `run` loop, since only it holds
+    /// the `UI` needed to release and re-acquire the terminal.
     pending_editor: Option<(PathBuf, usize)>,
-    /// Set by `Action::Suspend`, consumed by the run loop - see that action's doc comment.
     pending_suspend: bool,
-    /// Recently diffed pairs (most recent first), loaded from the config in `run` and offered on
-    /// the empty-start screen as digit shortcuts - see `draw_recent_pairs`/the digit-key arm.
+    /// Most recent first; offered on the empty-start screen as digit shortcuts.
     recent_pairs: Vec<(PathBuf, PathBuf)>,
 
     screen: AppScreen,
-    /// Which panel the open file dialog is selecting a file for.
     dialog_target: Option<Panel>,
-    /// The currently active overlay color theme, persisted across runs (see `tui::theme`).
     current_theme: OverlayTheme,
-    /// The chosen syntax-highlighting theme name, persisted alongside the overlay theme. `None`
-    /// until the user picks one in the theme dialog, in which case the code viewer keeps its own
-    /// built-in default.
+    /// `None` until picked in the theme dialog; the code viewer keeps its built-in default.
     syntax_theme: Option<String>,
-    /// The "Before" file path, once a file has been picked for that panel.
     before_path: Option<PathBuf>,
-    /// The "After" file path, once a file has been picked for that panel.
     after_path: Option<PathBuf>,
-    /// The most recent diff failure, shown as a one-line banner until the next file pick.
+    /// Shown as a one-line banner until the next file pick.
     last_error: Option<String>,
-    /// A quick, common-case classification of the currently loaded diff (see
-    /// `diff::text::DiffSummary`), shown as a one-line status bar above the panels when it's
-    /// `Some`. Computed once, when `Action::DiffReady` arrives (`summarize_diff`), not on every
-    /// frame - the panels themselves don't change without a fresh diff, so neither does this.
-    /// Cleared on `StartDiff`/`DiffFailed` so a stale summary from the *previous* diff never shows
-    /// while a new one is loading or after it fails.
+    /// The status bar's classification of the loaded diff. This, `change_counts` and
+    /// `plain_text_fallback` are cleared on `StartDiff`/`DiffFailed`, so a stale value from the
+    /// previous diff never shows while a new one loads or after it fails.
     diff_summary: Option<DiffSummary>,
-    /// Ticks remaining before the centered `diff_summary` toast fades on its own; 0 means no
-    /// toast is up. The status bar is easy to miss precisely when it matters most - "whitespace
-    /// changes only" is exactly the case where a user skims two panels that look different and
-    /// concludes something real changed - so a fresh diff also announces itself in the middle of
-    /// the screen, where the eye already is. Deliberately *not* a modal
-    /// (`AppScreen`/`help_modal`): this TUI is usually a git difftool opened per file, where the
-    /// first keystroke is `n` or `q`, and swallowing that keystroke would trade a missed
-    /// notification for a stolen one. Any key clears the toast *and* still does its own job, and
-    /// the one-line status bar stays up afterwards as the persistent record.
+    /// Ticks until the centered `diff_summary` toast fades; 0 means none is up. The status bar is
+    /// easy to miss exactly when it matters ("whitespace changes only"). Not a modal: as a git
+    /// difftool the first keystroke is usually `n` or `q`, and swallowing it would trade a missed
+    /// notification for a stolen one, so any key clears the toast and still does its own job.
     summary_toast_ticks: u8,
-    /// When the in-flight diff started, for the elapsed counter on the `Diffing` screen; `None`
-    /// when no diff is running. Read at draw time rather than accumulated on a timer: the render
-    /// loop already redraws at `frame_rate` (60Hz by default), so an `Instant::elapsed` in the
-    /// draw path costs one subtraction per frame and needs no tick handler, no background task
-    /// and no extra wakeups. The counter's resolution is therefore the frame rate, not the 4Hz
-    /// `Action::Tick`, which is what makes tenths of a second meaningful to show at all.
+    /// Read at draw time, so the counter's resolution is the frame rate rather than the 4Hz tick -
+    /// which is what makes tenths of a second worth showing.
     diff_started_at: Option<std::time::Instant>,
-    /// Line-level +/-/~ counts for the currently loaded diff (see `diff::text::change_counts`),
-    /// shown in the footer. Same lifecycle as `diff_summary` - computed once on `Action::DiffReady`,
-    /// cleared on `StartDiff`/`DiffFailed`.
     change_counts: Option<ChangeCounts>,
-    /// Whether the currently loaded diff came from `diff::text::plain_text_line_diff` (see
-    /// `DiffSessionData::plain_text_fallback`) rather than the AST pipeline - shown in the footer
-    /// as `[plain text]`, since no AST algorithm ran at all. Same lifecycle as
-    /// `diff_summary`/`change_counts`.
+    /// The loaded diff came from `plain_text_line_diff`; no AST algorithm ran.
     plain_text_fallback: bool,
 
     should_exit: bool,
 }
 
-/// Whether a key event is Ctrl-Z, the suspend request.
-///
-/// A free function so it can be tested without a `UI`, which needs a real terminal. The test must
-/// never reach `App::suspend` itself - that stops the process, which for a test process means the
-/// run hangs rather than fails.
+/// A free function so it can be tested without reaching `App::suspend`, which would stop the test
+/// process and hang the run.
 fn is_suspend_key(key: &crossterm::event::KeyEvent) -> bool {
     key.code == KeyCode::Char('z')
         && key
@@ -220,7 +176,6 @@ fn is_suspend_key(key: &crossterm::event::KeyEvent) -> bool {
 }
 
 impl App {
-    /// Construct the App.
     pub fn new(tick_rate: f64, frame_rate: f64) -> Result<Self> {
         let (action_tx, action_rx) = mpsc::unbounded_channel();
 
@@ -262,8 +217,7 @@ impl App {
     }
 
     pub async fn run(&mut self) -> Result<()> {
-        // Loaded here rather than in `new` so constructing an `App` (e.g. in tests) never
-        // touches disk; only actually running the TUI reads (and may create) the config file.
+        // Here rather than in `new`, so constructing an `App` in tests never touches the config.
         self.current_theme = theme::load_overlay_theme();
         self.diff_viewer.set_overlay_theme(self.current_theme);
         self.diff_viewer
@@ -272,19 +226,15 @@ impl App {
             .set_node_highlight(theme::load_node_highlight());
         self.diff_viewer
             .set_render_options(theme::load_render_options());
-        // The custom palette has to be installed before anything renders: `OverlayTheme::Custom`
-        // resolves through the process-global one, so a user whose saved theme is Custom would
-        // otherwise see Dracula's defaults for the first frame.
+        // Before anything renders: `OverlayTheme::Custom` resolves through this process-global
+        // palette, and would otherwise show Dracula's defaults for the first frame.
         theme::set_custom_palette(theme::load_custom_palette());
         self.syntax_theme = theme::load_syntax_theme();
         if let Some(name) = self.syntax_theme.clone() {
             self.diff_viewer.set_syntax_theme(name);
         }
         self.recent_pairs = theme::load_recent_pairs();
-        // A config that does not parse is otherwise entirely invisible: the settings above all
-        // fall back to defaults, and nothing is written back over the file (see
-        // `theme::update_config`), so the user sees their preferences quietly ignored every run
-        // with no clue why. The banner says which file and what serde objected to.
+        // A config that does not parse otherwise falls back to defaults silently, every run.
         if let Some(problem) = theme::config_error() {
             self.last_error = Some(format!(
                 "config not loaded, using defaults and leaving the file alone - {problem}"
@@ -294,9 +244,7 @@ impl App {
         let mut ui = UI::new()?
             .tick_rate(self.tick_rate)
             .frame_rate(self.frame_rate);
-        // Mouse capture on by default: the wheel scrolls the panel under the pointer and a
-        // click focuses/places the cursor (`DiffViewer::handle_mouse_event`). Terminal-native
-        // text selection remains available via the terminal's own modifier (usually Shift-drag).
+        // Terminal-native selection stays available through the terminal's modifier (Shift-drag).
         ui.mouse = true;
         ui.enter()?;
 
@@ -327,24 +275,18 @@ impl App {
         };
         let action_tx = self.action_tx.clone();
 
-        // Set by the o/c/? arms below when they open a new screen - see the comment at this
-        // function's `dispatch_event_to_active_screen` call site for why that matters.
+        // A keystroke that opened a screen must not also reach it: `?` is also HelpModal's close
+        // key, and `/` would seed SearchModal's query.
         let mut globally_handled = false;
 
-        // Global key handling that doesn't depend on which component is focused.
-        // Any keystroke means the user is already looking at the screen, so the toast has done
-        // its job - clear it here, *before* dispatch, so the same key still performs its normal
-        // action (see `summary_toast_ticks`'s doc comment on why this isn't a modal).
+        // Before dispatch, so the same key still does its own job (see `summary_toast_ticks`).
         if matches!(event, Event::Key(_)) {
             self.dismiss_summary_toast();
         }
 
         if let Event::Key(key) = &event {
-            // Ctrl-Z before the `match` on `key.code`, because the code is a plain `Char('z')`
-            // and would otherwise have to be excluded from every arm that might want `z`. Raw
-            // mode is why this is needed at all: it turns off ISIG, so the terminal never turns
-            // Ctrl-Z into SIGTSTP and the keystroke arrives as an ordinary key that the TUI was
-            // simply swallowing.
+            // Raw mode turns off ISIG, so Ctrl-Z arrives as an ordinary `Char('z')`; checked
+            // before the match so no `z` arm has to exclude it.
             if is_suspend_key(key) {
                 action_tx.send(Action::Suspend)?;
                 return Ok(());
@@ -356,9 +298,6 @@ impl App {
                 KeyCode::Esc if esc_should_quit(self.screen) => {
                     action_tx.send(Action::Quit)?;
                 }
-                // Esc during an in-flight diff cancels it instead of quitting: bump the
-                // generation so the eventual `DiffComputed` is recognized as stale and dropped,
-                // and return to the viewer (still showing whatever diff was loaded before).
                 KeyCode::Esc if self.screen == AppScreen::Diffing => {
                     self.diff_generation += 1;
                     self.restore_after_reload = None;
@@ -367,13 +306,10 @@ impl App {
                     action_tx.send(Action::Render)?;
                     globally_handled = true;
                 }
-                // Re-diff the current pair from disk - the edit-in-another-terminal loop. Keeps
-                // the cursor where it is (clamped) instead of resetting to the first change.
                 KeyCode::Char('r') if self.screen == AppScreen::Viewer => {
                     if let Some(position) = self.review_position.clone() {
-                        // A reviewed pair is re-materialized rather than re-read: the index
-                        // and HEAD blobs are snapshots, and the point of `r` is to see what
-                        // changed since.
+                        // Re-materialized: the index and HEAD blobs are snapshots, and `r`
+                        // is for seeing what changed since.
                         self.remember_cursor_for_restore();
                         self.open_review_position(position)?;
                     } else if let (Some(before), Some(after)) =
@@ -390,9 +326,7 @@ impl App {
                     action_tx.send(Action::Render)?;
                     globally_handled = true;
                 }
-                // On the empty-start screen, the digit keys reopen a recent pair (see
-                // `draw_recent_pairs`). Only with no files loaded: once a diff is up, digits
-                // stay free for future use.
+                // Only on the empty-start screen, so digits stay free once a diff is up.
                 KeyCode::Char(c @ '1'..='9')
                     if self.screen == AppScreen::Viewer
                         && self.before_path.is_none()
@@ -405,9 +339,6 @@ impl App {
                     }
                     globally_handled = true;
                 }
-                // Open the focused panel's file in $VISUAL/$EDITOR at the cursor line - serviced
-                // by the run loop (`run_editor`), which is the only place the terminal can be
-                // released and re-acquired.
                 KeyCode::Char('e') if self.screen == AppScreen::Viewer => {
                     let path = match self.diff_viewer.active_panel() {
                         Panel::Before => self.before_path.clone(),
@@ -442,8 +373,6 @@ impl App {
                     action_tx.send(Action::Render)?;
                     globally_handled = true;
                 }
-                // Open the render-options panel - which parts of the diff get painted, not a
-                // blind Full/Minimal flip any more (see `RenderOptionsDialog`).
                 KeyCode::Char('M') if self.screen == AppScreen::Viewer => {
                     self.render_options_dialog =
                         Some(RenderOptionsDialog::new(self.diff_viewer.render_options()));
@@ -489,21 +418,14 @@ impl App {
             Event::Key(_) | Event::Mouse(_) => {}
         }
 
-        // Skip forwarding this same keystroke to whatever screen it just opened above - `o`/`c`
-        // happened to get away with the double-dispatch (neither FileDialog nor ThemeDialog treats
-        // `o`/`c` as one of its own keys, so the stray extra delivery was a harmless no-op), but
-        // `?` doesn't: HelpModal treats `?` as its own close key too, so without this guard the
-        // keystroke that opens it would immediately reach the just-created modal and close it
-        // again in the same event cycle - it would open and close within a single frame, i.e.
-        // never visibly show up at all.
         if !globally_handled && let Some(action) = self.dispatch_event_to_active_screen(event)? {
             action_tx.send(action)?;
         }
         Ok(())
     }
 
-    /// Forward an event only to the component backing the currently active screen, so e.g. a
-    /// file dialog being open doesn't also feed arrow keys into the (hidden) diff viewer.
+    /// Only the active screen's component sees the event, so an open dialog does not also feed
+    /// keys to the viewer behind it.
     fn dispatch_event_to_active_screen(&mut self, event: Event) -> Result<Option<Action>> {
         match self.screen {
             AppScreen::Viewer => self.diff_viewer.handle_events(Some(event)),
@@ -539,8 +461,7 @@ impl App {
         }
     }
 
-    /// `G`: list the repository around the current directory. Failure (not a repository, no
-    /// `git`) goes to the banner rather than a dialog, since there is nothing to pick from.
+    /// Failure (not a repository, no `git`) goes to the banner, since there is nothing to pick.
     fn open_review(&mut self) {
         let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
         match review::load(&cwd, review::DEFAULT_COMMIT_LIMIT) {
@@ -557,9 +478,7 @@ impl App {
         self.open_review();
     }
 
-    /// Materializes `position`'s current file and opens the pair. Kept separate from
-    /// `select_file_for_panel` so that `before_path`/`after_path` and the viewer are set in one
-    /// step and the diff starts once, not once per side.
+    /// Not `select_file_for_panel` twice, so the diff starts once rather than once per side.
     fn open_review_position(&mut self, position: ReviewPosition) -> Result<()> {
         let Some(file) = position.files.get(position.index).cloned() else {
             return Ok(());
@@ -578,13 +497,11 @@ impl App {
             self.review_workspace = Some(review::Workspace::new()?);
         }
         let workspace = self.review_workspace.as_ref().expect("created just above");
-        // The position is remembered even when the file cannot be shown: `]`/`[` must still be
-        // able to step past a binary to the next file of the set.
+        // Kept even when the file cannot be shown, so `]`/`[` can step past a binary.
         self.review_position = Some(position);
         match workspace.materialize(&root, &target) {
             Ok((before, after)) => {
-                // Named by its repository path, not the workspace's: that is the file the reader
-                // picked, and the temp path says nothing they can act on.
+                // Named by its repository path; the temp path says nothing the reader can use.
                 if Self::unshowable(&before)
                     .or_else(|| Self::unshowable(&after))
                     .is_some()
@@ -613,8 +530,6 @@ impl App {
         Ok(())
     }
 
-    /// `Action::ReviewFileSelected`: close the picker and open the file, remembering its set so
-    /// `]`/`[` can walk the rest.
     fn handle_review_file_selected(&mut self, target: ReviewTarget, index: usize) -> Result<()> {
         let files = self
             .review_dialog
@@ -632,8 +547,7 @@ impl App {
         Ok(())
     }
 
-    /// `]`/`[`: the next or previous file of the reviewed set, stopping at the ends. A no-op
-    /// when the open pair did not come from the picker.
+    /// `]`/`[`: stops at the ends; a no-op when the open pair did not come from the picker.
     fn step_review_file(&mut self, direction: i32) -> Result<()> {
         let Some(mut position) = self.review_position.clone() else {
             return Ok(());
@@ -650,7 +564,7 @@ impl App {
         self.open_review_position(position)
     }
 
-    /// `file 2/7 (staged)` for the footer, when a reviewed pair is open.
+    /// `file 2/7 (staged)`.
     fn review_progress(&self) -> Option<String> {
         self.review_position.as_ref().map(|position| {
             format!(
@@ -662,7 +576,6 @@ impl App {
         })
     }
 
-    /// Create, register and initialize a fresh file dialog, replacing any previous one.
     fn open_file_dialog(&mut self, title: &str, ui: &mut UI) -> Result<()> {
         let mut dialog = FileDialog::new(title);
         dialog.register_action_handler(self.action_tx.clone())?;
@@ -696,10 +609,6 @@ impl App {
                     self.plain_text_fallback = false;
                     self.start_diff(before.clone(), after.clone());
                 }
-                // Every background diff reports back through here; only the result matching the
-                // current generation is re-dispatched as `DiffReady`/`DiffFailed` (which is what
-                // the components consume) - a stale one (cancelled, or superseded by a newer
-                // `StartDiff`) is dropped without a trace.
                 Action::DiffComputed {
                     generation,
                     outcome,
@@ -730,9 +639,7 @@ impl App {
                 Action::ThemeSelected(selected_theme) => {
                     self.apply_theme_selection(*selected_theme)
                 }
-                // A live preview while the theme dialog's selection moves - applied to the
-                // viewer behind the dialog, but not persisted and not recorded as
-                // `current_theme`; Esc (`DialogCancelled`) reverts to `current_theme`.
+                // Not persisted or recorded as `current_theme`; Esc reverts to it.
                 Action::ThemePreviewed(previewed) => {
                     self.diff_viewer.set_overlay_theme(*previewed);
                 }
@@ -746,14 +653,7 @@ impl App {
                     self.line_prompt = None;
                     self.screen = AppScreen::Viewer;
                 }
-                // Every toggle in the render-options panel is already final (see the action's own
-                // doc comment) - apply it to the live viewer and persist it in the same step,
-                // rather than waiting for the dialog to close.
                 Action::RenderOptionsChanged(options) => self.apply_render_options(*options)?,
-                // `Enter`: keep what is set. Nothing to apply - `RenderOptionsChanged` already did
-                // that for every keystroke - so accepting is exactly dropping the panel without
-                // running `handle_dialog_cancelled`'s restore. The counterpart of
-                // `apply_theme_selection`, which likewise only has the closing left to do.
                 Action::RenderOptionsAccepted => self.handle_render_options_accepted(),
                 _ => {}
             }
@@ -762,9 +662,7 @@ impl App {
             if let Some(dialog) = self.file_dialog.as_mut() {
                 dialog.update(action.clone())?;
             }
-            // `DiffViewer::load_diff` (triggered by the update call above) resets the cursor to
-            // the first change; a reload/exact re-run of the same pair should instead put it back
-            // where the user had it (clamped - the file may have changed under a reload).
+            // After `update`, because `DiffViewer::load_diff` resets the cursor to the first change.
             if matches!(action, Action::DiffReady(_))
                 && let Some((panel, row, col)) = self.restore_after_reload.take()
             {
@@ -774,10 +672,6 @@ impl App {
         Ok(())
     }
 
-    /// `Action::DiffReady`'s handler: a background diff (or reload) finished successfully - switch
-    /// to the viewer screen, remember the pair for the empty-start screen's digit shortcuts
-    /// (deduplicated and capped in `record_recent_pair`), and recompute the summary/change-count
-    /// state the header/footer read every frame.
     fn handle_diff_ready(&mut self, data: &DiffSessionData) {
         self.screen = AppScreen::Viewer;
         self.diff_started_at = None;
@@ -794,9 +688,7 @@ impl App {
             &data.after_ranges,
             data.comment_only,
         );
-        // Only announce something worth announcing: `summarize_diff_with_comment_check` returns
-        // `None` for an ordinary mixed diff, which is most of them, and a toast on every file
-        // would train the eye to ignore it.
+        // `None` for an ordinary mixed diff; a toast on every file would train the eye to ignore it.
         self.summary_toast_ticks = if self.diff_summary.is_some() {
             SUMMARY_TOAST_TICKS
         } else {
@@ -811,27 +703,16 @@ impl App {
         self.plain_text_fallback = data.plain_text_fallback;
     }
 
-    /// Record the focused panel's cursor so the next `DiffReady` puts it back - see
-    /// `restore_after_reload`.
     fn remember_cursor_for_restore(&mut self) {
         if let Some((row, col)) = self.diff_viewer.focused_cursor_position() {
             self.restore_after_reload = Some((self.diff_viewer.active_panel(), row, col));
         }
     }
 
-    /// `Action::RenderOptionsChanged`'s handler: apply and persist `options` immediately (every
-    /// toggle in the render-options panel is already final, see the action's own doc comment),
-    /// and - the one field that needs more than a re-filter -  reload the diff if
-    /// `whole_pair_updates` changed.
-    ///
-    /// `whole_pair_updates` changes which ranges the diff itself has, not just how much of an
-    /// already-built range list gets painted - `DiffViewer::set_render_options` alone re-filters
-    /// the cached list and would leave this one option looking like it did nothing until the next
-    /// unrelated reload. The other two fields are real post-filters and stay instant, so the
-    /// reload is gated on this one field specifically rather than firing on every call.
-    ///
-    /// A method of its own, not inlined into `handle_actions`, so it can be unit tested without a
-    /// real `UI` - nothing here touches one.
+    /// Applies and persists `options` at once, since every toggle in the panel is final. A
+    /// construction-time option such as `whole_pair_updates` changes which ranges the diff has,
+    /// which a re-filter cannot reach, so changing one reloads the diff; the post-filters stay
+    /// instant.
     fn apply_render_options(&mut self, options: RenderOptions) -> Result<()> {
         let previous = self.diff_viewer.render_options();
         let needs_reload = options.needs_rebuild_from(&previous);
@@ -846,12 +727,9 @@ impl App {
         Ok(())
     }
 
-    /// The `e` key's other half: release the terminal, run the user's editor on `path` at
-    /// `line` (the `+N` line convention vi/vim/nano/emacs/micro all accept), re-acquire the
-    /// terminal, and re-diff so the edit shows up immediately - closing the read-diff/fix-code
-    /// loop without ever leaving the session. `$VISUAL` beats `$EDITOR`, the POSIX convention;
-    /// `vi` is the last resort. Blocking the async loop here is the *point*: the TUI has no
-    /// terminal to draw on until the editor exits.
+    /// Runs `$VISUAL`, then `$EDITOR`, then `vi` with `+line` (which vi, nano, emacs and micro
+    /// all accept), then re-diffs. Blocking the async loop is intended: there is no terminal to
+    /// draw on until the editor exits.
     fn run_editor(&mut self, ui: &mut UI, path: &Path, line: usize) -> Result<()> {
         let editor = std::env::var("VISUAL")
             .or_else(|_| std::env::var("EDITOR"))
@@ -874,17 +752,9 @@ impl App {
         Ok(())
     }
 
-    /// Ctrl-Z: put the process in the background the way every other terminal program does.
-    ///
-    /// Same release/re-acquire shape as [`Self::run_editor`], and blocking the async loop is again
-    /// the point - there is no terminal to draw on while stopped. Safe to do inline here precisely
-    /// because input comes from an async `EventStream` rather than a background reader thread (see
-    /// `UI`'s doc comment): nothing else is touching the terminal to race with `exit`/`enter`.
-    ///
-    /// Raising the signal is what actually stops us. The default disposition of `SIGTSTP` stops
-    /// the process, and `raise` returns once the shell resumes it with `SIGCONT`, so the two lines
-    /// after it run on resume. Restoring the screen has to be unconditional: the shell will have
-    /// scribbled a prompt over it.
+    /// Ctrl-Z. Safe inline because input comes from an async `EventStream`, not a reader thread,
+    /// so nothing races `exit`/`enter`. `raise` returns once the shell sends `SIGCONT`; the screen
+    /// is always restored after it, since the shell will have drawn a prompt over it.
     #[cfg(unix)]
     fn suspend(&mut self, ui: &mut UI) -> Result<()> {
         ui.exit()?;
@@ -900,15 +770,12 @@ impl App {
         Ok(())
     }
 
-    /// Windows has no `SIGTSTP` and no job control to suspend into, so Ctrl-Z does nothing there
-    /// rather than pretending.
+    /// No job control to suspend into.
     #[cfg(not(unix))]
     fn suspend(&mut self, _ui: &mut UI) -> Result<()> {
         Ok(())
     }
 
-    /// A file was confirmed in the dialog: load it into the panel that was active when `o` was
-    /// pressed, then kick off the diff once both panels have a file.
     fn handle_file_selected(&mut self, path: PathBuf) -> Result<()> {
         if let Some(panel) = self.dialog_target.take() {
             self.select_file_for_panel(panel, path)?;
@@ -918,19 +785,15 @@ impl App {
         Ok(())
     }
 
-    /// Load `before` and `after` straight into their panels, bypassing the file dialog. Used to
-    /// support starting the TUI with both file paths already given on the command line.
+    /// Loads both panels, bypassing the file dialog, for paths given on the command line.
     pub fn open_files(&mut self, before: PathBuf, after: PathBuf) -> Result<()> {
         self.select_file_for_panel(Panel::Before, before)?;
         self.select_file_for_panel(Panel::After, after)
     }
 
-    /// Load `path` into `panel`, remember it, and kick off the diff once both panels have a file.
-    /// Why a file cannot be shown, in the words `codediff a.pdf b.pdf` uses on stdout, or
-    /// `None` when it can. Checked *before* loading a panel: `CodeViewer::load_file` reads with
-    /// `read_to_string`, and letting its UTF-8 error propagate took the whole TUI down - "Failed
-    /// to read file ... stream did not contain valid UTF-8" - on the first PDF picked, whether
-    /// through `o` or the review picker.
+    /// Why a file cannot be shown, in the words `codediff a.pdf b.pdf` uses, or `None` when it
+    /// can. Checked before loading a panel, whose `read_to_string` UTF-8 error would otherwise
+    /// take the whole TUI down.
     fn unshowable(path: &Path) -> Option<String> {
         match crate::code::is_binary_file(path) {
             Ok(true) => Some(format!(
@@ -943,7 +806,6 @@ impl App {
     }
 
     fn select_file_for_panel(&mut self, panel: Panel, path: PathBuf) -> Result<()> {
-        // Anything opened by hand is no longer "file N of the staged set".
         self.review_position = None;
         if let Some(problem) = Self::unshowable(&path) {
             self.last_error = Some(problem);
@@ -953,8 +815,6 @@ impl App {
             Panel::Before => self.diff_viewer.set_before_file(path.clone()),
             Panel::After => self.diff_viewer.set_after_file(path.clone()),
         };
-        // A read that fails for any other reason (permissions, a file that vanished between the
-        // listing and the pick) is a banner too, not an exit.
         if let Err(err) = loaded {
             self.last_error = Some(format!("{err:#}"));
             return Ok(());
@@ -971,23 +831,16 @@ impl App {
     }
 
     fn handle_dialog_cancelled(&mut self) -> Result<()> {
-        // Cancelling the theme dialog must undo any live preview it applied (see
-        // `Action::ThemePreviewed`); a no-op when no preview happened.
         if self.theme_dialog.is_some() {
             self.diff_viewer.set_overlay_theme(self.current_theme);
         }
-        // Cancelling the search modal reverts its live highlight preview to the last actually
-        // submitted query's matches (or none).
         if self.search_modal.is_some() {
             let last = self.last_search_query.clone().unwrap_or_default();
             self.diff_viewer.preview_search(&last);
         }
         self.file_dialog = None;
         self.theme_dialog = None;
-        // Every toggle in the render-options panel applied and persisted itself the moment it was
-        // pressed (see `Action::RenderOptionsChanged`), so cancelling has to actively put back
-        // what the panel opened with - there is no uncommitted state to simply drop. Without this,
-        // a mis-keyed preset is already on disk and Esc offers no way back.
+        // Every toggle was already persisted, so cancelling must actively restore.
         if let Some(dialog) = self.render_options_dialog
             && dialog.initial() != self.diff_viewer.render_options()
         {
@@ -1003,10 +856,7 @@ impl App {
         Ok(())
     }
 
-    /// Apply a search query from the search modal: jump the focused panel's cursor to the nearest
-    /// match and highlight every match, then return to the normal viewer screen. A bare Enter
-    /// (empty query) repeats the last submitted search, if any - the modal advertises this in its
-    /// hint line.
+    /// An empty query repeats the last submitted search, if any.
     fn handle_search_submitted(&mut self, query: String) {
         let query = if query.is_empty() {
             self.last_search_query.clone().unwrap_or_default()
@@ -1021,8 +871,7 @@ impl App {
         self.screen = AppScreen::Viewer;
     }
 
-    /// Live feedback while typing in the search modal: preview the highlights (no cursor
-    /// movement) and feed the match count back into the modal's `N matches` readout.
+    /// Previews the highlights without moving the cursor.
     fn handle_search_query_changed(&mut self, query: &str) {
         let count = self.diff_viewer.preview_search(query);
         if let Some(modal) = self.search_modal.as_mut() {
@@ -1030,8 +879,6 @@ impl App {
         }
     }
 
-    /// Apply a theme choice from the theme dialog: update the live viewer, persist it for future
-    /// runs, and return to the normal viewer screen.
     fn apply_theme_selection(&mut self, selected_theme: OverlayTheme) {
         self.current_theme = selected_theme;
         self.diff_viewer.set_overlay_theme(selected_theme);
@@ -1040,32 +887,22 @@ impl App {
         self.screen = AppScreen::Viewer;
     }
 
-    /// `Enter` in the render-options panel: keep what is set and close. Nothing to apply -
-    /// `RenderOptionsChanged` already did that for every keystroke - so accepting is exactly
-    /// dropping the panel *without* running `handle_dialog_cancelled`'s restore. The counterpart
-    /// of `apply_theme_selection`, which likewise has only the closing left to do.
+    /// `Enter`: every toggle is already applied, so accepting is closing without
+    /// `handle_dialog_cancelled`'s restore.
     fn handle_render_options_accepted(&mut self) {
         self.render_options_dialog = None;
         self.screen = AppScreen::Viewer;
     }
 
-    /// Run the (CPU-bound) parse+diff pipeline on a blocking thread so it never stalls the
-    /// render loop, then report the result back as `Action::DiffComputed`, tagged with a fresh
-    /// generation - see `diff_generation` for how that makes cancellation/supersession work.
-    ///
-    /// The diff pipeline isn't guaranteed panic-free for arbitrary/unsupported input (e.g. it
-    /// assumes a parsed AST further down the call chain), and a panic on a `spawn_blocking`
-    /// thread would otherwise just vanish, leaving the UI stuck on "Diffing…" forever. Catching
-    /// it here turns that into a reported failure instead.
+    /// Reports back as `Action::DiffComputed` tagged with a fresh generation; the computation
+    /// itself cannot be killed (see `diff_generation`). A panic is caught and reported, since on a
+    /// `spawn_blocking` thread it would vanish and leave the UI on "Diffing…" forever.
     fn start_diff(&mut self, before: PathBuf, after: PathBuf) {
         self.diff_generation += 1;
         let generation = self.diff_generation;
         let tx = self.action_tx.clone();
-        // Read off the live viewer rather than threaded through `Action::StartDiff`: every caller
-        // of `start_diff` (file selection, the external-editor reload,
-        // and `Action::RenderOptionsChanged` below) should compute with whatever
-        // `whole_pair_updates`/`paint_reindent_only_moves` currently are, not have to know to pass
-        // them along individually.
+        // Read off the live viewer rather than threaded through `Action::StartDiff`, so no
+        // caller has to know to pass them.
         let render_options = self.diff_viewer.render_options();
         tokio::task::spawn_blocking(move || {
             let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
@@ -1079,7 +916,6 @@ impl App {
                     panic_message(&panic)
                 )),
             };
-            // The receiver only goes away when the app is shutting down.
             let _ = tx.send(Action::DiffComputed {
                 generation,
                 outcome,
@@ -1123,15 +959,8 @@ impl App {
         Ok(())
     }
 
-    /// Draw the Before/After panels, with an optional one-line diff-summary status bar above them
-    /// (`self.diff_summary` - see `Action::DiffReady`'s handler), an optional one-line error
-    /// banner below them (`self.last_error`, e.g. an unsupported file type on the most recent file
-    /// pick), and an always-visible footer line below everything (cursor position plus a compact
-    /// key-hint reference - see `draw_footer`). The status bar and error banner are each present
-    /// or absent independently; the layout only reserves space for whichever actually has
-    /// something to show. The footer's row is always reserved, unlike those two: it's the primary
-    /// discoverability aid for a user who hasn't yet thought to press `?`, so unlike the status
-    /// bar/error banner it can't be conditionally absent without defeating its own purpose.
+    /// Status bar, panels, error banner, footer. The footer's row is always reserved: it is how a
+    /// user who has not pressed `?` learns that keybindings exist.
     fn draw_viewer(&mut self, frame: &mut ratatui::Frame, area: Rect) -> Result<()> {
         let mut constraints = Vec::with_capacity(4);
         if self.diff_summary.is_some() {
@@ -1163,16 +992,11 @@ impl App {
             next += 1;
         }
         self.draw_footer(frame, layout[next]);
-        // Last, so it sits over the panels rather than under them, and against the *whole* viewer
-        // area rather than `layout[..]` so it centers on the screen the user is looking at
-        // instead of on whichever sub-rectangle happens to be left over.
+        // Last and against the whole area, so it sits over the panels, centered on the screen.
         self.draw_summary_toast(frame, area);
         Ok(())
     }
 
-    /// Draw the centered diff-summary toast, if one is up (see `summary_toast_ticks`). A no-op
-    /// once the countdown reaches zero or the diff has no summary worth reporting, which is why
-    /// `draw_viewer` can call it unconditionally.
     fn draw_summary_toast(&self, frame: &mut ratatui::Frame, area: Rect) {
         let Some(summary) = self.diff_summary else {
             return;
@@ -1185,24 +1009,14 @@ impl App {
         frame.render_widget(summary_toast_paragraph(summary), popup);
     }
 
-    /// Count one `Action::Tick` against the summary toast's lifetime. Separate from
-    /// `handle_actions` so it's reachable from a test without building a real `UI` (and so the
-    /// countdown has one owner rather than being open-coded in the action match).
     fn tick_summary_toast(&mut self) {
         self.summary_toast_ticks = self.summary_toast_ticks.saturating_sub(1);
     }
 
-    /// Take the summary toast down now, whatever the countdown says.
     fn dismiss_summary_toast(&mut self) {
         self.summary_toast_ticks = 0;
     }
 
-    /// The always-visible footer: the focused panel's cursor position, the diff's +/-/~ line
-    /// counts, and its progress through `n`/`p` navigation on the left; a compact key-hint
-    /// reference on the right. Pressing `?` still shows the full keybinding/color reference
-    /// (`help_modal.rs`) - this is deliberately just the handful of most-used keys, so a
-    /// first-time user has *some* signal that keybindings exist at all without having to already
-    /// know to press `?` first.
     fn draw_footer(&self, frame: &mut ratatui::Frame, area: Rect) {
         let mut left_parts = Vec::with_capacity(3);
         if let Some((row, col)) = self.diff_viewer.focused_cursor_position() {
@@ -1214,9 +1028,7 @@ impl App {
                 left_parts.push(counts_text);
             }
         }
-        // While a search is active, its progress replaces "change N/M" rather than sitting
-        // alongside it - both convey "progress through a list of positions," and showing both at
-        // once would risk overflowing the footer's fixed-width left column on a narrow terminal.
+        // Replaces "change N/M" rather than joining it, to fit the fixed-width left column.
         if let Some((index, total)) = self.diff_viewer.focused_search_match_count_and_index() {
             left_parts.push(format!("match {index}/{total}"));
         } else if let Some((index, total)) = self.diff_viewer.merged_change_count_and_index() {
@@ -1225,22 +1037,15 @@ impl App {
         if let Some(progress) = self.review_progress() {
             left_parts.push(progress);
         }
-        // `[plain text]` flags that no AST algorithm ran at all (unrecognized language on one
-        // side).
         if self.plain_text_fallback {
             left_parts.push("[plain text]".to_string());
         }
-        // The layout override only earns footer space when it's actually overriding something.
         let layout = self.diff_viewer.layout_override();
         if layout != crate::tui::theme::PanelLayout::Auto {
             left_parts.push(format!("[layout: {}]", layout.label()));
         }
-        // Same rule as the layout override above, and it matters more here: turning an option off
-        // deliberately leaves something unpainted (standalone brackets, leading whitespace), so
-        // without a badge a reader who forgot they pressed `M` - or inherited the setting from a
-        // previous run, since it persists - would read the missing highlights as codediff having
-        // missed them. `FULL` is the default and the fullest rendering there is, so labelling it
-        // would put a permanent badge on a screen that has nothing to report.
+        // An option turned off leaves something unpainted, and the setting persists across runs,
+        // so without a badge missing highlights read as codediff having missed them.
         let render_options = self.diff_viewer.render_options();
         if render_options != RenderOptions::FULL {
             if render_options == RenderOptions::MINIMAL {
@@ -1273,10 +1078,7 @@ impl App {
         );
     }
 
-    /// On the empty-start screen only (no file picked for either panel), overlay a small
-    /// centered list of recently diffed pairs with their digit shortcuts - so a returning user
-    /// can reopen yesterday's comparison with one keypress instead of two file-dialog trips.
-    /// Draws nothing once any file is loaded, or when there's no history to offer.
+    /// Only on the empty-start screen, with no file picked for either panel.
     fn draw_recent_pairs(&self, frame: &mut ratatui::Frame, area: Rect) {
         if self.before_path.is_some() || self.after_path.is_some() || self.recent_pairs.is_empty() {
             return;
@@ -1317,7 +1119,6 @@ impl App {
         );
     }
 
-    /// Draw the theme picker as a popup over the (still-visible) viewer behind it.
     fn draw_theme_dialog(&mut self, frame: &mut ratatui::Frame, area: Rect) -> Result<()> {
         self.draw_viewer(frame, area)?;
         let Some(dialog) = self.theme_dialog.as_mut() else {
@@ -1328,9 +1129,7 @@ impl App {
         dialog.draw(frame, popup)
     }
 
-    /// Draw the `M` render-options panel as a popup over the (still-visible) viewer behind it -
-    /// same convention as the theme dialog, and for the same reason: every toggle applies
-    /// immediately, so the reader should see the diff repaint live as they check/uncheck options.
+    /// Over the viewer, so the diff repaints live as options toggle.
     fn draw_render_options_dialog(&mut self, frame: &mut ratatui::Frame, area: Rect) -> Result<()> {
         self.draw_viewer(frame, area)?;
         let Some(dialog) = self.render_options_dialog.as_mut() else {
@@ -1341,9 +1140,6 @@ impl App {
         dialog.draw(frame, popup)
     }
 
-    /// Draw the `g` jump-to-line prompt as a popup over the (still-visible) viewer behind it,
-    /// with a real terminal cursor at the end of the typed number - same convention as the
-    /// search modal.
     fn draw_line_prompt(&mut self, frame: &mut ratatui::Frame, area: Rect) -> Result<()> {
         self.draw_viewer(frame, area)?;
         let Some(prompt) = self.line_prompt.as_mut() else {
@@ -1357,7 +1153,6 @@ impl App {
         Ok(())
     }
 
-    /// Draw the `?` keybinding reference as a popup over the (still-visible) viewer behind it.
     fn draw_help_modal(&mut self, frame: &mut ratatui::Frame, area: Rect) -> Result<()> {
         self.draw_viewer(frame, area)?;
         let Some(modal) = self.help_modal.as_mut() else {
@@ -1368,9 +1163,6 @@ impl App {
         modal.draw(frame, popup)
     }
 
-    /// Draw the `/` search input as a popup over the (still-visible) viewer behind it, with a real
-    /// blinking terminal cursor at the end of the typed query - same convention as the focused
-    /// code panel's own cursor (`CodeViewer::cursor_screen_position`).
     fn draw_review_dialog(&mut self, frame: &mut ratatui::Frame, area: Rect) -> Result<()> {
         self.draw_viewer(frame, area)?;
         let Some(dialog) = self.review_dialog.as_mut() else {
@@ -1395,14 +1187,11 @@ impl App {
     }
 }
 
-/// The footer's compact key-hint reference - deliberately just the handful of most-used keys, not
-/// a full reference (that's `?`/`help_modal.rs`'s job).
+/// Only the most-used keys; `?` is the full reference.
 pub(crate) const FOOTER_HINTS: &str =
     "?:help  o:open  G:git  r:reload  n/p:next/prev  /:search  M:options  Tab:switch  q:quit";
 
-/// Formats a `ChangeCounts` as a compact `+12 -4 ~2` summary for the footer - omits any category
-/// that's zero, and returns an empty string if every category is (e.g. a `NoChanges` diff, already
-/// covered by the status bar above).
+/// `+12 -4 ~2 M3`, omitting zero categories.
 fn format_change_counts(counts: ChangeCounts) -> String {
     let mut parts = Vec::with_capacity(4);
     if counts.insertions > 0 {
@@ -1420,15 +1209,9 @@ fn format_change_counts(counts: ChangeCounts) -> String {
     parts.join(" ")
 }
 
-/// The centered status shown while a blocking (screen-owning) diff computation is in flight.
-/// Mentions the Esc cancel because it's only discoverable here - the footer isn't drawn on the
-/// `Diffing` screen.
-/// `elapsed` is `None` only if the screen is somehow reached without a start time, in which case
-/// the counter is left off rather than shown as a false 0.0s.
+/// Mentions Esc because the footer is not drawn on the `Diffing` screen.
 fn diffing_status_paragraph(elapsed: Option<std::time::Duration>) -> Paragraph<'static> {
     let text = match elapsed {
-        // Tenths, not milliseconds: this is a "something is still happening" signal, and a digit
-        // that changes 60 times a second is noise rather than information.
         Some(elapsed) => format!(
             "Diffing\u{2026} {:.1}s (Esc cancels)",
             elapsed.as_secs_f64()
@@ -1438,18 +1221,12 @@ fn diffing_status_paragraph(elapsed: Option<std::time::Duration>) -> Paragraph<'
     Paragraph::new(text).alignment(Alignment::Center)
 }
 
-/// How many `Action::Tick`s the centered summary toast stays up for. The tick timer runs at 4Hz
-/// (`UI::tick_rate`'s default, and what every `App::new` caller passes), so 16 ticks is about four
-/// seconds - long enough to read six words without looking away from the diff, short enough that
-/// it doesn't sit on top of the code the user came to read. It also clears on the first keystroke,
-/// so this bound only matters for a user who hasn't touched the keyboard yet.
+/// About four seconds at the 4Hz tick: long enough to read six words, short enough not to sit
+/// on the code.
 const SUMMARY_TOAST_TICKS: u8 = 16;
 
-/// The area the centered summary toast occupies within `area` - same fixed-width, content-height,
-/// centered shape as `ThemeDialog::popup_area`, sized to the label rather than to a fraction of
-/// the screen (a six-word notice in a 90%-of-screen box, `HelpModal`'s shape, would read as an
-/// error dialog). Clamped to `area` so a narrow terminal degrades to a truncated box instead of
-/// panicking on an out-of-bounds `Rect`.
+/// Sized to the label, not to a fraction of the screen, where a six-word notice would read as an
+/// error dialog. Clamped to `area` so a narrow terminal truncates rather than panics.
 fn summary_toast_area(summary: DiffSummary, area: Rect) -> Rect {
     let width = (summary.label().chars().count() as u16 + 4).min(area.width);
     let height = 3.min(area.height);
@@ -1458,10 +1235,7 @@ fn summary_toast_area(summary: DiffSummary, area: Rect) -> Rect {
     Rect::new(x, y, width, height)
 }
 
-/// The centered summary toast's content: the same label and the same color as the status bar
-/// (`status_bar_paragraph`), inside a rounded border so it reads as an overlay rather than as part
-/// of either code panel. Sharing `DiffSummary::label` with the status bar is deliberate - the two
-/// say the same thing in two places, and the toast is the one that fades.
+/// The status bar's label and color, in a rounded border so it reads as an overlay.
 fn summary_toast_paragraph(summary: DiffSummary) -> Paragraph<'static> {
     let color = summary_color(summary);
     Paragraph::new(summary.label())
@@ -1475,12 +1249,7 @@ fn summary_toast_paragraph(summary: DiffSummary) -> Paragraph<'static> {
         )
 }
 
-/// Maps a `DiffSummary` to its status-bar styling - color-coded consistently with this TUI's
-/// existing insert/delete/move conventions (`tui::headless::ansi_color` draws the same mapping for
-/// the headless renderer): green for a pure addition, red for a pure removal, cyan for a pure
-/// reformat, blue for a comment-only change, yellow for a pure reorganization, gray when there's
-/// nothing to report at all. `DiffSummary` itself stays presentation-agnostic (just a label) - see
-/// its own doc comment.
+/// Must match `tui::headless::ansi_color`'s mapping.
 fn summary_color(summary: DiffSummary) -> Color {
     match summary {
         DiffSummary::NoChanges => Color::DarkGray,
@@ -1499,30 +1268,15 @@ fn status_bar_paragraph(summary: DiffSummary) -> Paragraph<'static> {
         .alignment(Alignment::Center)
 }
 
-/// Parse both files, applying the `/dev/null` fallback below. The shared prefix of every
-/// `compute_diff` variant.
-///
-/// Does not require either side to have parsed successfully: a side with no tree-sitter grammar
-/// (unrecognized extension, e.g. a `Makefile`) comes back with `ast: None` rather than an error -
-/// `compute_diff_with_options` checks for that itself and routes to
-/// `diff::text::plain_text_line_diff` instead of the AST pipeline, rather than failing outright.
-/// Before that fallback existed, this bailed with "unsupported or unrecognized file type" here,
-/// which - via `headless`/`json_output`'s non-interactive callers - propagated as a fatal exit;
-/// under `GIT_EXTERNAL_DIFF`, a non-zero exit for any one file aborts the *entire* multi-file
-/// `git diff`, not just that file's view.
+/// A side with no grammar comes back with `ast: None`, not an error, and the caller falls back to
+/// a plain-text diff: under `GIT_EXTERNAL_DIFF` a non-zero exit for one file aborts the whole
+/// multi-file `git diff`.
 fn parse_before_after(before: &Path, after: &Path) -> Result<(Code, Code)> {
     let mut before_code = Code::from_file(before)?;
     let mut after_code = Code::from_file(after)?;
 
-    // git's `difftool`/`GIT_EXTERNAL_DIFF` integration represents an added or deleted file by
-    // handing us `/dev/null` for the missing side (see README's "Git integration" section).
-    // `/dev/null` reads back as empty content with no extension, so `Code::from_file` can't
-    // detect a language for it and leaves `ast` unset - re-parse that side as empty content in
-    // the *other* side's language instead of leaving it unsupported, so the diff shows a normal
-    // whole-file insert/delete rather than falling back to a plain-text diff for no reason. This
-    // is the only situation where the two sides may legitimately disagree on detected language,
-    // so it's safe to only kick in when the empty side's own language genuinely couldn't be
-    // determined.
+    // git hands over `/dev/null` for the missing side of an added or deleted file. Parsed in the
+    // other side's language, it shows as a whole-file insert/delete rather than a plain-text diff.
     let before_language = before_code.metadata.language;
     let after_language = after_code.metadata.language;
     substitute_missing_language(&mut before_code, after_language, before);
@@ -1531,7 +1285,6 @@ fn parse_before_after(before: &Path, after: &Path) -> Result<(Code, Code)> {
     Ok((before_code, after_code))
 }
 
-/// Builds the textual ranges needed to display an already-`finish`ed `Diff`.
 #[allow(clippy::too_many_arguments)]
 fn assemble_diff_session_data(
     before_path: &Path,
@@ -1539,17 +1292,14 @@ fn assemble_diff_session_data(
     before_code: &Code,
     after_code: &Code,
     diff: &Diff,
-    // Only its two construction-time options are read here (see `TextDiff::from_with_options`);
-    // the rest filter the built list in `ranges_for_options`, which callers apply afterwards.
+    // Only its construction-time options are read here; callers apply the post-filters.
     render_options: RenderOptions,
 ) -> Result<DiffSessionData> {
     let node_cache = NodeCache::build(before_code, after_code);
     let ast = diff.ast.as_ref().context("diff produced no AST mapping")?;
     let text_diff =
         TextDiff::from_with_options(before_code, after_code, ast, &node_cache, render_options);
-    // Computed here, not later from DiffSessionData's own fields: needs AST-level node-kind
-    // access (is_comment_only_diff), which is gone by the time DiffSessionData exists - see that
-    // field's own doc comment.
+    // Here, because it needs the AST, which `DiffSessionData` does not carry.
     let comment_only = is_comment_only_diff(before_code, after_code, ast, &node_cache);
 
     Ok(DiffSessionData {
@@ -1564,42 +1314,15 @@ fn assemble_diff_session_data(
     })
 }
 
-/// Replaces every literal tab with a single space, for text that's about to be stored as
-/// `DiffSessionData::before_contents`/`after_contents` - i.e. handed to `ratatui` for rendering,
-/// not to the diff engine (which already finished computing `before_ranges`/`after_ranges` against
-/// the *original* text by the time this runs).
+/// Replaces every ASCII control character except line terminators with a space, for text handed
+/// to `ratatui`. A raw `\t` or `\r` moves the real terminal cursor away from the cell `ratatui`
+/// believes it is at, corrupting everything drawn after it.
 ///
-/// `ratatui::buffer::Buffer` treats every character as exactly one cell wide, `\t` included - but
-/// a real terminal receiving a raw `\t` byte jumps its cursor to the next hardware tab stop
-/// instead, desyncing the terminal's actual cursor column from the column `ratatui`'s own Buffer
-/// model believes it's at. Every subsequent write on that line (and, since `ratatui` only
-/// redraws cells it believes changed, on later frames too) lands at the wrong screen position -
-/// exactly the "artifacts/repeated text that `?` doesn't clear" failure mode this fixes, confirmed
-/// against a real tab-indented fixture (html-gohugoio-hugo-enclose-table-with-div-and-add-thead-tbody).
-///
-/// A single space, not an N-column tab-stop expansion: `\t` and `' '` are both exactly one UTF-8
-/// byte, so this is a strict length-preserving substitution - every `RangeMatch`/`TextRange`
-/// offset computed against the original tab-containing text upstream of this function stays
-/// exactly as valid against the space-substituted text it returns.
-///
-/// **Every ASCII control character, not just `\t`** - each is one UTF-8 byte, so the substitution
-/// stays as strictly offset-preserving as the tab case above. `is_ascii_control` and not
-/// `is_control`: the latter also covers the C1 block (U+0080-U+009F), whose code points are *two*
-/// UTF-8 bytes, and swapping one of those for a one-byte space would break the very
-/// offset-preservation this function exists to guarantee.
-///
-/// **Two exemptions, both line terminators.** `\n` because this runs over whole file contents and
-/// every caller downstream splits them into rows on it. And a `\r` that immediately precedes one,
-/// because that `\r` is *part of the terminator* on a Windows CRLF file, not a column of the row:
-/// the renderers drop it where they split rows (`str::lines` in `code_viewer`,
-/// `strip_suffix('\r')` in `headless::render_side` and the solver's `render_paint_side`), and
-/// turning it into a space here instead would make it indistinguishable from real trailing
-/// whitespace and hand every row of such a file one phantom column for the cursor to rest on.
-///
-/// A *lone* `\r` - not followed by `\n` - is not a terminator anything downstream recognises, so
-/// it is substituted like any other control character. It is the worse one to leave in: a terminal
-/// receiving it returns its cursor to column 0 of the line being drawn, so the row is overwritten
-/// from its start rather than merely shifted along.
+/// Offset-preserving: every substituted character is one UTF-8 byte, like the space, so ranges
+/// computed against the original text stay valid. That is why it is `is_ascii_control` and not
+/// `is_control`, whose C1 code points are two bytes. A `\r` before `\n` is part of the CRLF
+/// terminator and is kept, since the renderers drop it where they split rows; as a space it would
+/// be a phantom trailing column.
 fn display_safe(text: &str) -> String {
     let bytes = text.as_bytes();
     text.char_indices()
@@ -1615,11 +1338,7 @@ fn display_safe(text: &str) -> String {
         .collect()
 }
 
-/// `assemble_diff_session_data`'s counterpart for the plain-text fallback (see
-/// `DiffSessionData::plain_text_fallback`'s doc comment): no `Diff`/`ASTDiff` exists, so this
-/// builds `before_ranges`/`after_ranges` from `diff::text::plain_text_line_diff` directly instead
-/// of `TextDiff::from`. `comment_only` is always `false` - there's no AST, so no concept of a
-/// comment node to check.
+/// `assemble_diff_session_data` for a pair without an AST; `comment_only` is always `false`.
 fn assemble_plain_text_diff_session_data(
     before_path: &Path,
     after_path: &Path,
@@ -1640,54 +1359,23 @@ fn assemble_plain_text_diff_session_data(
     }
 }
 
-/// Parse, diff and compute the textual ranges needed to display the result. Also returns whether
-/// the diff left an unusually large unmatched residual (`PendingDiff::large_residual`; always
-/// `false` under the plain-text fallback below, where no AST algorithm ran at all), so headless
-/// and JSON mode can say so.
-///
-/// `pub(crate)` rather than private: `tui::headless` calls this directly too, since it's the same
-/// terminal-independent diff computation either way - only what happens to the result (draw it
-/// interactively vs. print it as text) differs between the two modes.
-///
-/// Test-only convenience: [`compute_diff_with_options`] under [`RenderOptions::FULL`]. Every real
-/// (non-test) caller - `App::start_diff`, `tui::headless::run`, `tui::json_output::run` - resolves
-/// its options from the live viewer or from CLI/config; this exists so the many tests across this
-/// module and `headless`/`json_output` that predate the options don't all need to pass a preset.
+/// [`compute_diff_with_options`] under [`RenderOptions::FULL`], for tests.
 #[cfg(test)]
 pub(crate) fn compute_diff(before: &Path, after: &Path) -> Result<(DiffSessionData, bool)> {
     compute_diff_with_options(before, after, RenderOptions::FULL)
 }
 
-/// Stack size for the thread [`compute_diff_with_options`] runs the actual pipeline on.
-///
-/// Mirrors `file_stats.rs`'s `WORKER_STACK_SIZE` and its rationale: real-world corpora contain
-/// pathologically deep trees (huge generated/minified files, deeply nested JSON, long chained
-/// expressions) whose recursive AST walks (e.g. `apted`'s `gted`/`compute_has_match_below`,
-/// `stats::count_nodes`) can overflow a default-size stack, and the TUI's
-/// `tokio::task::spawn_blocking` pool gives each task only 2MB. A stack overflow aborts the whole
-/// process unconditionally - unlike a panic, it can't be caught by the `catch_unwind` already
-/// wrapping the TUI's `spawn_blocking` closure - so raising the ceiling here is the only fix, and
-/// doing it in this one choke point covers all three entry points at once.
-///
-/// Public since 2026-09-19 so `benchmark_diff_pairs` can give its own diff thread the same
-/// ceiling: with the default 2MB it aborted on a 1,525-line ffmpeg codebook header that the
-/// product diffs without incident, and reported the abort as a robustness failure.
+/// Stack size for the thread [`compute_diff_with_options`] runs the pipeline on. Deep trees
+/// overflow the recursive AST walks on a default stack, and a stack overflow aborts the process
+/// where a panic could be caught. Public so tools diffing on their own threads use the same ceiling.
 pub const DIFF_COMPUTE_STACK_SIZE: usize = 256 * 1024 * 1024;
 
-/// The real diff computation every production caller uses, with
-/// [`RenderOptions::whole_pair_updates`]/[`RenderOptions::paint_reindent_only_moves`] threaded
-/// through to the AST-backed path rather than fixed. `App::start_diff` reads them off the live
-/// `DiffViewer`; `tui::headless::run`/ `tui::json_output::run` read them off the `RenderOptions`
-/// CLI/config already resolved before a diff is computed.
+/// Parses, diffs and builds the display ranges, honouring `render_options`' construction-time
+/// options. The `bool` is `PendingDiff::large_residual`, always `false` for the plain-text
+/// fallback taken when either side has no grammar.
 ///
-/// Runs the actual work on a dedicated thread with [`DIFF_COMPUTE_STACK_SIZE`] - see that
-/// constant's doc comment - and joins it. A panic on that thread is re-raised here via
-/// `resume_unwind` rather than converted to an `Err`, so it still looks like an ordinary panic on
-/// the calling thread to every existing caller (the TUI's `catch_unwind`, and headless/json's
-/// unwrapped default panic behavior).
-///
-/// Public since 2026-09-18 for `src/bin/generate_showcase.rs`, which bakes the same session data
-/// the web front end serves into static JSON for GitHub Pages; the other callers are in-crate.
+/// Runs on a thread with [`DIFF_COMPUTE_STACK_SIZE`]. A panic there is re-raised on the caller's
+/// thread rather than turned into an `Err`, so callers see an ordinary panic.
 pub fn compute_diff_with_options(
     before: &Path,
     after: &Path,
@@ -1730,9 +1418,8 @@ fn compute_diff_with_options_inner(
     Ok((data, large_residual))
 }
 
-/// If `code` has no detected language and no content (the `/dev/null` case handled by
-/// `compute_diff`), re-parse it as empty content in `fallback_language` instead of leaving it
-/// unsupported.
+/// Only an empty side with no detected language is re-parsed; that is the one case where the two
+/// sides may legitimately disagree on language.
 fn substitute_missing_language(code: &mut Code, fallback_language: Option<Language>, path: &Path) {
     if code.ast.is_none()
         && code.contents.is_empty()
@@ -1743,7 +1430,6 @@ fn substitute_missing_language(code: &mut Code, fallback_language: Option<Langua
     }
 }
 
-/// Extract a human-readable message from a caught panic payload.
 fn panic_message(panic: &Box<dyn std::any::Any + Send>) -> String {
     if let Some(message) = panic.downcast_ref::<&str>() {
         message.to_string()
@@ -1785,8 +1471,6 @@ mod tests {
         assert_eq!(panic_message(&panic), "unknown panic");
     }
 
-    /// The diff must not start until *both* panels have a file, even if one panel is reselected
-    /// after the other was already set.
     #[test]
     fn select_file_for_panel_only_starts_diff_once_both_sides_are_set() -> Result<()> {
         let mut app = App::new(4.0, 60.0)?;
@@ -1813,11 +1497,7 @@ mod tests {
         Ok(())
     }
 
-    /// Regression guard for `git`'s add/delete convention (`difftool`/`GIT_EXTERNAL_DIFF` both
-    /// hand codediff `/dev/null` for the missing side of an added or deleted file). Without the
-    /// fallback, `Code::from_file("/dev/null")` detects no language (no extension) and leaves
-    /// `ast` unset, so `compute_diff` bails with "unsupported or unrecognized file type" even
-    /// though the other side parsed fine.
+    /// git hands over `/dev/null` for the missing side of an added or deleted file.
     #[test]
     fn compute_diff_treats_dev_null_before_as_an_empty_file_in_the_afters_language() -> Result<()> {
         let after = tempfile::Builder::new()
@@ -1837,7 +1517,6 @@ mod tests {
         Ok(())
     }
 
-    /// Same as above, mirrored: the *after* side is `/dev/null` (a deleted file).
     #[test]
     fn compute_diff_treats_dev_null_after_as_an_empty_file_in_the_befores_language() -> Result<()> {
         let before = tempfile::Builder::new()
@@ -1857,12 +1536,7 @@ mod tests {
         Ok(())
     }
 
-    /// The `/dev/null` fallback only kicks in for a genuinely empty, language-less side - a pair
-    /// where neither side is empty (so there's real content on both sides, just no recognizable
-    /// language) must fall through to the plain-text diff instead, not bail with "unsupported or
-    /// unrecognized file type" - see `parse_before_after`'s own doc comment on why bailing is
-    /// worse than it sounds (`GIT_EXTERNAL_DIFF` treats any non-zero exit as aborting the *whole*
-    /// multi-file `git diff`, not just this one file).
+    /// Bailing instead would abort the whole multi-file `git diff` under `GIT_EXTERNAL_DIFF`.
     #[test]
     fn compute_diff_falls_back_to_plain_text_when_neither_side_has_a_recognizable_language()
     -> Result<()> {
@@ -1899,10 +1573,8 @@ mod tests {
         Ok(())
     }
 
-    /// Every screen with its own dialog must resolve Esc itself rather than quitting the app - the
-    /// theme picker being the one easiest to leave out of such a rule. A repository with two
-    /// unstaged modifications, and the process moved into it - nextest runs every test in its own
-    /// process, so `set_current_dir` cannot leak into another test.
+    /// A repository with two unstaged modifications, and the process moved into it. nextest runs
+    /// every test in its own process, so `set_current_dir` cannot leak into another test.
     fn enter_sample_repository() -> tempfile::TempDir {
         let dir = tempfile::tempdir().unwrap();
         let root = dir.path();
@@ -1995,8 +1667,6 @@ mod tests {
         Ok(())
     }
 
-    /// The report that started this: `codediff`, `G`, Enter on a modified PDF, and the TUI was
-    /// gone with "Failed to read file ... stream did not contain valid UTF-8".
     #[test]
     fn a_binary_reviewed_file_is_a_banner_not_a_crash_and_stepping_moves_past_it() -> Result<()> {
         let dir = enter_sample_repository();
@@ -2040,7 +1710,6 @@ mod tests {
         Ok(())
     }
 
-    /// The same crash through `o`: the file dialog never checked what it was handing over.
     #[test]
     fn picking_a_binary_file_by_hand_is_a_banner_not_a_crash() -> Result<()> {
         let mut app = App::new(4.0, 60.0)?;
@@ -2100,25 +1769,20 @@ mod tests {
     #[test]
     fn esc_should_quit_is_true_only_on_the_bare_viewer() {
         assert!(esc_should_quit(AppScreen::Viewer));
-        // Esc during Diffing cancels the computation instead of quitting - see the dedicated
-        // Esc arm in `handle_events`.
         assert!(!esc_should_quit(AppScreen::Diffing));
     }
 
-    /// Esc during `Diffing` bumps the generation, so the eventually arriving `DiffComputed` is
-    /// recognized as stale and never re-dispatched as `DiffReady` - i.e. the cancel actually
-    /// discards the result instead of just hiding the screen.
+    /// The cancel discards the result rather than only hiding the screen.
     #[test]
     fn a_stale_diff_computed_result_is_dropped_after_cancel() -> Result<()> {
         let mut app = App::new(4.0, 60.0)?;
         app.screen = AppScreen::Diffing;
-        app.diff_generation = 1; // as if start_diff had launched generation 1
+        app.diff_generation = 1;
 
-        // The cancel: what the Esc arm in handle_events does.
+        // What the Esc arm in `handle_events` does.
         app.diff_generation += 1;
         app.screen = AppScreen::Viewer;
 
-        // The stale result arrives afterwards.
         app.action_tx.send(Action::DiffComputed {
             generation: 1,
             outcome: DiffOutcome::Failed("too late".to_string()),
@@ -2127,7 +1791,7 @@ mod tests {
         while let Ok(action) = app.action_rx.try_recv() {
             match &action {
                 Action::DiffComputed { .. } => {
-                    // Simulate handle_actions' arm without needing a real UI.
+                    // `handle_actions`' arm, which needs a real UI.
                     if let Action::DiffComputed { generation, .. } = &action
                         && *generation == app.diff_generation
                     {
@@ -2145,9 +1809,6 @@ mod tests {
         Ok(())
     }
 
-    /// Raw mode turns off ISIG, so the terminal never converts Ctrl-Z into SIGTSTP and the TUI
-    /// has to recognize the keystroke itself. Only the recognition is tested: calling the suspend
-    /// path would stop the test process, hanging the run instead of failing it.
     #[test]
     fn ctrl_z_is_recognised_as_suspend_and_a_bare_z_is_not() {
         use crossterm::event::{KeyEvent, KeyModifiers};
@@ -2185,10 +1846,7 @@ mod tests {
         Ok(())
     }
 
-    /// The render-options panel persists every toggle the instant it is pressed, so `Esc` has to
-    /// actively restore - there is no uncommitted state to drop. This is the bug that emptied a
-    /// real user's config: `M` opened the panel, a stray `m` meant MINIMAL (every field off), and
-    /// the wipe was on disk before `Esc` was ever reached.
+    /// Every toggle is persisted as pressed, so a stray preset key must not survive `Esc`.
     #[test]
     fn cancelling_the_render_options_panel_restores_what_it_opened_with() -> Result<()> {
         // `apply_render_options` persists, so redirect the write - see the note on
@@ -2214,8 +1872,6 @@ mod tests {
         Ok(())
     }
 
-    /// `whole_pair_updates` changes which ranges the diff itself has - a plain re-filter can't
-    /// reach it, so this is the one field whose toggle must reload the diff.
     #[test]
     fn apply_render_options_reloads_when_whole_pair_updates_changes() -> Result<()> {
         let mut app = App::new(4.0, 60.0)?;
@@ -2241,8 +1897,6 @@ mod tests {
         Ok(())
     }
 
-    /// Every construction-time field reloads, not only `whole_pair_updates` - the two move options
-    /// were once left out and toggling them re-filtered a stale diff.
     #[test]
     fn apply_render_options_reloads_for_every_construction_time_field() -> Result<()> {
         let construction_time = RenderOptions::default().options().len();
@@ -2265,8 +1919,6 @@ mod tests {
         Ok(())
     }
 
-    /// The other two fields are real post-filters - toggling only them must stay instant, with no
-    /// reload queued.
     #[test]
     fn apply_render_options_does_not_reload_for_the_other_fields() -> Result<()> {
         let mut app = App::new(4.0, 60.0)?;
@@ -2291,9 +1943,6 @@ mod tests {
         Ok(())
     }
 
-    /// Nothing is open yet (the empty-start screen) - there is no pair to reload, so the change
-    /// must apply to the (empty) viewer without trying to queue a diff for a path that doesn't
-    /// exist.
     #[test]
     fn apply_render_options_with_no_open_pair_does_not_queue_a_reload() -> Result<()> {
         let mut app = App::new(4.0, 60.0)?;
@@ -2311,16 +1960,8 @@ mod tests {
         Ok(())
     }
 
-    /// Regression test for the exact mechanism `handle_events`'s `globally_handled` guard exists
-    /// to prevent: without it, the `?` keystroke that opens the help modal would *also* reach
-    /// `dispatch_event_to_active_screen` in the same event cycle (since `self.screen` is already
-    /// `Help` by the time that call happens), and `HelpModal` treats `?` as its own close key too
-    /// - so the same keypress that opens it would immediately close it again, meaning it would
-    ///   never visibly show up at all. `handle_events` itself can't be unit-tested directly (it
-    ///   owns a real `UI`/terminal, which every other test in this module also avoids), so this
-    ///   pins the hazard at the one layer that is testable: simulating exactly the state
-    ///   `handle_events` leaves behind right after opening the modal, and confirming that
-    ///   re-delivering the same keystroke to it would indeed cancel it.
+    /// Why `handle_events` sets `globally_handled`, pinned at the layer testable without a
+    /// terminal: the `?` that opens the help modal would also close it in the same event cycle.
     #[test]
     fn redelivering_the_opening_keystroke_would_immediately_close_the_help_modal() {
         use crossterm::event::{KeyEvent, KeyModifiers};
@@ -2365,10 +2006,39 @@ mod tests {
         assert_eq!(app.diff_viewer.focused_cursor_position(), Some((1, 0)));
     }
 
-    /// Same hazard as `redelivering_the_opening_keystroke_would_immediately_close_the_help_modal`,
-    /// but for `/`: `SearchModal` treats every `Char` key as "append to the query," so without
-    /// `handle_events`'s `globally_handled` guard, the very keystroke that opens the modal would
-    /// also reach it in the same event cycle and seed the query with a stray `/`.
+    #[test]
+    fn submitting_an_empty_search_repeats_the_last_submitted_query() {
+        let mut app = App::new(4.0, 60.0).expect("construct App");
+        app.diff_viewer.load_diff(&DiffSessionData {
+            before_path: PathBuf::from("before.rs"),
+            after_path: PathBuf::from("after.rs"),
+            before_contents: "foo\nbar\n".to_string(),
+            after_contents: "foo\nbar\n".to_string(),
+            before_ranges: Vec::new(),
+            after_ranges: Vec::new(),
+            comment_only: false,
+            plain_text_fallback: false,
+        });
+        app.handle_search_submitted("bar".to_string());
+        app.diff_viewer.restore_cursor(Panel::Before, 0, 0);
+
+        app.handle_search_submitted(String::new());
+
+        assert_eq!(app.last_search_query.as_deref(), Some("bar"));
+        assert_eq!(app.diff_viewer.focused_cursor_position(), Some((1, 0)));
+    }
+
+    #[test]
+    fn recent_pairs_are_offered_only_while_no_file_is_loaded() -> Result<()> {
+        let mut app = App::new(4.0, 60.0)?;
+        app.recent_pairs = vec![(PathBuf::from("old.rs"), PathBuf::from("new.rs"))];
+        assert!(rendered_text(&draw_viewer_once(&mut app)?).contains("Recent pairs"));
+
+        app.before_path = Some(PathBuf::from("old.rs"));
+        assert!(!rendered_text(&draw_viewer_once(&mut app)?).contains("Recent pairs"));
+        Ok(())
+    }
+
     #[test]
     fn redelivering_the_opening_keystroke_would_seed_the_search_query_with_a_stray_slash() {
         use crossterm::event::{KeyEvent, KeyModifiers};
@@ -2402,18 +2072,6 @@ mod tests {
         Ok(())
     }
 
-    /// `apply_theme_selection` calls `theme::save_overlay_theme`, which writes for real. Since
-    /// 2026-09-10 the config is layered and an unredirected write would land in the developer's
-    /// own `~/.config/codediff/config.toml`, so this points `$CODEDIFF_CONFIG` at a temp file -
-    /// the override exists precisely for this.
-    ///
-    /// Safe under `cargo nextest`, which the repository uses and which runs every test in its own
-    /// process. Under a threaded `cargo test` this would be visible to a concurrent test; no other
-    /// test reads the variable.
-    /// `Enter` keeps what the panel applied, where `Esc` puts back what it opened with
-    /// (`cancelling_the_render_options_panel_restores_what_it_opened_with`, above). Before
-    /// 2026-09-18 nothing accepted at all, so the panel could only be left by reverting it or by
-    /// quitting the application.
     #[test]
     fn accepting_the_render_options_panel_keeps_what_it_applied() -> Result<()> {
         // `apply_render_options` persists, so redirect the write - see the note on
@@ -2437,6 +2095,8 @@ mod tests {
         Ok(())
     }
 
+    /// The saved theme would otherwise land in the developer's own config, so `$CODEDIFF_CONFIG`
+    /// points at a temp file. Safe under nextest, which runs each test in its own process.
     #[test]
     fn apply_theme_selection_updates_viewer_and_returns_to_the_viewer_screen() {
         let config = tempfile::NamedTempFile::new().expect("temp config");
@@ -2465,10 +2125,6 @@ mod tests {
             .collect()
     }
 
-    /// `MINIMAL` deliberately leaves brackets, separators and leading whitespace unpainted, and
-    /// the setting persists across runs - so without this badge, missing highlights read as
-    /// codediff having missed them rather than as a preset the reader chose (possibly in a
-    /// previous session).
     #[test]
     fn draw_viewer_badges_minimal_options_in_the_footer() -> Result<()> {
         let mut app = App::new(4.0, 60.0)?;
@@ -2508,8 +2164,7 @@ mod tests {
         Ok(())
     }
 
-    /// Neither preset - only one option off. The badge must name what's missing, not just
-    /// collapse to the `[minimal]` label, or a reader would misread this as "everything off".
+    /// Neither preset: the badge names what is off rather than reading as "everything off".
     #[test]
     fn draw_viewer_badges_a_single_disabled_option_by_name() -> Result<()> {
         let mut app = App::new(4.0, 60.0)?;
@@ -2584,10 +2239,8 @@ mod tests {
         Ok(())
     }
 
-    /// The centered toast and the one-line status bar say the same thing, so the label lands in
-    /// the buffer twice while the toast is up and once after it fades. Counting occurrences keeps
-    /// this independent of where either one is drawn - asserting on a position would break the
-    /// next time the layout changes width.
+    /// Counting occurrences (two while the toast is up, one after) keeps the assertions
+    /// independent of layout.
     fn summary_label_occurrences(
         terminal: &ratatui::Terminal<ratatui::backend::TestBackend>,
         summary: DiffSummary,
@@ -2622,8 +2275,7 @@ mod tests {
         assert!(text.contains("0.1s"), "expected tenths of a second: {text}");
         assert!(text.contains("Esc cancels"), "the cancel hint must survive");
 
-        // Rounded to tenths rather than shown to the millisecond - a digit changing 60 times a
-        // second is noise, not information.
+        // Tenths: a digit changing 60 times a second is noise.
         let text = rendered(Some(std::time::Duration::from_millis(2345)));
         assert!(text.contains("2.3s"), "expected 2.3s, got: {text}");
 
@@ -2632,8 +2284,6 @@ mod tests {
         assert!(text.contains("75.4s"), "expected 75.4s, got: {text}");
     }
 
-    /// Reaching the screen with no recorded start time leaves the counter off rather than showing
-    /// a false 0.0s that never advances.
     #[test]
     fn the_diffing_screen_omits_the_counter_when_no_diff_is_timed() {
         let backend = ratatui::backend::TestBackend::new(80, 6);
@@ -2653,8 +2303,6 @@ mod tests {
         );
     }
 
-    /// The clock starts when the diff does and is cleared by every way out of the screen, so a
-    /// later `Diffing` never shows a duration carried over from the previous one.
     #[test]
     fn the_diff_clock_is_cleared_when_the_diff_finishes() -> Result<()> {
         let mut app = App::new(4.0, 60.0)?;
@@ -2743,7 +2391,6 @@ mod tests {
     fn no_toast_is_drawn_when_the_diff_has_no_summary_worth_reporting() -> Result<()> {
         let mut app = App::new(4.0, 60.0)?;
         app.diff_summary = None;
-        // Even with a countdown left over, there is nothing to announce.
         app.summary_toast_ticks = SUMMARY_TOAST_TICKS;
 
         let terminal = draw_viewer_once(&mut app)?;
@@ -2759,7 +2406,7 @@ mod tests {
         let mut app = App::new(4.0, 60.0)?;
         assert_eq!(app.summary_toast_ticks, 0);
 
-        // Byte-identical sides classify as `NoChanges`, which is a summary worth announcing.
+        // Byte-identical sides classify as `NoChanges`.
         app.handle_diff_ready(&DiffSessionData {
             before_path: PathBuf::from("a.rs"),
             after_path: PathBuf::from("b.rs"),
@@ -2802,9 +2449,6 @@ mod tests {
         assert_eq!((narrow.x, narrow.y), (0, 0));
     }
 
-    /// The footer's key hints must render regardless of whether the status bar or error banner
-    /// are present - it's the primary discoverability aid for `?`, so it can't be conditionally
-    /// absent the way those two are (see `draw_viewer`'s own doc comment).
     #[test]
     fn draw_viewer_always_shows_the_footer_key_hints() -> Result<()> {
         let mut app = App::new(4.0, 60.0)?;
@@ -2917,9 +2561,6 @@ mod tests {
         Ok(())
     }
 
-    /// While a search is active, the footer's progress indicator must show "match N/M" - not
-    /// "change N/M" - even when the diff itself also has changes, since the two would otherwise
-    /// compete for the same fixed-width footer column (see `draw_footer`'s own comment).
     #[test]
     fn draw_viewer_shows_search_match_progress_in_the_footer_in_place_of_change_progress()
     -> Result<()> {
@@ -2983,10 +2624,7 @@ mod tests {
         Ok(())
     }
 
-    /// Regression guard for the layout math in `draw_viewer`: both a summary bar (top) and an
-    /// error banner (bottom) must be able to show at once, around the panels in the middle -
-    /// dynamic `Vec<Constraint>` indexing is exactly the kind of code an off-by-one silently
-    /// swallows one of the two rows without a test actually rendering both together.
+    /// An off-by-one in the dynamic constraint indexing would silently swallow one of the rows.
     #[test]
     fn draw_viewer_shows_both_the_status_bar_and_the_error_banner_at_once() -> Result<()> {
         let mut app = App::new(4.0, 60.0)?;
@@ -3006,13 +2644,6 @@ mod tests {
         Ok(())
     }
 
-    /// `handle_actions` itself needs a real `UI` (wraps a live terminal backend), which no other
-    /// test in this module constructs - see those tests' own comments on why they exercise the
-    /// smaller, directly-callable handlers instead. This checks the one part of the
-    /// `Action::DiffReady` handler that's actually novel here (the rest - `self.screen`,
-    /// `self.last_error`, `self.file_dialog` - already existed and is untouched): that
-    /// `summarize_diff_with_comment_check`'s result is what ends up in `self.diff_summary`, using
-    /// the exact same `DiffSessionData` fields the real handler reads.
     #[test]
     fn diff_ready_summary_matches_summarize_diff_on_the_same_session_data() {
         let data = DiffSessionData {
@@ -3041,10 +2672,6 @@ mod tests {
         assert_eq!(summary, Some(DiffSummary::NewFile));
     }
 
-    /// Regression guard for `summarize_diff_with_comment_check`'s wiring specifically (not
-    /// `is_comment_only_diff`'s own logic, already covered in `diff::text`'s tests): the
-    /// `comment_only` flag on `DiffSessionData` must actually reach the final `DiffSummary`, not
-    /// just get carried around unused.
     #[test]
     fn diff_ready_summary_reports_comment_only_when_the_session_data_says_so() {
         let ranges = vec![crate::diff::text::RangeMatch {
@@ -3074,12 +2701,7 @@ mod tests {
         assert_eq!(summary, Some(DiffSummary::CommentOnly));
     }
 
-    /// Full pipeline, not synthetic data: `compute_diff` -> `assemble_diff_session_data` (where
-    /// `comment_only` actually gets computed, from real AST access) -> `summarize_diff_with_
-    /// comment_check`. Regression guard for the real end-to-end wiring, since
-    /// `diff_ready_summary_reports_comment_only_when_the_session_data_says_so` only proves the
-    /// combinator itself is correct given a `comment_only` flag handed to it directly, not that
-    /// the real pipeline ever sets that flag to `true` for a genuine comment-only diff.
+    /// The real pipeline, which is where `comment_only` is computed from the AST.
     #[test]
     fn compute_diff_reports_comment_only_for_a_real_inserted_comment() -> Result<()> {
         let before = tempfile::Builder::new()
@@ -3110,15 +2732,7 @@ mod tests {
         Ok(())
     }
 
-    /// Regression test for the "artifacts / repeated text that `?` doesn't clear" TUI corruption
-    /// bug: `ratatui::buffer::Buffer` treats every character (`\t` included) as exactly one cell
-    /// wide, but a real terminal receiving a raw tab byte jumps its actual cursor to the next
-    /// hardware tab stop instead - desyncing the terminal's real cursor column from the column
-    /// `ratatui`'s own Buffer model believes it's at, corrupting everything drawn afterward.
-    /// `display_safe` fixes this by replacing every `\t` with a single space (`\t` and `' '` are
-    /// both exactly one UTF-8 byte, so this can't shift any `RangeMatch`/`TextRange` offset
-    /// computed against the original text). Confirmed against the real tab-indented fixture that
-    /// exposed the bug during manual TUI testing, not just a synthetic string.
+    /// A raw tab desyncs the terminal cursor from `ratatui`'s buffer and corrupts the screen.
     #[test]
     fn compute_diff_never_puts_a_raw_tab_into_diff_session_data_contents() -> Result<()> {
         let before = Path::new(
@@ -3143,15 +2757,8 @@ mod tests {
         Ok(())
     }
 
-    /// The same corruption, one control character over and louder: a Windows CRLF file carries a
-    /// `\r` at the end of every row, and a terminal receiving one returns its cursor to column 0
-    /// of the line being drawn rather than merely shifting it. Headless mode printed a literal
-    /// `^M` on every line of this fixture before `display_safe` covered the whole ASCII control
-    /// range.
-    ///
-    /// The CRLF `\r` itself is exempt from the substitution and comes off where rows are split -
-    /// what this pins is that nothing *else* in a Windows file reaches a terminal raw, and that
-    /// the contents keep every byte offset and row boundary they had.
+    /// The CRLF `\r` is kept (the renderers drop it); nothing else reaches a terminal raw, and
+    /// every byte offset and row boundary survives.
     #[test]
     fn compute_diff_leaves_a_crlf_file_offset_stable_and_free_of_other_control_bytes() -> Result<()>
     {
@@ -3191,9 +2798,7 @@ mod tests {
         Ok(())
     }
 
-    /// `is_ascii_control`, not `is_control`: a C1 code point is two UTF-8 bytes, so replacing one
-    /// with a one-byte space would shift every offset after it on its row - the exact failure the
-    /// tab substitution was designed never to cause.
+    /// A C1 code point is two UTF-8 bytes; replacing it with a space would shift offsets.
     #[test]
     fn display_safe_leaves_multi_byte_control_code_points_alone() {
         let text = "a\u{9c}b\x07\n";
@@ -3202,9 +2807,6 @@ mod tests {
         assert_eq!(safe.len(), text.len());
     }
 
-    /// A CRLF terminator's `\r` belongs to the line break and comes off where rows are split; a
-    /// lone `\r` is a control character like any other and must not reach a terminal, where it
-    /// would send the cursor back to column 0 of the row being drawn.
     #[test]
     fn display_safe_keeps_a_crlf_terminator_and_substitutes_a_lone_carriage_return() {
         assert_eq!(display_safe("a\r\nb\rc\n"), "a\r\nb c\n");

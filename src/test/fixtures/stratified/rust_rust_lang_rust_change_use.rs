@@ -23,13 +23,9 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // The 6 residual mismatches (all visible) are one rotation of a `use_list`, counted once per
-    // node it touches. The human reads the edit as the names moving - `identifier:1` to
-    // `identifier:3`, `:2` to `:1`, `:3` to `:2`, with each separating comma following its name -
-    // while `APTED("import_list_overlap")` pairs each list member with the one at its own index.
-    // That pass is built to match import lists by overlap rather than by position, so a rotation
-    // that preserves the set is exactly the shape it reads as "unchanged, in place". The known
-    // move-detection gap in an import list. Recorded as a measured gap, not accepted as correct.
+    // One rotation of a `use_list`, counted per node. The human reads the names as moving (with
+    // their commas); `APTED("import_list_overlap")` matches by overlap, so a set-preserving
+    // rotation reads as unchanged in place. The move-detection gap in an import list.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "rust-rust-lang-rust-change-use",
         6,
@@ -39,16 +35,13 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // After `RenderOptions::paint_displaced_moves` stopped `MINIMAL` painting a span that kept its
-    // own text and its own place and shifted only because of an edit before it: minimal 7.092% ->
-    // 6.420%. The option is off under `FULL`, which this fix leaves byte-identical at 7.008%, so
-    // `FULL` sets the limit now.
+    // `FULL` sets the limit.
     assert_matches_human_painting_within_limit("rust-rust-lang-rust-change-use", 7.02)
 }
 
 #[test]
 fn invariants() -> Result<()> {
     // Invariant 16: the Minimal/Full split for a renamed identifier is not painted this way yet
-    // (`Abi`/`CfgAbi` and `abi`/`cfg_abi`). Recorded as found.
+    // (`Abi`/`CfgAbi` and `abi`/`cfg_abi`).
     assert_ground_truth_invariants_with_known_violations("rust-rust-lang-rust-change-use", 6)
 }

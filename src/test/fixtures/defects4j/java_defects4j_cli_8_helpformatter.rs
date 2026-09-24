@@ -23,16 +23,11 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // `findWrapPos(text, width, nextLineTabStop)` becomes `findWrapPos(text, width, 0)`. The
-    // human mapping pairs the third argument across the kind change (`identifier` against
-    // `decimal_integer_literal`) because `text` and `width` are untouched and nothing else is
-    // left for the `0` to be; codediff deletes the identifier and inserts the literal instead
-    // (reason `APTED("large_flat_subtree")`).
-    //
-    // Invariant 18 does not require this pairing and cannot: an `argument_list` in
-    // tree-sitter-java declares no fields at all, so the third argument has no named slot to
-    // persist. Position here is fixed by elimination rather than by a field, which is a wider
-    // rule than the one that shipped - see the census's "what follows from this".
+    // `findWrapPos(text, width, nextLineTabStop)` becomes `findWrapPos(text, width, 0)`. The human
+    // pairs the third argument across the kind change, since `text` and `width` are untouched and
+    // nothing else is left for `0` to be; codediff deletes and inserts
+    // (`APTED("large_flat_subtree")`). Java's `argument_list` names no fields, so invariant 18
+    // reaches this only by elimination.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "java-defects4j-cli-8-helpformatter",
         1,

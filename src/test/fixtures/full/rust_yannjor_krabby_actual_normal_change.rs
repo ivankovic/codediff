@@ -21,10 +21,8 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // Dominated by `APTED("qualified_name")` (96 of 135), with `APTED("fast_fallback")` (24)
-    // behind it - the same two owners the corpus's other large residuals carry: a name-keyed
-    // search that does not reach across a changed enclosing path, and the terminal Myers LCS that
-    // cannot align a node whose position in the residual forest moved.
+    // Mostly `APTED("qualified_name")` (a name-keyed search that does not reach across a changed
+    // path) and `APTED("fast_fallback")` (a Myers LCS that cannot align a moved node).
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "rust-yannjor-krabby-actual-normal-change",
         147,

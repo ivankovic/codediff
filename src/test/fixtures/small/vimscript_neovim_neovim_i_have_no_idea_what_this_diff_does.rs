@@ -21,10 +21,8 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // Depends on `solve_large_flat_subtrees` (kind-uniqueness top-level identity + recursing the
-    // Myers-unmatched residual through APTED instead of atomically deleting/inserting it) to match
-    // this fixture's giant, deeply-nested dictionary at all; without it the diff takes minutes
-    // rather than a fraction of a second, at the same 0-mismatch exactness.
+    // Pins `solve_large_flat_subtrees` on a giant nested dictionary: without it the diff takes
+    // minutes, at the same exactness.
     test::helper::human_mapping::assert_matches_human_mapping(
         "vimscript-neovim-neovim-i-have-no-idea-what-this-diff-does",
     )

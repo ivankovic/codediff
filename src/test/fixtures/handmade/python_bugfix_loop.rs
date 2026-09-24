@@ -27,9 +27,8 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // A for-loop header rewrite where codediff matches only isolated leaf tokens as Move while the
-    // human matches the whole rewritten skeleton as one wider Move - a match-granularity gap, not a
-    // rendering-option question - not attempted.
+    // A rewritten for-loop header: codediff paints isolated leaf tokens as Move, the human the whole
+    // skeleton as one Move. A match-granularity gap.
     assert_matches_human_painting_within_limit("python-bugfix-loop", 1.71)
 }
 

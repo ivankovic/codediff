@@ -26,34 +26,24 @@ use tokio::sync::mpsc::UnboundedSender;
 use super::{Component, move_selection, render_list_dialog};
 use crate::tui::actions::{Action, DirEntryInfo};
 
-/// A minimal navigable directory/file picker.
-///
-/// Directory listings are fetched asynchronously via `tokio::fs::read_dir` so opening a (large)
-/// directory never blocks the render loop; the result comes back through the normal action
-/// channel as [`Action::DirectoryListed`].
+/// A navigable directory/file picker. Listings are read asynchronously, so a large directory
+/// never blocks the render loop; they arrive as [`Action::DirectoryListed`].
 pub struct FileDialog {
     command_tx: Option<UnboundedSender<Action>>,
-    /// Title shown in the dialog border, e.g. "Select before file".
     title: String,
-    /// The directory currently being displayed.
     current_dir: PathBuf,
-    /// The directory a listing has been requested for but not yet received.
+    /// Requested but not yet received.
     pending_dir: Option<PathBuf>,
     entries: Vec<DirEntryInfo>,
-    /// Index into `visible_entries()`'s output, not `entries` - the selection moves within
-    /// whatever the filter and hidden-file toggle currently show.
+    /// Index into `visible_entries()`, not `entries`.
     selected: usize,
-    /// Type-ahead filter: printable keys narrow the listing to entries whose name contains the
-    /// typed text (case-insensitive), Backspace widens it again (and only falls back to "go to
-    /// parent directory" once the filter is empty). Cleared on every directory change.
+    /// Case-insensitive type-ahead filter. Cleared on every directory change.
     filter: String,
-    /// Whether dotfiles are listed (`Ctrl-h` toggles). Off by default - the common case for
-    /// picking a source file is that dotfiles are noise.
     show_hidden: bool,
 }
 
 impl FileDialog {
-    /// Create a new FileDialog rooted at the current working directory.
+    /// Rooted at the current working directory.
     pub fn new(title: impl Into<String>) -> Self {
         Self {
             command_tx: None,
@@ -67,8 +57,7 @@ impl FileDialog {
         }
     }
 
-    /// The entries the filter and hidden-file toggle currently allow, in listing order. `..` is
-    /// always visible: filtering must never take away the way back out of a directory.
+    /// `..` is always visible: filtering must never take away the way back out of a directory.
     fn visible_entries(&self) -> Vec<&DirEntryInfo> {
         let filter_lower = self.filter.to_lowercase();
         self.entries
@@ -85,7 +74,6 @@ impl FileDialog {
             .collect()
     }
 
-    /// Kick off an async listing of `dir`; the result arrives later as `Action::DirectoryListed`.
     fn request_listing(&mut self, dir: PathBuf) {
         self.pending_dir = Some(dir.clone());
         let Some(tx) = self.command_tx.clone() else {
@@ -122,7 +110,6 @@ impl FileDialog {
                     },
                 );
             }
-            // The receiving end only goes away when the app is shutting down.
             let _ = tx.send(Action::DirectoryListed(dir, entries));
         });
     }
@@ -163,21 +150,17 @@ impl Component for FileDialog {
                     None => Ok(None),
                 }
             }
-            // Ctrl-h toggles dotfiles. Checked before the plain-character filter arm below, which
-            // would otherwise swallow the 'h'.
+            // Must precede the type-ahead arm, which would swallow the 'h'.
             KeyCode::Char('h') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                 self.show_hidden = !self.show_hidden;
                 self.selected = 0;
                 Ok(Some(Action::Render))
             }
-            // Type-ahead: printable characters narrow the listing instead of doing nothing.
             KeyCode::Char(c) => {
                 self.filter.push(c);
                 self.selected = 0;
                 Ok(Some(Action::Render))
             }
-            // Backspace widens the filter first; only with nothing left to widen does it keep
-            // its original meaning of "go to the parent directory".
             KeyCode::Backspace => {
                 if self.filter.pop().is_none()
                     && let Some(parent) = self.current_dir.parent()
@@ -352,5 +335,21 @@ mod tests {
             Some(Action::FileSelected(PathBuf::from("/tmp/bbb.rs"))),
             "selection index 0 must resolve within the filtered view"
         );
+    }
+
+    #[test]
+    fn arriving_directory_listing_clears_the_filter() {
+        let mut dialog = dialog_with_entries(vec![entry("main.rs", false)]);
+        dialog.handle_key_event(key(KeyCode::Char('m'))).unwrap();
+        dialog.pending_dir = Some(PathBuf::from("/tmp/sub"));
+
+        dialog
+            .update(Action::DirectoryListed(
+                PathBuf::from("/tmp/sub"),
+                vec![entry("lib.rs", false)],
+            ))
+            .unwrap();
+        assert!(dialog.filter.is_empty());
+        assert_eq!(dialog.visible_entries().len(), 1);
     }
 }

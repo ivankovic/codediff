@@ -21,11 +21,8 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // Resolved by `apted::prematch_unique_named_locals` - the local variable `resources` (`var
-    // resources = MapToResource(...)`) shifts from the 4th to the 8th declaration in
-    // `GetCalendar`'s body when 4 new declarations are inserted before it; now pre-matched by
-    // variable name before real APTED resolves the rest of the method. See that function's doc
-    // comment and `TODO.md`'s "shift-due-to-insertion" entry.
+    // Pins `apted::prematch_unique_named_locals`: the local `resources` shifts from the 4th to the
+    // 8th declaration when four are inserted before it, and is pre-matched by name.
     test::helper::human_mapping::assert_matches_human_mapping("csharp-lidarr-new-feature")
 }
 

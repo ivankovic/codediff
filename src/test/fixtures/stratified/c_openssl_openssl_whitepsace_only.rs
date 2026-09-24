@@ -29,12 +29,9 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // The whole commit is the alignment run between `NULL,` and `/* opener */` collapsing to one
-    // space, There is no narrower painting that ends on a visible character, so the five rows are
-    // now painted whole, as the Updates a reader sees. The bigger number is the honest one: it
-    // measures codediff painting nothing at all here, because interior whitespace lives in the gaps
-    // between AST nodes where no painting can reach (same wall as
-    // c-openssl-openssl-format-only-change). Recorded as the distance it is, not as a target.
+    // The alignment run between `NULL,` and `/* opener */` collapses to one space; no narrower
+    // painting ends on a visible character, so the rows are painted whole. codediff paints nothing:
+    // interior whitespace is out of reach (as in c-openssl-openssl-format-only-change).
     assert_matches_human_painting_within_limit("c-openssl-openssl-whitepsace-only", 21.12)
 }
 

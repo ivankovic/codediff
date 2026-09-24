@@ -21,32 +21,13 @@ use crate::diff::PassCtx;
 use crate::diff::nodes::{collect_unmatched, is_diagnostic_statement, map_identical_descendants};
 use crate::diff::{ASTDiff, ASTMapping, ASTMappingReason};
 
-/**
-* MatchIdenticalDiagnosticStatements: pairs up still-unmatched calls/macros that look like they're
-* meant for the programmer rather than the end user - logging (`log::error!`, `logger.warn(...)`),
-* error bailouts (`bail!`, `panic!`), assertions, debug `printf`s - whenever the *entire statement*
-* is byte-for-byte identical on both sides. See [`crate::diff::nodes::is_diagnostic_statement`] for
-* exactly what counts.
-*
-* Runs as part of phase 2 of the matching pipeline (`Diff::pending_with_config` lists all ten
-* phases), right after phase 1's hash descent and before phase 4's syntax-aware matching, the
-* terminal residual resolution and the move-detection fallback. Running it after phase 1 means it only ever picks up
-* statements phase 1's byte-identical/structural hash matching left behind, so it can't fragment a
-* match a bigger/more-reliable pass would otherwise have made in one piece (e.g. matching a whole
-* function wholesale) into a smaller one anchored on some incidental identical `log::debug!(...)`
-* call inside it. Running it before the later phases means it can still find a diagnostic
-* statement buried inside a function/impl that has no same-named counterpart on the other side.
-*
-* Validated only by its own unit tests (including non-Rust ones covering C/Python/Go callee
-* extraction); no corpus fixture exercises it - see "Design history moved out of source" in
-* `src/diff/TODO.md` for why the fixture that motivated it does not.
-*
-* Matching requires an *exact* full-content hash match (see `ASTMetadata::node_to_full_hash`) - no
-* similarity threshold. A `log::error!("failed: {e}")` that
-* only *changed* on one side is deliberately left for the final APTED pass to size up as an Update,
-* since this pass has no basis for deciding two non-identical diagnostic statements are "the same"
-* one.
-*/
+/// Phase 2: pairs still-unmatched diagnostic statements (logging, `bail!`, assertions; see
+/// [`crate::diff::nodes::is_diagnostic_statement`]) whose whole statement is byte-identical on both
+/// sides, one-to-one.
+///
+/// After phase 1, so an incidental identical `log::debug!` cannot fragment a whole-function match;
+/// before phase 4, so it still finds such statements inside a function with no same-named
+/// counterpart. Exact hash only: a changed message is left for APTED to size up as an update.
 pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
     let (before, after, node_cache) = (ctx.before, ctx.after, ctx.node_cache);
     let before_metadata = ctx.before_metadata();
@@ -74,8 +55,6 @@ pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
         return;
     }
 
-    // Index the after-side candidates by full hash, so each is only ever offered to one
-    // before-node (first-come, first-served, largest subtree first below).
     let mut after_by_hash: HashMap<u64, VecDeque<usize>> = HashMap::new();
     for node in &after_candidates {
         if let Some(&hash) = after_metadata.node_to_full_hash.get(&node.id()) {
@@ -83,9 +62,6 @@ pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
         }
     }
 
-    // Largest subtree first, mirroring `solve_hash_descent` - not load-bearing here (these are
-    // small leaf-ish statements, rarely nested in one another), but keeps behavior deterministic
-    // and consistent with the rest of the pipeline.
     let mut before_candidates = before_candidates;
     before_candidates.sort_by(|a, b| {
         let size_a = before_metadata
@@ -124,9 +100,6 @@ pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
             ASTMapping::identical(ASTMappingReason::IdenticalHash),
         );
 
-        // Recursively add all descendants with IdenticalHashOfAncestor reason - same idiom as
-        // `solve_hash_descent`, since an identical full hash guarantees the entire subtree
-        // (structure and values) is byte-for-byte identical too.
         map_identical_descendants(before_node, after_node, diff);
     }
 }
@@ -153,9 +126,7 @@ mod tests {
 
     #[test]
     fn identical_bail_macro_is_matched_across_renamed_functions() {
-        // `from_str` has no counterpart named function in `after` (renamed to `parse`), so
-        // without this pass the whole function - including the `bail!` inside it - would be
-        // swallowed into a from-scratch delete+insert by the final orphan pass.
+        // The renamed function has no name to match on.
         let before_src = r#"
 fn from_str(s: &str) -> Result<i32> {
     if s.is_empty() {
@@ -196,9 +167,6 @@ fn parse(s: &str) -> Result<i32> {
 
     #[test]
     fn changed_diagnostic_statement_is_not_matched() {
-        // Same macro, different message: not byte-identical, so this pass - which requires an
-        // exact hash match, no similarity threshold - must leave it alone for the final APTED
-        // pass to size up.
         let before_src = r#"
 fn a() {
     log::error!("first message");
@@ -234,8 +202,6 @@ fn b() {
 
     #[test]
     fn non_diagnostic_identical_call_is_not_matched() {
-        // Same call, byte-identical, but `compute(...)` isn't a recognized diagnostic callee -
-        // this pass should leave ordinary calls to the bigger/later passes.
         let before_src = r#"
 fn a() {
     compute(1, 2);
@@ -271,9 +237,6 @@ fn b() {
 
     #[test]
     fn duplicate_identical_diagnostic_calls_are_matched_one_to_one() {
-        // Two identical `bail!` calls on each side: each before-node should claim a distinct
-        // after-node, not both collapse onto the same one. This pass indexes after-candidates in a
-        // `VecDeque` per hash, which is what guarantees the one-to-one pairing.
         let before_src = r#"
 fn a() {
     if true { bail!("dup"); }

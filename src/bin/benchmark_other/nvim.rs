@@ -16,9 +16,6 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-// Split out of benchmark_other.rs (the `nvim`-cluster functions) purely to shrink that
-// file's visible size - no behavior change.
-
 use anyhow::{Context, Result, bail};
 use codediff::code::Code;
 use codediff::diff::text_range::TextRange;
@@ -27,10 +24,10 @@ use std::process::Command;
 
 use super::{external_tool_bin, span_on_row, whole_row_span, write_temp_pair};
 
-/// The Neovim diff driver (see its own header), embedded so it cannot drift from this binary.
+/// Embedded so it cannot drift from this binary.
 const NVIM_DRIVER: &str = include_str!("../../../assets/nvim_diff_driver.lua");
 
-/// Neovim binary, from `NVIM_BIN`. Not auto-installed, same policy as every other external tool.
+/// Neovim binary, from `NVIM_BIN`.
 pub(crate) fn nvim_bin() -> Result<std::path::PathBuf> {
     external_tool_bin(
         "NVIM_BIN",
@@ -39,8 +36,10 @@ pub(crate) fn nvim_bin() -> Result<std::path::PathBuf> {
 }
 
 /// Runs `nvim -d` once and returns the driver's two side objects (before, after), each carrying
-/// `lines` and `subline`. Shared by [`nvim_line_labels`] and [`nvim_node_spans`], which read
-/// different fields of the same output.
+/// `lines` and `subline`.
+///
+/// `-u NONE` scores Neovim's shipped defaults rather than a user `diffopt`; `-n` disables swap
+/// files, whose recovery prompt hangs a headless run.
 pub(crate) fn nvim_diff_sides(before: &Code, after: &Code) -> Result<Vec<serde_json::Value>> {
     let nvim = nvim_bin()?;
     let (before_file, after_file) = write_temp_pair(before, after, None)?;
@@ -67,8 +66,7 @@ pub(crate) fn nvim_diff_sides(before: &Code, after: &Code) -> Result<Vec<serde_j
         );
     }
 
-    // The driver writes exactly one JSON line; take the last non-empty one so any startup chatter
-    // Neovim emits on stdout ahead of it is ignored rather than breaking the parse.
+    // The last non-empty line, so startup chatter on stdout does not break the parse.
     let stdout = String::from_utf8_lossy(&output.stdout);
     let line = stdout
         .lines()
@@ -83,22 +81,8 @@ pub(crate) fn nvim_diff_sides(before: &Code, after: &Code) -> Result<Vec<serde_j
     Ok(sides)
 }
 
-/// `(before_touched, after_touched)` from `nvim -d`.
-///
-/// Included even though Neovim's *line* pass is libxdiff - the same engine as the four `git`
-/// rows - because excluding it on that basis would be letting this metric's granularity decide
-/// what gets measured. Neovim is the tool a large number of developers actually read diffs in,
-/// and it is the only entry here that pairs a line-level match with character-level display, so
-/// what it costs is one row and what it buys is a data point rather than an assumption. On a
-/// 40-fixture sample its line set matched `git_myers` on 38; the corpus decides the rest.
-///
-/// Run with `-u NONE`: `diffopt` is user-configurable and can change both the algorithm
-/// (`algorithm:histogram`) and the within-line alignment (`linematch:N`), so loading a user
-/// config would silently turn this into a measurement of that config. What is scored is Neovim's
-/// shipped default behaviour.
-///
-/// `-n` disables swap files - without it, concurrent or repeated runs over the same fixture path
-/// prompt for swap recovery and hang a headless process forever.
+/// `(before_touched, after_touched)` from `nvim -d`. Its line pass is libxdiff like the `git`
+/// rows; it is kept because it is where many developers read diffs.
 pub(crate) fn nvim_line_labels(before: &Code, after: &Code) -> Result<(Vec<bool>, Vec<bool>)> {
     let sides = nvim_diff_sides(before, after)?;
     let touched = |side: &serde_json::Value, line_count: usize| -> Vec<bool> {
@@ -120,17 +104,8 @@ pub(crate) fn nvim_line_labels(before: &Code, after: &Code) -> Result<(Vec<bool>
     ))
 }
 
-/// Neovim's changed regions, from the same driver output `nvim_line_labels` parses - but keeping
-/// the `DiffText` column runs instead of collapsing each changed line to a boolean.
-///
-/// This is what moves `nvim -d` out of the `line_only` bucket, and it is the only thing in this
-/// comparison that measures what Neovim actually adds over the four `git` rows: its *line* pass
-/// is libxdiff, the same engine, so on a line-level metric it can only ever tie them. The
-/// within-line highlight is computed by Neovim itself and is the whole difference.
-///
-/// A changed line with no `DiffText` run on it is a wholly added or removed line (`DiffAdd` /
-/// `DiffDelete`), not a rewritten one, so it contributes its whole row - the same treatment
-/// [`bdiff_spans_from_script`] gives an `insert` or a `delete`.
+/// Neovim's changed regions: the `DiffText` column runs, which are all it adds over the `git`
+/// rows. A changed line with no run is wholly added or removed and contributes its whole row.
 pub(crate) fn nvim_node_spans(
     before: &Code,
     after: &Code,
@@ -140,8 +115,7 @@ pub(crate) fn nvim_node_spans(
     let after_lines: Vec<&str> = after.contents.split('\n').collect();
 
     let spans_for = |side: &serde_json::Value, lines: &[&str]| -> Vec<TextRange> {
-        // `{lnum, start_col, end_col}`, 1-based byte columns with an exclusive end - see the
-        // driver's own comment on why these are runs rather than a per-line flag.
+        // `[lnum, start_col, end_col]`, 1-based byte columns with an exclusive end.
         let mut runs: HashMap<usize, Vec<(usize, usize)>> = HashMap::new();
         if let Some(entries) = side.get("subline").and_then(|v| v.as_array()) {
             for entry in entries {

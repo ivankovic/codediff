@@ -23,9 +23,8 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // Requires N:M mapping
-    // Exact until the ground truth gained an all-to-all group: both mismatches are its members,
-    // which a one-to-one output cannot reach - the N:M floor (see `MultiMapGroup::pairing`).
+    // Requires N:M mapping. Both mismatches are members of an all-to-all group, which a one-to-one
+    // output cannot reach - the N:M floor (see `MultiMapGroup::pairing`).
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "html-mozilla-firefox-firefox-test-span",
         2,
@@ -40,12 +39,9 @@ fn painting() -> Result<()> {
 
 #[test]
 fn invariants() -> Result<()> {
-    // RECORDED, NOT ACCEPTED - four violations the tree mapping introduced when it began pairing
-    // the identifier `office` with `ice`, which both paintings still leave unpainted. One of the
-    // two ground truths is wrong here and a human has to say which: either the mapping should not
-    // pair those leaves, or both paintings need the rename marked (Minimal the differing `off`,
-    // Full the whole identifier on both sides). Drop this count back to
-    // `assert_ground_truth_invariants` once repaired.
+    // RECORDED, NOT ACCEPTED: the tree mapping pairs the identifier `office` with `ice`, which both
+    // paintings leave unpainted. Either the mapping should not pair them, or both paintings need
+    // the rename marked (Minimal `off`, Full the whole identifier). A human has to decide.
     assert_ground_truth_invariants_with_known_violations(
         "html-mozilla-firefox-firefox-test-span",
         4,

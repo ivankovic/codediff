@@ -24,13 +24,8 @@ mod tests {
 
     use anyhow::Result;
 
-    /// Clamped stubs that predate the rule below and have no explanation yet.
-    ///
-    /// A backlog, not an exemption. Every one of these asserts that codediff cannot currently do
-    /// better without saying why - which is exactly the state the 49 stale clamps were in before
-    /// they were re-measured, and half of those turned out to need no clamp at all. Shrink this
-    /// list by writing the explanation (or by tightening the limit until none is needed); never
-    /// grow it.
+    /// Clamped stubs that predate the rule below and have no explanation yet. A backlog, not an
+    /// exemption: shrink it by writing the explanation or tightening the limit; never grow it.
     #[cfg(feature = "test-fixtures")]
     const CLAMPS_WITHOUT_AN_EXPLANATION: &[&str] = &[
         "c-linux-small-change-struct-to-char",
@@ -58,12 +53,8 @@ mod tests {
         "xml-gap-packages-toric-remove-two-attributes",
     ];
 
-    /// **A clamped limit must say why it is clamped.**
-    ///
-    /// See `fixtures`' module doc for the boundary this enforces: `description.md` says
-    /// what the fixture demands, a stub comment says why codediff falls short of it, and a limit
-    /// with neither is a number nobody can review. New clamps have to carry one; the ones that
-    /// already did not are listed above and must only ever shrink.
+    /// **A clamped limit must say why it is clamped** (see `fixtures`' module doc): a limit with no
+    /// stub comment is a number nobody can review.
     #[test]
     #[cfg(feature = "test-fixtures")]
     fn the_clamped_stubs_explain_their_limits() -> Result<()> {
@@ -95,18 +86,10 @@ mod tests {
                 else {
                     continue;
                 };
-                // Scoped to the one test that holds the clamped call, not the whole file. These
-                // files carry a `painting()` test too since the two suites were merged, and a few
-                // handmade ones carry extra mapping tests under their own names - an explanation
-                // of a painting residual, or of a different assertion, says nothing about why
-                // *this* number is what it is. Reading the file as a whole let one fixture look
-                // explained when it was not.
-                //
-                // Found by walking back from the call to its `#[test]` rather than by function
-                // name: `mapping()` is the standard name, but a handful of fixtures also carry a
-                // `mapping_details()` test asserting specific nodes by hand, and the clamped call
-                // is not always in the first one. Indented one level, too - the licence header
-                // and any `///` docs sit at column zero and explain the file, not this number.
+                // Scoped to the test holding the clamped call, found by walking back to its
+                // `#[test]` (not by name: `mapping_details()` may come first): a comment on the
+                // painting or on another assertion does not explain *this* number. Indented one
+                // level, since column-zero docs explain the file, not the limit.
                 let call_at = source
                     .find("assert_matches_human_mapping_within_limit")
                     .unwrap_or(0);
@@ -137,23 +120,13 @@ mod tests {
         Ok(())
     }
 
-    /// **Every fixture stub is declared in its dataset's module file.**
-    ///
-    /// A `fixtures/<dataset>/<name>.rs` with no `mod <name>;` beside it is not a failing test or a
-    /// compile error - it is not compiled at all. The file sits in the tree looking exactly like a
-    /// fixture that passes, and its `mapping()`, `painting()` and `invariants()` never run.
-    ///
-    /// `human_solver` writes the declaration alongside the stub, so the two only come apart by
-    /// accident - a bad merge, a revert that catches the module file but not the untracked stubs
-    /// beside it, a generator that errors after writing the file. Nothing else notices: the
-    /// undeclared stub compiles nowhere and fails nothing. This is the check that says so.
+    /// **Every fixture stub is declared in its dataset's module file.** An undeclared stub is not
+    /// compiled at all, so its tests silently never run and nothing else notices.
     #[test]
     #[cfg(feature = "test-fixtures")]
     fn every_fixture_stub_is_declared_in_its_dataset_module() -> Result<()> {
-        // Imported here rather than beside `Result` at the top of the module: every user of it is
-        // inside this one `test-fixtures`-gated test, so a module-level import is an unused one
-        // under the default feature set - which CI's `clippy (features=default)` job, running with
-        // `-D warnings`, turns into a build failure.
+        // Imported here: at module level it is unused under the default features, which
+        // `clippy -D warnings` rejects.
         use anyhow::Context;
 
         let fixtures = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -167,8 +140,7 @@ mod tests {
             if !dir.exists() {
                 continue;
             }
-            // Read as text rather than trusting the module system: a declaration that is missing
-            // is exactly what this looks for, so it cannot ask the compiler what it declared.
+            // Read as text: the compiler cannot report a declaration that is missing.
             let module_file = fixtures.join(format!("{dataset}.rs"));
             let declarations = std::fs::read_to_string(&module_file)
                 .with_context(|| format!("reading {module_file:?}"))?;
@@ -203,9 +175,8 @@ mod tests {
         Ok(())
     }
 
-    /// Pins what `stub_mapping_limits` can and cannot read, so the projection above is checked
-    /// against a parse that is itself checked - a regex that silently matched nothing would make
-    /// that test vacuously pass.
+    /// A `stub_mapping_limits` that silently read nothing would make the baseline projection test
+    /// below pass vacuously.
     #[test]
     #[cfg(feature = "test-fixtures")]
     fn stub_mapping_limits_reads_both_call_shapes_and_skips_the_hand_written_stub() -> Result<()> {
@@ -234,17 +205,9 @@ mod tests {
         Ok(())
     }
 
-    /// **`quality_baseline.csv`'s accuracy columns are a projection of the `optimal_solutions`
-    /// stubs, not a second opinion about them.**
-    ///
-    /// Maintained independently the two drift, a stub limit ending up looser than the baseline's
-    /// recorded number, and a single re-verification of the ground truth means editing the same
-    /// fixtures in both places. `write_baseline` fills those columns from `stub_mapping_limits`,
-    /// and this fails if the checked-in file stops matching - which is what makes "derived" a
-    /// property of the repository rather than of whoever last ran the command.
-    ///
-    /// Only the accuracy columns are pinned. `elapsed_ms` is a measurement of the machine that
-    /// produced it and legitimately changes on every run.
+    /// **`quality_baseline.csv`'s accuracy columns are a projection of the fixture stubs, not a
+    /// second opinion about them.** `write_baseline` fills them from `stub_mapping_limits`; kept
+    /// independently the two drift. `elapsed_ms` is machine-dependent and not pinned.
     #[test]
     #[cfg(feature = "test-fixtures")]
     fn the_quality_baseline_accuracy_columns_are_a_projection_of_the_stub_limits() -> Result<()> {
@@ -253,8 +216,7 @@ mod tests {
             .join("data")
             .join("quality")
             .join("quality_baseline.csv");
-        // Absent in a checkout that has never run the gate - not a failure, same posture the rest
-        // of this suite takes toward optional local data.
+        // Absent in a checkout that has never run the gate.
         if !path.exists() {
             return Ok(());
         }
@@ -266,8 +228,6 @@ mod tests {
             let record = record?;
             let name = record.get("solution").cloned().unwrap_or_default();
             let Some(&(total, visible)) = limits.get(&name) else {
-                // No stub means no recorded limit to project; `write_baseline` warns about these
-                // rather than inventing one.
                 continue;
             };
             let field = |key: &str| -> usize {

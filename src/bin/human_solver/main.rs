@@ -19,196 +19,85 @@
 /**
 * A helper binary for building the ground-truth AST mappings used by src/test/fixtures.
 *
-* Run as `cargo run --bin human_solver -- <name>`, where `<name>` is the name of a directory under
-* `src/test/data/diffs/` (e.g. "rust-add-if"). If `<name>` is omitted, the first available case
-* (alphabetically) opens instead - press `o` to pick a different one. It opens a Ratatui TUI
-* showing the TreeSitter ASTs
-* of the before and after code side by side (not the source text), lets a human walk both trees
-* independently and mark nodes as matching, deleted or inserted, and saves the result as
-* `src/test/data/diffs/<name>/human_mapping.json`. It also creates the corresponding
-* `src/test/fixtures/<name>.rs` test file (if one doesn't already exist), which simply
-* calls `codediff::test::helper::human_mapping::assert_matches_human_mapping`, a generic comparison
-* that parses the code again, computes codediff's own diff and checks it agrees with the human
-* mapping. Nodes are addressed by path (kind + sibling position), not by TreeSitter node ID, since
-* IDs are not stable across separate parses -- see `test::helper::path_for_node`.
+* Run as `cargo run --bin human_solver -- <name>`, where `<name>` is a directory under
+* `src/test/data/diffs/` (e.g. "rust-add-if"); without it the first case alphabetically opens. It
+* shows the before and after TreeSitter ASTs side by side, lets a human mark nodes as matching,
+* deleted or inserted, and saves `src/test/data/diffs/<name>/human_mapping.json` plus a
+* `src/test/fixtures/<name>.rs` stub that calls
+* `codediff::test::helper::human_mapping::assert_matches_human_mapping`. Nodes are addressed by
+* path (kind + sibling position), not by TreeSitter node ID, since IDs are not stable across
+* parses -- see `test::helper::path_for_node`.
 *
 * Keybindings:
 *   Tab            switch focus between the Before and After panels
 *   Up/k, Down/j   move the focused panel's cursor
-*   Left/h         collapse the current node, or move to its parent if already collapsed/a leaf
-*   Right/l        expand the current node, or move to its first child if already expanded
+*   Left/h         collapse the current node, or move to its parent if collapsed/a leaf
+*   Right/l        expand the current node, or move to its first child if expanded
 *   g / G          jump to the first / last visible node
-*   m              mark the Before cursor node and the After cursor node as matching. If their
-*                  kinds differ, asks for confirmation (codediff never maps different kinds
-*                  together, so this will always show as a mismatch, but can be useful for
-*                  exploration). If the kinds match and neither node has children, the operation
-*                  (Identical/Update) is inferred automatically by comparing their text. If the
-*                  kinds match and either has children, it's classified automatically too: Identical
-*                  if both subtrees' precomputed content hashes match (byte-identical), otherwise
-*                  MatchButNotIdentical -- no prompt
-*   M              like `m`, but also recurses into children pairwise as long as both sides
-*                  have the same number of children with the same kinds; stops recursing (without
-*                  error) at the first level that diverges, leaving it for manual resolution. Every
-*                  pair, top-level and descendant alike, is classified the same way as `m` (by
-*                  content hash for nodes with children, by text for leaves) with no prompting. Any
-*                  pair that ends up classified Identical and has children is collapsed in both
-*                  panels, to keep whole-unchanged subtrees from cluttering the view
-*   f              repeats what a single `m` press does, over and over -- match the cursor pair,
-*                  advance both cursors to their own next unmarked node, match that pair, and so
-*                  on -- as if `m` were being pressed by hand again and again. Stops exactly where
-*                  a human doing that would have to stop too: once there's nothing left to pair up
-*                  (end of file), or the next pair has different kinds, which raises the same
-*                  confirmation `m` would (pressing `f` again afterwards resumes the sweep)
-*   a              if the focused cursor node is matched (per the human mapping), move the other
-*                  panel's cursor to its matched node. If that node isn't currently visible,
-*                  scrolls the other panel so it's centered in the viewport (clamped at the
-*                  start/end of the tree, where a true center isn't possible)
-*   A              like `a`, but aligns to the node codediff's own diff (`p`) mapped the cursor
-*                  node to, instead of the human mapping. Requires `p` to have been run first
-*   p              run codediff's own diff algorithm and show its verdict for every node in
-*                  parentheses next to the human-marked status glyph -- M matched (any operation),
-*                  - deleted, + inserted, ? no verdict (e.g. the tree root) -- for a quick visual
-*                  comparison against the human mapping without leaving the TUI. A trailing `*`
-*                  marks a node the human has already decided on where codediff's verdict
-*                  disagrees (matched to a different node, or matched vs. deleted/inserted)
-*   n / N          jump the focused cursor forward/backward to the next/previous node marked with
-*                  that trailing `*` (a mismatch between the human mapping and codediff's verdict).
-*                  Wraps around the ends of the tree. Requires `p` to have been run first
-*   /              prompt for text, then move the focused cursor to the next leaf node (in
-*                  document order, wrapping around) whose own text contains it -- a plain
-*                  substring match, no regex. Pre-filled with the last search, if any, so `/` then
-*                  Enter repeats it from wherever the cursor landed. Leaf nodes only, not any node
-*                  whose subtree's text contains it: an ancestor's own text is the concatenation of
-*                  everything inside it, so a whole-subtree check would almost always match the
-*                  nearest enclosing container first, not the actual token
-*   t              show the before/after source as plain text, side by side, instead of the AST
-*                  tree -- for reading the code, and for painting the human text-range ground
-*                  truth onto it. T switches to the unix diff view instead, Esc closes. `?` lists
-*                  the painting keys; the one that leads back out of this view is `A`, which puts
-*                  *this side's* AST panel on the leaf under the text cursor (or on the next leaf,
-*                  when the cursor sits in whitespace between two tokens) and focuses that panel,
-*                  without closing the text view. That is the bridge between the two ground truths:
-*                  a painting is authored by row and column and a mapping by node, and every
-*                  invariant that crosses the two records reports a row
-*   T              show the output of the system `diff -u` between the before and after content --
-*                  a plain line-based diff, as a point of comparison against codediff's own
-*                  AST-based diff. j/k scroll, t switches to the text view instead, Esc closes
-*   H              toggle hiding fully solved subtrees in both panels: a node (and everything
-*                  under it) is hidden once it and every one of its descendants has some mark
-*                  (matched, deleted or inserted) -- nothing left there to review. Any node that's
-*                  still unmarked stays visible, together with its whole ancestor chain, since an
-*                  ancestor of an unmarked node can never itself count as fully solved. Recomputed
-*                  fresh every frame, so marking or unmarking a node updates what's hidden
-*                  immediately, without needing to toggle `H` again
-*   d / D          mark the Before cursor node as deleted / deleted with its whole subtree
-*   i / I          mark the After cursor node as inserted / inserted with its whole subtree
-*   u              remove the mark directly on the focused cursor node
-*   s              if the current case is a real test case (opened via `o`): save
-*                  human_mapping.json and ensure the optimal_solutions test stub exists. If it's a
-*                  sample (opened via `O`): prompt for a name and promote it -- pre-filled with
-*                  "<language>-<repository>" (lowercased, ".git" stripped - the same prefix
-*                  convention every existing promoted name already follows), so only the
-*                  descriptive suffix (e.g. "-add-item") needs typing. Promoting copies the
-*                  sample's before/after content into src/test/data/diffs/<name>/, saves
-*                  human_mapping.json and the test stub there, and records <name> against the
-*                  matching row in sample.csv. Re-prompts if the name is empty, contains anything
-*                  other than letters/digits/-/_, or a diffs/ case with that name already exists
-*   R              on a sample (opened via `O`), reject it instead of promoting it: prompts for a
-*                  reason, then records it verbatim in the matching sample.csv row's `comment`
-*                  column and sets `status` to REJECTED, leaving `promoted_to` empty and the sample
-*                  directory itself untouched. Re-prompts if the reason is empty. Has no effect on
-*                  a real test case or a git-commit-sourced case -- only a sample has a sample.csv
-*                  row to reject
-*   e              on a diff (`o`) or a sample (`O`), enter or edit a free-form comment. On a
-*                  diff it is written to `description.md` in the fixture's own directory,
-*                  immediately on Enter (not on `w` - that saves human_mapping.json); an empty
-*                  submission deletes the file. The `o` picker marks cases that have one with a
-*                  leading `*` and shows the selected case's note along the bottom.
-*                  It is the *only* home for a promoted fixture's note: `diff_inventory` reads
-*                  `description.md` and nothing else, and promotion moves any sample comment into
-*                  the file rather than leaving a copy in sample.csv (see `action_promote` /
-*                  `update_sample_csv_at`). On a sample it still edits sample.csv instead:
-*                  prompts for
-*                  text, pre-filled with whatever's already recorded, and records it verbatim in
-*                  the matching sample.csv row's `comment` column -- unlike `R`, doesn't touch
-*                  `status`, and an empty submission clears the comment rather than being rejected
-*                  as invalid input. If a comment is present when the sample is later promoted
-*                  (`s`), it is written both as a leading comment in the generated
-*                  optimal_solutions test stub and into the new fixture's `description.md`, and
-*                  the sample.csv cell is cleared. Has no effect on a real test case or a
-*                  git-commit-sourced case, same as `R`
-*   o              open a different test case: a table of every directory under
-*                  src/test/data/diffs/{handmade,small,full,stratified}/, one row per case and one
-*                  column per thing worth triaging on - Name, Dataset, Cmpl, Unmarked, Paint,
-*                  Disagree, Invariant, Size (see `DiffColumn`). j/k move between rows, Enter opens,
-*                  Esc cancels.
-*                  h/l move a cursor between *columns* (the current one is highlighted in the
-*                  header), and the two keys that act on it are the same for every column:
-*                    `s`  sort by the cursor column; pressing it again on the column that already
-*                         owns the sort flips ascending/descending. Only ever one column sorts -
-*                         the last one `s` was pressed on - with the case name as a stable
-*                         tiebreak.
-*                    `f`  filter on the cursor column: a substring prompt on Name (Enter applies,
-*                         empty clears, Esc cancels - while it is open every key is text, not a
-*                         command), the dataset cycle on Dataset (all -> handmade -> small -> full
-*                         -> stratified -> all, see DIFF_DATASETS), and an off -> yes -> no cycle
-*                         on each of the other six (e.g. Paint: all, painted only, unpainted
-*                         only; Size: all, has changed lines, empty diffs only). Filters on different columns combine as an AND: every active one
-*                         must match for a row to show. A row whose value for a column isn't known
-*                         - the scan behind it hasn't been run, or the case failed to load - stays
-*                         visible under either direction of that column's filter (see
-*                         `FlagFilter::keeps`).
-*                  Cmpl/Unmarked, Paint, Disagree, Invariant and Size each need a corpus-wide scan
-*                  that only runs when `s` or `f` is first pressed on them, and it blocks - roughly
-*                  12s for Cmpl/Unmarked and 7s for Disagree over 513 fixtures on a 4-core machine,
-*                  one external `diff` per case for Size (see
-*                  `scan_corpus`, which runs them across threads; h/l alone never triggers one),
-*                  so those columns read `?` until then. Cursor column, sort and
-*                  every filter persist across closing and reopening this picker (they live on
-*                  `App::diff_view`, not just this modal instance), same as the `O` picker's own
-*                  hide/sort state below. Every filter and sort change re-anchors the selection on
-*                  the row it was already on, falling back to the first row when that row is
-*                  filtered out.
-*                  If the current mapping has unsaved changes, asks first whether to save (only
-*                  offered for a real test case; see `s` above) or discard them before switching
-*   O              like `o`, but lists sampled candidates under src/test/data/samples/ instead --
-*                  see `s` above for what happens when one of these is saved. Samples already
-*                  promoted (per sample.csv's `status` column) are marked " - SOLVED", and rejected
-*                  ones (see `R` above) " - REJECTED"; press `H` inside this picker to hide both,
-*                  or `s` inside this picker to cycle its sort
-*                  order: alphabetical, reverse alphabetical, smallest text diff first, largest
-*                  text diff first (by changed-line count in a raw `diff -u`, not AST size) --
-*                  unlike `H`, changing sort order always jumps selection to the first (1st) entry
-*                  in the new order, rather than tracking the previously selected name. Both the
-*                  hide-solved state and the sort order persist across closing and reopening this
-*                  picker (they live on `App`, not just this modal instance) - the next `O` opens
-*                  right back where the last one left off
-*   C              open a commit from this repository's own `git log` (not a research repo): j/k
-*                  to move, Enter to list the files it changed, Enter again on one of those to
-*                  open its before/after content (before = the file at that commit's parent,
-*                  after = at the commit itself; either side is empty content, not an error, if
-*                  the file didn't exist there -- e.g. it was added or deleted by the commit), Esc
-*                  cancels either picker. Only files with a supported language are listed. Like a
-*                  sample (`O`), `s` then prompts for a name to promote it under -- but always into
-*                  `handmade/` (this *is* the handmade dataset's own source), and pre-filled with
-*                  just `<language>-` (e.g. "rust-"), since there's no second repository to name
-*   V              list every way this case's own ground truth contradicts itself - the detail
-*                  behind the `o` picker's `Invariant` column, which can only show a count. One
-*                  row per violation: which of the fifteen rules, which painting it is about, and
-*                  what it says; underneath, each place to look, with the text there and the node
-*                  it falls in. j/k move, g/G jump to the ends, Enter puts both trees and both
-*                  text panels on the selected violation and opens the text view over them (one
-*                  Esc back to the trees, which are already positioned), Esc closes. Checked
-*                  against the mapping *in memory*, so it sees unsaved edits and a repair
-*                  disappears from the list the next time `V` is pressed
-*   ?              show a popup listing every keybinding (`?` or Esc closes it)
+*   m              match the Before and After cursor nodes. Different kinds ask for confirmation
+*                  (codediff never maps different kinds, so this always shows as a mismatch).
+*                  Same kinds are classified without a prompt: leaves by text (Identical/Update),
+*                  inner nodes by content hash (Identical/MatchButNotIdentical)
+*   M              like `m`, then recurses pairwise into children while both sides have the same
+*                  child count and kinds; stops silently at the first level that diverges.
+*                  Identical pairs with children are collapsed in both panels
+*   f              repeat `m` and auto-advance until end of file or a kind mismatch, which raises
+*                  `m`'s confirmation (`f` again resumes)
+*   a              move the other panel's cursor to the focused node's human-mapped partner,
+*                  centering it if it is off screen
+*   A              like `a`, but follows codediff's own mapping (needs `p` first)
+*   p              run codediff's diff and show its verdict next to each node -- M matched,
+*                  - deleted, + inserted, ? none. A trailing `*` marks a human-decided node where
+*                  codediff disagrees
+*   n / N          jump to the next/previous `*` node, wrapping (needs `p` first)
+*   /              jump to the next leaf (wrapping) whose own text contains a substring; pre-filled
+*                  with the last search. Leaves only, since every ancestor's text contains its
+*                  descendants' and would match first
+*   t              side-by-side text view, for reading the source and painting the text-range
+*                  ground truth (`?` lists its keys). `A` there puts this side's AST panel on the
+*                  leaf under the text cursor (the next leaf, in whitespace), which bridges a
+*                  painting's row/column to the node whose entry has to change
+*   T              `diff -u` of before/after (j/k scroll, t to the text view, Esc closes)
+*   H              toggle hiding subtrees whose every node is marked; an unmarked node and its
+*                  ancestors always stay visible. Recomputed every frame
+*   d / D          mark the Before cursor node deleted / deleted with its subtree
+*   i / I          mark the After cursor node inserted / inserted with its subtree
+*   u              remove the mark on the focused cursor node
+*   s              on a real case (`o`): save human_mapping.json and ensure the test stub exists.
+*                  On a sample (`O`): prompt for a name, pre-filled "<language>-<repository>",
+*                  and promote it -- copy its content into src/test/data/diffs/<name>/, save the
+*                  mapping and stub, and record <name> in sample.csv. Re-prompts on an empty name,
+*                  characters other than letters/digits/-/_, or a name that already exists
+*   R              on a sample, prompt for a reason and reject it: the reason goes to sample.csv's
+*                  `comment`, `status` becomes REJECTED. No effect on other cases
+*   e              edit a free-form note. On a diff it is `description.md` in the fixture
+*                  directory, written on Enter (empty deletes it); the `o` picker marks such cases
+*                  with `*`. That file is the only home for a promoted fixture's note:
+*                  `diff_inventory` reads nothing else. On a sample it is sample.csv's `comment`
+*                  (empty clears it, `status` untouched); promotion moves it into the stub and
+*                  `description.md` and clears the cell. No effect on a git-commit case
+*   o              open a case from src/test/data/diffs/<dataset>/ as a table (columns: see
+*                  `DiffColumn`). j/k rows, h/l columns, Enter opens, Esc cancels. `s` sorts by the
+*                  cursor column (again to reverse; the name is the tiebreak); `f` filters on it --
+*                  substring on Name, a DIFF_DATASETS cycle on Dataset, off/yes/no elsewhere.
+*                  Filters AND together; a row whose value is unknown survives either direction
+*                  (`FlagFilter::keeps`). The columns backed by a corpus scan (`scan_corpus`) read
+*                  `?` until `s`/`f` is first pressed on them. Cursor, sort and filters persist on
+*                  `App::diff_view`. Unsaved changes prompt save/discard first
+*   O              like `o`, for sampled candidates under src/test/data/samples/. `H` hides
+*                  SOLVED/REJECTED samples, `s` cycles the sort (name, reverse, smallest/largest
+*                  `diff -u`) and jumps to the first entry. Both persist on `App`
+*   C              open a file changed by a commit in this repository's own `git log`: before is
+*                  the file at the parent, after at the commit (a missing side is empty). `s`
+*                  promotes into `handmade/`, pre-filled "<language>-"
+*   V              list every ground-truth invariant this case breaks (the `o` picker's
+*                  `Invariant` column is the count). Enter positions both trees and text panels on
+*                  the violation and opens the text view. Checked against the in-memory mapping
+*   ?              show every keybinding
 *   q / Esc        quit
 *
-* After a match finalizes (including a modal answer), both panels' cursors auto-advance to their
-* own next unmarked node (if one exists past the current position). After an insert or delete,
-* only the panel that was actually marked (After or Before, respectively) auto-advances, since the
-* other side wasn't touched. This makes stepping through a tree top to bottom mostly just holding
-* down the marking key.
+* After a match, both cursors advance to their own next unmarked node; after an insert or delete,
+* only the marked panel advances.
 */
 use std::io::{self, Stdout, Write};
 use std::time::Duration;
@@ -254,21 +143,19 @@ use codediff::code::language::{language_for_path, to_treesitter};
 use codediff::code::{Code, Language};
 use codediff::diff::text::TextDiff;
 use codediff::diff::{ASTDiff, ASTMappingReason, NodeCache, diff_code};
+#[cfg(test)]
+use codediff::test::helper::human_mapping::rebuild_caches;
 use codediff::test::helper::human_mapping::{
     self, Caches, GroupPairing, HumanMapping, HumanMappingEntry, HumanOperation, HumanTextEntry,
     HumanTextMapping, HumanTextOperation, HumanTextSpan, HumanTextVerdict, MarkKind, MultiMapGroup,
     NamedTextMapping, NodeStatus, disagreement_is_move_only, is_inherited_removed, path_refs,
     rebuild_caches_for_mapping, status_after, status_before, text_mapping_disagreements,
 };
-use codediff::tui::theme::{self, OverlayPalette, OverlayTheme};
-// Only used by this file's own test module (`rebuild_caches_for_mapping`, imported above, is the
-// one the non-test code path uses).
-#[cfg(test)]
-use codediff::test::helper::human_mapping::rebuild_caches;
 use codediff::test::helper::{
     DIFF_DATASETS, code_pair_from_dir, code_pair_from_dir_without_metadata, diffs_case_dir,
     node_for_path, path_for_node, precompute_paths, read_note, write_note,
 };
+use codediff::tui::theme::{self, OverlayPalette, OverlayTheme};
 
 #[derive(Parser, Debug)]
 #[command(
@@ -277,14 +164,12 @@ use codediff::test::helper::{
     about = "Interactively build a human ground-truth AST mapping for an optimal_solutions test case"
 )]
 struct Args {
-    /// Name of the test case, i.e. the directory name under src/test/data/diffs/ (e.g.
-    /// "rust-add-if"). Always starts with a language prefix. If omitted, the first available
-    /// case (alphabetically) opens instead - press `o` to pick a different one.
+    /// Directory name under src/test/data/diffs/ (e.g. "rust-add-if"). If omitted, the first case
+    /// alphabetically opens.
     name: Option<String>,
 }
 
-/// Shown by the `?` help popup (`Modal::Help`). Kept as a plain reference sheet, separate from the
-/// fuller explanations in this file's own doc comment, so it fits legibly in a single screen.
+/// The `?` help popup (`Modal::Help`): a terse sheet that fits on one screen.
 const HELP_TEXT: &str = "\
 Tab            switch focus between Before/After panels
 Up/k, Down/j   move cursor
@@ -444,12 +329,9 @@ C              open a commit from this repo's own git log, then a file it
 q / Esc        quit
 ";
 
-/// Where a freshly-opened panel puts its cursor: `code`'s root node id.
-///
-/// `usize::MAX` for a case with no tree at all (text-only mode - see `FrameState::before_root`).
-/// A real `Node::id` is an address inside the parsed tree, so the sentinel cannot collide with
-/// one, and nothing ever looks it up: the flat node list is empty in that mode, so `index_of`
-/// misses and the cursor simply sits nowhere - which is the truth about a case with no nodes.
+/// Where a freshly-opened panel puts its cursor: `code`'s root node id, or `usize::MAX` for a
+/// text-only case. A real `Node::id` is an address, so the sentinel cannot collide; the flat node
+/// list is empty in that mode, so the cursor sits nowhere.
 pub(crate) fn starting_cursor_id(code: &Code) -> usize {
     code.ast
         .as_ref()
@@ -457,11 +339,8 @@ pub(crate) fn starting_cursor_id(code: &Code) -> usize {
         .unwrap_or(usize::MAX)
 }
 
-/// Loads and parses the before/after code for a test case, by name. Parses only this one case's
-/// directory (rather than every directory under src/test/data/diffs/, as a naive
-/// `handmade_test_code_pairs`-style lookup would) since this runs on every `o`-picker open, not
-/// just at startup. Resolves across `DIFF_DATASETS` (`handmade`/`small`/`full`) via the library's
-/// own `diffs_case_dir`, same as every other per-name lookup in this file.
+/// Loads and parses the before/after code for the case `name`, in whichever `DIFF_DATASETS`
+/// folder it lives. Parses only this case, since it runs on every `o`-picker open.
 fn load_case(name: &str) -> Result<(Code, Code)> {
     let Some(dir) = diffs_case_dir(name) else {
         let available = list_available_cases().unwrap_or_default();
@@ -485,19 +364,11 @@ fn load_case(name: &str) -> Result<(Code, Code)> {
             )
         })?;
 
-    // A fixture whose language tree-sitter has no grammar for (a Bazel `BUILD` file, say) opens
-    // anyway, in *text-only* mode: no tree to map, but the text views and the painting - which
-    // read the raw source and nothing else - work exactly as they do anywhere else, and the
-    // painting is what such a fixture exists to record. Bailing here would leave such a case
-    // impossible to even look at. See `FrameState::before_root` for what the rest of the tool
-    // does with the missing tree, and `codediff_text_spans` for the plain-text diff codediff
-    // itself falls back to on this pair.
-    //
-    // `ensure_parsed` only when there is something to compute metadata *for*: it errors on a
-    // language with no `to_treesitter` mapping rather than returning an empty result.
+    // A language with no tree-sitter grammar opens in text-only mode (see
+    // `FrameState::before_root`): the painting is what such a fixture records. `ensure_parsed`
+    // errors on such a language, so it runs only when there is a tree. It fills
+    // node_to_full_hash, which `m`/`M` classify inner nodes by.
     if before.ast.is_some() {
-        // Populates node_to_full_hash (among other things), which `m`/`M` use to auto-classify
-        // matches on nodes with children instead of asking.
         before
             .ensure_parsed()
             .context("Failed to compute AST metadata for before code")?;
@@ -527,8 +398,7 @@ fn samples_root() -> PathBuf {
         .join("samples")
 }
 
-/// The dataset (`handmade`/`small`/`full`) an existing diffs/ case named `name` actually lives
-/// under, for display purposes (the title bar, prompts) - `None` if `name` isn't a case at all.
+/// The `DIFF_DATASETS` folder the case `name` lives under, for display; `None` if it isn't a case.
 fn case_dataset(name: &str) -> Option<String> {
     diffs_case_dir(name)?
         .parent()
@@ -536,12 +406,9 @@ fn case_dataset(name: &str) -> Option<String> {
         .map(|f| f.to_string_lossy().into_owned())
 }
 
-/// Names of every directory directly under `root` (not just the ones that successfully parse
-/// into a Code pair), for the `o`/`O` open pickers.
+/// Sorted names of every directory directly under `root`, parseable or not. A missing `root` is
+/// empty, not an error: `samples/` exists only after `materialize_test_diffs` runs.
 fn list_dir_names(root: &Path) -> Result<Vec<String>> {
-    // Not an error: `samples/` in particular won't exist at all until `materialize_test_diffs`
-    // has been run once, and `full/` (see `DIFF_DATASETS`) is deliberately empty until the full
-    // dataset is available.
     if !root.exists() {
         return Ok(Vec::new());
     }
@@ -557,12 +424,7 @@ fn list_dir_names(root: &Path) -> Result<Vec<String>> {
     Ok(names)
 }
 
-/// Every case name across all `DIFF_DATASETS` folders (`handmade`/`small`/`full`/`stratified`/`defects4j`) -
-/// the `o` picker doesn't distinguish between them (see the title bar's `[dataset]` tag, via
-/// `case_dataset`, for where a given case actually lives), since names are unique across all of
-/// them by construction (`action_promote`'s collision check spans all of them too).
-/// Just the case names from [`list_available_cases`], for the `scan_corpus` calls that only ever
-/// look a case up by name (all of them - the dataset half is for the picker's own Dataset column).
+/// Just the names from [`list_available_cases`], for `scan_corpus`.
 fn list_available_case_names() -> Result<Vec<String>> {
     Ok(list_available_cases()?
         .into_iter()
@@ -570,6 +432,8 @@ fn list_available_case_names() -> Result<Vec<String>> {
         .collect())
 }
 
+/// Every case across all `DIFF_DATASETS` folders with its dataset, sorted by name. Names are unique
+/// across datasets (`action_promote`'s collision check spans them all).
 fn list_available_cases() -> Result<Vec<(String, &'static str)>> {
     let mut names = Vec::new();
     for dataset in DIFF_DATASETS {
@@ -581,22 +445,10 @@ fn list_available_cases() -> Result<Vec<(String, &'static str)>> {
     Ok(names)
 }
 
-/// The case names the `o` picker actually shows, in the order it shows them: `options`
-/// (`list_available_cases`'s output) narrowed by every active filter in `view`, then ordered by
-/// `view.sort`.
-///
-/// **Filters combine as an AND** (see `DiffFilters`), and a row whose value for a column isn't
-/// known survives that column's filter in either direction (see `FlagFilter::keeps` for the full
-/// argument - in short, "not scanned yet" and "couldn't be measured" are not evidence a fixture
-/// needs no attention).
-///
-/// **The order is total.** The primary key is `view.sort.column`, reversed when
-/// `view.sort.descending`; the name is always the tiebreak, always ascending, so two rows that
-/// tie on an unscanned column (every row ties, in that case) still come out in a stable, readable
-/// order rather than whatever order `options` happened to arrive in. Unknown values sort after
-/// known ones ascending, and the reversal moves them to the front - `sort_rank`/`bool_rank` carry
-/// that as an explicit leading flag rather than leaving it to a sentinel value that a real
-/// measurement could collide with.
+/// The case names the `o` picker shows, in order: `options` narrowed by every filter in `view`
+/// (ANDed; an unknown value survives either direction, see `FlagFilter::keeps`), sorted by
+/// `view.sort` with the name as an always-ascending tiebreak, so the order is total. Unknown values
+/// sort after known ones ascending (see `sort_rank`).
 fn visible_diff_options(
     options: &[(String, &'static str)],
     view: &DiffPickerView,
@@ -641,8 +493,6 @@ fn visible_diff_options(
         .map(|(name, _)| name.as_str())
         .collect();
 
-    // `options`, not `visible`, is what carries each name's dataset; looked up per comparison
-    // rather than materialized into a parallel list, since only the `Dataset` sort ever asks.
     let dataset_of = |name: &str| -> &'static str {
         options
             .iter()
@@ -680,26 +530,19 @@ fn visible_diff_options(
     visible.into_iter().map(str::to_string).collect()
 }
 
-/// Sort key for a numeric column: the leading `false`/`true` puts every known value ahead of every
-/// unknown one under an ascending sort, without pretending an unknown row measured any particular
-/// number.
+/// Sort key for a numeric column: the leading flag puts unknowns after every known value, rather
+/// than a sentinel a real measurement could collide with.
 fn sort_rank(value: Option<usize>) -> (bool, usize) {
     (value.is_none(), value.unwrap_or(0))
 }
 
-/// `sort_rank` for a yes/no column - `false` (the condition doesn't hold) sorts before `true`, and
-/// unknown after both.
+/// `sort_rank` for a yes/no column: `false`, then `true`, then unknown.
 fn bool_rank(value: Option<bool>) -> (bool, bool) {
     (value.is_none(), value.unwrap_or(false))
 }
 
-/// Builds the `o` picker's modal from a freshly-listed `options`, `current_name` (the case already
-/// open - or, when reopening after a filter/sort change, the row that was selected - so the
-/// selection follows the row it was on rather than jumping to the top), and the persisted `view`
-/// (`App::diff_view`). Falls back to the first visible row when that name isn't in the filtered
-/// view at all. Keeping the real logic here, rather than in the `KeyCode::Char('o')`/`'s'`/`'f'`
-/// handlers, makes it unit-testable without real files under src/test/data/diffs/ - same shape as
-/// `open_sample_picker_modal` for `O`, and for the same reason.
+/// Builds the `o` picker's modal with the selection on `current_name`, or on the first visible row
+/// when the filters hide it. Separate from the key handlers so it is testable without files.
 fn open_diff_picker_modal(
     options: Vec<(String, &'static str)>,
     current_name: &str,
@@ -720,9 +563,7 @@ fn open_diff_picker_modal(
     }
 }
 
-/// Cycles the `o` picker's dataset filter, in `DIFF_DATASETS` order, wrapping back to "all"
-/// (`None`) after the last one - what `f` does on the `Dataset` column, same convention as
-/// `SampleSortOrder::next`.
+/// The `o` picker's next dataset filter: `DIFF_DATASETS` in order, then back to "all" (`None`).
 fn next_dataset_filter(current: Option<&'static str>) -> Option<&'static str> {
     match current {
         None => Some(DIFF_DATASETS[0]),
@@ -734,31 +575,13 @@ fn next_dataset_filter(current: Option<&'static str>) -> Option<&'static str> {
     }
 }
 
-/// Runs `scan` over every case name in `names` across several threads, collecting the `Some`
-/// results into a map. The shared shape of all four of the `o` picker's corpus scans: each is a
-/// pure per-case function of the filesystem, so all any of them needs is a work queue.
+/// Runs `scan` over `names` on several threads, collecting the `Some` results into a map.
 ///
-/// **Why this is safe to run concurrently.** Every scan body reaches the filesystem through
-/// `code_pair_from_dir`, `human_mapping::mapping_path`/`load` or `read_note`, all of which read and
-/// parse per call with no shared state. In particular none of them goes through
-/// `handmade_test_code_pair`'s process-wide `Mutex<HashMap<_, Arc<(Code, Code)>>>` - that cache
-/// never evicts, and filling it from N threads is exactly the shape that got a `cargo test` run
-/// OOM-killed at 12-16GB (see its own doc comment). Nothing a worker parses outlives the closure
-/// that made it; only the plain `T` result crosses a thread boundary.
+/// `scan` must not go through `handmade_test_code_pair`'s process-wide cache: it never evicts, so
+/// filling it from N threads multiplies peak memory. The scan bodies here read and parse per call.
 ///
-/// **A worker panic propagates**, rather than being turned into a missing map entry. A dropped
-/// slice of the corpus would read as `?` in the picker - indistinguishable from "not scanned yet"
-/// under `FlagFilter::keeps` - so silently returning a partial map would quietly lie about which
-/// cases were measured. `main` installs a panic hook that restores the terminal first, so this
-/// fails the same visible way a sequential scan always did.
-///
-/// Deterministic despite the interleaving: results land in a `HashMap`, and every consumer orders
-/// through `visible_diff_options`, which breaks every tie on the case name. All four scans were
-/// measured to return byte-identical entry counts single-threaded and parallel.
-///
-/// Used for all four scans even though two of them are already cheap and I/O-bound rather than
-/// CPU-bound, so the gain there is small: keeping one code path for all four is worth more than
-/// the handful of milliseconds either way.
+/// A worker panic propagates: a partial map would show the lost cases as `?`, indistinguishable
+/// from "not scanned yet".
 fn scan_corpus<T, F>(names: &[String], scan: F) -> std::collections::HashMap<String, T>
 where
     T: Send,
@@ -767,8 +590,6 @@ where
     scan_corpus_with_threads(names, default_scan_threads(), scan)
 }
 
-/// How many threads `scan_corpus` uses: the machine's parallelism, capped at
-/// `MAX_SCAN_THREADS`.
 fn default_scan_threads() -> usize {
     std::thread::available_parallelism()
         .map(|n| n.get())
@@ -776,27 +597,12 @@ fn default_scan_threads() -> usize {
         .min(MAX_SCAN_THREADS)
 }
 
-/// Ceiling on `scan_corpus`'s worker count, on top of `available_parallelism`. Each worker holds
-/// one fixture's two parsed trees (and, for the disagreement scan, an `ASTDiff` + `NodeCache` +
-/// `TextDiff` on top) at a time, so peak RSS scales with this number and nothing else bounds it -
-/// and this repo has been OOM-killed by exactly that kind of multiplier before (see
-/// `handmade_test_code_pair`).
-///
-/// Measured on the unmarked scan over 513 fixtures (release, 4-core machine, 2026-09-02): 833 MB
-/// at one worker, 2053 MB at four, 2978 MB at eight - so roughly 300 MB of headroom per extra
-/// worker. The same run shows why the ceiling costs nothing in speed: at eight workers on four
-/// cores the wall clock was 11.9s against 12.4s at four, i.e. within noise, while the disagreement
-/// scan was actually *slower* oversubscribed (8.2s vs 7.5s). Past the core count this buys memory
-/// pressure and no time, so eight is a bound on big machines rather than a target.
-///
-/// The other place this multiplies is the test suite, where nextest runs each corpus-scanning test
-/// in its own process concurrently. Measured after this change: peak 1.99 GB summed across every
-/// `human_solver` test process, with the suite down from 37.2s to 12.5s - well inside the headroom
-/// the nextest migration established, so no per-test thread limit is needed.
+/// Ceiling on `scan_corpus`'s workers. Each holds one fixture's parsed trees (plus a diff for the
+/// disagreement scan), so peak memory scales with this and nothing else bounds it; past the core
+/// count more workers add memory and no speed.
 const MAX_SCAN_THREADS: usize = 8;
 
-/// `scan_corpus` with the worker count pinned - the seam the tests use to check that a parallel
-/// run returns exactly what a single-threaded one does.
+/// `scan_corpus` with the worker count pinned, so tests can compare parallel against serial.
 fn scan_corpus_with_threads<T, F>(
     names: &[String],
     threads: usize,
@@ -813,9 +619,8 @@ where
             .collect();
     }
 
-    // A shared cursor rather than a fixed slice per thread: fixtures differ in size by orders of
-    // magnitude (one mapping file alone is 80 MB), so an even split by count would leave most
-    // workers idle waiting for whichever one drew the giants.
+    // A shared cursor rather than a slice per thread: fixture sizes differ by orders of magnitude,
+    // so an even split by count leaves workers idle behind whichever drew the giants.
     let next = std::sync::atomic::AtomicUsize::new(0);
     let scan = &scan;
     let next = &next;
@@ -849,16 +654,8 @@ where
     chunks.into_iter().flatten().collect()
 }
 
-/// Runs, if it hasn't already this session, whichever corpus-wide scan `column` reads - so `s` and
-/// `f` on a column show a real ranking or a real filter rather than a table of `?`.
-///
-/// Called only from those two keys, never from `h`/`l`: the scans still take real wall-clock time
-/// the first time even after `scan_corpus` parallelized them (order of ten seconds for
-/// `Cmpl`/`Unmarked`, under ten for `Disagree`, both sub-second for `Paint` - see
-/// `compute_diff_unmarked` for the full numbers), and stalling on plain
-/// cursor movement across the header would make the picker feel broken. Pressing `s`/`f` is a
-/// deliberate request for that column's data, which is exactly when paying for it is reasonable -
-/// the same bargain the `H`/`X`/`Y` keys this replaces each struck on their own.
+/// Runs, once per session, the corpus scan `column` reads. Called from `s`/`f` only, never from
+/// `h`/`l`: the scans take seconds, and cursor movement must not stall.
 fn ensure_diff_column_data(app: &mut App, column: DiffColumn) {
     match column {
         DiffColumn::Cmpl | DiffColumn::Unmarked => {
@@ -886,18 +683,12 @@ fn ensure_diff_column_data(app: &mut App, column: DiffColumn) {
                 app.diff_sizes = Some(compute_diff_sizes());
             }
         }
-        // Both are read straight off `list_available_cases`' own output - nothing to scan.
         DiffColumn::Name | DiffColumn::Dataset => {}
     }
 }
 
-/// How many nodes in `root`'s subtree are still `NodeStatus::Unmarked` under `caches` - the
-/// whole-tree counterpart of `count_unmarked` (which counts only the rows currently *visible* in
-/// a panel, for the status line). The `o` picker's `Unmarked` column needs the count rather than
-/// the "is any left?" boolean this replaced, because how much work a fixture still needs is what
-/// orders a triage queue; the lost short-circuit costs an unfinished fixture a full walk, which is
-/// a rounding error next to the tree-sitter parse and mapping rebuild `diff_case_unmarked_count`
-/// already does per case.
+/// How many nodes in `root`'s subtree are `NodeStatus::Unmarked` - the whole-tree counterpart of
+/// `count_unmarked`, which counts only visible rows.
 fn count_unmarked_nodes_in_tree(
     root: Node,
     caches: &Caches,
@@ -917,29 +708,14 @@ fn count_unmarked_nodes_in_tree(
     count
 }
 
-/// How many nodes `name`'s current human-authored mapping still leaves `NodeStatus::Unmarked`,
-/// across both its before and after trees - i.e. how much annotation work is left on it. `None` if
-/// the case's code or mapping couldn't be loaded at all - no `human_mapping.json` yet, a directory
-/// that doesn't parse as a valid case, or (rarer) source that no longer parses. That `None` is
-/// carried all the way through to the picker as an unknown (`?`) rather than being flattened into
-/// a number: a case that fails to load must not read as "0 left to do", and under
-/// `FlagFilter::keeps` an unknown row stays visible under either direction of the filter, so a
-/// broken case is surfaced rather than hidden. Pressing Enter on it in the picker still goes
-/// through `load_case`'s own error handling as normal; this function doesn't change what opening
-/// it does, only what the `Cmpl`/`Unmarked` columns say about it.
+/// How many nodes of both trees `name`'s human mapping leaves `NodeStatus::Unmarked`. `None` only
+/// when the case's source can't be loaded, which the picker shows as `?`, never as "0 left". No
+/// `human_mapping.json` yet counts every node; a text-only pair counts 0.
 fn diff_case_unmarked_count(name: &str) -> Option<usize> {
     let dir = diffs_case_dir(name)?;
-    // Tree only: the count walks nodes and never diffs, and the metadata `code_pair_from_dir`
-    // adds is three quarters of the load (see that function's doc comment).
+    // Without metadata: the count never diffs, and metadata is most of the load.
     let (before, after) = code_pair_from_dir_without_metadata(&dir).ok().flatten()?;
-    // A fixture with no `human_mapping.json` yet is an ordinary state - it reads as every node
-    // unmarked, which is exactly true, and is the same reading `diff_inventory::row_for` takes.
-    // `.ok()?` reported it as *unreadable* instead, so the picker's Unmarked column was blank for
-    // precisely the fixtures with the most work left in them.
     let mapping = human_mapping::load(name).unwrap_or_default();
-    // A pair tree-sitter has no grammar for has no nodes at all, so it has zero unmarked ones.
-    // `None` here means "could not be read", and reporting a perfectly real fixture that way made
-    // the picker's Unmarked column claim it was unreadable rather than complete.
     let (Some(before_tree), Some(after_tree)) = (before.ast.as_ref(), after.ast.as_ref()) else {
         return Some(0);
     };
@@ -952,10 +728,7 @@ fn diff_case_unmarked_count(name: &str) -> Option<usize> {
     )
 }
 
-/// Refreshes just `name`'s entry in `App::diff_unmarked`, if the cache has been built at all this
-/// session - called after a save, since that's the only way a case's unmarked count can change
-/// mid-session, and a targeted single-fixture refresh is cheap, unlike rebuilding the whole cache
-/// (see that field's own doc comment for why that's worth avoiding).
+/// Refreshes `name`'s entry in `App::diff_unmarked`, if that scan has run. Called after a save.
 fn refresh_diff_unmarked(app: &mut App, name: &str) {
     if let Some(map) = &mut app.diff_unmarked
         && let Some(count) = diff_case_unmarked_count(name)
@@ -964,19 +737,8 @@ fn refresh_diff_unmarked(app: &mut App, name: &str) {
     }
 }
 
-/// Builds `App::diff_unmarked` for every case `list_available_cases` currently lists - the `o`
-/// picker's `Cmpl` and `Unmarked` columns need this for the whole corpus before either can filter
-/// or sort, unlike `O`'s `hide_solved` (a cheap lookup against sample.csv, no parsing involved).
-///
-/// **The most expensive of the four scans**, and the reason `scan_corpus` exists: almost all of
-/// its cost is per-case work with no shared state - `code_pair_from_dir` (tree-sitter, both
-/// sides) plus `human_mapping::load` (the corpus' mapping JSON runs to over a gigabyte, one file
-/// of it 80 MB) - so it parallelizes nearly linearly. A case that fails to load stays absent from
-/// the map rather than failing the scan.
-///
-/// It is bearable at all only because `rebuild_caches_for_mapping` resolves every entry's path
-/// through a `PathCache` rather than rescanning siblings per entry - see `rebuild_caches`'s own
-/// doc comment.
+/// Builds `App::diff_unmarked` (the `Cmpl` and `Unmarked` columns) for the whole corpus. A case
+/// that fails to load is absent rather than failing the scan.
 fn compute_diff_unmarked() -> std::collections::HashMap<String, usize> {
     let Ok(names) = list_available_case_names() else {
         return std::collections::HashMap::new();
@@ -984,41 +746,21 @@ fn compute_diff_unmarked() -> std::collections::HashMap<String, usize> {
     scan_corpus(&names, diff_case_unmarked_count)
 }
 
-/// Whether `name`'s human mapping already carries a painted text-range mapping (see
-/// `HumanTextMapping`) - the text-painting counterpart of `diff_case_unmarked_count`.
+/// Whether `name`'s human mapping carries any text painting; `None` if the file can't be read.
 ///
-/// **A substring scan, not a JSON parse, and that is not a micro-optimization.** The corpus's 513
-/// `human_mapping.json` files come to ~1.4 GB (one is ~29,600 lines on its own), and parsing them
-/// all to ask whether one key is present costs on the order of the whole-corpus scans it was meant
-/// to be the cheap counterpart of. Searching for the quoted key instead is a linear scan with no
-/// allocation per entry, and it works: `compute_diff_text_painted` measured **616ms
-/// single-threaded, 292ms through `scan_corpus`** over the full corpus (release, 2026-09-02),
-/// against `compute_diff_unmarked`'s 38.9s/12.4s on the same run. It is the one column whose data
-/// is effectively free.
+/// A substring search rather than a JSON parse: parsing the whole corpus's mapping files costs as
+/// much as the expensive scans. The quotes make the token unambiguous, since `serde_json` escapes
+/// any quote inside a string value, so it can only match a key.
 ///
-/// The token includes its quotes deliberately. Every string this file stores is either a
-/// tree-sitter node kind or a `kind:index` path element, and `serde_json` escapes any quote inside
-/// a string value as `\"` - so a bare `"text_mapping"` can only be a JSON *key*, never content.
-/// Key order doesn't matter either, unlike a tail-only read: a hand-edited file that moved the key
-/// is still found.
-///
-/// `None` if the file can't be read, which `compute_diff_text_painted` treats as "not painted" for
-/// the same fail-open reason `compute_diff_unmarked` leaves a case it cannot measure out of its map:
-/// a case this can't read is exactly what the filter should surface, not hide.
-///
-/// Deliberately keyed on presence, not on emptiness. A fixture whose two files are identical has
-/// nothing to paint, and `Z` in the text view records that as `Some` with no entries - which is
-/// painted, and must not come back into the queue every session. That distinction is the entire
-/// reason `HumanMapping::text_mapping` is an `Option` rather than a plain `Vec`.
+/// Keyed on presence, not emptiness: `Z` records a nothing-to-paint fixture as an empty painting,
+/// which counts as painted.
 fn diff_case_has_text_mapping(name: &str) -> Option<bool> {
     let path = human_mapping::mapping_path(name);
     let contents = std::fs::read_to_string(path).ok()?;
     Some(contents.contains("\"text_mappings\""))
 }
 
-/// Refreshes just `name`'s entry in `App::diff_text_painted`, for the same reason (and at the same
-/// call sites) as `refresh_diff_unmarked`: saving is the only thing that can change a case's
-/// painted-ness mid-session.
+/// Refreshes `name`'s entry in `App::diff_text_painted`, if that scan has run. Called after a save.
 fn refresh_diff_text_painted(app: &mut App, name: &str) {
     if let Some(map) = &mut app.diff_text_painted
         && let Some(painted) = diff_case_has_text_mapping(name)
@@ -1027,32 +769,20 @@ fn refresh_diff_text_painted(app: &mut App, name: &str) {
     }
 }
 
-/// Builds `App::diff_text_painted` for every case `list_available_cases` lists - the `o` picker's
-/// `X` toggle needs the whole corpus before it can filter.
-///
-/// Much cheaper than `compute_diff_unmarked`, which it otherwise mirrors: this scans bytes,
-/// where that one parses both source files with tree-sitter and walks two trees. Still done lazily
-/// on first `X` rather than eagerly on every `o`, both to match `H`'s behaviour and because 1.4 GB
-/// of mapping files is not free to read however cheap the per-file test is.
+/// Builds `App::diff_text_painted` (the `Paint` column) for the whole corpus.
 fn compute_diff_text_painted() -> std::collections::HashMap<String, bool> {
     let Ok(names) = list_available_case_names() else {
         return std::collections::HashMap::new();
     };
-    // `Some(..unwrap_or(false))`, not `diff_case_has_text_mapping` directly: this map is keyed on
-    // every listed case, with an unreadable one recorded as unpainted rather than left absent -
-    // the fail-open direction this scan has always had, and the one place the four scans differ
-    // in what they do with a `None`.
+    // Unlike the other scans, an unreadable case is recorded (as unpainted) rather than absent.
     scan_corpus(&names, |name| {
         Some(diff_case_has_text_mapping(name).unwrap_or(false))
     })
 }
 
-/// How many bytes `name`'s human tree mapping and human text painting disagree about, via
-/// `text_mapping_disagreements` - a pure ground-truth-vs-ground-truth comparison with codediff's
-/// own matching taken out of the loop entirely, excluding `disagreement_is_move_only` runs (the one unavoidable rendering artifact from
-/// `TextDiff::from`'s column-shift `Move` heuristic - see that function's own doc comment). `None`
-/// when the case can't be loaded, or has no text painting yet at all (nothing to compare against -
-/// distinct from "compared and agrees exactly", which is `Some(0)`).
+/// How many bytes `name`'s human tree mapping and human text painting disagree about (codediff's
+/// own matching plays no part), excluding `disagreement_is_move_only` runs. `None` when the case
+/// can't be loaded or has no painting yet, as distinct from agreeing exactly (`Some(0)`).
 fn diff_case_disagreement_bytes(name: &str) -> Option<usize> {
     let dir = diffs_case_dir(name)?;
     let (before, after) = code_pair_from_dir(&dir).ok().flatten()?;
@@ -1070,18 +800,13 @@ fn diff_case_disagreement_bytes(name: &str) -> Option<usize> {
     )
 }
 
-/// Refreshes just `name`'s entry in `App::diff_disagreement`, for the same reason (and at the same
-/// call sites) as `refresh_diff_unmarked`/`refresh_diff_text_painted`: saving is the only
-/// thing that can change a case's disagreement score mid-session.
+/// Refreshes `name`'s entry in `App::diff_disagreement`, if that scan has run. Called after a save.
 fn refresh_diff_disagreement(app: &mut App, name: &str) {
     if let Some(map) = &mut app.diff_disagreement {
         match diff_case_disagreement_bytes(name) {
             Some(bytes) => {
                 map.insert(name.to_string(), bytes);
             }
-            // A case with no text painting yet has nothing to compare - stays absent from the map
-            // rather than reporting a misleading 0, same as `diff_case_has_text_mapping`'s
-            // presence-not-emptiness distinction.
             None => {
                 map.remove(name);
             }
@@ -1089,12 +814,7 @@ fn refresh_diff_disagreement(app: &mut App, name: &str) {
     }
 }
 
-/// Builds `App::diff_disagreement` for every case `list_available_cases` lists that already has a
-/// text painting - the `o` picker's `s` disagreement-sort and `Y` filter need this for the whole
-/// corpus before they can rank/hide by it. The most expensive of the four lazy `o`-picker scans:
-/// unlike `compute_diff_unmarked` (parses both sides once), this also builds a synthetic
-/// `ASTDiff` from the tree mapping and renders it through `TextDiff::from` per fixture - still
-/// bounded by the same corpus size, just a heavier constant per fixture.
+/// Builds `App::diff_disagreement` (the `Disagree` column) for every painted case.
 fn compute_diff_disagreement() -> std::collections::HashMap<String, usize> {
     let Ok(names) = list_available_case_names() else {
         return std::collections::HashMap::new();
@@ -1102,24 +822,16 @@ fn compute_diff_disagreement() -> std::collections::HashMap<String, usize> {
     scan_corpus(&names, diff_case_disagreement_bytes)
 }
 
-/// How many of its own ground-truth invariants `name`'s human mapping breaks - the number the
-/// per-fixture `invariants()` tests assert on, so a row reading above 0 here is a row whose test
-/// is either failing or pinned to a known violation.
-///
-/// `None`, not `Some(0)`, when there is no mapping to check: a case nobody has annotated has not
-/// *satisfied* these invariants, and reporting it as clean would put it at the bottom of the sort
-/// alongside the finished ones. Same presence-not-emptiness distinction
-/// `diff_case_disagreement_bytes` draws.
+/// How many ground-truth invariants `name`'s human mapping breaks - the number its fixture's
+/// `invariants()` test asserts on. `None`, not `Some(0)`, without a mapping: an unannotated case
+/// has not satisfied the invariants.
 fn diff_case_invariant_violations(name: &str) -> Option<usize> {
     human_mapping::invariants::ground_truth_invariant_violations(name)
         .ok()
         .map(|violations| violations.len())
 }
 
-/// Builds `App::diff_invariants` for the whole corpus, for the `o` picker's `Invariant` column.
-///
-/// Cost sits between `Paint` and `Disagree`: this parses both sides and walks every painting, but
-/// unlike `compute_diff_disagreement` it never builds a synthetic `ASTDiff` or renders one.
+/// Builds `App::diff_invariants` (the `Invariant` column) for the whole corpus.
 fn compute_diff_invariants() -> std::collections::HashMap<String, usize> {
     let Ok(names) = list_available_case_names() else {
         return std::collections::HashMap::new();
@@ -1127,9 +839,7 @@ fn compute_diff_invariants() -> std::collections::HashMap<String, usize> {
     scan_corpus(&names, diff_case_invariant_violations)
 }
 
-/// Refreshes just `name`'s entry, for the same reason and at the same call sites as
-/// `refresh_diff_disagreement`: saving a mapping is the only thing that can repair or introduce a
-/// violation mid-session, and the row it was saved from should not keep reading the old count.
+/// Refreshes `name`'s entry in `App::diff_invariants`, if that scan has run. Called after a save.
 fn refresh_diff_invariants(app: &mut App, name: &str) {
     if let Some(map) = &mut app.diff_invariants {
         match diff_case_invariant_violations(name) {
@@ -1143,13 +853,7 @@ fn refresh_diff_invariants(app: &mut App, name: &str) {
     }
 }
 
-/// Every case's note, keyed by case name, for the `o` picker. Cases without one are simply
-/// absent.
-///
-/// The cheapest of the three picker scans by a wide margin: a few hundred bytes per fixture where
-/// `compute_diff_text_painted` reads 1.4 GB of JSON and `compute_diff_unmarked` parses both
-/// sides with tree-sitter. Most fixtures have no `description.md` at all, so most of this is a
-/// failed `stat`.
+/// Every case's note (`description.md`) by case name; cases without one are absent.
 fn compute_diff_comments() -> std::collections::HashMap<String, String> {
     let Ok(names) = list_available_case_names() else {
         return std::collections::HashMap::new();
@@ -1157,9 +861,7 @@ fn compute_diff_comments() -> std::collections::HashMap<String, String> {
     scan_corpus(&names, read_note)
 }
 
-/// Refreshes just `name`'s entry, for the same reason as `refresh_diff_text_painted`: `e` is the
-/// only thing that can change a case's note mid-session, and the row it was typed on should not
-/// read as un-noted until the next restart.
+/// Refreshes `name`'s entry in `App::diff_comments`, if loaded. Called after `e`.
 fn refresh_diff_comment(app: &mut App, name: &str) {
     if let Some(map) = &mut app.diff_comments {
         match read_note(name) {
@@ -1173,10 +875,8 @@ fn refresh_diff_comment(app: &mut App, name: &str) {
     }
 }
 
-/// A sample's disposition, as recorded in its sample.csv row's `status` column - `Sampled` if
-/// nothing has been decided yet (including when the row predates that column, or no row matches
-/// at all: the same "nothing decided" default `default_status`/`default_sample_status` already
-/// use). Drives the `O` picker's " - SOLVED"/" - REJECTED" suffixes and what `hide_solved` hides.
+/// A sample's disposition from its sample.csv `status` column; `Sampled` when undecided, including
+/// a row without that column or no row at all.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum SampleTriageStatus {
     Sampled,
@@ -1193,8 +893,7 @@ impl SampleTriageStatus {
         }
     }
 
-    /// Sort order for the `Status` column: untriaged first, since those are the rows the picker
-    /// exists to surface, then the two finished decisions.
+    /// Sort order for the `Status` column: untriaged first.
     fn order(self) -> u8 {
         match self {
             SampleTriageStatus::Sampled => 0,
@@ -1204,15 +903,10 @@ impl SampleTriageStatus {
     }
 }
 
-/// Every sample directory under src/test/data/samples/, as the rows the `O` picker sorts and
-/// filters. Language, repository, commit and path come from the sample's own `source.json`; the
-/// triage status and LOC bucket come from the sample.csv row that joins to - the same join
-/// `action_promote`/`action_reject` use, so it stays correct even if a promoted `diffs/` case was
-/// later renamed or the sample directory has a numbered suffix.
-///
-/// `size` is left at 0 here and filled in by the `O` handler from `App::sample_diff_sizes`: taking
-/// it costs an external `diff` per sample, so it is cached across presses rather than recomputed
-/// on every listing (see `sample_diff_sizes`).
+/// Every sample under src/test/data/samples/ as an `O` picker row: language, repository, commit
+/// and path from its `source.json`, status and LOC bucket from the sample.csv row it joins to (the
+/// join `action_promote`/`action_reject` use). `size` is 0 here; the `O` handler fills it from the
+/// cached `App::sample_diff_sizes`.
 fn list_sample_rows() -> Result<Vec<SampleRow>> {
     let names = list_dir_names(&samples_root())?;
     let meta = sample_metadata()?;
@@ -1247,15 +941,13 @@ fn list_sample_rows() -> Result<Vec<SampleRow>> {
         .collect())
 }
 
-/// Reads just the provenance out of a sample's `source.json`, without parsing its before/after
-/// code (unlike `load_sample`) -- cheap enough to call once per sample when listing.
+/// A sample's `source.json` provenance, without parsing its code (unlike `load_sample`).
 fn source_json_for_sample(name: &str) -> Option<SampleSource> {
     let contents = fs::read_to_string(samples_root().join(name).join("source.json")).ok()?;
     serde_json::from_str(&contents).ok()
 }
 
-/// What the `O` picker reads off a sample.csv row, beyond the (language, repository, commit, path)
-/// it is keyed by.
+/// What the `O` picker reads off a sample.csv row besides its key.
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct SampleMeta {
     status: SampleTriageStatus,
@@ -1268,9 +960,8 @@ fn sample_metadata()
     sample_metadata_at(&sample_csv_path())
 }
 
-/// The triage status and LOC bucket of every row in the sample.csv at `path`, keyed by
-/// (language, repository, commit, path). Returns an empty map, not an error, if `path` doesn't
-/// exist.
+/// Every sample.csv row's status and bucket, keyed by (language, repository, commit, path). Empty,
+/// not an error, if `path` doesn't exist.
 fn sample_metadata_at(
     path: &Path,
 ) -> Result<std::collections::HashMap<(String, String, String, String), SampleMeta>> {
@@ -1298,40 +989,28 @@ fn sample_metadata_at(
         .collect())
 }
 
-/// Provenance recorded by `materialize_test_diffs` alongside each `src/test/data/samples/<name>/`
-/// fixture (`source.json`): the exact `sample.csv` row it came from. Used, when the sample is
-/// promoted, to find and update that row without having to reverse-engineer it from the
-/// (lossy: lowercased, 8-char commit) directory name, and (`dataset`) to know which of
-/// `DIFF_DATASETS` `action_promote` should place the fixture under.
+/// A sample's `source.json`, written by `materialize_test_diffs`: the exact `sample.csv` row it
+/// came from, since the directory name (lowercased, 8-char commit) is lossy.
 #[derive(Debug, Clone, Deserialize)]
 struct SampleSource {
     language: String,
     repository: String,
     commit: String,
     path: String,
-    /// Which research dataset (tiny/small/full) this sample was materialized from - see
-    /// `sample_test_diffs`'s `--dataset`. Defaults to `legacy_dataset()` for a `source.json`
-    /// written before provenance tracking existed, so samples already on disk keep working
-    /// without needing to be regenerated.
+    /// The research dataset (`sample_test_diffs --dataset`) this sample came from.
     #[serde(default = "legacy_dataset")]
     dataset: String,
 }
 
-/// Historical default for provenance that predates this field: every sample materialized before
-/// `dataset` existed really was pulled from the small research checkout (the only one available
-/// on this machine at the time), so this is a real fallback value, not a placeholder. Shared by
-/// `SampleSource::dataset`'s serde default and `ensure_stub_test`'s dataset resolution.
+/// The dataset of a `source.json` without one: such samples really came from the small checkout,
+/// so this is a true value, not a placeholder.
 fn legacy_dataset() -> String {
     "small".to_string()
 }
 
-/// A starting point for `s`'s promote-name prompt: `<language>-<repository>`, lowercased, with the
-/// repository's trailing `.git` stripped - same transformation `materialize_test_diffs.rs`'s own
-/// `base_name` applies to these same two fields, so the prefix a human sees here already matches
-/// the convention every existing promoted name follows. Deliberately just the prefix, not a full
-/// name: the descriptive suffix (what actually changed, e.g. "-add-item") still needs a human's
-/// judgment, and `validate_new_case_name` still rejects this if it collides or is otherwise
-/// invalid, same as before - this only saves retyping the boilerplate part.
+/// The promote-name prompt's pre-fill: `<language>-<repository>`, lowercased, `.git` stripped -
+/// the same prefix `materialize_test_diffs`'s `base_name` builds. The descriptive suffix is left
+/// to the human.
 fn default_promoted_name(source: &SampleSource) -> String {
     let language = source.language.to_lowercase();
     let repository = source
@@ -1379,10 +1058,8 @@ fn load_sample(name: &str) -> Result<(Code, Code, SampleSource)> {
     Ok((before, after, source))
 }
 
-/// Runs the system `diff -u` between `before_src` and `after_src`, as a point of comparison
-/// against codediff's own AST-based diff. Writes both sides to temp files first (rather than
-/// relying on any on-disk path the content may have originally come from) so this always reflects
-/// exactly what's currently loaded, regardless of case origin.
+/// The system `diff -u` of `before_src` against `after_src`, through temp files so it reflects
+/// what is loaded whatever the case's origin.
 fn run_unix_diff(before_src: &[u8], after_src: &[u8]) -> Result<String> {
     let mut before_file =
         tempfile::NamedTempFile::new().context("creating temp file for before content")?;
@@ -1407,17 +1084,14 @@ fn run_unix_diff(before_src: &[u8], after_src: &[u8]) -> Result<String> {
         .context("running unix `diff` (is it installed?)")?;
 
     match output.status.code() {
-        // 0 = identical, 1 = differences found -- both normal outcomes, not errors.
         Some(0) => Ok("(no textual differences)".to_string()),
         Some(1) => Ok(String::from_utf8_lossy(&output.stdout).into_owned()),
         _ => bail!("diff failed: {}", String::from_utf8_lossy(&output.stderr)),
     }
 }
 
-/// Reads the raw `before.<ext>.test`/`after.<ext>.test` contents of a fixture directory, without
-/// parsing an AST -- cheap enough to call once per sample when computing the `O` picker's
-/// text-diff-size sort keys (unlike `load_sample`, which parses both sides via tree-sitter just to
-/// display them). `None` if either file is missing or unreadable.
+/// The raw `before.<ext>.test`/`after.<ext>.test` contents of `dir`, unparsed. `None` if either
+/// is missing or unreadable.
 fn raw_before_after(dir: &Path) -> Option<(String, String)> {
     let mut before = None;
     let mut after = None;
@@ -1440,20 +1114,13 @@ fn raw_before_after(dir: &Path) -> Option<(String, String)> {
     Some((before?, after?))
 }
 
-/// The number of changed (`+`/`-`, excluding the `+++`/`---` header lines) lines in the unified
-/// `diff -u` between a sample's raw before/after content -- the sort key for
-/// `SampleSortOrder::{Smallest,Largest}DiffFirst`. A cheap, language-agnostic proxy for "how big a
-/// change is this" that needs no AST, unlike every other size notion this tool otherwise works
-/// with. `0` (not an error) if the sample's files can't be read or `diff` can't be run, so a
-/// missing/malformed sample just sorts as if it were empty rather than breaking the picker.
+/// A sample's `changed_line_count`, the `O` picker's size sort key; 0 when it can't be measured.
 fn sample_diff_line_count(name: &str) -> usize {
     changed_line_count(&samples_root().join(name)).unwrap_or(0)
 }
 
-/// The changed-line count of the before/after pair in `dir` - `sample_diff_line_count`'s
-/// measure, shared with the `o` picker's `Size` column (`diff_case_size`), which reads a case
-/// directory instead of a sample's. `None` when the pair cannot be read or `diff` cannot run;
-/// the two callers decide what that means for them.
+/// Changed lines in the `diff -u` of the pair in `dir`, the size measure both pickers share. `None`
+/// when the pair can't be read or `diff` can't run.
 fn changed_line_count(dir: &Path) -> Option<usize> {
     let (before, after) = raw_before_after(dir)?;
     let diff = run_unix_diff(before.as_bytes(), after.as_bytes()).ok()?;
@@ -1470,18 +1137,11 @@ fn count_changed_lines(diff: &str) -> usize {
         .count()
 }
 
-/// Which side a unified diff lies entirely on: `After` when it only ever adds lines, `Before` when
-/// it only ever removes them, and `None` when it does both - or neither.
+/// Which side a unified diff lies entirely on: `After` if it only adds lines, `Before` if it only
+/// removes them, `None` for both or neither (headers excluded).
 ///
-/// `f` (`action_match_to_end`) uses this to decide whether a kind mismatch it walks into needs
-/// asking about. In a change that only adds, the before file survives into the after one intact,
-/// so two nodes of different kinds at the same point in a lockstep walk means the *after* tree is
-/// carrying something the before tree has no counterpart for - and the mirror of that for a change
-/// that only removes. Which panel wants the next mark is then already decided by the shape of the
-/// diff, and a modal asking about it is a keystroke spent on a question with one answer.
-///
-/// Header lines are skipped on the same rule [`count_changed_lines`] uses, and for the same reason:
-/// `---`/`+++` start with the characters this is counting and are not changes.
+/// `f` uses this to resolve a kind mismatch without asking: in an add-only change the before file
+/// survives intact, so the mismatching node must be an insertion on the after side (and mirrored).
 fn one_sided_diff(diff: &str) -> Option<Side> {
     let mut adds = false;
     let mut removes = false;
@@ -1498,20 +1158,16 @@ fn one_sided_diff(diff: &str) -> Option<Side> {
     match (adds, removes) {
         (true, false) => Some(Side::After),
         (false, true) => Some(Side::Before),
-        // Both, or a pair that does not differ at all: nothing here to infer a side from.
         _ => None,
     }
 }
 
-/// Changed lines in `name`'s unified diff, for the `o` picker's `Size` column - `None` for a
-/// case whose directory or files cannot be read, carried through to the picker as `?` rather
-/// than as an empty diff, the same fail-open rule every other column keeps.
+/// Changed lines in `name`'s unified diff (the `Size` column); `None`, shown as `?`, when unreadable.
 fn diff_case_size(name: &str) -> Option<usize> {
     changed_line_count(&diffs_case_dir(name)?)
 }
 
-/// Builds `App::diff_sizes` for the whole corpus, for the `o` picker's `Size` column: one
-/// external `diff` per case, in parallel like the other scans, a few seconds over the corpus.
+/// Builds `App::diff_sizes` (the `Size` column) for the whole corpus.
 fn compute_diff_sizes() -> std::collections::HashMap<String, usize> {
     let Ok(names) = list_available_case_names() else {
         return std::collections::HashMap::new();
@@ -1519,16 +1175,10 @@ fn compute_diff_sizes() -> std::collections::HashMap<String, usize> {
     scan_corpus(&names, diff_case_size)
 }
 
-/// One column of the `o` picker's table, left to right - the unit `h`/`l` move the cursor
-/// between, and the thing both `s` (sort) and `f` (filter) act on. Every column supports both, so
-/// there is one pair of keys to remember rather than one letter per dimension, and a new column
-/// costs no new keys.
+/// One column of the `o` picker's table; `h`/`l` move between them, `s`/`f` act on the current one.
 ///
-/// `Cmpl` and `Unmarked` are two readings of one number (`App::diff_unmarked`): a yes/no glyph for
-/// glancing down the column, and the count itself for ranking how much annotation a fixture still
-/// needs. Their filters therefore select exactly the same rows by construction - kept as two
-/// columns anyway because their *sorts* differ in the way that matters when triaging: `Cmpl`
-/// splits the corpus in two, `Unmarked` orders it.
+/// `Cmpl` and `Unmarked` read one number (`App::diff_unmarked`) and filter identically; both exist
+/// because `Cmpl` sorts the corpus into two halves while `Unmarked` orders it by work left.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 enum DiffColumn {
     #[default]
@@ -1539,16 +1189,12 @@ enum DiffColumn {
     Paint,
     Disagree,
     Invariant,
-    /// Changed lines in the unified `diff` of the case's before/after files - the same measure,
-    /// taken the same way, as the `O` picker's `Size` (`sample_diff_line_count`), so the two
-    /// pickers rank a change by one number. Added 2026-09-20 so a session can start from the
-    /// smallest unsolved diffs, or hunt the largest.
+    /// Changed lines of the case's `diff -u`, the same measure as the `O` picker's `Size`.
     Size,
 }
 
 impl DiffColumn {
-    /// Left-to-right order, shared by the header row, the cursor movement below, and the width
-    /// list in `render_open_diff_picker` - so a column can only ever be added in one place.
+    /// Left-to-right order, shared by the header, cursor movement and `render_open_diff_picker`.
     const ALL: [DiffColumn; 8] = [
         DiffColumn::Name,
         DiffColumn::Dataset,
@@ -1567,8 +1213,8 @@ impl DiffColumn {
             .unwrap_or(0)
     }
 
-    /// Clamped at both ends rather than wrapping: the header row highlights the cursor column, so
-    /// a press that jumps from one edge of the table to the other reads as a glitch, not a move.
+    /// Clamped rather than wrapping: a jump from one edge of the header to the other reads as a
+    /// glitch.
     fn left(self) -> Self {
         DiffColumn::ALL[self.index().saturating_sub(1)]
     }
@@ -1590,8 +1236,7 @@ impl DiffColumn {
         }
     }
 
-    /// What `f` on this column reads as, per `FlagFilter` state - `None` for the two columns
-    /// (`Name`, `Dataset`) that carry their own filter shape instead of a yes/no one.
+    /// The (`Yes`, `No`) labels of this column's `FlagFilter`; `None` for `Name` and `Dataset`.
     fn flag_labels(self) -> Option<(&'static str, &'static str)> {
         match self {
             DiffColumn::Cmpl => Some(("incomplete only", "complete only")),
@@ -1599,24 +1244,17 @@ impl DiffColumn {
             DiffColumn::Paint => Some(("painted only", "unpainted only")),
             DiffColumn::Disagree => Some(("disagreements only", "agreeing only")),
             DiffColumn::Invariant => Some(("breaks invariants", "invariants hold")),
-            // The same yes/no the `O` picker's `Size` has: a case whose two sides differ by no
-            // line at all is a broken fixture, and this is how to find the ones to delete.
+            // An empty diff is a broken fixture; "No" finds them.
             DiffColumn::Size => Some(("has changed lines", "empty diffs only")),
             DiffColumn::Name | DiffColumn::Dataset => None,
         }
     }
 }
 
-/// The `f` state of one yes/no column: off, or narrowed to the rows where the column's condition
-/// does (`Yes`) or does not (`No`) hold. Cycles `Off -> Yes -> No -> Off`.
+/// The `f` state of one yes/no column. Cycles `Off -> Yes -> No -> Off`.
 ///
-/// **A row whose value is unknown survives either direction.** Every one of these columns is
-/// backed by a corpus-wide scan that is only run on demand (see `App::diff_unmarked` and
-/// friends), and a fixture the scan couldn't load reads as unknown too - so "unknown" covers both
-/// "not measured yet" and "failed to measure", and neither is evidence the row should be dropped.
-/// The picker's whole job is surfacing fixtures that need attention; silently hiding the ones it
-/// could not measure would hide exactly the wrong rows. One rule for every column, reading the
-/// same in both directions, rather than a separately-argued fail-open per filter.
+/// A row whose value is unknown survives either direction: unknown means "not scanned yet" or
+/// "failed to load", and the picker exists to surface fixtures that need attention.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 enum FlagFilter {
     #[default]
@@ -1644,17 +1282,13 @@ impl FlagFilter {
     }
 }
 
-/// Every column's filter at once. They combine as an AND: a row is shown only if it passes all of
-/// them, so narrowing on two columns asks for rows matching both ("still has unmarked nodes AND
-/// disagrees with its own painting"), never either.
+/// Every column's filter; a row shows only if it passes all of them.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 struct DiffFilters {
-    /// Case-insensitive substring of the case name, stored already lowercased (`f` on `Name`
-    /// prompts for it - see `Modal::OpenDiffPicker::name_input`). `None` when off; the prompt
-    /// never stores an empty string, since that would filter nothing while still reading as on.
+    /// Case-insensitive name substring, stored lowercased. Never `Some("")`, which would read as
+    /// on while filtering nothing.
     name: Option<String>,
-    /// Which of `DIFF_DATASETS` to show, cycled through by `f` on `Dataset` and wrapping back to
-    /// `None` ("all").
+    /// Which of `DIFF_DATASETS` to show; `None` is all.
     dataset: Option<&'static str>,
     cmpl: FlagFilter,
     unmarked: FlagFilter,
@@ -1697,8 +1331,7 @@ impl DiffFilters {
         }
     }
 
-    /// One human-readable clause per active filter, for the picker's title bar - empty when
-    /// nothing is filtered.
+    /// One clause per active filter, for the picker's title bar.
     fn labels(&self) -> Vec<String> {
         let mut labels = Vec::new();
         if let Some(name) = &self.name {
@@ -1708,10 +1341,8 @@ impl DiffFilters {
             labels.push(dataset.to_string());
         }
         for column in DiffColumn::ALL {
-            // `Cmpl` and `Unmarked` are one predicate read two ways, so setting both to the same
-            // direction narrows nothing further - listing it twice would read as a compound
-            // constraint that isn't one. The `Cmpl` wording wins; opposite directions are a real
-            // (if empty) compound query and are both shown.
+            // `Cmpl` and `Unmarked` are one predicate: the same direction on both is shown once
+            // (as `Cmpl`), opposite directions are a real, if empty, query and show both.
             if column == DiffColumn::Unmarked && self.unmarked == self.cmpl {
                 continue;
             }
@@ -1727,11 +1358,8 @@ impl DiffFilters {
     }
 }
 
-/// Which single column the `o` picker's rows are ordered by, and in which direction - `s` on the
-/// cursor column takes over the sort (ascending), and `s` again on the column that already owns it
-/// flips the direction. Deliberately one column, not a stack: the user asked for the last column
-/// selected to be the one that sorts, and a hidden secondary key would make two identical-looking
-/// tables order differently.
+/// The single column the `o` picker sorts by, and its direction. One column, not a stack: a hidden
+/// secondary key would make two identical-looking tables order differently.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct DiffSort {
     column: DiffColumn,
@@ -1767,24 +1395,17 @@ impl DiffSort {
     }
 }
 
-/// The `o` picker's whole cursor/sort/filter state, carried on `Modal::OpenDiffPicker` and
-/// persisted on `App::diff_view` so it survives closing and reopening the picker - the same
-/// contract the five separate `diff_*` fields this replaces each had on their own.
+/// The `o` picker's cursor/sort/filter state, persisted on `App::diff_view` across reopenings.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 struct DiffPickerView {
-    /// The column `h`/`l` last moved to: what `s` and `f` act on, and the one highlighted in the
-    /// header row.
+    /// The cursor column: what `s` and `f` act on.
     column: DiffColumn,
     sort: DiffSort,
     filters: DiffFilters,
 }
 
-/// The three corpus-wide scans the `o` picker's columns read, borrowed rather than owned - `None`
-/// for a scan not run yet this session (see `App::diff_unmarked`/`diff_text_painted`/
-/// `diff_disagreement` for the lazy-once contract, and `FlagFilter::keeps` for why a `None` here
-/// hides nothing). Bundled into one struct because filtering, sorting and rendering all need the
-/// same three maps, and threading them as six positional arguments through four functions is how
-/// the previous shape of this picker ended up at ten.
+/// The corpus scans the `o` picker's columns read, borrowed; `None` for a scan not run yet. Each
+/// `*_of` accessor returns `None` for "not known", whether unscanned or absent from the scan.
 #[derive(Clone, Copy, Default)]
 struct DiffPickerData<'a> {
     unmarked: Option<&'a HashMap<String, usize>>,
@@ -1805,8 +1426,6 @@ impl<'a> DiffPickerData<'a> {
         }
     }
 
-    /// Changed lines in `name`'s unified diff - `None` before the scan has run and for a case
-    /// whose files could not be read, the same "not known" every other column draws.
     fn size_of(&self, name: &str) -> Option<usize> {
         self.sizes.and_then(|map| map.get(name)).copied()
     }
@@ -1819,47 +1438,29 @@ impl<'a> DiffPickerData<'a> {
         self.text_painted.and_then(|map| map.get(name)).copied()
     }
 
-    /// `None` both when the disagreement scan hasn't run and when it ran but the case has no text
-    /// painting to compare against at all - the two are the same "not known" for this picker's
-    /// purposes, and `compute_diff_disagreement` already leaves the latter out of its map.
     fn disagreement_of(&self, name: &str) -> Option<usize> {
         self.disagreement.and_then(|map| map.get(name)).copied()
     }
 
-    /// How many of its own ground-truth invariants `name`'s human mapping breaks - 0 for a
-    /// mapping that holds, `None` both before the scan has run and for a case with no mapping to
-    /// check, the same "not known" `disagreement_of` draws.
     fn invariants_of(&self, name: &str) -> Option<usize> {
         self.invariants.and_then(|map| map.get(name)).copied()
     }
 }
 
-/// One row of the `O` picker's table: a materialized sample under `src/test/data/samples/`, with
-/// everything the picker can order or narrow on. `language`/`bucket` come from the sample.csv row
-/// the sample's `source.json` joins to; `size` is its `sample_diff_line_count` (cached on
-/// `App::sample_diff_sizes`, since taking it costs an external `diff` per sample).
+/// One row of the `O` picker's table; `size` is its `sample_diff_line_count`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct SampleRow {
     pub(crate) name: String,
     pub(crate) language: String,
-    /// The LOC stratum this sample was drawn for, or `None` for a row sampled before bucket
-    /// tracking existed or without `--stratified` (see `sample_test_diffs::Row::size_bucket`).
-    /// Rendered as `?`, and never hidden by the bucket filter - the same fail-open rule
-    /// `FlagFilter::keeps` applies to an unknown yes/no reading, for the same reason: "not
-    /// recorded" is not evidence the row should be dropped.
+    /// The LOC stratum this sample was drawn for; `None` when not recorded, which the bucket
+    /// filter never hides (the `FlagFilter::keeps` rule).
     pub(crate) bucket: Option<String>,
     pub(crate) status: SampleTriageStatus,
     pub(crate) size: usize,
 }
 
-/// One column of the `O` picker's table, left to right - the unit `h`/`l` move the cursor between,
-/// and the thing both `s` (sort) and `f` (filter) act on, exactly as in the `o` picker.
-///
-/// Deliberately its own type rather than a generic column shared with `DiffColumn`: the two
-/// pickers have only two column *shapes* in common (a typed substring and a cycle through a fixed
-/// list) and differ on every other one, so a trait spanning both would have to be read twice to
-/// understand either. The keys, the header conventions and the AND-ing of filters are what the two
-/// share, and those are a matter of behaviour rather than of types.
+/// One column of the `O` picker's table, driven by the same keys as `DiffColumn`. Not shared with
+/// it: the two pickers have too few column shapes in common for a common type to read well.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 enum SampleColumn {
     #[default]
@@ -1871,8 +1472,7 @@ enum SampleColumn {
 }
 
 impl SampleColumn {
-    /// Left-to-right order, shared by the header row, the cursor movement below and the width list
-    /// in `render_open_sample_picker` - so a column can only ever be added in one place.
+    /// Left-to-right order, shared by the header, cursor movement and `render_open_sample_picker`.
     const ALL: [SampleColumn; 5] = [
         SampleColumn::Name,
         SampleColumn::Lang,
@@ -1888,8 +1488,7 @@ impl SampleColumn {
             .unwrap_or(0)
     }
 
-    /// Clamped at both ends rather than wrapping, same as `DiffColumn::left`/`right`: the header
-    /// highlights the cursor column, so jumping from one edge to the other reads as a glitch.
+    /// Clamped rather than wrapping, as `DiffColumn::left`.
     fn left(self) -> Self {
         SampleColumn::ALL[self.index().saturating_sub(1)]
     }
@@ -1909,13 +1508,9 @@ impl SampleColumn {
     }
 }
 
-/// Sort key for a LOC-bucket label: its lower bound, parsed back out of the label itself
-/// ("30-100" -> 30, "3000+" -> 3000). Ordering by the label as a string would put "100-300" before
-/// "30-100", which is exactly backwards for the one column whose whole purpose is size.
-///
-/// Parsed rather than shared with `stats::sampling::LOC_BUCKETS`, because that lives behind the
-/// `stats` feature and human_solver builds with only `test-fixtures`. An unbucketed row sorts last
-/// under either direction's ascending pass, which is where "not recorded" belongs.
+/// Sort key for a LOC-bucket label: its lower bound ("30-100" -> 30, "3000+" -> 3000), since string
+/// order puts "100-300" before "30-100". `None` sorts last. Parsed from the label because
+/// `stats::sampling::LOC_BUCKETS` is behind the `stats` feature.
 fn bucket_order(bucket: Option<&str>) -> usize {
     let Some(bucket) = bucket else {
         return usize::MAX;
@@ -1927,24 +1522,17 @@ fn bucket_order(bucket: Option<&str>) -> usize {
         .unwrap_or(usize::MAX)
 }
 
-/// Every column's filter at once, AND-ed together exactly like `DiffFilters`: a row shows only if
-/// it passes all of them, so narrowing on two columns asks for rows matching both ("Go samples in
-/// the 1000-3000 stratum"), never either.
+/// Every column's filter; a row shows only if it passes all of them.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 struct SampleFilters {
-    /// Case-insensitive substring of the sample name, stored already lowercased. `None` when off.
+    /// Case-insensitive name substring, stored lowercased.
     name: Option<String>,
-    /// An exact language, cycled through the languages actually present in the list rather than
-    /// through `Language`'s full set - offering a language no sample has would be a filter that
-    /// can only produce an empty table.
+    /// An exact language, cycled through those present in the list.
     language: Option<String>,
-    /// An exact bucket label, cycled through the buckets present, `None` for "all". An unbucketed
-    /// row is never hidden by this - see `SampleRow::bucket`.
+    /// An exact bucket label, cycled through those present. Never hides an unbucketed row.
     bucket: Option<String>,
     status: Option<SampleTriageStatus>,
-    /// Yes/no on "this sample's diff has any changed lines at all". Not a filter invented to give
-    /// the column something to do: a sample whose before and after differ by nothing is a broken
-    /// draw, and this is how you find the ones worth deleting rather than triaging.
+    /// Whether the diff has any changed lines; an empty one is a broken draw to delete.
     size: FlagFilter,
 }
 
@@ -1965,8 +1553,7 @@ impl SampleFilters {
             .any(|column| self.is_active(*column))
     }
 
-    /// The filters in force, spelled out for the picker's title bar. Empty when nothing is
-    /// filtered, so the caller can leave the title alone.
+    /// The filters in force, for the picker's title bar; empty when none.
     fn describe(&self) -> String {
         let mut parts = Vec::new();
         if let Some(name) = &self.name {
@@ -2000,7 +1587,6 @@ impl SampleFilters {
         {
             return false;
         }
-        // Fail open on an unbucketed row - see `SampleRow::bucket`.
         if let Some(bucket) = &self.bucket
             && row.bucket.as_deref().is_some_and(|b| b != bucket)
         {
@@ -2015,8 +1601,7 @@ impl SampleFilters {
     }
 }
 
-/// Which single column the `O` picker's rows are ordered by, and in which direction - the same
-/// one-column, no-hidden-secondary-key contract as `DiffSort`.
+/// The single column the `O` picker sorts by, as `DiffSort`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 struct SampleSort {
     column: SampleColumn,
@@ -2036,8 +1621,7 @@ impl SampleSort {
     }
 }
 
-/// The `O` picker's whole cursor/sort/filter state, carried on `Modal::OpenSamplePicker` and
-/// persisted on `App::sample_view` so it survives closing and reopening.
+/// The `O` picker's cursor/sort/filter state, persisted on `App::sample_view` across reopenings.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 struct SamplePickerView {
     column: SampleColumn,
@@ -2045,9 +1629,7 @@ struct SamplePickerView {
     filters: SampleFilters,
 }
 
-/// The distinct values of one column across the whole list, in the order that column sorts, for
-/// `f` to cycle through. Built from the rows rather than from a static list so the cycle can only
-/// ever offer a value some row actually has.
+/// The distinct values present in a column, in its sort order, for `f` to cycle through.
 fn sample_language_values(rows: &[SampleRow]) -> Vec<String> {
     let mut values: Vec<String> = rows.iter().map(|row| row.language.clone()).collect();
     values.sort();
@@ -2080,13 +1662,8 @@ fn next_status_filter(current: Option<SampleTriageStatus>) -> Option<SampleTriag
     }
 }
 
-/// The rows actually shown in the `O` picker: `rows` narrowed by every active filter, then ordered
-/// by the sorted column. Shared by the renderer and the key handler so both agree on what index
-/// `selected` refers to by construction, rather than keeping two copies of this in sync by hand.
-///
-/// Every sort falls back to the name as a tiebreak, so rows that tie on the sorted column (all of
-/// them, for a column like `Bucket` with seven distinct values) keep a stable, readable order
-/// instead of shuffling between frames.
+/// The rows the `O` picker shows: filtered, then sorted with the name as tiebreak. Shared by the
+/// renderer and the key handler so both agree on what `selected` indexes.
 fn visible_sample_rows(rows: &[SampleRow], view: &SamplePickerView) -> Vec<SampleRow> {
     let mut visible: Vec<SampleRow> = rows
         .iter()
@@ -2119,14 +1696,8 @@ fn visible_sample_rows(rows: &[SampleRow], view: &SamplePickerView) -> Vec<Sampl
     visible
 }
 
-/// Builds the `O` picker's modal from a freshly-listed `rows`, `current_name` (the case already
-/// open, so it starts selected if it is a sample too) and the persisted `view`. A pure function,
-/// separate from the `KeyCode::Char('O')` handler that calls it, specifically so the part with
-/// real logic to get wrong is unit-testable without needing real files under
-/// `src/test/data/samples/`.
-///
-/// `selected` is computed against `visible_sample_rows`'s output, not raw `rows`: once a filter or
-/// a non-default sort is in force, a raw-`rows` position would point at the wrong row.
+/// Builds the `O` picker's modal with `current_name` selected if visible. `selected` indexes
+/// `visible_sample_rows`, not `rows`.
 fn open_sample_picker_modal(
     rows: Vec<SampleRow>,
     current_name: &str,
@@ -2148,18 +1719,13 @@ fn open_sample_picker_modal(
 
 // ---------------------------------------------------------------------------------------------
 
-/// The first 8 characters of a full commit hash, for compact display - `git`'s own default abbrev
-/// length. `hash` is always a full 40-character SHA here (from `list_repo_commits`'s `%H`), so this
-/// never actually needs the `.min()` clamp in practice; it's there so a shorter input can't panic.
+/// The first 8 characters of a commit hash, for display.
 fn short_hash(hash: &str) -> &str {
     &hash[..hash.len().min(8)]
 }
 
-/// Every commit in this repository's own history (not a research repo - see `diffs_root`'s
-/// sibling `samples_root`, which is what `O` reads from instead), newest first, as
-/// `(full hash, subject line)` - the `C` picker's options. Uses `\x1f` (unit separator) rather
-/// than a visible character to split the two `git log` fields, since a commit subject can contain
-/// almost anything else.
+/// Every commit in this repository's history, newest first, as `(full hash, subject)`. Split on
+/// `\x1f`, since a subject can contain almost anything else.
 fn list_repo_commits() -> Result<Vec<(String, String)>> {
     let output = std::process::Command::new("git")
         .arg("-C")
@@ -2182,16 +1748,8 @@ fn list_repo_commits() -> Result<Vec<(String, String)>> {
         .collect())
 }
 
-/// Paths changed by commit `hash`, narrowed to ones `to_treesitter` can actually parse - picking
-/// an unsupported one (e.g. a `.md` or `.toml` file, both of which `language_for_path` happily
-/// recognizes but codediff has no grammar for) would just fail at open time with a less helpful
-/// error, so it's left out of the list entirely instead. Doesn't pass `-M` (rename detection) to
-/// `git diff-tree`: a renamed-with-edits file already shows as one path here (git's default), and
-/// a pure rename with no edits showing up as a delete+add pair is an acceptable rough edge for
-/// this picker rather than something worth chasing. Also empty (not an error) for a merge commit:
-/// `git diff-tree` shows no diff for one by default (needs `-m`/`-c`, neither passed here) - the
-/// `C` picker's Enter handler folds this into the same "nothing to pick" message as a genuinely
-/// empty/unsupported-only commit, which is close enough not to be worth telling apart.
+/// Paths changed by commit `hash` that have a tree-sitter grammar. Empty for a merge commit, since
+/// `diff-tree` shows none without `-m`/`-c`.
 fn list_commit_files(hash: &str) -> Result<Vec<String>> {
     let output = std::process::Command::new("git")
         .arg("-C")
@@ -2214,13 +1772,9 @@ fn list_commit_files(hash: &str) -> Result<Vec<String>> {
         .collect())
 }
 
-/// The content of `rev_path` (e.g. `"<hash>:<path>"` or `"<hash>^:<path>"`) via the system
-/// `git show`, in this repository. Empty, not an error, when `git show` exits non-zero: the one
-/// path that matters here is a file that genuinely doesn't exist at that revision (added by the
-/// commit being diffed, so it has no "before"; deleted by it, so it has no "after"; or the commit
-/// being a root commit, so `<hash>^` doesn't resolve at all) - all three are valid, expected empty
-/// sides, exactly like a missing side already means for `load_sample`/`load_case`. A `git` that
-/// can't even run is still a real error, surfaced via `.context` on `.output()` below.
+/// The content of `rev_path` (e.g. `"<hash>^:<path>"`) via `git show`. Empty, not an error, when
+/// `git show` fails: the file is absent at that revision (added, deleted, or a root commit's
+/// parent). Only a `git` that can't run is an error.
 fn git_show(rev_path: &str) -> Result<String> {
     let output = std::process::Command::new("git")
         .arg("-C")
@@ -2236,16 +1790,8 @@ fn git_show(rev_path: &str) -> Result<String> {
     }
 }
 
-/// Loads the before/after content for `path` as changed by commit `hash`, read straight out of
-/// git (`git_show`) rather than from any on-disk fixture - before is `path` at `hash^`, after is
-/// `path` at `hash` itself. Mirrors `load_sample`'s AST checks: bails with a clear message if
-/// either side's language has no AST (unsupported or undetected).
-///
-/// Unlike `load_case`, which opens such a pair in text-only mode (see `FrameState::before_root`):
-/// a case under `diffs/` is one somebody deliberately added to the corpus and wants to paint,
-/// while these two are *browsing* paths - picking an arbitrary commit or sample only to find it
-/// has no tree is a mis-pick to report, not a mode to enter. Relaxing them is a small change if
-/// that turns out to be wrong; nothing below assumes the tree is there.
+/// `path` at `hash^` and at `hash`, read from git. Bails if either side has no AST: unlike
+/// `load_case`'s text-only mode, a browsing path that picks a file with no tree is a mis-pick.
 fn load_git_commit_file(hash: &str, path: &str) -> Result<(Code, Code)> {
     let language = language_for_path(Path::new(path)).unwrap_or(Language::Unknown);
 
@@ -2277,12 +1823,8 @@ fn load_git_commit_file(hash: &str, path: &str) -> Result<(Code, Code)> {
     Ok((before, after))
 }
 
-/// A starting point for `s`'s promote-name prompt when the current case came from `C` rather than
-/// a sample: just `<language>-` (e.g. "rust-"), lowercased - unlike `default_promoted_name`,
-/// there's no second repository name to prefix with, since the source *is* this repository.
-/// Empty (no dash at all) if `path`'s language can't be determined, which in practice can't
-/// happen for a case that actually made it here: `load_git_commit_file` already requires a
-/// language with a working `to_treesitter` mapping before this case can be opened at all.
+/// The promote-name pre-fill for a `C` case: `<language>-` lowercased (no repository, since it is
+/// this one); empty for an unknown language.
 fn default_promoted_name_for_path(path: &str) -> String {
     match language_for_path(Path::new(path)) {
         Some(language) => format!("{}-", language.to_string().to_lowercase()),
@@ -2290,18 +1832,13 @@ fn default_promoted_name_for_path(path: &str) -> String {
     }
 }
 
-/// Which of `DIFF_DATASETS` `s`'s promote prompt (`Modal::PromptPromoteName`) would write the
-/// current case into - shared by that prompt's own display text and `action_promote`'s actual
-/// destination, so the two can never say something different - a prompt naming a fixed folder
-/// regardless of `source.dataset` is the failure this shape rules out. `None` for
-/// `CaseOrigin::Diffs`, which never raises this prompt at all (it saves directly via
-/// `action_save`) - kept in the match anyway so a fourth origin can't silently fall through here.
+/// The `DIFF_DATASETS` folder promotion writes the current case into, shared by the prompt's text
+/// and `action_promote` so they cannot disagree. `None` for `CaseOrigin::Diffs`, which saves in place.
 fn promote_target_dataset(origin: &CaseOrigin) -> Option<&str> {
     match origin {
         CaseOrigin::Diffs => None,
         CaseOrigin::Sample(source) => Some(source.dataset.as_str()),
-        // Always handmade: a case built by hand from this repo's own commits *is* what the
-        // handmade dataset is for, unlike a sample, which carries its own recorded provenance.
+        // This repository's own commits are the handmade dataset's source.
         CaseOrigin::GitCommitFile { .. } => Some("handmade"),
     }
 }
@@ -2309,17 +1846,11 @@ fn promote_target_dataset(origin: &CaseOrigin) -> Option<&str> {
 fn main() -> Result<()> {
     let args = Args::parse();
 
-    // Read the theme the `codediff` binary is configured with, from the same `.codediff.toml`, so
-    // the two tools paint a diff identically. `set_custom_palette` first, because `OverlayTheme::
-    // Custom` resolves its colours from that process-global rather than from the enum - installing
-    // the theme without it would leave a custom theme rendering as Dracula.
+    // The same theme as the `codediff` binary. `set_custom_palette` must come first:
+    // `OverlayTheme::Custom` resolves its colours from that process-global.
     theme::set_custom_palette(theme::load_custom_palette());
     let _ = OVERLAY_THEME.set(theme::load_overlay_theme());
 
-    // A case always has to be loaded (the app is not built to sit there with none), so when no
-    // name is given on the command line, fall back to the first available one - press `o` to open
-    // a different one. Any case will do: one whose language has no grammar opens in text-only
-    // mode rather than failing (see `load_case`).
     let name = match args.name {
         Some(name) => name,
         None => list_available_cases()?

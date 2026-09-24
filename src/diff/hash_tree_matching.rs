@@ -22,29 +22,18 @@ use crate::code::{ASTMetadata, Code};
 use crate::diff::nodes::is_reference;
 use crate::diff::{ASTDiff, ASTMapping, ASTMappingOperation, ASTMappingReason, NodeCache};
 
-/// Configuration for selecting which nodes to consider for hash-based matching.
-///
-/// Nodes are included if they are either:
-/// - Reference nodes (language-specific structural elements like functions, classes)
-/// - OR meet the minimum depth and subtree size thresholds
-///
-/// This allows the hash matching passes to also consider large, deep subtrees
-/// that aren't formally "reference nodes" but are still worth matching.
+/// Which nodes are hash-matching candidates: reference nodes, plus any node meeting both
+/// thresholds.
 #[derive(Debug, Clone)]
 pub struct NodeSelectionConfig {
-    /// Minimum tree depth for a non-reference node to be included
     pub min_depth: usize,
-    /// Minimum number of nodes in the subtree for a non-reference node to be included
     pub min_subtree_size: usize,
 }
 
 impl Default for NodeSelectionConfig {
     fn default() -> Self {
         Self {
-            // Tuned against the benchmark suite: 0/45 was found to provide optimal results.
-            // With solve_hash_descent's KindAndValueHash pass using extended selection and its
-            // KindOnlyHash pass using only reference nodes, this gives: 1437 -> 771 (666 fewer
-            // mismatches). This is the best configuration found after testing various thresholds.
+            // Tuned against the benchmark corpus.
             min_depth: 0,
             min_subtree_size: 45,
         }
@@ -52,25 +41,19 @@ impl Default for NodeSelectionConfig {
 }
 
 impl NodeSelectionConfig {
-    /// Create a node list selector function that can be passed to `solve_with_hash_map`.
-    ///
-    /// The selector includes reference nodes plus any nodes that meet the depth/size thresholds,
-    /// sorted by subtree size (largest first) and then by start byte for deterministic ordering.
+    /// [`build_extended_node_list`] as a selector for `solve_with_hash_map`.
     pub fn to_node_list_selector(&self) -> impl Fn(&ASTMetadata) -> Vec<usize> + '_ {
         move |metadata: &ASTMetadata| build_extended_node_list(metadata, self)
     }
 }
 
-/// Build an extended node list that includes reference nodes plus nodes meeting size thresholds.
-///
-/// Returns nodes sorted by subtree size (largest first), with ties broken by start_byte
-/// for deterministic ordering across runs.
+/// The candidates `config` selects, largest subtree first, ties by start byte.
 pub fn build_extended_node_list(
     metadata: &ASTMetadata,
     config: &NodeSelectionConfig,
 ) -> Vec<usize> {
     let language = metadata.language;
-    let mut nodes_with_info: Vec<(usize, usize, usize)> = Vec::new(); // (node_id, subtree_size, start_byte)
+    let mut nodes_with_info: Vec<(usize, usize, usize)> = Vec::new(); // (id, size, start_byte)
 
     for (&node_id, info) in &metadata.node_info {
         let subtree_size = metadata
@@ -81,9 +64,8 @@ pub fn build_extended_node_list(
         let depth = metadata.node_to_depth.get(&node_id).copied().unwrap_or(0);
         let start_byte = info.start_byte;
 
-        // `is_named`: see `ASTNodeMetadata::is_named` - a keyword token sharing its statement's
-        // kind string (Kotlin `import`) otherwise becomes a hash-matching candidate of its own and
-        // pairs with an arbitrary same-keyword token elsewhere in the file.
+        // A keyword token can share its statement's kind string (Kotlin `import`); unnamed, it
+        // would pair with an arbitrary same keyword elsewhere.
         let is_reference_node = info.is_named && is_reference(&info.kind, &language);
         let is_big_enough = depth >= config.min_depth && subtree_size >= config.min_subtree_size;
 
@@ -92,10 +74,7 @@ pub fn build_extended_node_list(
         }
     }
 
-    // Sort by subtree size descending, then by start_byte ascending for deterministic tiebreaking.
-    // Using start_byte (document position) rather than node_id ensures stability across
-    // separate parses of identical source, since node_ids are tree-sitter arena slots that
-    // may differ between parses even for identical code.
+    // Ties by start byte, not node id: ids are arena slots that differ between parses.
     nodes_with_info.sort_by(|a, b| b.1.cmp(&a.1).then(a.2.cmp(&b.2)));
     nodes_with_info
         .into_iter()
@@ -104,24 +83,11 @@ pub fn build_extended_node_list(
 }
 
 /**
-* Seven-phase pipeline rework (`TODO.md`, 2026-07-17): the generalized, reusable version of
-* [`solve_with_hash_map`] phase 1 is built around. The old `HashMatchSpec` reads a *named* field
-* off `ASTMetadata` via a function pointer (`|m| &m.node_to_full_hash`) - baking in "there is one
-* fixed hash per purpose" and requiring a new `HashMatchSpec` variant (plus `ASTMappingReason`
-* wiring) for every new hash algorithm. This version takes the before-side hash map and the
-* after-side reverse map directly as parameters instead: the caller computes whichever hash
-* algorithm it wants (`KindAndValueHash`, `KindOnlyHash`, a normalized-import-path hash, ...)
-* before calling in, so this function never needs to know how many hash algorithms exist.
-*
-* Classification (`Identical` vs `Update`) no longer needs a `classify` function pointer either:
-* regardless of which hash matched the pair, whether the match is byte-identical is answered by
-* comparing `node_to_kind_and_value_hash` directly (always available - it's the finest-grained
-* hash in the new pipeline) rather than threading a second, matcher-specific hash through the
-* caller.
+* Matches each selected, still-unmatched before node to the nearest unmatched after node with the
+* same value in the caller's hash, then maps both subtrees in lockstep. The caller picks the hash;
+* whether a pair is identical is always decided by `node_to_kind_and_value_hash`.
 */
-// Each parameter is genuinely distinct context (both sides' `Code`, the node cache, the two hash
-// maps, the diff, the node-list selector closure) - a params struct here would just relocate the
-// same fields, not reduce them.
+// Every parameter is distinct context; a params struct would only relocate them.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn solve_with_hash_map(
     before: &Code,
@@ -143,20 +109,9 @@ pub(crate) fn solve_with_hash_map(
         if before_kv.is_some() && before_kv == after_kv {
             return (ASTMappingOperation::Identical, 0);
         }
-        // Same leaf-vs-interior distinction as the canonical rule in
-        // `apted::common::classify_match`: `Update` means a *leaf's own value* changed; an
-        // interior node whose `kind_and_value_hash` differs only because some descendant differs
-        // (not necessarily this node's own text) is `MatchButNotIdentical` instead - cost 0 here,
-        // matching `classify_match`'s own convention, since the children responsible for the
-        // actual difference get their own separate classify() call (and their own cost) via this
-        // same recursive descent, so charging COST_UPDATE again at every ancestor would double-
-        // count it.
-        //
-        // The distinction is not cosmetic: a single renamed identifier deep inside several
-        // declarations bubbles its hash mismatch up to every ancestor (`const_declaration`,
-        // `var_declaration`, `method_declaration`, ...), so labelling all of them `Update` turns
-        // one renamed leaf into a mismatch at every level above it - an operation-label error
-        // rather than a matching one, since the paths still agree.
+        // As in `apted::common::classify_match`, `Update` is a leaf's own value. An interior node
+        // differs only through descendants that carry their own cost; labelling it `Update` would
+        // turn one renamed leaf into a mismatch at every ancestor.
         if before_metadata.is_leaf(before_id) && after_metadata.is_leaf(after_id) {
             (ASTMappingOperation::Update, crate::diff::COST_UPDATE)
         } else if before_metadata
@@ -168,10 +123,7 @@ pub(crate) fn solve_with_hash_map(
                 .get(&after_id)
                 .map(|info| info.owned_text_hash)
         {
-            // An interior node whose *own* gap text differs (an XML attribute value, a YAML quoted
-            // scalar - see `ASTNodeMetadata::owned_text_hash`): no descendant entry carries that
-            // difference, so the recorded cost must, mirroring `UnitCostModel::ren` and
-            // `operation_cost`.
+            // Its own gap text differs, which no descendant entry carries (see `operation_cost`).
             (
                 ASTMappingOperation::MatchButNotIdentical,
                 crate::diff::COST_UPDATE,
@@ -197,8 +149,7 @@ pub(crate) fn solve_with_hash_map(
             continue;
         };
 
-        // Same tiebreak rationale as `solve_with_hash_map`: proximity in the file, not discovery
-        // order, is what tells true duplicates apart from unrelated hash collisions.
+        // Proximity in the file, not discovery order, tells true duplicates from coincidences.
         let Some(&after_node_id) = after_candidates
             .iter()
             .filter(|&&id| !diff.after_node_map.contains_key(&id))
@@ -227,14 +178,7 @@ pub(crate) fn solve_with_hash_map(
             },
         );
 
-        // Descend both subtrees in lockstep, pairing children by position and kind - except
-        // under a commutative container, where children must be paired by hash instead (see
-        // `pair_children_for_descent`'s doc comment for why a positional `zip` is wrong there).
-        // `reordered_ids` collects every before-side node whose *own* children were found
-        // reordered, so their ancestors (up to this match's own root) can be downgraded from
-        // `Identical` afterward - a reorder several levels down (e.g. a `use_list` nested inside
-        // `scoped_use_list`/`use_declaration`) means none of its ancestors are a true no-op match
-        // either, even though none of *them* are commutative containers themselves.
+        // Nodes whose own children were reordered; their ancestors are downgraded afterwards.
         let mut reordered_ids: Vec<usize> = Vec::new();
         let mut stack = vec![(before_node, after_node)];
         while let Some((before_parent, after_parent)) = stack.pop() {
@@ -245,14 +189,8 @@ pub(crate) fn solve_with_hash_map(
                 &after_metadata,
             );
 
-            // `before_parent`/`after_parent`'s own mapping was already added (either as the root
-            // match above, or as a `descendant_reason`-tagged child pair in an earlier iteration
-            // of this same loop) before we could know whether *its* children turned out to be
-            // reordered - patch it now that we know, rather than looking ahead. A pure reorder is
-            // not a no-op: children's content is unchanged, but their positions are, so it's
-            // recorded as `MatchButNotIdentical` at `COST_UPDATE`, not `Identical` at cost 0 -
-            // matching the human-authored ground truth's own convention for these pairs (see
-            // `TODO.md`'s "Distinguishing reordered from truly identical" section).
+            // The parent's mapping is already recorded, so patch it. A pure reorder is not a no-op:
+            // the ground truth records it as `MatchButNotIdentical` at `COST_UPDATE`.
             if reordered {
                 if let Some(mapping) = diff
                     .mapping
@@ -283,12 +221,8 @@ pub(crate) fn solve_with_hash_map(
             }
         }
 
-        // Propagate: every ancestor between a reordered node and this match's own root
-        // (inclusive) is downgraded from `Identical` to `MatchButNotIdentical` too - a container
-        // is never a true no-op match if anything inside it, at any depth, wasn't. Reason is left
-        // alone for these ancestors (only the node that's actually a commutative container with
-        // reordered children gets `FullyMappingSubtrees` - see above); they didn't reorder
-        // anything themselves, they just aren't a pure `Identical` match anymore either.
+        // A container is not a no-op if anything inside it was reordered, up to this match's root.
+        // The ancestors keep their reason: only the reordered container itself reordered.
         for reordered_id in reordered_ids {
             let mut cur = reordered_id;
             while let Some(&parent_id) = before_metadata.node_to_parent.get(&cur) {
@@ -311,58 +245,17 @@ pub(crate) fn solve_with_hash_map(
 }
 
 /**
-* Pairs `before_parent`'s and `after_parent`'s children for the hash-descent engine's lockstep
-* walk. Ordinary containers pair positionally (`zip`, filtered to matching kinds) - safe because
-* the parent's own hash match (`KindAndValueHash`/`KindOnlyHash`) was computed in document order,
-* so equal hashes already imply position-for-position correspondence.
+* Pairs two matched parents' children for the lockstep descent, and reports whether a
+* commutative container's children were reordered.
 *
-* Under a `nodes::is_commutative_container` parent, that assumption breaks: both new hashes hash a
-* commutative container's children *unordered* (sorted), so two containers can hash equal while
-* their children sit in completely different positions (a same-name reorder is exactly what
-* `is_commutative_container` exists to match). A positional `zip` there would silently mis-pair
-* reordered children - the exact bug `code::hash::compute_commutative_structural_hash`'s own doc
-* comment warned about ("reordered children get re-mangled by the shared engine's positional
-* zip").
+* Ordinary parents pair positionally, dropping kind mismatches: equal hashes computed in document
+* order imply positional correspondence. A `nodes::is_commutative_container` hashes its children
+* unordered, so its children pair by hash: kind-and-value first, then kind-only for what is left
+* (a `KindOnlyHash` outer match allows values to differ). Kind-only alone would pair differently
+* named identifiers arbitrarily and hide a real reorder.
 *
-* Fix: pair by hash instead of position, in two tiers - **not** `node_to_kind_only_hash` alone
-* (an earlier version of this function did that unconditionally, which is wrong whenever the
-* *outer* match came from `KindAndValueHash`: `kind_only_hash` ignores leaf text, so e.g. three
-* plain `identifier` children with different names all hash equal, and the nearest-by-position
-* tiebreak can silently "recover" a pairing that looks unreordered even though the identifiers
-* actually did move - which also breaks reorder detection below, since it works from whichever
-* pairing this function returns).
-* 1. `node_to_kind_and_value_hash` first (exact - correctly distinguishes same-kind, different-
-*    value children like `a`/`b`/`c` above). Multiset equality here is guaranteed whenever the
-*    outer match was itself `KindAndValueHash`-driven (the sorted-hash combination that produced
-*    the parent's own hash could only be equal if the multiset of child hashes is equal); may
-*    leave some children unpaired when the outer match was `KindOnlyHash`-driven instead (content
-*    values may legitimately differ there), which tier 2 picks up.
-* 2. `node_to_kind_only_hash` as a fallback, for whatever tier 1 left unpaired - the coarser
-*    guarantee that *does* hold unconditionally (a `KindOnlyHash` match only guarantees kind-level
-*    multiset equality), same tiebreak methodology.
-*
-* Either tier breaks ties among same-hash candidates by child-ordinal proximity (`before_index` vs
-* `after_index` within their own parent's children list) - **not** absolute document byte position,
-* which the top-level match itself uses but which is unsound here: `before_parent`/`after_parent`
-* were already matched as a pair, but everything *outside* their span can still have grown or
-* shrunk from unrelated earlier edits, shifting both parents' (and every descendant's) absolute
-* byte offset by some constant delta. Nearest-by-absolute-byte-distance then silently prefers a
-* neighboring same-hash sibling over the true positional counterpart whenever that delta exceeds
-* half the local gap between siblings - confirmed against a real case
-* (`rust-firefox-webrenderer-borders`: two untouched struct definitions later in the file, byte-
-* shifted by 14 from edits earlier in the file, whose 25-27-byte comma-to-comma gaps made a
-* same-hash *neighboring* comma look closer than each comma's own correct counterpart, rotating
-* three of five `,` pairings). Child-ordinal position is relative to the already-matched parent and
-* so is immune to any shift outside that parent's own span.
-*
-* Returns the pairs plus a `reordered` flag: true if `before_parent` is a commutative container
-* and at least one pair's after-side document-order index differs from its before-side index -
-* i.e. content-wise nothing changed, but the children's actual order did. The caller uses this to
-* distinguish `FullyMappingSubtrees` (matched via order-independence, order genuinely changed)
-* from a plain `IdenticalHash`/`StructurallyIdenticalSubtrees` match (order-independence didn't
-* need to do anything, because nothing moved) - see the user request this responds to ("we do need
-* a way to distinguish between truly identical and reordered") and `ASTMappingReason::
-* FullyMappingSubtrees`'s doc comment.
+* Ties go to the nearest sibling index, not byte offset: an edit before the parents shifts every
+* offset inside them, and a shifted neighbouring comma can be closer than the right one.
 */
 pub(crate) fn pair_children_for_descent<'a>(
     before_parent: tree_sitter::Node<'a>,
@@ -429,8 +322,7 @@ pub(crate) fn pair_children_for_descent<'a>(
         }
     }
 
-    // Tier 2: kind-only fallback for whatever tier 1 (exact kind+value) couldn't pair - covers a
-    // `KindOnlyHash`-driven outer match, where children may legitimately differ in value.
+    // Kind-only fallback for what the exact tier left.
     for (before_index, before_child) in unmatched_before {
         let ko_hash = before_metadata
             .node_to_kind_only_hash
@@ -597,8 +489,6 @@ mod tests {
             reordered,
             "identical identifiers reshuffled inside a commutative container must be detected as reordered"
         );
-        // `{`, `a`, `,`, `b`, `,`, `c`, `}` - every child (identifiers and punctuation alike)
-        // must still find its same-kind, same-text counterpart despite the reorder.
         assert_eq!(
             pairs.len(),
             7,
@@ -629,5 +519,60 @@ mod tests {
             !reordered,
             "an unchanged commutative container must not be flagged as reordered"
         );
+    }
+
+    #[test]
+    fn pair_children_for_descent_pairs_reordered_children_by_value_not_by_position() {
+        let before = Code::from_string("use std::{a, b, c};\n", &Language::Rust);
+        let after = Code::from_string("use std::{c, a, b};\n", &Language::Rust);
+        let before_metadata = metadata_of(&before);
+        let after_metadata = metadata_of(&after);
+        let before_use_list =
+            find_first_of_kind(before.ast.as_ref().unwrap().root_node(), "use_list").unwrap();
+        let after_use_list =
+            find_first_of_kind(after.ast.as_ref().unwrap().root_node(), "use_list").unwrap();
+
+        let (pairs, _) = pair_children_for_descent(
+            before_use_list,
+            after_use_list,
+            &before_metadata,
+            &after_metadata,
+        );
+
+        for (b, a) in &pairs {
+            assert_eq!(
+                b.utf8_text(before.contents.as_bytes()).unwrap(),
+                a.utf8_text(after.contents.as_bytes()).unwrap()
+            );
+        }
+    }
+
+    /// `rust-firefox-webrenderer-borders`: an edit earlier in the file shifts every byte offset
+    /// inside the matched parents.
+    #[test]
+    fn pair_children_for_descent_breaks_ties_by_sibling_index_not_byte_offset() {
+        let before = Code::from_string("use std::{a, a, a};\n", &Language::Rust);
+        let after = Code::from_string("//\nuse std::{a, a, a};\n", &Language::Rust);
+        let before_metadata = metadata_of(&before);
+        let after_metadata = metadata_of(&after);
+        let before_use_list =
+            find_first_of_kind(before.ast.as_ref().unwrap().root_node(), "use_list").unwrap();
+        let after_use_list =
+            find_first_of_kind(after.ast.as_ref().unwrap().root_node(), "use_list").unwrap();
+
+        let (pairs, reordered) = pair_children_for_descent(
+            before_use_list,
+            after_use_list,
+            &before_metadata,
+            &after_metadata,
+        );
+
+        assert!(!reordered);
+        for (b, a) in &pairs {
+            assert_eq!(
+                b.start_byte() - before_use_list.start_byte(),
+                a.start_byte() - after_use_list.start_byte()
+            );
+        }
     }
 }

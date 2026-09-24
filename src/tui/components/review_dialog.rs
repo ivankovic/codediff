@@ -124,7 +124,6 @@ impl ReviewDialog {
         matches!(row, Row::File { .. } | Row::Commit(_))
     }
 
-    /// Moves the selection to the next selectable row in `direction`, staying put at the ends.
     fn move_selection(&mut self, direction: i32) {
         let rows = self.rows();
         let mut index = self.selected;

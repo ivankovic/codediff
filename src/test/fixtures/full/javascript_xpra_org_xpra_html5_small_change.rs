@@ -21,7 +21,7 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // Clamped at the measured residual; what the remainder is has not been analysed here.
+    // Residual not yet examined.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "javascript-xpra-org-xpra-html5-small-change",
         4,

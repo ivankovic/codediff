@@ -22,21 +22,16 @@ use super::common::{
     ContainmentCtx, DeltaTable, ForestDist, Grid, PostorderIndexer, UnitCostModel,
 };
 
-/// Whether `APTED_DEBUG` is set, read once and cached - `gted`/`spf_a` check this at every debug
-/// write point on the hottest part of the algorithm (`gted` recurses over every node in the tree
-/// decomposition), so re-querying the environment there on every call would be pure per-call
-/// overhead for a flag that can't change mid-run.
+/// Whether `APTED_DEBUG` is set, cached because it is checked on the DP's hot path.
 fn apted_debug() -> bool {
     static DEBUG: std::sync::LazyLock<bool> =
         std::sync::LazyLock::new(|| std::env::var("APTED_DEBUG").is_ok());
     *DEBUG
 }
 
-/// `strategy[(pre_v, pre_w)]` from `computeOptStrategy_postL`/`_postR`: a *signed* encoded path
-/// id (not a distance), kept in its own buffer rather than overloaded onto `DeltaTable`. One
-/// buffer could serve both - `gted` never needs a cell's strategy value again once it has routed
-/// on it - but keeping them apart avoids relying on that consumption order, at the cost of one
-/// extra buffer.
+/// `strategy[(pre_v, pre_w)]` from `computeOptStrategy_postL`/`_postR`: a signed, encoded path
+/// id, not a distance. Kept apart from `DeltaTable` so correctness does not rest on `gted`
+/// consuming each strategy cell before `delta` reuses it.
 pub(crate) struct StrategyTable {
     grid: Grid<i64>,
 }
@@ -57,41 +52,26 @@ impl StrategyTable {
     }
 }
 
-/// Indexes a forest of (possibly multiple) sibling roots on one side, wrapped under a single
-/// synthetic virtual root (preorder id `0`, no backing node, zero del/ins/rename cost). The
-/// virtual root lets the APTED recursion (`gted`/`spfL`/`spfR`/`spfA`), which is only defined for
-/// a single rooted tree, run unmodified over a multi-root residual forest: matching the two
-/// virtual roots is always free, so `treedist(vrootedT1, vrootedT2) == forestdist(F1, F2)`
-/// exactly, which is what callers actually want for a forest of unmatched siblings.
+/// Indexes one side's forest under a synthetic virtual root (preorder `0`, no backing node, zero
+/// cost), so the single-tree APTED recursion runs unmodified on a multi-root forest: matching the
+/// two virtual roots is free, so `treedist(vroot+F1, vroot+F2) == forestdist(F1, F2)`.
 ///
-/// Real node `pre` therefore sits at index `pre` here (vroot owns index `0`); left-to-right
-/// postorder is unaffected by the wrapping (vroot, having every other node as a descendant, is
-/// simply the last postorder index, `size - 1`).
-///
-/// `kr_sum`/`rev_kr_sum`/`desc_sum` are computed via closed-form bottom-up recurrences rather
-/// than a single pass threading each child's partial state through mutable fields across
-/// recursive calls. Both compute the same values; the recurrence form keeps that state out of
-/// the struct.
+/// Real node `pre` of the pruned forest sits at virtual index `pre + 1`; the virtual root is the
+/// last left-to-right postorder index.
 pub(crate) struct AptedIndexer {
-    /// Number of nodes including the virtual root.
     pub(crate) size: usize,
     /// 0-based preorder index -> real node id, or `None` for the virtual root (index `0`).
     pub(crate) pre_to_node_id: Vec<Option<usize>>,
     /// 0-based preorder index -> 0-based preorder index of the parent, or `-1` for the root.
     pub(crate) parents: Vec<i64>,
-    /// 0-based preorder index -> left-to-right ordered list of children's preorder indices.
     pub(crate) children: Vec<Vec<usize>>,
-    /// 0-based preorder index -> size of the subtree rooted there (including the virtual root).
+    /// 0-based preorder index -> size of the subtree rooted there.
     pub(crate) sizes: Vec<usize>,
-    /// 0-based preorder index -> 0-based left-to-right postorder index.
     pub(crate) pre_to_post_l: Vec<usize>,
-    /// 0-based left-to-right postorder index -> 0-based preorder index.
     pub(crate) post_l_to_pre_l: Vec<usize>,
     /// 0-based left-to-right postorder index -> postorder index of the leftmost leaf descendant.
     pub(crate) post_l_to_lld: Vec<usize>,
-    /// 0-based preorder index -> 0-based right-to-left preorder index.
     pub(crate) pre_to_pre_r: Vec<usize>,
-    /// 0-based right-to-left preorder index -> 0-based (left-to-right) preorder index.
     pub(crate) pre_r_to_pre_l: Vec<usize>,
     /// 0-based right-to-left postorder index -> right-to-left postorder index of the rightmost
     /// leaf descendant.
@@ -112,9 +92,7 @@ pub(crate) struct AptedIndexer {
     pub(crate) rev_kr_sum: Vec<u64>,
     /// Cost of `spfA` for the subtree rooted at this node.
     pub(crate) desc_sum: Vec<u64>,
-    /// 0-based preorder index -> total delete cost of every node in its subtree.
     pub(crate) sum_del_cost: Vec<u64>,
-    /// 0-based preorder index -> total insert cost of every node in its subtree.
     pub(crate) sum_ins_cost: Vec<u64>,
     /// Count of leaf nodes that are their parent's first (leftmost) child [APTED paper, Section 5.3].
     pub(crate) lchl: usize,
@@ -161,8 +139,6 @@ impl AptedIndexer {
             Some(my_pre)
         }
 
-        // Virtual root owns preorder index 0; its parent (`-1`) is never read since `gted`'s
-        // walk-up always stops once it reaches the root of the subtree it started decomposing.
         let mut pre_to_node_id: Vec<Option<usize>> = vec![None];
         let mut parents: Vec<i64> = vec![-1];
         let mut children: Vec<Vec<usize>> = vec![Vec::new()];
@@ -183,7 +159,6 @@ impl AptedIndexer {
 
         let size = pre_to_node_id.len();
 
-        // Left-to-right postorder, computed iteratively (children finalized before parent).
         let mut pre_to_post_l = vec![0usize; size];
         let mut post_l_to_pre_l = vec![0usize; size];
         {
@@ -203,11 +178,11 @@ impl AptedIndexer {
             }
         }
 
-        // Bottom-up (postorder) pass: sizes, kr_sum/rev_kr_sum/desc_sum, node_type_l/r.
         let mut sizes = vec![1usize; size];
         let mut kr_sum = vec![0u64; size];
         let mut rev_kr_sum = vec![0u64; size];
-        let mut desc_sum_total = vec![0u64; size]; // sum of sizes of every node in the subtree
+        // Sum of the subtree sizes of every node in the subtree.
+        let mut desc_sum_total = vec![0u64; size];
         let mut node_type_l = vec![false; size];
         let mut node_type_r = vec![false; size];
         for &pre in &post_l_to_pre_l {
@@ -265,11 +240,7 @@ impl AptedIndexer {
             pre_r_to_pre_l[pre_r] = pre;
         }
 
-        // Right-to-left postorder index of a node's rightmost leaf descendant. Right-to-left
-        // postorder of preorder index `pre` is the trivial `size - 1 - pre` (see
-        // `pre_to_post_r`/`post_r_to_pre_l`), so processing preorder indices high-to-low visits
-        // nodes in ascending right-to-left-postorder order - i.e. children (always a higher
-        // preorder than their parent) are finalized before the parent that needs them.
+        // Descending preorder is ascending right-to-left postorder: children before parents.
         let mut post_r_to_rld = vec![0usize; size];
         for pre in (0..size).rev() {
             let post_r = size - 1 - pre;
@@ -279,9 +250,6 @@ impl AptedIndexer {
             };
         }
 
-        // Nearest leaf strictly to the left (in preorder)/right (in right-to-left preorder),
-        // `-1` if none - needed by `spf_a`'s `updateFnArray` to seed its "next forest member"
-        // linked list. A single forward scan each.
         let mut pre_to_ln = vec![-1i64; size];
         {
             let mut current_leaf: i64 = -1;
@@ -306,9 +274,6 @@ impl AptedIndexer {
         let sum_del_cost = vec![0u64; size];
         let sum_ins_cost = vec![0u64; size];
 
-        // `lchl`/`rchl` [APTED paper, Section 5.3]: count of leaf nodes that are their parent's first/last
-        // child, used by `compute_delta` to pick whichever of postL/postR's preorder direction is
-        // cheaper for this tree's shape.
         let mut lchl = 0usize;
         let mut rchl = 0usize;
         for pre in 0..size {
@@ -348,8 +313,7 @@ impl AptedIndexer {
         }
     }
 
-    /// Fills `sum_del_cost`/`sum_ins_cost` bottom-up. Split out of `build` because it needs the
-    /// cost model (the virtual root and any pruned-away node contribute `0`).
+    /// Fills `sum_del_cost`/`sum_ins_cost`; the virtual root contributes 0.
     pub(crate) fn fill_subtree_costs(&mut self, meta: &ASTMetadata, cost_model: &UnitCostModel) {
         for &pre in &self.post_l_to_pre_l {
             let own_del = vdel(cost_model, vnode(self, meta, pre));
@@ -365,35 +329,29 @@ impl AptedIndexer {
         }
     }
 
-    /// Left-to-right preorder id of the leftmost leaf descendant of `pre` (itself if `pre` is a
-    /// leaf).
+    /// Preorder id of the leftmost leaf descendant of `pre` (itself for a leaf).
     pub(crate) fn pre_l_to_lld(&self, pre: usize) -> usize {
         self.post_l_to_pre_l[self.post_l_to_lld[self.pre_to_post_l[pre]]]
     }
 
-    /// 0-based right-to-left postorder index of `pre`. Trivially `size - 1 - pre`: the
-    /// right-to-left-postorder rank of any node equals `size - 1` minus its left-to-right-
-    /// preorder rank, for any tree shape.
+    /// Right-to-left postorder is reversed left-to-right preorder, for any tree shape.
     pub(crate) fn pre_to_post_r(&self, pre: usize) -> usize {
         self.size - 1 - pre
     }
 
-    /// Inverse of `pre_to_post_r` - also self-inverse, by the same identity.
     pub(crate) fn post_r_to_pre_l(&self, post_r: usize) -> usize {
         self.size - 1 - post_r
     }
 
-    /// Left-to-right preorder id of the rightmost leaf descendant of `pre` (itself if `pre` is a
-    /// leaf).
+    /// Preorder id of the rightmost leaf descendant of `pre` (itself for a leaf).
     pub(crate) fn pre_l_to_rld(&self, pre: usize) -> usize {
         self.post_r_to_pre_l(self.post_r_to_rld[self.pre_to_post_r(pre)])
     }
 }
 
-/// `node.del`/`.ins`/`.ren`, but `None` (the virtual root, or any node pruned because it's
-/// already matched) always costs `0` - this is the whole trick that lets `gted` run on a
-/// virtual-rooted *forest* and still compute exactly the forest-to-forest distance: matching the
-/// two virtual roots is always free, so it's always at least as good as any alternative.
+/// The node at virtual index `pre`, or `None` for the virtual root. `vdel`/`vins` price `None`
+/// at 0 and `vren` pairs it only with the other virtual root, which is what keeps the virtual
+/// roots from changing the forest distance.
 pub(crate) fn vnode<'a>(
     idx: &AptedIndexer,
     meta: &'a ASTMetadata,
@@ -428,34 +386,20 @@ pub(crate) fn vren(
     }
 }
 
-/// Bundles everything `gted`/`spfL`/`spfR`/`spf1` need, in the fixed global "before/after"
-/// orientation - `delta` is always written and read as `delta[before_pre][after_pre]`,
-/// regardless of which side a given single-path function happens to be decomposing.
+/// Everything `gted` and the single-path functions need. `delta` is always indexed
+/// `[before_pre][after_pre]`, whichever side a single-path function is decomposing.
 pub(crate) struct EngineCtx<'a> {
     pub(crate) before_idx: &'a AptedIndexer,
     pub(crate) after_idx: &'a AptedIndexer,
     pub(crate) before_meta: &'a ASTMetadata,
     pub(crate) after_meta: &'a ASTMetadata,
     pub(crate) cost_model: &'a UnitCostModel,
-    /// Mirrors `forest_dist`'s own `containment` parameter (Zhang-Shasha side, common.rs) - see
-    /// `vren_adjusted`, the single place every `vren` call site here routes through so a
-    /// "hollowed out" ancestor can't freely rename onto a node that would contradict where its
-    /// pruned descendant already landed. `None` whenever this forest has nothing pruned, in which
-    /// case `vren_adjusted` is a pure passthrough.
+    /// Applied through `vren_adjusted`; `None` when nothing in the forest is pruned.
     pub(crate) containment: Option<&'a ContainmentCtx<'a>>,
-    /// `spf_path`'s `forestdist` scratch table, one per path orientation (index `0` when the
-    /// path lives on `before`, `1` when it lives on `after` - the two have transposed
-    /// dimensions), built on first use and reused by every `spf_path` call of this
-    /// `compute_delta`. It is sized by the *whole* forest, not the current subproblem (see
-    /// `spf_path` for why the absolute indexing is needed), so allocating it fresh per call
-    /// meant one `(n+1)*(m+1)` zeroing per `gted` subproblem - which callgrind put at 75-91% of
-    /// all instructions on every fixture over 400ms (a (848, 679) pair zeroes 4.6MB per call,
-    /// hundreds of times). Reuse is sound for the same reason the table was already shared
-    /// across one call's keyroot sweep: `apted_tree_edit_dist` writes every cell it reads
-    /// within its own sweep, so leftover contents never matter.
-    ///
-    /// `RefCell` rather than a `&mut` threaded through `gted`'s recursion: the recursion is
-    /// deep and the borrow is short (one `spf_path` body, which never re-enters `gted`).
+    /// `spf_path`'s `forestdist` table per path orientation (`[0]` path on before, `[1]` on
+    /// after), sized by the whole forest and reused by every `spf_path` call: allocating it per
+    /// call makes zeroing it dominate the run. Reuse is sound because `apted_tree_edit_dist`
+    /// writes every cell it reads. `RefCell` because the borrow never spans a `gted` re-entry.
     forestdist_scratch: std::cell::RefCell<[Option<ForestDist>; 2]>,
 }
 
@@ -479,9 +423,7 @@ impl<'a> EngineCtx<'a> {
         }
     }
 
-    /// Runs `f` with the `forestdist` scratch table for the given path orientation, sized
-    /// `(path.size + 1) x (other.size + 1)` and allocated on the first call for that
-    /// orientation.
+    /// Runs `f` with the `forestdist` scratch table for the given path orientation.
     fn with_forestdist<R>(&self, path_is_before: bool, f: impl FnOnce(&mut ForestDist) -> R) -> R {
         let (path_idx, other_idx, _, _) = self.sides(path_is_before);
         let mut scratch = self.forestdist_scratch.borrow_mut();
@@ -489,11 +431,7 @@ impl<'a> EngineCtx<'a> {
             .get_or_insert_with(|| ForestDist::new(path_idx.size + 1, other_idx.size + 1, 0));
         f(table)
     }
-    /// Resolves which indexer/metadata pair is the "path" side and which is "other", given which
-    /// global side (`before`/`after`) the path currently lives on. Every single-path function
-    /// (`spf_a`, `apted_tree_edit_dist`, `spf_path`) starts with exactly this lookup - pulled out
-    /// once here instead of duplicating the same `if path_is_before {...} else {...}` at each of
-    /// their 5 call sites.
+    /// `(path_idx, other_idx, path_meta, other_meta)` for the side the path lives on.
     fn sides(
         &self,
         path_is_before: bool,
@@ -521,12 +459,8 @@ impl<'a> EngineCtx<'a> {
     }
 }
 
-/// Applies `ctx.containment`'s `adjust()` to a `vren`-computed `base` cost for the real-node pair
-/// at virtual preorder ids `(before_pre, after_pre)` in the fixed global before/after orientation
-/// - the Apted-engine equivalent of the `ctx.adjust(before_id, after_id, cost_ren)` call in
-///   `forest_dist` (common.rs). A `None` id (the virtual root, or any boundary read that lands on
-///   it) is never itself pruned, so it's always left as a no-op - `vren` already prices a lone
-///   `None` side as `FORBIDDEN_PAIRING_COST` regardless.
+/// Applies `ctx.containment` to a `vren` cost at virtual preorder ids `(before_pre, after_pre)`,
+/// as `forest_dist` does; the virtual root is left unadjusted.
 pub(crate) fn vren_adjusted(ctx: &EngineCtx, before_pre: i64, after_pre: i64, base: u64) -> u64 {
     let Some(containment) = ctx.containment else {
         return base;
@@ -539,23 +473,9 @@ pub(crate) fn vren_adjusted(ctx: &EngineCtx, before_pre: i64, after_pre: i64, ba
     }
 }
 
-/// Flat, `i64`-valued 2D matrix - backs `spf_a`'s `s`/`t` tables.
+/// Backs `spf_a`'s `s`/`t` tables.
 pub(crate) type Mat = Grid<i64>;
 
-/// `spfA`, the general "inner path" single-path function (Algorithm 3 in the APTED paper),
-/// **specialized to `pathType == INNER`**: `gted` only ever calls this once it has already
-/// routed `pathType == LEFT`/`RIGHT` to `spf_path` directly, so the LEFT and RIGHT branches -
-/// which would handle this function as a general LEFT/RIGHT/INNER entry point - are dead code
-/// from that call site and are omitted; every conditional that depended on them is simplified
-/// accordingly (e.g. the "deal with nodes to the left of the path" guard becomes plain
-/// `leftPart`).
-///
-/// `lF`/`rF` range over `path_idx`'s subtree, `lG`/`rG` over `other_idx`'s; `path_is_before`
-/// carries the orientation the algorithm states as `treesSwapped`, same as `spf_path`.
-/// Costs are `i64` (never negative in practice for a metric cost model, but several
-/// intermediate `sp3` terms are differences, so `i64` avoids an underflow panic `u64` would risk
-/// on the way to a non-negative result) and cast to `u64` only at the `DeltaTable`/return
-/// boundary.
 fn update_fn_array(fna: &mut [i64], ln_for_node: i64, node: i64, current_subtree_pre_l: i64) {
     let last = fna.len() - 1;
     if ln_for_node >= current_subtree_pre_l {
@@ -574,6 +494,10 @@ fn update_ft_array(fna: &[i64], fta: &mut [i64], ln_for_node: i64, node: i64) {
     }
 }
 
+/// `spfA` (Algorithm 3 of the APTED paper), specialized to `pathType == INNER`: `gted` routes
+/// LEFT/RIGHT paths to `spf_path`, so those branches are omitted and their guards simplified.
+/// `path_is_before` plays the role of `treesSwapped`. Costs are `i64` because several `sp3`
+/// intermediates are differences.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn spf_a(
     ctx: &EngineCtx,
@@ -584,8 +508,7 @@ pub(crate) fn spf_a(
     path_id: usize,
 ) -> u64 {
     let (path_idx, other_idx, path_meta, other_meta) = ctx.sides(path_is_before);
-    // `(before, after)`, in that order - the fixed global orientation `delta` is always read and
-    // written in, regardless of which side `path_idx`/`other_idx` happen to be (see `spf_path`).
+    // `delta` is always indexed `(before, after)`.
     let delta_order = |path_pre: i64, other_pre: i64| -> (usize, usize) {
         if path_is_before {
             (path_pre as usize, other_pre as usize)
@@ -645,9 +568,7 @@ pub(crate) fn spf_a(
     let mut fna = vec![-1i64; max_size as usize + 1];
     let mut fta = vec![-1i64; max_size as usize + 1];
     let mut q = vec![0i64; max_size as usize + 1];
-    // Incrementally summed forest size/cost - F is `path_idx`'s side, G is `other_idx`'s.
-    // The G-side pair is (re)computed from scratch inside the loops before every read, so it
-    // gets no initial value.
+    // F is `path_idx`'s side, G is `other_idx`'s.
     let mut current_forest_size1: i64 = 0;
     let mut current_forest_size2: i64;
     let mut current_forest_cost1: i64 = 0;
@@ -683,8 +604,7 @@ pub(crate) fn spf_a(
         let right_part =
             start_path_node >= 0 && start_path_node_in_pre_r - end_path_node_in_pre_r > 1;
 
-        // Deal with nodes to the left of the path - the general form's path-type guard,
-        // simplified to plain `leftPart` by this function's INNER-only specialization.
+        // Nodes to the left of the path.
         if left_part {
             let (r_f_first, l_f_first);
             if start_path_node == -1 {
@@ -710,7 +630,6 @@ pub(crate) fn spf_a(
                 fna[i as usize] = -1;
                 fta[i as usize] = -1;
             }
-            // Store the current size and cost of forest in F.
             let tmp_forest_size1 = current_forest_size1;
             let tmp_forest_cost1 = current_forest_cost1;
             // Loop B [1, Algorithm 3] - for all nodes in G (right-hand input tree).
@@ -725,8 +644,6 @@ pub(crate) fn spf_a(
                         other_idx.pre_r_to_pre_l[(r_g - 1) as usize] as i64
                     };
                 let parent_of_r_g_in_pre_l = other_idx.parents[r_g_in_pre_l as usize];
-                // Decides on the last lG node for Loop D - INNER-only, so the path-type
-                // branch the general form has here collapses to a single case.
                 let l_g_last = if l_g_first == current_subtree_pre_l2 {
                     l_g_first
                 } else {
@@ -824,11 +741,7 @@ pub(crate) fn spf_a(
 
                     // Loop D [1, Algorithm 3] - for all nodes to the left of rG.
                     while l_g >= l_g_last {
-                        // `current_forest_size2` is deliberately not incremented here: it's
-                        // re-read only via the `== 1` check above, before this loop runs, and
-                        // gets a fresh value on the next outer (`l_f`) iteration regardless - an
-                        // increment here was dead (confirmed via clippy's `unused_assignments`),
-                        // so it was removed rather than kept as effect-free busywork.
+                        // The paper increments `current_forest_size2` here; nothing reads it.
                         current_forest_cost2 += other_ins_cost(l_g);
                         sp1 = match sp1source {
                             1 => s[(sp1s_row, l_g - it2_pre_l_off)] + path_del_cost(l_f_node),
@@ -869,10 +782,8 @@ pub(crate) fn spf_a(
                 if r_g_minus1_in_pre_l == parent_of_r_g_in_pre_l {
                     if !right_part {
                         if left_part {
-                            // `other`-axis index is `parent_of_r_g_in_pre_l` (== `r_g_minus1_in_pre_l`
-                            // per the gate above) - *not* `+ 1`. The `+1` belongs only to the
-                            // s-table's own relative-offset lookup on the line below. The
-                            // delta write takes the bare value.
+                            // The `+ 1` belongs to the `s` lookup only; `delta` takes the
+                            // bare index.
                             let (b, a) = delta_order(end_path_node, parent_of_r_g_in_pre_l);
                             let v = s[(
                                 l_f_last + 1 - it1_pre_l_off,
@@ -908,11 +819,6 @@ pub(crate) fn spf_a(
                         l_f2 -= 1;
                     }
                 }
-                // `fta`'s chain here is walked fresh on
-                // every outer iteration rather than cached, a known but unclaimed micro-
-                // optimization (not correctness-affecting - `fta` itself doesn't change during
-                // this sweep) that hasn't been prioritized since `spfA` isn't this pipeline's
-                // measured bottleneck.
                 let mut l_g_iter = l_g_first;
                 while l_g_iter >= l_g_last {
                     t[(l_g_iter - it2_pre_l_off, r_g - it2_pre_r_off)] =
@@ -923,8 +829,7 @@ pub(crate) fn spf_a(
             }
         }
 
-        // Deal with nodes to the right of the path - the general form's path-type guard,
-        // simplified to `rightPart || !leftPart` by this function's INNER-only specialization.
+        // Nodes to the right of the path.
         if right_part || !left_part {
             let (l_f_first, r_f_first);
             if start_path_node == -1 {
@@ -1045,8 +950,6 @@ pub(crate) fn spf_a(
 
                     let mut r_g = r_g_first2;
                     let r_g_first_in_pre_l = other_idx.pre_r_to_pre_l[r_g_first2 as usize] as i64;
-                    // See Loop D above: incrementing `current_forest_size2` here was dead (never
-                    // read again before the next outer iteration's fresh assignment).
                     let mut sp1 = match sp1source {
                         1 => s[(sp1s_row, r_g - it2_pre_r_off)],
                         2 => t[(sp1t_row, r_g - it2_pre_r_off)],
@@ -1144,11 +1047,6 @@ pub(crate) fn spf_a(
                         r_f2 -= 1;
                     }
                 }
-                // `fta`'s chain here is walked fresh on
-                // every outer iteration rather than cached, a known but unclaimed micro-
-                // optimization (not correctness-affecting - `fta` itself doesn't change during
-                // this sweep) that hasn't been prioritized since `spfA` isn't this pipeline's
-                // measured bottleneck.
                 let mut r_g_iter = r_g_first2;
                 while r_g_iter >= r_g_last2 {
                     t[(l_g - it2_pre_l_off, r_g_iter - it2_pre_r_off)] =
@@ -1159,7 +1057,6 @@ pub(crate) fn spf_a(
             }
         }
 
-        // Walk up the path by one node.
         start_path_node = end_path_node;
         end_path_node = path_idx.parents[end_path_node as usize];
     }
@@ -1167,9 +1064,8 @@ pub(crate) fn spf_a(
     min_cost as u64
 }
 
-/// `spf1`: closed-form tree edit distance when at least one of the two subtrees is a single node,
-/// avoiding the overhead of the general single-path machinery. Writes nothing into `delta` - the
-/// size-1-side cells it would otherwise touch are already covered by `ted_init`.
+/// `spf1`: closed-form distance when either subtree is a single node. Writes nothing into
+/// `delta`; `ted_init` already covers those cells.
 pub(crate) fn spf1(ctx: &EngineCtx, root1: usize, root2: usize) -> u64 {
     let size1 = ctx.before_idx.sizes[root1];
     let size2 = ctx.after_idx.sizes[root2];
@@ -1206,25 +1102,15 @@ pub(crate) fn spf1(ctx: &EngineCtx, root1: usize, root2: usize) -> u64 {
     cost.min(max_cost)
 }
 
-/// Which postorder direction a single-path decomposition is walking - `Left` (left-to-right,
-/// `spfL`'s world) or `Right` (right-to-left, `spfR`'s world). Bundled with the four accessor
-/// functions below so that the per-direction pairs (`computeKeyRoots`/`computeRevKeyRoots` ->
-/// `compute_keyroots`; `treeEditDist`/`treeEditDistR` -> `apted_tree_edit_dist`; `spfL`/`spfR` ->
-/// `spf_path`) can share one implementation each, the same way `path_is_before: bool` already lets
-/// `spf_a` share one implementation across the before/after axis. This is genuine mechanical
-/// duplication and was worth removing like any other.
-/// `compute_opt_strategy_post_l`/`compute_opt_strategy_post_r` are deliberately NOT unified this
-/// way - they aren't a pure accessor-swap mirror (the post-`min_cost` parent-propagation step
-/// swaps which owned mutable buffer plays which role between the two), so merging them would be a
-/// materially bigger and riskier change than this one.
+/// Postorder direction of a single-path decomposition: `Left` for `spfL`, `Right` for `spfR`.
+/// The strategy functions are not unified over it: their parent propagation swaps buffer roles,
+/// not just accessors.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(crate) enum PostDir {
     Left,
     Right,
 }
 
-/// Preorder id -> this direction's own postorder index. `Left` is a plain array lookup
-/// (`pre_to_post_l`); `Right` is `pre_to_post_r`'s computed `size - 1 - pre`.
 fn pre_to_post(idx: &AptedIndexer, dir: PostDir, pre: usize) -> usize {
     match dir {
         PostDir::Left => idx.pre_to_post_l[pre],
@@ -1232,7 +1118,6 @@ fn pre_to_post(idx: &AptedIndexer, dir: PostDir, pre: usize) -> usize {
     }
 }
 
-/// This direction's postorder index -> preorder id. Inverse of `pre_to_post`.
 fn post_to_pre(idx: &AptedIndexer, dir: PostDir, post: usize) -> usize {
     match dir {
         PostDir::Left => idx.post_l_to_pre_l[post],
@@ -1240,8 +1125,8 @@ fn post_to_pre(idx: &AptedIndexer, dir: PostDir, post: usize) -> usize {
     }
 }
 
-/// This direction's postorder index -> this direction's own postorder index of that node's
-/// "extreme" leaf descendant (leftmost/`lld` for `Left`, rightmost/`rld` for `Right`).
+/// Postorder index of the node's extreme leaf descendant: leftmost for `Left`, rightmost for
+/// `Right`, both in `dir`'s own postorder.
 fn post_to_extreme_leaf_post(idx: &AptedIndexer, dir: PostDir, post: usize) -> usize {
     match dir {
         PostDir::Left => idx.post_l_to_lld[post],
@@ -1249,8 +1134,6 @@ fn post_to_extreme_leaf_post(idx: &AptedIndexer, dir: PostDir, post: usize) -> u
     }
 }
 
-/// Preorder id -> preorder id of that node's extreme leaf descendant (itself if it's a leaf;
-/// leftmost for `Left`, rightmost for `Right`).
 fn pre_to_extreme_leaf(idx: &AptedIndexer, dir: PostDir, pre: usize) -> usize {
     match dir {
         PostDir::Left => idx.pre_l_to_lld(pre),
@@ -1258,12 +1141,8 @@ fn pre_to_extreme_leaf(idx: &AptedIndexer, dir: PostDir, pre: usize) -> usize {
     }
 }
 
-/// `computeKeyRoots`/`computeRevKeyRoots`, generalized over `dir`: collects, into `keyroots`, every
-/// node that is a keyroot of `subtree_root`'s decomposition along `dir` - i.e. `subtree_root`
-/// itself, plus (recursively) every sibling on the side opposite `dir` encountered while walking up
-/// from `path_id` (the extreme leaf descendant of `subtree_root` in direction `dir`) back to
-/// `subtree_root`. `Left`: every node with a left sibling is its own keyroot, reached via each
-/// subtree's leftmost leaf descendant. `Right`: the mirror image, via rightmost leaf descendants.
+/// `computeKeyRoots`/`computeRevKeyRoots`: appends `subtree_root` and, recursively, every
+/// off-path sibling met walking up from `path_id` (its extreme leaf in `dir`) to it.
 pub(crate) fn compute_keyroots(
     idx: &AptedIndexer,
     dir: PostDir,
@@ -1290,21 +1169,9 @@ pub(crate) fn compute_keyroots(
     }
 }
 
-/// `treeEditDist`/`treeEditDistR` (the core of `spfL`/`spfR`), generalized over `dir`: fills
-/// `forestdist` with the distances between every subforest pair spanning
-/// `[extreme_leaf(path_subtree), path_subtree]` on the path side against
-/// `[extreme_leaf(other_subtree), other_subtree]` on the other side, and - as a side effect,
-/// exactly like `forest_dist` above - writes `delta` for every aligned (tree-vs-tree) position
-/// encountered along the way. `dir == Left`: "extreme leaf" means leftmost (`lld`), boundaries are
-/// left-to-right postorder. `dir == Right`: rightmost (`rld`), right-to-left postorder - the `_i`/
-/// `_j`/`lld_*` names below are kept for both directions rather than renamed per-direction, since
-/// the DP shape is otherwise identical either way.
-///
-/// `path_is_before` says whether the path side is `before` (the "T1" of the global
-/// before/after orientation) or `after`; this alone determines both the delete/insert cost
-/// direction and which axis of `delta` each side's preorder id belongs on. It replaces the
-/// algorithm's separate `treesSwapped` parameter, which serves the same purpose: the orientation
-/// is already implied by `path_is_before`.
+/// `treeEditDist`/`treeEditDistR`, the core of `spfL`/`spfR`: the same recurrence as
+/// `forest_dist`, over `dir`'s postorder, writing `delta` at every aligned (tree-vs-tree) point.
+/// `path_is_before` replaces the paper's `treesSwapped`.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn apted_tree_edit_dist(
     ctx: &EngineCtx,
@@ -1317,13 +1184,8 @@ pub(crate) fn apted_tree_edit_dist(
 ) {
     let (path_idx, other_idx, path_meta, other_meta) = ctx.sides(path_is_before);
 
-    // `i`/`j`/`di`/`dj` are 1-based boundaries exactly like `forest_dist`'s (boundary `b`
-    // corresponds to the node at 0-based postorder `b - 1`) - `forestdist`'s array index *is*
-    // this same boundary value directly, so `lld_i`/`lld_j` (0-based postorder of the extreme
-    // leaf, which numerically equals the boundary of the node *before* it) double as the base-
-    // case index without any extra shift. Mirrors `forest_dist` precisely; only the cost
-    // direction (`path_is_before`), the direction (`dir`), and the indexer/cost-model plumbing
-    // differ.
+    // 1-based boundaries as in `forest_dist`, absolute rather than relative to this subtree, so
+    // `lld_i`/`lld_j` (0-based postorder) are also the base-case boundaries.
     let i = pre_to_post(path_idx, dir, path_subtree) + 1;
     let j = pre_to_post(other_idx, dir, other_subtree) + 1;
     let lld_i = post_to_extreme_leaf_post(path_idx, dir, i - 1);
@@ -1401,11 +1263,9 @@ pub(crate) fn apted_tree_edit_dist(
     }
 }
 
-/// `spfL`/`spfR`, generalized over `dir`: the path side (`path_subtree`, already reduced to a
-/// single remaining path by `gted`'s caller) against the *entire* other side, decomposed via its
-/// own keyroots (in direction `dir`) in one combined sweep - this single combined sweep across all
-/// of `other_subtree`'s keyroots, rather than one call per (keyroot, keyroot) pair, is what makes
-/// APTED asymptotically cheaper than the classic Zhang-Shasha keyroot loop.
+/// `spfL`/`spfR`: the path side (`gted` has already resolved every off-path subtree) against
+/// every keyroot of the other side in one sweep, which is what makes APTED cheaper than
+/// Zhang-Shasha's keyroot-pair loop.
 pub(crate) fn spf_path(
     ctx: &EngineCtx,
     delta: &mut DeltaTable,
@@ -1418,13 +1278,9 @@ pub(crate) fn spf_path(
 
     let mut keyroots = Vec::new();
     if other_subtree == 0 {
-        // The virtual root's children are the *forest's own roots* - each is its own keyroot
-        // regardless of sibling status on either side (mirroring `PostorderIndexer`'s
-        // `root_pres`), since there is no real ancestor whose own path could ever cover more than
-        // one of them. Treating the virtual root itself as an ordinary node here would silently
-        // absorb its first child into a path that runs all the way down to the forest's overall
-        // extreme leaf - that child would then never get its own aligned (tree-vs-tree)
-        // boundary, exactly the boundary `compute_edit_mapping`'s backtrace later depends on.
+        // Every forest root is its own keyroot. Treating the virtual root as an ordinary node
+        // would absorb its first child into the path, and that child would never get the aligned
+        // boundary `compute_edit_mapping`'s backtrace reads.
         for &root in &other_idx.children[0] {
             compute_keyroots(
                 other_idx,
@@ -1445,11 +1301,6 @@ pub(crate) fn spf_path(
     }
     keyroots.sort_by_key(|&pre| pre_to_post(other_idx, dir, pre));
 
-    // Sized and indexed by the same 1-based-boundary convention as `apted_tree_edit_dist`
-    // (absolute, not relative to any one call's own extreme-leaf boundary), and reused across the
-    // whole keyroot sweep below - see the comment there for why a relative scheme would be
-    // unsound here. Shared across every `spf_path` call of this `compute_delta`, too - see
-    // `EngineCtx::forestdist_scratch`.
     ctx.with_forestdist(path_is_before, |forestdist| {
         for &kr in &keyroots {
             apted_tree_edit_dist(
@@ -1469,31 +1320,16 @@ pub(crate) fn spf_path(
     })
 }
 
-/// Sentinel cost for a disabled INNER candidate, shared by `compute_opt_strategy_post_l` and
-/// `compute_opt_strategy_post_r` (mirror-image twins, see the former's doc comment). Keeps the
-/// same comparison structure as a plain `i64::MAX` would, with enough headroom below `i64::MAX`
-/// that summing several of them (the `cost1_I`/`cost2_I` propagation in both functions) can't
-/// overflow.
+/// "Infinite" strategy cost, with headroom so the `cost*_i` propagation's sums cannot overflow.
 const INNER_DISABLED: i64 = i64::MAX / 4;
 
-/// `computeOptStrategy_postL`: for every `(v, w)` pair, picks whichever of v's LEFT/RIGHT/INNER
-/// path or w's LEFT/RIGHT/INNER path minimizes the cost of the single-path sweep `gted` would have
-/// to run, and encodes that choice as a signed path id (see `getStrategyPathType`/`gted`'s decode).
-/// Costs are `i64` rather than floating point - the products involved (`size * krSum`) are well
-/// within `i64` range for any real input, and exact integers sidestep the precision loss `float`
-/// would have on a "subtree size" scale.
+/// `computeOptStrategy_postL`: for every `(v, w)` pair, picks the LEFT/RIGHT/INNER path on
+/// either side that minimizes `gted`'s single-path work, encoded as a signed path id (decoded by
+/// `get_strategy_path_type`). Costs are exact `i64`, not the paper's floats.
 ///
-/// `clamp_to_left_right` disables the two INNER candidates at selection time only (the
-/// `cost1_I`/`cost2_I` *maintenance* below still runs unconditionally), which exercises the
-/// bidirectional `gted` and this function's L/R candidates in isolation from `spfA`. Forcing L/R
-/// instead of the truly optimal path only affects efficiency, never correctness:
-/// `gted`/`spfL`/`spfR` compute the exact distance for *any* valid strategy, optimal or not -
-/// which is why the oracle, a distance comparison, can validate the clamped strategy on its
-/// own.
-///
-/// `cost1_L/R/I` are `Vec<Option<Vec<i64>>>`, each row allocated fresh the first time a node
-/// needs one, rather than recycled through free lists once a node has been fully consumed -
-/// that would be a pure allocation-count optimization with no effect on the values computed.
+/// `clamp_to_left_right` excludes INNER candidates from selection (their costs are still
+/// propagated), to test the L/R machinery apart from `spfA`. Any valid strategy yields the exact
+/// distance, so this changes speed only.
 pub(crate) fn compute_opt_strategy_post_l(
     before_idx: &AptedIndexer,
     after_idx: &AptedIndexer,
@@ -1545,9 +1381,7 @@ pub(crate) fn compute_opt_strategy_post_l(
             cost1_i[parent_post_l] = Some(vec![0i64; size2]);
         }
 
-        // Reset for every `v` - `cost2_*` accumulate `w`'s contributions *within this v's own
-        // sweep*; carrying values over from a previous
-        // `v` would both be wrong and accumulate unboundedly across the outer loop.
+        // `cost2_*` accumulate within one `v`'s sweep only.
         cost2_l.fill(0);
         cost2_r.fill(0);
         cost2_i.fill(0);
@@ -1571,8 +1405,7 @@ pub(crate) fn compute_opt_strategy_post_l(
             }
 
             let mut min_cost = INNER_DISABLED;
-            // Left at `-1`: it's never decoded, since `gted` short-circuits straight to
-            // `spf1` (writing no `delta`) whenever either side is this small.
+            // Stays `-1` for size-1 pairs, which `gted` sends to `spf1` without decoding.
             let mut strategy_path: i64 = -1;
 
             if size_v <= 1 || size_w <= 1 {
@@ -1669,16 +1502,8 @@ pub(crate) fn compute_opt_strategy_post_l(
     strategy
 }
 
-/// Mirror of `compute_opt_strategy_post_l`, using right-to-left preorder (equivalently: a single
-/// pass over the *plain* (left-to-right) preorder indices from `size-1` down to `0`, since a
-/// node's preorder index is always smaller than every one of its descendants') instead of
-/// left-to-right postorder, with the parent-propagation step's L/R roles swapped to match - this
-/// is `computeOptStrategy_postR`. Unlike `compute_opt_strategy_post_l` this needs no
-/// `post_l_to_pre_l`/`pre_to_post_l` translation at all: `v`/`w` already *are* preorder indices
-/// throughout, simplifying every lookup. The (kr_sum/revkr_sum/desc_sum) candidate-comparison
-/// section is unchanged from postL - only the post-`min_cost` parent-propagation swaps which of
-/// L/R absorbs `cost_*_v - min_cost` (gated by `node_type_l`/`node_type_r` respectively) versus
-/// which one unconditionally adds `min_cost`.
+/// `computeOptStrategy_postR`: `compute_opt_strategy_post_l` over descending preorder (children
+/// before parents), with the L/R roles of the parent propagation swapped.
 pub(crate) fn compute_opt_strategy_post_r(
     before_idx: &AptedIndexer,
     after_idx: &AptedIndexer,
@@ -1726,8 +1551,7 @@ pub(crate) fn compute_opt_strategy_post_r(
             }
         }
 
-        // Reset for every `v`, mirroring `compute_opt_strategy_post_l`'s same per-`v` reset:
-        // `cost2_*` accumulate `w`'s contributions *within this v's own sweep*.
+        // `cost2_*` accumulate within one `v`'s sweep only.
         cost2_l.fill(0);
         cost2_r.fill(0);
         cost2_i.fill(0);
@@ -1842,9 +1666,7 @@ pub(crate) fn compute_opt_strategy_post_r(
     strategy
 }
 
-/// `getStrategyPathType`: decodes a signed, offset-encoded path id (see
-/// `compute_opt_strategy_post_l`) into which kind of path it is. The algorithm's `it` parameter is
-/// unused and is dropped here.
+/// `getStrategyPathType`: 0 LEFT, 1 RIGHT, 2 INNER.
 pub(crate) fn get_strategy_path_type(
     path_id_with_offset: i64,
     path_id_offset: i64,
@@ -1864,16 +1686,9 @@ pub(crate) fn get_strategy_path_type(
     2 // INNER
 }
 
-/// `tedInit`: densely pre-fills `delta[x][y]` for every (x, y) pair where at least one side's
-/// subtree has size 1 - the "subtree distance without the root nodes" in that case is just the cost
-/// to insert/delete everything except the size-1 side's own root, computed directly from the
-/// subtree cost sums (no recursion needed). `gted`'s own spfL/spfR/spfA write conditions are sparse
-/// by design and never populate these size-1-side cells themselves (`gted` bypasses them entirely
-/// via the `spf1` shortcut whenever one side has size 1); without this pre-fill, any (x, y) pair
-/// absorbed into a path's own contiguous sweep - rather than being given an independent recursive
-/// `gted` call - is silently left at delta=0, corrupting later `forest_dist` reads that need the
-/// true value. Must run after the strategy is computed and before `gted` starts, since `gted`'s own
-/// writes for both-size>1 pairs are disjoint from (and must not be clobbered by) this pre-fill.
+/// `tedInit`: fills `delta` for every pair where either subtree has size 1, from the subtree
+/// cost sums. `gted` sends those pairs to `spf1`, which writes nothing, so a pair absorbed into a
+/// path's sweep would otherwise read 0. Runs before `gted`, whose writes never touch these cells.
 pub(crate) fn ted_init(ctx: &EngineCtx, delta: &mut DeltaTable) {
     for x in 1..ctx.before_idx.size {
         let size_x = ctx.before_idx.sizes[x];
@@ -1892,23 +1707,8 @@ pub(crate) fn ted_init(ctx: &EngineCtx, delta: &mut DeltaTable) {
     }
 }
 
-/// `gted`: reads the strategy chosen for `(current1, current2)`, walks the indicated path on
-/// whichever side it lives on (recursing into every off-path sibling first), then dispatches to the
-/// matching single-path function for the resolved path.
-///
-/// Two deliberate departures from the textbook recursion:
-/// - No `spf1` shortcut for `size <= 1` (see `gted_forced_right`'s comment - `current2`/`current1`
-///   can sit at a much larger node than the strategy "expects" mid-recursion here exactly the way
-///   it could in that forced-right driver, for the same structural reason: the virtual
-///   root makes one side's subtree larger than any single real node, and only `spfL`/`spfR`'s own
-///   per-keyroot sweep - not a single aggregate `spf1` comparison - leaves every delta entry an
-///   ancestor's sweep might need behind).
-/// - The virtual root (preorder `0`) is never path-walked on whichever axis it appears on: unlike
-///   every other node, it does not have a single "leftmost child on the path" - *all* of its
-///   children are independent forest roots, so each gets its own fully independent `gted` call
-///   instead of being silently absorbed into a path that runs past it. This mirrors the
-///   `other_subtree == 0` fix in `spf_path`, just applied to `gted`'s own recursion instead
-///   of the keyroot-seeding helpers.
+/// `gted`: resolves every off-path subtree of the strategy's path for `(current1, current2)`
+/// recursively, then runs the single-path function for that path.
 pub(crate) fn gted(
     ctx: &EngineCtx,
     delta: &mut DeltaTable,
@@ -1917,12 +1717,8 @@ pub(crate) fn gted(
     current1: usize,
     current2: usize,
 ) -> u64 {
-    // Expand virtual-root axes *before* ever reading the strategy or calling a single-path
-    // function - on *either* axis, not just whichever one the strategy ends up choosing to
-    // decompose. `spf_path` tolerates a vroot-sized *other_subtree* (its own
-    // `other_subtree == 0` fix), but `spf_a` does not: its size-based shortcuts (e.g. "G is a
-    // single node") key off the *raw* subtree size, which the virtual root inflates by one
-    // without representing anything real, so it doesn't get to see vroot as a boundary at all.
+    // Each forest root gets its own `gted` call rather than being absorbed into a path through
+    // the virtual root, on both axes: `spf_a`'s size shortcuts would count the virtual root.
     if current1 == 0 {
         let mut total = 0;
         for &child in &ctx.before_idx.children[0] {
@@ -1940,16 +1736,8 @@ pub(crate) fn gted(
 
     let size1 = ctx.before_idx.sizes[current1];
     let size2 = ctx.after_idx.sizes[current2];
-    // Whenever EITHER side has size 1, shortcut to `spf1` - a pure scalar computation that writes
-    // nothing into `delta`. This must be `||`, not `&&`: any size-1-side pair that instead falls
-    // through to spf_path/spf_a gets its boundary cells *written* by that call's keyroot sweep,
-    // clobbering the values `ted_init` already deposited for exactly these size-1-side pairs
-    // (confirmed via a 10-node repro, commit `60453b6`: `&&` let an off-path `gted(id3-alone,
-    // id8-subtree)` call run spf_path (then still named spf_l), which overwrote `ted_init`'s
-    // delta[id3][id9]=0 mid-computation, corrupting a sibling spf_a call's read of that same cell
-    // even though the final delta value looked correct again by the time `gted` returned). Since
-    // `ted_init` already covers every size-1-side cell spf_path could otherwise write, this loses
-    // no coverage.
+    // `||`, not `&&`: a size-1 pair that reaches `spf_path`/`spf_a` has its sweep overwrite the
+    // `ted_init` cells a sibling call still reads.
     if size1 <= 1 || size2 <= 1 {
         return spf1(ctx, current1, current2);
     }
@@ -1958,7 +1746,6 @@ pub(crate) fn gted(
     let current_path_node_global = strategy_path_id.abs() - 1;
 
     if current_path_node_global < path_id_offset {
-        // Path lives on the `before` side.
         let strategy_path_type =
             get_strategy_path_type(strategy_path_id, path_id_offset, current1, size1);
         let mut current_path_node = current_path_node_global as usize;
@@ -1994,8 +1781,6 @@ pub(crate) fn gted(
         };
     }
 
-    // Path lives on the `after` side. (`current2 == 0` is impossible here - handled at the top
-    // of this function, before the strategy was ever read.)
     let current_path_node_global = current_path_node_global - path_id_offset;
     let strategy_path_type =
         get_strategy_path_type(strategy_path_id, path_id_offset, current2, size2);
@@ -2032,13 +1817,8 @@ pub(crate) fn gted(
     }
 }
 
-/// Recursive tree-decomposition driver, forcing APTED's RIGHT strategy: always decomposes
-/// `before`'s *rightmost* path, recursing into off-path (non-last) children, then
-/// `spf_path(.., PostDir::Right, ..)` for the resolved path. A `#[cfg(test)]`-only validator: pins
-/// `spf_path`/`compute_keyroots`/`apted_tree_edit_dist` (all three with `PostDir::Right`) against
-/// the oracle in isolation, since the live engine's strategy
-/// choice (`compute_opt_strategy_post_l`) doesn't otherwise guarantee the right-side machinery
-/// gets exercised on every test case.
+/// `gted` forced to `before`'s rightmost path, so tests exercise `PostDir::Right` against the
+/// oracle on every case, not just where the optimal strategy picks it.
 #[cfg(test)]
 pub(crate) fn gted_forced_right(
     ctx: &EngineCtx,
@@ -2064,11 +1844,8 @@ pub(crate) fn gted_forced_right(
     spf_path(ctx, delta, PostDir::Right, true, current1, current2)
 }
 
-/// Computes the tree edit distance and populates `delta` for a forest pair, using the real
-/// APTED engine instead of classic Zhang-Shasha keyroot decomposition. Each side's forest is
-/// wrapped under a virtual root (see `AptedIndexer`) so the single-rooted APTED recursion can
-/// run unmodified; the resulting virtual-space `delta` is then translated back into a `DeltaTable`
-/// indexed by the real (non-virtual) preorder ids that `compute_edit_mapping` expects.
+/// Runs APTED on a forest pair and returns `delta` indexed by the pruned forests' real preorder
+/// ids, as `compute_edit_mapping` expects.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn compute_delta(
     before: &PostorderIndexer,
@@ -2092,18 +1869,8 @@ pub(crate) fn compute_delta(
     before_idx.fill_subtree_costs(before_meta, cost_model);
     after_idx.fill_subtree_costs(after_meta, cost_model);
 
-    // `lchl < rchl` heuristic [APTED paper, Section 5.3]: pick whichever of postL/postR's preorder
-    // direction is cheaper for this tree's shape (counted via `lchl`/`rchl` on `before_idx` - only
-    // the source tree is ever looked at). The strategy table's *contents* (signed, offset-encoded
-    // path ids) mean the same thing regardless of which function computed them, so
-    // `gted`/`spf_path`/`spf_a` don't need to know or care which branch ran.
-    //
-    // Unclamped (INNER/spfA enabled) is correctness-verified: full fuzz suite
-    // (test_apted_engine_matches_oracle_fuzz) and a 20,000-seed shrinker sweep
-    // (shrink_apted_engine_fuzz_failure) both pass. The three conditions that took the longest to
-    // get right are documented where they are enforced rather than here: `ted_init`'s own doc
-    // comment, the bare-index note in `spf_a`'s write-A/B, and the `||`-not-`&&` note on `gted`'s
-    // `spf1` shortcut.
+    // `lchl < rchl` [APTED paper, Section 5.3] picks the cheaper strategy direction; both
+    // produce the same path-id encoding.
     let strategy = if before_idx.lchl < before_idx.rchl {
         compute_opt_strategy_post_l(&before_idx, &after_idx, false)
     } else {
@@ -2123,8 +1890,7 @@ pub(crate) fn compute_delta(
     ted_init(&ctx, &mut virtual_delta);
     gted(&ctx, &mut virtual_delta, &strategy, path_id_offset, 0, 0);
 
-    // Translate virtual-space (vroot-inclusive) preorder ids back to real preorder ids: vroot
-    // sits at virtual index `0`, real node `pre` sits at virtual index `pre + 1`, on both sides.
+    // Virtual index `pre + 1` is real preorder `pre`.
     for before_pre in 0..before.size {
         for after_pre in 0..after.size {
             let v = virtual_delta.get(before_pre + 1, after_pre + 1);
@@ -2137,12 +1903,8 @@ pub(crate) fn compute_delta(
     real_delta
 }
 
-/// Shared by the `#[cfg(test)]`-only forced-left/forced-right oracle validators: builds both
-/// sides' `AptedIndexer`s, runs `drive` once per top-level real root (see the comment on the loop
-/// below), and translates the resulting virtual-space `delta` back into real preorder ids. The
-/// live `compute_delta` no longer uses this - the real bidirectional `gted` handles the virtual
-/// root's children inside its own recursion (see its doc comment), so it only needs a single
-/// `gted(0, 0)` call, not a per-before-root loop.
+/// `compute_delta` with a test-only `drive` in place of `gted`, called once per before-side
+/// forest root.
 #[cfg(test)]
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn compute_delta_with_driver(
@@ -2177,17 +1939,12 @@ pub(crate) fn compute_delta_with_driver(
         containment,
     );
     let mut virtual_delta = DeltaTable::new(before_idx.size, after_idx.size);
-    // Drive once per top-level real root (the virtual root's children) - exactly the
-    // `other_subtree == 0` fix in `spf_path` above, mirrored on the before/T1 axis:
-    // starting from the virtual root itself would walk its leftmost/rightmost path all the way
-    // down to the forest's overall extreme leaf, silently absorbing the first real root into
-    // that path instead of giving it (and every sibling root) its own aligned boundary.
+    // Per forest root, for the same reason `spf_path` seeds keyroots per root.
     for &before_root in &before_idx.children[0] {
         drive(&ctx, &mut virtual_delta, before_root, 0);
     }
 
-    // Translate virtual-space (vroot-inclusive) preorder ids back to real preorder ids: vroot
-    // sits at virtual index `0`, real node `pre` sits at virtual index `pre + 1`, on both sides.
+    // Virtual index `pre + 1` is real preorder `pre`.
     for before_pre in 0..before.size {
         for after_pre in 0..after.size {
             let v = virtual_delta.get(before_pre + 1, after_pre + 1);

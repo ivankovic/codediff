@@ -27,17 +27,8 @@ pub fn blob_bytes(repo: &Repository, tree: &Tree, path: &Path) -> Result<Vec<u8>
     Ok(blob.content().to_vec())
 }
 
-/// The line count of the blob at `oid`, or `None` if it's binary or its *byte* length falls
-/// outside `[min_bytes, max_bytes]`. Shared size/UTF-8-validity check behind `sample_test_diffs`'
-/// and `sample_code_pairs`' blob filtering - both tools exclude near-empty files (trivial
-/// fixtures) and anything above the size `stats::expand_from_code` itself treats as "too large to
-/// parse", since `diff_code` couldn't use it anyway.
-///
-/// The gate is byte-based but the return value is a line count, not a byte count: both callers
-/// only ever used the byte length to feed `stats::sampling::loc_bucket`, and that function buckets
-/// by LOC (chosen for human-readable bucket labels - "10-30 lines" reads far better than a byte
-/// count), not bytes. The size *gate* stays byte-based regardless, since it's a cheap sanity/perf
-/// filter unrelated to which unit a caller happens to bucket by.
+/// The line count of the blob at `oid` (for `sampling::loc_bucket`), or `None` if it is not UTF-8
+/// or its *byte* length falls outside `[min_bytes, max_bytes]`.
 pub fn text_loc_if_in_range(
     repo: &Repository,
     oid: Oid,
@@ -53,15 +44,11 @@ pub fn text_loc_if_in_range(
     Some(text.lines().count())
 }
 
-/// Walks the most-recent `max_commits` non-merge, non-root commits reachable from `repo_path`'s
-/// HEAD (most-recent-first: repeated shallow fetches can leave a checkout with far more local
-/// history than its nominal depth, so walking "all reachable commits" can mean walking the entire
-/// project history - time order lets `max_commits` reliably mean "the N most recent"), and calls
-/// `on_delta` once per changed-file delta in each commit's diff against its single parent.
+/// Calls `on_delta` for each changed file of the `max_commits` most recent single-parent commits
+/// reachable from HEAD, diffed against the parent; filtering deltas is the caller's job.
 ///
-/// Only the walk/diff machinery is shared: what counts as a *useful* delta (which `Delta::*`
-/// statuses, path/language filtering, content validation, ...) differs between callers, so that
-/// stays their responsibility inside `on_delta`.
+/// Time-ordered because repeated shallow fetches can leave far more history than the nominal
+/// depth, and `max_commits` must mean "the most recent".
 pub fn walk_single_parent_commit_diffs(
     repo_path: &Path,
     max_commits: usize,
@@ -82,8 +69,7 @@ pub fn walk_single_parent_commit_diffs(
             continue;
         };
 
-        // Merges mix unrelated changes and root commits have no "before" version; neither
-        // produces a clean (before, after) edit pair, so only plain single-parent commits count.
+        // Merges mix unrelated changes and root commits have no "before".
         if commit.parents().len() != 1 {
             continue;
         }
@@ -93,9 +79,7 @@ pub fn walk_single_parent_commit_diffs(
         let after_tree = commit.tree()?;
         let mut diff = repo.diff_tree_to_tree(Some(&before_tree), Some(&after_tree), None)?;
         if detect_renames {
-            // Rename detection is off by default; without it, a renamed+edited file shows up as
-            // an unrelated Added/Deleted pair instead of the single meaningful edit pair it
-            // actually is.
+            // Off by default; without it a renamed+edited file is an unrelated Added/Deleted pair.
             let mut find_opts = DiffFindOptions::new();
             find_opts.renames(true);
             diff.find_similar(Some(&mut find_opts))?;

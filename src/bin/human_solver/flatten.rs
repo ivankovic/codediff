@@ -16,8 +16,6 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 //! Flattening a tree into visible rows, and what each node's mapping status is.
-//!
-//! Split out of `main.rs` along the section banner that already marked this boundary.
 
 use crate::*;
 
@@ -25,9 +23,8 @@ use crate::*;
 // Tree flattening & node status
 // ---------------------------------------------------------------------------------------------
 
-/// Flattens a tree into preorder (node, depth) pairs, skipping the children of collapsed nodes and
-/// (if `hidden` is given) any node -- and its whole subtree -- present in `hidden` entirely. A
-/// node that's hidden this way doesn't get a row of its own, unlike a collapsed one.
+/// Preorder (node, depth) rows. A collapsed node keeps its row but not its children; a node in
+/// `hidden` loses its row and its whole subtree.
 pub(crate) fn flatten_visible<'a>(
     root: Node<'a>,
     collapsed: &std::collections::HashSet<usize>,
@@ -58,15 +55,8 @@ pub(crate) fn walk_visible<'a>(
     }
 }
 
-/// `flatten_visible`'s output, paired with a node id -> index lookup table built alongside it.
-/// Resolving a node id back to its position in the flat list -- almost always
-/// `PanelState::cursor_id`, to move it or to find where the cursor row is for scrolling/rendering
-/// -- would otherwise be an O(n) linear scan of the flat list (`.position()`/`.find()`), repeated
-/// on every cursor move, every mark and every redraw. On a 30k-node tree that scan alone is real
-/// per-keystroke latency; the table makes it O(1).
-///
-/// Derefs to `[(Node, usize)]`, so a caller that only iterates or indexes the flat list
-/// positionally, never by node id, needs nothing from this type at all.
+/// `flatten_visible`'s output plus a node id -> row lookup. Cursor moves, marks and redraws all
+/// resolve `cursor_id` to a row, and a linear scan per keystroke is visible latency on large trees.
 pub(crate) struct FlatIndex<'a> {
     pub(crate) nodes: Vec<(Node<'a>, usize)>,
     pub(crate) by_id: rustc_hash::FxHashMap<usize, usize>,
@@ -82,13 +72,11 @@ impl<'a> FlatIndex<'a> {
         Self { nodes, by_id }
     }
 
-    /// `id`'s position in the flat list, in O(1).
     pub(crate) fn index_of(&self, id: usize) -> Option<usize> {
         self.by_id.get(&id).copied()
     }
 
-    /// The node with id `id`, in O(1). `None` if `id` isn't currently visible (e.g. hidden under
-    /// a collapsed ancestor, or under `H`'s hide-solved filter).
+    /// `None` if `id` isn't currently visible (under a collapsed ancestor, or hidden by `H`).
     pub(crate) fn node_for_id(&self, id: usize) -> Option<Node<'a>> {
         self.index_of(id).map(|index| self.nodes[index].0)
     }
@@ -102,11 +90,8 @@ impl<'a> std::ops::Deref for FlatIndex<'a> {
     }
 }
 
-/// Node IDs whose entire subtree -- the node itself and every descendant -- has `NodeStatus`
-/// other than `Unmarked`: nothing left in it to review. Used by the `H` (hide solved) toggle to
-/// prune those subtrees from the flattened view (via `flatten_visible`'s `hidden` set) while any
-/// node that's still `Unmarked` stays visible, along with its full ancestor chain (an ancestor of
-/// an `Unmarked` node can never itself be fully solved, so it's never included here).
+/// Node IDs whose node and every descendant are marked: the `hidden` set for `H`. An ancestor of
+/// an `Unmarked` node is never included, so an unmarked node stays reachable.
 pub(crate) fn fully_solved_nodes(
     root: Node,
     caches: &Caches,
@@ -117,8 +102,7 @@ pub(crate) fn fully_solved_nodes(
     solved
 }
 
-/// Post-order: returns whether `node`'s own subtree is fully solved, recording it in `solved` if
-/// so. A node counts as solved only if it is itself marked *and* every child is fully solved.
+/// Returns whether `node`'s subtree is fully solved, recording it in `solved` if so.
 pub(crate) fn mark_fully_solved(
     node: Node,
     caches: &Caches,
@@ -140,24 +124,18 @@ pub(crate) fn mark_fully_solved(
     is_solved
 }
 
-/// codediff's own per-node verdict, computed from an `ASTDiff` (via `p`) the same way `NodeStatus`
-/// is computed from the human mapping, but collapsed to a single glyph rather than distinguishing
-/// with-children/inherited marks: `before_node_map`/`after_node_map` already carry that down to
-/// every descendant node directly, since codediff maps (or zero-maps) every node in the tree.
+/// codediff's own per-node verdict (from `p`). Unlike `NodeStatus` it has no inherited variants:
+/// codediff's node maps carry an entry for every descendant directly.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum AlgoStatus {
     /// Mapped to a node on the other side (whatever the specific `ASTMappingOperation`).
     Matched,
     Deleted,
     Inserted,
-    /// No entry for this node at all, e.g. the tree root (see `ASTDiff::is_complete`) or a diff
-    /// that hasn't been recomputed since the tree changed underneath it.
+    /// No entry, e.g. the tree root (see `ASTDiff::is_complete`) or a stale diff.
     Unknown,
 }
 
-/// `side`'s node map in `diff_ast`, and the `(before, after)` mapping key that pairs `own` on
-/// that side with `partner` on the other - the two things every before/after twin below differs
-/// in.
 fn side_node_map(side: Side, diff_ast: &ASTDiff) -> &rustc_hash::FxHashMap<usize, usize> {
     match side {
         Side::Before => &diff_ast.before_node_map,
@@ -172,7 +150,6 @@ fn side_mapping_key(side: Side, own: usize, partner: usize) -> (usize, usize) {
     }
 }
 
-/// What codediff did with `node` on `side`.
 pub(crate) fn algo_status(side: Side, node: Node, diff_ast: &ASTDiff) -> AlgoStatus {
     match side_node_map(side, diff_ast).get(&node.id()) {
         Some(0) => match side {
@@ -193,11 +170,8 @@ pub(crate) fn algo_status_glyph(status: AlgoStatus) -> &'static str {
     }
 }
 
-/// Which pass produced `node`'s mapping entry on `side`, if any -- `diff_ast.mapping` has one
-/// entry per node (see `apted::common::add_delete_mappings`/`add_insert_mappings`), keyed by
-/// `(before_id, after_id)` with `0` standing in for "no partner" on whichever side is missing, so
-/// this looks up the entry the same way for a match, a delete, or (in principle) an unresolved
-/// node -- `None` only when the side's node map has no entry at all (`AlgoStatus::Unknown`).
+/// Which pass produced `node`'s mapping entry on `side`. Deletes and inserts have entries too,
+/// keyed with `0` for the missing partner; `None` only for `AlgoStatus::Unknown`.
 pub(crate) fn algo_reason(side: Side, node: Node, diff_ast: &ASTDiff) -> Option<ASTMappingReason> {
     let partner = *side_node_map(side, diff_ast).get(&node.id())?;
     diff_ast
@@ -206,21 +180,14 @@ pub(crate) fn algo_reason(side: Side, node: Node, diff_ast: &ASTDiff) -> Option<
         .map(|m| m.reason)
 }
 
-/// Short column-style label for an `ASTMappingReason`. Thin wrapper around
-/// `ASTMappingReason::bucket_label`, shared with `src/bin/benchmark_optimal_solutions.rs`'s
-/// reason-count columns so the same abbreviation means the same thing in both tools. Collapses
-/// `APTED`'s provenance payload to a bare "APTED" - see [`reason_detail`] for the version that
-/// shows it.
+/// The same bucket label `benchmark_optimal_solutions` uses, so an abbreviation means the same
+/// thing in both tools. Drops `APTED`'s provenance; see [`reason_detail`].
 pub(crate) fn reason_label(reason: ASTMappingReason) -> &'static str {
     reason.bucket_label()
 }
 
-/// Same short label as [`reason_label`], except for `APTED`, where it also appends the
-/// provenance payload (e.g. `"APTED:final_pass"`) - see `ASTMappingReason::APTED`'s doc comment
-/// on why that payload exists. Used for the `r`-toggle's per-node display (`render_panel`), where
-/// "which pass matched it" is exactly the point; `reason_label` stays the bare bucket label
-/// everywhere a stable, provenance-independent abbreviation is needed instead (the reason-count
-/// table this tool shares an abbreviation scheme with).
+/// [`reason_label`] plus `APTED`'s provenance (e.g. `"APTED:final_pass"`), for the `r` toggle's
+/// per-node display.
 pub(crate) fn reason_detail(reason: ASTMappingReason) -> String {
     match reason {
         ASTMappingReason::APTED(source) => format!("APTED:{source}"),
@@ -228,11 +195,8 @@ pub(crate) fn reason_detail(reason: ASTMappingReason) -> String {
     }
 }
 
-/// True if codediff's verdict for the Before `node` disagrees with the human's, once the human has
-/// actually made a decision about it: not just whether both sides call it "matched", but whether
-/// they agree on *what* it's matched to (mirrors the comparison `check_entry` makes for the
-/// `optimal_solutions` tests). A node the human hasn't marked yet has nothing to disagree with, so
-/// it's never flagged, even if codediff already has an opinion.
+/// True if codediff's verdict for `node` differs from the human's, including matching it to a
+/// different partner (the same comparison `check_entry` makes). An unmarked node never disagrees.
 pub(crate) fn algo_disagrees(side: Side, node: Node, caches: &Caches, diff_ast: &ASTDiff) -> bool {
     let (human_match, human_removed) = match side {
         Side::Before => (&caches.before_match, &caches.before_removed),

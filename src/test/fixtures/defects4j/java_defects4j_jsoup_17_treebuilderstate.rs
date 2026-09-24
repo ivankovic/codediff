@@ -23,11 +23,9 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // The same shape as `java-defects4j-cli-8-helpformatter` next door: an argument changes
-    // lexical class in place - `hex_integer_literal` against `character_literal` - and the human
-    // mapping pairs it while codediff deletes and inserts (reason `APTED("qualified_name")`).
-    // Also outside invariant 18's reach, and for the same reason: `argument_list` has no fields,
-    // so the slot that makes the pairing obvious to a reader is not one the grammar names.
+    // An argument changes lexical class in place (`hex_integer_literal` against
+    // `character_literal`); the human pairs it, codediff deletes and inserts. The shape of
+    // `cli-8-helpformatter`.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "java-defects4j-jsoup-17-treebuilderstate",
         1,

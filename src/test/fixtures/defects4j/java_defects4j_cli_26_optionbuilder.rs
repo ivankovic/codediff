@@ -23,10 +23,8 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // A local variable declaration is inserted and another removed; the mapping treats them as
-    // separate statements while codediff reuses the old one's parts for the new - its
-    // `type_identifier`, `identifier`, `=` and `;` - and pairs a `line_comment` across as well.
-    // Seven mismatches, all of that one substitution, all `APTED("large_flat_subtree")`.
+    // One local declaration is removed and another inserted; codediff reuses the old one's parts
+    // for the new, and pairs a `line_comment` across (`APTED("large_flat_subtree")`).
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "java-defects4j-cli-26-optionbuilder",
         7,

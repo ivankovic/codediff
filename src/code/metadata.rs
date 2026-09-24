@@ -25,27 +25,13 @@ use crate::diff::nodes;
 /// The length of each row of `contents` in **bytes** - the column one past its last character,
 /// in the unit every column in this codebase uses (see `diff::text_range::SourceColumn`).
 ///
-/// Bytes, not characters, and the distinction is not academic. The only consumer is
-/// `TextRange::from_treesitter_range`, which asks "does this node's end land exactly at the end of
-/// its row?" by comparing this against tree-sitter's `Point::column` - a **byte** offset. While
-/// this counted characters the comparison was between two different units, and it went wrong in
-/// both directions:
-///
-/// * it **failed to fire** on a row whose byte length exceeded its character count, leaving a
-///   genuine end-of-row unnormalized;
-/// * it **fired spuriously** whenever a mid-row byte column happened to equal the row's character
-///   count, rewriting that end as `(row + 1, 0)` and silently widening the range to the end of the
-///   line. `let 漢 = "yy";` is 15 bytes and 13 characters, and the string's end at byte 13 was
-///   read as end-of-row - which painted `yy";` where the human sees `yy` change.
-///
-/// Renamed from `compute_row_byte_lengths` deliberately: the unit is the whole point, so it belongs
-/// in the name rather than in a doc comment nobody re-reads.
+/// Bytes, not characters: `TextRange::from_treesitter_range` compares this against tree-sitter's
+/// byte `Point::column` to detect a range ending at end of row, and in characters that check both
+/// misses real ends and fires mid-row (`let 漢 = "yy";` would paint `yy";`).
 pub fn compute_row_byte_lengths(contents: &str) -> Vec<usize> {
     let mut result: Vec<usize> = contents.split('\n').map(str::len).collect();
 
-    // `split` always yields one trailing empty piece for a string ending in a newline. That piece
-    // is not a row: a file of "a\n" has one row, not two. An empty input keeps its single zero
-    // row, matching the previous behaviour.
+    // A trailing newline does not start a row; an empty input still has one empty row.
     if result.len() > 1 && result.last() == Some(&0) {
         result.pop();
     }
@@ -53,9 +39,7 @@ pub fn compute_row_byte_lengths(contents: &str) -> Vec<usize> {
     result
 }
 
-/**
-* Compute all metadata fields, that can be computed without reading any new information.
-*/
+/// Fills in the metadata derivable without reading the file (type and language, from the path).
 pub fn hermetic_expand(m: &mut Metadata) {
     if m.tip.is_none()
         && let Some(path) = &m.path
@@ -70,13 +54,8 @@ pub fn hermetic_expand(m: &mut Metadata) {
     }
 }
 
-/**
-* Compute AST metadata for the given Code structure.
-*
-* This function creates a default ASTMetadata object and populates it by calling hash_code
-* from hash.rs to compute both full and structural hashes for all nodes in the AST.
-* It also discovers all reference nodes and orders them by subtree size.
-*/
+/// Computes every [`ASTMetadata`] field for `code`. Errors if `code` is unparsed; an unset language
+/// becomes `Language::Unknown`.
 pub fn compute_ast_metadata(code: &Code) -> Result<ASTMetadata> {
     let mut metadata = ASTMetadata::default();
     metadata.language = code.metadata.language.unwrap_or_default();
@@ -84,9 +63,7 @@ pub fn compute_ast_metadata(code: &Code) -> Result<ASTMetadata> {
         .ast
         .as_ref()
         .context("AST must be parsed before computing metadata")?;
-    // One walk of the tree-sitter tree; every step below works over this table. Each walk used
-    // to create two cursors per node, and with eight of them the cursor traffic was a fifth of a
-    // large file's whole diff (callgrind, 2026-09-06).
+    // One walk of the tree-sitter tree serves every step: cursor traffic is expensive.
     let nodes = collect_nodes(ast.root_node());
     let source = code.contents.as_bytes();
     crate::code::hash::hash_nodes(&nodes, source, metadata.language, &mut metadata);
@@ -162,14 +139,8 @@ pub(crate) fn collect_nodes(root: tree_sitter::Node) -> Vec<NodeRecord> {
 }
 
 /**
-* Borrow `code`'s AST metadata if it has already been computed, computing a fresh (owned) copy
-* only when it hasn't.
-*
-* Every diff pass needs both sides' metadata; before this helper each pass deep-cloned the whole
-* `ASTMetadata` (several whole-tree HashMaps) per side just to sidestep borrow bookkeeping. In the
-* normal pipeline the metadata is always already present, so this is a plain borrow and costs
-* nothing. A `Code` that failed to parse yields the default (empty) metadata, matching the
-* fail-safe convention documented on `Diff`.
+* Borrows `code`'s AST metadata, computing an owned copy only when it is missing. An unparsed
+* `Code` yields empty metadata, per the fail-safe convention on `Diff`.
 */
 pub fn metadata_of(code: &Code) -> std::borrow::Cow<'_, ASTMetadata> {
     match &code.metadata.ast_metadata {
@@ -188,13 +159,10 @@ fn compute_subtree_sizes(nodes: &[NodeRecord], metadata: &mut ASTMetadata) {
     }
 }
 
-/// Compute node information (kind, text, children) for all nodes
 fn compute_node_info(nodes: &[NodeRecord], source: &[u8], metadata: &mut ASTMetadata) {
     for (preorder_index, record) in nodes.iter().enumerate() {
         let kind = record.kind.to_string();
-        // Leaves only. Every consumer compares `text` between two leaves (`UnitCostModel::ren`,
-        // `classify_match`, the slot alignment's leaf arms); an internal node's text is its
-        // children's.
+        // Leaves only; see `ASTNodeMetadata::text`.
         let text = if record.children.is_empty() {
             std::str::from_utf8(&source[record.start_byte..record.end_byte])
                 .unwrap_or("")
@@ -229,15 +197,9 @@ fn compute_node_info(nodes: &[NodeRecord], source: &[u8], metadata: &mut ASTMeta
 /// between and after its children - or 0 when every gap is formatting (the overwhelmingly common
 /// case: a well-behaved internal node's bytes are entirely covered by its children).
 ///
-/// Not a curiosity. Grammars disagree about whether a construct's payload is a child node or text
-/// the parent owns, and for several it is the latter. Census over the whole corpus (2026-08-18,
-/// `code::gap_survey`): XML `AttValue` 21663 nodes / 394KB - *every* attribute value - CSS
-/// `integer_value`/`color_value` 6962, Rust `line_comment`/`block_comment` 2149 / 146KB, YAML's
-/// quoted scalars 1844. Zero in TypeScript, JSON, Go, Kotlin, JavaScript, C++, TSX and Java, which
-/// is why the gap went unnoticed for so long.
-///
-/// A leaf owns its whole span, but that is already `ASTNodeMetadata::text`, which `ren` compares
-/// directly - so this reports 0 for leaves rather than duplicating it.
+/// Grammars that keep a payload as parent-owned text include XML (`AttValue`, every attribute
+/// value), CSS (`integer_value`, `color_value`), Rust comments and YAML quoted scalars;
+/// `code::gap_survey` measures them. Leaves report 0: their span is already `text`.
 fn owned_text_hash_of(record: &NodeRecord, source: &[u8], nodes: &[NodeRecord]) -> u64 {
     use std::hash::Hasher;
     if record.children.is_empty() {
@@ -272,15 +234,12 @@ fn owned_text_hash_of(record: &NodeRecord, source: &[u8], nodes: &[NodeRecord]) 
     }
 }
 
-/// Compute `ASTMetadata::node_to_widest_subtree_node` (see its doc comment) via a bottom-up
-/// (post-order) pass over `node_info`, already populated by `compute_node_info` - id-based, no
-/// second walk of the raw tree-sitter AST needed beyond reading the root id.
+/// Computes `ASTMetadata::node_to_widest_subtree_node` bottom-up over `node_info`, which must
+/// already be populated.
 fn compute_widest_subtree_node(code: &Code, metadata: &mut ASTMetadata) {
     let Some(ast) = code.ast.as_ref() else { return };
     let root_id = ast.root_node().id();
 
-    // Post-order via the same (id, processed) stack idiom `compute_subtree_sizes` uses, just
-    // operating on `node_info.children` instead of raw tree-sitter nodes.
     let mut stack = vec![(root_id, false)];
     while let Some((node_id, processed)) = stack.pop() {
         if processed {
@@ -313,16 +272,11 @@ fn compute_widest_subtree_node(code: &Code, metadata: &mut ASTMetadata) {
 }
 
 /**
-* Discover all reference nodes in the AST and order them by subtree size.
-*
-* Reference nodes are nodes that humans use to "think about code". Prioritizing matching reference
-* nodes results in diffs that "make sense" to humans.
-*
-* To speed up the algorithm, we sort the nodes by tree size.
+* Lists the reference nodes - the units humans think about code in, matched first so diffs make
+* sense - largest subtree first, so hash descent settles big duplicated subtrees before their
+* descendants.
 */
 fn discover_reference_nodes(nodes: &[NodeRecord], metadata: &mut ASTMetadata) {
-    // `metadata.language`, not `code.metadata.language` - the former is already fail-safed to
-    // `Language::Unknown` by `compute_ast_metadata` (this function's only caller).
     let language = &metadata.language;
 
     // Collected in preorder, children right to left, which is the order the stable sort below
@@ -331,8 +285,7 @@ fn discover_reference_nodes(nodes: &[NodeRecord], metadata: &mut ASTMetadata) {
     let mut stack = vec![0usize];
     while let Some(index) = stack.pop() {
         let record = &nodes[index];
-        // `is_named`: an anonymous keyword token can share its kind string with the statement it
-        // introduces (Kotlin's `import`), and must not be listed as a reference node itself.
+        // See `ASTNodeMetadata::is_named`.
         if record.is_named
             && nodes::is_reference(record.kind, language)
             && let Some(&subtree_size) = metadata.node_to_subtree_size.get(&record.id)
@@ -342,10 +295,8 @@ fn discover_reference_nodes(nodes: &[NodeRecord], metadata: &mut ASTMetadata) {
         stack.extend(record.children.iter().copied());
     }
 
-    // Sort reference nodes by subtree size in descending order
     reference_nodes_with_sizes.sort_by_key(|&(_, subtree_size)| std::cmp::Reverse(subtree_size));
 
-    // Extract just the node IDs in order
     metadata.reference_nodes_ordered = reference_nodes_with_sizes
         .into_iter()
         .map(|(node_id, _)| node_id)
@@ -358,11 +309,6 @@ mod tests {
 
     use std::path::PathBuf;
 
-    /// `discover_reference_nodes` must take the `metadata.language` its caller
-    /// (`compute_ast_metadata`) has already fail-safed, rather than reading
-    /// `code.metadata.language` and `.expect()`ing it: a `Code` with a real parsed AST but an
-    /// unset `metadata.language` is constructible directly, every field here being `pub`, and must
-    /// degrade gracefully like everything else in this pipeline rather than panicking.
     #[test]
     fn compute_ast_metadata_does_not_panic_when_language_is_unset() {
         let mut code = crate::code::Code::from_string("fn main() {}", &crate::code::Language::Rust);
@@ -425,14 +371,9 @@ mod tests {
     #[test]
     fn compute_row_byte_lengths_multibyte_characters() {
         let result = compute_row_byte_lengths("a🎉b\nc🎉d");
-        // Six bytes, not three characters: the emoji is four bytes, and the one consumer of this
-        // compares the result against tree-sitter's byte columns. Asserting 3 here is what let the
-        // end-of-row check fire on a mid-row column - see `compute_row_byte_lengths`' doc comment.
         assert_eq!(result, vec![6, 6]);
     }
 
-    /// The end-of-row check this feeds must agree with tree-sitter's own column for that position,
-    /// on rows where bytes and characters disagree in either direction.
     #[test]
     fn compute_row_byte_lengths_agrees_with_byte_offsets_on_mixed_rows() {
         for line in [
@@ -462,7 +403,6 @@ mod tests {
 
         let ast_metadata = compute_ast_metadata(code)?;
 
-        // Test that all metadata fields are populated
         assert!(!ast_metadata.node_to_full_hash.is_empty());
         assert!(!ast_metadata.full_hash_to_node.is_empty());
         assert!(!ast_metadata.node_to_structural_hash.is_empty());
@@ -473,10 +413,6 @@ mod tests {
             assert!(ast_metadata.node_to_full_hash.contains_key(&node_id));
         }
 
-        // Reference nodes must be ordered by subtree size, descending (largest first) - this is
-        // what lets `solve_hash_descent`'s phase 1 process the biggest duplicated subtrees before
-        // their descendants, so the descendants' own matches don't need to be decided
-        // independently.
         let sizes: Vec<usize> = ast_metadata
             .reference_nodes_ordered
             .iter()

@@ -27,15 +27,10 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // minimal 0.000%, full 0.930% (33 bytes) - the asymmetry flipped. `ranges()`'s
-    // `shifted_by_an_edit_beside_it` rule (a single-row node slid sideways by an edit elsewhere on
-    // its own row is not a Move) took Minimal to exact, and costs those 33 bytes under Full: `|v| v
-    // == "true")` on `.map_or(false, ...)` -> `.is_ok_and(...)`, which this fixture's dedicated
-    // Full painting calls a Move and its Minimal painting does not. The three fixtures the rule
-    // fixed outright (`cpp-add-const-correctness`, `kotlin-fix-loop-bug`, `java-fix-array-index`)
-    // carry one painting for both modes that paints no Move for the same shape, so the two readings
-    // of "pure same-row repositioning under Full" cannot both be honoured until those fixtures get
-    // a Full painting of their own. Accepted deliberately; not a `ranges()` bug to chase.
+    // `shifted_by_an_edit_beside_it` (a single-row node slid sideways by an edit on its own row is
+    // not a Move) makes Minimal exact and costs Full 33 bytes: this fixture's Full painting calls
+    // `|v| v == "true")` a Move, while fixtures with one painting for both modes do not. Both
+    // readings cannot be honoured until those get Full paintings of their own.
     assert_matches_human_painting_within_limit("rust-tauri-api-build-2", 0.93)
 }
 

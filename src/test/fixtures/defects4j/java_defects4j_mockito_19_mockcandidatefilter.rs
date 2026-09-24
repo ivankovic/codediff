@@ -30,7 +30,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // The ground truth moved, not the renderer - see `ground-truth-moves-limits-move`.
     assert_matches_human_painting_within_limit("java-defects4j-mockito-19-mockcandidatefilter", 3.4)
 }
 

@@ -21,13 +21,8 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // Two tests merged into one. The human resolved it as an ordinary one-to-one mapping -
-    // 32 Delete, 25 Insert, 20 MatchButNotIdentical, and no multi-map group anywhere in the
-    // fixture - so this is a reachable target, not an N:M case the format cannot express.
-    // 47 of the mismatches come from `fast_fallback`.
-    // Known gap, characterized above but unfixed. Clamped at the observed count rather than
-    // requiring an exact match. Lower (or drop back to `assert_matches_human_mapping`) once
-    // a fix lands.
+    // Two tests merged into one, resolved by the human as an ordinary one-to-one mapping with no
+    // multi-map group: a reachable target. Mostly `fast_fallback`.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "lua-luakit-luakit-actual-test-change-merging-two-tests-into-one",
         107,

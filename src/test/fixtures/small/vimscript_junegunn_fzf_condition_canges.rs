@@ -21,9 +21,7 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // A multi-map group (2 before <-> 3 after) expects codediff to realize 2 pairs, but it only
-    // matches 1 - the third after node it leaves as a leftover insert doesn't get picked over
-    // whichever specific pairing codediff's algorithm settles on.
+    // A 2:3 multi-map group expects two realized pairs; codediff matches one.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "vimscript-junegunn-fzf-condition-canges",
         1,

@@ -21,12 +21,8 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // Despite the .js extension, the fixture content isn't valid JavaScript (it's a TypeScript
-    // compiler test-baseline dump - tab-indented virtual file paths and serialized string
-    // contents, per the "broken-js" name). Tree-sitter's error-recovery parsing of malformed
-    // input is inherently unstable: removing one short substring from a ~940-line file of mostly
-    // parse-error tokens reshuffles error-recovery boundaries throughout, so a tiny textual edit
-    // cascades into a large, but not meaningfully wrong, mapping difference.
+    // Not valid JavaScript (a TypeScript compiler baseline dump). Error recovery is unstable, so
+    // removing one substring reshuffles error boundaries throughout the file.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "javascript-microsoft-typescript-broken-js-remove-string-fragment",
         464,

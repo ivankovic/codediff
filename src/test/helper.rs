@@ -31,12 +31,8 @@ use crate::code::{Code, metadata};
 use crate::diff::{ASTDiff, ASTMapping, ASTMappingOperation};
 
 /**
-* Depth-first, includes-self search for the first node of a given `kind` at or below `node`
-* (self first, then children in order, recursively). Was independently copy-pasted as
-* `find_first`/`first_child_of_kind` in six different `solve_*.rs` test modules - consolidated
-* here since one of those six copies (the since-deleted `solve_bottom_up_expansion`'s `first_child_of_kind`)
-* used *strict*-descendant semantics instead (skipping `node` itself), silently disagreeing with
-* the other five whenever called on a node that already was the target kind.
+* Depth-first, pre-order search for the first node of `kind` at or below `node`. Includes `node`
+* itself.
 */
 pub fn find_first_of_kind<'a>(node: Node<'a>, kind: &str) -> Option<Node<'a>> {
     if node.kind() == kind {
@@ -51,11 +47,8 @@ pub fn find_first_of_kind<'a>(node: Node<'a>, kind: &str) -> Option<Node<'a>> {
     None
 }
 
-/// Parses one path segment into (node kind, 0-indexed same-kind occurrence) - shared by
-/// `node_for_path` and `PathCache::resolve` so the "type" / "type:index" mini-language is defined
-/// in exactly one place. Split on the *last* colon rather than the first: node kinds can
-/// themselves contain colons (e.g. TypeScript's ":" token, Rust's "::" token), but the index
-/// suffix we append is always pure digits, so the rightmost colon is always the one we inserted.
+/// Parses one path segment into (node kind, 0-indexed same-kind occurrence). Splits on the *last*
+/// colon: node kinds can contain colons (Rust's "::"), the index suffix never does.
 fn parse_path_segment<'a>(path_segment: &'a str, path: &[&str]) -> Result<(&'a str, usize)> {
     match path_segment.rsplit_once(':') {
         Some((node_type, index_str)) => {
@@ -83,12 +76,8 @@ fn parse_path_segment<'a>(path_segment: &'a str, path: &[&str]) -> Result<(&'a s
 *    is used for traversal. In the case of "block:3", the third block node. Note the 1-indexing
 *    used to make the string easier to read for humans.
 *
-* If the path is invalid, an error is returned.
-*
-* Each segment does a fresh linear scan of the current node's children - fine for the occasional
-* one-off lookup this is designed for (e.g. `human_solver`'s interactive jump-to-node), but not for
-* resolving many paths against the same root, where the same high-fanout parent can get rescanned
-* over and over - see [`PathCache`] for that case.
+* If the path is invalid, an error is returned. Each segment rescans the parent's children; use
+* [`PathCache`] to resolve many paths against one root.
 */
 pub fn node_for_path<'a>(root: Node<'a>, path: &[&str]) -> Result<Node<'a>> {
     let mut current_node = root;
@@ -96,7 +85,6 @@ pub fn node_for_path<'a>(root: Node<'a>, path: &[&str]) -> Result<Node<'a>> {
     for path_segment in path {
         let (node_type, child_index) = parse_path_segment(path_segment, path)?;
 
-        // Find the matching child node
         let mut found_node = None;
         let mut current_count = 0;
 
@@ -124,12 +112,8 @@ pub fn node_for_path<'a>(root: Node<'a>, path: &[&str]) -> Result<Node<'a>> {
     Ok(current_node)
 }
 
-/// One parent's children, indexed once for both directions [`PathCache`] needs: `by_kind`
-/// answers `node_for_path`'s "the Nth child of kind K" (forward, path -> node), `occurrence_of`
-/// answers `path_for_node`'s "which same-kind occurrence is this child" (reverse, node -> path).
-/// Building both from the same single scan means a parent visited via both directions (as
-/// `human_mapping`'s determinism check does - see `diff_paths_with_config`) still only gets
-/// scanned once total, not once per direction.
+/// One parent's children, indexed once for both directions: `by_kind` for path -> node,
+/// `occurrence_of` (child id -> 0-indexed same-kind occurrence) for node -> path.
 struct ParentIndex<'a> {
     by_kind: HashMap<(String, usize), Node<'a>>,
     occurrence_of: HashMap<usize, usize>,
@@ -156,23 +140,10 @@ impl<'a> ParentIndex<'a> {
 }
 
 /**
-* Memoized alternative to [`node_for_path`]/[`path_for_node`], for a caller that resolves *many*
-* paths against the *same* root - e.g. `human_mapping::check_entry`'s per-mapping-entry lookups, or
-* `human_mapping::diff_paths_with_config`'s per-mapped-node path computation. Both plain functions
-* rescan a parent's children from scratch on every call; for a diff with thousands of entries that
-* all resolve through one shared high-fanout parent (a large flat JSON object is the motivating
-* case - one added key produces one mapping entry, but every *other* entry's path still passes
-* through that same object node), that rescan happening once per entry makes the whole loop
-* effectively quadratic in the entry count.
-*
-* `PathCache` fixes this by indexing each parent's children ([`ParentIndex`]) exactly once, the
-* first time that parent is visited in either direction, and reusing the index for every
-* subsequent lookup through it - the same object node then costs one scan total, not one per entry
-* that passes through it.
-*
-* Not a drop-in replacement for `node_for_path`/`path_for_node`: the memory and setup cost of the
-* index only pays for itself when the same root is queried many times, so this is a separate,
-* opt-in type rather than either plain function growing an implicit cache.
+* Memoized [`node_for_path`]/[`path_for_node`] for resolving many paths against one root. Without
+* it, entries that all pass through one high-fanout parent (a large flat JSON object) rescan it
+* once each, which is quadratic in the entry count. Opt-in, because the index only pays for itself
+* when the same root is queried many times.
 */
 #[derive(Default)]
 pub struct PathCache<'a> {
@@ -223,8 +194,7 @@ impl<'a> PathCache<'a> {
 
         while let Some(parent) = current.parent() {
             let kind = current.kind();
-            // `occurrence_of` is populated for every child of `parent` by `ParentIndex::build`,
-            // including `current` itself, so this can never miss.
+            // `ParentIndex::build` indexes every child of `parent`, so this cannot miss.
             let occurrence = self.index_of(parent).occurrence_of[&current.id()];
             path.push(format!("{}:{}", kind, occurrence + 1));
             current = parent;
@@ -239,13 +209,9 @@ impl<'a> PathCache<'a> {
 * The inverse of [`node_for_path`]: computes the path from the root of the tree down to `node`,
 * using the same "type" / "type:index" mini-language.
 *
-* This always emits the fully-qualified "type:index" form (never the bare-type shorthand), which
-* `node_for_path` also accepts, so the two functions round-trip: for any node in a tree,
-* `node_for_path(root, &path_for_node(node))` returns that same node.
-*
-* Paths are stable across re-parses of the same source text (unlike TreeSitter node IDs, which are
-* arena slot indices and can differ between parses), which is why this is the basis for comparing
-* human-authored ground-truth mappings against freshly computed diffs.
+* Always emits the "type:index" form, so `node_for_path(root, &path_for_node(node))` is `node`.
+* Unlike node ids, paths are stable across re-parses, which is why ground-truth mappings are keyed
+* by them.
 */
 pub fn path_for_node(node: Node) -> Vec<String> {
     let mut path = Vec::new();
@@ -254,8 +220,6 @@ pub fn path_for_node(node: Node) -> Vec<String> {
     while let Some(parent) = current.parent() {
         let kind = current.kind();
 
-        // Count how many earlier siblings share this node's kind, to reproduce the same
-        // 1-indexed "occurrence of this kind" numbering that node_for_path consumes.
         let mut occurrence = 0usize;
         let mut cursor = parent.walk();
         for sibling in parent.children(&mut cursor) {
@@ -276,14 +240,8 @@ pub fn path_for_node(node: Node) -> Vec<String> {
 }
 
 /**
-* Every node's path, in the same `"{kind}:{occurrence}"`-per-level format [`path_for_node`]
-* produces, computed in a single top-down O(n) pass over `root` instead of `path_for_node`'s
-* per-node O(sibling count) backward walk. That per-node cost is invisible for a single lookup,
-* but a node with many same-kind siblings (a big JSON array's elements, a large enum's variants)
-* makes it O(width) *per node at that level*, which a caller that looks up every node's path in a
-* tight loop (`human_solver`'s `action_match_to_end`, or a site generator embedding every node's
-* path) would pay again and again - this instead assigns each child its 1-indexed occurrence while
-* visiting its parent's children exactly once.
+* Every node's [`path_for_node`], keyed by node id, in one O(n) pass. Calling `path_for_node` per
+* node is quadratic in the width of wide parents.
 */
 pub fn precompute_paths(root: Node) -> HashMap<usize, Vec<String>> {
     let mut paths = HashMap::new();
@@ -342,7 +300,6 @@ pub fn entire_path_has_mapping<'a>(
     diff: &ASTDiff,
     expected_operation: ASTMappingOperation,
 ) -> Result<bool> {
-    // Build up the path incrementally, checking each intermediate node
     let mut current_before_path = Vec::new();
     let mut current_after_path = Vec::new();
 
@@ -350,33 +307,24 @@ pub fn entire_path_has_mapping<'a>(
         current_before_path.push(path_segment);
         current_after_path.push(path_segment);
 
-        // Get the nodes at this level
         match node_for_path(before_root, &current_before_path) {
-            Ok(node_before) => {
-                // Try to get the after node
-                match node_for_path(after_root, &current_after_path) {
-                    Ok(node_after) => {
-                        // Get the mapping for these nodes
-                        let mapping = diff.mapping.get(&(node_before.id(), node_after.id()));
+            Ok(node_before) => match node_for_path(after_root, &current_after_path) {
+                Ok(node_after) => {
+                    let mapping = diff.mapping.get(&(node_before.id(), node_after.id()));
 
-                        if let Some(mapping) = mapping {
-                            // Check if this mapping has the expected operation
-                            if mapping.operation != expected_operation {
-                                return Ok(false);
-                            }
-                        } else {
-                            // If there's no mapping, the path doesn't have the expected operation
+                    if let Some(mapping) = mapping {
+                        if mapping.operation != expected_operation {
                             return Ok(false);
                         }
-                    }
-                    Err(_) => {
-                        // If we can't find the path in the after tree, return false
+                    } else {
                         return Ok(false);
                     }
                 }
-            }
+                Err(_) => {
+                    return Ok(false);
+                }
+            },
             Err(_) => {
-                // If we can't find the path in the before tree, return false
                 return Ok(false);
             }
         }
@@ -432,28 +380,14 @@ pub fn was_tree_deleted<'a>(path: &[&str], root: Node<'a>, diff: &ASTDiff) -> Re
 }
 
 /**
-* Returns handmade test code as Code objects.
-*
-* Useful for testing any function that takes Code as input.
-*
-* Note that the actual files are stored with ".test" extension in "src/test/data/code". This is so
-* that the build system doesn't treat data as code. To make sure the files are correctly treated
-* during testing, ".test" extension is removed in this function.
-*
-* Returns a HashMap where the key is the file name without the ".test" extension.
+* The files in `src/test/data/code/`, parsed, keyed by file name without the ".test" extension
+* (stored as ".test" so the build does not treat them as code).
 */
 pub fn handmade_test_code() -> Result<HashMap<String, Code>> {
     let mut codes = handmade_unparsed_test_code()?;
 
-    // `ensure_parsed`, not a bare `parse` plus manual hasher setup: `parse` alone only sets
-    // `code.ast`, leaving `code.metadata.ast_metadata` at `None` - every downstream `metadata_of`
-    // call on a `Code` from this function then has nothing to borrow and silently recomputes the
-    // whole thing from scratch, once per pipeline phase that touches metadata, on both sides.
-    // `ensure_parsed` parses *and* caches metadata in one idempotent call, matching what every
-    // real caller (`Code::from_string`/`from_file`) already does. Safe because `Code`'s
-    // hand-written `Clone` drops `ast_metadata` back to `None` on every clone (see its doc
-    // comment) - a caller of this function that clones a returned `Code` before diffing gets a
-    // correct, if uncached, copy rather than one with stale root-id-keyed metadata.
+    // `ensure_parsed`, not `parse`: without cached `ast_metadata` every downstream `metadata_of`
+    // silently recomputes it, once per pipeline phase.
     for code in codes.values_mut() {
         if code.metadata.language.is_some() {
             code.ensure_parsed()?;
@@ -463,12 +397,7 @@ pub fn handmade_test_code() -> Result<HashMap<String, Code>> {
     Ok(codes)
 }
 
-/**
-* Returns handmade test code as Code objects.
-*
-* This is a special version of handmade_test_code that doesn't parse the code. This is useful for
-* testing functions that consume Data and similar files that don't get parsed.
-*/
+/// [`handmade_test_code`] without parsing, for code that consumes files that are never parsed.
 pub fn handmade_unparsed_test_code() -> Result<HashMap<String, Code>> {
     let mut result = HashMap::new();
 
@@ -493,7 +422,6 @@ pub fn handmade_unparsed_test_code() -> Result<HashMap<String, Code>> {
 
             metadata::hermetic_expand(&mut code.metadata);
 
-            // Extract file name without .test extension for the key
             let new_path = path.with_extension("");
             let file_name = new_path.file_name().unwrap();
             result.insert(file_name.to_string_lossy().into_owned(), code);
@@ -504,17 +432,8 @@ pub fn handmade_unparsed_test_code() -> Result<HashMap<String, Code>> {
 }
 
 /**
-* Returns handmade test code, but as paths to a temporary file system.
-*
-* The files are returned as a hash map, where the key of the map is the name of the file in the
-* "src/test/data/code" directory, with the ".test" extension removed. E.g.
-* "src/test/data/code/hello_world.rs.test" will become the following key-value pair:
-*
-* ("hello_world.rs", PathBuf("<temporary directory>/hello_world.rs"))
-*
-* This is useful for testing code that expects paths. This function will correctly remove the
-* ".test" extension when copying the code over to the temporary filesystem, so that all metadata
-* recognition works correctly.
+* [`handmade_test_code`] copied to a temporary directory with the ".test" extension dropped, so
+* metadata detection sees the real extension: `"hello_world.rs"` -> `<tmp>/hello_world.rs`.
 */
 pub fn handmade_test_code_as_paths() -> Result<HashMap<String, PathBuf>> {
     let mut result = HashMap::new();
@@ -542,7 +461,6 @@ pub fn handmade_test_code_as_paths() -> Result<HashMap<String, PathBuf>> {
         if path.is_file() {
             let contents = fs::read_to_string(&path)?;
 
-            // Create the destination path with .test extension removed
             let new_path = path.with_extension("");
             let file_name_os_str = new_path.file_name().unwrap();
 
@@ -557,31 +475,12 @@ pub fn handmade_test_code_as_paths() -> Result<HashMap<String, PathBuf>> {
 }
 
 /**
-* Returns every (before, after) pair in the corpus, as Code objects, swept from all of
-* `src/test/data/diffs/{handmade,small,full}/<dir>/` despite the name - see [`DIFF_DATASETS`]'s
-* doc comment for why the split doesn't matter to this function's callers.
-*
-* Note that the actual files are stored with ".test" extension in each `<dir>/`. This is so
-* that the build system doesn't treat data as code. To make sure the files are correctly treated
-* during testing, ".test" extension is removed in this function.
-*
-* Returns a HashMap where the key is the directory name and the value is the (before, after) Code
-* object pair.
+* Every (before, after) pair in the whole corpus (every [`DIFF_DATASETS`] entry, despite the
+* name), parsed, keyed by fixture name. Cached for the process: it holds every fixture in memory,
+* so prefer [`handmade_test_code_pair`] or [`handmade_test_case_dirs`].
 */
 pub fn handmade_test_code_pairs() -> Result<std::sync::Arc<HashMap<String, (Code, Code)>>> {
-    // Every fixture directory is re-read and re-parsed with tree-sitter on every call. Fine for
-    // the handful of direct callers that run once, but `compute_mismatches` (human_mapping.rs)
-    // calls this once *per fixture* it checks - across a whole suite run that turns one full
-    // O(fixture count) parse pass into an O(fixture count squared) one. The fixtures are
-    // immutable for the life of the process (nothing in this codebase mutates the on-disk test
-    // data at runtime), so memoize the whole map after the first successful build and hand out
-    // `Arc` clones from then on.
-    //
-    // `Arc`, not a bare clone of the map: this is the *entire* corpus (every `DIFF_DATASETS`
-    // entry) and `Code`'s hand-written `Clone` deep-copies the `tree_sitter::Tree` per side, so
-    // `.clone()`-ing the whole map re-materializes every parsed tree in the corpus on every single
-    // call. One `Arc` clone is a refcount bump instead - see `handmade_test_code_pair`'s doc
-    // comment for the same reasoning on the per-name cache.
+    // `Arc` because `Code::clone` deep-copies the tree; cloning the map would copy the corpus.
     static CACHE: std::sync::OnceLock<std::sync::Arc<HashMap<String, (Code, Code)>>> =
         std::sync::OnceLock::new();
     if let Some(cached) = CACHE.get() {
@@ -594,21 +493,10 @@ pub fn handmade_test_code_pairs() -> Result<std::sync::Arc<HashMap<String, (Code
 }
 
 /**
-* Every fixture in the corpus as a `(name, directory)` pair, sorted by name - the corpus walk on
-* its own, with no file read and no parse.
-*
-* Exists so that a caller that visits each fixture exactly once (`benchmark_optimal_solutions`)
-* can stream them - resolve a name, load it, measure it, drop it - instead of going through
-* [`handmade_test_code_pairs`], which necessarily holds all 500+ fixtures parsed in memory at
-* once. That distinction is worth ~5.5GB of resident memory: `code_pair_from_dir` calls
-* `ensure_parsed`, so the full-corpus map retains a `tree_sitter::Tree` *and* its `ast_metadata`
-* per side for the life of the process (measured 2026-09-02: the benchmark's RSS climbed to
-* 5564MB during the load and then sat flat there for the whole measurement run, against a 7GB
-* limit on a standard CI runner).
-*
-* A cache is the right shape for repeated lookups of the same few fixtures, which is what almost
-* every test does; it is pure cost for a single ordered pass over all of them, which is what the
-* benchmark does. Use this for the latter and [`handmade_test_code_pair`] for the former.
+* Every fixture as a `(name, directory)` pair, sorted by name, without reading or parsing
+* anything. For a single pass over the corpus that loads and drops one fixture at a time: the
+* cached [`handmade_test_code_pairs`] holds every parsed tree and its metadata in memory at once,
+* which does not fit a standard CI runner.
 */
 pub fn handmade_test_case_dirs() -> Result<Vec<(String, std::path::PathBuf)>> {
     let mut cases = Vec::new();
@@ -629,8 +517,7 @@ pub fn handmade_test_case_dirs() -> Result<Vec<(String, std::path::PathBuf)>> {
         }
     }
 
-    // Sorted so that every caller sees the same order regardless of the filesystem's `read_dir`
-    // order, which differs between machines (and so between a local run and CI).
+    // `read_dir` order differs between machines.
     cases.sort();
     Ok(cases)
 }
@@ -638,8 +525,6 @@ pub fn handmade_test_case_dirs() -> Result<Vec<(String, std::path::PathBuf)>> {
 fn handmade_test_code_pairs_uncached() -> Result<HashMap<String, (Code, Code)>> {
     let mut result = HashMap::new();
 
-    // Shares `handmade_test_case_dirs`' walk rather than repeating it, so the two can't drift on
-    // what counts as a fixture directory.
     for (dir_name, path) in handmade_test_case_dirs()? {
         if let Some(pair) = code_pair_from_dir(&path)? {
             result.insert(dir_name, pair);
@@ -649,22 +534,12 @@ fn handmade_test_code_pairs_uncached() -> Result<HashMap<String, (Code, Code)>> 
     Ok(result)
 }
 
-/// The corpus under `src/test/data/diffs/` is split by provenance into five sibling folders:
-/// `handmade` (hand-authored fixtures, never sampled), `small` (promoted from the small research
-/// dataset's `sample.csv`), `full` (promoted from the full research dataset's `sample.csv`),
-/// `stratified` (promoted from a `sample_test_diffs --stratified` run - sampled per language *per
-/// size bucket* (`stats::sampling::SIZE_BUCKETS`, gated by the `stats` feature so not linkable
-/// from here under plain `test-fixtures`), rather than per language alone, so large files get
-/// guaranteed representation instead of being drowned out by the much more common small ones; see
-/// that binary's module doc comment), and `defects4j` (the Java bug fixes of the Alikhanifard &
-/// Tsantalis AST-diff oracle - *all* 996 of its compilation units, not a selection, so this is the
-/// one dataset that is a third party's list taken whole rather than sampled by us; see
-/// `research/external/README.md`. Which of them carry a mapping is a matter of how far annotation
-/// has got, not of any property of the case, so a rate over the solved ones is not a rate over
-/// the dataset). Fixture names are unique across all five (a
-/// promoted name can't collide with a handmade one - see `human_solver`'s `action_promote`), so
-/// every reader below treats the split as an implementation detail: a name resolves to whichever
-/// of the five actually holds it, and callers never need to know which.
+/// The corpus under `src/test/data/diffs/`, split by provenance: `handmade` (hand-authored),
+/// `small` and `full` (sampled from the two research datasets), `stratified` (sampled per language
+/// *per size bucket*, so large files are represented), and `defects4j` (a third party's list taken
+/// whole, so a rate over its solved fixtures is not a rate over the dataset; see
+/// `research/external/README.md`). Names are unique across all five, so readers resolve a name to
+/// whichever dataset holds it.
 pub const DIFF_DATASETS: &[&str] = &["handmade", "small", "full", "stratified", "defects4j"];
 
 fn diffs_root() -> std::path::PathBuf {
@@ -675,9 +550,7 @@ fn diffs_root() -> std::path::PathBuf {
         .join("diffs")
 }
 
-/// The directory for fixture `name`, searched across `DIFF_DATASETS` in order - the one place
-/// that resolves the on-disk dataset split into a flat name lookup. `None` if `name` isn't a
-/// directory under any of the three.
+/// The directory for fixture `name` in whichever of `DIFF_DATASETS` holds it, or `None`.
 pub fn diffs_case_dir(name: &str) -> Option<std::path::PathBuf> {
     DIFF_DATASETS
         .iter()
@@ -685,56 +558,24 @@ pub fn diffs_case_dir(name: &str) -> Option<std::path::PathBuf> {
         .find(|path| path.is_dir())
 }
 
-/// The free-form human note for one fixture: `src/test/data/diffs/<dataset>/<name>/description.md`.
-///
-/// **What belongs here: what the fixture is and what it demands** - "Requires an N:M mapping. A
-/// rare case of 1:2." A fact about the data, true whoever is diffing it, and it travels with the
-/// directory. What does *not* belong here is why codediff currently falls short of that; a
-/// residual is a fact about this implementation and stops being true when someone fixes it, so it
-/// lives next to the limit it justifies, in the fixture's `fixtures` test file (see that
-/// module's own doc for both halves of the rule).
-///
-/// **Not a new convention.** 21 fixtures already carry this file - hand-written prose saying what
-/// the case demonstrates - and until now nothing read it. Wiring it up beats inventing a second
-/// note file beside it, and it complements `sample.csv`'s `comment` column exactly: every one of
-/// those 21 is handmade (never sampled, so no row could hold a comment) and the 20 fixtures with
-/// a sample comment are all promoted. The two sets do not intersect at all today, which is why
-/// preferring this file loses nothing.
-///
-/// `None` for a name no dataset holds - the same "no such case" answer [`diffs_case_dir`] gives,
-/// rather than a path that could never be written.
-///
-/// **A separate file, not a field of `human_mapping.json`.** The mappings come to 1.4 GB across
-/// the corpus with one file at 80 MB, and parsing them all costs about ten seconds - which is why
-/// `human_solver`'s picker already reaches for a substring scan rather than serde when it needs
-/// one bit out of every mapping. A note that has to be *displayed* in a list needs its value, not
-/// a yes/no, and pulling a JSON string value out by substring scan (escapes, embedded newlines)
-/// is a fragile thing to build to avoid a cost this file simply doesn't have.
-///
-/// **Not `README.md`, which is already in these directories.** That one is generated - provenance
-/// and upstream licensing, written by `stats::license` - so anything hand-written there is one
-/// regeneration away from being gone.
+/// The human note for one fixture, `<fixture dir>/description.md`, or `None` for a name no dataset
+/// holds. It says what the fixture demands, never why codediff falls short (that belongs in the
+/// fixture's stub, see `test::fixtures`). A separate file because `human_mapping.json` is too
+/// large to parse just to list notes, and `README.md` is generated.
 pub fn note_path(name: &str) -> Option<std::path::PathBuf> {
     diffs_case_dir(name).map(|dir| dir.join("description.md"))
 }
 
 /// The note for `name`, trimmed, or `None` if there is no note file, it can't be read, or it holds
 /// only whitespace.
-///
-/// The three cases are deliberately one answer: a fixture with no note and a fixture whose note is
-/// a stray newline are the same thing to every caller, and distinguishing them would only invite
-/// somebody to handle the difference.
 pub fn read_note(name: &str) -> Option<String> {
     let text = std::fs::read_to_string(note_path(name)?).ok()?;
     let trimmed = text.trim();
     (!trimmed.is_empty()).then(|| trimmed.to_string())
 }
 
-/// Writes `name`'s note, or **deletes** the file when `text` is blank.
-///
-/// Deleting rather than leaving an empty file is what makes "no note" a single state on disk. An
-/// empty `description.md` in 60 fixture directories would be indistinguishable from a note somebody
-/// meant to write, and would show up in every corpus listing as a file worth opening.
+/// Writes `name`'s note, or **deletes** the file when `text` is blank, so "no note" is one state on
+/// disk.
 pub fn write_note(name: &str, text: &str) -> Result<()> {
     let path = note_path(name).with_context(|| format!("no fixture directory for '{name}'"))?;
     let trimmed = text.trim();
@@ -750,65 +591,34 @@ pub fn write_note(name: &str, text: &str) -> Result<()> {
     }
 }
 
-/// `note` as a single line, for a CSV cell.
-///
-/// `description.md` is markdown and may be several paragraphs; `diffs.csv`'s `comment` column is read as
-/// a one-liner. The csv writer would quote the newlines correctly, but the result is a cell that
-/// no spreadsheet or `cut` pipeline reads the way the rest of the column reads, and a file whose
-/// diff churns whenever a note is rewrapped. So the file keeps its formatting and the CSV gets
-/// every run of whitespace collapsed to one space.
+/// `note` with every whitespace run collapsed to one space, for `diffs.csv`'s one-line `comment`
+/// cell (so rewrapping a note does not churn the CSV).
 pub fn note_as_csv_cell(note: &str) -> String {
     note.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
 // ─── Upstream provenance ────────────────────────────────────────────────────────────────────
-//
-// Where a fixture came from. Unlike everything above, this does not live in the fixture directory:
-// a promoted fixture keeps only its two files, and the repository/commit/path it was sampled from
-// stay in `sample.csv`, joined on `promoted_to`. Two binaries need that join now
-// (`diff_inventory`, which writes it into `diffs.csv`, and `generate_mapping_site`, which links
-// it), so it lives here rather than being written twice and drifting.
 
 /// The upstream columns of one promoted `sample.csv` row.
 #[derive(Debug, Clone, Default)]
 pub struct SampleProvenance {
-    /// The clone-directory slug, `owner` and `repo` joined by a dash - **not** `owner/repo` and
-    /// not a URL. The dash carries no boundary, so `Ondsel-Development-OndselSolver` cannot be
-    /// split back into its two halves by inspection; [`repository_urls`] resolves it by matching
-    /// against the real clone list instead of guessing.
+    /// The clone-directory slug, `owner-repo`. The dash is ambiguous (owners contain dashes), so
+    /// [`repository_urls`] resolves it against the clone list rather than splitting it.
     pub repository: String,
-    /// The commit the *after* side was taken from. The before side is the same file in that
-    /// commit's single parent (see `sample_code_pairs`' reconstruction contract), so this commit
-    /// *is* the change the fixture captures - which is what makes a link to it meaningful.
+    /// The commit the *after* side was taken from; the before side is its single parent, so this
+    /// commit is the change the fixture captures.
     pub commit: String,
     /// Path within the repository, at `commit`.
     pub path: String,
-    /// The comment the sample was recorded with. Superseded by the fixture's own `description.md`
-    /// (see [`read_note`]) for everything promoted; kept here because an unpromoted sample has
-    /// nowhere else to put one.
+    /// The sample's recorded comment. A promoted fixture's `description.md` supersedes it.
     pub comment: String,
 }
 
-/// Provenance read from a fixture's **own** `README.md`, the file that travels with it.
+/// Provenance read from the fixture's own generated `README.md`, so a fixture describes itself
+/// without a join against `sample.csv`. `None` when there is no README (handmade fixtures).
 ///
-/// **The fixture directory is the source of truth for what a fixture is**, and this is what makes
-/// that true rather than aspirational. Reading the same four facts - repository, commit, path,
-/// dataset - by joining `sample.csv` on `promoted_to` instead would make a fixture depend on a
-/// file outside itself to describe itself: move the directory, or lose the row, and the fixture
-/// goes anonymous. `README.md` also records the upstream license, which `sample.csv` never
-/// carries.
-///
-/// `sample.csv` keeps its own job: the append-only record of what was *sampled* and what happened
-/// to each candidate, including the rejections that have no directory at all.
-///
-/// Returns `None` for a fixture with no README - the `handmade` fixtures were written by hand
-/// rather than sampled from a repository, so they have no upstream provenance to record, and no
-/// `sample.csv` row either.
-///
-/// The parse is against `render_readme`'s own generated output (see
-/// `materialize_test_diffs`), not free-form Markdown: each fact is the single backticked span on
-/// its labelled line. The repository line carries both a clone URL and the slug; the slug is the
-/// backticked one, and the slug is what every other consumer keys on.
+/// Parses `render_readme`'s output, not free-form Markdown: each fact is the last backticked span
+/// on its labelled line (on the repository line, the slug rather than the URL).
 #[cfg(feature = "test-fixtures")]
 pub fn readme_provenance(name: &str) -> Option<SampleProvenance> {
     let dir = diffs_case_dir(name)?;
@@ -827,23 +637,13 @@ pub fn readme_provenance(name: &str) -> Option<SampleProvenance> {
         repository: backticked("Repository"),
         commit: backticked("Commit"),
         path: backticked("File"),
-        // Never read from the README: the directory a fixture sits in *is* its dataset, and a
-        // README that disagreed with its own location would be a third opinion about a fact the
-        // filesystem already settles.
         comment: String::new(),
     })
 }
 
-/// `sample.csv` keyed by the fixture name each row was promoted to.
-///
-/// `test-fixtures` only: this module also compiles under a plain `cfg(test)` build with no
-/// features (see `lib.rs`'s gate on `mod test`), where the `csv` crate the read needs is not
-/// linked. Both callers are `test-fixtures` binaries, so nothing loses access.
-///
-/// Rows with an empty `promoted_to` are candidates that were never promoted (or were rejected):
-/// they name no fixture, so they are skipped rather than keyed under an empty string. A missing
-/// `sample.csv` is an empty map, not an error - a checkout can legitimately have fixtures and no
-/// sampling history.
+/// `sample.csv` keyed by the fixture name each row was promoted to; unpromoted rows are skipped
+/// and a missing file is an empty map. Gated because `csv` is not linked in a featureless
+/// `cfg(test)` build.
 #[cfg(feature = "test-fixtures")]
 pub fn sample_provenance() -> Result<HashMap<String, SampleProvenance>> {
     let path = data_root().join("sample.csv");
@@ -873,20 +673,9 @@ pub fn sample_provenance() -> Result<HashMap<String, SampleProvenance>> {
     Ok(out)
 }
 
-/// Clone URL for each [`SampleProvenance::repository`] slug, from `list_of_repositories.csv`.
-///
-/// `test-fixtures` only, for the same reason as [`sample_provenance`].
-///
-/// The slug is `owner-repo` with the boundary lost, so it is resolved the only way that is sound:
-/// by deriving the same slug from every known clone URL and looking it up. Anything that does not
-/// resolve is simply absent - 447 of the corpus's 449 promoted samples resolve, and the two that
-/// don't come from a host whose URL has no `owner` segment at all
-/// (`https://git.libreoffice.org/core`), which is exactly the case a guessed split would get
-/// wrong silently.
-///
-/// The list covers github.com, gitlab.com and codeberg.org. All three serve a commit at
-/// `<clone url>/commit/<sha>`, which is why callers are handed the repository URL and not a
-/// per-host URL builder.
+/// Clone URL for each [`SampleProvenance::repository`] slug, from `list_of_repositories.csv`,
+/// found by deriving the slug from every clone URL (the slug cannot be split back). A slug that
+/// does not resolve is absent. Every listed host serves `<clone url>/commit/<sha>`.
 #[cfg(feature = "test-fixtures")]
 pub fn repository_urls() -> Result<HashMap<String, String>> {
     let path =
@@ -904,8 +693,6 @@ pub fn repository_urls() -> Result<HashMap<String, String>> {
         };
         let url = url.trim().trim_end_matches('/');
         if let Some(slug) = repository_slug(url) {
-            // First wins: the list is allowed to name the same repository twice, and either row
-            // gives the same URL for the purposes of a link.
             out.entry(slug).or_insert_with(|| url.to_string());
         }
     }
@@ -913,10 +700,7 @@ pub fn repository_urls() -> Result<HashMap<String, String>> {
 }
 
 /// The clone-directory slug for a clone URL: everything after the host, `.git` dropped, `/`
-/// replaced by `-` - the same shape `sample.csv`'s `repository` column holds.
-///
-/// `None` for a URL with nothing after the host, which is what makes an unresolvable entry absent
-/// rather than wrong.
+/// replaced by `-`. `None` for a URL with nothing after the host.
 fn repository_slug(url: &str) -> Option<String> {
     let after_scheme = url.split_once("://").map(|(_, rest)| rest).unwrap_or(url);
     let (_host, path) = after_scheme.split_once('/')?;
@@ -929,9 +713,6 @@ fn repository_slug(url: &str) -> Option<String> {
 
 /// The upstream commit URL for one fixture, or `None` when it has no sample row, no commit, or a
 /// repository the clone list doesn't resolve.
-///
-/// Takes the two maps rather than loading them, because every caller wants this for a whole
-/// corpus and re-reading two CSVs per fixture would be pure waste.
 pub fn upstream_commit_url(
     provenance: &SampleProvenance,
     repository_urls: &HashMap<String, String>,
@@ -939,15 +720,12 @@ pub fn upstream_commit_url(
     if provenance.commit.is_empty() {
         return None;
     }
-    // `sample.csv` records some slugs with the `.git` a bare clone directory carries; the list is
-    // derived from URLs and never does.
+    // `sample.csv` records some slugs with `.git`; the derived list never does.
     let slug = provenance.repository.trim_end_matches(".git");
     let url = repository_urls.get(slug)?;
     Some(format!("{url}/commit/{}", provenance.commit))
 }
 
-/// Gated with its only caller ([`sample_provenance`]) - see that function's note on why this
-/// module compiles in builds where `csv` is not linked.
 #[cfg(feature = "test-fixtures")]
 fn data_root() -> std::path::PathBuf {
     std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -957,28 +735,13 @@ fn data_root() -> std::path::PathBuf {
 }
 
 /**
-* Loads exactly one named fixture from `src/test/data/diffs/{handmade,small,full}/<name>/`,
-* without touching the rest of the corpus. Unlike [`handmade_test_code_pairs`], which parses and
-* caches all ~220+ fixtures on first call, this parses only `name` - the first call for a given
-* `name` pays one fixture's parse cost, not the whole corpus's. Subsequent calls for the same
-* `name` (from other tests) hit a per-name cache and are free.
+* Loads and parses one named fixture, cached per name for the process. The default for new test
+* code; for coverage across languages use [`UNIT_TEST_FIXTURES`] via
+* [`handmade_test_code_pairs_for`], and the full corpus only when that sample cannot do.
 *
-* Most tests only ever look up one or two specific fixtures by name (see
-* [`compute_mismatches_with_config`] and most callers in `apted/common/tests.rs`), so this is the
-* right default for new test code. A test that wants coverage across every language without a
-* specific fixture in mind should use [`UNIT_TEST_FIXTURES`] via [`handmade_test_code_pairs_for`]
-* instead - reach for [`handmade_test_code_pairs`] (the full corpus) only when a test genuinely
-* can't be satisfied by that sample (e.g. `test_handmade_test_code_pairs_returns_all_diffs`, or a
-* `#[ignore = "slow"]` full-corpus check).
+* Returns an `Arc` because the cache never evicts and `Code::clone` deep-copies the tree: owned
+* copies per caller grow memory without bound under parallel tests.
 */
-///
-/// Returns an `Arc` rather than an owned `(Code, Code)`: this cache is process-lifetime and never
-/// evicts, and `Code`'s hand-written `Clone` deep-copies the `tree_sitter::Tree` per side. Under
-/// `cargo test`'s default parallelism, an owned return has every call site requesting the same
-/// fixture materialize its own full parsed-tree copy on top of the one the cache retains, with
-/// nothing freed for the life of the process - monotonic growth with no plateau, and an
-/// OOM-killed run at the end of it. An `Arc` clone is a refcount bump instead of a tree copy, so
-/// concurrent requesters of the same fixture share one parse.
 pub fn handmade_test_code_pair(name: &str) -> Result<std::sync::Arc<(Code, Code)>> {
     type PairCache = std::sync::Mutex<HashMap<String, std::sync::Arc<(Code, Code)>>>;
     static CACHE: std::sync::OnceLock<PairCache> = std::sync::OnceLock::new();
@@ -1000,12 +763,7 @@ pub fn handmade_test_code_pair(name: &str) -> Result<std::sync::Arc<(Code, Code)
     Ok(pair)
 }
 
-/**
-* Same as [`handmade_test_code_pair`], but for a batch of names at once - for tests that sample a
-* handful of fixtures across languages (see `UNIT_TEST_FIXTURES`) rather than needing just one.
-* Each name still goes through the same per-name cache, so this is just a convenience wrapper, not
-* a separate loading path.
-*/
+/// [`handmade_test_code_pair`] for several names, keyed by name.
 pub fn handmade_test_code_pairs_for(
     names: &[&str],
 ) -> Result<HashMap<String, std::sync::Arc<(Code, Code)>>> {
@@ -1015,18 +773,9 @@ pub fn handmade_test_code_pairs_for(
         .collect()
 }
 
-/// 1-3 fixtures per language (smallest/fastest available, preferring real-world diffs over
-/// synthetic ones, each well under the corpus's largest fixtures) - the "unit test set" for tests
-/// that need coverage across every supported language but not the full ~220-fixture corpus. Chosen
-/// for small file size / node count, which is a reliable proxy for parse cost - but *not* for the
-/// cost of running the real diff algorithm (`for_roots`/APTED) on a fixture, which is driven by
-/// tree shape, not size (see the 2026-08-07 TODO.md entry: two of these fixtures are 100+ seconds
-/// through `for_roots` despite being small by node count). A caller that only needs to parse this
-/// set (a path<->node round trip, a size check) gets a fast, representative sample; a caller that
-/// runs the actual diff algorithm over it should stay `#[ignore = "slow"]`.
-/// See [`test_path_for_node_round_trips_through_node_for_path`] for the original motivating case (a
-/// handful of multi-hundred-KB fixtures were dominating that test's runtime while adding no
-/// coverage the smaller fixtures in the same language don't already provide).
+/// 1-3 small fixtures per language, for tests that need every language but not the corpus. Chosen
+/// for parse cost only: small does not mean fast to diff (cost follows tree shape), so a test that
+/// runs the diff over this set belongs behind `#[ignore = "slow"]`.
 pub const UNIT_TEST_FIXTURES: &[&str] = &[
     // c
     "c-freeciv-add-parameter-to-function",
@@ -1115,7 +864,7 @@ pub const UNIT_TEST_FIXTURES: &[&str] = &[
 ];
 
 /// Reads one `before.<ext>.test`/`after.<ext>.test` file into an unparsed `Code`, with its
-/// `metadata.path` set - shared by both sides of [`code_pair_from_dir`].
+/// `metadata.path` set.
 fn load_side(file_path: &Path) -> Result<Code> {
     let contents = fs::read_to_string(file_path)?;
     let mut code = Code {
@@ -1128,21 +877,15 @@ fn load_side(file_path: &Path) -> Result<Code> {
 }
 
 /**
-* Reads and parses the `before.<ext>.test` / `after.<ext>.test` pair out of a single directory
-* (a test case under `src/test/data/diffs/`, or a sampled candidate under
-* `src/test/data/samples/`). Returns `None` if the directory doesn't have both files -- this is
-* not an error, since `handmade_test_code_pairs` tolerates directories that aren't (yet) complete
-* test cases.
+* Reads and parses the `before.<ext>.test` / `after.<ext>.test` pair in `path`, with AST metadata.
+* `None`, not an error, if either file is missing.
 */
 pub fn code_pair_from_dir(path: &Path) -> Result<Option<(Code, Code)>> {
     let Some((mut before, mut after)) = code_pair_from_dir_without_metadata(path)? else {
         return Ok(None);
     };
 
-    // `ensure_parsed`, not `parse` - see `handmade_test_code`'s doc comment for why leaving
-    // `ast_metadata` uncached here silently turns every downstream `metadata_of` call into a full
-    // recompute, and why this is now safe against the stale-root-id hazard that blocked the first
-    // attempt at this fix. The tree is already there, so this only adds the metadata.
+    // The tree is already parsed; this adds the metadata (see `handmade_test_code`).
     if before.metadata.language.is_some() {
         before.ensure_parsed()?;
     }
@@ -1156,13 +899,9 @@ pub fn code_pair_from_dir(path: &Path) -> Result<Option<(Code, Code)>> {
 /// [`code_pair_from_dir`] without the AST metadata: both sides read and parsed with tree-sitter,
 /// `ast_metadata` left `None`.
 ///
-/// For the corpus scans that only walk the tree - `diff_inventory`'s row per fixture, the
-/// `human_solver` picker's unmarked-node count - and never diff. Over the whole corpus the parse is
-/// under a quarter of the load (measured 2026-09-05, release, single-threaded: 3.7s to parse
-/// 26MB of fixtures, 15.5s with the hashes, subtree sizes and sketches on top), and a scan that
-/// pays for metadata it never reads is the difference between the picker feeling instant and
-/// feeling stuck. Anything that goes on to `diff_code` must use [`code_pair_from_dir`] instead:
-/// with `ast_metadata` unset, every `metadata_of` call downstream recomputes it from scratch.
+/// For corpus scans that only walk the tree, where the metadata is most of the load cost. Anything
+/// that diffs must use [`code_pair_from_dir`]: without cached metadata every `metadata_of`
+/// recomputes it.
 pub fn code_pair_from_dir_without_metadata(path: &Path) -> Result<Option<(Code, Code)>> {
     let mut before_code = None;
     let mut after_code = None;
@@ -1197,11 +936,8 @@ pub fn code_pair_from_dir_without_metadata(path: &Path) -> Result<Option<(Code, 
     Ok(Some((before, after)))
 }
 
-/**
-* Returns a path to a fully functional git repository that is on a temporary path.
-*
-* The repository contains handmade commits to be used in tests.
-*/
+/// A temporary git repository holding one commit per numbered directory of
+/// `src/test/data/fake-git-repo/`.
 #[cfg(feature = "stats")]
 pub fn handmade_git_repository() -> Result<PathBuf> {
     let (repo_path, repo) = initialize_repository()?;
@@ -1234,19 +970,16 @@ fn read_fake_git_repo_testdata() -> Result<Vec<(u32, PathBuf)>> {
         .filter_map(|entry| {
             let entry = entry.ok()?;
             let path = entry.path();
-            if path.is_dir() {
-                // Extract directory name and try to parse as number
-                if let Some(dir_name) = path.file_name()
-                    && let Ok(num) = dir_name.to_string_lossy().parse::<u32>()
-                {
-                    return Some((num, path));
-                }
+            if path.is_dir()
+                && let Some(dir_name) = path.file_name()
+                && let Ok(num) = dir_name.to_string_lossy().parse::<u32>()
+            {
+                return Some((num, path));
             }
             None
         })
         .collect();
 
-    // Sort directories by their numeric names
     dirs.sort_by_key(|&(num, _)| num);
     Ok(dirs)
 }
@@ -1264,7 +997,6 @@ fn add_commits(repo: &Repository, repo_path: &Path, dirs: Vec<(u32, PathBuf)>) -
 }
 
 #[cfg(feature = "stats")]
-/// Copy test files from source directory to repository, transforming paths
 fn copy_test_files_to_repo(dir_path: &Path, commit_num: u32, repo_path: &Path) -> Result<()> {
     let files: Vec<_> = fs::read_dir(dir_path)
         .expect("Failed to read directory")
@@ -1309,7 +1041,6 @@ fn path_in_repo(file_path: &Path, commit_num: u32, repo_path: &Path) -> PathBuf 
 }
 
 #[cfg(feature = "stats")]
-/// Create a git commit for the current repository state
 fn create_commit(repo: &Repository, signature: &Signature, commit_num: u32) -> Result<()> {
     let commit_message = format!("Commit {}", commit_num);
 
@@ -1344,7 +1075,6 @@ fn create_commit(repo: &Repository, signature: &Signature, commit_num: u32) -> R
         )
         .expect("Failed to create commit");
     } else {
-        // First commit
         repo.commit(
             Some("HEAD"),
             signature,
@@ -1365,7 +1095,6 @@ mod tests {
 
     #[test]
     fn repository_slug_matches_the_clone_directory_name_sample_csv_records() {
-        // The three forges the corpus is drawn from, plus the `.git` a bare clone carries.
         assert_eq!(
             repository_slug("https://github.com/awslabs/aws-c-common").as_deref(),
             Some("awslabs-aws-c-common")
@@ -1378,13 +1107,11 @@ mod tests {
             repository_slug("https://codeberg.org/dnkl/foot.git").as_deref(),
             Some("dnkl-foot")
         );
-        // An owner whose own name contains dashes is exactly why the slug can't be split back
-        // apart, and exactly why this goes the other way instead.
+        // Why the slug is derived from URLs rather than split: the owner contains a dash.
         assert_eq!(
             repository_slug("https://github.com/Ondsel-Development/OndselSolver").as_deref(),
             Some("Ondsel-Development-OndselSolver")
         );
-        // A URL with nothing after the host names no repository - absent rather than wrong.
         assert_eq!(repository_slug("https://git.libreoffice.org"), None);
     }
 
@@ -1410,15 +1137,12 @@ mod tests {
             upstream_commit_url(&sample("awslabs-aws-c-common.git", "fbb2123"), &urls).as_deref(),
             Some("https://github.com/awslabs/aws-c-common/commit/fbb2123")
         );
-        // A handmade fixture has no commit, and an unknown repository has no URL. Both are the
-        // ordinary "no link" answer, not an error.
         assert!(upstream_commit_url(&sample("awslabs-aws-c-common", ""), &urls).is_none());
         assert!(upstream_commit_url(&sample("nobody-nothing", "fbb2123"), &urls).is_none());
     }
 
-    /// The join is only worth anything if it actually resolves. Measured against the real corpus
-    /// rather than asserted in the abstract: a rename in `list_of_repositories.csv`, or a new
-    /// sampling host, should show up here rather than as pages quietly losing their link.
+    /// Against the real corpus, so a renamed repository or a new host fails here rather than
+    /// silently dropping links.
     #[cfg(feature = "test-fixtures")]
     #[test]
     fn the_corpus_provenance_resolves_to_upstream_urls() {
@@ -1444,9 +1168,8 @@ mod tests {
 
     use crate::code::Language;
 
-    /// Removes `name`'s description.md on drop, so a test that writes one into the real corpus
-    /// cleans up even when it panics. Leaving one behind would change `diffs.csv`, and the
-    /// pre-commit hook would then quietly stage a fixture note nobody wrote.
+    /// Removes `name`'s description.md on drop, so a panicking test leaves no note in the real
+    /// corpus.
     struct NoteGuard(&'static str);
 
     impl Drop for NoteGuard {
@@ -1455,8 +1178,7 @@ mod tests {
         }
     }
 
-    /// Round-trips through the real fixture directory, because the paths come from
-    /// `diffs_case_dir` and cannot be pointed at a temp dir.
+    /// Uses the real fixture directory: `diffs_case_dir` cannot point at a temp dir.
     #[test]
     fn a_note_round_trips_and_a_blank_one_deletes_the_file() -> Result<()> {
         // A fixture with no description.md of its own, so nothing real is overwritten.
@@ -1474,12 +1196,11 @@ mod tests {
         );
         assert!(note_path(CASE).expect("a real case").exists());
 
-        // Blank deletes rather than leaving an empty file, so "has no note" is one state on disk.
         write_note(CASE, "   ")?;
         assert!(read_note(CASE).is_none());
         assert!(!note_path(CASE).expect("a real case").exists());
 
-        // Deleting a note that is already gone is not an error - `e` can be confirmed empty twice.
+        // Deleting a note that is already gone is not an error.
         write_note(CASE, "")?;
         Ok(())
     }
@@ -1491,8 +1212,6 @@ mod tests {
         assert!(write_note("no-such-fixture-anywhere", "x").is_err());
     }
 
-    /// The CSV cell is one line however the markdown is wrapped - otherwise every rewrap of a
-    /// paragraph churns `diffs.csv`, and the cell reads differently from the rest of its column.
     #[test]
     fn a_multi_line_note_becomes_one_csv_line() {
         assert_eq!(
@@ -1502,8 +1221,6 @@ mod tests {
         assert_eq!(note_as_csv_cell(""), "");
     }
 
-    /// The 21 descriptions that already existed are what this reads; if the filename ever drifts,
-    /// this catches it rather than `diffs.csv` silently losing a column.
     #[test]
     fn the_descriptions_already_in_the_corpus_are_readable() {
         let note = read_note("rust-no-change").expect("rust-no-change has a description.md");
@@ -1569,11 +1286,53 @@ mod tests {
     }
 
     #[test]
+    fn find_first_of_kind_includes_the_starting_node_and_searches_depth_first() -> Result<()> {
+        let test_codes = handmade_test_code()?;
+        let code = test_codes.get("hello-world.rs").unwrap();
+        let root = code.ast.as_ref().unwrap().root_node();
+
+        let function = find_first_of_kind(root, "function_item").unwrap();
+        assert_eq!(
+            find_first_of_kind(function, "function_item").map(|n| n.id()),
+            Some(function.id())
+        );
+        // Pre-order: `main`, not the later `println` macro identifier.
+        let identifier = find_first_of_kind(root, "identifier").unwrap();
+        assert_eq!(identifier.utf8_text(code.contents.as_bytes())?, "main");
+        assert!(find_first_of_kind(root, "no_such_kind").is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn a_path_segment_splits_on_its_last_colon() -> Result<()> {
+        assert_eq!(parse_path_segment("block:3", &[])?, ("block", 2));
+        assert_eq!(parse_path_segment("block", &[])?, ("block", 0));
+        assert_eq!(parse_path_segment(":::2", &[])?, ("::", 1));
+        assert!(parse_path_segment("block:x", &[]).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn precompute_paths_agrees_with_path_for_node() -> Result<()> {
+        let test_codes = handmade_test_code()?;
+        let code = test_codes.get("hello-world.rs").unwrap();
+        let root = code.ast.as_ref().unwrap().root_node();
+
+        let paths = precompute_paths(root);
+        let mut stack = vec![root];
+        let mut visited = 0;
+        while let Some(node) = stack.pop() {
+            assert_eq!(paths[&node.id()], path_for_node(node), "{}", node.kind());
+            visited += 1;
+            let mut cursor = node.walk();
+            stack.extend(node.children(&mut cursor));
+        }
+        assert_eq!(paths.len(), visited);
+        Ok(())
+    }
+
+    #[test]
     fn test_path_for_node_round_trips_through_node_for_path() -> Result<()> {
-        // path_for_node must be the exact inverse of node_for_path for every node in a tree,
-        // since human-authored mappings are compared against fresh diffs purely by path. Runs
-        // against a per-language sample (see `UNIT_TEST_FIXTURES`) rather than the whole corpus -
-        // this property doesn't depend on tree size, and the full corpus takes minutes.
         let sampled = handmade_test_code_pairs_for(UNIT_TEST_FIXTURES)?;
         assert_eq!(
             sampled.len(),
@@ -1627,15 +1386,7 @@ mod tests {
 
     #[test]
     fn path_cache_resolve_matches_node_for_path_for_every_node() -> Result<()> {
-        // `human_mapping::rebuild_caches` switched from a fresh `node_for_path` scan per entry to
-        // a `PathCache` per side (a real fixture with tens of thousands of entries sharing
-        // high-fanout parents turned that scan into multiple seconds; `PathCache` indexes each
-        // parent once instead) - this is the equivalence proof that swap didn't quietly change
-        // which node a path resolves to. Walks the same per-language fixture sample and derives
-        // paths the same way `test_path_for_node_round_trips_through_node_for_path` does, but
-        // resolves each one through *both* `node_for_path` and a `PathCache`, requiring the two to
-        // agree node-for-node - not just "both succeed", since a bug that resolved a *different*
-        // but still-valid node wouldn't show up as a resolution failure at all.
+        // Compares node ids, not just success: resolving to a different valid node is the bug.
         let sampled = handmade_test_code_pairs_for(UNIT_TEST_FIXTURES)?;
 
         for (name, pair) in &sampled {
@@ -1756,10 +1507,7 @@ mod tests {
         Ok(())
     }
 
-    /// The corpus walk, not the corpus load: `handmade_test_code_pairs` parses every fixture and
-    /// computes its metadata, which is the whole suite's single most expensive test for three
-    /// `contains_key` checks. `handmade_test_case_dirs` is the same walk without the parse, and
-    /// the loaders that build on it are covered by the fixture tests themselves.
+    /// The walk without the parse: loading the whole corpus is too expensive for a unit test.
     #[test]
     fn test_handmade_test_case_dirs_lists_every_diff() -> Result<()> {
         let names: Vec<String> = handmade_test_case_dirs()?
@@ -1792,7 +1540,6 @@ mod tests {
 
     #[test]
     fn test_entire_path_has_mapping() -> Result<()> {
-        // Use rust-no-change since all nodes should have Identical mapping
         let (before, after) = &*handmade_test_code_pair("rust-no-change")?;
 
         let diff = crate::diff::diff_code(before, after);
@@ -1803,8 +1550,6 @@ mod tests {
         let before_root = before_ast.root_node();
         let after_root = after_ast.root_node();
 
-        // rust-no-change has impl_item as a child of source_file (with comments before it)
-        // Test a path where all nodes should have Identical mapping (no changes)
         let path = vec!["impl_item"];
         assert!(entire_path_has_mapping(
             &path,
@@ -1832,7 +1577,6 @@ mod tests {
             ASTMappingOperation::Identical
         )?);
 
-        // Test with wrong expected operation - should return false
         let path = vec!["impl_item"];
         assert!(!entire_path_has_mapping(
             &path,
@@ -1842,7 +1586,7 @@ mod tests {
             ASTMappingOperation::MatchButNotIdentical
         )?);
 
-        // Test with a non-existent path - should return false (no mapping)
+        // A path that does not resolve is false, not an error.
         let path = vec!["impl_item", "nonexistent"];
         assert!(!entire_path_has_mapping(
             &path,
@@ -1852,7 +1596,6 @@ mod tests {
             ASTMappingOperation::Identical
         )?);
 
-        // Test with rust-hello-world-added-message where we know function_item has MatchButNotIdentical
         let (before2, after2) = &*handmade_test_code_pair("rust-hello-world-added-message")?;
 
         let diff2 = crate::diff::diff_code(before2, after2);
@@ -1862,7 +1605,6 @@ mod tests {
         let before_root2 = before_ast2.root_node();
         let after_root2 = after_ast2.root_node();
 
-        // Just check the function_item node - it has MatchButNotIdentical
         let path = vec!["function_item"];
         assert!(entire_path_has_mapping(
             &path,

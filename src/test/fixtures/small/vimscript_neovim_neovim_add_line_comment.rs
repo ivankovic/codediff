@@ -21,9 +21,8 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // Was 15 mismatches (same-kind-sibling ambiguity in a 1732-line file with hundreds of
-    // near-duplicate test functions - see TODO.md's "1 new optimal-solution fixture added, clamped"
-    // entry) until `solve_large_flat_subtrees` incidentally resolved it too - see TODO.md.
+    // Same-kind-sibling ambiguity among hundreds of near-duplicate functions, resolved by
+    // `solve_large_flat_subtrees`.
     test::helper::human_mapping::assert_matches_human_mapping(
         "vimscript-neovim-neovim-add-line-comment",
     )

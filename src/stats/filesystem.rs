@@ -43,12 +43,8 @@ pub fn find_git_repositories(base_path: &Path) -> Result<Vec<PathBuf>> {
     Ok(repo_paths)
 }
 
-/// Runs `process` once per repository in `repo_paths`, printing "Scanning {name}... " before and
-/// "done" (or the error) after each - the identical progress-reporting wrapper
-/// `sample_code_pairs.rs` and `sample_test_diffs.rs` each hand-rolled around their own
-/// differently-shaped per-repository sampling call. `process` gets the repository's path and its
-/// derived directory-name (empty string if the path has none); a returned `Err` is reported to
-/// stderr and does not stop the remaining repositories from being processed.
+/// Runs `process(path, directory name)` once per repository, with a progress line for each. An
+/// `Err` is reported to stderr and does not stop the remaining repositories.
 pub fn for_each_repository(
     repo_paths: &[PathBuf],
     mut process: impl FnMut(&Path, &str) -> Result<()>,
@@ -72,7 +68,6 @@ pub fn for_each_repository(
 
 pub fn all_files_from_path(root: &Path, path_tx: Sender<PathBuf>) -> Result<()> {
     if root.is_file() {
-        // Ignore error if no receivers (program shutting down)
         if !anomalous_paths::is_anomalous(root) {
             let _ = path_tx.send(PathBuf::from(root));
         }
@@ -83,9 +78,7 @@ pub fn all_files_from_path(root: &Path, path_tx: Sender<PathBuf>) -> Result<()> 
                     continue;
                 }
 
-                // This will block when the queue is full.
                 if path_tx.send(entry.into_path()).is_err() {
-                    // All workers are gone, stop producing.
                     break;
                 }
             }

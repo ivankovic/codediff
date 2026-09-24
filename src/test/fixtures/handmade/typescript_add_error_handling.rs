@@ -27,10 +27,8 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // Among the largest residuals in the corpus, behind kotlin-refactor-function (~61%) and
-    // java-add-exception-handling (~54%) - and, like both of those, an edit that wraps existing
-    // code in new error-handling structure. That is the shape codediff renders least like a human
-    // does, and three fixtures now say so.
+    // Wrapping existing code in new error-handling structure is the shape codediff renders least
+    // like a human (as in kotlin-refactor-function and java-add-exception-handling).
     assert_matches_human_painting_within_limit("typescript-add-error-handling", 35.61)
 }
 

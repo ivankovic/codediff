@@ -21,13 +21,9 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // A whitespace change that actually modifies the AST and the code logic: `.a.b` (one
-    // `class_selector` with two `.`-prefixed parts) becomes `.a .b` (a `descendant_selector`
-    // wrapping a second `class_selector`) - real tree restructuring from a formatting-looking edit.
-    // the terminal `fast_fallback` resolver leaves every relocated `class_selector`/`.` pair as a
-    // Delete+Identical-elsewhere rather than reaching inside the newly-inserted
-    // `descendant_selector` wrapper to match them - the wrap/reparent shape this project's
-    // move-detection work has repeatedly found hard, not a new failure mode.
+    // A whitespace change that restructures the tree: `.a.b` becomes `.a .b`, a new
+    // `descendant_selector` wrapping a second `class_selector`. `fast_fallback` does not reach
+    // into the new wrapper: the wrap/reparent shape.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "css-horst3180-vertex-theme-add-spaces-to-change-class-selector-into-descendant-selectors",
         16,

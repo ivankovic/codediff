@@ -16,19 +16,13 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-// Split out of text.rs (its trailing `#[cfg(test)] mod tests` block) purely to shrink that
-// file's visible size, matching the same pattern already used for `nodes.rs`/`nodes/tests.rs`
-// and `apted/common.rs`/`apted/common/tests.rs`. No behavior change.
-
 use crate::test;
 use anyhow::Result;
 
-use super::*;
-// The test module exercises private (`pub(crate)`) helpers of each submodule directly, not just
-// the public API they expose through `text.rs`'s re-exports above.
 use super::plain_text_diff::*;
 use super::render_options::*;
 use super::summary::*;
+use super::*;
 
 fn text_range_on(row: usize, start: usize, end: usize) -> TextRange {
     TextRange::new(row, start, row, end)
@@ -42,30 +36,21 @@ fn changed(row: usize, start: usize, end: usize) -> RangeMatch {
     }
 }
 
-/// Neither preset ever turns `whole_pair_updates` on - the corpus's own ground truth was
-/// painted narrow either way, so this option lives outside the `MINIMAL`/`FULL` axis entirely.
-/// See that field's own doc comment.
+/// The corpus was painted narrow under both presets, so `whole_pair_updates` is off in both.
 #[test]
 fn neither_preset_turns_on_whole_pair_updates() {
     const { assert!(!RenderOptions::MINIMAL.whole_pair_updates) };
     const { assert!(!RenderOptions::FULL.whole_pair_updates) };
 }
 
-/// Unlike `whole_pair_updates`, the two presets genuinely disagree on
-/// `paint_reindent_only_moves` - measured directly against `rust-next-font-imports-generator`'s
-/// separate `Minimal`/`Full` ground truths (see that field's own doc comment).
+/// `rust-next-font-imports-generator`'s `Minimal` and `Full` paintings disagree on this.
 #[test]
 fn minimal_and_full_disagree_on_paint_reindent_only_moves() {
     const { assert!(!RenderOptions::MINIMAL.paint_reindent_only_moves) };
     const { assert!(RenderOptions::FULL.paint_reindent_only_moves) };
 }
 
-/// The actual gate `paint_reindent_only_moves` controls: a node
-/// `solve_nested_condition_collapse` has tagged `NestedConditionCollapse` (a verified pure
-/// reindent) paints as `Move` when the option is on, and is left unpainted when it's off -
-/// while an *ordinary* column-shifted match (no such tag - a genuine relocation, the
-/// `rust-add-if` shape this option must never touch) keeps painting `Move` regardless of the
-/// option either way.
+/// A `NestedConditionCollapse`-tagged body paints `Move` only under `paint_reindent_only_moves`.
 #[test]
 fn paint_reindent_only_moves_gates_only_tagged_nodes() {
     let body = "\x20               step_one();\n\
@@ -136,23 +121,16 @@ fn paint_reindent_only_moves_gates_only_tagged_nodes() {
     );
 }
 
-/// `paint_displaced_moves` is the second axis the two presets disagree on, and the polarity
-/// matters: `MINIMAL` suppresses a displacement-only `Move`, `FULL` keeps painting it.
+/// `MINIMAL` suppresses a displacement-only `Move`; `FULL` keeps it.
 #[test]
 fn minimal_and_full_disagree_on_paint_displaced_moves() {
     const { assert!(!RenderOptions::MINIMAL.paint_displaced_moves) };
     const { assert!(RenderOptions::FULL.paint_displaced_moves) };
 }
 
-/// The gate `paint_displaced_moves` controls, in the shape the corpus found it in
-/// (`shellscript-ansible-ansible-a-small-add`): a single-row node keeps its own text *and* its
-/// own place beside the one edit on its row, but lands on a different row index because a line
-/// was inserted above it. `FULL` paints that `Move`, `MINIMAL` does not.
-///
-/// Before 2026-09-08 `shifted_by_an_edit_beside_it` additionally required `s.start_row ==
-/// d.start_row`, so the check could not fire at all here and *both* presets painted `Move` -
-/// which is why the `FULL` half of this test is as load-bearing as the `MINIMAL` half. It pins
-/// that the fix stayed a preset split rather than becoming a blanket suppression.
+/// `shellscript-ansible-ansible-a-small-add`'s shape: a single-row node keeps its text and its
+/// place beside the one edit on its row, but a line inserted above changes its row index. The
+/// `FULL` half pins that this stays a preset split, not a blanket suppression.
 #[test]
 fn paint_displaced_moves_gates_a_node_pushed_down_by_an_insertion_above_it() {
     let before = Code::from_string(
@@ -166,13 +144,9 @@ fn paint_displaced_moves_gates_a_node_pushed_down_by_an_insertion_above_it() {
     let ast = crate::diff::diff_code(&before, &after);
     let node_cache = crate::diff::NodeCache::build(&before, &after);
 
-    // The tail of the call's own row - unchanged text, pushed one row down by `setup();` above
-    // it and rightwards by `extra, ` beside it. Neither displacement is a relocation.
-    //
-    // Asserted as "is there an `Identical` range starting there at all", not as "is that one
-    // range `Move` vs `Identical`": under `FULL` the span is not a range of its own, it is
-    // swallowed into the multi-row `Move` that runs from it to the closing brace, so there is
-    // nothing at that position to compare an operation against.
+    // The call row's unchanged tail, pushed down by `setup();` and right by `extra, `. Asserted as
+    // "is there an `Identical` range there" because under `FULL` it is swallowed into a larger
+    // multi-row `Move`, not a range of its own.
     let identical_tail_on_the_call_row = |options| {
         TextDiff::from_with_options(
             &before,
@@ -200,15 +174,9 @@ fn paint_displaced_moves_gates_a_node_pushed_down_by_an_insertion_above_it() {
     );
 }
 
-/// The multi-row half of the same gate (`rust-adding-a-variable-and-test-with-comments`): a
-/// closure spanning three rows whose *first* row carries the one edit - `row_len` renamed to
-/// `paint_row_len` beside it - and which a line inserted above pushes down the file. Its
-/// remaining rows are byte-identical at the same columns, so nothing about it was relocated.
-///
-/// `shifted_within_its_own_line` was written against row *indices* (`s.start_row ==
-/// d.start_row`) and so could not fire here, exactly as `shifted_by_an_edit_beside_it` could
-/// not; `displaced_beside_an_edit_on_its_first_row` reads the geometry and the row content
-/// instead. Pinned as a preset split, not a blanket suppression - `FULL` still paints it.
+/// The multi-row half (`rust-adding-a-variable-and-test-with-comments`): a closure whose first row
+/// carries the one edit, pushed down by a line inserted above, other rows unchanged. `FULL` still
+/// paints it.
 #[test]
 fn paint_displaced_moves_gates_a_multi_row_node_edited_on_its_first_row() {
     let before = Code::from_string(
@@ -249,15 +217,8 @@ fn paint_displaced_moves_gates_a_multi_row_node_edited_on_its_first_row() {
     );
 }
 
-/// `reconcile_moves` must not require the *other* walk to hold a range with this pair's
-/// destination extent **exactly**, treating anything else as the two walks disagreeing about which
-/// pair relocated. The two walks routinely decompose the same subtree differently, so a relocation
-/// both of them saw reads as a conflict - and the tie-break then withdraws one side's correct
-/// claim while its own counterpart lookup finds nothing to promote, leaving the relocation painted
-/// on one side and blank on the other.
-///
-/// Here the two sides name the same relocation over extents a column or two apart, so neither
-/// side's exact-extent lookup finds the other. Neither claim may be withdrawn.
+/// Two walks naming one relocation over extents a column apart agree; neither claim is withdrawn
+/// under `FULL`, while `MINIMAL` keeps only the more economical account.
 #[test]
 fn reconcile_moves_keeps_two_overlapping_accounts_of_one_relocation() {
     let range_match = |source: TextRange, destination: TextRange, operation| RangeMatch {
@@ -299,6 +260,72 @@ fn reconcile_moves_keeps_two_overlapping_accounts_of_one_relocation() {
     );
 }
 
+fn one_row(row: usize) -> TextRange {
+    TextRange::new(row, 0, row + 1, 0)
+}
+
+fn row_pair(source_row: usize, destination_row: usize, operation: TextOperation) -> RangeMatch {
+    RangeMatch {
+        source: one_row(source_row),
+        destination: one_row(destination_row),
+        operation,
+    }
+}
+
+/// One line moved below five: the before walk blames the five, the after walk the one. The
+/// smaller account wins on both sides, and the winner's counterpart is promoted to `Move`.
+#[test]
+fn reconcile_moves_believes_the_side_that_blames_fewer_rows() {
+    let mut before = vec![row_pair(0, 5, TextOperation::Identical)];
+    before.extend((1..6).map(|row| row_pair(row, row - 1, TextOperation::Move)));
+    let mut after = (0..5)
+        .map(|row| row_pair(row, row + 1, TextOperation::Identical))
+        .collect::<Vec<_>>();
+    after.push(row_pair(5, 0, TextOperation::Move));
+
+    reconcile_moves(&mut before, &mut after, RenderOptions::FULL);
+
+    let moved_rows = |ranges: &[RangeMatch]| {
+        ranges
+            .iter()
+            .filter(|r| r.operation == TextOperation::Move)
+            .map(|r| r.source.start_row)
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(moved_rows(&before), vec![0]);
+    assert_eq!(moved_rows(&after), vec![5]);
+}
+
+/// Two accounts of equal size: the before side's wins, so the result is a function of the input.
+#[test]
+fn reconcile_moves_breaks_a_tie_in_favour_of_the_before_side() {
+    let mut before = vec![
+        row_pair(0, 1, TextOperation::Move),
+        row_pair(1, 0, TextOperation::Identical),
+    ];
+    let mut after = vec![
+        row_pair(0, 1, TextOperation::Move),
+        row_pair(1, 0, TextOperation::Identical),
+    ];
+
+    reconcile_moves(&mut before, &mut after, RenderOptions::FULL);
+
+    let operations = |ranges: &[RangeMatch]| {
+        ranges
+            .iter()
+            .map(|r| r.operation.clone())
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(
+        operations(&before),
+        vec![TextOperation::Move, TextOperation::Identical]
+    );
+    assert_eq!(
+        operations(&after),
+        vec![TextOperation::Identical, TextOperation::Move]
+    );
+}
+
 /// `paint_resized_moves` is the third axis the two presets disagree on.
 #[test]
 fn minimal_and_full_disagree_on_paint_resized_moves() {
@@ -330,9 +357,7 @@ fn minimal_and_full_disagree_on_whole_identifier_updates() {
     const { assert!(RenderOptions::FULL.whole_identifier_updates) };
 }
 
-/// The exact tokens the painted corpus showed `Full` adding over `Minimal` - eight `(`, five
-/// `)`, two `):` and one `;` across ten fixtures. If `Minimal` does not drop these, it is not
-/// modelling the style it is named after.
+/// The lone brackets and separators the painted corpus's `Minimal` drops.
 #[test]
 fn minimal_drops_the_punctuation_the_painted_corpus_drops() {
     for text in ["(", ")", "):", ";", "{", "}", "[]", "  ", " ,\n", "( )"] {
@@ -449,9 +474,7 @@ fn minimal_keeps_whitespace_inside_a_range() {
     );
 }
 
-/// `FULL` keeps leading whitespace (that option is on) but still trims trailing whitespace -
-/// unlike old `RenderMode::Full`, which was untouched by any of this. Trailing whitespace is
-/// not an option at all; every preset trims it.
+/// Trailing whitespace is not an option: even `FULL` trims it.
 #[test]
 fn full_keeps_leading_but_still_trims_trailing_whitespace() {
     let source = "    foo   \n";
@@ -467,12 +490,8 @@ fn full_keeps_leading_but_still_trims_trailing_whitespace() {
     );
 }
 
-/// The rules doc's own indentation example: a whole multi-line block inserted on its own,
-/// each row indented. `leading_whitespace: false` (choice 2, what `MINIMAL` does since
-/// 2026-09-01) must highlight each row's own real content only - not the indentation before
-/// `def` on row 0, and not the indentation before `print` on row 1 either, even though
-/// `leading_whitespace: true` (choice 3/4, what `FULL` does) keeps that second row's
-/// indentation whole.
+/// A multi-line block inserted on its own: with `leading_whitespace` off each row is highlighted
+/// without its indentation, including interior rows that `FULL` keeps whole.
 #[test]
 fn leading_whitespace_off_splits_a_multiline_insert_per_row_trimmed() {
     let source = "    def added_function():\n        print(\"added\")\n";
@@ -534,9 +553,7 @@ fn leading_whitespace_off_drops_a_blank_interior_row() {
     );
 }
 
-/// The per-row split only ever applies to `Insert`/`Delete` - see `leading_whitespace`'s own
-/// doc comment for why a matched `Update`/`Move` range isn't split the same way. A multi-row
-/// Update stays exactly one range, its interior rows unaffected by this option either way.
+/// The per-row split applies only to `Insert`/`Delete`: a multi-row `Update` stays one range.
 #[test]
 fn leading_whitespace_off_does_not_split_a_multiline_update() {
     let source = "one\ntwo\nthree\n";
@@ -638,11 +655,8 @@ fn leading_whitespace_off_alone_still_keeps_a_range_containing_punctuation() {
     );
 }
 
-/// `python-refactoring`'s own shape, minimized: `max_val = max(numbers)` where the diff's own
-/// range-merging bundles `max_val = max(` (real content, survives `structural_punctuation:
-/// false` on its own) as one Insert range, leaving `)` alone in a second, purely-structural
-/// Insert range that would otherwise be dropped. The lone `)` must be restored so a reader
-/// never sees `(` without its own `)`.
+/// `python-refactoring`, minimized: merging bundles `max_val = max(` into one `Insert` and leaves
+/// `)` alone. The lone `)` is restored so a reader never sees `(` without it.
 #[test]
 fn a_lone_closing_paren_is_restored_when_its_open_partner_survives() {
     let source = "max_val = max(numbers)";
@@ -672,10 +686,7 @@ fn a_lone_closing_paren_is_restored_when_its_open_partner_survives() {
     );
 }
 
-/// The symmetric case doesn't need restoring at all: `(` is already alone in its own range,
-/// same as `)` - nothing keeps either half in isolation, so both stay dropped exactly as
-/// `structural_punctuation: false` says for an ordinary standalone pair with nothing else
-/// painted nearby.
+/// A pair whose halves are both standalone stays dropped.
 #[test]
 fn a_pair_that_is_entirely_standalone_punctuation_stays_dropped() {
     let source = "(x)";
@@ -706,11 +717,8 @@ fn a_pair_that_is_entirely_standalone_punctuation_stays_dropped() {
     assert!(!result.iter().any(|r| r.source == text_range_on(0, 2, 3)));
 }
 
-/// Restoration is scoped to `Insert`/`Delete` - a `Move`/`Update` range that happens to be
-/// standalone punctuation is left to its own operation-specific reading rather than restored
-/// for pairing's sake. Measured directly: including `Move` regressed
-/// `javascript-refactor-arrow-func`, which paints a lone `");"` `Move` that the human's own
-/// ground truth never wanted shown at all.
+/// Restoration is scoped to `Insert`/`Delete`: `javascript-refactor-arrow-func` paints a lone `");"`
+/// `Move` that its ground truth never shows.
 #[test]
 fn a_lone_move_bracket_is_not_restored() {
     let source = "max_val = max(numbers)";
@@ -848,10 +856,7 @@ fn plain_text_line_diff_finds_a_pure_deletion() {
     assert_eq!(changed_row_spans(&after), vec![]);
 }
 
-/// Two lines that share no common prefix or suffix at all are not a rewrite of each other in
-/// any useful sense, so they stay an adjacent delete+insert pair, same as a plain `diff -u`.
-/// The similar-lines case is `plain_text_line_diff_narrows_a_changed_line_to_the_changed_part`
-/// below.
+/// Two lines sharing no affix are not a rewrite of each other: delete plus insert, as `diff -u`.
 #[test]
 fn plain_text_line_diff_treats_a_dissimilar_changed_line_as_delete_plus_insert() {
     let (before, after) = plain_text_line_diff("a\nOLD\nc\n", "a\nNEW\nc\n");
@@ -865,9 +870,7 @@ fn plain_text_line_diff_treats_a_dissimilar_changed_line_as_delete_plus_insert()
     );
 }
 
-/// Every range on one row, as `(operation, start_column, end_column)` - byte columns, this
-/// module's convention (see `text_range::SourceText::byte_index`). The assertion shape the
-/// intra-line tests below need, where `changed_row_spans` deliberately drops columns.
+/// Every range on one row, as `(operation, start_column, end_column)` in byte columns.
 fn row_column_spans(ranges: &[RangeMatch], row: usize) -> Vec<(TextOperation, usize, usize)> {
     ranges
         .iter()
@@ -882,9 +885,7 @@ fn row_column_spans(ranges: &[RangeMatch], row: usize) -> Vec<(TextOperation, us
         .collect()
 }
 
-/// The point of the whole intra-line path: a wide line whose one field changed highlights that
-/// field, not the row. Modeled on a regenerated CSV row (the case that motivated this - see
-/// `MIN_SHARED_AFFIX_PERCENT`), where only a timing column differs.
+/// A wide line whose one field changed highlights that field, not the row (a regenerated CSV row).
 #[test]
 fn plain_text_line_diff_narrows_a_changed_line_to_the_changed_part() {
     let before = "h\nname,alpha,beta,gamma,delta,37.282,epsilon,zeta\n";
@@ -913,9 +914,7 @@ fn plain_text_line_diff_narrows_a_changed_line_to_the_changed_part() {
     );
 }
 
-/// A pure block insert must keep reading as one change, not become one range per line. This is
-/// the regression the gap-level gate in `emit_gap` exists for: if it ever leaks, `n`/`p`
-/// navigation degrades for every grammar-less file.
+/// A pure block insert stays one range, not one per line, so `n`/`p` navigation steps over it once.
 #[test]
 fn plain_text_line_diff_keeps_a_block_insert_merged() {
     let before = "same\n";
@@ -928,10 +927,8 @@ fn plain_text_line_diff_keeps_a_block_insert_merged() {
     );
 }
 
-/// Rows inserted *among* changed rows knock the two sides out of step. Without the bounded
-/// resynchronisation in `plan_gap` the first mismatch ends refinement for the entire rest of
-/// the run - which is exactly what happened on the CSV that motivated this (33 rows narrowed,
-/// 400+ below the first inserted row fell back to whole-line).
+/// Rows inserted among changed rows knock the sides out of step; `plan_gap` resynchronises
+/// instead of ending refinement for the rest of the run.
 #[test]
 fn plain_text_line_diff_resynchronises_after_an_inserted_line() {
     let before = "row-a,1\nrow-b,1\nrow-c,1\n";
@@ -960,9 +957,8 @@ fn plain_text_line_diff_resynchronises_after_an_inserted_line() {
     );
 }
 
-/// Byte columns, not character counts. A multi-byte character before the changed part shifts
-/// every later byte offset, and getting this wrong slices mid-character downstream - the crash
-/// `text_range::row_col_to_byte_index`'s doc comment records.
+/// Byte columns, not characters: a multi-byte character before the change shifts every later
+/// offset, and getting it wrong slices mid-character downstream.
 #[test]
 fn plain_text_line_diff_intra_line_columns_are_byte_offsets() {
     let before = "x\nprefix — value 1 suffix\n";
@@ -988,9 +984,8 @@ fn plain_text_line_diff_intra_line_columns_are_byte_offsets() {
     );
 }
 
-/// Non-contiguous matches (matched, gap on both sides, matched, gap on both sides, matched) -
-/// the case most likely to expose a grouping bug, since a naive implementation might zip the
-/// two sides' gaps together instead of walking each side's own row space independently.
+/// Matches separated by gaps on both sides: each side's gaps are walked in its own row space, not
+/// zipped together.
 #[test]
 fn plain_text_line_diff_handles_non_contiguous_matches() {
     let before = "same0\nDEL_A\nsame1\nDEL_B\nDEL_C\nsame2\n";
@@ -1019,10 +1014,8 @@ fn plain_text_line_diff_handles_non_contiguous_matches() {
     assert_eq!(matches, vec![(0, 0), (2, 3), (5, 4)]);
 }
 
-/// The cross-panel cursor anchor for an unmatched run must land right after the nearest
-/// *preceding* match in the other side's coordinate space - not at the unmatched run's own
-/// row number, which is a different (and generally diverging) coordinate space once earlier
-/// insertions/deletions have shifted the two sides out of alignment.
+/// An unmatched run's anchor is just past the preceding match's destination, not its own row
+/// number, which is in the other side's coordinate space.
 #[test]
 fn plain_text_line_diff_anchors_unmatched_runs_at_the_preceding_matchs_destination() {
     // before: same0, DEL, same1        (3 lines)
@@ -1081,12 +1074,8 @@ fn plain_text_line_diff_treats_two_empty_files_as_no_changes() {
     assert!(after.is_empty());
 }
 
-/// Past the edit-distance cap, `myers_lcs` gives up and the whole file is treated as replaced
-/// - one Delete covering all of before, one Insert covering all of after - rather than paying
-///   for an unbounded search. Exercises `plain_text_line_diff_with_max_edit` with a small cap
-///   rather than the real `PLAIN_TEXT_MAX_EDIT` (10,000): actually reaching that cap costs
-///   O(10,000²) - ~1.6GB and genuinely slow - which the "gave up" *logic* doesn't need paying
-///   for just to verify it fires and produces the right ranges.
+/// Past the edit-distance cap, the whole file is one `Delete` and one `Insert`. Uses a small cap:
+/// reaching the real `PLAIN_TEXT_MAX_EDIT` costs quadratic memory.
 #[test]
 fn plain_text_line_diff_replaces_the_whole_file_past_the_edit_cap() {
     const SMALL_CAP: usize = 20;
@@ -1112,11 +1101,8 @@ fn plain_text_line_diff_replaces_the_whole_file_past_the_edit_cap() {
     assert_eq!(after_ranges[0].source.end_row, SMALL_CAP + 10);
 }
 
-/// Confirms the real, production `PLAIN_TEXT_MAX_EDIT` actually is large enough to cover a
-/// realistic large-file edit - a 10,000-line file with a change scattered across it (not just
-/// a handful of lines) - without falling back to "whole file replaced". Cheap despite the
-/// large line count: Myers' search terminates at the *actual* edit distance, not the cap, so
-/// this only costs O(changed_lines²), not O(PLAIN_TEXT_MAX_EDIT²).
+/// The real `PLAIN_TEXT_MAX_EDIT` covers a scattered edit to a 10,000-line file. Cheap: Myers
+/// stops at the actual edit distance, not the cap.
 #[test]
 fn plain_text_line_diff_handles_a_ten_thousand_line_file_with_scattered_changes() {
     let before: String = (0..10_000).map(|i| format!("line-{i}\n")).collect();
@@ -1208,15 +1194,10 @@ fn whole_file_class_mixed_when_myers_lcs_gives_up() {
     );
 }
 
-/// Cross-checks `whole_file_text_class` (Myers LCS, this module's own algorithm) against an
-/// independently computed classification (Python `difflib.SequenceMatcher`, `autojunk=False`)
-/// over the same 338-fixture corpus used for Phase 0's hunk-level census (`TODO.md`'s
-/// "Phase 0 findings" section) - `src/test/data/whole_file_text_classification_census.csv`.
-/// This is the load-bearing primitive Phase 3a's dispatcher licenses a delete-free/insert-free
-/// resolver from, so a wiring bug here (not just a logic bug within this module) needs an
-/// external ground truth to catch, per the phases-4-7 rearchitecture plan's Phase 3a doc
-/// comment ("give this newly load-bearing primitive focused test coverage beyond its existing
-/// viz-oriented tests").
+/// Cross-checks `whole_file_text_class` against an independent classification (Python
+/// `difflib.SequenceMatcher`, `autojunk=False`) of the corpus in
+/// `src/test/data/whole_file_text_classification_census.csv`. The class licenses a delete-free or
+/// insert-free resolver, so wiring bugs need an external ground truth to catch.
 #[test]
 #[ignore = "slow"]
 fn whole_file_text_class_matches_independent_census() -> Result<()> {
@@ -1264,12 +1245,8 @@ fn whole_file_text_class_matches_independent_census() -> Result<()> {
     Ok(())
 }
 
-/// Regression guard: a real one-token change (e.g. renaming a call inside an otherwise
-/// unchanged statement) can leave the same row covered by both an Update range (the token)
-/// and an Identical range (the rest of the line/its surrounding punctuation). If the Identical
-/// range for that row happens to come *after* the Update range in `ranges`' order, a naive
-/// last-write-wins would silently overwrite the row back to `Identical`, hiding the change -
-/// this is exactly what a real end-to-end smoke test against the built binary caught.
+/// A row covered by both an `Update` (a changed token) and an `Identical` range (the rest of the
+/// row) is `Update`, whichever comes last.
 #[test]
 fn line_operations_does_not_let_a_same_row_identical_range_hide_a_real_change() {
     let ranges = vec![
@@ -1278,8 +1255,7 @@ fn line_operations_does_not_let_a_same_row_identical_range_hide_a_real_change() 
             destination: TextRange::new(0, 4, 0, 12),
             operation: TextOperation::Update,
         },
-        // Ordered *after* the Update above on purpose - this is the ordering that triggered
-        // the bug.
+        // After the `Update` on purpose.
         RangeMatch {
             source: TextRange::new(0, 12, 1, 0),
             destination: TextRange::new(0, 12, 1, 0),
@@ -1300,10 +1276,7 @@ fn line_operations_treats_a_zero_width_range_as_a_placeholder_not_a_real_row() {
     assert_eq!(ops, vec![TextOperation::Identical; 3]);
 }
 
-/// `before` is `"a\nb\nc"` (3 lines), `after` is `"a\nX\nc\nd"` (4 lines): row 1 updated
-/// (`b` -> `X`, present as an Update range on both sides), row 3 inserted (`d`, only on the
-/// after side). Update must be counted once, not twice, even though both sides carry an Update
-/// range for the same row.
+/// Row 1 updated on both sides and row 3 inserted: the update counts once, not once per side.
 #[test]
 fn change_counts_tallies_insertions_deletions_and_updates_without_double_counting() {
     let update_range = |row: usize| RangeMatch {
@@ -1333,8 +1306,7 @@ fn change_counts_tallies_insertions_deletions_and_updates_without_double_countin
     );
 }
 
-/// `Move` is counted from the after side only, mirroring `Update`'s single-count rule - a
-/// moved line exists on both sides at different rows.
+/// A moved line exists on both sides, so `Move` counts once, from the after side.
 #[test]
 fn change_counts_tallies_moves_once_from_the_after_side() {
     let move_range = |row: usize, dest_row: usize| RangeMatch {
@@ -1702,10 +1674,6 @@ fn hello_world_added_message_all_ranges() -> Result<()> {
     Ok(())
 }
 
-/// Was `#[ignore]`d during the `phases-4-7-rearchitecture` branch's Phase 1 (see `TODO.md`):
-/// `python-added-if-block` briefly had 5 mismatches (was 0) from replacing whole-residual full
-/// APTED with the cheaper Myers-LCS fallback. Passes again as of the `maximal_unmatched_roots`
-/// traversal fix (`TODO.md`'s "Bug fix" entry) - un-ignored.
 #[test]
 fn python_leetcode_1_added_if_block_all_ranges() -> Result<()> {
     let (before, after) = &*test::helper::handmade_test_code_pair("python-added-if-block")?;
@@ -1839,10 +1807,8 @@ fn summarize_diff_is_new_file_when_only_inserts_are_present() {
     );
 }
 
-/// Regression guard for a real finding, not a hypothetical: confirmed via the actual pipeline
-/// (adding one line to an otherwise-unchanged file) that "only Insert operations present"
-/// alone is not enough to mean NewFile - the rest of the file being untouched shows up as
-/// Identical ranges, which must disqualify NewFile just as much as a Delete/Update/Move would.
+/// One line added to an otherwise unchanged file is not `NewFile`: its `Identical` ranges
+/// disqualify it.
 #[test]
 fn summarize_diff_is_not_new_file_when_inserts_are_mixed_with_identical_content() {
     let ranges = vec![
@@ -1889,9 +1855,7 @@ fn summarize_diff_is_deleted_file_when_only_deletes_are_present() {
 
 #[test]
 fn summarize_diff_is_whitespace_only_when_stripped_content_matches_despite_move_ranges() {
-    // A pure re-indent: codediff sees the reindented block as Moved (column shifted), even
-    // though nothing about the code itself changed - see DiffSummary::WhitespaceOnly's own
-    // doc comment for why the operation set alone can't distinguish this from a real move.
+    // A pure reindent paints `Move`s; only the stripped content says nothing changed.
     let ranges = vec![range(TextOperation::Move)];
     assert_eq!(
         summarize_diff(
@@ -1926,11 +1890,7 @@ fn summarize_diff_is_none_for_a_genuine_mixed_edit() {
 
 #[test]
 fn summarize_diff_prefers_whitespace_only_over_refactor_when_both_could_apply() {
-    // Both conditions are structurally satisfiable at once (only Move ranges present, and the
-    // content is whitespace-stripped-equal but *not* byte-identical - "same" vs " same " here,
-    // not "same" vs "same", which would instead hit NoChanges); the whitespace-stripped content
-    // check must win, since "reformatted" is the more specific and more useful claim - see
-    // DiffSummary::RefactorMovedOnly's own doc comment on the order.
+    // Only `Move`s and whitespace-stripped-equal content: "reformatted" is the more specific claim.
     let ranges = vec![range(TextOperation::Move)];
     assert_eq!(
         summarize_diff("same", " same ", &ranges, &ranges),
@@ -1938,13 +1898,8 @@ fn summarize_diff_prefers_whitespace_only_over_refactor_when_both_could_apply() 
     );
 }
 
-/// Regression guard for a real finding, not a hypothetical: a whole-file reformat can produce
-/// *zero* `TextOperation`s at all (not even `Move`), when the single matched subtree covering
-/// the reformatted content happens to have an unchanged start position itself - confirmed
-/// against the real pipeline (`codediff --headless` on a file reindented inside an unchanged
-/// top-level item showed no diff whatsoever, not a `Move`-marked one). Checking "no operations"
-/// before "content differs only in whitespace" would have misreported this as `NoChanges`
-/// (implying the files are identical, which they are not) instead of `WhitespaceOnly`.
+/// A reformat matched as one subtree whose start did not move produces no operations at all, and
+/// is still `WhitespaceOnly`, not `NoChanges`: the files are not byte-identical.
 #[test]
 fn summarize_diff_is_whitespace_only_even_with_zero_operations_when_content_is_not_byte_identical()
 {
@@ -1960,9 +1915,7 @@ fn summarize_diff_is_whitespace_only_even_with_zero_operations_when_content_is_n
     );
 }
 
-/// Real `Code`/`diff_code` pairs, not hand-built `ASTDiff`s - `is_comment_only_diff` needs
-/// genuine node kinds (`nodes::is_comment` reads `node.kind()`), which only a real parse
-/// provides.
+/// A real parse and diff: `is_comment_only_diff` reads node kinds.
 fn diff_ast(
     before_src: &str,
     after_src: &str,
@@ -1977,13 +1930,8 @@ fn diff_ast(
     (before, after, ast, node_cache)
 }
 
-/// Regression guard for the `Insert`/`Delete`-with-children arm added to `ranges` (see its own
-/// doc comment): a brand-new comment's `line_comment` node splits into a `//` marker leaf plus
-/// un-decomposed trailing text (its own_content). Before that arm existed, only the childless
-/// leaf arms fired, so the marker got an `Insert` range and the comment's actual words - not
-/// covered by any child - were silently dropped. Confirmed against the real bug on
-/// `rust-cost-optimization`, where a brand-new `// Early termination optimization` line
-/// rendered with only its `//` highlighted.
+/// A new `line_comment` is a `//` leaf plus its own words; the words are painted too, not just the
+/// marker (`rust-cost-optimization`).
 #[test]
 fn ranges_paints_a_wholly_new_comments_own_words_not_just_its_marker() {
     let (before, after, ast, node_cache) =
@@ -2010,20 +1958,9 @@ fn ranges_paints_a_wholly_new_comments_own_words_not_just_its_marker() {
     );
 }
 
-/// Regression guard for the ordering hazard the arm above has to avoid: a content node whose
-/// children *already* fully reconstruct it with no real gap (Rust's `string_literal` is
-/// exactly `"` + `string_content` + `"`, with nothing between them) must fall through to plain
-/// recursive descent rather than take the new arm's `new_ranges.len() > 1` bypass - that bypass
-/// skips the same-operation-neighbor merge accumulator, which is what silently absorbs a
-/// whitespace-only gap into an adjacent `Insert` range. Regressed `java-add-logging` from exact
-/// agreement to six dropped single-space bytes (the spaces around `+` in a brand-new
-/// `"Dividing " + a + " by " + b` expression) before the arm's guard required a genuine,
-/// non-whitespace `own_content_span` before firing.
-///
-/// With merging intact, a whole brand-new statement like `let s = "a" + b;` collapses into
-/// *one* `Insert` range end to end (every child is `Insert`, and every gap between them is
-/// pure whitespace) - so the regression this guards against shows up as that single range
-/// splitting apart around the string literal, not as a byte silently vanishing.
+/// A string literal its children fully cover (`"` + content + `"`) descends normally, so the
+/// whitespace between it and its siblings still merges: a new `let s = "a" + b;` is one `Insert`
+/// end to end, not split around the literal (`java-add-logging`).
 #[test]
 fn a_no_gap_string_literal_does_not_break_whitespace_merging_with_a_sibling() {
     let (before, after, ast, node_cache) =
@@ -2054,11 +1991,8 @@ fn a_no_gap_string_literal_does_not_break_whitespace_merging_with_a_sibling() {
          {after_ranges:?}"
     );
 }
-/// Regression test for the `crossed_backwards` check in `ranges`: before it, a pure reorder
-/// of two sibling functions (same column, different rows) produced no non-Identical range at
-/// all - the diff rendered as completely unchanged and `summarize_diff` returned `None`,
-/// silence for two byte-different files (found via `codediff --headless` smoke test,
-/// 2026-08-19).
+/// Swapping two sibling functions (same column, different rows) paints `Move`, not nothing
+/// (`crossed_backwards`).
 #[test]
 fn sibling_reorder_produces_move_ranges_and_a_refactor_moved_summary() {
     let before_src = "fn main() {\n    let a = 1;\n    println!(\"{}\", a);\n}\n\nfn helper(x: i32) -> i32 {\n    x * 2\n}\n";
@@ -2086,9 +2020,7 @@ fn sibling_reorder_produces_move_ranges_and_a_refactor_moved_summary() {
     );
 }
 
-/// The other half of the `crossed_backwards` contract: content shifted *down* by an unrelated
-/// insertion above it keeps its column and its relative order, so it must stay `Identical` -
-/// flagging everything below an inserted line as "moved" would be noise.
+/// Content shifted down by an insertion above keeps its column and order, so stays `Identical`.
 #[test]
 fn unrelated_insertion_does_not_flag_shifted_content_as_moved() {
     let before_src = "fn main() {\n    foo();\n}\n\nfn helper() {\n    bar();\n}\n";
@@ -2103,11 +2035,8 @@ fn unrelated_insertion_does_not_flag_shifted_content_as_moved() {
     }
 }
 
-/// A comment whose text changed (as opposed to being wholly inserted/deleted) is tagged
-/// `MatchButNotIdentical` by the pipeline, not `Update` - confirmed via a real parse. This has to
-/// agree with `ranges`, which handles `MatchButNotIdentical` via `own_content`: the status bar
-/// must never claim something changed when the diff below it shows nothing, nor stay silent about
-/// a change the diff does show.
+/// A changed comment maps `MatchButNotIdentical`, not `Update`, and still counts as a change, in
+/// agreement with what `ranges` paints.
 #[test]
 fn is_comment_only_diff_is_true_when_only_a_comments_text_changed() {
     let (before, after, ast, node_cache) = diff_ast(
@@ -2146,20 +2075,13 @@ fn is_comment_only_diff_is_false_when_a_comment_and_real_code_both_changed() {
 
 #[test]
 fn is_comment_only_diff_is_false_when_nothing_changed_at_all() {
-    // Vacuous case: no qualifying operation exists anywhere, so there is nothing to claim is
-    // "comment-only" about - see this function's own doc comment on why this must be false,
-    // not true.
+    // "Comment-only" is a claim about what changed; with nothing changed it is false.
     let (before, after, ast, node_cache) = diff_ast("fn main() {}", "fn main() {}");
     assert!(!is_comment_only_diff(&before, &after, &ast, &node_cache));
 }
 
-/// A container whose text differs everywhere purely because a statement got wrapped one level
-/// deeper - not because any comment changed - must not spuriously look "comment-only" just
-/// because `MatchButNotIdentical` is now checked. Regression guard tied directly to the same
-/// real bug `ranges`' own `own_content`-vs-child-operation development history hit (see
-/// `ranges`'s `MatchButNotIdentical` arm doc comment): a statement moving one level deeper
-/// stays `Identical` at the AST level, so a naive check could have missed that the enclosing
-/// block's real content changed.
+/// A statement wrapped one level deeper stays `Identical` in the AST, but its enclosing block
+/// changed, so the diff is not comment-only.
 #[test]
 fn is_comment_only_diff_is_false_when_a_statement_moves_one_level_deeper() {
     let (before, after, ast, node_cache) = diff_ast(
@@ -2225,10 +2147,7 @@ fn summarize_diff_with_comment_check_ignores_the_flag_when_false() {
     );
 }
 
-/// Under `MINIMAL`, a single-character edit inside a 20-character identifier
-/// ("long_identifier_**n**ame" -> "long_identifier_**n**ome": common prefix "long_identifier_n",
-/// common suffix "me", one changed character in between) produces exactly one narrow `Update`
-/// range. `FULL` paints the same rename whole - see the test below.
+/// Under `MINIMAL`, one changed character inside a long identifier is one narrow `Update`.
 #[test]
 fn ranges_decomposes_a_small_change_inside_a_long_identifier() {
     let (before, after, ast, node_cache) = diff_ast(
@@ -2314,9 +2233,8 @@ fn full_paints_a_renamed_identifier_whole() {
     }
 }
 
-/// `whole_identifier_updates` is scoped to identifiers: a changed comment keeps its narrow reading
-/// under `FULL`, because painting every changed pair whole is what cost `FULL` 148 fixtures when
-/// `whole_pair_updates` was tried in its place.
+/// `whole_identifier_updates` is scoped to identifiers: a changed comment stays narrow under
+/// `FULL`.
 #[test]
 fn full_keeps_a_changed_comment_narrow() {
     let (before, after, ast, node_cache) = diff_ast(
@@ -2342,10 +2260,8 @@ fn full_keeps_a_changed_comment_narrow() {
     );
 }
 
-/// [`RenderOptions::whole_pair_updates`] forces the same identifier edit from the test above
-/// to report one `Update` spanning the *whole* identifier instead of the single changed
-/// character - the "highlight the matched pair whole" reading `RULES_AND_PREFERENCES.md`'s
-/// Identifier updates section calls out as the other equally defensible preference.
+/// [`RenderOptions::whole_pair_updates`] reports the same edit as one `Update` over the whole
+/// identifier.
 #[test]
 fn ranges_reports_the_whole_identifier_when_whole_pair_updates_is_set() {
     let (before, after, ast, node_cache) = diff_ast(
@@ -2380,8 +2296,7 @@ fn ranges_reports_the_whole_identifier_when_whole_pair_updates_is_set() {
     );
 }
 
-/// When the two texts share no common prefix or suffix at all, there's nothing more precise
-/// to report than the whole span - same as the pre-existing whole-node behavior.
+/// With no common prefix or suffix, the whole span is the `Update`.
 #[test]
 fn ranges_falls_back_to_a_whole_span_update_when_there_is_no_common_affix() {
     let (before, after, ast, node_cache) = diff_ast(
@@ -2410,9 +2325,8 @@ fn ranges_falls_back_to_a_whole_span_update_when_there_is_no_common_affix() {
     );
 }
 
-/// A comment's own content sits in a single gap after its `//` marker child
-/// (`own_content_span` succeeds), so a localized change inside a comment should decompose the
-/// same way a leaf identifier does, not report the whole comment as changed.
+/// A comment's words sit in one gap after its `//` child, so a small change in them splits like an
+/// identifier's.
 #[test]
 fn ranges_decomposes_a_small_change_inside_a_comment() {
     let (before, after, ast, node_cache) = diff_ast(
@@ -2458,12 +2372,9 @@ fn ranges_decomposes_a_small_change_inside_a_comment() {
     );
 }
 
-/// Regression guard for the risk that motivated bypassing the range-merging accumulator for
-/// decomposed nodes (see `ranges`'s own comment on why): an unrelated insertion earlier in the
-/// file shifts the changed identifier to a different column on each side, which is exactly the
-/// kind of before/after asymmetry that could make accumulator-based merging diverge between
-/// the two independently-computed range lists. `TextDiff::from` (which calls `merge_ranges`)
-/// must not panic or misalign, and the narrow Update must still be found on both sides.
+/// An unrelated earlier insertion shifts the changed identifier to different columns on each side.
+/// The decomposed ranges bypass merging, so both sides still carry the narrow `Update` and
+/// `merge_ranges` stays aligned.
 #[test]
 fn ranges_decomposition_survives_an_unrelated_earlier_insertion() {
     let (before, after, ast, node_cache) = diff_ast(
@@ -2497,9 +2408,8 @@ fn ranges_decomposition_survives_an_unrelated_earlier_insertion() {
         1
     );
 }
-/// The defect this split exists to prevent: a phrase appended inside a string literal rendering
-/// yellow, because the middle is unconditionally an `Update` even when one side of it is empty.
-/// Nothing was replaced there - the words are new.
+/// A phrase appended inside a string literal is an `Insert`: one side's middle is empty, so
+/// nothing was replaced.
 #[test]
 fn a_phrase_added_inside_a_string_renders_as_an_insert_not_an_update() {
     let before = Code::from_string(
@@ -2531,10 +2441,8 @@ fn a_phrase_added_inside_a_string_renders_as_an_insert_not_an_update() {
     );
 }
 
-/// The other half of the same rule, and the reason it is gated on the node kind: `IntBox`
-/// becoming `Box` shares the suffix `Box`, so the affix split leaves an empty after-middle -
-/// exactly the shape above. But an identifier is a name, not content, and every painter in the
-/// corpus calls that a rename rather than the deletion of an `Int`.
+/// `IntBox` -> `Box` leaves an empty middle too, but an identifier is a name: painters call it a
+/// rename, not the deletion of `Int`.
 #[test]
 fn a_renamed_identifier_stays_an_update_even_though_one_side_is_empty() {
     let before = Code::from_string("struct IntBox;\n", &crate::code::Language::Rust);
@@ -2556,15 +2464,9 @@ fn a_renamed_identifier_stays_an_update_even_though_one_side_is_empty() {
     );
 }
 
-/// A row carrying **two** edits, one on each side of an untouched node
-/// (`cpp-add-const-correctness`, and the shape a one-line file repeats along a single row). The
-/// prefix/suffix split in `node_untouched_on_its_row` answers for one edit per row and no more,
-/// so the parameter's type - which neither edit touches - fell in neither affix and painted
-/// `Move`. `node_uniquely_placed_on_its_row` reads it: the text is the same on both sides and
-/// occurs once on each row, at the node's own columns, so nothing has to be guessed about where
-/// it went.
-///
-/// A preset split, like the two gates above: `FULL` keeps painting the displaced type.
+/// A row carrying two edits, one on each side of an untouched node (`cpp-add-const-correctness`).
+/// The node is in neither common affix; `node_uniquely_placed_on_its_row` reads it as untouched
+/// because its text occurs once on each row, at its own columns. `FULL` still paints it.
 #[test]
 fn paint_displaced_moves_gates_a_node_between_two_edits_on_its_own_row() {
     let before = Code::from_string(
@@ -2605,13 +2507,8 @@ fn paint_displaced_moves_gates_a_node_between_two_edits_on_its_own_row() {
     );
 }
 
-/// The counter-example that keeps the reading above honest, and the one this module's
-/// `shifted_by_an_edit_beside_it` comment already named: a row *rewritten* around its surviving
-/// fragment. `function fetchData(callback: ...): void {` becoming
-/// `async function fetchData(): Promise<string> {` leaves `function fetchData(` intact and unique
-/// on both rows - uniqueness alone would call it untouched - but nothing else on the row
-/// survived, and `typescript-async-await`'s own painting calls the surviving fragments moved.
-/// `row_was_edited_rather_than_rewritten` is what declines it: there is no common suffix.
+/// A row rewritten around its one surviving fragment (`typescript-async-await`): `function
+/// fetchData(` is unique on both rows, but there is no common suffix, so it still paints `Move`.
 #[test]
 fn a_row_rewritten_around_its_one_surviving_fragment_still_paints_move() {
     let before = Code::from_string(
@@ -2644,9 +2541,7 @@ fn a_row_rewritten_around_its_one_surviving_fragment_still_paints_move() {
     );
 }
 
-/// Uniqueness is the whole guard, so a repeated text must decline rather than pick. Two `count`
-/// identifiers on one row, one of which the edit removes: "it stayed" and "it is the other one"
-/// are both consistent with the bytes, and this pass has no way to tell them apart.
+/// Text that repeats on its row declines: "it stayed" and "it is the other one" both fit.
 #[test]
 fn a_node_whose_text_repeats_on_its_row_is_not_read_as_displaced() {
     let source_row: Vec<char> = "let a = count + count + one;".chars().collect();
@@ -2660,4 +2555,102 @@ fn a_node_whose_text_repeats_on_its_row_is_not_read_as_displaced() {
         &s,
         &d
     ));
+}
+
+/// `é` and `è` share their first UTF-8 byte, but no character: the common affixes stay on char
+/// boundaries of both strings, so slicing at them never panics.
+#[test]
+fn common_affixes_never_split_a_multibyte_character() {
+    assert_eq!(common_prefix_byte_len("é", "è"), 0);
+    assert_eq!(common_suffix_byte_len("aé", "bé"), "é".len());
+    assert_eq!(common_prefix_byte_len("xé", "xé!"), "xé".len());
+}
+
+/// Hashed lines carry no identity that survives relocation, so a moved line is a delete plus an
+/// insert, as in `diff -u`.
+#[test]
+fn plain_text_line_diff_never_reports_a_move() {
+    let (before, after) = plain_text_line_diff("moved line\na\nb\nc\n", "a\nb\nc\nmoved line\n");
+    assert_eq!(
+        changed_row_spans(&before),
+        vec![(TextOperation::Delete, 0, 1)]
+    );
+    assert_eq!(
+        changed_row_spans(&after),
+        vec![(TextOperation::Insert, 3, 4)]
+    );
+}
+
+/// `myers_lcs` can leave two identical lines unmatched (reordered duplicates); pairing them as a
+/// rewrite would claim a match it deliberately did not make.
+#[test]
+fn shared_affix_declines_two_identical_lines() {
+    assert_eq!(shared_affix("same line", "same line"), None);
+    assert_eq!(shared_affix("same line", "same lime"), Some((7, 1)));
+}
+
+/// A range through the end of a file with no final newline ends one row past the last line, and
+/// the trailing trim steps back onto that line rather than dropping the range.
+#[test]
+fn trailing_trim_keeps_a_range_that_runs_off_a_file_with_no_final_newline() {
+    let lines: Vec<&str> = "a\nfoo()".split('\n').collect();
+    assert_eq!(
+        trim_trailing_whitespace(&lines, &TextRange::new(1, 0, 2, 0)),
+        Some(TextRange::new(1, 0, 1, 5))
+    );
+}
+
+/// Under `FULL`, a wholly new line's insertion grows back over its indentation, even when the
+/// matched range before it ends at column 0 of that line.
+#[test]
+fn full_grows_an_insert_over_the_indentation_of_its_own_line() {
+    let source = "fn f() {\n    new();\n}\n";
+    let ranges = [
+        RangeMatch {
+            source: TextRange::new(0, 0, 1, 0),
+            destination: TextRange::new(0, 0, 1, 0),
+            operation: TextOperation::Identical,
+        },
+        RangeMatch {
+            source: TextRange::new(1, 4, 1, 10),
+            destination: TextRange::zero(),
+            operation: TextOperation::Insert,
+        },
+    ];
+    let painted = ranges_for_options(&ranges, source, RenderOptions::FULL);
+    assert_eq!(painted[1].source, TextRange::new(1, 0, 1, 10));
+}
+
+/// Indentation in front of an insertion on a row that also holds matched content belongs to that
+/// content, so the insertion does not grow over it (`const ` before a moved declaration).
+#[test]
+fn full_does_not_grow_an_insert_over_indentation_a_matched_range_shares() {
+    let source = "    const int x\n";
+    let ranges = [
+        RangeMatch {
+            source: TextRange::new(0, 4, 0, 10),
+            destination: TextRange::zero(),
+            operation: TextOperation::Insert,
+        },
+        RangeMatch {
+            source: TextRange::new(0, 10, 0, 15),
+            destination: TextRange::new(0, 4, 0, 9),
+            operation: TextOperation::Move,
+        },
+    ];
+    let painted = ranges_for_options(&ranges, source, RenderOptions::FULL);
+    assert_eq!(painted[0].source, TextRange::new(0, 4, 0, 9));
+}
+
+#[test]
+fn bracket_pair_partners_skips_a_mismatched_bracket() {
+    assert!(bracket_pair_partners("(]").is_empty());
+    assert_eq!(bracket_pair_partners("[()]").get(&0), Some(&3));
+}
+
+#[test]
+fn toggling_an_out_of_range_option_is_a_no_op() {
+    let mut options = RenderOptions::FULL;
+    options.toggle(options.options().len());
+    assert_eq!(options, RenderOptions::FULL);
 }

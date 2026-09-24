@@ -35,10 +35,8 @@ use crate::tui::theme::{
 };
 use crate::tui::widgets::code_viewer::syntax_theme_names;
 
-/// One editable color in the dialog, and the [`CustomPalette`] field it reads and writes.
-///
-/// Ordered as the dialog displays them: the four diff operations first (the colors a user is most
-/// likely to want to change), then the two cursor/search accents, then the panel titles.
+/// One editable color in the dialog, and the [`CustomPalette`] field it reads and writes. Declared
+/// in display order.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ColorSlot {
     Insert,
@@ -114,24 +112,17 @@ const DROPDOWN_ROWS: usize = 2;
 const THEME_ROW: usize = 0;
 const SYNTAX_ROW: usize = 1;
 
-/// The theme editor (the `c` key).
+/// The theme editor (the `c` key): the selected theme's colors, each editable in place.
 ///
-/// Replaced a plain eight-item theme list on 2026-08-24. The list could only answer "which preset",
-/// and every color in it was fixed; this shows the selected theme's actual colors and lets each one
-/// be edited in place, so the preset list becomes a set of starting points rather than the whole
-/// choice.
-///
-/// **Editing any color forks to `OverlayTheme::Custom`.** Presets stay exactly as published - a
-/// user who edits Dracula's insert color gets a Custom palette seeded from Dracula, and Dracula
-/// itself is unchanged the next time they select it. There is one custom palette, not one per
-/// preset, so "fork, edit, fork again from a different preset" overwrites rather than accumulating.
+/// Editing any color forks to `OverlayTheme::Custom`, seeded from the current preset; presets never
+/// change. There is one custom palette, not one per preset, so forking again from another preset
+/// overwrites it.
 pub struct ThemeDialog {
     themes: Vec<OverlayTheme>,
     theme_index: usize,
     syntax_themes: Vec<String>,
     syntax_index: usize,
-    /// The colors shown in the color rows. Mirrors whichever theme is selected, and is what gets
-    /// saved as the custom palette once edited.
+    /// Mirrors the selected theme; saved as the custom palette once edited.
     working: CustomPalette,
     /// Which row has focus: `THEME_ROW`, `SYNTAX_ROW`, or `DROPDOWN_ROWS + n` for the nth color.
     selected_row: usize,
@@ -140,12 +131,10 @@ pub struct ThemeDialog {
 }
 
 impl ThemeDialog {
-    /// Create the dialog with `current` selected and its colors loaded into the editable rows.
     pub fn new(current: OverlayTheme) -> Self {
         Self::with_syntax_theme(current, None)
     }
 
-    /// Same, but pre-selecting a syntax-highlighting theme by name.
     pub fn with_syntax_theme(current: OverlayTheme, syntax_theme: Option<&str>) -> Self {
         let themes: Vec<OverlayTheme> = OverlayTheme::iter().collect();
         let theme_index = themes.iter().position(|&t| t == current).unwrap_or(0);
@@ -168,7 +157,6 @@ impl ThemeDialog {
         DROPDOWN_ROWS + ColorSlot::ALL.len()
     }
 
-    /// The color slot the focused row edits, or `None` on a dropdown row.
     fn focused_slot(&self) -> Option<ColorSlot> {
         self.selected_row
             .checked_sub(DROPDOWN_ROWS)
@@ -179,8 +167,6 @@ impl ThemeDialog {
         self.themes[self.theme_index]
     }
 
-    /// Move the theme dropdown and reload the color rows from the newly selected theme, so the
-    /// rows always describe what the viewer behind the dialog is showing.
     fn cycle_theme(&mut self, delta: i32) -> Action {
         move_selection(&mut self.theme_index, delta, self.themes.len());
         let theme = self.theme();
@@ -198,10 +184,7 @@ impl ThemeDialog {
         ))
     }
 
-    /// Commit a typed hex value: fork to Custom, install it for live preview, and re-preview.
-    ///
-    /// An unparseable value is rejected rather than stored, so a half-typed `#ff` cannot become a
-    /// persisted color. The row simply keeps its previous value.
+    /// Forks to Custom. An unparseable value is dropped and the row keeps its previous color.
     fn commit_edit(&mut self, slot: ColorSlot, typed: String) -> Option<Action> {
         parse_hex_color(&typed)?;
         slot.set(&mut self.working, normalize_hex(&typed));
@@ -214,12 +197,8 @@ impl ThemeDialog {
         Some(Action::ThemePreviewed(OverlayTheme::Custom))
     }
 
-    /// Persist everything the dialog owns and report the chosen overlay theme.
-    ///
-    /// The custom palette and the syntax theme are saved here rather than in `app.rs`'s
-    /// `ThemeSelected` handler: both are dialog-local state that no `Action` currently carries,
-    /// and inventing two more actions to move them one level up would not make them any less
-    /// dialog-owned.
+    /// Persists the custom palette and syntax theme here rather than in `app.rs`: no `Action`
+    /// carries them, and both are dialog-owned state.
     fn commit_dialog(&self) -> Action {
         save_custom_palette(self.working.clone());
         if let Some(name) = self.syntax_themes.get(self.syntax_index) {
@@ -228,8 +207,6 @@ impl ThemeDialog {
         Action::ThemeSelected(self.theme())
     }
 
-    /// The area the popup occupies, centered within `area` and sized to fit every row plus the
-    /// border and hint line.
     pub fn popup_area(&self, area: Rect) -> Rect {
         let width = 52.min(area.width);
         let height = (self.row_count() as u16 + 2).min(area.height);
@@ -246,8 +223,7 @@ fn normalize_hex(typed: &str) -> String {
 
 impl Component for ThemeDialog {
     fn handle_key_event(&mut self, key: KeyEvent) -> Result<Option<Action>> {
-        // Hex entry swallows every key while active: a bare `d` is a hex digit here, not a
-        // navigation key, and Esc must cancel the edit rather than the whole dialog.
+        // Hex entry swallows every key: `d` is a hex digit here, and Esc cancels only the edit.
         if let Some(buffer) = self.editing.as_mut() {
             match key.code {
                 KeyCode::Char(c) if c.is_ascii_hexdigit() || c == '#' => {
@@ -295,8 +271,6 @@ impl Component for ThemeDialog {
                     _ => Ok(None),
                 }
             }
-            // Enter opens the hex field on a color row, and commits the dialog anywhere else -
-            // so a user who only wants to switch preset never has to learn the editing keys.
             KeyCode::Enter => match self.focused_slot() {
                 Some(slot) => {
                     self.editing = Some(slot.get(&self.working).to_string());
@@ -335,8 +309,7 @@ impl Component for ThemeDialog {
         for (index, slot) in ColorSlot::ALL.iter().enumerate() {
             let row = DROPDOWN_ROWS + index;
             let stored = slot.get(&self.working).to_string();
-            // While editing, the swatch tracks what has been typed so far when it parses, so the
-            // color updates under the cursor instead of only on Enter.
+            // The swatch previews the typed value whenever it parses.
             let shown = match (&self.editing, row == self.selected_row) {
                 (Some(buffer), true) => buffer.clone(),
                 _ => stored.clone(),
@@ -393,7 +366,6 @@ mod tests {
         }
     }
 
-    /// Move focus down to the first color row (Insert).
     fn focus_first_color(dialog: &mut ThemeDialog) {
         for _ in 0..DROPDOWN_ROWS {
             dialog.handle_key_event(key(KeyCode::Down)).unwrap();
@@ -410,8 +382,6 @@ mod tests {
         );
     }
 
-    /// The theme row is a dropdown now: left/right cycles it, and the color rows must follow, or
-    /// they would keep describing the previously selected theme.
     #[test]
     fn cycling_the_theme_reloads_the_color_rows() {
         let mut dialog = ThemeDialog::new(OverlayTheme::Dark);
@@ -425,7 +395,6 @@ mod tests {
         );
     }
 
-    /// Editing any color forks to Custom rather than mutating the preset.
     #[test]
     fn editing_a_color_switches_the_selection_to_custom() {
         let mut dialog = ThemeDialog::new(OverlayTheme::Dracula);
@@ -448,7 +417,6 @@ mod tests {
         );
     }
 
-    /// A half-typed value must not become a stored color.
     #[test]
     fn an_unparseable_hex_value_is_rejected() {
         let mut dialog = ThemeDialog::new(OverlayTheme::Dracula);
@@ -465,8 +433,6 @@ mod tests {
         assert_eq!(dialog.theme(), OverlayTheme::Dracula);
     }
 
-    /// Esc while typing cancels the edit only - the dialog stays open. This is the one place two
-    /// Escs mean different things, so it is worth pinning.
     #[test]
     fn esc_while_editing_cancels_the_edit_not_the_dialog() {
         let mut dialog = ThemeDialog::new(OverlayTheme::Dracula);
@@ -481,7 +447,6 @@ mod tests {
         assert_eq!(action, Some(Action::DialogCancelled));
     }
 
-    /// Enter on a dropdown row accepts the dialog, so switching preset stays a two-key operation.
     #[test]
     fn enter_on_a_dropdown_row_accepts_the_dialog() {
         let mut dialog = ThemeDialog::new(OverlayTheme::Dracula);
@@ -509,9 +474,9 @@ mod tests {
         }
     }
 
-    /// Render the dialog into a test buffer and dump it, so the layout is verified as text rather
-    /// than assumed from the row model. Catches a dropdown or swatch that silently renders empty.
+    /// Catches a dropdown or swatch that silently renders empty.
     #[test]
+
     fn renders_every_row_with_a_value() {
         use ratatui::{Terminal, backend::TestBackend};
 

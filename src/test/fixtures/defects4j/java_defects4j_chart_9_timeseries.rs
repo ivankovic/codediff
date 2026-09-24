@@ -33,9 +33,7 @@ fn painting() -> Result<()> {
 
 #[test]
 fn invariants() -> Result<()> {
-    // Measured at three and at zero, with no change to the data: all three were one parenthesis on
-    // after row 944, and all three were invariants reading a 1:2 multi-map group through
-    // `representative_entries`' arbitrary flattening - two of invariant 3, one of invariant 9. Both
-    // now ask whether *some* admissible pairing agrees.
+    // Pins invariants 3 and 9 reading a 1:2 multi-map group (the parenthesis on after row 944) by
+    // whether *some* admissible pairing agrees, not through `representative_entries`.
     assert_ground_truth_invariants("java-defects4j-chart-9-timeseries")
 }

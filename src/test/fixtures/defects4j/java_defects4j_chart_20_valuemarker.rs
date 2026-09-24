@@ -28,7 +28,6 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // The ground truth moved, not the renderer - see `ground-truth-moves-limits-move`.
     assert_matches_human_painting_within_limit("java-defects4j-chart-20-valuemarker", 0.34)
 }
 

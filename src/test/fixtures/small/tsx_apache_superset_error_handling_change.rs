@@ -21,17 +21,12 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // A whole new ternary expression is inserted into JSX, but a couple of its string-literal/
-    // quote leaf tokens coincidentally match identical tokens elsewhere in the file, so codediff
-    // partially matches those leaves instead of treating the whole subtree as new. The re-verified
-    // mapping records the real relationship as 1:2 (see this fixture's own `description.md`), which
-    // codediff cannot express at all: one before-side string becomes two after-side ones, so every
-    // leaf codediff pairs one-to-one is scored wrong however it pairs them. This limit will only
-    // come down with N:M support, not with a better matcher.
+    // A new ternary whose string/quote leaves coincidentally match tokens elsewhere, so codediff
+    // pairs them. The ground truth is 1:2 (see `description.md`), so any one-to-one pairing
+    // scores wrong: this comes down only with N:M support.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "tsx-apache-superset-error-handling-change",
-        // 6/4 became 7/5 when the ground truth gained an all-to-all group: one of the mismatches
-        // is a group member a one-to-one output cannot reach, the N:M floor.
+        // Includes all-to-all group members a one-to-one output cannot reach: the N:M floor.
         7,
         5,
     )
