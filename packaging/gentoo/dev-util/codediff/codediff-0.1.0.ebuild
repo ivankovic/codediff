@@ -21,8 +21,8 @@ CRATES="
 	bytes@1.12.1
 	cassowary@0.3.0
 	castaway@0.2.4
-	cc@1.4.6
-	cfg-if@1.0.4
+	cc@1.4.7
+	cfg-if@1.0.5
 	clap@4.6.7
 	clap_builder@4.6.7
 	clap_complete@4.6.11
@@ -49,7 +49,7 @@ CRATES="
 	fallible-streaming-iterator@0.1.9
 	fancy-regex@0.16.2
 	fastrand@2.5.0
-	find-msvc-tools@0.1.12
+	find-msvc-tools@0.1.13
 	flate2@1.1.10
 	fnv@1.0.7
 	foldhash@0.1.5
@@ -140,7 +140,7 @@ CRATES="
 	roff@1.1.1
 	rusqlite@0.37.0
 	rustc-hash@2.1.3
-	rustix@1.1.4
+	rustix@1.1.5
 	rustversion@1.0.23
 	ryu@1.0.23
 	same-file@1.0.6
@@ -169,12 +169,12 @@ CRATES="
 	strum_macros@0.26.4
 	strum_macros@0.28.0
 	syn@2.0.119
-	syn@3.0.5
-	synstructure@0.13.2
+	syn@3.0.6
+	synstructure@0.14.0
 	syntect@5.3.0
 	tempfile@3.27.0
-	thiserror-impl@2.0.20
-	thiserror@2.0.20
+	thiserror-impl@2.0.21
+	thiserror@2.0.21
 	thread_local@1.1.10
 	time-core@0.1.9
 	time-macros@0.2.32
@@ -218,7 +218,7 @@ CRATES="
 	tree-sitter-yaml@0.7.2
 	tree-sitter@0.25.10
 	two-face@0.5.2+bat-0.26.1
-	unicode-ident@1.0.24
+	unicode-ident@1.0.26
 	unicode-segmentation@1.13.3
 	unicode-truncate@1.1.0
 	unicode-width@0.1.14
@@ -258,11 +258,11 @@ CRATES="
 	winnow@1.0.4
 	writeable@0.6.4
 	yaml-rust@0.4.5
-	yoke-derive@0.8.2
+	yoke-derive@0.8.3
 	yoke@0.8.3
-	zerocopy-derive@0.8.57
-	zerocopy@0.8.57
-	zerofrom-derive@0.1.7
+	zerocopy-derive@0.8.58
+	zerocopy@0.8.58
+	zerofrom-derive@0.1.8
 	zerofrom@0.1.8
 	zerotrie@0.2.5
 	zerovec-derive@0.11.6
