@@ -7,29 +7,22 @@ CRATES="
 	adler2@2.0.1
 	aho-corasick@1.1.5
 	allocator-api2@0.2.21
-	anes@0.1.6
 	anstream@1.0.0
 	anstyle-parse@1.0.0
 	anstyle-query@1.1.5
 	anstyle-wincon@3.0.11
 	anstyle@1.0.14
 	anyhow@1.0.104
-	autocfg@1.5.1
 	base64@0.23.1
 	bincode@1.3.3
 	bit-set@0.8.0
 	bit-vec@0.8.0
 	bitflags@2.13.2
-	bumpalo@3.20.3
 	bytes@1.12.1
 	cassowary@0.3.0
-	cast@0.3.0
 	castaway@0.2.4
 	cc@1.4.6
 	cfg-if@1.0.4
-	ciborium-io@0.2.2
-	ciborium-ll@0.2.2
-	ciborium@0.2.2
 	clap@4.6.7
 	clap_builder@4.6.7
 	clap_complete@4.6.11
@@ -40,15 +33,10 @@ CRATES="
 	compact_str@0.7.1
 	confy@2.0.0
 	crc32fast@1.5.2
-	criterion-plot@0.5.0
-	criterion@0.5.1
 	crossbeam-channel@0.5.17
-	crossbeam-deque@0.8.8
-	crossbeam-epoch@0.9.21
 	crossbeam-utils@0.8.23
 	crossterm@0.27.0
 	crossterm_winapi@0.9.1
-	crunchy@0.2.4
 	csv-core@0.1.13
 	csv@1.4.0
 	deranged@0.5.8
@@ -78,7 +66,6 @@ CRATES="
 	getrandom@0.2.17
 	getrandom@0.4.3
 	git2@0.20.4
-	half@2.7.1
 	hashbrown@0.15.5
 	hashbrown@0.17.1
 	hashlink@0.10.0
@@ -96,14 +83,11 @@ CRATES="
 	idna_adapter@1.2.2
 	indexmap@2.14.2
 	indoc@2.0.7
-	is-terminal@0.4.17
 	is_terminal_polyfill@1.70.2
-	itertools@0.10.5
 	itertools@0.12.1
 	itertools@0.13.0
 	itoa@1.0.18
 	jobserver@0.1.35
-	js-sys@0.3.105
 	lazy_static@1.5.0
 	libc@0.2.189
 	libgit2-sys@0.18.8+1.9.7
@@ -124,13 +108,11 @@ CRATES="
 	mio@1.2.3
 	nu-ansi-term@0.50.3
 	num-conv@0.2.2
-	num-traits@0.2.19
 	num_cpus@1.17.0
 	once_cell@1.21.4
 	once_cell_polyfill@1.70.2
 	onig@6.5.3
 	onig_sys@69.9.3
-	oorandom@11.1.5
 	openssl-probe@0.1.6
 	openssl-sys@0.9.117
 	parking_lot@0.12.5
@@ -140,9 +122,6 @@ CRATES="
 	pin-project-lite@0.2.17
 	pkg-config@0.3.34
 	plist@1.10.1
-	plotters-backend@0.3.7
-	plotters-svg@0.3.7
-	plotters@0.3.7
 	potential_utf@0.1.6
 	powerfmt@0.2.0
 	ppv-lite86@0.2.21
@@ -154,8 +133,6 @@ CRATES="
 	rand_chacha@0.3.1
 	rand_core@0.6.4
 	ratatui@0.26.3
-	rayon-core@1.13.0
-	rayon@1.12.0
 	redox_syscall@0.5.18
 	regex-automata@0.4.18
 	regex-syntax@0.8.11
@@ -203,7 +180,6 @@ CRATES="
 	time-macros@0.2.32
 	time@0.3.55
 	tinystr@0.8.4
-	tinytemplate@1.2.1
 	tokio-macros@2.7.2
 	tokio@1.53.1
 	toml@0.9.12+spec-1.1.0
@@ -253,11 +229,6 @@ CRATES="
 	vcpkg@0.2.15
 	walkdir@2.5.0
 	wasi@0.11.1+wasi-snapshot-preview1
-	wasm-bindgen-macro-support@0.2.128
-	wasm-bindgen-macro@0.2.128
-	wasm-bindgen-shared@0.2.128
-	wasm-bindgen@0.2.128
-	web-sys@0.3.105
 	winapi-i686-pc-windows-gnu@0.4.0
 	winapi-util@0.1.11
 	winapi-x86_64-pc-windows-gnu@0.4.0
