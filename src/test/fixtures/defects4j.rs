@@ -407,6 +407,8 @@ mod java_defects4j_jacksondatabind_17_objectmapper;
 #[cfg(test)]
 mod java_defects4j_jacksondatabind_1_beanpropertywriter;
 #[cfg(test)]
+mod java_defects4j_jacksondatabind_20_objectnode;
+#[cfg(test)]
 mod java_defects4j_jacksondatabind_25_simpleabstracttyperesolver;
 #[cfg(test)]
 mod java_defects4j_jacksondatabind_34_numberserializer;
