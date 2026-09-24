@@ -1,3 +1,17 @@
+# Pending
+- [Marko Ivankovic] (2026-09-25 00:11:36) In Makefile on line 28: Why doesn't coverage depend on test? What is the point of running coverage if tests fail? Also, why don't we have "test-rust" the same way we have "test-python"? Please add these. - "coverage:"
+- [Marko Ivankovic] (2026-09-25 00:12:45) In README.pdf: Let's not store the README.pdf in the repository.
+- [Marko Ivankovic] (2026-09-25 00:13:23) In readme-screenshot.png: Why don't we move this to assets/ and make it auto-generate the same way the gif does.
+- [Marko Ivankovic] (2026-09-25 00:15:44) In results.txt: This file seems obsolete? If it is, remove it.
+- [Marko Ivankovic] (2026-09-25 00:16:13) In RULES_AND_PREFERENCES.md: This file is obsolete. It has been superseded by the invariant testing. Delete it.
+- [Marko Ivankovic] (2026-09-25 00:17:23) In list_of_repositories_tiny.csv: Update to point to github.com, not codeberg.
+- [Marko Ivankovic] (2026-09-25 00:17:56) In HANDOVER.md: Obsolete file. Delete.
+- [Marko Ivankovic] (2026-09-25 00:18:21) In CONTRIBUTING.md on line 3: Bold the notice that contributions are not accepted. - "At this time, to keep the development speed high, contributions are not accep..."
+- [Marko Ivankovic] (2026-09-25 00:21:06) In src/main.rs on line 1: Move the copyright notice to the top of the file. - "use anyhow::Result;"
+- [Marko Ivankovic] (2026-09-25 00:24:50) In research/sampling/process_gentoo_package_list.sh: This can be deleted. The csv now exists and we will not need to refresh it.
+- [Marko Ivankovic] (2026-09-25 00:25:42) In research/sampling/dataset.sh on line 25: Remove the "Why this became a flag" comment. It is a historical comment that doesn't matter anymore. - "# Why this became a flag (2026-08-20): the `full` corpus on disk had only ~10..."
+- [Marko Ivankovic] (2026-09-25 00:27:22) In src/test/view_test_diff.sh: This file can be deleted. It is not relevant anymore with how good human solver is.
+
 # Code Health Review — 2026-09-05
 
 Scope: dead code, duplication, ease of understanding, runtime performance, testing. Whole
@@ -747,3 +761,5 @@ Not recommended: restructuring `engine.rs`'s APTED internals (`spf_a`, strategy 
 the lint-silencing in §4 — prior benchmarking discipline applies (profile via
 `benches/diff_code_benchmark` first), and the mirrored `_l`/`_r` variants follow the published
 algorithm's own structure.
+
+# Completed
