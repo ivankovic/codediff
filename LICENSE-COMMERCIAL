@@ -1,0 +1,228 @@
+CODEDIFF COMMERCIAL LICENSE AGREEMENT
+Version 1.0, 24 September 2026
+
+Copyright (C) 2026 Marko Ivankovic
+
+This Agreement is an alternative to the GNU Affero General Public License
+(AGPL). codediff is and remains available under the AGPL, version 3 or later,
+to everyone, at no cost. This Agreement exists for organisations that cannot
+or do not want to accept the obligations of the AGPL. It grants the same
+software under different terms, in exchange for a recurring fee. Nothing in
+this Agreement limits the rights that anyone has under the AGPL.
+
+If you do not hold a Subscription, this Agreement does not apply to you, and
+your use of codediff is governed by the AGPL alone.
+
+
+1. PARTIES
+
+1.1 "Licensor" is Marko Ivankovic, a sole proprietorship registered in
+    Switzerland, UID CHE-381.084.114. Licensor's postal address is stated
+    on the invoice and will be provided on request.
+
+1.2 "Licensee" is the legal entity that holds a Subscription. Where the
+    Subscription is paid from a GitHub account, Licensee is the legal entity
+    named in the account's sponsorship registration or, if none is named,
+    the legal entity that owns the account. Licensee must be a business,
+    public body, or other organisation acting in the course of its
+    professional activity. This Agreement is not offered to consumers.
+
+
+2. DEFINITIONS
+
+2.1 "Software" means the codediff program, its source code, and its
+    documentation, as published by Licensor at
+    https://github.com/ivankovic/codediff or a successor location.
+
+2.2 "Subscription" means an active, paid sponsorship of Licensor at a tier
+    that names this Agreement as a benefit, at
+    https://github.com/sponsors/ivankovic or through a direct invoice from
+    Licensor.
+
+2.3 "Tier" means the sponsorship tier the Subscription is paid at. The Tier
+    description may limit the number of Authorized Users. If it names no
+    number, there is no limit within Licensee.
+
+2.4 "Authorized User" means an employee or individual contractor of Licensee
+    who uses the Software on Licensee's behalf.
+
+2.5 "Internal Use" means running the Software, unmodified, on systems that
+    Licensee owns or controls, by Authorized Users, for Licensee's own
+    internal business purposes. Systems operated for Licensee by a hosting
+    or cloud provider count as controlled by Licensee. Continuous
+    integration and other automated pipelines that run only on Licensee's
+    own code count as Internal Use.
+
+2.6 "Third-Party Components" means software included in or built into the
+    Software that is licensed by others under their own terms, as listed in
+    the notices distributed with the Software.
+
+
+3. LICENSE GRANT
+
+3.1 For the Term, and subject to this Agreement, Licensor grants Licensee a
+    worldwide, non-exclusive, non-transferable license to install and run
+    the Software for Internal Use, and to make the copies needed for that,
+    without the obligations that the AGPL attaches to such use.
+
+3.2 Everything not granted in Section 3.1 is reserved. In particular,
+    Licensee may not, under this Agreement:
+
+    (a) modify the Software, or create derivative works of it;
+
+    (b) distribute, sell, rent, lend, or otherwise make the Software
+        available to any third party, in source or object code form, on its
+        own or as part of another product;
+
+    (c) include the Software in, link it to, or invoke it from a product or
+        service that Licensee provides to third parties;
+
+    (d) make the Software available to third parties over a network, or
+        operate it as a service for anyone other than Licensee;
+
+    (e) let anyone other than Authorized Users use the Software;
+
+    (f) remove or alter copyright, license, or attribution notices in the
+        Software, including the notices of Third-Party Components;
+
+    (g) use Licensor's name or the name "codediff" to endorse or promote
+        Licensee or its products without prior written permission, beyond a
+        factual statement that Licensee uses codediff;
+
+    (h) transfer or assign this license.
+
+3.3 Any use outside Section 3.1 is not covered by this Agreement. Licensee
+    remains free to do anything the AGPL permits, under the AGPL and its
+    obligations, but such use is not licensed under this Agreement and
+    does not benefit from it.
+
+3.4 Affiliates of Licensee that Licensee controls, is controlled by, or is
+    under common control with may exercise the rights in Section 3.1
+    through Licensee, and their employees and individual contractors count
+    as Authorized Users. Licensee remains responsible for them.
+
+
+4. THIRD-PARTY COMPONENTS
+
+4.1 Third-Party Components are licensed under their own terms, which are
+    permissive. Licensee must comply with those terms, which for Internal
+    Use means keeping their copyright notices and license texts with the
+    Software.
+
+4.2 Where a Third-Party Component is offered under a choice of licenses,
+    Licensor selects the MIT License or the Apache License 2.0 for the
+    purposes of this Agreement, and Licensee may rely on that selection.
+
+
+5. FEES AND TAXES
+
+5.1 The fee is the monthly amount of the Tier, paid through the
+    Subscription. Fees are due in advance for each month.
+
+5.2 Fees do not include value added tax, sales tax, or similar taxes.
+    Licensee is responsible for any such tax on its side. Where reverse
+    charge applies, Licensee accounts for the tax itself. Licensee will
+    provide its VAT identification number or equivalent to Licensor on
+    request, and confirms that it acquires the license for its business.
+
+5.3 Fees paid are not refundable. If a Subscription is cancelled during a
+    month, the license continues to the end of that paid month.
+
+5.4 Licensor may change the fee for future months by changing the Tier.
+    A change takes effect at the next renewal after Licensor publishes it.
+    Licensee may cancel before then.
+
+5.5 Licensor will issue an invoice on request. GitHub sponsorship receipts
+    are not invoices from Licensor.
+
+
+6. TERM AND TERMINATION
+
+6.1 The Term begins when the first Subscription payment is received and
+    continues for as long as the Subscription is active.
+
+6.2 When the Subscription ends, the Term ends at the end of the last paid
+    month, and all rights under this Agreement end with it. Licensee must
+    then stop using the Software under this Agreement. From that point,
+    only the AGPL applies to Licensee's use of the Software, in any
+    version.
+
+6.3 Licensor may terminate this Agreement with immediate effect if Licensee
+    breaches Section 3 and does not cure the breach within 30 days of
+    written notice, or at once if the breach cannot be cured. On
+    termination all rights under this Agreement end. Licensee's rights
+    under the AGPL are unaffected.
+
+6.4 Licensee may start a new Subscription at any time. The new Term begins
+    when the first payment for it is received. Use between two Terms is
+    governed by the AGPL alone.
+
+6.5 Sections 5.3, 7, 8, 9, and 10 survive the end of the Term.
+
+
+7. OWNERSHIP
+
+7.1 The Software is protected by copyright. Licensor owns all rights in it
+    other than Third-Party Components. This Agreement grants a license, not
+    a sale. No title passes to Licensee.
+
+7.2 Nothing in this Agreement grants Licensee any right in modifications,
+    forks, or derivative works of the Software. Any such work that Licensee
+    creates under the AGPL is governed by the AGPL alone.
+
+
+8. NO WARRANTY
+
+8.1 The Software is provided "as is" and "as available". To the extent
+    permitted by law, Licensor disclaims all warranties, express or implied,
+    including warranties of merchantability, fitness for a particular
+    purpose, title, non-infringement, and that the Software will be free of
+    errors or operate without interruption.
+
+8.2 This Agreement includes no support, maintenance, or update obligation.
+    Licensor decides alone what to publish and when.
+
+
+9. LIMITATION OF LIABILITY
+
+9.1 To the extent permitted by law, Licensor is not liable for indirect or
+    consequential loss, loss of profit, loss of data, loss of business, or
+    the cost of substitute software, however caused.
+
+9.2 To the extent permitted by law, Licensor's total liability under or in
+    connection with this Agreement is limited to the fees Licensee paid
+    under it in the twelve months before the event giving rise to the
+    claim.
+
+9.3 Nothing in this Agreement excludes or limits liability for intent or
+    gross negligence, or any other liability that cannot be excluded under
+    Swiss law.
+
+
+10. GENERAL
+
+10.1 This Agreement is governed by Swiss law, excluding its conflict of law
+     rules and excluding the United Nations Convention on Contracts for the
+     International Sale of Goods. The courts at Licensor's seat have
+     exclusive jurisdiction.
+
+10.2 This Agreement is the entire agreement between the parties about the
+     commercial licensing of the Software. It replaces any prior discussion.
+     Terms in Licensee's purchase orders or vendor forms do not apply.
+
+10.3 Licensor may publish a new version of this Agreement. A new version
+     applies to Licensee from the first renewal that follows 30 days after
+     its publication at the location in Section 2.1. Licensee may cancel
+     before then.
+
+10.4 If a provision of this Agreement is invalid, the rest remains in force,
+     and the invalid provision is replaced by a valid one that comes closest
+     to its purpose.
+
+10.5 Notices to Licensor go to the email address published on Licensor's
+     GitHub sponsorship page. Notices to Licensee go to the email address
+     associated with the sponsoring account. Licensee is responsible for
+     keeping that address current.
+
+10.6 Licensor's copy of the Subscription records is proof of the Term and
+     the Tier.

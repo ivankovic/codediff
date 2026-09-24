@@ -283,7 +283,12 @@ See the LICENSE file for the full text of the License.
 
 ## Cannot use AGPL software?
 
-Contact me for options.
+A commercial license is available as a monthly subscription through
+[GitHub Sponsors](https://github.com/sponsors/ivankovic). It covers internal use of codediff
+by your organisation without the source-disclosure obligations of the AGPL. The terms are in
+[LICENSE-COMMERCIAL](LICENSE-COMMERCIAL). Pick the tier that names the commercial license as a
+benefit. For invoicing or other arrangements, contact me at
+[marko@ivankovic.me](mailto:marko@ivankovic.me).
 
 # AI policy
 
