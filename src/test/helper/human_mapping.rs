@@ -3444,6 +3444,8 @@ mod tests {
         );
     }
 
+    // Apple's diff has no `--*-line-format`, so the GNU-only runner cannot work there.
+    #[cfg_attr(target_os = "macos", ignore = "needs GNU diff")]
     #[test]
     fn unix_diff_line_labels_marks_only_the_changed_line_on_each_side() {
         let before = crate::code::Code::from_string("a\nb\nc\n", &Language::Unknown);
@@ -3455,6 +3457,8 @@ mod tests {
         assert_eq!(after_touched, vec![false, true, false, false]);
     }
 
+    // Apple's diff has no `--*-line-format`, so the GNU-only runner cannot work there.
+    #[cfg_attr(target_os = "macos", ignore = "needs GNU diff")]
     #[test]
     fn unix_diff_line_labels_marks_nothing_for_identical_files() {
         let before = crate::code::Code::from_string("a\nb\nc\n", &Language::Unknown);
@@ -3466,6 +3470,8 @@ mod tests {
         assert!(after_touched.iter().all(|&t| !t));
     }
 
+    // Apple's diff has no `--*-line-format`, so the GNU-only runner cannot work there.
+    #[cfg_attr(target_os = "macos", ignore = "needs GNU diff")]
     #[test]
     fn line_mismatches_for_is_zero_for_a_fixture_codediff_solves_exactly() -> Result<()> {
         // rust-no-change is fully identical, so both agree with the all-untouched human mapping.

@@ -565,7 +565,12 @@ mod tests {
     fn load_lists_the_three_sets_of_a_real_repository() {
         let dir = sample_repo();
         let review = load(&dir.path().join("src"), 10).unwrap();
-        assert_eq!(review.root, dir.path().canonicalize().unwrap());
+        // Canonicalize both sides: git reports the root with forward slashes, and on Windows
+        // canonicalize() yields the verbatim `\\?\` form, so the raw strings never agree there.
+        assert_eq!(
+            review.root.canonicalize().unwrap(),
+            dir.path().canonicalize().unwrap()
+        );
         let names =
             |files: &[ChangedFile]| files.iter().map(ChangedFile::label).collect::<Vec<_>>();
         assert_eq!(

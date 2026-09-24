@@ -1553,6 +1553,8 @@ mod tests {
 
     /// GNU diff and libxdiff are independent Myers implementations, so any disagreement is a bug in
     /// `git_line_labels`'s header parsing, not a finding about the algorithms.
+    // Apple's diff has no `--*-line-format`, so the GNU-only runner cannot work there.
+    #[cfg_attr(target_os = "macos", ignore = "needs GNU diff")]
     #[test]
     fn git_myers_agrees_with_unix_diff() {
         let cases = [
