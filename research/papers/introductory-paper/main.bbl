@@ -2,7 +2,7 @@
 %%% Do NOT edit. File created by BibTeX with style
 %%% ACM-Reference-Format-Journals [18-Jan-2012].
 
-\begin{thebibliography}{15}
+\begin{thebibliography}{33}
 
 %%% ====================================================================
 %%% NOTE TO THE USER: you can override these defaults by providing
@@ -37,6 +37,22 @@
 \providecommand\natexlab[1]{#1}
 \providecommand\showeprint[2][]{arXiv:#2}
 
+\bibitem[Alcocer et~al\mbox{.}(2023)]%
+        {alcocer-2023}
+\bibfield{author}{\bibinfo{person}{Juan Pablo~Sandoval Alcocer},
+  \bibinfo{person}{Alejandra Cossio-Chavalier}, \bibinfo{person}{Tiara
+  Rojas-Stambuk}, {and} \bibinfo{person}{Leonel Merino}.}
+  \bibinfo{year}{2023}\natexlab{}.
+\newblock \showarticletitle{An Eye-Tracking Study on the Use of Split/Unified
+  Code Change Views for Bug Detection}.
+\newblock \bibinfo{journal}{\emph{IEEE Access}}  \bibinfo{volume}{11}
+  (\bibinfo{year}{2023}), \bibinfo{pages}{136195--136205}.
+\newblock
+\urldef\tempurl%
+\url{https://doi.org/10.1109/ACCESS.2023.3336859}
+\showDOI{\tempurl}
+
+
 \bibitem[Alikhanifard and Tsantalis(2025)]%
         {astdiffbenchmark}
 \bibfield{author}{\bibinfo{person}{Pouria Alikhanifard} {and}
@@ -62,6 +78,114 @@
 \newblock
 \urldef\tempurl%
 \url{https://doi.org/10.1109/HICSS.2009.421}
+\showDOI{\tempurl}
+
+
+\bibitem[Bacchelli and Bird(2013)]%
+        {bacchelli-bird-2013}
+\bibfield{author}{\bibinfo{person}{Alberto Bacchelli} {and}
+  \bibinfo{person}{Christian Bird}.} \bibinfo{year}{2013}\natexlab{}.
+\newblock \showarticletitle{Expectations, outcomes, and challenges of modern
+  code review}. In \bibinfo{booktitle}{\emph{Proceedings of the 35th
+  International Conference on Software Engineering}}
+  \emph{(\bibinfo{series}{ICSE 2013})}. \bibinfo{publisher}{IEEE},
+  \bibinfo{pages}{712--721}.
+\newblock
+\urldef\tempurl%
+\url{https://doi.org/10.1109/ICSE.2013.6606617}
+\showDOI{\tempurl}
+
+
+\bibitem[Barnett et~al\mbox{.}(2015)]%
+        {barnett-2015}
+\bibfield{author}{\bibinfo{person}{Mike Barnett}, \bibinfo{person}{Christian
+  Bird}, \bibinfo{person}{Jo{\~a}o Brunet}, {and} \bibinfo{person}{Shuvendu~K.
+  Lahiri}.} \bibinfo{year}{2015}\natexlab{}.
+\newblock \showarticletitle{Helping Developers Help Themselves: Automatic
+  Decomposition of Code Review Changesets}. In
+  \bibinfo{booktitle}{\emph{Proceedings of the 37th IEEE/ACM International
+  Conference on Software Engineering}} \emph{(\bibinfo{series}{ICSE 2015})}.
+  \bibinfo{publisher}{IEEE}, \bibinfo{pages}{134--144}.
+\newblock
+\urldef\tempurl%
+\url{https://doi.org/10.1109/ICSE.2015.35}
+\showDOI{\tempurl}
+
+
+\bibitem[Baum et~al\mbox{.}(2019)]%
+        {baum-2019}
+\bibfield{author}{\bibinfo{person}{Tobias Baum}, \bibinfo{person}{Kurt
+  Schneider}, {and} \bibinfo{person}{Alberto Bacchelli}.}
+  \bibinfo{year}{2019}\natexlab{}.
+\newblock \showarticletitle{Associating working memory capacity and code change
+  ordering with code review performance}.
+\newblock \bibinfo{journal}{\emph{Empirical Software Engineering}}
+  \bibinfo{volume}{24}, \bibinfo{number}{4} (\bibinfo{year}{2019}),
+  \bibinfo{pages}{1762--1798}.
+\newblock
+\urldef\tempurl%
+\url{https://doi.org/10.1007/s10664-018-9676-8}
+\showDOI{\tempurl}
+
+
+\bibitem[Braunstein et~al\mbox{.}(2022)]%
+        {meta-review-time-2022}
+\bibfield{author}{\bibinfo{person}{Louise Braunstein}, \bibinfo{person}{Brendan
+  Fallon}, \bibinfo{person}{Rebecca Lewis}, {and} \bibinfo{person}{Kristin
+  Pandit}.} \bibinfo{year}{2022}\natexlab{}.
+\newblock \bibinfo{title}{Move faster, wait less: Improving code review time at
+  {Meta}}.
+\newblock \bibinfo{howpublished}{Meta Engineering blog,
+  \url{https://engineering.fb.com/2022/11/16/culture/meta-code-review-time-improving/}}.
+\newblock
+\newblock
+\shownote{Accessed 2026-09-24}.
+
+
+\bibitem[Brito and Valente(2021)]%
+        {brito-2021}
+\bibfield{author}{\bibinfo{person}{Rodrigo Brito} {and}
+  \bibinfo{person}{Marco~Tulio Valente}.} \bibinfo{year}{2021}\natexlab{}.
+\newblock \showarticletitle{{RAID}: Tool Support for Refactoring-Aware Code
+  Reviews}. In \bibinfo{booktitle}{\emph{Proceedings of the 29th IEEE/ACM
+  International Conference on Program Comprehension}}
+  \emph{(\bibinfo{series}{ICPC 2021})}. \bibinfo{publisher}{IEEE},
+  \bibinfo{pages}{265--275}.
+\newblock
+\urldef\tempurl%
+\url{https://doi.org/10.1109/ICPC52881.2021.00033}
+\showDOI{\tempurl}
+
+
+\bibitem[Decker et~al\mbox{.}(2020)]%
+        {decker-2020}
+\bibfield{author}{\bibinfo{person}{Michael~John Decker},
+  \bibinfo{person}{Michael~L. Collard}, \bibinfo{person}{L.~Gwenn Volkert},
+  {and} \bibinfo{person}{Jonathan~I. Maletic}.}
+  \bibinfo{year}{2020}\natexlab{}.
+\newblock \showarticletitle{{srcDiff}: A syntactic differencing approach to
+  improve the understandability of deltas}.
+\newblock \bibinfo{journal}{\emph{Journal of Software: Evolution and Process}}
+  \bibinfo{volume}{32}, \bibinfo{number}{4}, Article \bibinfo{articleno}{e2226}
+  (\bibinfo{year}{2020}).
+\newblock
+\urldef\tempurl%
+\url{https://doi.org/10.1002/smr.2226}
+\showDOI{\tempurl}
+
+
+\bibitem[di~Biase et~al\mbox{.}(2019)]%
+        {dibiase-2019}
+\bibfield{author}{\bibinfo{person}{Marco di Biase}, \bibinfo{person}{Magiel
+  Bruntink}, \bibinfo{person}{Arie van Deursen}, {and} \bibinfo{person}{Alberto
+  Bacchelli}.} \bibinfo{year}{2019}\natexlab{}.
+\newblock \showarticletitle{The effects of change decomposition on code
+  review---a controlled experiment}.
+\newblock \bibinfo{journal}{\emph{PeerJ Computer Science}}  \bibinfo{volume}{5}
+  (\bibinfo{year}{2019}), \bibinfo{pages}{e193}.
+\newblock
+\urldef\tempurl%
+\url{https://doi.org/10.7717/peerj-cs.193}
 \showDOI{\tempurl}
 
 
@@ -126,6 +250,53 @@
 \showDOI{\tempurl}
 
 
+\bibitem[Fregnan et~al\mbox{.}(2022)]%
+        {fregnan-2022}
+\bibfield{author}{\bibinfo{person}{Enrico Fregnan}, \bibinfo{person}{Larissa
+  Braz}, \bibinfo{person}{Marco D'Ambros}, \bibinfo{person}{G{\"u}l
+  {\c{C}}al{\i}kl{\i}}, {and} \bibinfo{person}{Alberto Bacchelli}.}
+  \bibinfo{year}{2022}\natexlab{}.
+\newblock \showarticletitle{First come first served: the impact of file
+  position on code review}. In \bibinfo{booktitle}{\emph{Proceedings of the
+  30th ACM Joint European Software Engineering Conference and Symposium on the
+  Foundations of Software Engineering}} \emph{(\bibinfo{series}{ESEC/FSE
+  '22})}. \bibinfo{publisher}{Association for Computing Machinery},
+  \bibinfo{pages}{483--494}.
+\newblock
+\urldef\tempurl%
+\url{https://doi.org/10.1145/3540250.3549177}
+\showDOI{\tempurl}
+
+
+\bibitem[Ge et~al\mbox{.}(2017)]%
+        {ge-2017}
+\bibfield{author}{\bibinfo{person}{Xi Ge}, \bibinfo{person}{Saurabh Sarkar},
+  \bibinfo{person}{Jim Witschey}, {and} \bibinfo{person}{Emerson Murphy-Hill}.}
+  \bibinfo{year}{2017}\natexlab{}.
+\newblock \showarticletitle{Refactoring-aware code review}. In
+  \bibinfo{booktitle}{\emph{2017 IEEE Symposium on Visual Languages and
+  Human-Centric Computing}} \emph{(\bibinfo{series}{VL/HCC 2017})}.
+  \bibinfo{publisher}{IEEE}, \bibinfo{pages}{71--79}.
+\newblock
+\urldef\tempurl%
+\url{https://doi.org/10.1109/VLHCC.2017.8103453}
+\showDOI{\tempurl}
+
+
+\bibitem[Herzig and Zeller(2013)]%
+        {herzig-2013}
+\bibfield{author}{\bibinfo{person}{Kim Herzig} {and} \bibinfo{person}{Andreas
+  Zeller}.} \bibinfo{year}{2013}\natexlab{}.
+\newblock \showarticletitle{The impact of tangled code changes}. In
+  \bibinfo{booktitle}{\emph{Proceedings of the 10th Working Conference on
+  Mining Software Repositories}} \emph{(\bibinfo{series}{MSR 2013})}.
+  \bibinfo{publisher}{IEEE}, \bibinfo{pages}{121--130}.
+\newblock
+\urldef\tempurl%
+\url{https://doi.org/10.1109/MSR.2013.6624018}
+\showDOI{\tempurl}
+
+
 \bibitem[Hughes(2018)]%
         {difftastic}
 \bibfield{author}{\bibinfo{person}{Wilfred Hughes}.}
@@ -155,6 +326,36 @@
 \showDOI{\tempurl}
 
 
+\bibitem[Kononenko et~al\mbox{.}(2016)]%
+        {kononenko-2016}
+\bibfield{author}{\bibinfo{person}{Oleksii Kononenko}, \bibinfo{person}{Olga
+  Baysal}, {and} \bibinfo{person}{Michael~W. Godfrey}.}
+  \bibinfo{year}{2016}\natexlab{}.
+\newblock \showarticletitle{Code review quality: how developers see it}. In
+  \bibinfo{booktitle}{\emph{Proceedings of the 38th International Conference on
+  Software Engineering}} \emph{(\bibinfo{series}{ICSE '16})}.
+  \bibinfo{publisher}{Association for Computing Machinery},
+  \bibinfo{pages}{1028--1038}.
+\newblock
+\urldef\tempurl%
+\url{https://doi.org/10.1145/2884781.2884840}
+\showDOI{\tempurl}
+
+
+\bibitem[Kudrjavets and Rastogi(2023)]%
+        {kudrjavets-2023}
+\bibfield{author}{\bibinfo{person}{Gunnar Kudrjavets} {and}
+  \bibinfo{person}{Ayushi Rastogi}.} \bibinfo{year}{2023}\natexlab{}.
+\newblock \showarticletitle{Does code review speed matter for practitioners?}
+\newblock \bibinfo{journal}{\emph{Empirical Software Engineering}}
+  \bibinfo{volume}{29}, \bibinfo{number}{1}, Article \bibinfo{articleno}{21}
+  (\bibinfo{year}{2023}).
+\newblock
+\urldef\tempurl%
+\url{https://doi.org/10.1007/s10664-023-10401-z}
+\showDOI{\tempurl}
+
+
 \bibitem[L{\"a}mmel et~al\mbox{.}(2011)]%
         {ast-api-2}
 \bibfield{author}{\bibinfo{person}{Ralf L{\"a}mmel}, \bibinfo{person}{Ekaterina
@@ -181,6 +382,22 @@
 \newblock
 \newblock
 \shownote{Accessed 2026-08-23}.
+
+
+\bibitem[McIntosh et~al\mbox{.}(2016)]%
+        {mcintosh-2016}
+\bibfield{author}{\bibinfo{person}{Shane McIntosh}, \bibinfo{person}{Yasutaka
+  Kamei}, \bibinfo{person}{Bram Adams}, {and} \bibinfo{person}{Ahmed~E.
+  Hassan}.} \bibinfo{year}{2016}\natexlab{}.
+\newblock \showarticletitle{An empirical study of the impact of modern code
+  review practices on software quality}.
+\newblock \bibinfo{journal}{\emph{Empirical Software Engineering}}
+  \bibinfo{volume}{21}, \bibinfo{number}{5} (\bibinfo{year}{2016}),
+  \bibinfo{pages}{2146--2189}.
+\newblock
+\urldef\tempurl%
+\url{https://doi.org/10.1007/s10664-015-9381-9}
+\showDOI{\tempurl}
 
 
 \bibitem[Myers(1986)]%
@@ -235,6 +452,73 @@
 \newblock
 \urldef\tempurl%
 \url{https://doi.org/10.1145/2699485}
+\showDOI{\tempurl}
+
+
+\bibitem[Rahman et~al\mbox{.}(2026)]%
+        {rahman-2026}
+\bibfield{author}{\bibinfo{person}{Md~Shamimur Rahman}, \bibinfo{person}{Zadia
+  Codabux}, {and} \bibinfo{person}{Chanchal~K. Roy}.}
+  \bibinfo{year}{2026}\natexlab{}.
+\newblock \showarticletitle{Breaking the Alphabet: Rethinking File Ordering in
+  Code Review}. In \bibinfo{booktitle}{\emph{Proceedings of the 48th IEEE/ACM
+  International Conference on Software Engineering}}
+  \emph{(\bibinfo{series}{ICSE '26})}. \bibinfo{publisher}{Association for
+  Computing Machinery}, \bibinfo{pages}{2492--2504}.
+\newblock
+\urldef\tempurl%
+\url{https://doi.org/10.1145/3744916.3787838}
+\showDOI{\tempurl}
+
+
+\bibitem[Sadowski et~al\mbox{.}(2018)]%
+        {sadowski-2018}
+\bibfield{author}{\bibinfo{person}{Caitlin Sadowski}, \bibinfo{person}{Emma
+  S{\"o}derberg}, \bibinfo{person}{Luke Church}, \bibinfo{person}{Michal
+  Sipko}, {and} \bibinfo{person}{Alberto Bacchelli}.}
+  \bibinfo{year}{2018}\natexlab{}.
+\newblock \showarticletitle{Modern code review: a case study at {Google}}. In
+  \bibinfo{booktitle}{\emph{Proceedings of the 40th International Conference on
+  Software Engineering: Software Engineering in Practice}}
+  \emph{(\bibinfo{series}{ICSE-SEIP '18})}. \bibinfo{publisher}{Association for
+  Computing Machinery}, \bibinfo{pages}{181--190}.
+\newblock
+\urldef\tempurl%
+\url{https://doi.org/10.1145/3183519.3183525}
+\showDOI{\tempurl}
+
+
+\bibitem[Tao et~al\mbox{.}(2012)]%
+        {tao-2012}
+\bibfield{author}{\bibinfo{person}{Yida Tao}, \bibinfo{person}{Yingnong Dang},
+  \bibinfo{person}{Tao Xie}, \bibinfo{person}{Dongmei Zhang}, {and}
+  \bibinfo{person}{Sunghun Kim}.} \bibinfo{year}{2012}\natexlab{}.
+\newblock \showarticletitle{How do software engineers understand code changes?
+  {An} exploratory study in industry}. In \bibinfo{booktitle}{\emph{Proceedings
+  of the ACM SIGSOFT 20th International Symposium on the Foundations of
+  Software Engineering}} \emph{(\bibinfo{series}{FSE '12})}.
+  \bibinfo{publisher}{Association for Computing Machinery}, Article
+  \bibinfo{articleno}{51}, \bibinfo{numpages}{11}~pages.
+\newblock
+\urldef\tempurl%
+\url{https://doi.org/10.1145/2393596.2393656}
+\showDOI{\tempurl}
+
+
+\bibitem[Wurzel~Gon{\c{c}}alves et~al\mbox{.}(2022)]%
+        {goncalves-2022}
+\bibfield{author}{\bibinfo{person}{Pavl{\'\i}na Wurzel~Gon{\c{c}}alves},
+  \bibinfo{person}{Enrico Fregnan}, \bibinfo{person}{Tobias Baum},
+  \bibinfo{person}{Kurt Schneider}, {and} \bibinfo{person}{Alberto Bacchelli}.}
+  \bibinfo{year}{2022}\natexlab{}.
+\newblock \showarticletitle{Do explicit review strategies improve code review
+  performance? {Towards} understanding the role of cognitive load}.
+\newblock \bibinfo{journal}{\emph{Empirical Software Engineering}}
+  \bibinfo{volume}{27}, \bibinfo{number}{4}, Article \bibinfo{articleno}{92}
+  (\bibinfo{year}{2022}).
+\newblock
+\urldef\tempurl%
+\url{https://doi.org/10.1007/s10664-022-10123-8}
 \showDOI{\tempurl}
 
 

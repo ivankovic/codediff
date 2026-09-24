@@ -93,7 +93,15 @@ each result decided in CodeDiff's design) stays. Section 3.4 is retitled "Cross-
 existing datasets" and no longer compares CodeDiff against the oracle - only the human annotation
 against it - so the `\OracleHumanCodeDiff*` macros are generated and unused. Section 8's Limits
 paragraph and the by-dataset accuracy sentence are gone; Table 5 keeps a one-sentence pointer.
-Figure 4 draws CodeDiff dash-dotted. 12 pages.
+Figure 4 draws CodeDiff dash-dotted.
+
+The same day, the point behind the second author's F4 (the paper never said *why* diff quality
+matters) was answered by expanding outward: two evidence paragraphs in the introduction and
+seventeen new `references.bib` entries - review is understanding (Bacchelli & Bird, Tao et al.),
+presentation alone moves outcomes (file position, unified vs. split view, decomposition, working
+memory), and size, latency and move-aware diffs shape quality, time and satisfaction - closing on
+the gap that none of them varies the correspondence a diff draws. `REVIEW-2026-09-24.md` lists
+them by strand and names the three read from abstracts only. 13 pages.
 
 The one measurement item, Figure 2's Unknown share, is answered at the foot of the review file:
 the classifier improvement of 2026-09-13 was never written back into the corpus database's `tip`

@@ -155,6 +155,34 @@ operations that transforms one into the other, underlies modern version control 
 modern code review. During a review, we read the diff to see what changed and what stayed
 the same, so the quality of the diff directly shapes the ease and quality of the review.
 
+Whether that reading succeeds depends on how the change is shown, not only on the change.
+Reviewers name understanding the change as the main challenge of code
+review~\cite{bacchelli-bird-2013}, and ask for tools that show a change's structure rather than
+its text delta~\cite{tao-2012}. Controlled experiments show the presentation alone moving the
+outcome. Files shown later in a review receive fewer comments, and a seeded defect in the last
+file has 64\% lower odds of being found than the same defect in the
+first~\cite{fregnan-2022,rahman-2026}. The unified view of a diff costs less visual effort and
+finds more bugs than the split view of the same diff~\cite{alcocer-2023}. A change decomposed
+into its separate concerns is reviewed with fewer wrongly reported issues than the same change
+tangled~\cite{herzig-2013,barnett-2015,dibiase-2019}. A reviewer's working-memory capacity
+predicts whether they find a \emph{delocalised} defect, one whose parts the diff shows far
+apart~\cite{baum-2019,goncalves-2022}.
+
+The cost of a diff that is hard to read is paid in time and in quality. At Google, useful
+comments fall and review latency rises with the size of a change~\cite{sadowski-2018}, and
+Mozilla's contributors name size-related factors as the largest driver of review
+latency~\cite{kononenko-2016}. Components with low review participation ship more post-release
+defects~\cite{mcintosh-2016}. Practitioners rate the reaction time of review tooling as of the
+first importance~\cite{kudrjavets-2023}, and at Meta, developer satisfaction with code review
+falls with the time the slowest quarter of a developer's changes wait for
+review~\cite{meta-review-time-2022}. Where a diff shows a refactoring as a refactoring rather
+than as deleted and inserted lines, reviewers report lower cognitive effort and read fewer
+lines~\cite{ge-2017,brito-2021}, and syntactic deltas modelled on how developers edit are judged
+more understandable than the cheapest tree edit~\cite{decker-2020}. What none of these studies
+varies is the correspondence the diff draws between the two versions: whether the text it marks
+as changed, moved or unchanged is the text a reader would mark. This paper measures that property
+on real changes.
+
 The standard diff used by almost all developers and platforms today is line-based: the file is
 treated as a sequence of text lines, and the tool computes a shortest edit script between the two
 sequences using three operations, insert, delete, and update. This approach is computationally
