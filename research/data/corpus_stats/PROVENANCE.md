@@ -152,7 +152,8 @@ the new `reclassify_tips` binary), so `tips.png` and the `Unknown` share it show
 run `make reclassify-tips MODE=full RECLASSIFY_FLAGS=--write` and then `make file-stats-report`
 against this run's `stats.sqlite`, and record it here. Rows reclassified that way carry no
 size/AST numbers (they were never read), so `code_percentiles.csv` is unaffected by them until the
-corpus is re-walked.
+corpus is re-walked. **Superseded:** the corpus was re-walked on 2026-09-24, see the last section
+of this file; every figure and macro now reflects the widened tables.
 
 ## The files above 1 MiB, 2026-09-20
 
@@ -193,3 +194,59 @@ than this run), 128,288 are in a language the classifier knows but codediff has 
 4,824 are empty, 9 gave up. The largest files in the corpus are generated too, but carry no such
 comment and so are parsed; that is why the corpus-shape figure's nodes curve starts flat and its
 maximum is a data table.
+
+## Re-measured with the 2026-09-13 classifier, 2026-09-24
+
+The 2026-09-24 paper review asked why Figure 2 still showed 30% of files as Unknown after the
+classifier tables in `src/code/tip.rs` had been expanded on 2026-09-13. Because the `tip` column
+is what `file_stats` stores at measurement time, and the 2026-09-20 pass re-processed only the
+files above 1 MiB, the answer was that nothing had re-measured the rest. Writing the new
+classification back by path alone (`make reclassify-tips RECLASSIFY_FLAGS=--write`) was
+considered and rejected: a file moved out of Unknown that way was never read, so 805,630 rows
+would have joined the code-file distributions with no bytes, lines or node count. The corpus was
+walked again instead.
+
+| | |
+|---|---|
+| Date | 2026-09-24, 18:01 to 20:54 for the walk, then the report |
+| Command | `file_stats --path <repository> --db /var/tmp/research/full/stats.sqlite`, one process per repository over `/var/tmp/research/full/repositories/*/`, in alphabetical order, as a systemd user unit capped at 48 GB (`codediff-fullwalk-20260924`) |
+| Repositories | 7,444, 0 non-zero exits |
+| Wall clock | 2h53m for the walk; `analysis/file_stats.py` about 20 minutes, run twice (once by `make file-stats-report`, once as `make introductory-paper-empirical`'s prerequisite) |
+| Held out | `FasterXML-jackson-dataformats-text/yaml/src/test/resources/data/fuzz-65918.yaml`, renamed for the duration and restored, for the reason under "One file is excluded from the parse" above |
+| Binary | `target/release/file_stats` at commit `dc063239`, tree-sitter 0.25.10, the 60-second per-file parse budget of the 2026-09-20 pass in place |
+
+Rows are upserted by path, so the run replaced every row's measurements in place and the table
+still holds 7,045,754 files. One row was added by mistake and deleted afterwards: the held-out
+file was walked under its temporary `.held-out` name and inserted as an Unknown file, so
+`files.path LIKE '%fuzz-65918.yaml.held-out'` was deleted and the report re-run before anything
+was committed. The original `fuzz-65918.yaml` row still carries its 2026-09-07 measurement.
+
+What moved:
+
+| category | 2026-09-07 | | 2026-09-24 | |
+|---|---|---|---|---|
+| Code | 3,890,994 | 55.2% | 4,688,419 | 66.5% |
+| Data | 911,023 | 12.9% | 1,593,317 | 22.6% |
+| Unknown | 2,112,884 | 30.0% | 434,318 | 6.2% |
+| Configuration | 84,973 | 1.2% | 176,475 | 2.5% |
+| Documentation | 45,880 | 0.7% | 153,225 | 2.2% |
+
+The numbers agree with the `reclassify_tips --db` dry run of the same day to the row, which is
+the check that the re-walk classified the same way the reclassification would have.
+
+The code-file distributions moved because their population grew by a fifth, and the newcomers
+run small: `\LocPFifty` 62 -> 43, `\LocPNinety` 448 -> 375, `\LocPNinetyNine` 2,914 -> 2,511;
+`\AstPFifty` 335 -> 206, `\AstPNinety` 3,482 -> 2,876, `\AstPNinetyNine` 25,674 -> 22,005;
+`\BytesPFifty` 2,353 -> 2,238. The maxima are unchanged. `\CorrelationR` is unchanged at 0.4702
+and `\CorrelationRTrimmed` 0.9133 -> 0.9085; the trimmed fit is
+`nodes = 0.207 * bytes + 44`, so the paper's bytes/5 rule of thumb stands.
+
+One thing to know when reading the node percentiles: **820,078 of the 4,688,419 code files
+(17.5%) have no tree-sitter grammar** (`language` is null), against 128,288 before, because
+the expanded tables classify Perl, Makefile, CMake, Lisp, Fortran, assembly and similar
+extensions as Code. Those files are counted with a node count of zero, as the 2026-09-20
+section above explains for the smaller set, so the nodes curve's flat start in the paper's
+corpus-shape figure is now a fifth of the population rather than a twelfth, and `\AstPFifty` is
+pulled down by them more than `\LocPFifty` is. The convention was kept rather than changed
+here; excluding no-grammar files from the node distribution alone would make the three
+top-row curves of that figure describe three different populations.

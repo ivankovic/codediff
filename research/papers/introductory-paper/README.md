@@ -107,8 +107,9 @@ The one measurement item, Figure 2's Unknown share, is answered at the foot of t
 the classifier improvement of 2026-09-13 was never written back into the corpus database's `tip`
 column (`make reclassify-tips RECLASSIFY_FLAGS=--write` does that; a file moved out of Unknown by
 path alone still has no size or node numbers until `measure-file-stats` re-walks the corpus).
-The re-walk was deferred on the author's decision the same day; the root `TODO.md` carries the
-job, so Figure 2 still shows the 2026-09-07 classification.
+The re-walk ran the same evening (2h53m, see `data/corpus_stats/PROVENANCE.md`), so Figure 2 and
+the empirical macros now reflect the 2026-09-13 classifier: Unknown 6.2%, Code 66.5%, and a
+code-file population a fifth larger, whose medians are correspondingly smaller.
 
 ### Review pass of 2026-09-11
 
@@ -391,19 +392,18 @@ step with `main.tex`, not with `DISPLAY_NAMES`. `_escape_tex` is deliberately **
 
 ### Figures are vector and greyscale-safe
 
-Added 2026-09-09. Every plot script now writes a `.pdf` beside its `.png`, and `main.tex` includes
-figures without an extension so LaTeX takes the vector copy - with one exception, `figures/tips.png`,
-which keeps its extension because `plots/tips.pdf` does not exist yet (see below). Drop the
-extension and add the `figures/tips.pdf` symlink once a `measure-file-stats` run has produced it. `apted_only_report.py`'s bars carry
-hatching as well as hue, because colour alone says nothing in a printed paper. Both in-image chart
-titles were removed: they duplicated the LaTeX caption and went stale independently of it - one
-still read "RQ1" a week after the 2026-09-02 restructure renumbered that question to RQ2.
+Added 2026-09-09. Every plot script writes a `.pdf` beside its `.png`, `figures/` symlinks both,
+and `main.tex` includes figures without an extension so LaTeX takes the vector copy.
+`apted_only_report.py`'s bars carry hatching as well as hue, because colour alone says nothing in
+a printed paper. Both in-image chart titles were removed: they duplicated the LaTeX caption and
+went stale independently of it - one still read "RQ1" a week after the 2026-09-02 restructure
+renumbered that question to RQ2.
 
-**`plots/tips.png` is the one figure still stale.** `file_stats.py`'s pie chart was replaced with a
-horizontal bar chart (the pie's two smallest labels overprinted into an illegible smear, and five
-wedges separated by hue alone are unreadable in greyscale), but regenerating the image needs
-`stats.sqlite`, which is not committed. Run `make measure-file-stats MODE=small` then
-`make introductory-paper-empirical MODE=small`.
+`plots/tips.png` is a horizontal bar chart (the earlier pie's two smallest labels overprinted into
+an illegible smear, and five wedges separated by hue alone are unreadable in greyscale).
+Regenerating it needs `stats.sqlite`, which is not committed: `make file-stats-report MODE=full`
+re-reads the database on the measuring machine, `make measure-file-stats MODE=full` re-walks the
+corpus first (about three hours, see `data/corpus_stats/PROVENANCE.md`).
 
 ### Known-stale numbers
 
