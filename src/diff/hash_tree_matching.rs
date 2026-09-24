@@ -82,11 +82,9 @@ pub fn build_extended_node_list(
         .collect()
 }
 
-/**
-* Matches each selected, still-unmatched before node to the nearest unmatched after node with the
-* same value in the caller's hash, then maps both subtrees in lockstep. The caller picks the hash;
-* whether a pair is identical is always decided by `node_to_kind_and_value_hash`.
-*/
+/// Matches each selected, still-unmatched before node to the nearest unmatched after node with the
+/// same value in the caller's hash, then maps both subtrees in lockstep. The caller picks the hash;
+/// whether a pair is identical is always decided by `node_to_kind_and_value_hash`.
 // Every parameter is distinct context; a params struct would only relocate them.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn solve_with_hash_map(
@@ -244,19 +242,17 @@ pub(crate) fn solve_with_hash_map(
     }
 }
 
-/**
-* Pairs two matched parents' children for the lockstep descent, and reports whether a
-* commutative container's children were reordered.
-*
-* Ordinary parents pair positionally, dropping kind mismatches: equal hashes computed in document
-* order imply positional correspondence. A `nodes::is_commutative_container` hashes its children
-* unordered, so its children pair by hash: kind-and-value first, then kind-only for what is left
-* (a `KindOnlyHash` outer match allows values to differ). Kind-only alone would pair differently
-* named identifiers arbitrarily and hide a real reorder.
-*
-* Ties go to the nearest sibling index, not byte offset: an edit before the parents shifts every
-* offset inside them, and a shifted neighbouring comma can be closer than the right one.
-*/
+/// Pairs two matched parents' children for the lockstep descent, and reports whether a
+/// commutative container's children were reordered.
+///
+/// Ordinary parents pair positionally, dropping kind mismatches: equal hashes computed in document
+/// order imply positional correspondence. A `nodes::is_commutative_container` hashes its children
+/// unordered, so its children pair by hash: kind-and-value first, then kind-only for what is left
+/// (a `KindOnlyHash` outer match allows values to differ). Kind-only alone would pair differently
+/// named identifiers arbitrarily and hide a real reorder.
+///
+/// Ties go to the nearest sibling index, not byte offset: an edit before the parents shifts every
+/// offset inside them, and a shifted neighbouring comma can be closer than the right one.
 pub(crate) fn pair_children_for_descent<'a>(
     before_parent: tree_sitter::Node<'a>,
     after_parent: tree_sitter::Node<'a>,

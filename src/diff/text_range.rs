@@ -108,15 +108,13 @@ pub fn row_cells_of(line: &str) -> ScreenColumn {
     screen_column_in(line, row_len_of(line))
 }
 
-/**
-* A right-open range of (row, column) points, columns in bytes.
-*
-* A range that ends at the end of a row is written `(row + 1, 0)`, never `(row, row_len)`, even
-* when that row does not exist (end of file); one form means fewer off-by-one errors.
-*
-* A range with `start == end` selects nothing. It marks where an insert or delete sits on the
-* side that has nothing to show, so both sides always have the same number of ranges.
-*/
+/// A right-open range of (row, column) points, columns in bytes.
+///
+/// A range that ends at the end of a row is written `(row + 1, 0)`, never `(row, row_len)`, even
+/// when that row does not exist (end of file); one form means fewer off-by-one errors.
+///
+/// A range with `start == end` selects nothing. It marks where an insert or delete sits on the
+/// side that has nothing to show, so both sides always have the same number of ranges.
 #[derive(Debug, Clone, PartialEq)]
 pub struct TextRange {
     pub start_row: usize,

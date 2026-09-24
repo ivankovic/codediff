@@ -36,13 +36,11 @@ fn record_hash(
     reverse.entry(hash).or_default().push(node_id);
 }
 
-/**
-* Fills `metadata`'s four hash maps (full, structural, kind-and-value, kind-only; see
-* [`ASTMetadata`]), their reverse maps, and the similarity sketches. Errors if `code` is unparsed.
-*
-* Speed matters (every file is hashed) and security does not, hence MetroHash. Node ids are only
-* stable within one parse, which is all the maps need.
-*/
+/// Fills `metadata`'s four hash maps (full, structural, kind-and-value, kind-only; see
+/// [`ASTMetadata`]), their reverse maps, and the similarity sketches. Errors if `code` is unparsed.
+///
+/// Speed matters (every file is hashed) and security does not, hence MetroHash. Node ids are only
+/// stable within one parse, which is all the maps need.
 pub fn hash_code(code: &Code, metadata: &mut ASTMetadata) -> Result<()> {
     let ast = code
         .ast
@@ -156,14 +154,12 @@ pub(crate) fn hash_nodes(
     }
 }
 
-/**
-* The full hash: a Merkle hash of kind, child count, each child's hash, and the gap text this node
-* owns around its children (a leaf's whole span).
-*
-* Gaps rather than the whole span, so reformatting keeps the hash; but a gap can be content
-* (tree-sitter-r leaves a string's body outside its only child), so only an all-whitespace gap is
-* skipped, and a kept gap is hashed untrimmed so embedded whitespace still counts.
-*/
+/// The full hash: a Merkle hash of kind, child count, each child's hash, and the gap text this node
+/// owns around its children (a leaf's whole span).
+///
+/// Gaps rather than the whole span, so reformatting keeps the hash; but a gap can be content
+/// (tree-sitter-r leaves a string's body outside its only child), so only an all-whitespace gap is
+/// skipped, and a kept gap is hashed untrimmed so embedded whitespace still counts.
 fn compute_full_hash(
     record: &NodeRecord,
     source_code: &[u8],
@@ -244,12 +240,10 @@ fn compute_structural_hash(record: &NodeRecord, child_hashes: &[u64]) -> u64 {
     hasher.finish()
 }
 
-/**
-* Like `compute_full_hash`, but a commutative container's children are hashed in sorted order.
-* Children's hashes come from this same function, so the order-independence reaches every
-* ancestor: the `enum_item` around a reordered `enum_variant_list` keeps its hash. That requires
-* `hash_tree_matching::pair_children_for_descent` to pair such children by hash, not position.
-*/
+/// Like `compute_full_hash`, but a commutative container's children are hashed in sorted order.
+/// Children's hashes come from this same function, so the order-independence reaches every
+/// ancestor: the `enum_item` around a reordered `enum_variant_list` keeps its hash. That requires
+/// `hash_tree_matching::pair_children_for_descent` to pair such children by hash, not position.
 fn compute_kind_and_value_hash(
     record: &NodeRecord,
     source_code: &[u8],
@@ -281,11 +275,9 @@ fn compute_kind_and_value_hash(
     hasher.finish()
 }
 
-/**
-* Like `compute_structural_hash`, with `compute_kind_and_value_hash`'s order-independence for
-* commutative containers. The single "same shape, any leaf values" tier: coarser than separate
-* ignore-identifiers / ignore-literals tiers, a deliberate precision trade.
-*/
+/// Like `compute_structural_hash`, with `compute_kind_and_value_hash`'s order-independence for
+/// commutative containers. The single "same shape, any leaf values" tier: coarser than separate
+/// ignore-identifiers / ignore-literals tiers, a deliberate precision trade.
 fn compute_kind_only_hash(record: &NodeRecord, child_hashes: &[u64], language: Language) -> u64 {
     let mut hasher = MetroHash64::new();
     hasher.write(record.kind_id.to_le_bytes().as_slice());

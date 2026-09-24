@@ -27,10 +27,8 @@
 use crate::code::Type;
 use crate::code::language::language_for_extension;
 
-/**
-* Returns the type from path. If possible, the subtype is added as the string value to the enums
-* gross Code/Config/Data categorization.
-*/
+/// Returns the type from path. If possible, the subtype is added as the string value to the enums
+/// gross Code/Config/Data categorization.
 pub fn type_from_path(path: &std::path::Path) -> Option<Type> {
     if let Some(filename) = path.file_name()
         && let Some(t) = type_from_filename(&filename.to_string_lossy())
@@ -46,11 +44,9 @@ pub fn type_from_path(path: &std::path::Path) -> Option<Type> {
     None
 }
 
-/**
-* Returns the type from the extension.
-*
-* If possible, the subtype is added as the string value to the enums gross Code/Config/Data categorization.
-*/
+/// Returns the type from the extension.
+///
+/// If possible, the subtype is added as the string value to the enums gross Code/Config/Data categorization.
 pub fn type_from_extension(ext: &str) -> Option<Type> {
     if language_for_extension(ext).is_some() {
         return Some(Type::Code(String::from("Uncategorized")));
@@ -222,11 +218,9 @@ pub fn type_from_extension(ext: &str) -> Option<Type> {
     }
 }
 
-/**
-* Returns the type from the file name.
-*
-* If possible, the subtype is added as the string value to the enums gross Code/Config/Data categorization.
-*/
+/// Returns the type from the file name.
+///
+/// If possible, the subtype is added as the string value to the enums gross Code/Config/Data categorization.
 pub fn type_from_filename(filename: &str) -> Option<Type> {
     let code = |subtype: &str| Some(Type::Code(String::from(subtype)));
     let configuration = |subtype: &str| Some(Type::Configuration(String::from(subtype)));

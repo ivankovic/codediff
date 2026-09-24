@@ -27,13 +27,11 @@ pub mod tip; // `type` is a Rust keyword, so Croatian.
 use anyhow::{Result, anyhow};
 use std::fmt;
 
-/**
-* Source code and everything derived from it.
-*
-* Consumers must not assume any derived field is set: check, compute it if possible, and otherwise
-* fail safe with a zero result. That keeps large files and data-that-looks-like-code cheap, and is
-* why the derived fields are `Option`s.
-*/
+/// Source code and everything derived from it.
+///
+/// Consumers must not assume any derived field is set: check, compute it if possible, and otherwise
+/// fail safe with a zero result. That keeps large files and data-that-looks-like-code cheap, and is
+/// why the derived fields are `Option`s.
 #[derive(Debug, Default)]
 pub struct Code {
     /// The actual code.
@@ -44,11 +42,9 @@ pub struct Code {
     pub ast: Option<tree_sitter::Tree>,
 }
 
-/**
-* Hand-written, not derived: `tree_sitter::Tree::clone()` gives the root node a new `id()`, so
-* id-keyed `ast_metadata` would point at a node the clone does not have. The clone drops it, so
-* `ast_metadata` ids match its own `ast` by construction; it is recomputed on first use.
-*/
+/// Hand-written, not derived: `tree_sitter::Tree::clone()` gives the root node a new `id()`, so
+/// id-keyed `ast_metadata` would point at a node the clone does not have. The clone drops it, so
+/// `ast_metadata` ids match its own `ast` by construction; it is recomputed on first use.
 impl Clone for Code {
     fn clone(&self) -> Self {
         Code {
@@ -167,22 +163,18 @@ impl Code {
     }
 }
 
-/**
- * Whether `path` holds bytes `Code::from_file` cannot read as text. I/O failures propagate.
- *
- * Deliberately `from_file`'s own failure condition (invalid UTF-8), not git's NUL-byte heuristic:
- * the two must agree on every input, and a Latin-1 source file has no NUL yet fails to decode.
- */
+/// Whether `path` holds bytes `Code::from_file` cannot read as text. I/O failures propagate.
+///
+/// Deliberately `from_file`'s own failure condition (invalid UTF-8), not git's NUL-byte heuristic:
+/// the two must agree on every input, and a Latin-1 source file has no NUL yet fails to decode.
 pub fn is_binary_file(path: &std::path::Path) -> Result<bool> {
     let bytes = std::fs::read(path)
         .map_err(|e| anyhow!("Failed to read file {}: {}", path.display(), e))?;
     Ok(std::str::from_utf8(&bytes).is_err())
 }
 
-/**
-* What diffing needs to know about the code, beyond the code itself. Statistics and test data do
-* not belong here.
-*/
+/// What diffing needs to know about the code, beyond the code itself. Statistics and test data do
+/// not belong here.
 #[derive(Debug, Clone, Default)]
 pub struct Metadata {
     pub path: Option<std::path::PathBuf>,
@@ -271,14 +263,12 @@ pub struct KindCostClass {
     pub operator_families: crate::diff::nodes::FamilyMask,
 }
 
-/**
-* Per-tree hashes and indexes, keyed by tree-sitter node id.
-*
-* Every map is an `FxHashMap`: SipHash's per-process reseed makes lookup time on these small
-* integer keys vary by an order of magnitude between runs, and the ancestor walk in APTED's DP does
-* a lookup per step. Reverse maps hold a `Vec` in deterministic traversal order, not a set, so the
-* duplicate a caller picks first is reproducible; many nodes share a hash (every `;`).
-*/
+/// Per-tree hashes and indexes, keyed by tree-sitter node id.
+///
+/// Every map is an `FxHashMap`: SipHash's per-process reseed makes lookup time on these small
+/// integer keys vary by an order of magnitude between runs, and the ancestor walk in APTED's DP does
+/// a lookup per step. Reverse maps hold a `Vec` in deterministic traversal order, not a set, so the
+/// duplicate a caller picks first is reproducible; many nodes share a hash (every `;`).
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct ASTMetadata {
     /// Full hash: kinds and values of the whole subtree, in order.

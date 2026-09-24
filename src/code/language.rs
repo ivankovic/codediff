@@ -18,9 +18,7 @@
 
 use crate::code::Language;
 
-/**
-* Returns the language for a given path.
-*/
+/// Returns the language for a given path.
 pub fn language_for_path(path: &std::path::Path) -> Option<Language> {
     let ext = path.extension()?.to_string_lossy().to_ascii_lowercase();
     if ext == "test" {
@@ -30,28 +28,26 @@ pub fn language_for_path(path: &std::path::Path) -> Option<Language> {
     language_for_extension(ext.as_str())
 }
 
-/**
-* Refines [`language_for_path`]'s extension-derived guess by peeking at `content`, for the one
-* collision where a content check is cheap, unambiguous, and worth it: `.ts` is TypeScript in the
-* overwhelming majority of cases, but Qt Linguist also uses `.ts` for its XML translation-source
-* files (`<?xml version="1.0"?><!DOCTYPE TS>...`) - a real, recurring collision (any Qt-based
-* project), not a one-off. Unlike a fuzzy content heuristic, this one is safe to apply
-* unconditionally: a file starting with an XML declaration cannot also be valid TypeScript, so
-* there is no genuine TypeScript source this could misclassify.
-*
-* Every other extension collision this project has hit in practice (e.g. `.r` used by one
-* project's C runtime files instead of R) has been a one-off, single-repository convention rather
-* than a recurring pattern, so it's handled by rejecting that one corpus sample rather than by a
-* general content heuristic here - see `sample.csv`'s REJECTED rows and the "language detection"
-* discussion this function came out of.
-*
-* Callers that already have the file's content in hand (e.g. [`crate::code::Code::from_file`],
-* which reads the whole file before determining its language anyway) should prefer this over
-* [`language_for_path`] - it can only ever be as good or better, never worse, and costs nothing
-* beyond a `starts_with` check. Callers that only have a path, or where reading content first would
-* add real I/O cost against a large corpus (e.g. `sample_test_diffs`'s commit-delta walk, which
-* checks extension before ever touching a blob), should keep using `language_for_path` alone.
-*/
+/// Refines [`language_for_path`]'s extension-derived guess by peeking at `content`, for the one
+/// collision where a content check is cheap, unambiguous, and worth it: `.ts` is TypeScript in the
+/// overwhelming majority of cases, but Qt Linguist also uses `.ts` for its XML translation-source
+/// files (`<?xml version="1.0"?><!DOCTYPE TS>...`) - a real, recurring collision (any Qt-based
+/// project), not a one-off. Unlike a fuzzy content heuristic, this one is safe to apply
+/// unconditionally: a file starting with an XML declaration cannot also be valid TypeScript, so
+/// there is no genuine TypeScript source this could misclassify.
+///
+/// Every other extension collision this project has hit in practice (e.g. `.r` used by one
+/// project's C runtime files instead of R) has been a one-off, single-repository convention rather
+/// than a recurring pattern, so it's handled by rejecting that one corpus sample rather than by a
+/// general content heuristic here - see `sample.csv`'s REJECTED rows and the "language detection"
+/// discussion this function came out of.
+///
+/// Callers that already have the file's content in hand (e.g. [`crate::code::Code::from_file`],
+/// which reads the whole file before determining its language anyway) should prefer this over
+/// [`language_for_path`] - it can only ever be as good or better, never worse, and costs nothing
+/// beyond a `starts_with` check. Callers that only have a path, or where reading content first would
+/// add real I/O cost against a large corpus (e.g. `sample_test_diffs`'s commit-delta walk, which
+/// checks extension before ever touching a blob), should keep using `language_for_path` alone.
 pub fn language_for_path_and_content(path: &std::path::Path, content: &str) -> Option<Language> {
     let guess = language_for_path(path)?;
     if guess == Language::TypeScript && looks_like_xml(content) {
@@ -69,12 +65,10 @@ fn looks_like_xml(content: &str) -> bool {
         .starts_with("<?xml")
 }
 
-/**
-* Returns the best guess language for a given file extension.
-*
-* Note that some extensions are not uniquely identifiable so the highest probability result is
-* returned. It may or may not be correct.
-*/
+/// Returns the best guess language for a given file extension.
+///
+/// Note that some extensions are not uniquely identifiable so the highest probability result is
+/// returned. It may or may not be correct.
 pub fn language_for_extension(ext: &str) -> Option<Language> {
     match ext {
         // Sorted alphabetically.
@@ -112,9 +106,7 @@ pub fn language_for_extension(ext: &str) -> Option<Language> {
     }
 }
 
-/**
-* Returns the treesitter language structure, if supported.
-*/
+/// Returns the treesitter language structure, if supported.
 pub fn to_treesitter(language: &Language) -> Option<tree_sitter::Language> {
     match language {
         // alphabetically sorted

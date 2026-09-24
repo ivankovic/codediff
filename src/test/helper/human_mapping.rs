@@ -16,14 +16,12 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/**
-* Human-authored ground truth for a fixture, `<fixture dir>/human_mapping.json`, written by the
-* `human_solver` binary: a node mapping (`entries`, `groups`) and independent text paintings
-* (`text_mappings`), plus the checks that grade codediff against them.
-*
-* Nodes are identified by *path* (see [`super::path_for_node`]), not node id: ids are not stable
-* across the separate parses that write and later check a mapping.
-*/
+/// Human-authored ground truth for a fixture, `<fixture dir>/human_mapping.json`, written by the
+/// `human_solver` binary: a node mapping (`entries`, `groups`) and independent text paintings
+/// (`text_mappings`), plus the checks that grade codediff against them.
+///
+/// Nodes are identified by *path* (see [`super::path_for_node`]), not node id: ids are not stable
+/// across the separate parses that write and later check a mapping.
 use anyhow::{Context, Result, bail, ensure};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -1454,14 +1452,12 @@ fn owned_text_hash(metadata: &ASTMetadata, id: usize) -> u64 {
         .unwrap_or(0)
 }
 
-/**
-* Total edit cost of a `HumanMapping` under the unit-cost model of `crate::diff::cost::diff_cost`,
-* via the same `operation_cost` table so the two stay comparable. The metadata must come from the
-* same parse as the roots (node ids are per-parse).
-*
-* Sums only annotated entries, which is correct only while the mapping covers every real change:
-* an unannotated edit silently undercounts the human side.
-*/
+/// Total edit cost of a `HumanMapping` under the unit-cost model of `crate::diff::cost::diff_cost`,
+/// via the same `operation_cost` table so the two stay comparable. The metadata must come from the
+/// same parse as the roots (node ids are per-parse).
+///
+/// Sums only annotated entries, which is correct only while the mapping covers every real change:
+/// an unannotated edit silently undercounts the human side.
 pub fn human_mapping_cost(
     mapping: &HumanMapping,
     before_root: Node,
@@ -1631,18 +1627,16 @@ pub fn as_ast_diff_for_mapping(
     Ok(diff)
 }
 
-/**
-* `mapping.entries` plus one *deterministic* representative pairing per group, flattened into
-* plain entries: members sorted by start byte and zipped pairwise under the group's `operation`,
-* the larger side's leftovers deleted/inserted per `with_children`.
-*
-* An [`GroupPairing::AllToAll`] group has no leftovers: its surplus members each pair with the last
-* member of the shorter side, putting one node in several entries. Deleting them would misstate
-* the ground truth.
-*
-* *A* valid solution, not *the* solution: used for cost and display ([`human_mapping_cost`],
-* [`as_ast_diff_for_mapping`]), **never** for pass/fail, which is [`check_group_entry`].
-*/
+/// `mapping.entries` plus one *deterministic* representative pairing per group, flattened into
+/// plain entries: members sorted by start byte and zipped pairwise under the group's `operation`,
+/// the larger side's leftovers deleted/inserted per `with_children`.
+///
+/// An [`GroupPairing::AllToAll`] group has no leftovers: its surplus members each pair with the last
+/// member of the shorter side, putting one node in several entries. Deleting them would misstate
+/// the ground truth.
+///
+/// *A* valid solution, not *the* solution: used for cost and display ([`human_mapping_cost`],
+/// [`as_ast_diff_for_mapping`]), **never** for pass/fail, which is [`check_group_entry`].
 pub fn representative_entries(
     mapping: &HumanMapping,
     before_root: Node,
@@ -1893,22 +1887,20 @@ fn check_entry<'b, 'a>(
     Ok(())
 }
 
-/**
-* Checks one [`MultiMapGroup`] against `diff_ast`. For `AnyOneToOne`:
-*
-* 1. Every before member is matched to an after member or deleted; matched outside the group is a
-*    mismatch.
-* 2. Every unclaimed after member is inserted.
-* 3. Exactly `min(N, M)` pairs are found. This catches deleting *and* inserting where a match was
-*    possible, which steps 1-2 accept node by node.
-* 4. Every pair uses an operation the group's `operation` allows.
-* 5. With `with_children`: matched pairs close within each other ([`check_subtree_maps_within`])
-*    and leftovers' whole subtrees are deleted/inserted.
-*
-* For `AllToAll`, deleted and inserted are not valid fates in steps 1-2, step 3 does not apply,
-* and step 5's closure is over the union of the members (no leftovers exist). A one-to-one diff
-* therefore always reports at least `|N - M|` mismatches for such a group.
-*/
+/// Checks one [`MultiMapGroup`] against `diff_ast`. For `AnyOneToOne`:
+///
+/// 1. Every before member is matched to an after member or deleted; matched outside the group is a
+///    mismatch.
+/// 2. Every unclaimed after member is inserted.
+/// 3. Exactly `min(N, M)` pairs are found. This catches deleting *and* inserting where a match was
+///    possible, which steps 1-2 accept node by node.
+/// 4. Every pair uses an operation the group's `operation` allows.
+/// 5. With `with_children`: matched pairs close within each other ([`check_subtree_maps_within`])
+///    and leftovers' whole subtrees are deleted/inserted.
+///
+/// For `AllToAll`, deleted and inserted are not valid fates in steps 1-2, step 3 does not apply,
+/// and step 5's closure is over the union of the members (no leftovers exist). A one-to-one diff
+/// therefore always reports at least `|N - M|` mismatches for such a group.
 fn check_group_entry<'b, 'a>(
     group: &MultiMapGroup,
     before_root: Node<'b>,
@@ -2265,14 +2257,12 @@ fn describe_nondeterminism_with_config(
     mismatches
 }
 
-/**
-* Every disagreement between `name`'s human mapping and codediff's diff (empty if they agree).
-*
-* For [`crate::test::helper::UNIT_TEST_FIXTURES`], also diffs two more fresh parses and compares
-* all three runs by path: `diff_code` must be a pure function of its source, and a difference
-* means some pass depends on hash iteration order or node ids. Sampled because it quadruples the
-* cost, and nondeterminism belongs to a code path, which the per-language sample exercises.
-*/
+/// Every disagreement between `name`'s human mapping and codediff's diff (empty if they agree).
+///
+/// For [`crate::test::helper::UNIT_TEST_FIXTURES`], also diffs two more fresh parses and compares
+/// all three runs by path: `diff_code` must be a pure function of its source, and a difference
+/// means some pass depends on hash iteration order or node ids. Sampled because it quadruples the
+/// cost, and nondeterminism belongs to a code path, which the per-language sample exercises.
 pub fn compute_mismatches(name: &str) -> Result<Vec<String>> {
     compute_mismatches_with_config(name, &crate::diff::HeuristicConfig::default())
 }
@@ -2301,19 +2291,17 @@ pub fn total_node_count_for(before: &crate::code::Code, after: &crate::code::Cod
     node_cache.before.len() + node_cache.after.len()
 }
 
-/**
-* How many node slots the human mapping actually *grades*, in the unit of
-* [`total_node_count_for`].
-*
-* The two differ because grading is asymmetric: `*WithChildren` entries are checked over their
-* whole subtree, pair entries only for the pair named. One `identical` entry over a large
-* function grades one pair and puts the whole function in the denominator, so a low mismatch rate
-* can mean "barely graded" rather than "nearly perfect".
-*
-* Counted per entry as grading counts it: pairs 2 slots, `Delete`/`Insert` 1, `*WithChildren`
-* their subtree; groups via representative entries. A coverage measure, not a validator: an
-* unresolvable path contributes what it can.
-*/
+/// How many node slots the human mapping actually *grades*, in the unit of
+/// [`total_node_count_for`].
+///
+/// The two differ because grading is asymmetric: `*WithChildren` entries are checked over their
+/// whole subtree, pair entries only for the pair named. One `identical` entry over a large
+/// function grades one pair and puts the whole function in the denominator, so a low mismatch rate
+/// can mean "barely graded" rather than "nearly perfect".
+///
+/// Counted per entry as grading counts it: pairs 2 slots, `Delete`/`Insert` 1, `*WithChildren`
+/// their subtree; groups via representative entries. A coverage measure, not a validator: an
+/// unresolvable path contributes what it can.
 pub fn graded_node_count(
     mapping: &HumanMapping,
     before_root: Node,
@@ -2389,10 +2377,8 @@ fn touched(ops: &[crate::diff::text::TextOperation]) -> Vec<bool> {
         .collect()
 }
 
-/**
-* Per-line touched masks for both sides of `ast_diff`, via `TextDiff`/`line_operations`, so any
-* two diffs of one pair reduce to line labels identically (see [`line_disagreement_count`]).
-*/
+/// Per-line touched masks for both sides of `ast_diff`, via `TextDiff`/`line_operations`, so any
+/// two diffs of one pair reduce to line labels identically (see [`line_disagreement_count`]).
 pub fn touched_lines(
     before: &crate::code::Code,
     after: &crate::code::Code,
@@ -2507,11 +2493,9 @@ pub fn changed_spans(
     (changed(text_diff.all(0)), changed(text_diff.all(1)))
 }
 
-/**
-* Per-line touched masks from the real GNU `diff` (the tool people actually run), via
-* `--*-line-format` with `%dn` rather than parsing hunk headers. Writes `before`/`after` to temp
-* files, so any `Code` pair works.
-*/
+/// Per-line touched masks from the real GNU `diff` (the tool people actually run), via
+/// `--*-line-format` with `%dn` rather than parsing hunk headers. Writes `before`/`after` to temp
+/// files, so any `Code` pair works.
 pub fn unix_diff_line_labels(
     before: &crate::code::Code,
     after: &crate::code::Code,
@@ -2598,10 +2582,8 @@ pub struct LineMismatches {
     pub total_lines: usize,
 }
 
-/**
-* The human mapping's per-line projection (see [`touched_lines`]), plus the [`NodeCache`] built
-* for it, which the caller reuses to project a second diff onto the same pair.
-*/
+/// The human mapping's per-line projection (see [`touched_lines`]), plus the [`NodeCache`] built
+/// for it, which the caller reuses to project a second diff onto the same pair.
 pub fn human_touched_lines_for_mapping(
     mapping: &HumanMapping,
     before: &crate::code::Code,
@@ -2623,10 +2605,8 @@ pub fn human_touched_lines_for(
     human_touched_lines_for_mapping(&mapping, before, after)
 }
 
-/**
-* [`LineMismatches`] for one fixture: codediff and Unix `diff` against the human mapping. Only
-* Unix `diff`, since other external tools need binaries a caller cannot assume.
-*/
+/// [`LineMismatches`] for one fixture: codediff and Unix `diff` against the human mapping. Only
+/// Unix `diff`, since other external tools need binaries a caller cannot assume.
 pub fn line_mismatches_for(
     name: &str,
     before: &crate::code::Code,
@@ -2828,23 +2808,19 @@ pub fn compute_visible_mismatches_for_with_config(
     })
 }
 
-/**
-* Checks that every decision in `name`'s human mapping holds in codediff's diff, reporting every
-* mismatch at once.
-*/
+/// Checks that every decision in `name`'s human mapping holds in codediff's diff, reporting every
+/// mismatch at once.
 pub fn assert_matches_human_mapping(name: &str) -> Result<()> {
     assert_matches_human_mapping_within_limit(name, 0, 0)
 }
 
-/**
-* [`assert_matches_human_mapping`] allowing up to `upper_limit_of_mismatched_nodes` total and
-* `upper_limit_of_visible_mismatched_nodes` *visible* mismatches (see [`VisibleMismatches`]).
-* Either limit failing fails: they are independent, since a change can turn invisible mismatches
-* visible without moving the total.
-*
-* A clamp records today's count for a known gap, so the test still catches regressions. Lower it
-* when a fix lands, and switch to [`assert_matches_human_mapping`] at zero.
-*/
+/// [`assert_matches_human_mapping`] allowing up to `upper_limit_of_mismatched_nodes` total and
+/// `upper_limit_of_visible_mismatched_nodes` *visible* mismatches (see [`VisibleMismatches`]).
+/// Either limit failing fails: they are independent, since a change can turn invisible mismatches
+/// visible without moving the total.
+///
+/// A clamp records today's count for a known gap, so the test still catches regressions. Lower it
+/// when a fix lands, and switch to [`assert_matches_human_mapping`] at zero.
 pub fn assert_matches_human_mapping_within_limit(
     name: &str,
     upper_limit_of_mismatched_nodes: usize,

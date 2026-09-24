@@ -138,10 +138,8 @@ pub(crate) fn collect_nodes(root: tree_sitter::Node) -> Vec<NodeRecord> {
     }
 }
 
-/**
-* Borrows `code`'s AST metadata, computing an owned copy only when it is missing. An unparsed
-* `Code` yields empty metadata, per the fail-safe convention on `Diff`.
-*/
+/// Borrows `code`'s AST metadata, computing an owned copy only when it is missing. An unparsed
+/// `Code` yields empty metadata, per the fail-safe convention on `Diff`.
 pub fn metadata_of(code: &Code) -> std::borrow::Cow<'_, ASTMetadata> {
     match &code.metadata.ast_metadata {
         Some(metadata) => std::borrow::Cow::Borrowed(metadata),
@@ -271,11 +269,9 @@ fn compute_widest_subtree_node(code: &Code, metadata: &mut ASTMetadata) {
     }
 }
 
-/**
-* Lists the reference nodes - the units humans think about code in, matched first so diffs make
-* sense - largest subtree first, so hash descent settles big duplicated subtrees before their
-* descendants.
-*/
+/// Lists the reference nodes - the units humans think about code in, matched first so diffs make
+/// sense - largest subtree first, so hash descent settles big duplicated subtrees before their
+/// descendants.
 fn discover_reference_nodes(nodes: &[NodeRecord], metadata: &mut ASTMetadata) {
     let language = &metadata.language;
 

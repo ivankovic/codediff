@@ -105,10 +105,8 @@ pub fn anchor_pair_via_apted(
     }
 }
 
-/**
-* Whether `node_kind` is a reference node: a unit a reader thinks of as a whole (a function, a
-* class, an import), used as an anchor for exact-hash matching whatever its size.
-*/
+/// Whether `node_kind` is a reference node: a unit a reader thinks of as a whole (a function, a
+/// class, an import), used as an anchor for exact-hash matching whatever its size.
 pub fn is_reference(node_kind: &str, language: &Language) -> bool {
     match language {
         Language::Rust => {
@@ -1030,10 +1028,8 @@ pub fn update_allowed_from_masks(
     (a.operator_families & b.operator_families & language_mask) != 0
 }
 
-/**
-* Whether a `kind_a` node may be updated into a `kind_b` node. Different kinds never pair, except
-* identifier kinds with each other and kinds sharing one of `language`'s families above.
-*/
+/// Whether a `kind_a` node may be updated into a `kind_b` node. Different kinds never pair, except
+/// identifier kinds with each other and kinds sharing one of `language`'s families above.
 pub fn kinds_update_allowed(kind_a: &str, kind_b: &str, language: &Language) -> bool {
     if kind_a == kind_b {
         return true;
@@ -1281,11 +1277,9 @@ pub fn is_comment(kind: &str) -> bool {
     )
 }
 
-/**
-* Whether `kind` is an attribute/decorator that is a *sibling* of the declaration it modifies.
-* Most grammars nest these inside the declaration, where they match with it for free. Note that
-* JavaScript's `decorator` is nested, unlike TypeScript's of the same name.
-*/
+/// Whether `kind` is an attribute/decorator that is a *sibling* of the declaration it modifies.
+/// Most grammars nest these inside the declaration, where they match with it for free. Note that
+/// JavaScript's `decorator` is nested, unlike TypeScript's of the same name.
 pub fn is_leading_modifier(kind: &str, language: &Language) -> bool {
     match language {
         Language::Rust => kind == "attribute_item",
@@ -1299,11 +1293,9 @@ pub fn is_leading_modifier(kind: &str, language: &Language) -> bool {
 /// names sharing only a stray character pair.
 const LEAF_TEXT_SIMILARITY_THRESHOLD: f64 = 0.6;
 
-/**
-* Whether two leaf texts read as the same token renamed (character-bigram Dice similarity).
-* Single-character texts never pass unless equal: `i` -> `j` carries no textual evidence, and the
-* caller's matched-ancestor context is what lets such renames through.
-*/
+/// Whether two leaf texts read as the same token renamed (character-bigram Dice similarity).
+/// Single-character texts never pass unless equal: `i` -> `j` carries no textual evidence, and the
+/// caller's matched-ancestor context is what lets such renames through.
 pub fn leaf_texts_similar(text_a: &str, text_b: &str) -> bool {
     if text_a == text_b {
         return true;
@@ -1320,11 +1312,9 @@ pub fn leaf_texts_similar(text_a: &str, text_b: &str) -> bool {
     2.0 * common as f64 / (a.len() + b.len()) as f64 >= LEAF_TEXT_SIMILARITY_THRESHOLD
 }
 
-/**
-* [`kinds_update_allowed`], plus: if either kind is a generic token, the parents must already
-* correspond. Otherwise tree edit distance pairs a lone `<` across unrelated statements just
-* because reuse is cheaper than delete + insert. `parents_matched` is called only when needed.
-*/
+/// [`kinds_update_allowed`], plus: if either kind is a generic token, the parents must already
+/// correspond. Otherwise tree edit distance pairs a lone `<` across unrelated statements just
+/// because reuse is cheaper than delete + insert. `parents_matched` is called only when needed.
 pub fn matching_allowed(
     kind_a: &str,
     kind_b: &str,

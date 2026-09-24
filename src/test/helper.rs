@@ -30,10 +30,8 @@ use tree_sitter::Node;
 use crate::code::{Code, metadata};
 use crate::diff::{ASTDiff, ASTMapping, ASTMappingOperation};
 
-/**
-* Depth-first, pre-order search for the first node of `kind` at or below `node`. Includes `node`
-* itself.
-*/
+/// Depth-first, pre-order search for the first node of `kind` at or below `node`. Includes `node`
+/// itself.
 pub fn find_first_of_kind<'a>(node: Node<'a>, kind: &str) -> Option<Node<'a>> {
     if node.kind() == kind {
         return Some(node);
@@ -65,20 +63,18 @@ fn parse_path_segment<'a>(path_segment: &'a str, path: &[&str]) -> Result<(&'a s
     }
 }
 
-/**
-* Follows path from the root node and returns the resulting node, if the path is valid.
-*
-* The path is a vector of strings. Each string is one of the following:
-*
-* 1) The type of the node, e.g. "expression_statement". If only the type is given, the first child
-*    node matching the type is used for traversal.
-* 2) The type of the node, followed by a number, e.g. "block:3". The n-th child matching the type
-*    is used for traversal. In the case of "block:3", the third block node. Note the 1-indexing
-*    used to make the string easier to read for humans.
-*
-* If the path is invalid, an error is returned. Each segment rescans the parent's children; use
-* [`PathCache`] to resolve many paths against one root.
-*/
+/// Follows path from the root node and returns the resulting node, if the path is valid.
+///
+/// The path is a vector of strings. Each string is one of the following:
+///
+/// 1) The type of the node, e.g. "expression_statement". If only the type is given, the first child
+///    node matching the type is used for traversal.
+/// 2) The type of the node, followed by a number, e.g. "block:3". The n-th child matching the type
+///    is used for traversal. In the case of "block:3", the third block node. Note the 1-indexing
+///    used to make the string easier to read for humans.
+///
+/// If the path is invalid, an error is returned. Each segment rescans the parent's children; use
+/// [`PathCache`] to resolve many paths against one root.
 pub fn node_for_path<'a>(root: Node<'a>, path: &[&str]) -> Result<Node<'a>> {
     let mut current_node = root;
 
@@ -139,12 +135,10 @@ impl<'a> ParentIndex<'a> {
     }
 }
 
-/**
-* Memoized [`node_for_path`]/[`path_for_node`] for resolving many paths against one root. Without
-* it, entries that all pass through one high-fanout parent (a large flat JSON object) rescan it
-* once each, which is quadratic in the entry count. Opt-in, because the index only pays for itself
-* when the same root is queried many times.
-*/
+/// Memoized [`node_for_path`]/[`path_for_node`] for resolving many paths against one root. Without
+/// it, entries that all pass through one high-fanout parent (a large flat JSON object) rescan it
+/// once each, which is quadratic in the entry count. Opt-in, because the index only pays for itself
+/// when the same root is queried many times.
 #[derive(Default)]
 pub struct PathCache<'a> {
     by_parent: HashMap<usize, ParentIndex<'a>>,
@@ -205,14 +199,12 @@ impl<'a> PathCache<'a> {
     }
 }
 
-/**
-* The inverse of [`node_for_path`]: computes the path from the root of the tree down to `node`,
-* using the same "type" / "type:index" mini-language.
-*
-* Always emits the "type:index" form, so `node_for_path(root, &path_for_node(node))` is `node`.
-* Unlike node ids, paths are stable across re-parses, which is why ground-truth mappings are keyed
-* by them.
-*/
+/// The inverse of [`node_for_path`]: computes the path from the root of the tree down to `node`,
+/// using the same "type" / "type:index" mini-language.
+///
+/// Always emits the "type:index" form, so `node_for_path(root, &path_for_node(node))` is `node`.
+/// Unlike node ids, paths are stable across re-parses, which is why ground-truth mappings are keyed
+/// by them.
 pub fn path_for_node(node: Node) -> Vec<String> {
     let mut path = Vec::new();
     let mut current = node;
@@ -239,10 +231,8 @@ pub fn path_for_node(node: Node) -> Vec<String> {
     path
 }
 
-/**
-* Every node's [`path_for_node`], keyed by node id, in one O(n) pass. Calling `path_for_node` per
-* node is quadratic in the width of wide parents.
-*/
+/// Every node's [`path_for_node`], keyed by node id, in one O(n) pass. Calling `path_for_node` per
+/// node is quadratic in the width of wide parents.
 pub fn precompute_paths(root: Node) -> HashMap<usize, Vec<String>> {
     let mut paths = HashMap::new();
     paths.insert(root.id(), Vec::new());
@@ -289,10 +279,8 @@ pub fn mapping_for_path<'a>(
     Ok(mapping.clone())
 }
 
-/**
-* Returns true if every node along `path` (including intermediate nodes, not just the final one),
-* resolved in both `before_root` and `after_root`, has a mapping in `diff` with `expected_operation`.
-*/
+/// Returns true if every node along `path` (including intermediate nodes, not just the final one),
+/// resolved in both `before_root` and `after_root`, has a mapping in `diff` with `expected_operation`.
 pub fn entire_path_has_mapping<'a>(
     path: &[&str],
     before_root: Node<'a>,
@@ -379,10 +367,8 @@ pub fn was_tree_deleted<'a>(path: &[&str], root: Node<'a>, diff: &ASTDiff) -> Re
     Ok(true)
 }
 
-/**
-* The files in `src/test/data/code/`, parsed, keyed by file name without the ".test" extension
-* (stored as ".test" so the build does not treat them as code).
-*/
+/// The files in `src/test/data/code/`, parsed, keyed by file name without the ".test" extension
+/// (stored as ".test" so the build does not treat them as code).
 pub fn handmade_test_code() -> Result<HashMap<String, Code>> {
     let mut codes = handmade_unparsed_test_code()?;
 
@@ -431,10 +417,8 @@ pub fn handmade_unparsed_test_code() -> Result<HashMap<String, Code>> {
     Ok(result)
 }
 
-/**
-* [`handmade_test_code`] copied to a temporary directory with the ".test" extension dropped, so
-* metadata detection sees the real extension: `"hello_world.rs"` -> `<tmp>/hello_world.rs`.
-*/
+/// [`handmade_test_code`] copied to a temporary directory with the ".test" extension dropped, so
+/// metadata detection sees the real extension: `"hello_world.rs"` -> `<tmp>/hello_world.rs`.
 pub fn handmade_test_code_as_paths() -> Result<HashMap<String, PathBuf>> {
     let mut result = HashMap::new();
 
@@ -474,11 +458,9 @@ pub fn handmade_test_code_as_paths() -> Result<HashMap<String, PathBuf>> {
     Ok(result)
 }
 
-/**
-* Every (before, after) pair in the whole corpus (every [`DIFF_DATASETS`] entry, despite the
-* name), parsed, keyed by fixture name. Cached for the process: it holds every fixture in memory,
-* so prefer [`handmade_test_code_pair`] or [`handmade_test_case_dirs`].
-*/
+/// Every (before, after) pair in the whole corpus (every [`DIFF_DATASETS`] entry, despite the
+/// name), parsed, keyed by fixture name. Cached for the process: it holds every fixture in memory,
+/// so prefer [`handmade_test_code_pair`] or [`handmade_test_case_dirs`].
 pub fn handmade_test_code_pairs() -> Result<std::sync::Arc<HashMap<String, (Code, Code)>>> {
     // `Arc` because `Code::clone` deep-copies the tree; cloning the map would copy the corpus.
     static CACHE: std::sync::OnceLock<std::sync::Arc<HashMap<String, (Code, Code)>>> =
@@ -492,12 +474,10 @@ pub fn handmade_test_code_pairs() -> Result<std::sync::Arc<HashMap<String, (Code
     ))
 }
 
-/**
-* Every fixture as a `(name, directory)` pair, sorted by name, without reading or parsing
-* anything. For a single pass over the corpus that loads and drops one fixture at a time: the
-* cached [`handmade_test_code_pairs`] holds every parsed tree and its metadata in memory at once,
-* which does not fit a standard CI runner.
-*/
+/// Every fixture as a `(name, directory)` pair, sorted by name, without reading or parsing
+/// anything. For a single pass over the corpus that loads and drops one fixture at a time: the
+/// cached [`handmade_test_code_pairs`] holds every parsed tree and its metadata in memory at once,
+/// which does not fit a standard CI runner.
 pub fn handmade_test_case_dirs() -> Result<Vec<(String, std::path::PathBuf)>> {
     let mut cases = Vec::new();
 
@@ -734,14 +714,12 @@ fn data_root() -> std::path::PathBuf {
         .join("data")
 }
 
-/**
-* Loads and parses one named fixture, cached per name for the process. The default for new test
-* code; for coverage across languages use [`UNIT_TEST_FIXTURES`] via
-* [`handmade_test_code_pairs_for`], and the full corpus only when that sample cannot do.
-*
-* Returns an `Arc` because the cache never evicts and `Code::clone` deep-copies the tree: owned
-* copies per caller grow memory without bound under parallel tests.
-*/
+/// Loads and parses one named fixture, cached per name for the process. The default for new test
+/// code; for coverage across languages use [`UNIT_TEST_FIXTURES`] via
+/// [`handmade_test_code_pairs_for`], and the full corpus only when that sample cannot do.
+///
+/// Returns an `Arc` because the cache never evicts and `Code::clone` deep-copies the tree: owned
+/// copies per caller grow memory without bound under parallel tests.
 pub fn handmade_test_code_pair(name: &str) -> Result<std::sync::Arc<(Code, Code)>> {
     type PairCache = std::sync::Mutex<HashMap<String, std::sync::Arc<(Code, Code)>>>;
     static CACHE: std::sync::OnceLock<PairCache> = std::sync::OnceLock::new();
@@ -876,10 +854,8 @@ fn load_side(file_path: &Path) -> Result<Code> {
     Ok(code)
 }
 
-/**
-* Reads and parses the `before.<ext>.test` / `after.<ext>.test` pair in `path`, with AST metadata.
-* `None`, not an error, if either file is missing.
-*/
+/// Reads and parses the `before.<ext>.test` / `after.<ext>.test` pair in `path`, with AST metadata.
+/// `None`, not an error, if either file is missing.
 pub fn code_pair_from_dir(path: &Path) -> Result<Option<(Code, Code)>> {
     let Some((mut before, mut after)) = code_pair_from_dir_without_metadata(path)? else {
         return Ok(None);

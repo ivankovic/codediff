@@ -111,13 +111,11 @@ pub const COST_INSERT: u64 = 1;
 pub const COST_DELETE: u64 = 1;
 pub const COST_UPDATE: u64 = 1;
 
-/**
-* The difference between two `Code` values.
-*
-* Any function taking this or a sub-field must not assume a field is set: check, try to construct
-* it, and otherwise fail safe with a zero result. That is what lets large files and files that are
-* really data or configuration pass through cheaply, and why most fields are `Option`.
-*/
+/// The difference between two `Code` values.
+///
+/// Any function taking this or a sub-field must not assume a field is set: check, try to construct
+/// it, and otherwise fail safe with a zero result. That is what lets large files and files that are
+/// really data or configuration pass through cheaply, and why most fields are `Option`.
 #[derive(Debug, Clone)]
 pub struct Diff {
     pub ast: Option<ASTDiff>,
@@ -369,12 +367,10 @@ impl<'code> PendingDiff<'code> {
     }
 }
 
-/**
-* Per-pass on/off switches for ablation studies (`ablation_study.sh`, via
-* `benchmark_optimal_solutions --no-solver-X`). Removing exactly one pass measures its
-* contribution in a way `ASTMappingReason` counts cannot, since several passes share a reason.
-* Production callers use [`HeuristicConfig::default`].
-*/
+/// Per-pass on/off switches for ablation studies (`ablation_study.sh`, via
+/// `benchmark_optimal_solutions --no-solver-X`). Removing exactly one pass measures its
+/// contribution in a way `ASTMappingReason` counts cannot, since several passes share a reason.
+/// Production callers use [`HeuristicConfig::default`].
 #[derive(Debug, Clone, Copy)]
 pub struct HeuristicConfig {
     pub solver_moved_subtrees: bool,
@@ -397,9 +393,7 @@ impl Default for HeuristicConfig {
     }
 }
 
-/**
-* Difference between two Code structures, based on their TreeSitter ASTs.
-*/
+/// Difference between two Code structures, based on their TreeSitter ASTs.
 #[derive(Debug, Clone, Default)]
 pub struct ASTDiff {
     /// Every `(before_id, after_id)` pair, with 0 on the missing side of a delete or insert.
@@ -512,9 +506,7 @@ impl ASTDiff {
     }
 }
 
-/**
-* Information about the mapping of two AST subtrees.
-*/
+/// Information about the mapping of two AST subtrees.
 #[derive(Debug, Clone, Default)]
 pub struct ASTMapping {
     /// The cost of the root operation plus, where the producing algorithm totals them, its
@@ -573,9 +565,7 @@ impl ASTMapping {
     }
 }
 
-/**
-* The operations that can be used to transform one tree into another.
-*/
+/// The operations that can be used to transform one tree into another.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub enum ASTMappingOperation {
     #[default]
@@ -598,9 +588,7 @@ pub enum ASTMappingOperation {
     MatchButNotIdentical,
 }
 
-/**
-* Why were the two subtrees mapped to each other?
-*/
+/// Why were the two subtrees mapped to each other?
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
 pub enum ASTMappingReason {
     #[default]

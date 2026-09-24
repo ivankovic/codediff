@@ -16,89 +16,87 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-/**
-* A helper binary for building the ground-truth AST mappings used by src/test/fixtures.
-*
-* Run as `cargo run --bin human_solver -- <name>`, where `<name>` is a directory under
-* `src/test/data/diffs/` (e.g. "rust-add-if"); without it the first case alphabetically opens. It
-* shows the before and after TreeSitter ASTs side by side, lets a human mark nodes as matching,
-* deleted or inserted, and saves `src/test/data/diffs/<name>/human_mapping.json` plus a
-* `src/test/fixtures/<name>.rs` stub that calls
-* `codediff::test::helper::human_mapping::assert_matches_human_mapping`. Nodes are addressed by
-* path (kind + sibling position), not by TreeSitter node ID, since IDs are not stable across
-* parses -- see `test::helper::path_for_node`.
-*
-* Keybindings:
-*   Tab            switch focus between the Before and After panels
-*   Up/k, Down/j   move the focused panel's cursor
-*   Left/h         collapse the current node, or move to its parent if collapsed/a leaf
-*   Right/l        expand the current node, or move to its first child if expanded
-*   g / G          jump to the first / last visible node
-*   m              match the Before and After cursor nodes. Different kinds ask for confirmation
-*                  (codediff never maps different kinds, so this always shows as a mismatch).
-*                  Same kinds are classified without a prompt: leaves by text (Identical/Update),
-*                  inner nodes by content hash (Identical/MatchButNotIdentical)
-*   M              like `m`, then recurses pairwise into children while both sides have the same
-*                  child count and kinds; stops silently at the first level that diverges.
-*                  Identical pairs with children are collapsed in both panels
-*   f              repeat `m` and auto-advance until end of file or a kind mismatch, which raises
-*                  `m`'s confirmation (`f` again resumes)
-*   a              move the other panel's cursor to the focused node's human-mapped partner,
-*                  centering it if it is off screen
-*   A              like `a`, but follows codediff's own mapping (needs `p` first)
-*   p              run codediff's diff and show its verdict next to each node -- M matched,
-*                  - deleted, + inserted, ? none. A trailing `*` marks a human-decided node where
-*                  codediff disagrees
-*   n / N          jump to the next/previous `*` node, wrapping (needs `p` first)
-*   /              jump to the next leaf (wrapping) whose own text contains a substring; pre-filled
-*                  with the last search. Leaves only, since every ancestor's text contains its
-*                  descendants' and would match first
-*   t              side-by-side text view, for reading the source and painting the text-range
-*                  ground truth (`?` lists its keys). `A` there puts this side's AST panel on the
-*                  leaf under the text cursor (the next leaf, in whitespace), which bridges a
-*                  painting's row/column to the node whose entry has to change
-*   T              `diff -u` of before/after (j/k scroll, t to the text view, Esc closes)
-*   H              toggle hiding subtrees whose every node is marked; an unmarked node and its
-*                  ancestors always stay visible. Recomputed every frame
-*   d / D          mark the Before cursor node deleted / deleted with its subtree
-*   i / I          mark the After cursor node inserted / inserted with its subtree
-*   u              remove the mark on the focused cursor node
-*   s              on a real case (`o`): save human_mapping.json and ensure the test stub exists.
-*                  On a sample (`O`): prompt for a name, pre-filled "<language>-<repository>",
-*                  and promote it -- copy its content into src/test/data/diffs/<name>/, save the
-*                  mapping and stub, and record <name> in sample.csv. Re-prompts on an empty name,
-*                  characters other than letters/digits/-/_, or a name that already exists
-*   R              on a sample, prompt for a reason and reject it: the reason goes to sample.csv's
-*                  `comment`, `status` becomes REJECTED. No effect on other cases
-*   e              edit a free-form note. On a diff it is `description.md` in the fixture
-*                  directory, written on Enter (empty deletes it); the `o` picker marks such cases
-*                  with `*`. That file is the only home for a promoted fixture's note:
-*                  `diff_inventory` reads nothing else. On a sample it is sample.csv's `comment`
-*                  (empty clears it, `status` untouched); promotion moves it into the stub and
-*                  `description.md` and clears the cell. No effect on a git-commit case
-*   o              open a case from src/test/data/diffs/<dataset>/ as a table (columns: see
-*                  `DiffColumn`). j/k rows, h/l columns, Enter opens, Esc cancels. `s` sorts by the
-*                  cursor column (again to reverse; the name is the tiebreak); `f` filters on it --
-*                  substring on Name, a DIFF_DATASETS cycle on Dataset, off/yes/no elsewhere.
-*                  Filters AND together; a row whose value is unknown survives either direction
-*                  (`FlagFilter::keeps`). The columns backed by a corpus scan (`scan_corpus`) read
-*                  `?` until `s`/`f` is first pressed on them. Cursor, sort and filters persist on
-*                  `App::diff_view`. Unsaved changes prompt save/discard first
-*   O              like `o`, for sampled candidates under src/test/data/samples/. `H` hides
-*                  SOLVED/REJECTED samples, `s` cycles the sort (name, reverse, smallest/largest
-*                  `diff -u`) and jumps to the first entry. Both persist on `App`
-*   C              open a file changed by a commit in this repository's own `git log`: before is
-*                  the file at the parent, after at the commit (a missing side is empty). `s`
-*                  promotes into `handmade/`, pre-filled "<language>-"
-*   V              list every ground-truth invariant this case breaks (the `o` picker's
-*                  `Invariant` column is the count). Enter positions both trees and text panels on
-*                  the violation and opens the text view. Checked against the in-memory mapping
-*   ?              show every keybinding
-*   q / Esc        quit
-*
-* After a match, both cursors advance to their own next unmarked node; after an insert or delete,
-* only the marked panel advances.
-*/
+/// A helper binary for building the ground-truth AST mappings used by src/test/fixtures.
+///
+/// Run as `cargo run --bin human_solver -- <name>`, where `<name>` is a directory under
+/// `src/test/data/diffs/` (e.g. "rust-add-if"); without it the first case alphabetically opens. It
+/// shows the before and after TreeSitter ASTs side by side, lets a human mark nodes as matching,
+/// deleted or inserted, and saves `src/test/data/diffs/<name>/human_mapping.json` plus a
+/// `src/test/fixtures/<name>.rs` stub that calls
+/// `codediff::test::helper::human_mapping::assert_matches_human_mapping`. Nodes are addressed by
+/// path (kind + sibling position), not by TreeSitter node ID, since IDs are not stable across
+/// parses -- see `test::helper::path_for_node`.
+///
+/// Keybindings:
+///   Tab            switch focus between the Before and After panels
+///   Up/k, Down/j   move the focused panel's cursor
+///   Left/h         collapse the current node, or move to its parent if collapsed/a leaf
+///   Right/l        expand the current node, or move to its first child if expanded
+///   g / G          jump to the first / last visible node
+///   m              match the Before and After cursor nodes. Different kinds ask for confirmation
+///                  (codediff never maps different kinds, so this always shows as a mismatch).
+///                  Same kinds are classified without a prompt: leaves by text (Identical/Update),
+///                  inner nodes by content hash (Identical/MatchButNotIdentical)
+///   M              like `m`, then recurses pairwise into children while both sides have the same
+///                  child count and kinds; stops silently at the first level that diverges.
+///                  Identical pairs with children are collapsed in both panels
+///   f              repeat `m` and auto-advance until end of file or a kind mismatch, which raises
+///                  `m`'s confirmation (`f` again resumes)
+///   a              move the other panel's cursor to the focused node's human-mapped partner,
+///                  centering it if it is off screen
+///   A              like `a`, but follows codediff's own mapping (needs `p` first)
+///   p              run codediff's diff and show its verdict next to each node -- M matched,
+///                  - deleted, + inserted, ? none. A trailing `*` marks a human-decided node where
+///                  codediff disagrees
+///   n / N          jump to the next/previous `*` node, wrapping (needs `p` first)
+///   /              jump to the next leaf (wrapping) whose own text contains a substring; pre-filled
+///                  with the last search. Leaves only, since every ancestor's text contains its
+///                  descendants' and would match first
+///   t              side-by-side text view, for reading the source and painting the text-range
+///                  ground truth (`?` lists its keys). `A` there puts this side's AST panel on the
+///                  leaf under the text cursor (the next leaf, in whitespace), which bridges a
+///                  painting's row/column to the node whose entry has to change
+///   T              `diff -u` of before/after (j/k scroll, t to the text view, Esc closes)
+///   H              toggle hiding subtrees whose every node is marked; an unmarked node and its
+///                  ancestors always stay visible. Recomputed every frame
+///   d / D          mark the Before cursor node deleted / deleted with its subtree
+///   i / I          mark the After cursor node inserted / inserted with its subtree
+///   u              remove the mark on the focused cursor node
+///   s              on a real case (`o`): save human_mapping.json and ensure the test stub exists.
+///                  On a sample (`O`): prompt for a name, pre-filled "<language>-<repository>",
+///                  and promote it -- copy its content into src/test/data/diffs/<name>/, save the
+///                  mapping and stub, and record <name> in sample.csv. Re-prompts on an empty name,
+///                  characters other than letters/digits/-/_, or a name that already exists
+///   R              on a sample, prompt for a reason and reject it: the reason goes to sample.csv's
+///                  `comment`, `status` becomes REJECTED. No effect on other cases
+///   e              edit a free-form note. On a diff it is `description.md` in the fixture
+///                  directory, written on Enter (empty deletes it); the `o` picker marks such cases
+///                  with `*`. That file is the only home for a promoted fixture's note:
+///                  `diff_inventory` reads nothing else. On a sample it is sample.csv's `comment`
+///                  (empty clears it, `status` untouched); promotion moves it into the stub and
+///                  `description.md` and clears the cell. No effect on a git-commit case
+///   o              open a case from src/test/data/diffs/<dataset>/ as a table (columns: see
+///                  `DiffColumn`). j/k rows, h/l columns, Enter opens, Esc cancels. `s` sorts by the
+///                  cursor column (again to reverse; the name is the tiebreak); `f` filters on it --
+///                  substring on Name, a DIFF_DATASETS cycle on Dataset, off/yes/no elsewhere.
+///                  Filters AND together; a row whose value is unknown survives either direction
+///                  (`FlagFilter::keeps`). The columns backed by a corpus scan (`scan_corpus`) read
+///                  `?` until `s`/`f` is first pressed on them. Cursor, sort and filters persist on
+///                  `App::diff_view`. Unsaved changes prompt save/discard first
+///   O              like `o`, for sampled candidates under src/test/data/samples/. `H` hides
+///                  SOLVED/REJECTED samples, `s` cycles the sort (name, reverse, smallest/largest
+///                  `diff -u`) and jumps to the first entry. Both persist on `App`
+///   C              open a file changed by a commit in this repository's own `git log`: before is
+///                  the file at the parent, after at the commit (a missing side is empty). `s`
+///                  promotes into `handmade/`, pre-filled "<language>-"
+///   V              list every ground-truth invariant this case breaks (the `o` picker's
+///                  `Invariant` column is the count). Enter positions both trees and text panels on
+///                  the violation and opens the text view. Checked against the in-memory mapping
+///   ?              show every keybinding
+///   q / Esc        quit
+///
+/// After a match, both cursors advance to their own next unmarked node; after an insert or delete,
+/// only the marked panel advances.
 use std::io::{self, Stdout, Write};
 use std::time::Duration;
 

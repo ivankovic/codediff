@@ -32,10 +32,8 @@ pub mod sampling;
 
 static AUTO_GENERATED_RE: OnceLock<Regex> = OnceLock::new();
 
-/**
-* All metadata that is not used in normal functionality of the system but is instead used for
-* testing, research and planning.
-*/
+/// All metadata that is not used in normal functionality of the system but is instead used for
+/// testing, research and planning.
 #[derive(Debug, Clone, Default)]
 pub struct CodeStats {
     pub code: Code,
@@ -58,19 +56,15 @@ pub struct CodeStats {
     pub too_large_to_parse: bool,
 }
 
-/**
-* One node kind's stats within one file: its count, and a histogram of its subtree sizes keyed by
-* `size.ilog2()` (bucket B covers `[2^B, 2^(B+1))`), small enough to store per file.
-*/
+/// One node kind's stats within one file: its count, and a histogram of its subtree sizes keyed by
+/// `size.ilog2()` (bucket B covers `[2^B, 2^(B+1))`), small enough to store per file.
 #[derive(Debug, Clone, Default)]
 pub struct KindStats {
     pub count: u64,
     pub subtree_size_histogram: std::collections::HashMap<u32, u64>,
 }
 
-/**
-* Statistics about a diff between two versions of a file.
-*/
+/// Statistics about a diff between two versions of a file.
 #[derive(Debug, Clone, Default)]
 pub struct DiffStats {
     pub commit_id: String,
@@ -101,12 +95,10 @@ pub struct DiffStats {
     pub nodes_changed: u64,
 }
 
-/**
-* Count the nodes in a TreeSitter tree, the root included.
-*
-* Iterative, like [`visit_for_kind_stats`]: tree-sitter parses trees nested deep enough (minified
-* bundles, data literals) to overflow the stack of a recursive walk.
-*/
+/// Count the nodes in a TreeSitter tree, the root included.
+///
+/// Iterative, like [`visit_for_kind_stats`]: tree-sitter parses trees nested deep enough (minified
+/// bundles, data literals) to overflow the stack of a recursive walk.
 pub fn count_nodes(root: Node) -> usize {
     let mut count = 0;
     let mut stack = vec![root];
@@ -118,9 +110,7 @@ pub fn count_nodes(root: Node) -> usize {
     count
 }
 
-/**
-* Per-kind [`KindStats`] for every node in the tree, plus the total node count, in one traversal.
-*/
+/// Per-kind [`KindStats`] for every node in the tree, plus the total node count, in one traversal.
 pub fn compute_kind_stats(root: Node) -> (std::collections::HashMap<String, KindStats>, usize) {
     let mut stats = std::collections::HashMap::new();
     let total_nodes = visit_for_kind_stats(root, &mut stats);
@@ -159,10 +149,8 @@ fn visit_for_kind_stats(
     sizes[0]
 }
 
-/**
-* Returns true if the code looks like it was automatically generated instead
-* of being human written.
-*/
+/// Returns true if the code looks like it was automatically generated instead
+/// of being human written.
 pub fn is_generated(code: &str) -> bool {
     let re = AUTO_GENERATED_RE.get_or_init(|| {
         Regex::new(indoc::indoc!(r#"
@@ -190,9 +178,7 @@ pub fn is_generated(code: &str) -> bool {
 /// well-formed file needs.
 const PARSE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(60);
 
-/**
-* Expand existing statistics by parsing the code and processing the AST.
-*/
+/// Expand existing statistics by parsing the code and processing the AST.
 pub fn expand_from_code(stats: &mut CodeStats, parser: &mut TSParser) -> Result<()> {
     match &stats.code.metadata.tip {
         Some(tip) => match tip {
@@ -262,10 +248,8 @@ pub fn expand_from_code(stats: &mut CodeStats, parser: &mut TSParser) -> Result<
     Ok(())
 }
 
-/**
-* Generate statistics for the given path. Infallible: failures are recorded in `CodeStats`' error
-* fields.
-*/
+/// Generate statistics for the given path. Infallible: failures are recorded in `CodeStats`' error
+/// fields.
 pub fn for_path(path: &std::path::Path, parser: &mut TSParser) -> CodeStats {
     let mut stats = CodeStats {
         ..Default::default()

@@ -20,19 +20,17 @@ use std::hash::Hash;
 
 use crate::diff::ASTDiff;
 
-/**
-* Greedy matching of candidates grouped by key, shared by phase 4's mechanisms. Only same-key
-* candidates are compared; each same-key pair is scored by `cost` (lower is better), pairs above
-* `max_cost` are dropped (`None`: the key alone justifies a pair, and cost only orders it), and
-* the cheapest remaining pairs are accepted first, each side at most once. `on_accept` does the
-* actual mapping; a pair already mapped by an earlier `on_accept` is skipped.
-*
-* # Determinism contract
-*
-* The candidate slices must come in a run-to-run deterministic order (a tree traversal, never
-* node-id or `HashMap` order). Ties keep that order; nothing else here can introduce
-* nondeterminism.
-*/
+/// Greedy matching of candidates grouped by key, shared by phase 4's mechanisms. Only same-key
+/// candidates are compared; each same-key pair is scored by `cost` (lower is better), pairs above
+/// `max_cost` are dropped (`None`: the key alone justifies a pair, and cost only orders it), and
+/// the cheapest remaining pairs are accepted first, each side at most once. `on_accept` does the
+/// actual mapping; a pair already mapped by an earlier `on_accept` is skipped.
+///
+/// # Determinism contract
+///
+/// The candidate slices must come in a run-to-run deterministic order (a tree traversal, never
+/// node-id or `HashMap` order). Ties keep that order; nothing else here can introduce
+/// nondeterminism.
 pub(crate) fn solve<K: Eq + Hash>(
     diff: &mut ASTDiff,
     before_candidates: &[(usize, K)],
