@@ -109,7 +109,10 @@ column (`make reclassify-tips RECLASSIFY_FLAGS=--write` does that; a file moved 
 path alone still has no size or node numbers until `measure-file-stats` re-walks the corpus).
 The re-walk ran the same evening (2h53m, see `data/corpus_stats/PROVENANCE.md`), so Figure 2 and
 the empirical macros now reflect the 2026-09-13 classifier: Unknown 6.2%, Code 66.5%, and a
-code-file population a fifth larger, whose medians are correspondingly smaller.
+code-file population a fifth larger, whose medians are correspondingly smaller. Because a sixth
+of that population is code codediff has no grammar for, the AST-node percentiles and the nodes
+panel of Figure 3 are computed over the code files that parse (`\ParsedCodeFiles` of
+`\CodeFiles`), while lines and bytes stay over every code file - see `data/corpus_stats/PROVENANCE.md`.
 
 ### Review pass of 2026-09-11
 

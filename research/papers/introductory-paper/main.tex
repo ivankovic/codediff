@@ -349,9 +349,12 @@ This section describes the overall shape of the resulting dataset.
 We used a simple extension- and content-based method to categorise the files. The first thing to note about the dataset is that only two thirds of all files are code (Figure~\ref{fig:tips}). The rest is data, configuration, documentation, and a residual of unknown type, which limited manual inspection suggests is mostly data. Note however that any ``code'' diffing tool still must support visualising changes to non-code files as well.
 
 Restricted to code files, the top row of Figure~\ref{fig:corpus-shape} shows the distribution of
-bytes, lines of code and AST nodes per file. The median code file has \LocPFifty{} lines and
-\AstPFifty{} AST nodes, the 99th percentile \LocPNinetyNine{} lines and \AstPNinetyNine{} nodes,
-and the largest \LocMax{} lines and \AstMax{} nodes.
+bytes, lines of code and AST nodes per file. The median code file has \LocPFifty{} lines, the
+99th percentile \LocPNinetyNine{} and the largest \LocMax{}. The node counts are over the
+\ParsedCodeFilesPct{}\% of code files that parse (\ParsedCodeFiles{} of \CodeFiles{}); the rest
+are in a language without a grammar, flagged as generated and not parsed, or empty. Of those
+that parse, the median has \AstPFifty{} AST nodes, the 99th percentile \AstPNinetyNine{} and the
+largest \AstMax{}.
 
 \begin{figure}
   \centering
@@ -366,9 +369,8 @@ and the largest \LocMax{} lines and \AstMax{} nodes.
   \caption{The shape of the corpus, every distribution drawn the same way: the share of the
   population at or below the value on the axis, with the median, 90th and 99th percentiles marked
   on each curve and the maximum in the corner. Top: size of every code file in the corpus, in
-  lines, bytes and AST nodes; the flat start of the nodes curve is the files the statistics
-  give no node count, which are counted: those they flag as generated and do not parse, those in
-  a language without a grammar, and empty ones. Bottom: size of every code-file modification in the
+  lines and bytes, and in AST nodes for the code files that parse, which is why the third
+  panel's $n$ is smaller. Bottom: size of every code-file modification in the
   corpus's recent history, in lines changed per file, lines changed per commit, and the share of
   the file an edit rewrites. The horizontal axes are logarithmic except the last.}
   \label{fig:corpus-shape}

@@ -247,6 +247,23 @@ the expanded tables classify Perl, Makefile, CMake, Lisp, Fortran, assembly and 
 extensions as Code. Those files are counted with a node count of zero, as the 2026-09-20
 section above explains for the smaller set, so the nodes curve's flat start in the paper's
 corpus-shape figure is now a fifth of the population rather than a twelfth, and `\AstPFifty` is
-pulled down by them more than `\LocPFifty` is. The convention was kept rather than changed
-here; excluding no-grammar files from the node distribution alone would make the three
-top-row curves of that figure describe three different populations.
+pulled down by them more than `\LocPFifty` is.
+
+### Node counts are over parsed files only, from 2026-09-24
+
+That last effect was judged to make the node figures describe the wrong thing, so on the
+author's decision the same evening `analysis/file_stats.py` computes the AST-node percentiles
+(`\AstPFifty` and friends) and the `ast_nodes` rows of `code_file_size_distribution.csv` over the
+code files that have a node count - `ast_nodes > 0`, which excludes a file in a language without
+a grammar, one flagged as generated and never parsed, one that gave up at the parse budget, and an
+empty one. The lines and bytes distributions stay over every code file, so the corpus-shape
+figure's third panel has a smaller `n` than its neighbours, and the paper says so in the caption
+and in the prose. Two new macros carry the population: `\ParsedCodeFiles` and
+`\ParsedCodeFilesPct` (of `\CodeFiles`): 3,586,682 of 4,688,419 code files, 76.5%, parse.
+`\AstPFifty` is 407 over them (206 with the zeros counted), `\AstPNinety` 3,791 and
+`\AstPNinetyNine` 27,546. The maxima are unaffected, since a zero never was one. `\CorrelationR`
+is unchanged, being already over non-empty parsed files; `\CorrelationRTrimmed` moved from 0.9085
+to 0.9156 because its "within the 99th percentile" cut uses the node p99, which rose with the
+population it is taken over.
+The per-language rows of `code_percentiles.csv` are unchanged: a language's own rows never held a
+no-grammar file, and its generated, failed and empty files stay in them as before.
