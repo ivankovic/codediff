@@ -84,8 +84,10 @@ impl UI {
         self
     }
 
+    /// The whole terminal as a `Rect` at the origin, the shape `Component::init` and `resize` take.
     pub fn size(&self) -> Result<Rect> {
-        Ok(self.terminal.size()?)
+        let size = self.terminal.size()?;
+        Ok(Rect::new(0, 0, size.width, size.height))
     }
 
     /// Call after a resize event.

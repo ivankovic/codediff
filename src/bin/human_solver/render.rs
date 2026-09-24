@@ -284,7 +284,7 @@ pub(crate) fn draw_ui(
     // No grammar, so no nodes (see `FrameState::before_root`).
     text_only: bool,
 ) {
-    let size = frame.size();
+    let size = frame.area();
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([

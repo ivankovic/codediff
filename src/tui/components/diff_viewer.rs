@@ -797,7 +797,7 @@ impl Component for DiffViewer {
                 .focused_viewer()
                 .cursor_screen_position(focused_content)
             {
-                frame.set_cursor(x, y);
+                frame.set_cursor_position((x, y));
             }
         } else {
             let palette = self.overlay_theme.palette();
@@ -854,7 +854,7 @@ impl Component for DiffViewer {
             }
 
             if let Some((x, y)) = self.focused_viewer().cursor_screen_position(content_area) {
-                frame.set_cursor(x, y);
+                frame.set_cursor_position((x, y));
             }
         }
 
@@ -1031,7 +1031,7 @@ mod tests {
         let backend = ratatui::backend::TestBackend::new(240, 24);
         let mut terminal = ratatui::Terminal::new(backend)?;
         terminal.draw(|f| {
-            let area = f.size();
+            let area = f.area();
             viewer.draw(f, area).unwrap();
         })?;
         assert_eq!(
@@ -1064,7 +1064,7 @@ mod tests {
             let backend = ratatui::backend::TestBackend::new(width, 24);
             let mut terminal = ratatui::Terminal::new(backend)?;
             terminal.draw(|f| {
-                let area = f.size();
+                let area = f.area();
                 viewer.draw(f, area).unwrap();
             })?;
             assert_eq!(viewer.display_mode, expected_mode);

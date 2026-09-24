@@ -244,7 +244,7 @@ mod tests {
 
         terminal
             .draw(|f| {
-                let area = f.size();
+                let area = f.area();
                 modal.draw(f, modal.popup_area(area)).unwrap();
             })
             .unwrap();
@@ -265,7 +265,7 @@ mod tests {
 
         terminal
             .draw(|f| {
-                let area = f.size();
+                let area = f.area();
                 modal.draw(f, modal.popup_area(area)).unwrap();
             })
             .unwrap();

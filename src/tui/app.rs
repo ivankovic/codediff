@@ -938,7 +938,7 @@ impl App {
 
     fn render(&mut self, ui: &mut UI) -> Result<()> {
         ui.draw(|frame| {
-            let area = frame.size();
+            let area = frame.area();
             let result = match self.screen {
                 AppScreen::Viewer => self.draw_viewer(frame, area),
                 AppScreen::SelectFile => match self.file_dialog.as_mut() {
@@ -1156,7 +1156,7 @@ impl App {
         frame.render_widget(Clear, popup);
         prompt.draw(frame, popup)?;
         let (x, y) = prompt.cursor_screen_position(popup);
-        frame.set_cursor(x, y);
+        frame.set_cursor_position((x, y));
         Ok(())
     }
 
@@ -1189,7 +1189,7 @@ impl App {
         frame.render_widget(Clear, popup);
         modal.draw(frame, popup)?;
         let (x, y) = modal.cursor_screen_position(popup);
-        frame.set_cursor(x, y);
+        frame.set_cursor_position((x, y));
         Ok(())
     }
 }
@@ -2165,7 +2165,7 @@ mod tests {
         let backend = ratatui::backend::TestBackend::new(120, 24);
         let mut terminal = ratatui::Terminal::new(backend)?;
         terminal.draw(|f| {
-            let area = f.size();
+            let area = f.area();
             app.draw_viewer(f, area).unwrap();
         })?;
 
@@ -2186,7 +2186,7 @@ mod tests {
         let backend = ratatui::backend::TestBackend::new(120, 24);
         let mut terminal = ratatui::Terminal::new(backend)?;
         terminal.draw(|f| {
-            let area = f.size();
+            let area = f.area();
             app.draw_viewer(f, area).unwrap();
         })?;
 
@@ -2213,7 +2213,7 @@ mod tests {
         let backend = ratatui::backend::TestBackend::new(120, 24);
         let mut terminal = ratatui::Terminal::new(backend)?;
         terminal.draw(|f| {
-            let area = f.size();
+            let area = f.area();
             app.draw_viewer(f, area).unwrap();
         })?;
 
@@ -2231,7 +2231,7 @@ mod tests {
         let backend = ratatui::backend::TestBackend::new(80, 24);
         let mut terminal = ratatui::Terminal::new(backend)?;
         terminal.draw(|f| {
-            let area = f.size();
+            let area = f.area();
             app.draw_viewer(f, area).unwrap();
         })?;
 
@@ -2250,7 +2250,7 @@ mod tests {
         let backend = ratatui::backend::TestBackend::new(80, 24);
         let mut terminal = ratatui::Terminal::new(backend)?;
         terminal.draw(|f| {
-            let area = f.size();
+            let area = f.area();
             app.draw_viewer(f, area).unwrap();
         })?;
 
@@ -2284,7 +2284,7 @@ mod tests {
         let backend = ratatui::backend::TestBackend::new(80, 24);
         let mut terminal = ratatui::Terminal::new(backend)?;
         terminal.draw(|f| {
-            let area = f.size();
+            let area = f.area();
             app.draw_viewer(f, area).unwrap();
         })?;
         Ok(terminal)
@@ -2297,7 +2297,7 @@ mod tests {
             let mut terminal = ratatui::Terminal::new(backend).unwrap();
             terminal
                 .draw(|f| {
-                    f.render_widget(diffing_status_paragraph(elapsed), f.size());
+                    f.render_widget(diffing_status_paragraph(elapsed), f.area());
                 })
                 .unwrap();
             rendered_text(&terminal)
@@ -2321,7 +2321,7 @@ mod tests {
         let backend = ratatui::backend::TestBackend::new(80, 6);
         let mut terminal = ratatui::Terminal::new(backend).unwrap();
         terminal
-            .draw(|f| f.render_widget(diffing_status_paragraph(None), f.size()))
+            .draw(|f| f.render_widget(diffing_status_paragraph(None), f.area()))
             .unwrap();
 
         let text = rendered_text(&terminal);
@@ -2490,7 +2490,7 @@ mod tests {
         let backend = ratatui::backend::TestBackend::new(80, 24);
         let mut terminal = ratatui::Terminal::new(backend)?;
         terminal.draw(|f| {
-            let area = f.size();
+            let area = f.area();
             app.draw_viewer(f, area).unwrap();
         })?;
 
@@ -2545,7 +2545,7 @@ mod tests {
         let backend = ratatui::backend::TestBackend::new(80, 24);
         let mut terminal = ratatui::Terminal::new(backend)?;
         terminal.draw(|f| {
-            let area = f.size();
+            let area = f.area();
             app.draw_viewer(f, area).unwrap();
         })?;
 
@@ -2582,7 +2582,7 @@ mod tests {
         let backend = ratatui::backend::TestBackend::new(80, 24);
         let mut terminal = ratatui::Terminal::new(backend)?;
         terminal.draw(|f| {
-            let area = f.size();
+            let area = f.area();
             app.draw_viewer(f, area).unwrap();
         })?;
 
@@ -2620,7 +2620,7 @@ mod tests {
         let backend = ratatui::backend::TestBackend::new(80, 24);
         let mut terminal = ratatui::Terminal::new(backend)?;
         terminal.draw(|f| {
-            let area = f.size();
+            let area = f.area();
             app.draw_viewer(f, area).unwrap();
         })?;
 
@@ -2644,7 +2644,7 @@ mod tests {
         let backend = ratatui::backend::TestBackend::new(80, 24);
         let mut terminal = ratatui::Terminal::new(backend)?;
         terminal.draw(|f| {
-            let area = f.size();
+            let area = f.area();
             app.draw_viewer(f, area).unwrap();
         })?;
 
@@ -2666,7 +2666,7 @@ mod tests {
         let backend = ratatui::backend::TestBackend::new(80, 24);
         let mut terminal = ratatui::Terminal::new(backend)?;
         terminal.draw(|f| {
-            let area = f.size();
+            let area = f.area();
             app.draw_viewer(f, area).unwrap();
         })?;
 

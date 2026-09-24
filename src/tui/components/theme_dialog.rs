@@ -484,7 +484,7 @@ mod tests {
         let mut terminal = Terminal::new(TestBackend::new(60, 20)).expect("terminal");
         terminal
             .draw(|frame| {
-                let area = dialog.popup_area(frame.size());
+                let area = dialog.popup_area(frame.area());
                 dialog.draw(frame, area).expect("draw");
             })
             .expect("render");

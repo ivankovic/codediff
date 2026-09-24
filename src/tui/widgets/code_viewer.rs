@@ -1661,9 +1661,9 @@ mod tests {
             !text.contains(&widget.filename()),
             "no title should ever be drawn: {text}"
         );
-        assert_eq!(buf.get(0, 0).symbol(), "1", "gutter line number first");
+        assert_eq!(buf[(0, 0)].symbol(), "1", "gutter line number first");
         assert_eq!(
-            buf.get(widget.gutter_width() as u16, 0).symbol(),
+            buf[(widget.gutter_width() as u16, 0)].symbol(),
             "h",
             "content immediately after the gutter, no border row/column to skip"
         );

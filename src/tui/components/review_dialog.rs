@@ -391,7 +391,7 @@ mod tests {
         let mut dialog = ReviewDialog::new(sample_review());
         terminal
             .draw(|f| {
-                let area = f.size();
+                let area = f.area();
                 dialog.draw(f, dialog.popup_area(area)).unwrap();
             })
             .unwrap();
