@@ -1,6 +1,6 @@
 # Contributing
 
-At this time, to keep the development speed high, contributions are not accepted.
+**At this time, to keep the development speed high, contributions are not accepted.**
 
 Thank you for considering a contribution, human or AI-assisted (see the README's AI policy).
 

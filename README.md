@@ -21,7 +21,7 @@ Light theme is available:
 
 ![A screenshot of CodeDiff's two-panel terminal UI in a light theme, showing the same Python
 refactoring, with the changed right-hand sides highlighted rather than whole
-lines](/readme-screenshot.png)
+lines](/assets/readme-screenshot.png)
 
 # Installation
 

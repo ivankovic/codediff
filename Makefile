@@ -17,15 +17,17 @@ FEATURES ?= stats
 # Usage: make benchmark-ablation [OUT_DIR=path]
 OUT_DIR ?= research/data/ablation
 
-.PHONY: coverage test test-mapping-site-js test-python build install install-hooks benchmark-quality \
-	diff-inventory lint-python ci benchmark-ablation check-quality update-quality-baseline \
-	check-painting-attribution update-painting-attribution diff-gif test-web-js test-showcase-js \
-	check-versions deploy-checks deploy-crates deploy-github deploy
+.PHONY: coverage test test-rust test-mapping-site-js test-python build install install-hooks \
+	benchmark-quality diff-inventory lint-python ci benchmark-ablation check-quality \
+	update-quality-baseline check-painting-attribution update-painting-attribution diff-gif \
+	readme-screenshot test-web-js test-showcase-js check-versions deploy-checks deploy-crates \
+	deploy-github deploy
 
 # Line coverage of the suite `make test` runs (`--all-features`), with a per-area summary (see
 # scripts/coverage_report.py). On demand, not a gate: a threshold teaches touching lines. Rebuilds
-# everything instrumented - about ten minutes and 6GB.
-coverage:
+# everything instrumented - about ten minutes and 6GB - so it runs `test` first: a coverage number
+# over a failing suite measures nothing.
+coverage: test
 	# `--no-report` never cleans, so without this the numbers only ever climb.
 	cargo llvm-cov clean --workspace
 	# Otherwise nextest stops at the first failure and the instrumented run is wasted.
@@ -40,7 +42,10 @@ coverage:
 # Every test, JS, Python and Rust. `--all-features` because several features gate their own tests.
 # Not a substitute for `make ci`, which also proves each feature compiles alone and runs the
 # clippy matrix and baseline gates. Release, because the fixture tests run real diffs.
-test: test-mapping-site-js test-web-js test-python
+test: test-mapping-site-js test-web-js test-python test-rust
+
+# The Rust suite alone, every feature on.
+test-rust:
 	cargo nextest run --release --all-features
 
 # The unit tests of research/analysis/ and scripts/, in research/'s uv environment.
@@ -100,6 +105,20 @@ diff-gif:
 	cargo run --release --features test-fixtures,web --bin generate_showcase -- --out "$$tmp" >/dev/null && \
 	cd research && uv run python ../scripts/record_diff_gif.py \
 		--showcase "$$tmp" --case $(DIFF_GIF_CASE) --out ../$(DIFF_GIF_OUT)
+
+# Records the README's assets/readme-screenshot.png the same way: the viewer drawn by the TUI's
+# own widgets into an offscreen terminal (render_tui_screenshot), rasterized by
+# scripts/render_tui_screenshot.py in the GIF's font. Committed, so it resolves on crates.io; re-run
+# after TUI or painting changes. Needs research/'s uv environment.
+README_SCREENSHOT_CASE ?= handmade/python-refactoring
+README_SCREENSHOT_OUT ?= assets/readme-screenshot.png
+readme-screenshot:
+	@tmp=$$(mktemp -d) && trap 'rm -rf "$$tmp"' EXIT; \
+	dir=src/test/data/diffs/$(README_SCREENSHOT_CASE) && \
+	cargo run --release --features $(FEATURES) --bin render_tui_screenshot -- \
+		"$$dir"/before.* "$$dir"/after.* --out "$$tmp/still.json" && \
+	cd research && uv run python ../scripts/render_tui_screenshot.py \
+		--still "$$tmp/still.json" --out ../$(README_SCREENSHOT_OUT)
 
 # Lints and format-checks all Python (research/, scripts/, assets/) with the rules pinned in
 # ruff.toml, the same set the hook and CI lint.

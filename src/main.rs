@@ -1,4 +1,3 @@
-use anyhow::Result;
 /*  This file is part of the CodeDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
@@ -20,6 +19,7 @@ use std::io::IsTerminal;
 use std::path::PathBuf;
 
 use anyhow::Context;
+use anyhow::Result;
 use clap::{Parser, Subcommand};
 
 use codediff::tui;

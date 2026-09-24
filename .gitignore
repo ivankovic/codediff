@@ -86,3 +86,6 @@ src/test/data/samples/
 
 # What generate_mapping_site and generate_showcase write (the Pages artifact) when run locally.
 /site/
+
+# A rendering of README.md, not a source: regenerate it, do not commit it.
+/README.pdf

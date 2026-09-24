@@ -21,12 +21,6 @@
 # value is a per-corpus tradeoff, not a constant: it bounds how far back sampling can reach, and
 # `git fetch --depth=N` on an existing shallow clone *shortens* as well as deepens, so lowering it
 # discards history that is already on disk.
-#
-# Why this became a flag (2026-08-20): the `full` corpus on disk had only ~10-20 commits per
-# repository despite this script hardcoding 1000, and the committed sample CSVs referenced commits
-# that no checkout could resolve - roughly 41% of sampled pairs were unreadable, concentrated in
-# whole repositories rather than spread evenly. A sample is only reproducible while the history it
-# points into still exists, so record the depth each corpus was fetched at.
 DEPTH="${DEPTH:-1000}"
 
 function update() {

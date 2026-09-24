@@ -968,7 +968,37 @@ impl App {
 
     /// Status bar, panels, error banner, footer. The footer's row is always reserved: it is how a
     /// user who has not pressed `?` learns that keybindings exist.
-    fn draw_viewer(&mut self, frame: &mut ratatui::Frame, area: Rect) -> Result<()> {
+    /// Everything an offscreen render needs before `draw_viewer` (`tui::screenshot`): the themes
+    /// applied without being saved, the viewer sized to `area`, and the pair diffed on this
+    /// thread rather than through the action channel nobody is polling.
+    pub(crate) fn load_still(
+        &mut self,
+        before: &Path,
+        after: &Path,
+        area: Rect,
+        overlay: OverlayTheme,
+        syntax_theme: Option<String>,
+    ) -> Result<()> {
+        self.current_theme = overlay;
+        self.diff_viewer.set_overlay_theme(overlay);
+        if let Some(name) = syntax_theme {
+            self.diff_viewer.set_syntax_theme(name.clone());
+            self.syntax_theme = Some(name);
+        }
+        self.diff_viewer.init(area)?;
+        // As every caller of `start_diff` does; without a current pair, the recent-pairs prompt
+        // draws over the panels.
+        self.before_path = Some(before.to_path_buf());
+        self.after_path = Some(after.to_path_buf());
+        let (data, _large_residual) =
+            compute_diff_with_options(before, after, self.diff_viewer.render_options())?;
+        self.handle_diff_ready(&data);
+        // What `handle_actions` does after `handle_diff_ready`: the viewer loads the diff itself.
+        self.diff_viewer.update(Action::DiffReady(data))?;
+        Ok(())
+    }
+
+    pub(crate) fn draw_viewer(&mut self, frame: &mut ratatui::Frame, area: Rect) -> Result<()> {
         let mut constraints = Vec::with_capacity(4);
         if self.diff_summary.is_some() {
             constraints.push(Constraint::Length(1));

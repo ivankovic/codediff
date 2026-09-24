@@ -19,7 +19,7 @@ include = [
     "/Cargo.toml",
     "/LICENSE",
     "/README.md",
-    "/readme-screenshot.png",
+    "/assets/readme-screenshot.png",
     "/assets/diff-vs-codediff.gif",
     "/assets/web/*.html",
     "/assets/web/*.js",
@@ -232,6 +232,12 @@ required-features = ["tui"]
 name = "codediff-web"
 path = "src/web_main.rs"
 required-features = ["web"]
+
+[[bin]]
+name = "render_tui_screenshot"
+path = "src/bin/render_tui_screenshot.rs"
+# The README's screenshot (`make readme-screenshot`), drawn by the TUI's own widgets.
+required-features = ["tui"]
 
 [[bin]]
 name = "ascii_visualizer"

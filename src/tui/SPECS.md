@@ -273,6 +273,20 @@ omitted entirely rather than `null` for the ordinary case) instead of a printed 
 reason it has a `fallback_used` field instead of `headless::run`'s stderr note: JSON mode is for a
 script to parse, not a person to read.
 
+### Screenshot still: `tui::screenshot`
+
+The README's screenshot is not taken by hand. `tui::screenshot::render` builds the same `App` the
+interactive path does, applies an overlay and a syntax theme without persisting them, diffs the pair
+on the calling thread and draws one frame with `App::draw_viewer` into ratatui's `TestBackend`. The
+buffer's cells come back as per-row styled runs with colours already resolved to `#rrggbb` (named
+ANSI colours at their xterm values, the 256-colour indices likewise); a cell with no colour of its
+own stays unset, because an offscreen terminal has no defaults to inherit. The
+`render_tui_screenshot` binary prints those runs as JSON and `scripts/render_tui_screenshot.py`
+rasterizes them with the GIF's bundled DejaVu Sans Mono, so the two README images share a face and
+the output does not depend on installed fonts. `make readme-screenshot` runs both; the result is
+committed so it resolves on crates.io. Nothing outside the TUI decides what is painted, for the same
+reason the GIF is painted by the browser viewer's own model: a second implementation would drift.
+
 ## Git review (`G`, `--review`)
 
 A second way to open a pair: pick a change out of the repository around the current directory
