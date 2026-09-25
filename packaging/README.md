@@ -11,7 +11,7 @@ extension, which is a separate repository rather than a recipe here.
 | Arch (AUR) | `aur/PKGBUILD` | ready to submit |
 | Gentoo | `gentoo/dev-util/codediff/` | ready for an overlay |
 | Debian/Ubuntu | `[package.metadata.deb]` in `../Cargo.toml` | **published** — signed apt repository at [ivankovic.github.io/codediff/apt](https://ivankovic.github.io/codediff/apt) |
-| Nix / NixOS | `nix/package.nix`, `../flake.nix` | works today via `nix run` |
+| Nix / NixOS | `nix/package.nix`, `../flake.nix`, `../flake.lock` | works today via `nix run`; built by the Nix workflow |
 | VS Code | [`vscode.md`](vscode.md) | **published** — v0.0.1 on the Marketplace and Open VSX, built from [codediff-vscode](https://github.com/ivankovic/codediff-vscode) |
 
 ## The one thing you cannot skip: checksums
@@ -218,11 +218,30 @@ A nixpkgs submission would take `nix/package.nix` as-is but swap `src` for a `fe
 and `cargoLock.lockFile` for a `cargoHash`, since nixpkgs does not carry the lock file. The
 `maintainers` list is deliberately empty until somebody agrees to be on it.
 
-**`flake.lock` is not committed yet.** Without it `nix run github:ivankovic/codediff` resolves
-`nixos-unstable` afresh on every run, so two users on two days build against two nixpkgs.
-Generate and commit it on a machine with Nix (`nix flake lock`, then `nix flake update` on later
-releases), and re-run `nix build` against it before tagging; it is on the release checklist below
-until it exists.
+`flake.lock` is committed, so `nix run github:ivankovic/codediff` builds against one pinned
+nixpkgs rather than whatever `nixos-unstable` is that day. `nix flake update` moves the pin; do
+it deliberately, in a commit of its own.
+
+**CI builds the recipe.** `.github/workflows/nix.yml` runs `nix flake check` and `nix build` on
+every change to the flake, the derivation or the Cargo files, and once a week to catch nixpkgs
+moving under the lock file. It then checks the binary runs and the man page and completions are
+installed. About twelve minutes uncached, which is why it is its own workflow and not a CI job.
+
+The derivation's check phase runs the library tests under cargo-nextest, as CI and the `Makefile`
+do, with `git` as a check-time input: the git review tests spawn `git` and change the working
+directory, which is safe in a process of their own and not under plain `cargo test`.
+
+**Building it locally without Nix installed.** The official image works through podman or
+docker; the named volume keeps the store between runs so a retry only rebuilds codediff:
+
+```
+podman run --rm -it -v "$PWD":/src -w /src -v codediff-nix:/nix docker.io/nixos/nix:latest \
+  sh -c 'git config --global --add safe.directory /src && \
+         nix --extra-experimental-features "nix-command flakes" build .#codediff -L'
+```
+
+Flakes see only git-tracked files, so a new fixture or source file has to be `git add`ed before
+the build sees it. The `result` link it leaves at the root is ignored.
 
 ## Release checklist
 
@@ -235,7 +254,8 @@ until it exists.
    run it too.
 4. Give `CHANGELOG.md`'s section for the version its release date: `## [x.y.z] - YYYY-MM-DD`.
    The release workflow takes the release notes from that section and fails on `unreleased`.
-5. If `flake.lock` is missing or stale, `nix flake lock` / `nix flake update` and commit it.
+5. `nix flake update` if the nixpkgs pin should move with this release, and commit the lock
+   file; the Nix workflow builds the result before the tag.
 6. `make deploy` — publishes to crates.io, tags, and triggers the release workflow, which creates
    the release as a draft and publishes it once every asset is attached.
 7. Now that the tag tarball exists, regenerate the two tarball hashes with `updpkgsums` and
