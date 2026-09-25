@@ -41,6 +41,14 @@ profile.
 Pre-built binaries for Linux, macOS (Intel and Apple Silicon), and Windows are attached to every
 [GitHub release](https://github.com/ivankovic/codediff/releases/latest).
 
+## Homebrew
+
+macOS and Linux:
+
+```
+brew install ivankovic/codediff/codediff
+```
+
 ## Debian and Ubuntu
 
 `.deb` packages are available in a signed apt repository, so `apt upgrade` picks up new
