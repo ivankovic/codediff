@@ -303,7 +303,9 @@ mod tests {
         let readme = std::fs::read_to_string(
             std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("README.md"),
         )
-        .expect("README.md at the crate root");
+        .expect("README.md at the crate root")
+        // git's Windows autocrlf default checks the README out with CRLF.
+        .replace("\r\n", "\n");
         let start = "<!-- languages:start -->\n";
         let end = "<!-- languages:end -->";
         let from = readme
