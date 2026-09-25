@@ -1,4 +1,0 @@
-# PDFs mirrored to the Boox by boox-bridge (~/src/boox-bridge). Annotations come back
-# as <name>.boox.pdf and <name>.notes.md next to each one.
-research/papers/introductory-paper/main.pdf -> codediff paper.pdf
-research/presentations/MUC-2026-03/presentation.pdf -> MUC 2026-03 presentation.pdf
