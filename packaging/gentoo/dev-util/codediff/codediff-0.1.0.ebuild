@@ -119,6 +119,7 @@ CRATES="
 	libc@0.2.189
 	libgit2-sys@0.18.8+1.9.7
 	libm@0.2.16
+	libmimalloc-sys@0.1.49
 	libsqlite3-sys@0.38.2
 	libz-sys@1.1.29
 	line-clipping@0.3.8
@@ -135,6 +136,7 @@ CRATES="
 	memmem@0.1.1
 	memoffset@0.9.1
 	metrohash@1.0.7
+	mimalloc@0.1.52
 	minimal-lexical@0.2.1
 	miniz_oxide@0.9.1
 	mio@1.2.3

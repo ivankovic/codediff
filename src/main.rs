@@ -29,6 +29,13 @@ mod configure_prompt;
 mod git_configure;
 mod jj_configure;
 
+/// The static musl builds only: musl's malloc costs them 20-30% on the largest files, and
+/// mimalloc brings the diff-bound ones ahead of the glibc builds. See Cargo.toml's
+/// target-specific dependency for the measurement.
+#[cfg(target_env = "musl")]
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 /// Top-level subcommands, coexisting with `Args::paths`: each subcommand name becomes a reserved
 /// word for the first positional path, so a file literally named `git` cannot be diffed directly.
 #[derive(Subcommand)]

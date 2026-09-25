@@ -184,6 +184,15 @@ two-face = { version = "0.5.2", default-features = false, features = ["syntect-f
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
 
+# musl's own malloc is markedly slower than glibc's on this allocation-heavy tool: the static
+# Linux binaries measured 20-30% slower than the glibc ones on the five largest fixtures with
+# it. With mimalloc the three diff-bound ones are faster than glibc and the two parse-bound ones
+# (a 900KB JSON, a 580KB TypeScript file) stay ~20% slower, which is the grammars' C compiled by
+# zig rather than the allocator. Only the musl targets link it; every other platform keeps its
+# system allocator.
+[target.'cfg(target_env = "musl")'.dependencies]
+mimalloc = "0.1"
+
 [dev-dependencies]
 # The same two crates the `test-fixtures` feature enables, for the `#[cfg(test)]` builds that
 # compile src/test/ without that feature (see lib.rs's gate on `mod test`).

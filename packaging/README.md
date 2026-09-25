@@ -8,10 +8,11 @@ extension, which is a separate repository rather than a recipe here.
 
 | Target | Files | Status |
 | --- | --- | --- |
-| Arch (AUR) | `aur/PKGBUILD` | ready to submit |
+| Arch (AUR) | `aur/PKGBUILD` | the AUR is closed to new submissions; the PKGBUILD builds locally with `makepkg -si` |
 | Gentoo | `gentoo/dev-util/codediff/` | ready for an overlay |
 | Debian/Ubuntu | `[package.metadata.deb]` in `../Cargo.toml` | **published** — signed apt repository at [ivankovic.github.io/codediff/apt](https://ivankovic.github.io/codediff/apt) |
 | Nix / NixOS | `nix/package.nix`, `../flake.nix`, `../flake.lock` | works today via `nix run`; built by the Nix workflow |
+| Homebrew | `homebrew/codediff.rb.in`, rendered by `../scripts/render_homebrew_formula.py` | tap at `ivankovic/homebrew-codediff`, pushed by the release workflow |
 | VS Code | [`vscode.md`](vscode.md) | **published** — v0.0.1 on the Marketplace and Open VSX, built from [codediff-vscode](https://github.com/ivankovic/codediff-vscode) |
 
 ## The one thing you cannot skip: checksums
@@ -243,6 +244,35 @@ podman run --rm -it -v "$PWD":/src -w /src -v codediff-nix:/nix docker.io/nixos/
 Flakes see only git-tracked files, so a new fixture or source file has to be `git add`ed before
 the build sees it. The `result` link it leaves at the root is ignored.
 
+## Homebrew
+
+A tap, not homebrew-core: `brew install ivankovic/codediff/codediff` taps
+[`ivankovic/homebrew-codediff`](https://github.com/ivankovic/homebrew-codediff) and installs from
+it. The formula installs the release tarballs rather than building from source, so a user gets
+the same attested binary every other route ships in seconds, instead of compiling every grammar
+under fat LTO on their own machine. homebrew-core would not take a binary formula; a personal tap
+routinely does. On macOS it installs the Apple Silicon or Intel build; on Linux the static musl
+build, which runs on any distribution.
+
+`homebrew/codediff.rb.in` is the source of truth, kept here so it versions with the code. It is a
+template: the version and the four checksums come from the release's `SHA256SUMS.txt`, which
+only exists once the release does. `scripts/render_homebrew_formula.py` fills them in and refuses
+to leave a placeholder behind, and release.yml's `homebrew` job runs it after the checksums job
+and pushes `Formula/codediff.rb` to the tap.
+
+The push needs a fine-grained personal access token with **Contents: read and write** on the
+tap repository alone, stored as the `HOMEBREW_TAP_TOKEN` secret of this repository. Without it the
+job prints a warning and the release proceeds; render and push by hand then:
+
+```sh
+gh release download v<version> --pattern SHA256SUMS.txt
+python3 scripts/render_homebrew_formula.py --version <version> --sums SHA256SUMS.txt \
+  --out ../homebrew-codediff/Formula/codediff.rb
+```
+
+The man page and completions are generated at install time by the installed binary, as every
+other recipe does; `brew test codediff` runs a real headless diff.
+
 ## Release checklist
 
 1. Bump `version` in `Cargo.toml`, then `cargo update --workspace` so `Cargo.lock` follows.
@@ -261,7 +291,10 @@ the build sees it. The `result` link it leaves at the root is ignored.
 7. Now that the tag tarball exists, regenerate the two tarball hashes with `updpkgsums` and
    `ebuild ... manifest` (see "The one thing you cannot skip" above). **Not from
    `SHA256SUMS.txt`**: that file covers the release assets, and the source tarball is not one.
-8. Push the updated recipes to the AUR and the overlay.
+8. Push the updated Gentoo recipe to the overlay. The Homebrew tap updates itself from the
+   release workflow (see "Homebrew" above); check that
+   [`Formula/codediff.rb`](https://github.com/ivankovic/homebrew-codediff/blob/main/Formula/codediff.rb)
+   names the new version.
 9. Check that the apt repository picked the release up — `curl -s
    https://ivankovic.github.io/codediff/apt/dists/stable/main/binary-amd64/Packages | grep ^Version`
    should name the new version. It refreshes itself (step 2 above), so this is a check, not a task;

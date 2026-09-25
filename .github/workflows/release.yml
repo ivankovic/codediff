@@ -97,6 +97,16 @@ jobs:
           - target: aarch64-unknown-linux-gnu
             os: ubuntu-22.04
             cross: aarch64-linux-gnu
+          # Static binaries: run on any Linux, any glibc or none (Alpine containers, distributions
+          # older than the glibc 2.35 the gnu builds need). Cross-compiled with cargo-zigbuild,
+          # whose zig is the C compiler and linker for the grammars as well as the Rust.
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-22.04
+            zig: true
+          - target: aarch64-unknown-linux-musl
+            os: ubuntu-22.04
+            zig: true
+            cross: aarch64-linux-musl
           - target: x86_64-apple-darwin
             os: macos-latest
           - target: aarch64-apple-darwin
@@ -119,7 +129,7 @@ jobs:
       # which are C. Setting only the linker produces host-architecture objects and a link failure
       # that reads as if the toolchain were missing.
       - name: Install cross toolchain
-        if: matrix.cross
+        if: matrix.cross && !matrix.zig
         run: |
           sudo apt-get update
           sudo apt-get install -y gcc-${{ matrix.cross }}
@@ -130,7 +140,33 @@ jobs:
       # test-fixtures/stats-gated dev tools in src/bin/. `--locked`: the committed Cargo.lock is
       # what CI tested and what `cargo publish --locked` ships.
       - name: Build
+        if: "!matrix.zig"
         run: cargo build --release --locked --target ${{ matrix.target }} --bin codediff
+
+      # The musl targets: zig is the C compiler and linker for the grammars as well as the Rust,
+      # for both architectures, so no per-architecture toolchain package is needed.
+      - name: Install cargo-zigbuild
+        if: matrix.zig
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-zigbuild
+
+      - name: Install zig
+        if: matrix.zig
+        uses: mlugg/setup-zig@v2
+
+      - name: Build (zig)
+        if: matrix.zig
+        run: cargo zigbuild --release --locked --target ${{ matrix.target }} --bin codediff
+
+      # A musl binary is only worth shipping if it is static: a dynamic one would still need a
+      # musl loader on the user's machine, which a glibc distribution does not have.
+      - name: Verify static linking
+        if: matrix.zig
+        run: |
+          file target/${{ matrix.target }}/release/codediff
+          file target/${{ matrix.target }}/release/codediff | grep -q 'static' \
+            || { echo "::error::musl binary is not statically linked"; exit 1; }
 
       # A cross-compiled binary cannot be run here to check it, so check what it *is*. A silent
       # fallback to the host compiler would otherwise ship an x86-64 binary under an arm64 name,
@@ -330,6 +366,52 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
         run: gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false
+
+  # The Homebrew tap (github.com/ivankovic/homebrew-codediff) installs the release tarballs by
+  # checksum, so its formula can only be written once SHA256SUMS.txt exists. Rendered from
+  # packaging/homebrew/codediff.rb.in and pushed to the tap; see packaging/README.md, "Homebrew".
+  # The push needs the HOMEBREW_TAP_TOKEN secret (a fine-grained token with contents write on the
+  # tap repository); without it this warns and the release stands, since the tap is downstream of
+  # the release and not part of it.
+  homebrew:
+    name: update Homebrew tap
+    needs: checksums
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Render the formula from this release's checksums
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern SHA256SUMS.txt
+          python3 scripts/render_homebrew_formula.py \
+            --version "${TAG#v}" --sums SHA256SUMS.txt --out rendered/codediff.rb
+          cat rendered/codediff.rb
+
+      - name: Push to the tap
+        env:
+          TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          if [ -z "$TAP_TOKEN" ]; then
+            echo "::warning::HOMEBREW_TAP_TOKEN is not set; the formula was rendered but not pushed"
+            exit 0
+          fi
+          git clone --depth 1 "https://x-access-token:${TAP_TOKEN}@github.com/ivankovic/homebrew-codediff.git" tap
+          mkdir -p tap/Formula
+          cp rendered/codediff.rb tap/Formula/codediff.rb
+          cd tap
+          git add Formula/codediff.rb
+          if git diff --cached --quiet; then
+            echo "formula already at $TAG"
+            exit 0
+          fi
+          git -c user.name="github-actions[bot]" \
+              -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+              commit -m "codediff $TAG"
+          git push
 
   # Rebuild the apt repository that GitHub Pages serves, now that the release is public: pages.yml
   # pools the .debs of the last few non-draft releases, so a dispatch before `checksums` publishes

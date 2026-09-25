@@ -58,6 +58,18 @@ on a fresh machine would have hit.
 
 ### Added
 
+- A commercial license for organisations that cannot use AGPL software, as a monthly
+  subscription through GitHub Sponsors; see `LICENSE-COMMERCIAL` and the README.
+- Static Linux binaries (`x86_64-unknown-linux-musl`, `aarch64-unknown-linux-musl`) on every
+  release: they run on any distribution and any glibc, or none. They link mimalloc, since musl's
+  own allocator made them 20-30% slower than the glibc builds on the largest files; with it they
+  are within a few percent either way. The glibc builds remain the default Linux download.
+- A Homebrew tap: `brew install ivankovic/codediff/codediff` installs the release binary on macOS
+  and Linux. The release workflow updates the formula.
+- The Nix recipe is built and its library tests run on every change to it and weekly; the flake
+  is locked to one nixpkgs.
+- The README screenshot is generated from the TUI's own rendering (`make readme-screenshot`), so
+  it cannot drift from the product.
 - A panic hook for the TUI: on a panic it restores the terminal, prints the panic message where
   it can be read, and asks for a bug report at the issue tracker. A panic used to leave the
   message inside the alternate screen, where it was wiped as the program exited.
