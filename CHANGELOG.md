@@ -7,6 +7,10 @@ release does: a minor bump may change the JSON output or the library API, a patc
 The release workflow takes a release's notes from its section here, and refuses to cut a release
 whose heading still says `unreleased`.
 
+## [0.1.0-rc1] - 2026-09-25
+
+A dry run of the release workflow; not published. See 0.1.0 below.
+
 ## [0.1.0] - 2026-09-25
 
 The first release ready for users!
