@@ -81,10 +81,10 @@ Appearance
   M                Open the render-options panel: independent checkboxes for which
                    parts of the diff get painted (leading whitespace, standalone
                    punctuation), plus 1/2 shortcuts for the Minimal/Full presets.
-                   Every choice applies immediately and persists. Trailing whitespace
-                   is never painted, regardless of any option. Up/Down moves,
-                   Space toggles, Enter keeps what is set and closes, Esc puts
-                   back what the panel opened with.
+                   Every choice is applied and saved to the config the moment it
+                   is pressed. Trailing whitespace is never painted, regardless of
+                   any option. Up/Down moves, Space toggles, Enter or Esc closes;
+                   nothing is undone on the way out.
 
 Other
   ?                Toggle this help

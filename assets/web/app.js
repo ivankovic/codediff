@@ -854,12 +854,12 @@
     return dialog;
   }
 
-  // `M`: RenderOptionsDialog.
+  // `M`: RenderOptionsDialog. Every toggle and preset is applied and persisted as pressed, so
+  // Escape only closes: there is nothing to accept and nothing to revert.
   function renderOptionsDialog() {
     const rows = state.info.render_option_rows;
     const dialog = {
       options: { ...state.renderOptions },
-      initial: { ...state.renderOptions },
       selected: 0,
       key(e) {
         if (e.key === "ArrowUp") this.selected = moveSelection(this.selected, -1, rows.length);
@@ -878,16 +878,14 @@
           applyRenderOptions(this.options);
           return;
         } else if (e.key === "Escape") {
-          const differs = rows.some((row) => this.options[row.key] !== this.initial[row.key]);
           state.dialog = null;
-          if (differs) applyRenderOptions(this.initial);
-          else render();
+          render();
           return;
         }
         render();
       },
       render(container) {
-        const { body } = box(container, "Render options", "↑/↓ move  Enter/Space toggle  1: minimal  2: full  Esc: cancel");
+        const { body } = box(container, "Render options", "↑/↓ move  Enter/Space toggle  1: minimal  2: full  Esc: close");
         listRows(body, rows.map((row) => `[${this.options[row.key] ? "x" : " "}] ${row.label}`), this.selected);
       },
     };

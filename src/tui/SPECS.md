@@ -91,6 +91,17 @@ directly:
   second pass at render time (splitting/recoloring the relevant character spans), so the syntax
   foreground colors are preserved underneath.
 
+## Render options panel (`M`)
+
+Every toggle and preset in the panel is applied to the viewer and written to the config file at
+the moment it is pressed (`App::apply_render_options`, then `theme::save_render_options`). A
+construction-time option such as whole-pair updates reloads the diff, since a re-filter cannot
+reach the ranges it changes; the rest are instant. The panel therefore has no accept or cancel:
+`Enter` and `Esc` both close it and keep what is set, and nothing is reverted on the way out.
+This differs from the theme picker, whose arrow keys only preview and whose `Esc` reverts: the
+options panel shows no preview state, so a user who toggles, looks, and closes has already made
+the choice that is now on disk.
+
 ## Screen state machine
 
 `App` tracks one `AppScreen`: `Viewer` (default), `SelectFile`, `Diffing`. There is no separate

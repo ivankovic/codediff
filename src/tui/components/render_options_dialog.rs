@@ -23,18 +23,18 @@ use super::{Component, move_selection, render_list_dialog};
 use crate::diff::text::RenderOptions;
 use crate::tui::actions::Action;
 
-const HINT: &str = "↑/↓ move  Space toggle  Enter apply  Esc cancel  1/2 presets";
+const HINT: &str = "↑/↓ move  Space toggle  1/2 presets  Enter or Esc close";
 
 /// The `M` key's settings panel: one checkbox row per [`RenderOptions`] field, plus two presets.
 ///
-/// Every toggle applies and persists immediately, so the diff behind the panel previews it. That is
-/// why `Esc` reverts to [`Self::initial`] rather than merely closing, and `Enter` accepts - the same
-/// split `ThemeDialog` makes. The presets are on `1`/`2`, not `m`/`f`: the panel opens on `M`, and a
-/// doubled opening key must not wipe every field and persist that.
+/// Every toggle applies and persists the moment it is pressed, and the diff behind the panel
+/// shows it. There is nothing to accept or cancel, so `Enter` and `Esc` both just close; unlike
+/// `ThemeDialog`, this panel has no preview state to revert. The presets are on `1`/`2`, not
+/// `m`/`f`: the panel opens on `M`, and a doubled opening key must not wipe every field and
+/// persist that.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RenderOptionsDialog {
     options: RenderOptions,
-    initial: RenderOptions,
     selected: usize,
 }
 
@@ -42,14 +42,8 @@ impl RenderOptionsDialog {
     pub fn new(options: RenderOptions) -> Self {
         Self {
             options,
-            initial: options,
             selected: 0,
         }
-    }
-
-    /// The options this panel was opened with, which `app.rs` restores on cancel.
-    pub fn initial(&self) -> RenderOptions {
-        self.initial
     }
 
     fn row_count(&self) -> usize {
@@ -83,7 +77,7 @@ impl Component for RenderOptionsDialog {
                 self.options.toggle(self.selected);
                 Ok(Some(Action::RenderOptionsChanged(self.options)))
             }
-            KeyCode::Enter => Ok(Some(Action::RenderOptionsAccepted)),
+            KeyCode::Enter | KeyCode::Esc => Ok(Some(Action::RenderOptionsAccepted)),
             KeyCode::Char('1') => {
                 self.options = RenderOptions::MINIMAL;
                 Ok(Some(Action::RenderOptionsChanged(self.options)))
@@ -92,7 +86,6 @@ impl Component for RenderOptionsDialog {
                 self.options = RenderOptions::FULL;
                 Ok(Some(Action::RenderOptionsChanged(self.options)))
             }
-            KeyCode::Esc => Ok(Some(Action::DialogCancelled)),
             _ => Ok(None),
         }
     }
@@ -188,20 +181,23 @@ mod tests {
         );
     }
 
-    /// Every toggle has already applied itself, so accepting has nothing left to change.
+    /// Every toggle has already applied and persisted itself, so closing has nothing left to
+    /// change - and nothing to revert: `Esc` is not a cancel here.
     #[test]
-    fn enter_accepts_and_changes_nothing_on_the_way_out() {
-        let mut dialog = RenderOptionsDialog::new(RenderOptions::MINIMAL);
-        dialog.handle_key_event(key(KeyCode::Char(' '))).unwrap();
-        let toggled = dialog.options;
+    fn enter_and_esc_both_close_and_keep_every_toggle() {
+        for close in [KeyCode::Enter, KeyCode::Esc] {
+            let mut dialog = RenderOptionsDialog::new(RenderOptions::MINIMAL);
+            dialog.handle_key_event(key(KeyCode::Char(' '))).unwrap();
+            let toggled = dialog.options;
 
-        let action = dialog.handle_key_event(key(KeyCode::Enter)).unwrap();
+            let action = dialog.handle_key_event(key(close)).unwrap();
 
-        assert_eq!(action, Some(Action::RenderOptionsAccepted));
-        assert_eq!(
-            dialog.options, toggled,
-            "accepting must not edit the options it accepts"
-        );
+            assert_eq!(action, Some(Action::RenderOptionsAccepted), "{close:?}");
+            assert_eq!(
+                dialog.options, toggled,
+                "{close:?} must not edit the options it closes on"
+            );
+        }
     }
 
     /// Bound to MINIMAL, a doubled `M`/`m` would turn every field off and persist it.
@@ -220,21 +216,10 @@ mod tests {
         assert_eq!(dialog.options, RenderOptions::FULL);
     }
 
+    /// A preset pressed and then `Esc`: the preset stands, since it was applied and saved when
+    /// it was pressed. `Esc` never sends a cancel from this panel.
     #[test]
-    fn esc_cancels_without_changing_anything() {
-        let mut dialog = RenderOptionsDialog::new(RenderOptions::FULL);
-
-        let action = dialog.handle_key_event(key(KeyCode::Esc)).unwrap();
-
-        assert_eq!(action, Some(Action::DialogCancelled));
-        assert_eq!(dialog.options, RenderOptions::FULL);
-    }
-
-    /// The change is already on disk, so the panel must remember what it opened with. The test
-    /// above cannot catch a lost `initial`: nothing changed before its Esc.
-    #[test]
-
-    fn esc_after_a_change_still_reports_what_the_panel_opened_with() {
+    fn esc_after_a_preset_keeps_the_preset() {
         let mut dialog = RenderOptionsDialog::new(RenderOptions::FULL);
 
         dialog.handle_key_event(key(KeyCode::Char('1'))).unwrap();
@@ -242,8 +227,8 @@ mod tests {
 
         let action = dialog.handle_key_event(key(KeyCode::Esc)).unwrap();
 
-        assert_eq!(action, Some(Action::DialogCancelled));
-        assert_eq!(dialog.initial(), RenderOptions::FULL);
+        assert_eq!(action, Some(Action::RenderOptionsAccepted));
+        assert_eq!(dialog.options, RenderOptions::MINIMAL);
     }
 
     #[test]

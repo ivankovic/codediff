@@ -71,6 +71,10 @@ distribution's repository yet.
 
 ## Editor integration
 
+**Please note: VS Code doesn't yet support replacing the default diff. The API feature request for
+this functionality is currently implemented but not yet released. As soon as it is released,
+CodeDiff will support replacing the default VS Code diff**
+
 * **VS Code** - [codediff-vscode](https://github.com/ivankovic/codediff-vscode), v0.0.1. Search for
   **CodeDiff** in the Extensions view, or `code --install-extension ivankovic.codediff`. Also on
   [Open VSX](https://open-vsx.org/extension/ivankovic/codediff) for VSCodium, Cursor and Windsurf.

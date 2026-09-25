@@ -847,12 +847,7 @@ impl App {
         }
         self.file_dialog = None;
         self.theme_dialog = None;
-        // Every toggle was already persisted, so cancelling must actively restore.
-        if let Some(dialog) = self.render_options_dialog
-            && dialog.initial() != self.diff_viewer.render_options()
-        {
-            self.apply_render_options(dialog.initial())?;
-        }
+        // The render-options panel has nothing to restore: every toggle is final as pressed.
         self.render_options_dialog = None;
         self.help_modal = None;
         self.search_modal = None;
@@ -894,8 +889,8 @@ impl App {
         self.screen = AppScreen::Viewer;
     }
 
-    /// `Enter`: every toggle is already applied, so accepting is closing without
-    /// `handle_dialog_cancelled`'s restore.
+    /// `Enter` or `Esc`: every toggle is already applied and persisted, so closing is all that
+    /// is left. Nothing is reverted on the way out.
     fn handle_render_options_accepted(&mut self) {
         self.render_options_dialog = None;
         self.screen = AppScreen::Viewer;
@@ -1910,9 +1905,10 @@ mod tests {
         Ok(())
     }
 
-    /// Every toggle is persisted as pressed, so a stray preset key must not survive `Esc`.
+    /// Every toggle is saved the moment it is pressed, and closing the panel by any route keeps
+    /// it: what the viewer shows and what the config file holds are the same thing.
     #[test]
-    fn cancelling_the_render_options_panel_restores_what_it_opened_with() -> Result<()> {
+    fn closing_the_render_options_panel_keeps_what_was_toggled_and_persisted() -> Result<()> {
         // `apply_render_options` persists, so redirect the write - see the note on
         // `apply_theme_selection_updates_viewer_and_returns_to_the_viewer_screen`.
         let config = tempfile::NamedTempFile::new().expect("temp config");
@@ -1923,13 +1919,21 @@ mod tests {
         app.screen = AppScreen::RenderOptions;
         app.render_options_dialog = Some(RenderOptionsDialog::new(RenderOptions::FULL));
 
-        // What the preset key does: applied and persisted immediately.
+        // What a preset key does: applied and persisted immediately.
         app.apply_render_options(RenderOptions::MINIMAL)?;
         assert_eq!(app.diff_viewer.render_options(), RenderOptions::MINIMAL);
+        assert_eq!(theme::load_render_options(), RenderOptions::MINIMAL);
 
+        // Esc and Enter both arrive as `RenderOptionsAccepted`; a stray `DialogCancelled` must
+        // not revert either.
         app.handle_dialog_cancelled()?;
+        assert_eq!(app.diff_viewer.render_options(), RenderOptions::MINIMAL);
+        assert!(app.render_options_dialog.is_none());
 
-        assert_eq!(app.diff_viewer.render_options(), RenderOptions::FULL);
+        app.render_options_dialog = Some(RenderOptionsDialog::new(RenderOptions::MINIMAL));
+        app.handle_render_options_accepted();
+        assert_eq!(app.diff_viewer.render_options(), RenderOptions::MINIMAL);
+        assert_eq!(theme::load_render_options(), RenderOptions::MINIMAL);
         assert!(app.render_options_dialog.is_none());
 
         unsafe { std::env::remove_var(theme::CONFIG_ENV) };
