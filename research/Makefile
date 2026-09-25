@@ -59,7 +59,7 @@ RESEARCH_DIR = /var/tmp/research/$(MODE)/
 	debug-stats analyze tiny small full sample-pairs sample-pairs-all measure-pairs \
 	measure-code-pair-diffs pairs-diff-report measure-sampled matching-reasons-report \
 	shapes-report measure-edit-shape ambiguity-report rendering-report measure-tools-timing \
-	measure-tools-accuracy timing-report install-bdiff apted-budget-report measure-apted-budget \
+	measure-tools-accuracy timing-report install-bdiff install-srcdiff apted-budget-report measure-apted-budget \
 	paper-variables introductory-paper introductory-paper-empirical fetch-external \
 	measure-astdiff-oracle measure-astdiff-oracle-human measure-robustness-fixtures
 
@@ -452,6 +452,45 @@ install-bdiff:
 	$(BDIFF_PREFIX)/venv/bin/pip install -q $(BDIFF_PREFIX)/BDiff rapidfuzz
 	@$(BDIFF_PREFIX)/venv/bin/python -m bdiff --version
 	@echo "export BDIFF_PYTHON=$(BDIFF_PREFIX)/venv/bin/python"
+
+# Builds srcDiff (Decker et al., TOSEM 2020; syntactic differencing over srcML) into /var/tmp,
+# and prints the SRCDIFF_BIN export the benchmark targets need. Needs no root.
+#
+#  * srcDiff's development tip calls srcml_unit_get_archive, which no srcML release has (1.1.0 is
+#    the latest, 2025-08), so srcML is built from its development branch too. Both are pinned: a
+#    moving tip is a different tool next month.
+#  * srcML's build needs the -dev headers of libxml2, libxslt, libarchive, libcurl and ICU, whose
+#    runtime libraries Ubuntu already has. `apt download` + `dpkg -x` unpacks them into a sysroot,
+#    and the dangling .so symlinks are repointed at the system libraries. Also needs Java (srcML
+#    generates its parser with ANTLR 2) and cmake >= 3.28, installed here from PyPI with ninja.
+SRCDIFF_PREFIX ?= /var/tmp/srcdiff-install
+SRCDIFF_COMMIT ?= ef42b332b2e9400e441a8049c4ee170a2a2203e8
+SRCML_COMMIT ?= c9f001484253b8b837b1c3db81fa553bc69301ce
+install-srcdiff:
+	mkdir -p $(SRCDIFF_PREFIX)/debs
+	test -d $(SRCDIFF_PREFIX)/venv || python3 -m venv $(SRCDIFF_PREFIX)/venv
+	$(SRCDIFF_PREFIX)/venv/bin/pip install -q cmake ninja
+	cd $(SRCDIFF_PREFIX)/debs && apt download libxml2-dev libxslt1-dev libarchive-dev \
+		libcurl4-openssl-dev libicu-dev && for d in *.deb; do dpkg -x $$d ../sysroot; done
+	cd $(SRCDIFF_PREFIX)/sysroot/usr/lib/x86_64-linux-gnu && for f in *.so; do \
+		t=$$(readlink $$f); test -e "$$t" || ln -sfn /usr/lib/x86_64-linux-gnu/$$t $$f; done
+	test -d $(SRCDIFF_PREFIX)/srcML || git clone https://github.com/srcML/srcML.git $(SRCDIFF_PREFIX)/srcML
+	test -d $(SRCDIFF_PREFIX)/srcDiff || git clone https://github.com/srcDiff/srcDiff.git $(SRCDIFF_PREFIX)/srcDiff
+	git -C $(SRCDIFF_PREFIX)/srcML checkout -q $(SRCML_COMMIT)
+	git -C $(SRCDIFF_PREFIX)/srcDiff checkout -q $(SRCDIFF_COMMIT)
+	git -C $(SRCDIFF_PREFIX)/srcDiff submodule update --init --recursive
+	I=$(SRCDIFF_PREFIX)/sysroot/usr/include; \
+	export PATH=$(SRCDIFF_PREFIX)/venv/bin:$$PATH CPLUS_INCLUDE_PATH=$$I:$$I/x86_64-linux-gnu \
+		C_INCLUDE_PATH=$$I:$$I/x86_64-linux-gnu LIBRARY_PATH=$(SRCDIFF_PREFIX)/sysroot/usr/lib/x86_64-linux-gnu; \
+	cmake -S $(SRCDIFF_PREFIX)/srcML -B $(SRCDIFF_PREFIX)/srcml-build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+		-DCMAKE_PREFIX_PATH=$(SRCDIFF_PREFIX)/sysroot/usr -DCMAKE_INSTALL_PREFIX=$(SRCDIFF_PREFIX)/srcml-head \
+		-DBUILD_CLIENT_TESTS=OFF && \
+	cmake --build $(SRCDIFF_PREFIX)/srcml-build && cmake --install $(SRCDIFF_PREFIX)/srcml-build && \
+	cd $(SRCDIFF_PREFIX)/srcDiff && \
+	cmake --preset debian -DCMAKE_PREFIX_PATH="$(SRCDIFF_PREFIX)/srcml-head;$(SRCDIFF_PREFIX)/sysroot/usr" && \
+	cmake --build build
+	@$(SRCDIFF_PREFIX)/srcDiff/build/bin/srcdiff -V
+	@echo "export SRCDIFF_BIN=$(SRCDIFF_PREFIX)/srcDiff/build/bin/srcdiff"
 
 # ── External oracles: ground truth we did not write ─────────────────────────────────────────────
 

@@ -127,6 +127,9 @@ libc = { version = "0.2", optional = true }
 num_cpus = { version = "1.17.0", optional = true }
 # Only used by src/stats/sampling.rs (feature-gated) and the stats-gated sample_*.rs dev tools.
 rand = { version = "0.10", optional = true }
+# Only used by benchmark_other's srcDiff adapter, to read srcDiff's XML - gated by `test-fixtures`.
+# Already in the lockfile via syntect's plist.
+quick-xml = { version = "0.42", optional = true }
 # Only used by src/stats.rs and the fixture-loading helpers under src/test/ (`test-fixtures`);
 # also a dev-dependency below because those helpers compile under a plain `cargo test` too.
 regex = { version = "1.12.2", optional = true }
@@ -224,7 +227,7 @@ tui = [
 ]
 # Gates `codediff::test`, whose data files are excluded from the published crate, so it must not
 # be public API there. Needed by every src/bin/ dev tool; `stats` includes it.
-test-fixtures = ["dep:csv", "dep:regex", "dep:tempfile", "tui"]
+test-fixtures = ["dep:csv", "dep:quick-xml", "dep:regex", "dep:tempfile", "tui"]
 # git2 (with its OpenSSL/libssh2 build), bundled SQLite and the rest of the history
 # stats/sampling tools' deps. Opt-in, so `cargo install codediff` and library consumers skip them.
 stats = [

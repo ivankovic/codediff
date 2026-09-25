@@ -324,6 +324,7 @@ dependencies = [
  "metrohash",
  "mimalloc",
  "num_cpus",
+ "quick-xml",
  "rand 0.10.3",
  "ratatui",
  "regex",

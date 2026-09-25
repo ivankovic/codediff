@@ -23,8 +23,8 @@
 //! codediff's `ASTDiff` are both projected down to per-line "touched or not" labels. That throws
 //! away moves, so a fixture codediff gets node-perfect can still show line mismatches here.
 //!
-//! GumTree, difftastic and diffsitter are not bundled: point `GUMTREE_BIN`, `DIFFT_BIN` and
-//! `DIFFSITTER_BIN` at built binaries. `treesitter_parse_ms` is timed as a reference lower bound,
+//! GumTree, difftastic, diffsitter and srcDiff are not bundled: point `GUMTREE_BIN`, `DIFFT_BIN`,
+//! `DIFFSITTER_BIN` and `SRCDIFF_BIN` at built binaries. `treesitter_parse_ms` is timed as a reference lower bound,
 //! and GumTree and BDiff each get a second, warm-process timing that excludes JVM or interpreter
 //! startup (`gumtree_warm_batch`, `bdiff_warm_batch`).
 
@@ -53,12 +53,15 @@ mod git;
 mod gumtree;
 #[path = "benchmark_other/nvim.rs"]
 mod nvim;
+#[path = "benchmark_other/srcdiff.rs"]
+mod srcdiff;
 use bdiff::*;
 use diffsitter::*;
 use difftastic::*;
 use git::*;
 use gumtree::*;
 use nvim::*;
+use srcdiff::*;
 
 #[derive(Parser)]
 struct Args {
@@ -147,6 +150,7 @@ enum ExternalTool {
     GumTree,
     Difftastic,
     Diffsitter,
+    SrcDiff,
 }
 
 impl ExternalTool {
@@ -161,6 +165,7 @@ impl ExternalTool {
         ExternalTool::GumTree,
         ExternalTool::Difftastic,
         ExternalTool::Diffsitter,
+        ExternalTool::SrcDiff,
     ];
 
     fn name(&self) -> &'static str {
@@ -175,6 +180,7 @@ impl ExternalTool {
             ExternalTool::GumTree => "gumtree",
             ExternalTool::Difftastic => "difftastic",
             ExternalTool::Diffsitter => "diffsitter",
+            ExternalTool::SrcDiff => "srcdiff",
         }
     }
 
@@ -208,6 +214,7 @@ impl ExternalTool {
             ExternalTool::GumTree => gumtree_generator(language).is_some(),
             ExternalTool::Difftastic => difftastic_extension(language).is_some(),
             ExternalTool::Diffsitter => diffsitter_file_type(language).is_some(),
+            ExternalTool::SrcDiff => srcdiff_language(language).is_some(),
         }
     }
 
@@ -229,6 +236,7 @@ impl ExternalTool {
             ExternalTool::GumTree => gumtree_line_labels(before, after),
             ExternalTool::Difftastic => difftastic_line_labels(before, after),
             ExternalTool::Diffsitter => diffsitter_line_labels(before, after),
+            ExternalTool::SrcDiff => srcdiff_line_labels(before, after),
         }
     }
 }
@@ -893,6 +901,7 @@ fn tool_node_spans(
         ExternalTool::GumTree => Some(gumtree_node_spans(before, after)),
         ExternalTool::Difftastic => Some(difftastic_node_spans(before, after)),
         ExternalTool::Diffsitter => Some(diffsitter_node_spans(before, after)),
+        ExternalTool::SrcDiff => Some(srcdiff_node_spans(before, after)),
     }
 }
 
