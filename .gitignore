@@ -89,3 +89,6 @@ src/test/data/samples/
 
 # A rendering of README.md, not a source: regenerate it, do not commit it.
 /README.pdf
+
+# `nix build` leaves its output link here.
+/result

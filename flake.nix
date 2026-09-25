@@ -49,6 +49,7 @@
         apps.default = {
           type = "app";
           program = "${codediff}/bin/codediff";
+          meta.description = codediff.meta.description;
         };
 
         # `nix develop` for working on codediff itself: the full toolchain plus the tools the
