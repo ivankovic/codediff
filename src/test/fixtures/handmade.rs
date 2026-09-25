@@ -114,6 +114,8 @@ mod rust_small_addition_with_reuse_of_binary_expressions;
 #[cfg(test)]
 mod rust_sniffnet_protocol;
 #[cfg(test)]
+mod rust_some_to_const_slice;
+#[cfg(test)]
 mod rust_tauri_api_build_1;
 #[cfg(test)]
 mod rust_tauri_api_build_2;
