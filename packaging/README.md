@@ -17,7 +17,7 @@ extension, which is a separate repository rather than a recipe here.
 
 ## The one thing you cannot skip: checksums
 
-The tarball hashes belong to the **v0.0.14** tag: they hash GitHub's tag tarball, so they can only
+The tarball hashes belong to the **v0.1.0** tag: they hash GitHub's tag tarball, so they can only
 be regenerated after the next tag exists, and until then the recipes name the new version with the
 old hash and do not build. `make check-versions` checks the version strings, not the hashes.
 
