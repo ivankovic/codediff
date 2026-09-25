@@ -75,6 +75,7 @@ test-python:
 test-mapping-site-js:
 	node assets/mapping_site/index.test.js
 	node assets/mapping_site/viewer.test.js
+	node assets/mapping_site/reviewed.test.js
 
 # The browser viewer's logic (assets/web/model.js), ported from the TUI and pinned to it test by
 # test; its only coverage, since Rust only embeds it.

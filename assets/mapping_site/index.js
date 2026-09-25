@@ -21,7 +21,8 @@
 // convention as viewer.js. Deliberately separate from viewer.js rather than folded into it: this
 // only ever runs on index.html (which never loads viewer.js - there's no before/after tree, no
 // mapping to navigate), and viewer.js only ever runs on a fixture page (which has no table to
-// sort), so the two scripts' code never needs to coexist in the same page.
+// sort), so the two scripts' code never needs to coexist in the same page. What both pages do
+// share - the reader's "reviewed" marks - lives in reviewed.js, which both load.
 (function () {
   "use strict";
 

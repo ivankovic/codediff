@@ -20,10 +20,16 @@
 //! read-only HTML page with before/after trees and code panels, driven by
 //! `assets/mapping_site/viewer.js`. Published to GitHub Pages by `.github/workflows/pages.yml`.
 //!
-//! This is for humans to review the ground truth itself; it never runs codediff's own diff.
+//! This is for humans to review the ground truth itself; it never runs codediff's own diff. The
+//! one thing a reviewer can record is "I looked at this and had nothing to file": a per-fixture
+//! mark that `assets/mapping_site/reviewed.js` keeps in the browser's own storage (the site has
+//! no server), tied to the page's [`fixture_revision`] so a later remapping shows up as
+//! unreviewed again. The index page and every fixture page can also open a random fixture that
+//! has no current mark.
 
 use std::collections::HashMap;
 use std::fs;
+use std::hash::Hasher;
 use std::path::PathBuf;
 
 use anyhow::{Context, Result};
@@ -78,6 +84,10 @@ fn main() -> Result<()> {
     fs::write(
         assets_dir.join("index.js"),
         include_str!("../../assets/mapping_site/index.js"),
+    )?;
+    fs::write(
+        assets_dir.join("reviewed.js"),
+        include_str!("../../assets/mapping_site/reviewed.js"),
     )?;
 
     let pairs = helper::handmade_test_code_pairs()?;
@@ -155,12 +165,19 @@ fn main() -> Result<()> {
                 .collect(),
             note,
             unmarked_nodes: page.unmarked_nodes,
+            revision: page.revision,
         });
     }
 
     fs::write(
         args.out.join("index.html"),
         render_index_page(&index_entries),
+    )?;
+    // Every fixture page's "random unreviewed fixture" button needs the whole list; see
+    // `render_fixtures_script`.
+    fs::write(
+        assets_dir.join("fixtures.js"),
+        render_fixtures_script(&index_entries),
     )?;
 
     let painted = index_entries
@@ -201,6 +218,27 @@ struct FixturePage {
     /// Nodes the human mapping says nothing about. Counted here because rendering already built
     /// the `Caches` it needs.
     unmarked_nodes: usize,
+    /// See [`fixture_revision`]; baked into the page and repeated in the index's row for it.
+    revision: String,
+}
+
+/// A fingerprint of everything a fixture's page shows: the mapping (paintings included, they are
+/// in the same struct) and both source files. `reviewed.js` stores it with a reader's "I have
+/// reviewed this" mark, so a fixture that is remapped, repainted or resampled after being reviewed
+/// shows up as needing another look rather than silently keeping its mark.
+///
+/// Hashes the mapping as serialized, not the file's bytes, so reformatting `human_mapping.json`
+/// without changing a decision keeps every mark. MetroHash because it is already a dependency and
+/// nothing here needs to resist an adversary; 16 hex digits, one `u64`.
+fn fixture_revision(mapping: &HumanMapping, before: &Code, after: &Code) -> Result<String> {
+    let mut hasher = metrohash::MetroHash64::new();
+    let mapping_json = serde_json::to_string(mapping).context("serializing the mapping")?;
+    // Length-prefixed so the three parts cannot slide into one another.
+    for part in [mapping_json.as_str(), &before.contents, &after.contents] {
+        hasher.write_usize(part.len());
+        hasher.write(part.as_bytes());
+    }
+    Ok(format!("{:016x}", hasher.finish()))
 }
 
 fn render_fixture_page(
@@ -228,6 +266,7 @@ fn render_fixture_page(
     let groups = resolve_groups(mapping, before_root, after_root);
     let unmarked_nodes = unmarked_node_count(before_root, &caches, status_before)
         + unmarked_node_count(after_root, &caches, status_after);
+    let revision = fixture_revision(mapping, before, after)?;
 
     let before_quiet_sizes =
         fully_quiet_subtree_sizes(before_root, &caches, status_before, is_identical_before);
@@ -434,7 +473,7 @@ fn render_fixture_page(
 <title>{name_escaped} — human mapping</title>
 <link rel="stylesheet" href="../assets/style.css">
 </head>
-<body data-fixture="{name_attr}" data-repo="{repo}">
+<body data-fixture="{name_attr}" data-repo="{repo}" data-revision="{revision}">
 <header class="page-header">
 <a class="back-link" href="../index.html">&larr; all fixtures</a>
 <h1>{name_escaped}</h1>
@@ -482,10 +521,14 @@ fn render_fixture_page(
 <footer class="page-footer">
 <a id="file-issue" href="#" aria-disabled="true" target="_blank" rel="noopener">File an issue about the selected node</a>
 <button id="toggle-identical" type="button" aria-pressed="false">Hide identical matches</button>
+<button id="toggle-reviewed" type="button" aria-pressed="false" title="Remembered in this browser only; forgotten if this fixture's mapping changes">Mark as reviewed</button>
+<button id="random-unreviewed" type="button" data-fixtures-dir="">Random unreviewed fixture</button>
 <span id="status-line" role="status"></span>
 </footer>
 {help_overlay}
 {search_prompt}
+<script src="../assets/fixtures.js"></script>
+<script src="../assets/reviewed.js"></script>
 <script src="../assets/viewer.js"></script>
 </body>
 </html>
@@ -499,12 +542,14 @@ fn render_fixture_page(
         name_escaped = escape_html_text(name),
         name_attr = escape_html_attr(name),
         repo = REPO,
+        revision = revision,
         help_overlay = HELP_OVERLAY_HTML,
         search_prompt = SEARCH_PROMPT_HTML,
     );
     Ok(FixturePage {
         html,
         unmarked_nodes,
+        revision,
     })
 }
 
@@ -520,6 +565,8 @@ const HELP_OVERLAY_HTML: &str = r#"<div id="help-overlay" class="hidden" role="d
 <dt>i</dt><dd>hide identical matches, showing only inserted/deleted/updated nodes and their ancestors</dd>
 <dt>v</dt><dd>cycle the view: split / code only / tree only</dd>
 <dt>p</dt><dd>cycle what the code view renders: the node mapping, then each human painting</dd>
+<dt>r</dt><dd>mark this fixture as reviewed, or forget the mark (kept in this browser only)</dd>
+<dt>n</dt><dd>open a random fixture not yet marked as reviewed</dd>
 <dt>?</dt><dd>toggle this help</dd>
 </dl>
 </div>"#;
@@ -1345,6 +1392,29 @@ struct IndexEntry {
     unmarked_nodes: usize,
     /// Every painting's name, in file order. Empty means unpainted.
     paintings: Vec<String>,
+    /// See [`fixture_revision`].
+    revision: String,
+}
+
+/// `assets/fixtures.js`: every fixture's name and revision as one array on `window`, for the
+/// "random unreviewed fixture" button on fixture pages, which have no table to read the list from.
+/// A script rather than JSON to `fetch`, so a site opened from a file:// URL works too. It is one
+/// cached asset shared by every page, not something inflating each of them.
+fn render_fixtures_script(entries: &[IndexEntry]) -> String {
+    let items: Vec<String> = entries
+        .iter()
+        .map(|entry| {
+            format!(
+                "{{name:{},revision:{}}}",
+                serde_json::to_string(&entry.name).expect("a string serializes"),
+                serde_json::to_string(&entry.revision).expect("a string serializes"),
+            )
+        })
+        .collect();
+    format!(
+        "// Generated by generate_mapping_site.rs; read by reviewed.js.\nwindow.CODEDIFF_FIXTURES = [\n{}\n];\n",
+        items.join(",\n")
+    )
 }
 
 fn render_index_page(entries: &[IndexEntry]) -> String {
@@ -1353,7 +1423,7 @@ fn render_index_page(entries: &[IndexEntry]) -> String {
         let name_attr = escape_html_attr(&entry.name);
         let name_escaped = escape_html_text(&entry.name);
         rows.push_str(&format!(
-            r#"<tr data-name="{name_attr}" data-language="{language}" data-codediff="{codediff}" data-unix_diff="{unix_diff}" data-total_lines="{total_lines}" data-paintings="{painting_count}" data-unmarked="{unmarked}">
+            r#"<tr data-name="{name_attr}" data-language="{language}" data-codediff="{codediff}" data-unix_diff="{unix_diff}" data-total_lines="{total_lines}" data-paintings="{painting_count}" data-unmarked="{unmarked}" data-revision="{revision}" data-reviewed="0">
 <td><a href="fixtures/{name_attr}.html">{name_escaped}</a>{note}</td>
 <td><span class="language-badge">{language}</span></td>
 <td>{codediff}</td>
@@ -1361,9 +1431,11 @@ fn render_index_page(entries: &[IndexEntry]) -> String {
 <td>{total_lines}</td>
 <td class="paintings">{painting_names}</td>
 <td>{unmarked_cell}</td>
+<td class="reviewed"><input type="checkbox" class="reviewed-mark" aria-label="Reviewed: {name_attr}"></td>
 </tr>
 "#,
             language = entry.language,
+            revision = entry.revision,
             codediff = entry.codediff_mismatches,
             unix_diff = entry.unix_diff_mismatches,
             total_lines = entry.total_lines,
@@ -1420,6 +1492,13 @@ rendering. A dash means nobody has painted that fixture yet.</p>
 <p>"Unmarked nodes" counts what the human mapping still says nothing about - a dash means the
 mapping is finished. Sort by it to find the ones that still need work. Where a fixture carries a
 description, it appears under its name.</p>
+<p>"Reviewed" is yours to tick: it means you looked at that fixture and had nothing to file. It is
+kept in this browser only, and a fixture whose mapping changes after you reviewed it drops back to
+half-ticked so you know to look again. Sort by it to see what is left.</p>
+<div class="review-controls">
+<span id="review-progress" role="status"></span>
+<button id="random-unreviewed" type="button" data-fixtures-dir="fixtures/">Random unreviewed fixture</button>
+</div>
 </header>
 <table class="fixture-table" id="fixture-table">
 <thead>
@@ -1431,11 +1510,13 @@ description, it appears under its name.</p>
 <th data-sort="total_lines" data-type="number" tabindex="0" aria-sort="none">Total lines</th>
 <th data-sort="paintings" data-type="number" tabindex="0" aria-sort="none">Paintings</th>
 <th data-sort="unmarked" data-type="number" tabindex="0" aria-sort="none">Unmarked nodes</th>
+<th data-sort="reviewed" data-type="number" tabindex="0" aria-sort="none">Reviewed</th>
 </tr>
 </thead>
 <tbody>
 {rows}</tbody>
 </table>
+<script src="assets/reviewed.js"></script>
 <script src="assets/index.js"></script>
 </body>
 </html>
@@ -3029,6 +3110,7 @@ mod tests {
                 paintings: vec!["Minimal".to_string(), "Full".to_string()],
                 note: Some("Requires a N:M match for perfect solution".to_string()),
                 unmarked_nodes: 0,
+                revision: "0123456789abcdef".to_string(),
             },
             IndexEntry {
                 name: "c-linux-small-bugfix".to_string(),
@@ -3039,6 +3121,7 @@ mod tests {
                 paintings: Vec::new(),
                 note: None,
                 unmarked_nodes: 7,
+                revision: "0123456789abcdef".to_string(),
             },
         ];
 
@@ -3080,6 +3163,7 @@ mod tests {
             paintings: vec!["Only one solution".to_string()],
             note: None,
             unmarked_nodes: 4,
+            revision: "0123456789abcdef".to_string(),
         }];
 
         let html = render_index_page(&entries);
@@ -3141,9 +3225,167 @@ mod tests {
             paintings: Vec::new(),
             note: None,
             unmarked_nodes: 0,
+            revision: "0123456789abcdef".to_string(),
         }];
         let html = render_index_page(&entries);
         assert!(html.contains("a&amp;b"));
         assert!(!html.contains("a&b<"));
+    }
+
+    #[test]
+    fn render_index_page_has_a_reviewed_column_carrying_each_rows_revision() {
+        let entries = vec![IndexEntry {
+            name: "rust-add-if".to_string(),
+            language: Language::Rust,
+            codediff_mismatches: 0,
+            unix_diff_mismatches: 0,
+            total_lines: 0,
+            paintings: Vec::new(),
+            note: None,
+            unmarked_nodes: 0,
+            revision: "00ff00ff00ff00ff".to_string(),
+        }];
+        let html = render_index_page(&entries);
+
+        assert!(
+            html.contains(r#"data-revision="00ff00ff00ff00ff" data-reviewed="0">"#),
+            "the row must carry the revision reviewed.js compares marks against: {html}"
+        );
+        assert!(html.contains(r#"<th data-sort="reviewed" data-type="number""#));
+        assert!(html.contains(
+            r#"<input type="checkbox" class="reviewed-mark" aria-label="Reviewed: rust-add-if">"#
+        ));
+        assert!(html.contains(
+            r#"<button id="random-unreviewed" type="button" data-fixtures-dir="fixtures/">"#
+        ));
+        assert!(html.contains(r#"<script src="assets/reviewed.js"></script>"#));
+    }
+
+    #[test]
+    fn render_fixtures_script_lists_every_fixture_with_its_revision() {
+        let entry = |name: &str, revision: &str| IndexEntry {
+            name: name.to_string(),
+            language: Language::Rust,
+            codediff_mismatches: 0,
+            unix_diff_mismatches: 0,
+            total_lines: 0,
+            paintings: Vec::new(),
+            note: None,
+            unmarked_nodes: 0,
+            revision: revision.to_string(),
+        };
+        let script = render_fixtures_script(&[
+            entry("rust-add-if", "0000000000000001"),
+            // A quote in a name is not something the corpus has, but the script must stay valid JS
+            // if it ever does.
+            entry("odd\"name", "0000000000000002"),
+        ]);
+
+        assert!(script.starts_with("// Generated by generate_mapping_site.rs"));
+        assert!(script.contains("window.CODEDIFF_FIXTURES = ["));
+        assert!(script.contains(r#"{name:"rust-add-if",revision:"0000000000000001"}"#));
+        assert!(script.contains(r#"{name:"odd\"name",revision:"0000000000000002"}"#));
+    }
+
+    #[test]
+    fn fixture_revision_follows_the_mapping_and_the_sources_but_not_json_formatting() {
+        let before = Code::from_string("fn f() {}\n", &Language::Rust);
+        let after = Code::from_string("fn g() {}\n", &Language::Rust);
+        let empty = HumanMapping::default();
+        let base = fixture_revision(&empty, &before, &after).expect("hashes");
+
+        assert_eq!(base.len(), 16, "one u64 as hex: {base}");
+        assert_eq!(
+            base,
+            fixture_revision(&empty, &before, &after).expect("hashes"),
+            "deterministic"
+        );
+
+        // Reformatting the file changes nothing: the hash is over the mapping as a value, so it
+        // is what `load` would see, not the bytes on disk.
+        let reparsed: HumanMapping =
+            serde_json::from_str(&serde_json::to_string_pretty(&empty).expect("serializes"))
+                .expect("parses");
+        assert_eq!(
+            base,
+            fixture_revision(&reparsed, &before, &after).expect("hashes")
+        );
+
+        let mut painted = HumanMapping::default();
+        painted.text_mappings.push(painting(Vec::new()));
+        assert_ne!(
+            base,
+            fixture_revision(&painted, &before, &after).expect("hashes"),
+            "a painting"
+        );
+
+        let other_after = Code::from_string("fn h() {}\n", &Language::Rust);
+        assert_ne!(
+            base,
+            fixture_revision(&empty, &before, &other_after).expect("hashes"),
+            "a source"
+        );
+        assert_ne!(
+            base,
+            fixture_revision(&empty, &after, &before).expect("hashes"),
+            "swapping the sides"
+        );
+    }
+
+    #[test]
+    fn render_fixture_page_bakes_its_revision_and_the_review_controls() {
+        let before = Code::from_string("fn f() {}\n", &Language::Rust);
+        let after = Code::from_string("fn f() {}\n", &Language::Rust);
+        let mapping = HumanMapping::default();
+
+        let page = render_fixture_page(
+            "rust-add-if",
+            &before,
+            &after,
+            &mapping,
+            None,
+            None,
+            &mut Vec::new(),
+        )
+        .expect("should render");
+
+        assert_eq!(
+            page.revision,
+            fixture_revision(&mapping, &before, &after).expect("hashes")
+        );
+        assert!(
+            page.html.contains(&format!(
+                r#"<body data-fixture="rust-add-if" data-repo="ivankovic/codediff" data-revision="{}">"#,
+                page.revision
+            )),
+            "the page must carry the same revision the index row does: {}",
+            page.html
+        );
+        assert!(
+            page.html
+                .contains(r#"<button id="toggle-reviewed" type="button" aria-pressed="false""#)
+        );
+        assert!(
+            page.html
+                .contains(r#"<button id="random-unreviewed" type="button" data-fixtures-dir="">"#)
+        );
+        // fixtures.js before reviewed.js: the latter reads the list the former defines.
+        let fixtures_at = page
+            .html
+            .find(r#"<script src="../assets/fixtures.js"></script>"#)
+            .expect("fixtures.js");
+        let reviewed_at = page
+            .html
+            .find(r#"<script src="../assets/reviewed.js"></script>"#)
+            .expect("reviewed.js");
+        assert!(fixtures_at < reviewed_at);
+        assert!(
+            page.html
+                .contains("<dt>r</dt><dd>mark this fixture as reviewed")
+        );
+        assert!(
+            page.html
+                .contains("<dt>n</dt><dd>open a random fixture not yet marked as reviewed")
+        );
     }
 }

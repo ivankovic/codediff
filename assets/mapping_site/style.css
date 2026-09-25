@@ -352,7 +352,9 @@ body.hide-identical .node:not(.status-deleted, .status-inserted, .changed):not(
 }
 
 #file-issue,
-#toggle-identical {
+#toggle-identical,
+#toggle-reviewed,
+#random-unreviewed {
   font-family: inherit;
   font-size: 0.85rem;
   padding: 0.4rem 0.8rem;
@@ -374,6 +376,39 @@ body.hide-identical .node:not(.status-deleted, .status-inserted, .changed):not(
   background: var(--matched);
   color: #fff;
   border-color: var(--matched);
+}
+
+/* Set by reviewed.js. A stale mark (the mapping changed since it was made) keeps the button in
+ * its unpressed shape but says so in the label; the colour is the "needs work" one. */
+#toggle-reviewed[aria-pressed="true"] {
+  background: var(--inserted);
+  color: #fff;
+  border-color: var(--inserted);
+}
+
+#toggle-reviewed[data-state="stale"] {
+  border-color: var(--update);
+  color: var(--update);
+}
+
+/* The index page's own review controls: a progress line and the random-fixture button, above the
+ * table rather than in a fixed footer, which the index does not have. */
+.review-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.fixture-table td.reviewed {
+  text-align: center;
+}
+
+.fixture-table input.reviewed-mark {
+  cursor: pointer;
 }
 
 #status-line {
