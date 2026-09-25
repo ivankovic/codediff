@@ -1,9 +1,9 @@
 # Overview
 
-As of commit 4c3d31df on main, 2026-09-25 11:01.
+As of commit cbdeeac7 on main, 2026-09-25 16:32.
 
 ## Facts
-- 9068 files, 5575 tests in 1406 files, 19 marked to skip
+- 9078 files, 5595 tests in 1409 files, 19 marked to skip
 
 ## Start here
 - src/main.rs — the binary starts here
@@ -65,6 +65,8 @@ As of commit 4c3d31df on main, 2026-09-25 11:01.
 - coverage sets groups a fixtures tests but leaves other tests alone
 - coverage sets masks to the area and combines sets
 - coverage sets refuses bits that do not match their record
+- the homebrew formula renders from the release checksums
+- the homebrew formula refuses an asset the release lacks
 ### src/bin/analyze_human_mappings.rs
 - sibling candidate rejects depth parent and kind changes
 - renumbering after a deletion is not a reorder
@@ -543,6 +545,8 @@ As of commit 4c3d31df on main, 2026-09-25 11:01.
 - ts extension with xml content is qt linguist not typescript
 - ts extension with ts content is still typescript
 - xml content sniff is scoped to ts extension
+- the readme lists exactly the supported languages
+- every extension maps to exactly one language
 ### src/code/metadata.rs
 - compute ast metadata does not panic when language is unset
 - hermetic expand from path
@@ -1673,6 +1677,22 @@ As of commit 4c3d31df on main, 2026-09-25 11:01.
 ### src/test/data/diffs/handmade/rust-sniffnet-protocol/before.rs.test
 - protocol display
 - all protocols collection
+### src/test/data/diffs/handmade/rust-some-to-const-slice/after.rs.test
+- language for invalid extensions
+- language for valid extensions
+- language for path strips test suffix
+- ts extension with xml content is qt linguist not typescript
+- ts extension with ts content is still typescript
+- xml content sniff is scoped to ts extension
+- the readme lists exactly the supported languages
+- every extension maps to exactly one language
+### src/test/data/diffs/handmade/rust-some-to-const-slice/before.rs.test
+- language for invalid extensions
+- language for valid extensions
+- language for path strips test suffix
+- ts extension with xml content is qt linguist not typescript
+- ts extension with ts content is still typescript
+- xml content sniff is scoped to ts extension
 ### src/test/data/diffs/handmade/rust-zed-workspace-tasks/after.rs.test
 - schedule resolved task save all
 - schedule resolved task save current
@@ -3864,6 +3884,10 @@ As of commit 4c3d31df on main, 2026-09-25 11:01.
 - painting
 - invariants
 ### src/test/fixtures/handmade/rust_sniffnet_protocol.rs
+- mapping
+- painting
+- invariants
+### src/test/fixtures/handmade/rust_some_to_const_slice.rs
 - mapping
 - painting
 - invariants
@@ -6686,7 +6710,7 @@ As of commit 4c3d31df on main, 2026-09-25 11:01.
 - a stale diff computed result is dropped after cancel
 - ctrl z is recognised as suspend and a bare z is not
 - handle dialog cancelled resets dialog state
-- cancelling the render options panel restores what it opened with
+- closing the render options panel keeps what was toggled and persisted
 - apply render options reloads when whole pair updates changes
 - apply render options reloads for every construction time field
 - apply render options does not reload for the other fields
@@ -6802,10 +6826,9 @@ As of commit 4c3d31df on main, 2026-09-25 11:01.
 - space toggles the selected option and reports it
 - down then space toggles the second option
 - digits jump straight to the named presets
-- enter accepts and changes nothing on the way out
+- enter and esc both close and keep every toggle
 - the key that opens the panel is inert inside it
-- esc cancels without changing anything
-- esc after a change still reports what the panel opened with
+- esc after a preset keeps the preset
 - selection does not move past the last row
 - popup is wide enough for the whole hint
 ### src/tui/components/review_dialog.rs
@@ -7013,7 +7036,7 @@ As of commit 4c3d31df on main, 2026-09-25 11:01.
 - research/analysis/paper_variables.py — robustness_fixtures, common_subset_concentration, robustness_full, sampling_provenance
 - research/analysis/verify_sample.py — resolves
 - src/stats/git.rs — walk_single_parent_commit_diffs, blob_bytes, text_loc_if_in_range
-- src/tui/widgets.rs — code_viewer
-- src/anomalous_paths.rs — is_anomalous
 - research/analysis/file_stats.py — write_paper_variables, export_size_distribution, load_data, load_node_kind_counts
+- src/anomalous_paths.rs — is_anomalous
+- src/tui/widgets.rs — code_viewer
 - research/analysis/ambiguity_report.py — summarize
