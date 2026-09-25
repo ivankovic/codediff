@@ -133,6 +133,15 @@ jobs:
       - name: Packaging recipes name Cargo.toml's version
         run: make check-versions
 
+      # THIRD-PARTY-NOTICES.md ships beside every binary and LICENSE-COMMERCIAL points at it, so a
+      # dependency change has to reach it; generated from Cargo.lock, so checked against it.
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-about
+
+      - name: Third-party notices are in sync with Cargo.lock
+        run: make check-third-party-notices
+
       # The Python unit tests, in research/'s uv environment (pytest is a dev dependency there).
       - uses: astral-sh/setup-uv@v7
 

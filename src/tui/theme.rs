@@ -611,7 +611,7 @@ pub fn load_recent_pairs() -> Vec<(PathBuf, PathBuf)> {
 }
 
 /// Record a diffed pair at the front of the recent list (deduplicated, capped at
-/// [`MAX_RECENT_PAIRS`]). A pair with a throwaway side is never recorded; filtering only on read
+/// `MAX_RECENT_PAIRS`). A pair with a throwaway side is never recorded; filtering only on read
 /// would still write one per `git difftool` run.
 pub fn record_recent_pair(before: &Path, after: &Path) {
     if is_throwaway(before) || is_throwaway(after) {

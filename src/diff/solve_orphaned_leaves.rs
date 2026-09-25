@@ -71,7 +71,7 @@ fn neighbours_correspond(
 /// * The parents already correspond, as in `solve_unique_type_matching` (which keys on kind alone).
 /// * Equal counts per (kind, text) under the pair, so any bijection is the same mapping; unequal
 ///   counts would mean guessing which leaf survived.
-/// * [`neighbours_correspond`]: a `,` between different arguments is a different `,`
+/// * `neighbours_correspond`: a `,` between different arguments is a different `,`
 ///   (csharp-lidarr-call-different-function).
 ///
 /// An `Identical` pair costs 0 against a delete plus an insert, so this only moves the objective

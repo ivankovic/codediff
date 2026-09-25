@@ -38,7 +38,7 @@ OUT_DIR ?= research/data/ablation
 	benchmark-quality diff-inventory lint-python ci benchmark-ablation check-quality \
 	update-quality-baseline check-painting-attribution update-painting-attribution diff-gif \
 	readme-screenshot test-web-js test-showcase-js check-versions deploy-checks deploy-crates \
-	deploy-github deploy
+	deploy-github deploy third-party-notices check-third-party-notices
 
 # Line coverage of the suite `make test` runs (`--all-features`), with a per-area summary (see
 # scripts/coverage_report.py). On demand, not a gate: a threshold teaches touching lines. Rebuilds
@@ -136,6 +136,25 @@ readme-screenshot:
 		"$$dir"/before.* "$$dir"/after.* --out "$$tmp/still.json" && \
 	cd research && uv run python ../scripts/render_tui_screenshot.py \
 		--still "$$tmp/still.json" --out ../$(README_SCREENSHOT_OUT)
+
+# Regenerates THIRD-PARTY-NOTICES.md, the licenses of every crate the product binary links, from
+# Cargo.lock (cargo-about, `cargo install cargo-about --features cli`). Ships beside the binary in
+# every distribution and is what LICENSE-COMMERCIAL's third-party clause points at, so
+# `check-third-party-notices` fails CI when a dependency change is not reflected here.
+NOTICES_CONFIG := packaging/notices/about.toml
+NOTICES_TEMPLATE := packaging/notices/third-party-notices.hbs
+third-party-notices:
+	cargo about generate -c $(NOTICES_CONFIG) $(NOTICES_TEMPLATE) -o THIRD-PARTY-NOTICES.md
+
+check-third-party-notices:
+	@tmp=$$(mktemp) && trap 'rm -f "$$tmp"' EXIT; \
+	cargo about generate -c $(NOTICES_CONFIG) $(NOTICES_TEMPLATE) -o "$$tmp" && \
+	if ! diff -q "$$tmp" THIRD-PARTY-NOTICES.md >/dev/null; then \
+		echo "THIRD-PARTY-NOTICES.md is stale against Cargo.lock: run \`make third-party-notices\` and commit it" >&2; \
+		diff "$$tmp" THIRD-PARTY-NOTICES.md | head -20 >&2; \
+		exit 1; \
+	fi; \
+	echo "THIRD-PARTY-NOTICES.md is up to date"
 
 # Lints and format-checks all Python (research/, scripts/, assets/) with the rules pinned in
 # ruff.toml, the same set the hook and CI lint.

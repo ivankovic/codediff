@@ -69,7 +69,10 @@ on a fresh machine would have hit.
 - The Nix recipe is built and its library tests run on every change to it and weekly; the flake
   is locked to one nixpkgs.
 - The README screenshot is generated from the TUI's own rendering (`make readme-screenshot`), so
-  it cannot drift from the product.
+  it cannot drift from the product, and its list of supported languages is pinned to the code by
+  a test.
+- `THIRD-PARTY-NOTICES.md`, the licenses of every crate the binary links, ships beside the binary
+  in every archive, the `.deb` and the crate; CI checks it against `Cargo.lock`.
 - A panic hook for the TUI: on a panic it restores the terminal, prints the panic message where
   it can be read, and asks for a bug report at the issue tracker. A panic used to leave the
   message inside the alternate screen, where it was wiped as the program exited.

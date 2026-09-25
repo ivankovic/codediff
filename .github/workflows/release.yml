@@ -191,14 +191,14 @@ jobs:
         if: runner.os != 'Windows'
         run: |
           mkdir dist
-          cp target/${{ matrix.target }}/release/codediff LICENSE README.md dist/
-          tar czf codediff-${{ matrix.target }}.tar.gz -C dist codediff LICENSE README.md
+          cp target/${{ matrix.target }}/release/codediff LICENSE THIRD-PARTY-NOTICES.md README.md dist/
+          tar czf codediff-${{ matrix.target }}.tar.gz -C dist codediff LICENSE THIRD-PARTY-NOTICES.md README.md
 
       - name: Package (Windows)
         if: runner.os == 'Windows'
         run: |
           New-Item -ItemType Directory dist
-          Copy-Item target/${{ matrix.target }}/release/codediff.exe, LICENSE, README.md dist/
+          Copy-Item target/${{ matrix.target }}/release/codediff.exe, LICENSE, THIRD-PARTY-NOTICES.md, README.md dist/
           Compress-Archive -Path dist/* -DestinationPath codediff-${{ matrix.target }}.zip
 
       # Signed provenance (which workflow, commit and runner produced this file), verifiable with

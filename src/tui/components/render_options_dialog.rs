@@ -56,7 +56,7 @@ impl RenderOptionsDialog {
         self.options.options().len()
     }
 
-    /// Centered, sized to every option row and the whole of [`HINT`].
+    /// Centered, sized to every option row and the whole of `HINT`.
     pub fn popup_area(&self, area: Rect) -> Rect {
         let width = (HINT.chars().count() as u16 + 2).max(56).min(area.width);
         let height = (self.row_count() as u16 + 3).min(area.height);

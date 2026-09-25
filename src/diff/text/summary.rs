@@ -200,7 +200,7 @@ pub fn summarize_diff(
 /// either side has no AST, and when nothing changed at all (e.g. only `Move`s): "comment-only" is a
 /// claim about what changed.
 ///
-/// A real change is what [`classify_node`] says `ranges` paints; containers of one are descended.
+/// A real change is what `classify_node` says `ranges` paints; containers of one are descended.
 /// A node counts as a comment when it or an ancestor is one, because some grammars (Rust's
 /// `line_comment`) build a comment from child nodes such as its `//` marker.
 pub fn is_comment_only_diff(

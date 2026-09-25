@@ -946,7 +946,7 @@ const IDENTIFIER_KINDS: &[&str] = &[
     "shorthand_property_identifier_pattern",
 ];
 
-/// Whether `kind` is in [`IDENTIFIER_KINDS`].
+/// Whether `kind` is in `IDENTIFIER_KINDS`.
 pub fn is_identifier_kind(kind: &str) -> bool {
     IDENTIFIER_KINDS.contains(&kind)
 }
@@ -1225,7 +1225,7 @@ pub fn delimiter_complement_kinds(kind: &str) -> Option<Vec<&'static str>> {
     (!openers.is_empty()).then_some(openers)
 }
 
-/// Leaves whose identity is their value, as opposed to [`IDENTIFIER_KINDS`], whose identity is a
+/// Leaves whose identity is their value, as opposed to `IDENTIFIER_KINDS`, whose identity is a
 /// name.
 const LITERAL_KINDS: &[&str] = &[
     "string_literal",
@@ -1508,7 +1508,7 @@ pub fn structurally_visible_node_ids(code: &Code) -> std::collections::HashSet<u
     visible
 }
 
-/// Whether `node` is a call whose callee looks diagnostic (see [`DIAGNOSTIC_CALLEE_KEYWORDS`]).
+/// Whether `node` is a call whose callee looks diagnostic (see `DIAGNOSTIC_CALLEE_KEYWORDS`).
 /// Loose on purpose: its caller only pairs byte-identical subtrees, so a false positive is
 /// harmless.
 pub fn is_diagnostic_statement(node: Node, language: &Language, source: &[u8]) -> bool {
@@ -1531,7 +1531,7 @@ pub fn is_diagnostic_statement(node: Node, language: &Language, source: &[u8]) -
 /// Whether `node_kind` directly holds a function's, class's or namespace's statements or members.
 /// The kind names are unambiguous across grammars, so no `Language` is needed.
 ///
-/// The anchor for [`crate::diff::apted::prematch_identical_statement_siblings`]. An allow-list,
+/// The anchor for `crate::diff::apted::prematch_identical_statement_siblings`. An allow-list,
 /// not "the widest descendant": that picks a macro's `token_tree` over the function's own `block`
 /// (`rust-tauri-cli-ios-dev`). Not exhaustive; a missing entry only costs a missed speed-up.
 pub fn is_statement_sequence_body(node_kind: &str) -> bool {

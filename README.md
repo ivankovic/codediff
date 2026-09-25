@@ -131,6 +131,36 @@ callers are version control systems driving it as a display tool, and they read 
 aborts the whole diff. (The 7-argument `GIT_EXTERNAL_DIFF` form stays at `0` even with
 `--exit-code`, since git treats a non-zero exit there as fatal.)
 
+## JSON output
+
+`codediff --mode json BEFORE AFTER` prints the diff as one JSON object, for editors and tools that
+place highlights on their own buffers. Each side carries its path, its detected language and its
+hunks, and each hunk is an operation (`delete`, `insert`, `update`, `move`) with a range in that
+side's own file:
+
+```json
+{
+  "before": {
+    "path": "old.rs",
+    "language": "Rust",
+    "hunks": [
+      { "operation": "delete", "range": { "start_row": 12, "start_column": 4, "end_row": 12, "end_column": 20 } }
+    ]
+  },
+  "after": { "path": "new.rs", "language": "Rust", "hunks": [ ... ] },
+  "large_residual": false,
+  "summary": "comment_only"
+}
+```
+
+Rows and columns are 0-indexed, and columns are byte offsets within their row, as tree-sitter
+reports them. `summary` is present only when the diff is one of the special shapes the TUI's
+status bar names, such as `comment_only` or `whitespace_only`. A binary file on either side
+answers with `"binary": true` and empty hunks. Unlike headless mode, JSON output is never chosen
+automatically: only `--mode json` selects it, so a pipe never receives it by surprise. The
+[VS Code extension](https://github.com/ivankovic/codediff-vscode) is built on this output; the
+authoritative field list is `src/tui/json_output.rs`.
+
 ## Git integration
 
 CodeDiff is a `git difftool` backend. Run the interactive setup wizard, which asks
@@ -208,6 +238,44 @@ there - the same output `git diff` gets. jj has no equivalent of `git difftool`'
 per-file viewer (its terminal-attached hook, `ui.diff-editor`, is for `jj diffedit`/`jj split`,
 which edit the right-hand side and read it back - not something a read-only viewer should claim to
 do), so for the full-screen TUI on a jj repo, run `codediff BEFORE AFTER` directly.
+
+# Supported languages
+
+The language is detected from the file extension. A file with an unknown extension is diffed as
+plain text, line by line, so nothing is refused.
+
+<!-- languages:start -->
+24 languages are parsed with a tree-sitter grammar and diffed structurally:
+
+| Language | File extensions |
+|---|---|
+| C | `.c`, `.h` |
+| C# | `.cs` |
+| C++ | `.cc`, `.cpp`, `.cxx`, `.hpp`, `.hh`, `.hxx` |
+| CSS | `.css`, `.scss` |
+| Go | `.go` |
+| HTML | `.html`, `.htm` |
+| Java | `.java` |
+| JavaScript | `.js`, `.mjs`, `.cjs`, `.jsx` |
+| JSON | `.json` |
+| Kotlin | `.kt` |
+| Lua | `.lua` |
+| PHP | `.php` |
+| Python | `.py`, `.pyi`, `.pyw` |
+| R | `.r` |
+| Ruby | `.rb` |
+| Rust | `.rs` |
+| Scala | `.scala` |
+| Shell (Bash) | `.bash`, `.sh` |
+| Swift | `.swift` |
+| TSX | `.tsx` |
+| TypeScript | `.ts`, `.mts`, `.cts` |
+| Vimscript | `.vim` |
+| XML | `.xml`, `.xht`, `.xhtml` |
+| YAML | `.yaml`, `.yml` |
+
+Recognised by extension but diffed as plain text, since no grammar is compiled in: Bazel (`.bazel`), Dart (`.dart`), Emacs Lisp (`.el`), Markdown (`.md`, `.markdown`), Protocol Buffers (`.proto`), SQL (`.sql`).
+<!-- languages:end -->
 
 # Guiding principles
 
@@ -296,9 +364,10 @@ This project uses substantial AI assistance, currently Claude Code. Most commits
 with a `Co-Authored-By` trailer and a link to the session that produced them. This project does not
 hide that fact. This project does not treat AI assistance as a lesser way to write software.
 
-AI-assisted contributions are welcome. Use whatever tools help you do good work. Disclose your use
-of these tools the same way. You are still responsible for understanding and standing behind
-whatever you submit.
+Contributions are not accepted at this time, to keep the development speed high (see
+[CONTRIBUTING.md](CONTRIBUTING.md)). When that changes, AI-assisted contributions will be as
+welcome as any other, disclosed the same way: whoever submits the work is responsible for
+understanding it and standing behind it.
 
 # For Developers, human or otherwise
 

@@ -318,7 +318,7 @@ impl ASTMetadata {
 
 /// The programming language: a crate enum rather than a tree-sitter language, so unknown and
 /// grammar-less languages are representable.
-#[derive(Debug, Clone, Copy, Default, PartialEq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, strum::EnumIter)]
 pub enum Language {
     #[default]
     Unknown,

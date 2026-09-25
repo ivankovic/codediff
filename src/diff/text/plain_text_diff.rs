@@ -33,8 +33,8 @@ pub(crate) const PLAIN_TEXT_MAX_EDIT: usize = 10_000;
 /// `(before_ranges, after_ranges)` in the shape of [`super::TextDiff::all`].
 ///
 /// Never produces `Move`: hashed lines carry no identity that survives relocation. Does produce
-/// `Update` with sub-line columns: rows in a hunk that share enough affix ([`shared_affix`]) are
-/// split by [`intra_line_ranges`] instead of rendering as a delete plus an insert.
+/// `Update` with sub-line columns: rows in a hunk that share enough affix (`shared_affix`) are
+/// split by `intra_line_ranges` instead of rendering as a delete plus an insert.
 pub fn plain_text_line_diff(before: &str, after: &str) -> (Vec<RangeMatch>, Vec<RangeMatch>) {
     plain_text_line_diff_with_max_edit(before, after, PLAIN_TEXT_MAX_EDIT)
 }
@@ -142,7 +142,7 @@ pub(crate) fn whole_line_range(row: usize) -> TextRange {
 }
 
 /// The share of the longer of two unmatched lines their common prefix and suffix must cover for
-/// [`intra_line_ranges`] to split them. A ratio, not a length: unrelated rows of a wide CSV share
+/// `intra_line_ranges` to split them. A ratio, not a length: unrelated rows of a wide CSV share
 /// long affixes like `,0,0,0,0` by coincidence, and splitting such a pair hides the real change
 /// inside a span labelled `Identical`.
 pub(crate) const MIN_SHARED_AFFIX_PERCENT: usize = 50;
@@ -167,7 +167,7 @@ pub(crate) fn shared_affix(before_line: &str, after_line: &str) -> Option<(usize
 }
 
 /// Sub-line ranges for one changed line pair: `Identical` prefix and suffix around an `Update`
-/// middle. `None` under the same condition as [`shared_affix`]. Columns are bytes.
+/// middle. `None` under the same condition as `shared_affix`. Columns are bytes.
 ///
 /// Both sides always get the same number of ranges, since the two lists are consumed
 /// index-for-index downstream (see `merge_ranges`).

@@ -103,7 +103,7 @@ pub struct RenderOptions {
     /// `Move`/`Update` ranges are never split: their destinations are real positions, and a
     /// per-row split would need a matching split on the other side.
     pub leading_whitespace: bool,
-    /// Whether a range of nothing but [`STRUCTURAL_PUNCTUATION`] is kept. Off in `MINIMAL`: the
+    /// Whether a range of nothing but `STRUCTURAL_PUNCTUATION` is kept. Off in `MINIMAL`: the
     /// painted corpus drops lone brackets and separators.
     pub structural_punctuation: bool,
     /// Whether every updated matched pair is highlighted whole (`argument` -> `i_am_an_argument`

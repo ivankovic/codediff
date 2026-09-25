@@ -248,7 +248,7 @@ pub fn parse_name_status(bytes: &[u8]) -> Vec<ChangedFile> {
 /// records NUL-terminated by `-z`.
 const LOG_FORMAT: &str = "--format=%H%x1f%h%x1f%an%x1f%ad%x1f%s";
 
-/// Parses [`LOG_FORMAT`] output into commits with no files yet.
+/// Parses `LOG_FORMAT` output into commits with no files yet.
 pub fn parse_log(bytes: &[u8]) -> Vec<Commit> {
     bytes
         .split(|&b| b == 0)

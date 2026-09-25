@@ -152,7 +152,7 @@ impl<'a> ContainmentCtx<'a> {
 /// corpus fixture's quality unchanged; lowering it trades quality for latency.
 pub(crate) const APTED_MAX_CELLS: usize = 600_000;
 
-/// What `resolve_forest` does with a single pair over [`APTED_MAX_CELLS`]: pairs the two roots
+/// What `resolve_forest` does with a single pair over `APTED_MAX_CELLS`: pairs the two roots
 /// (or deletes and inserts them if their kinds may not meet), then resolves their children the
 /// way a flat container's are. Each leftover pair re-enters `resolve_forest`, so the gate applies
 /// again a level down.
@@ -228,7 +228,7 @@ pub enum Algorithm {
     ZhangShasha,
     Apted,
     /// APTED on the whole pair with every `resolve_forest` shortcut off (identical emit, flat
-    /// containers, thin wrappers, the [`APTED_MAX_CELLS`] gate), however much it costs. Not for
+    /// containers, thin wrappers, the `APTED_MAX_CELLS` gate), however much it costs. Not for
     /// the product: `apted_only_worker` uses it to measure tree edit distance itself, which the
     /// shortcuts would otherwise be credited as.
     AptedWholeTree,

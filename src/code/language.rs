@@ -69,44 +69,116 @@ fn looks_like_xml(content: &str) -> bool {
 ///
 /// Note that some extensions are not uniquely identifiable so the highest probability result is
 /// returned. It may or may not be correct.
+/// Every file extension CodeDiff recognises, lower-cased, and the language it means. The one
+/// table behind [`language_for_extension`] and the README's language list.
+pub const EXTENSIONS: &[(&[&str], Language)] = &[
+    (&["bash", "sh"], Language::ShellScript),
+    (&["bazel"], Language::Bazel),
+    (&["c", "h"], Language::C),
+    (&["cc", "cpp", "cxx", "hpp", "hh", "hxx"], Language::CPP),
+    (&["cs"], Language::CSharp),
+    (&["css", "scss"], Language::CSS),
+    (&["dart"], Language::Dart),
+    (&["el"], Language::Lisp),
+    (&["go"], Language::Go),
+    (&["html", "htm"], Language::HTML),
+    (&["java"], Language::Java),
+    (&["js", "mjs", "cjs", "jsx"], Language::JavaScript),
+    (&["json"], Language::JSON),
+    (&["kt"], Language::Kotlin),
+    (&["lua"], Language::LUA),
+    (&["md", "markdown"], Language::MarkDown),
+    (&["php"], Language::PHP),
+    (&["proto"], Language::ProtoBuf),
+    (&["py", "pyi", "pyw"], Language::Python),
+    (&["r"], Language::R),
+    (&["rb"], Language::Ruby),
+    (&["rs"], Language::Rust),
+    (&["scala"], Language::Scala),
+    (&["sql"], Language::SQL),
+    (&["swift"], Language::Swift),
+    (&["ts", "mts", "cts"], Language::TypeScript),
+    (&["tsx"], Language::TSX),
+    (&["vim"], Language::Vimscript),
+    (&["yaml", "yml"], Language::YAML),
+    (&["xml", "xht", "xhtml"], Language::XML),
+];
+
 pub fn language_for_extension(ext: &str) -> Option<Language> {
-    match ext {
-        // Sorted alphabetically.
-        "bash" | "sh" => Some(Language::ShellScript),
-        "bazel" => Some(Language::Bazel),
-        "c" | "h" => Some(Language::C),
-        "cc" | "cpp" | "cxx" | "hpp" | "hh" | "hxx" => Some(Language::CPP),
-        "cs" => Some(Language::CSharp),
-        "css" | "scss" => Some(Language::CSS),
-        "dart" => Some(Language::Dart),
-        "el" => Some(Language::Lisp),
-        "go" => Some(Language::Go),
-        "html" | "htm" => Some(Language::HTML),
-        "java" => Some(Language::Java),
-        "js" | "mjs" | "cjs" | "jsx" => Some(Language::JavaScript),
-        "json" => Some(Language::JSON),
-        "kt" => Some(Language::Kotlin),
-        "lua" => Some(Language::LUA),
-        "md" | "markdown" => Some(Language::MarkDown),
-        "php" => Some(Language::PHP),
-        "proto" => Some(Language::ProtoBuf),
-        "py" | "pyi" | "pyw" => Some(Language::Python),
-        "r" => Some(Language::R),
-        "rb" => Some(Language::Ruby),
-        "rs" => Some(Language::Rust),
-        "scala" => Some(Language::Scala),
-        "sql" => Some(Language::SQL),
-        "swift" => Some(Language::Swift),
-        "ts" | "mts" | "cts" => Some(Language::TypeScript),
-        "tsx" => Some(Language::TSX),
-        "vim" => Some(Language::Vimscript),
-        "yaml" | "yml" => Some(Language::YAML),
-        "xml" | "xht" | "xhtml" => Some(Language::XML),
-        _ => None,
+    EXTENSIONS
+        .iter()
+        .find(|(extensions, _)| extensions.contains(&ext))
+        .map(|(_, language)| *language)
+}
+
+/// The language's name as a person writes it, where the variant name is not that.
+pub fn human_name(language: Language) -> String {
+    match language {
+        Language::CPP => "C++".into(),
+        Language::CSharp => "C#".into(),
+        Language::LUA => "Lua".into(),
+        Language::MarkDown => "Markdown".into(),
+        Language::ProtoBuf => "Protocol Buffers".into(),
+        Language::ShellScript => "Shell (Bash)".into(),
+        Language::Lisp => "Emacs Lisp".into(),
+        other => other.to_string(),
     }
 }
 
-/// Returns the treesitter language structure, if supported.
+/// The README's "Supported languages" section, generated so it cannot drift from this file: one
+/// table of the languages with a grammar, and the extensions that are recognised but diffed as
+/// plain text because no grammar is compiled in.
+pub fn supported_languages_markdown() -> String {
+    use strum::IntoEnumIterator;
+
+    let extensions_of = |language: Language| -> String {
+        EXTENSIONS
+            .iter()
+            .filter(|(_, candidate)| *candidate == language)
+            .flat_map(|(extensions, _)| extensions.iter())
+            .map(|extension| format!("`.{extension}`"))
+            .collect::<Vec<_>>()
+            .join(", ")
+    };
+    let mut with_grammar: Vec<Language> = Vec::new();
+    let mut plain_text: Vec<Language> = Vec::new();
+    for language in Language::iter().filter(|language| *language != Language::Unknown) {
+        if to_treesitter(&language).is_some() {
+            with_grammar.push(language);
+        } else {
+            plain_text.push(language);
+        }
+    }
+    with_grammar.sort_by_key(|language| human_name(*language).to_lowercase());
+    plain_text.sort_by_key(|language| human_name(*language).to_lowercase());
+
+    let mut out = String::new();
+    out.push_str(&format!(
+        "{} languages are parsed with a tree-sitter grammar and diffed structurally:\n\n",
+        with_grammar.len()
+    ));
+    out.push_str("| Language | File extensions |\n|---|---|\n");
+    for language in &with_grammar {
+        out.push_str(&format!(
+            "| {} | {} |\n",
+            human_name(*language),
+            extensions_of(*language)
+        ));
+    }
+    out.push_str(
+        "\nRecognised by extension but diffed as plain text, since no grammar is compiled in: ",
+    );
+    out.push_str(
+        &plain_text
+            .iter()
+            .map(|language| format!("{} ({})", human_name(*language), extensions_of(*language)))
+            .collect::<Vec<_>>()
+            .join(", "),
+    );
+    out.push_str(".\n");
+    out
+}
+
 pub fn to_treesitter(language: &Language) -> Option<tree_sitter::Language> {
     match language {
         // alphabetically sorted
@@ -222,5 +294,45 @@ mod tests {
             ),
             Some(Language::Rust)
         );
+    }
+
+    /// The README's language section is this file's output between two HTML comment markers, so
+    /// adding a grammar or an extension without updating it fails here, with the text to paste.
+    #[test]
+    fn the_readme_lists_exactly_the_supported_languages() {
+        let readme = std::fs::read_to_string(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("README.md"),
+        )
+        .expect("README.md at the crate root");
+        let start = "<!-- languages:start -->\n";
+        let end = "<!-- languages:end -->";
+        let from = readme
+            .find(start)
+            .expect("README has the languages:start marker")
+            + start.len();
+        let to = readme[from..]
+            .find(end)
+            .expect("README has the languages:end marker")
+            + from;
+        let expected = supported_languages_markdown();
+        assert_eq!(
+            readme[from..to].trim_end(),
+            expected.trim_end(),
+            "README.md's language section is stale; paste this between the markers:\n\n{expected}"
+        );
+    }
+
+    #[test]
+    fn every_extension_maps_to_exactly_one_language() {
+        let mut seen = std::collections::HashSet::new();
+        for (extensions, _) in EXTENSIONS {
+            for extension in *extensions {
+                assert!(
+                    seen.insert(*extension),
+                    "extension {extension} is listed twice"
+                );
+                assert_eq!(*extension, extension.to_ascii_lowercase(), "{extension}");
+            }
+        }
     }
 }

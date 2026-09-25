@@ -31,7 +31,7 @@ use crate::tui::theme::{OverlayTheme, PanelLayout};
 pub const SINGLE_PANEL_THRESHOLD: u16 = 220;
 
 /// The TUI's central content pane: the before/after files side by side (or, under
-/// [`DisplayMode::Single`], one at a time), each half owned by its own [`CodeViewer`].
+/// `DisplayMode::Single`, one at a time), each half owned by its own [`CodeViewer`].
 #[derive(Default)]
 pub struct DiffViewer {
     /// The Before side's viewer.
@@ -185,7 +185,7 @@ impl DiffViewer {
         stops.into_iter().map(|(_, stop)| stop).collect()
     }
 
-    /// Where the cursor currently sits in [`change_stops`]' ordering, if it is on a stop.
+    /// Where the cursor currently sits in `change_stops`' ordering, if it is on a stop.
     fn current_stop_index(&self, stops: &[ChangeStop]) -> Option<usize> {
         let cursor = self.focused_cursor_position()?;
         stops
@@ -228,7 +228,7 @@ impl DiffViewer {
         self.sync_scroll_centered();
     }
 
-    /// `(1-based index, total)` over the merged [`change_stops`] walk, for the footer's
+    /// `(1-based index, total)` over the merged `change_stops` walk, for the footer's
     /// `change N/M`; `None` when there are no changes.
     pub fn merged_change_count_and_index(&self) -> Option<(usize, usize)> {
         let stops = self.change_stops();

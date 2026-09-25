@@ -211,7 +211,7 @@ impl Diff {
 }
 
 /// What every `solve_*` pass reads: both sides, their [`NodeCache`] and each side's
-/// [`ASTMetadata`], resolved once per diff. One shared signature means a new input reaches every
+/// [`crate::code::ASTMetadata`], resolved once per diff. One shared signature means a new input reaches every
 /// pass through one field.
 pub struct PassCtx<'a> {
     pub before: &'a Code,

@@ -1,0 +1,28 @@
+# cargo-about's configuration for THIRD-PARTY-NOTICES.md (`make third-party-notices`): the
+# licenses a shipped dependency may carry. Anything else fails the generation, which is the point -
+# a new dependency under a license not listed here is a decision, not a surprise. Only what the
+# product binary links: build and dev dependencies are left out, and the default feature set is
+# what every binary distribution is built with.
+accepted = [
+    "0BSD",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "BSL-1.0",
+    "ISC",
+    "MIT",
+    "MPL-2.0",
+    "Unicode-3.0",
+    "Unicode-DFS-2016",
+    "Unlicense",
+    "WTFPL",
+    "Zlib",
+]
+ignore-build-dependencies = true
+ignore-dev-dependencies = true
+
+# The root crate itself: cargo-about resolves it too, and its license is not a third party's.
+# Accepted here so the run succeeds; the template leaves its entry out.
+[codediff]
+accepted = ["AGPL-3.0-or-later"]
