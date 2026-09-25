@@ -361,7 +361,11 @@ jobs:
           draft: true
           files: SHA256SUMS.txt
 
+      # A pre-release tag (`v0.1.0-rc1`, anything with a hyphen) is a dry run of this workflow: it
+      # builds every asset into the draft and stops there, so nothing reaches users, the apt
+      # repository or the Homebrew tap. Delete the draft and the tag afterwards.
       - name: Publish the release
+        if: ${{ !contains(github.ref_name, '-') }}
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
@@ -376,6 +380,7 @@ jobs:
   homebrew:
     name: update Homebrew tap
     needs: checksums
+    if: ${{ !contains(github.ref_name, '-') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -423,6 +428,7 @@ jobs:
   apt:
     name: refresh apt repository
     needs: checksums
+    if: ${{ !contains(github.ref_name, '-') }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
