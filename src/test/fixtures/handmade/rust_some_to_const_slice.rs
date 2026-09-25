@@ -28,9 +28,8 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test and record the
-    // limit it reports instead.
-    assert_matches_human_painting_within_limit("rust-some-to-const-slice", 100.0)
+    // Recorded as found, not examined: Minimal 8.41%, Full 12.32%.
+    assert_matches_human_painting_within_limit("rust-some-to-const-slice", 12.32)
 }
 
 #[test]
