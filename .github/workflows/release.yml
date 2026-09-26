@@ -202,7 +202,7 @@ jobs:
 
       # Signed provenance (which workflow, commit and runner produced this file), verifiable with
       # `gh attestation verify codediff-<target>.tar.gz --repo ivankovic/codediff`.
-      - uses: actions/attest-build-provenance@v2
+      - uses: actions/attest-build-provenance@v4
         with:
           subject-path: codediff-${{ matrix.target }}.*
 
@@ -313,7 +313,7 @@ jobs:
             || { echo "::error::.deb declares Architecture $got, expected ${{ matrix.arch }}"; exit 1; }
           echo "Depends: $(dpkg-deb -f codediff_${{ matrix.arch }}.deb Depends)"
 
-      - uses: actions/attest-build-provenance@v2
+      - uses: actions/attest-build-provenance@v4
         with:
           subject-path: codediff_${{ matrix.arch }}.deb
 
