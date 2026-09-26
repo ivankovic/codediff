@@ -16,10 +16,11 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-// Hand-run instruments, not checks: every fn here is `#[test] #[ignore]` and prints or writes an
-// analysis. `painting_failure_census` (`make update-painting-attribution`), `mismatch_census` and
-// `cross_fixture_convention_census` write artifacts; the rest answer "why does *this* fixture
-// disagree" for a fixture named in an env var.
+// Hand-run instruments: every fn here is `#[test] #[ignore]` and prints or writes an analysis.
+// `painting_failure_census`, `mismatch_census` and `cross_fixture_convention_census` write
+// artifacts, and `painting_failure_census` is also the painting gate (`make
+// check-painting-attribution`, `PAINTING_ATTRIBUTION_CHECK=1`, run in CI). The rest answer "why
+// does *this* fixture disagree" for the fixtures named in an env var.
 
 use super::*;
 

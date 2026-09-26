@@ -57,7 +57,6 @@ fn print_ast_tree(node: tree_sitter::Node, indent: usize, code: &Code) -> usize 
     child_count + 1
 }
 
-// TODO: also visualize Diff objects.
 fn main() -> Result<()> {
     let args = Args::parse();
 

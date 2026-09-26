@@ -15,11 +15,11 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-"""What every report script under research/analysis/ used to carry its own copy of.
+"""Helpers shared by every report script under research/analysis/.
 
 Importable as a sibling module (`from _common import ...`) because `uv run ./analysis/foo.py`
-puts the script's own directory first on `sys.path` - the same mechanism `file_stats.py` already
-relies on for `percentile_report`. Kept to helpers with exactly one correct implementation: a CSV
+puts the script's own directory first on `sys.path` - the same mechanism `file_stats.py` relies
+on for `percentile_report`. Kept to helpers with exactly one correct implementation: a CSV
 reader, the papers' LaTeX number format, the repository paths, and the chart chrome every figure
 shares. Anything a report computes differently from its siblings on purpose (the various `pct`
 functions, say) stays in the report.

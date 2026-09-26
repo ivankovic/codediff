@@ -26,14 +26,9 @@
 (function () {
   "use strict";
 
-  // `dataset` only camelCases *hyphens* (`data-foo-bar` -> `dataset.fooBar`) - an underscore in
-  // the attribute name is left exactly as-is, so `data-total_lines` reads back as
-  // `dataset.total_lines`, not `dataset.totalLines`. `key` (from a `data-sort` attribute value,
-  // e.g. "total_lines") already matches that untouched form, so no case conversion is needed at
-  // all - reaching for one here (an earlier version of this file did) reads back `undefined` for
-  // every underscored key, breaking those columns' sort silently (`Number(undefined)` is `NaN`,
-  // and every comparison against `NaN` is `false`, so the rows never actually reorder). Regression
-  // test: index.test.js.
+  // `dataset` camelCases only hyphens, so `data-total_lines` reads back as `dataset.total_lines` -
+  // the form a `data-sort` key already has. Converting its case would read `undefined` for every
+  // underscored key and silently stop those columns sorting. Pinned by index.test.js.
   function cellValue(row, key, type) {
     const raw = row.dataset[key];
     return type === "number" ? Number(raw) : raw;

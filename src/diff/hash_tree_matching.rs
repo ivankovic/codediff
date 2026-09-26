@@ -74,7 +74,7 @@ pub fn build_extended_node_list(
         }
     }
 
-    // Ties by start byte, not node id: ids are arena slots that differ between parses.
+    // Ties by `start_byte`; see `ASTNodeMetadata::start_byte`.
     nodes_with_info.sort_by(|a, b| b.1.cmp(&a.1).then(a.2.cmp(&b.2)));
     nodes_with_info
         .into_iter()
@@ -248,7 +248,7 @@ pub(crate) fn solve_with_hash_map(
 /// Ordinary parents pair positionally, dropping kind mismatches: equal hashes computed in document
 /// order imply positional correspondence. A `nodes::is_commutative_container` hashes its children
 /// unordered, so its children pair by hash: kind-and-value first, then kind-only for what is left
-/// (a `KindOnlyHash` outer match allows values to differ). Kind-only alone would pair differently
+/// (a kind-only hash outer match allows values to differ). Kind-only alone would pair differently
 /// named identifiers arbitrarily and hide a real reorder.
 ///
 /// Ties go to the nearest sibling index, not byte offset: an edit before the parents shifts every

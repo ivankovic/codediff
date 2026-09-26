@@ -20,8 +20,9 @@
 //! code that *moved* across a matched boundary, which ordered tree edit distance can only express
 //! as delete+insert. GumTree's "recovery mappings", run after every pass that matches by an anchor
 //! (a hash, a name, a matched ancestor or container), so it only converts leftovers and never takes
-//! a node from a better mapping. Only phases 8 and 8b follow it; they refine the pairs found so far
-//! rather than match by an anchor.
+//! a node from a better mapping. Phases 8 to 10 follow it: 8 and 8b refine the pairs found so far
+//! rather than match by an anchor, 9 only re-tags, and 10 records a delete or insert for what is
+//! left.
 //!
 //! Guardrails:
 //!
@@ -59,8 +60,7 @@ pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
     let before_parents = &before_metadata.node_to_parent;
     let after_parents = &after_metadata.node_to_parent;
 
-    // Ties broken by `start_byte`, not node id: ids are arena slots that are not stable across
-    // parses, so only a source-position tiebreak is reproducible across process runs.
+    // Ties by `start_byte`; see `ASTNodeMetadata::start_byte`.
     let mut deleted: Vec<(usize, usize, usize)> = diff
         .before_node_map
         .iter()

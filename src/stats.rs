@@ -259,7 +259,8 @@ pub fn for_path(path: &std::path::Path, parser: &mut TSParser) -> CodeStats {
     stats.code.metadata.path = Some(std::path::PathBuf::from(path));
     metadata::hermetic_expand(&mut stats.code.metadata);
 
-    // TODO: read files the path alone could not classify, and classify them by content.
+    // Only what the path classifies as code or configuration is read; nothing is classified by
+    // content.
     if !matches!(
         stats.code.metadata.tip,
         Some(code::Type::Code(_)) | Some(code::Type::Configuration(_))

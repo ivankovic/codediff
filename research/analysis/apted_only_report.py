@@ -77,8 +77,7 @@ Three caveats the numbers below carry, all worth reading before citing a headlin
    x-axis. LOC is kept as the x-axis here because it is the quantity practitioners reason about,
    not because it is the more precise predictor.
 
-   This is sharper since adopting the project-wide buckets, which key on `max(before, after)`
-   rather than the combined before+after LOC this report used previously. APTED compares *both*
+   The LOC buckets are the project-wide ones, keyed on `max(before, after)`. APTED compares *both*
    trees, so its cost tracks combined size more closely than either side alone; the node
    cross-check, which is bucketed on combined node count, is the check that the headline shape
    survives that choice of key.

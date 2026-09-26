@@ -255,7 +255,7 @@ pub(crate) fn action_load_solution(app: &mut App, target: &str) {
     app.status = Some(format!("Editing '{target}' ({count} range(s))"));
 }
 
-/// What the `t` view paints, cycled by `p`. The disagreement modes exist because the question
+/// What the `t` view paints, cycled by `o`. The disagreement modes exist because the question
 /// while painting ground truth is "where do we differ", which flipping by eye answers badly.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub(crate) enum TextOverlay {
@@ -1541,8 +1541,8 @@ pub(crate) fn action_paint_mark_empty(app: &mut App) {
 /// A blocking prompt. While `App::modal` is `Some`, keys go to `handle_modal_key`.
 #[derive(Debug, Clone)]
 pub(crate) enum Modal {
-    /// The two cursor nodes have different kinds. codediff never maps those (see
-    /// `ASTDiff::is_valid`), so this is always a mismatch against it; confirmed explicitly.
+    /// The two cursor nodes have different kinds. codediff pairs different kinds only where
+    /// `nodes::kinds_update_allowed` permits, so this is usually a mismatch; confirmed explicitly.
     ConfirmKindMismatch {
         before_id: usize,
         after_id: usize,
@@ -1576,7 +1576,7 @@ pub(crate) enum Modal {
     },
     /// Raised by `O`: pick a sample under src/test/data/samples/, each with its
     /// `SampleTriageStatus` and `sample_diff_line_count`. `selected` indexes
-    /// `visible_sample_options`.
+    /// `visible_sample_rows`.
     OpenSamplePicker {
         rows: Vec<SampleRow>,
         selected: usize,
@@ -1735,7 +1735,7 @@ pub(crate) struct App {
     /// Every case's `description.md`, loaded on the first `o` since it is displayed, not just
     /// filtered on. Cases with no note are absent.
     pub(crate) diff_comments: Option<std::collections::HashMap<String, String>>,
-    /// What the `t` view paints (see `TextOverlay`), cycled by `p`.
+    /// What the `t` view paints (see `TextOverlay`), cycled by `o`.
     pub(crate) text_overlay: TextOverlay,
     /// codediff's text ranges per side, computed on first use and dropped on case change.
     pub(crate) algo_text_spans: Option<[Vec<(HumanTextSpan, HumanTextVerdict)>; 2]>,

@@ -37,8 +37,8 @@ use crate::tui::display_columns;
 /// legible on both light and dark terminals.
 const CHROME_COLOR: &str = "90";
 
-/// ANSI SGR color for each `TextOperation`; must match the TUI palette
-/// (`tui::theme::OverlayTheme`, moves grey per `every_preset_paints_moves_grey`).
+/// ANSI SGR color for each `TextOperation`; must match the TUI palette (`tui::theme::OverlayTheme`,
+/// moves grey per `every_themes_move_band_is_grey_rather_than_a_hue`).
 fn ansi_color(operation: &TextOperation) -> Option<&'static str> {
     match operation {
         TextOperation::Insert => Some("32"),

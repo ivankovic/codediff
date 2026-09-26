@@ -258,7 +258,7 @@ pub fn is_reference(node_kind: &str, language: &Language) -> bool {
 
 /// True for the import/use/include statement kinds [`is_reference`] lists for `language`.
 ///
-/// Phase 1's shape-only tier (`KindOnlyHash`) skips these: two unrelated imports with the same
+/// Phase 1's shape-only tier (the kind-only hash) skips these: two unrelated imports with the same
 /// number of path segments have the same shape, and pairing them plus a few identifier updates
 /// is cheaper than delete + insert and wrong to every reader (`kotlin-remove-function`). The
 /// byte-exact tier and every later pass still see them.

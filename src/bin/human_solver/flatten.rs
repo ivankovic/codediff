@@ -186,7 +186,7 @@ pub(crate) fn reason_label(reason: ASTMappingReason) -> &'static str {
     reason.bucket_label()
 }
 
-/// [`reason_label`] plus `APTED`'s provenance (e.g. `"APTED:final_pass"`), for the `r` toggle's
+/// [`reason_label`] plus `APTED`'s provenance (e.g. `"APTED:fast_fallback"`), for the `r` toggle's
 /// per-node display.
 pub(crate) fn reason_detail(reason: ASTMappingReason) -> String {
     match reason {

@@ -22,8 +22,8 @@
 """
 Measures the *shape of real-world file edits* over the cloned corpus: how many lines a commit
 touches, how many files it touches, and how much of a file an edit changes. This answers the
-introductory paper's Section 3 ("Shape of real-world file edits"), which previously cited only
-Arafat and Riehle's commit-size distribution and carried a TODO for our own numbers.
+introductory paper's Section 3 ("Shape of real-world file edits") with the corpus's own numbers,
+alongside Arafat and Riehle's commit-size distribution.
 
 Population: the most recent `--max-commits` non-merge commits of each clone under
 `repositories/`, 50 by default to match the corpus's stated clone depth. The cap is not a
@@ -39,11 +39,8 @@ cannot answer "how big is a typical edit".
 Churn - what share of a file an edit rewrites - is derived, not joined. `git log --numstat` gives
 added and removed; counting the newlines of the after-side blob (one `git cat-file --batch` per
 repository) gives `lines_after`, and `lines_before = lines_after - added + removed` follows
-exactly, so every edit in the window gets a fraction. An earlier version instead joined against
-`stats.sqlite`'s `commits` table, which covered 6,000 of 19.7M edits - 0.03%, and selected
-differently - and was not a usable denominator. That table cannot supply churn directly either:
-its `lines_added`, `lines_removed`, `lines_changed` and three `nodes_*` columns are all zero for
-every row, hardcoded by `commit_stats.rs` ("the actual diff processing will be implemented later").
+exactly, so every edit in the window gets a fraction. `stats.sqlite`'s `commits` table cannot
+supply this: its change-count columns are always zero (`commit_stats.rs` does not compute them).
 
 This measurement does not parse anything, so it reports no AST-node churn. The line-level fraction
 is a proxy for it, and the paper labels it as one.

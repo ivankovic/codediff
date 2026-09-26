@@ -102,10 +102,9 @@ pub enum Action {
     /// A 1-indexed line number, already parsed by the prompt.
     JumpToLineSubmitted(usize),
     /// A render option changed: applied and persisted at once, so the diff behind the panel shows
-    /// its effect. Unlike the theme preview this writes through, so `DialogCancelled` must
-    /// actively restore the options the panel opened with.
+    /// its effect. Closing the panel keeps it; nothing is restored.
     RenderOptionsChanged(RenderOptions),
-    /// Enter in the render-options panel. Carries nothing: `RenderOptionsChanged` has already
-    /// applied and persisted every change.
+    /// Enter or Esc in the render-options panel. Carries nothing: `RenderOptionsChanged` has
+    /// already applied and persisted every change.
     RenderOptionsAccepted,
 }

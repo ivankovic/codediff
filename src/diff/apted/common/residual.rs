@@ -23,7 +23,7 @@ use super::*;
 /// Edit-distance cap for the residual Myers diffs, as `FLAT_MAX_EDIT` is for flat containers.
 pub(crate) const FALLBACK_MAX_EDIT: usize = 1000;
 
-/// Minimum subtree size, on both sides, for a `KindOnlyHash` pair in
+/// Minimum subtree size, on both sides, for a kind-only hash pair in
 /// `resolve_unequal_segment_via_kind_only_anchors` to be trusted. The hash ignores leaf values,
 /// so small subtrees - shallow repeated containers as well as leaves - collide on shape alone.
 pub(crate) const KIND_ONLY_ANCHOR_MIN_SIZE: usize = 50;
@@ -346,7 +346,7 @@ pub(crate) fn resolve_unequal_segment_via_kind_only_anchors(
     let before_hash_counts = count_occurrences(&before_hashes);
     let after_hash_counts = count_occurrences(&after_hashes);
 
-    // The size floor and ambiguity check guard `KindOnlyHash` collisions only; applied to a
+    // The size floor and ambiguity check guard kind-only hash collisions only; applied to a
     // similarity-aligned pair they would reject the small genuine matches it exists to find.
     let mut pairs = myers_lcs(&before_hashes, &after_hashes, FALLBACK_MAX_EDIT).unwrap_or_default();
     let from_hash = !pairs.is_empty();
@@ -416,7 +416,7 @@ pub(crate) fn resolve_unequal_segment_via_kind_only_anchors(
 
 /// Minimum leaf-content Jaccard (`node_to_similarity_sketch`) for
 /// [`align_segment_by_similarity`] to call two residual entries the same thing. It sits between
-/// the known true positive and the known `KindOnlyHash` false positives, separating them on
+/// the known true positive and the known kind-only hash false positives, separating them on
 /// content rather than on size.
 pub(crate) const SEGMENT_SIMILARITY_MIN: f32 = 0.9;
 

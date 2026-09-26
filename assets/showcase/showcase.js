@@ -18,9 +18,10 @@
 
 // The showcase's half of the page: a `fetch` shim that answers the viewer's `/api/*` calls from
 // the JSON `generate_showcase` baked, and the strip of chrome above the viewer that picks a case
-// and flips between `diff`'s view and codediff's. app.js and model.js are the product's own files,
-// byte for byte; nothing here reaches into them. Switching a case or a view rewrites what the
-// shim will answer and then presses the viewer's own `r` (reload), which makes it ask again.
+// and flips between `diff`'s view and codediff's. app.js and model.js are the viewer under
+// assets/viewer/, loaded unchanged; nothing here reaches into them. Switching a case or a view
+// rewrites what the shim will answer and then presses the viewer's own `r` (reload), which makes
+// it ask again.
 //
 // Loaded before app.js, whose `init()` runs at load and asks `/api/state` first - so the shim
 // must be installed synchronously here, and it is; the data it answers with is fetched lazily

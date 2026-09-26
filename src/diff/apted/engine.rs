@@ -22,8 +22,8 @@
 //! and that implementation (`spf_a`, `compute_opt_strategy_post_l`/`_post_r`, `ted_init`, key
 //! roots), so the long dynamic-programming functions here can be read side by side with them.
 //!
-//! The pipeline runs it only on scoped pairs (see `apted.rs`), where its exact computation,
-//! worst-case `O(n^3)` time, is affordable.
+//! The pipeline runs it only on scoped pairs, bounded by `common::resolve`'s `APTED_MAX_CELLS`,
+//! where its exact computation, worst-case `O(n^3)` time, is affordable.
 //!
 //! Setting the `APTED_DEBUG` environment variable prints the DP's intermediate tables to stderr.
 

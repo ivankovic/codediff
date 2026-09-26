@@ -139,7 +139,7 @@ mod tests {
     use crate::diff::NodeCache;
 
     /// Pre-matches the container and runs only this pass: with `solve_hash_descent` in the setup,
-    /// its `KindOnlyHash` sub-anchoring could make an assertion pass without this pass.
+    /// its kind-only hash sub-anchoring could make an assertion pass without this pass.
     fn solve_with_container_pre_matched(
         before: &Code,
         after: &Code,
@@ -160,8 +160,8 @@ mod tests {
         diff
     }
 
-    /// The `if` changes shape, so `KindOnlyHash` cannot pair it. The block is pre-matched, not the
-    /// function: otherwise the block pairs first and its APTED call resolves the `if` as a side
+    /// The `if` changes shape, so the kind-only hash cannot pair it. The block is pre-matched, not
+    /// the function: otherwise the block pairs first and its APTED call resolves the `if` as a side
     /// effect, under a different reason.
     #[test]
     fn unique_leftover_child_kind_matches_under_an_already_matched_parent() {

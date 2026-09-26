@@ -25,9 +25,10 @@
 //!   spans, so the page needs no highlighter of its own.
 //! * [`state`] is everything the page needs to draw its first frame: themes, presets, help text.
 //!
-//! Everything the page does between requests - cursor, scroll, search, dialogs, the overlay
-//! painting rules - is `assets/viewer/model.js`, a port of the corresponding
-//! `tui::widgets::code_viewer`/`tui::components::diff_viewer` logic, tested under plain Node.
+//! Everything the page decides between requests - cursor, scroll, search, the overlay painting
+//! rules - is `assets/viewer/model.js`, a port of the corresponding
+//! `tui::widgets::code_viewer`/`tui::components::diff_viewer` logic, tested under plain Node;
+//! `app.js` draws the dialogs and wires the DOM.
 
 pub mod payload;
 pub mod state;

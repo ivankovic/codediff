@@ -103,7 +103,7 @@
 
   const SIDES = ["before", "after"];
   const panels = {
-    // Scoped to `.tree-panels`: the page now has a second `.panel[data-side=...]` pair for the
+    // Scoped to `.tree-panels`: the page has a second `.panel[data-side=...]` pair for the
     // code view, which comes *first* in the document, so an unscoped selector would silently hand
     // every tree keybinding the wrong element.
     before: document.querySelector('.tree-panels .panel[data-side="before"]'),

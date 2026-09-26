@@ -47,22 +47,9 @@ if ! cargo build --release --features "$FEATURES" --bin benchmark_optimal_soluti
   exit 1
 fi
 
-# Keep this list in sync with the --no-solver-X flags in src/bin/benchmark_optimal_solutions.rs
-# (which in turn mirror HeuristicConfig's fields in src/diff.rs). Exactly 4 passes have their own
-# on/off knob today - the pipeline's other steps run unconditionally, so there's nothing left to
-# ablate for them.
-#
-# This list went stale twice, and both times the study kept "running" while measuring nothing: a
-# --no-solver-X flag the binary does not define makes clap exit non-zero before a single fixture is
-# scored, which this script reports as a per-flag FAILED row rather than as the list being wrong.
-# Re-read the binary's flags, do not trust this array, whenever a pass is added or deleted.
-#
-# Deliberately not listed: solver-import-nodes, solver-bottom-up-expansion (Dice-coefficient
-# bottom-up expansion) and solver-similar-flow-control. All three had been
-# net-negative here and permanently off by default; the code behind them is deleted outright, so
-# there is nothing left to switch. solve_bottom_up_propagation below occupies the same conceptual
-# slot as the removed bottom-up expansion but is a different, strict mechanism - the two must not
-# be conflated when reading this study's history.
+# The --no-solver-X flags of benchmark_optimal_solutions, one per HeuristicConfig field in
+# src/diff.rs; the pipeline's other passes have no switch and are not ablated. The pre-flight check
+# below fails the study if this list names a flag the binary does not define.
 FLAGS=(
   solver-moved-subtrees
   solver-bottom-up-propagation

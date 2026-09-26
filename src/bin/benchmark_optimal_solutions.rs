@@ -18,8 +18,8 @@
 
 //! Scores codediff against every fixture in `src/test/data/diffs/` that has a
 //! `human_mapping.json`, counting mismatched nodes; fixtures without one are reported as
-//! "unsolved". A mismatch count shows partial progress that `cargo test optimal_solutions`'s
-//! pass/fail cannot.
+//! "unsolved". A mismatch count shows partial progress that the `fixtures` tests' pass/fail
+//! cannot.
 
 use anyhow::{Context, Result, bail};
 use clap::Parser;
@@ -63,7 +63,7 @@ const NON_APTED_REASON_LABELS: &[&str] = &[
 ];
 
 /// Column label for one `ASTMappingReason`: `bucket_label`, except that `APTED` gets one column
-/// per provenance (`"APTED:final_pass"`, ...), since this table is where that breakdown is read.
+/// per provenance (`"APTED:fast_fallback"`, ...), since this table is where that breakdown is read.
 /// The APTED column set is therefore data-dependent; see `all_reason_columns`.
 fn reason_column_label(reason: &ASTMappingReason) -> String {
     match reason {
@@ -690,7 +690,7 @@ fn print_reason_table(rows: &[Row]) {
 //
 // The release gate (`make check-quality`). Per fixture, never aggregate: the corpus grows toward
 // hard cases, so any aggregate total or rate rises when hard fixtures are added and cannot tell
-// that apart from a regression. It also catches drift below the `optimal_solutions` tests'
+// that apart from a regression. It also catches drift below the `fixtures` tests'
 // per-fixture clamps, which only fire above the recorded value.
 
 /// One fixture's row in the gate baseline.

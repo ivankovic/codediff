@@ -31,20 +31,10 @@ genuinely interchangeable. It does not mean the annotator was unsure - it means 
 established that more than one pairing is equally correct, and the fixture's validation accepts
 any of them.
 
-=== One corpus-wide rate, and why there is no longer a split ===
+=== One corpus-wide rate ===
 
-`groups` was added to the annotation tool partway through corpus construction, so for a while this
-script reported three rates instead of one: fixtures whose mapping file had not been touched since
-the facility landed were held apart from those that had, on the ground that the former could not
-have recorded an ambiguity even where one existed. That split was a statement about git history,
-not about the corpus, and it is no longer true of it: **every fixture has since been reviewed by an
-annotator with multi-mapping available**. A review that found nothing to add leaves the file
-untouched, so "last modified before date D" stopped being evidence of anything about the
-annotation, and reporting it as though it were understated the corpus by counting reviewed
-fixtures as unexamined ones.
-
-So there is one rate, over every fixture in scope. It remains a lower bound, for the reason it
-always did and the only one that survives: an annotator can miss an ambiguity that is really there.
+Every fixture in scope has been reviewed with multi-mapping available, so there is one rate over
+all of them; it is a lower bound, since an annotator can miss a real ambiguity.
 
 === Corpus state ===
 

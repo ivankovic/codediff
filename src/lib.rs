@@ -25,10 +25,10 @@
 //!
 //! This crate is published for the `codediff` binary. Its stable contracts are the command line
 //! and the `--mode json` output, which the editor integrations consume. The library API - the
-//! `diff` module's solver passes, the `tui` module, and the `tree_sitter` and `ratatui`
-//! types in their signatures - is the binary's internals made visible, and changes between 0.x
-//! minor versions without notice. [`diff_strings`] and the [`code`] and [`diff`] module roots are
-//! the parts meant for use from another crate.
+//! `diff` module's submodules (`apted`, `cost`, `nodes`, `text`, `text_range`), the `tui` module,
+//! and the `tree_sitter` and `ratatui` types in their signatures - is the binary's internals made
+//! visible, and changes between 0.x minor versions without notice. [`diff_strings`] and the
+//! [`code`] and [`diff`] module roots are the parts meant for use from another crate.
 #[cfg(feature = "stats")]
 pub mod anomalous_paths;
 pub mod code;
@@ -57,7 +57,6 @@ use crate::{
 };
 
 /// Diffs two programs given as source strings in `language`.
-// TODO: auto-detect an Unknown language (in `Code::from_string`), checking both sides agree.
 pub fn diff_strings(before: &str, after: &str, language: &Language) -> Diff {
     let code_before = Code::from_string(before, language);
     let code_after = Code::from_string(after, language);

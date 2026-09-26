@@ -18,8 +18,9 @@
 
 // The page: DOM, keyboard, mouse and the JSON API. Everything that decides *what* the cursor
 // and panels do is model.js; this file measures, draws and fetches. Mirrors src/tui/app.rs
-// screen for screen - the same dialogs open on the same keys, and the diff itself only ever
-// comes from the server, which computes it with the library the TUI uses.
+// screen for screen - the same dialogs open on the same keys. Every diff arrives through `api()`;
+// in the showcase, assets/showcase/showcase.js answers from JSON that `generate_showcase` baked
+// with the library the TUI uses.
 "use strict";
 
 (() => {
@@ -28,7 +29,7 @@
   const TOKEN_HEADER = "X-Codediff-Token";
   const $ = (selector) => document.querySelector(selector);
 
-  // ----- server -------------------------------------------------------------------------------
+  // ----- api ----------------------------------------------------------------------------------
 
   async function api(path, body, signal) {
     const response = await fetch(path, {
@@ -382,8 +383,7 @@
     state.diffing = null;
   }
 
-  // Esc while diffing: drop the answer (the server retires the generation too) and keep what was
-  // shown before, exactly as the TUI does.
+  // Esc while diffing: drop the answer and keep what was shown before, exactly as the TUI does.
   function cancelDiff() {
     cancelInFlight();
     state.restoreAfterReload = null;
@@ -441,8 +441,7 @@
 
   // ----- git review --------------------------------------------------------------------------
 
-  // `App::open_review_position`: diff file `index` of the reviewed set, through the server's
-  // workspace.
+  // `App::open_review_position`: diff file `index` of the reviewed set.
   async function openReviewPosition(position) {
     const file = position.files[position.index];
     if (!file) return;
@@ -522,7 +521,7 @@
     try {
       await api("/api/quit");
     } catch (_) {
-      // The server closes as it answers; a failed read here is the expected outcome.
+      // The showcase shim refuses /api/quit; there is nothing to recover.
     }
   }
 

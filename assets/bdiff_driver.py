@@ -35,10 +35,10 @@ a silently perfect-looking score rather than an error. See data/comparison/PROVE
 `bdiff_driver.py --batch` reads line-delimited JSON requests `{"id", "before", "after"}` from
 stdin and writes one `{"id", "ms"}` response line per request, timing *only* the `bdiff.bdiff()`
 call. This mirrors research/drivers/gumtree-batch for the same reason it exists: importing bdiff
-pulls in numpy, scipy and rapidfuzz, which costs ~394 ms against a ~12 ms bare interpreter,
-so a per-invocation wall-clock number is ~97% import overhead and says
-almost nothing about the algorithm. `benchmark_other` reports both - `bdiff_ms` per process and
-`bdiff_warm_ms` from this batch - exactly as it already does for GumTree's cold and warm JVM.
+pulls in numpy, scipy and rapidfuzz, which costs far more than the call being timed, so a
+per-invocation wall-clock number says almost nothing about the algorithm. `benchmark_other`
+reports both - `bdiff_ms` per process and `bdiff_warm_ms` from this batch - exactly as it already
+does for GumTree's cold and warm JVM.
 """
 
 import json

@@ -27,10 +27,11 @@
 // endCol]`, half-open, and a range match is `{op, source, destination}` with `op` one of
 // insert/delete/update/move/identical/unset.
 //
-// Text keeps its tabs, which the page draws to the next multiple of the server's `tab_width`
-// (CSS `tab-size`). What is measured on screen - horizontal scroll, the viewport width, the sticky
-// column, a click's cell - is in display columns, converted from and to UTF-16 columns only by
-// `displayColumn`/`columnAtDisplay`: the split `tui::display_columns` makes on the Rust side.
+// Text keeps its tabs, which the page draws to the next multiple of the state's `tab_width`
+// (`/api/state`; CSS `tab-size`). What is measured on screen - horizontal scroll, the viewport
+// width, the sticky column, a click's cell - is in display columns, converted from and to UTF-16
+// columns only by `displayColumn`/`columnAtDisplay`: the split `tui::display_columns` makes on the
+// Rust side.
 "use strict";
 
 const CodeDiffModel = (() => {
@@ -518,7 +519,8 @@ const CodeDiffModel = (() => {
       this.highlightDestination = null;
       this.searchMatches = [];
       this.focused = false;
-      // Until `DiffModel.setTabWidth` hands over the server's `tab_width`, a tab is one column.
+      // Until `DiffModel.setTabWidth` hands over the state's `tab_width` (`/api/state`), a tab is
+      // one column.
       this.tabWidth = 1;
     }
 

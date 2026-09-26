@@ -31,9 +31,8 @@ mod configure_prompt;
 mod git_configure;
 mod jj_configure;
 
-/// The static musl builds only: musl's malloc costs them 20-30% on the largest files, and
-/// mimalloc brings the diff-bound ones ahead of the glibc builds. See Cargo.toml's
-/// target-specific dependency for the measurement.
+/// The static musl builds only: musl's own malloc is markedly slower on this allocation-heavy
+/// tool, and mimalloc closes the gap (see Cargo.toml's musl dependency).
 #[cfg(target_env = "musl")]
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
@@ -554,8 +553,8 @@ mod tests {
         }
     }
 
-    /// Without any render flag the saved `M` panel setting must apply untouched; leaving out
-    /// `--whole-updates` used to switch a saved "Whole-pair updates" off.
+    /// Without any render flag the saved `M` panel setting applies untouched, "Whole-pair updates"
+    /// included.
     #[test]
     fn no_render_flag_leaves_the_saved_setting_alone() {
         assert_eq!(render_option_flags(&args_with(Mode::Tui, false)), None);
@@ -572,8 +571,8 @@ mod tests {
         assert!(options.whole_pair_updates);
     }
 
-    /// Both used to be accepted silently: `--review` diffed the two files, and `--headless`
-    /// lost to `--mode json`.
+    /// `--review` with a pair, and `--headless` with `--mode json`, are errors rather than one flag
+    /// silently winning.
     #[test]
     fn contradictory_mode_flags_are_rejected() {
         for argv in [
@@ -652,7 +651,7 @@ mod tests {
         );
     }
 
-    /// A typo in `--mode` used to fall through to the TUI silently; the values are also what
+    /// A `--mode` typo is an error, not a silent fallback to the TUI; the values are also what
     /// shell completion offers.
     #[test]
     fn mode_accepts_its_three_values_case_insensitively_and_nothing_else() {

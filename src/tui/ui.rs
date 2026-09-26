@@ -36,9 +36,8 @@ use tokio::time::{Interval, interval};
 use crate::tui::{color_depth::ColorDepth, events::Event, theme::OverlayPalette};
 
 /// Owns the terminal and its raw-mode/alternate-screen lifecycle, plus the merged input/tick/
-/// render event source. Input is an async, epoll-driven `EventStream`, not a thread polling
-/// crossterm: an earlier version polled with a zero timeout in a loop, which kept a CPU core busy
-/// and made the whole TUI feel slow.
+/// render event source. Input is an async, epoll-driven `EventStream`: polling crossterm with a
+/// zero timeout in a loop keeps a CPU core busy and makes the TUI feel slow.
 pub struct UI {
     pub terminal: ratatui::Terminal<Backend<Stdout>>,
 

@@ -147,9 +147,8 @@ impl<'a> ContainmentCtx<'a> {
 
 /// Largest `before.size * after.size` (pruned node counts) a single subtree pair may hand to the
 /// APTED kernel; above it, [`resolve_oversized_pair`] decomposes the pair one level. Multi-root
-/// forests are bounded by their callers, but a single whole function or class pair was not, and
-/// one such kernel call is what dominates slow diffs. The value is the lowest that leaves every
-/// corpus fixture's quality unchanged; lowering it trades quality for latency.
+/// forests are bounded by their callers; one unbounded whole-function kernel call is what dominates
+/// slow diffs. Lowering it trades quality for latency.
 pub(crate) const APTED_MAX_CELLS: usize = 600_000;
 
 /// What `resolve_forest` does with a single pair over `APTED_MAX_CELLS`: pairs the two roots

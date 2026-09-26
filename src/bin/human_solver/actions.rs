@@ -75,8 +75,9 @@ pub(crate) fn remove_entries_touching(
     });
 }
 
-/// Finds `id` anywhere under `root`, unlike [`find_node_by_id`]. A multi-map selection member can
-/// be collapsed or hidden by the time `m`/`M` commits it.
+/// Finds `id` anywhere under `root`, unlike `flatten_visible` (the same search as
+/// [`find_node_by_id_anywhere`]). A multi-map selection member can be collapsed or hidden by the
+/// time `m`/`M` commits it.
 pub(crate) fn find_node_anywhere(root: Node, id: usize) -> Option<Node> {
     let mut stack = vec![root];
     while let Some(n) = stack.pop() {

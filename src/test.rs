@@ -205,9 +205,9 @@ mod tests {
         Ok(())
     }
 
-    /// **`quality_baseline.csv`'s accuracy columns are a projection of the fixture stubs, not a
-    /// second opinion about them.** `write_baseline` fills them from `stub_mapping_limits`; kept
-    /// independently the two drift. `elapsed_ms` is machine-dependent and not pinned.
+    /// **`quality_baseline.csv`'s accuracy columns must equal the fixture stubs' limits.**
+    /// `write_baseline` writes a run's own numbers; this test is what keeps the two from
+    /// drifting apart. `elapsed_ms` is machine-dependent and not pinned.
     #[test]
     #[cfg(feature = "test-fixtures")]
     fn the_quality_baseline_accuracy_columns_are_a_projection_of_the_stub_limits() -> Result<()> {

@@ -85,11 +85,6 @@ struct ReviewPosition {
     index: usize,
 }
 
-/// Whether Esc on `screen` quits the app rather than closing that screen's own dialog. On
-/// `Diffing` it cancels the computation instead, so a reflexive Esc on a slow diff keeps the session.
-///
-/// An exhaustive match on purpose: a new `AppScreen` missing from an exclusion list would make
-/// Esc quit the app instead of closing its dialog.
 /// `q` quits from the viewer and from the "Diffing…" wait, and nowhere else: every other screen
 /// is a dialog, and three of them (search, go-to-line, the file dialog's filter) take typed text,
 /// where a `q` is a letter. The dialogs close on Esc.
@@ -97,6 +92,11 @@ fn q_should_quit(screen: AppScreen) -> bool {
     matches!(screen, AppScreen::Viewer | AppScreen::Diffing)
 }
 
+/// Whether Esc on `screen` quits the app rather than closing that screen's own dialog. On
+/// `Diffing` it cancels the computation instead, so a reflexive Esc on a slow diff keeps the session.
+///
+/// An exhaustive match on purpose: a new `AppScreen` missing from an exclusion list would make
+/// Esc quit the app instead of closing its dialog.
 fn esc_should_quit(screen: AppScreen) -> bool {
     match screen {
         AppScreen::Viewer => true,
@@ -559,12 +559,12 @@ impl App {
         }
     }
 
-    /// `--review`: start on the picker instead of the empty viewer.
     /// Paint with `options` instead of the saved render options, for this run only.
     pub fn override_render_options(&mut self, options: RenderOptions) {
         self.render_options_override = Some(options);
     }
 
+    /// `--review`: start on the picker instead of the empty viewer.
     pub fn start_in_review(&mut self) {
         self.open_review();
     }
@@ -977,8 +977,7 @@ impl App {
         self.screen = AppScreen::Viewer;
     }
 
-    /// `Enter` or `Esc`: every toggle is already applied and persisted, so closing is all that
-    /// is left. Nothing is reverted on the way out.
+    /// `Enter` or `Esc`: closing is all that is left (see `RenderOptionsDialog`).
     fn handle_render_options_accepted(&mut self) {
         self.render_options_dialog = None;
         self.screen = AppScreen::Viewer;
@@ -1050,8 +1049,6 @@ impl App {
         Ok(())
     }
 
-    /// Status bar, panels, error banner, footer. The footer's row is always reserved: it is how a
-    /// user who has not pressed `?` learns that keybindings exist.
     /// Everything an offscreen render needs before `draw_viewer` (`tui::screenshot`): the themes
     /// applied without being saved, the viewer sized to `area`, and the pair diffed on this
     /// thread rather than through the action channel nobody is polling.
@@ -1082,6 +1079,8 @@ impl App {
         Ok(())
     }
 
+    /// Status bar, panels, error banner, footer. The footer's row is always reserved: it is how a
+    /// user who has not pressed `?` learns that keybindings exist.
     pub(crate) fn draw_viewer(&mut self, frame: &mut ratatui::Frame, area: Rect) -> Result<()> {
         let mut constraints = Vec::with_capacity(4);
         if self.diff_summary.is_some() {
@@ -1392,7 +1391,8 @@ fn summary_toast_paragraph(summary: DiffSummary) -> Paragraph<'static> {
         )
 }
 
-/// Must match `tui::headless::ansi_color`'s mapping.
+/// The summary's colour in the TUI. Headless prints the same label bold and uncoloured
+/// (`headless::summary_header`).
 fn summary_color(summary: DiffSummary) -> Color {
     match summary {
         DiffSummary::NoChanges => Color::DarkGray,
@@ -2004,7 +2004,7 @@ mod tests {
         )));
     }
 
-    /// `EDITOR="code -w"` used to be run as a program named `code -w`.
+    /// `EDITOR="code -w"` runs `code` with `-w`, not a program named `code -w`.
     #[cfg(unix)]
     #[test]
     fn an_editor_with_arguments_gets_them_and_then_the_line_and_path() {

@@ -23,9 +23,10 @@ use crate::diff::{ASTDiff, ASTMappingReason};
 /// Phase 1: largest-subtree-first hash descent, run twice; the second call sees only what the
 /// first left unmatched.
 ///
-/// 1. `KindAndValueHash`: byte-identical subtrees, over reference nodes plus big-enough nodes.
-/// 2. `KindOnlyHash`: same shape, any leaf value, over reference nodes only. One coarse tier on
-///    purpose, rather than several intermediate normalisations.
+/// 1. The kind-and-value hash (`node_to_kind_and_value_hash`): byte-identical subtrees, over
+///    reference nodes plus big-enough nodes.
+/// 2. The kind-only hash (`node_to_kind_only_hash`): same shape, any leaf value, over reference
+///    nodes only. One coarse tier on purpose, rather than several intermediate normalisations.
 ///
 /// Both hashes are order-independent for `nodes::is_commutative_container` kinds at every level.
 pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {

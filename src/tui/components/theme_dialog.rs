@@ -388,7 +388,7 @@ mod tests {
         );
     }
 
-    /// Enter on a preset used to save the preset's colors over the user's custom palette.
+    /// Enter on a preset leaves the saved custom palette alone.
     #[test]
     fn accepting_a_preset_keeps_the_saved_custom_palette() {
         let config = tempfile::NamedTempFile::new().expect("temp config");

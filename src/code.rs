@@ -119,8 +119,6 @@ impl Code {
     }
 
     /// Parses `contents` as `language`, with `tip` set to `Type::Code` whatever the content is.
-    // TODO: recognize configuration (e.g. docker-compose YAML) by content; needs content-aware
-    // detection in language.rs.
     pub fn from_string(contents: &str, language: &Language) -> Self {
         let mut code = Code {
             contents: contents.to_string(),
@@ -150,7 +148,6 @@ impl Code {
 
     /// Reads and parses `path`, detecting the language from its path and content (`Unknown` if
     /// unrecognized). Errors if the file cannot be read as UTF-8 text.
-    // TODO: use the hermetic expansion from metadata.rs to expand the metadata.
     pub fn from_file(path: &std::path::Path) -> Result<Self> {
         use std::fs;
 

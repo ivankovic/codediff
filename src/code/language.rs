@@ -65,10 +65,6 @@ fn looks_like_xml(content: &str) -> bool {
         .starts_with("<?xml")
 }
 
-/// Returns the best guess language for a given file extension.
-///
-/// Note that some extensions are not uniquely identifiable so the highest probability result is
-/// returned. It may or may not be correct.
 /// Every file extension CodeDiff recognises, lower-cased, and the language it means. The one
 /// table behind [`language_for_extension`] and the README's language list.
 pub const EXTENSIONS: &[(&[&str], Language)] = &[
@@ -104,6 +100,8 @@ pub const EXTENSIONS: &[(&[&str], Language)] = &[
     (&["xml", "xht", "xhtml"], Language::XML),
 ];
 
+/// The language `ext` (lower-cased, no dot) most likely means; some extensions are shared, so this
+/// is the likeliest reading, not a certainty.
 pub fn language_for_extension(ext: &str) -> Option<Language> {
     EXTENSIONS
         .iter()

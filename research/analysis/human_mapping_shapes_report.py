@@ -29,10 +29,10 @@ often sparse, only explicitly marking changed/relevant nodes and leaving the res
 Identical, which `analyze_human_mappings` folds into `node_op_identical` before writing this CSV).
 Using the entry-count `op_<operation>` columns instead would both misrepresent node-weight (one
 `InsertWithChildren` entry for a 200-node function reading the same as one single-token `Insert`)
-and, for the 62/417 fixtures with sparse ground truth, wildly overstate how much of the file
+and, for the fixtures with sparse ground truth, wildly overstate how much of the file
 changed (a huge file with one 460-entry localized edit would look almost entirely non-Identical).
 
-Identical is 99.1% of all node instances corpus-wide (see `analyze_human_mappings`'s own stdout
+Identical is nearly all node instances corpus-wide (see `analyze_human_mappings`'s own stdout
 report), so a plain 7-way stacked bar per fixture would render as one solid color everywhere -
 useless for seeing shape. Instead, per fixture:
 
@@ -41,15 +41,10 @@ useless for seeing shape. Instead, per fixture:
                   non-Identical operations - i.e. normalized to that fixture's own non-Identical
                   mass, not to the whole fixture
 
-An earlier version of this chart scaled each bar's *height* to density instead of normalizing, so
-"how much changed" and "what kind of change" were both visible in one chart. That turned out to be
-unreadable in practice: density is heavily right-skewed (median 1.8% of a fixture's nodes change),
-so nearly every bar was too short to show its internal color composition at all - only a handful of
-outlier fixtures had visible detail. This version drops "how much changed" from the plot entirely
-(still reported in the density printout and the CSV) and normalizes every bar to its own density, so
-every fixture's *composition* of change is legible regardless of how much of it actually changed.
-Fixtures are still sorted by density, descending, so the left-to-right ordering still carries a
-"most-changed to least-changed" reading even though bar height no longer does.
+Bar height is not scaled to density: density is heavily right-skewed, so most bars would be too
+short to show their colour composition. The plot shows only the composition of change, normalized
+per fixture; how much changed is in the density printout and the CSV. Fixtures are sorted by
+density, descending, so the left-to-right order still reads most-changed to least-changed.
 
 Usage (from research/):
     uv run ./analysis/human_mapping_shapes_report.py

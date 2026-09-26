@@ -349,7 +349,7 @@ fn process_delta(stats: &DiffStats, before: &str, after: &str) -> Result<DiffSta
         .and_then(|code| code.ast.as_ref())
         .map_or(0, |ast| ast.root_node().child_count() as u64);
 
-    // TODO: compute line and node change counts; they are zero until then.
+    // Line and node change counts are not computed; these columns are always 0.
     result.lines_added = 0;
     result.lines_removed = 0;
     result.lines_changed = 0;

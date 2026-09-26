@@ -16,12 +16,12 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/// Human-authored ground truth for a fixture, `<fixture dir>/human_mapping.json`, written by the
-/// `human_solver` binary: a node mapping (`entries`, `groups`) and independent text paintings
-/// (`text_mappings`), plus the checks that grade codediff against them.
-///
-/// Nodes are identified by *path* (see [`super::path_for_node`]), not node id: ids are not stable
-/// across the separate parses that write and later check a mapping.
+//! Human-authored ground truth for a fixture, `<fixture dir>/human_mapping.json`, written by the
+//! `human_solver` binary: a node mapping (`entries`, `groups`) and independent text paintings
+//! (`text_mappings`), plus the checks that grade codediff against them.
+//!
+//! Nodes are identified by *path* (see [`super::path_for_node`]), not node id: ids are not stable
+//! across the separate parses that write and later check a mapping.
 use anyhow::{Context, Result, bail, ensure};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -34,7 +34,6 @@ use crate::diff::cost::operation_cost;
 use crate::diff::{ASTDiff, ASTMapping, ASTMappingOperation, ASTMappingReason, NodeCache};
 use crate::test::helper::{PathCache, path_for_node};
 
-/// Properties the ground truth must hold on its own, independently of what codediff does with it.
 pub mod invariants;
 
 /// What a human decided should happen to a node (or pair of nodes) between before and after. The

@@ -34,8 +34,9 @@ pub struct SourceColumn(usize);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 pub struct SourceOffset(usize);
 
-/// A terminal **cell** offset within a screen row: a CJK ideograph is two cells, a combining mark
-/// zero. Derived at the render boundary by [`screen_column_in`], never stored.
+/// A terminal **cell** offset within a screen row, tabs not expanded: a CJK ideograph is two cells,
+/// a combining mark zero. Derived by [`screen_column_in`], never stored. Used by human_solver's
+/// wrapping; the viewers draw at tab stops through `tui::display_columns`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 pub struct ScreenColumn(usize);
 

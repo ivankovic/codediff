@@ -25,11 +25,11 @@
 const assert = require("assert");
 const { cellValue, compareRows } = require("./index.js");
 
-// The actual bug this file exists to catch: `dataset` only camelCases hyphens, not underscores, so
-// a real `data-total_lines="123"` attribute reads back as `dataset.total_lines`, not
-// `dataset.totalLines`. An earlier version of `cellValue` converted "total_lines" to "totalLines"
-// before the lookup, silently reading `undefined` (-> `NaN`) for every row on that column (and
-// `unix_diff`, the other underscored one) - see index.js's own comment on `cellValue`.
+// `dataset` only camelCases hyphens, not underscores, so a real `data-total_lines="123"` attribute
+// reads back as `dataset.total_lines`, not `dataset.totalLines`. `cellValue` must look the key up
+// unconverted: converting "total_lines" to "totalLines" would silently read `undefined` (-> `NaN`)
+// for every row on that column (and `unix_diff`, the other underscored one) - see index.js's own
+// comment on `cellValue`.
 {
   const row = {
     dataset: { name: "foo", codediff: "3", unix_diff: "7", total_lines: "123" },

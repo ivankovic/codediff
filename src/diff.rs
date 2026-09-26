@@ -23,8 +23,8 @@
 //! order below is the code's; the call-site comments in `Diff::pending_with_config` and
 //! [`PendingDiff::finish`] say why each pass sits where it does, and each pass's `solve` doc
 //! explains its mechanism. The right-hand column maps the code's phase numbers to the paper's
-//! ("CodeDiff", `research/papers/introductory-paper`); the code's numbering has gaps where phases
-//! were merged or removed.
+//! ("CodeDiff", `research/papers/introductory-paper`); the code's numbering has gaps (there is no
+//! phase 3 or 5).
 //!
 //! | Code phase | Pass | Paper |
 //! |---|---|---|
@@ -32,7 +32,7 @@
 //! | 1b, 1c | `solve_nested_condition_collapse`, `solve_heritage_clause_growth`: pairs phase 1 cannot see, attributions it cannot make | - |
 //! | 2 | `solve_leading_siblings`, `solve_identical_diagnostic_statements` | phase 2 |
 //! | 4 | `solve_syntax_aware_matching`: flat containers by Myers, qualified names, imports, `solve_greedy_anchor_blocks`; APTED inside each matched pair | phase 3 |
-//! | 6 | residual: named-local prematch, `solve_bottom_up_propagation`, `solve_unique_type_matching`, the Myers-LCS fallback ([`apted::for_roots`]), propagation again, `solve_orphaned_leaves` | phase 4 |
+//! | 6 | residual: named-local prematch, `solve_bottom_up_propagation`, `solve_unique_type_matching`, the Myers-LCS fallback ([`apted::for_roots_fallback`]), propagation again, `solve_orphaned_leaves` | phase 4 |
 //! | 7 | `solve_moved_subtrees`: GumTree-style move recovery | phase 5 |
 //! | 8, 8b, 9 | `solve_mutual_ancestors`, `solve_leaf_neighbour_agreement`, `solve_wrap_growth`: refine and re-tag existing pairs | - |
 //! | 10 | `solve_unresolved_nodes`: delete/insert for every undecided node | closing step |

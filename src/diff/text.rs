@@ -48,7 +48,6 @@ use summary::whitespace_stripped_equal;
 /// Whitespace is ignored except where it changes the parsed AST (e.g. inside a string constant).
 #[derive(Debug, Clone, Default)]
 pub struct TextDiff {
-    // TODO: a tree-based structure, for partial lookups in very large files.
     before_ranges: Vec<RangeMatch>,
     after_ranges: Vec<RangeMatch>,
 }

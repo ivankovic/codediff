@@ -19,17 +19,18 @@
 
 """Turn `cargo llvm-cov --json --summary-only` into a per-area table.
 
-llvm-cov's own table is one row per file, 675 of them here, which buries the thing worth knowing:
-the diff engine and the dev tools are held to very different standards on purpose. `src/bin/`
-holds samplers, benchmark harnesses and human_solver - tools whose value is what they let a human
-do, several of which exist to be run once and read. Averaging them together with `src/diff/`
-produces a number that means nothing about either.
+llvm-cov's own table is one row per file, hundreds of them here, which buries the thing worth
+knowing: the diff engine and the dev tools are held to very different standards on purpose.
+`src/bin/` holds samplers, benchmark harnesses and human_solver - tools whose value is what they
+let a human do, several of which exist to be run once and read. Averaging them together with
+`src/diff/` produces a number that means nothing about either.
 
 Reads the JSON on stdin so it composes with whatever llvm-cov invocation the caller wants.
 
 `--badge` additionally writes a shields.io endpoint file, which is what the README's badge reads.
-Both numbers go on it: a badge showing only the 91% would be quietly choosing the flattering half,
-and one showing only the 79% would describe the sampler harnesses rather than the diff engine.
+Both numbers go on it: a badge showing only the product figure would be quietly choosing the
+flattering half, and one showing only the overall figure would describe the sampler harnesses
+rather than the diff engine.
 """
 
 import argparse
@@ -42,7 +43,7 @@ from pathlib import Path
 # wanted. Order here is display order.
 #
 # Each module is two prefixes, the directory *and* the module file beside it: `src/diff/` is the
-# engine's submodules and `src/diff.rs` is the engine's own root, 581 lines of it. Matching only
+# engine's submodules and `src/diff.rs` is the engine's own root. Matching only
 # the directory would send every one of those roots - diff, code, test, stats, tui - to `other`,
 # which no row prints and no total but EVERYTHING counts, and the product figure would silently
 # leave them out.
@@ -140,9 +141,8 @@ def main() -> int:
     print("Line coverage by area")
     product = [0, 0]
     # `other` is `area_of`'s fallback and is deliberately printed last rather than skipped: a
-    # source directory nobody added to AREAS used to vanish from every row while still counting
-    # toward EVERYTHING, which is how a whole module once stayed invisible. A row that reads
-    # "other" is a prompt to add the prefix above.
+    # source directory nobody added to AREAS would otherwise vanish from every row while still
+    # counting toward EVERYTHING. A row that reads "other" is a prompt to add the prefix above.
     for label in [name for _, name in AREAS] + [TOP_LEVEL, "other"]:
         if label not in totals:
             continue
