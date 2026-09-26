@@ -43,7 +43,7 @@ done; the §4 typos are fixed except `symetric` (×3).
   speeds up the picker's `o` scan in the tool itself. Still over 5s: the inventory test (31s,
   now dominated by reading 1.4GB of `human_mapping.json`), the picker scan test (12.6s), the
   invariants pass (16s), and the largest fixtures' own mapping tests. Left open: `NodeCache`
-  rebuilt outside `diff_code` (the transmuted `'static` cache would have to travel in `Diff`).
+  rebuilt outside `diff_code` (the cache borrows both `Code`s, and `Diff` does not).
 - **2026-09-05, section 3** - done: `DiffMode`, `--exact`'s effect and the `fallback_used`
   field are gone (`PendingDiff::finish()` takes no mode; `--exact` stays as a hidden no-op for
   one release; JSON output's field is `large_residual`, which is what it always measured, and
@@ -689,11 +689,10 @@ File-length outliers:
   caller was `benches/optimal_iud_benchmark.rs`, which itself had no Makefile target and did not
   compile; its 16 tests tested only itself. 1777 lines, recoverable from git if it is ever wanted
   back as the starting point for a real oracle.
-- **`NodeCache`'s transmuted `'static` lifetime** (diff.rs:40–54) is thoroughly documented, and
-  callers are currently disciplined. If it ever grows another caller, consider the standard
-  self-referential escape: make `NodeCache<'tree>` borrow properly and let the few construction
-  sites own `Code` first. Documented-unsound-by-convention is the weakest structural point in an
-  otherwise safe crate; no action urgent.
+- **`NodeCache` borrows its `Code`s since 2026-09-26.** This finding described a transmuted
+  `'static` lifetime, unsound by convention. `NodeCache<'code>` now borrows both sides, the
+  transmute and its `unsafe` are gone, and a `compile_fail` doctest shows a cache that outlives
+  its `Code` is rejected.
 - **`ensure_parsed` / metadata-population responsibilities are split across `Code::parse`,
   `Code::ensure_parsed`, `from_string`, `from_file`** with slightly different guarantees (tests
   exist for each combination, which is itself a hint the state machine has too many entry

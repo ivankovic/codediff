@@ -1916,26 +1916,22 @@ fn summarize_diff_is_whitespace_only_even_with_zero_operations_when_content_is_n
 }
 
 /// A real parse and diff: `is_comment_only_diff` reads node kinds.
-fn diff_ast(
-    before_src: &str,
-    after_src: &str,
-) -> (crate::code::Code, crate::code::Code, ASTDiff, NodeCache) {
+fn diff_ast(before_src: &str, after_src: &str) -> (crate::code::Code, crate::code::Code, ASTDiff) {
     let before = crate::code::Code::from_string(before_src, &crate::code::Language::Rust);
     let after = crate::code::Code::from_string(after_src, &crate::code::Language::Rust);
-    let node_cache = NodeCache::build(&before, &after);
     let diff = crate::diff::diff_code(&before, &after);
     let ast = diff
         .ast
         .expect("diff_code should always produce an AST for valid Rust");
-    (before, after, ast, node_cache)
+    (before, after, ast)
 }
 
 /// A new `line_comment` is a `//` leaf plus its own words; the words are painted too, not just the
 /// marker (`rust-cost-optimization`).
 #[test]
 fn ranges_paints_a_wholly_new_comments_own_words_not_just_its_marker() {
-    let (before, after, ast, node_cache) =
-        diff_ast("fn main() {}\n", "// hi there\nfn main() {}\n");
+    let (before, after, ast) = diff_ast("fn main() {}\n", "// hi there\nfn main() {}\n");
+    let node_cache = NodeCache::build(&before, &after);
     let after_ranges = ranges(
         &after,
         &before,
@@ -1963,8 +1959,9 @@ fn ranges_paints_a_wholly_new_comments_own_words_not_just_its_marker() {
 /// end to end, not split around the literal (`java-add-logging`).
 #[test]
 fn a_no_gap_string_literal_does_not_break_whitespace_merging_with_a_sibling() {
-    let (before, after, ast, node_cache) =
+    let (before, after, ast) =
         diff_ast("fn main() {}\n", "fn main() {\n    let s = \"a\" + b;\n}\n");
+    let node_cache = NodeCache::build(&before, &after);
     let after_ranges = ranges(
         &after,
         &before,
@@ -1997,7 +1994,8 @@ fn a_no_gap_string_literal_does_not_break_whitespace_merging_with_a_sibling() {
 fn sibling_reorder_produces_move_ranges_and_a_refactor_moved_summary() {
     let before_src = "fn main() {\n    let a = 1;\n    println!(\"{}\", a);\n}\n\nfn helper(x: i32) -> i32 {\n    x * 2\n}\n";
     let after_src = "fn helper(x: i32) -> i32 {\n    x * 2\n}\n\nfn main() {\n    let a = 1;\n    println!(\"{}\", a);\n}\n";
-    let (before, after, ast, node_cache) = diff_ast(before_src, after_src);
+    let (before, after, ast) = diff_ast(before_src, after_src);
+    let node_cache = NodeCache::build(&before, &after);
     let text_diff = TextDiff::from(&before, &after, &ast, &node_cache);
     let before_ranges = text_diff.all(0);
     let after_ranges = text_diff.all(1);
@@ -2025,7 +2023,8 @@ fn sibling_reorder_produces_move_ranges_and_a_refactor_moved_summary() {
 fn unrelated_insertion_does_not_flag_shifted_content_as_moved() {
     let before_src = "fn main() {\n    foo();\n}\n\nfn helper() {\n    bar();\n}\n";
     let after_src = "fn added() {}\n\nfn main() {\n    foo();\n}\n\nfn helper() {\n    bar();\n}\n";
-    let (before, after, ast, node_cache) = diff_ast(before_src, after_src);
+    let (before, after, ast) = diff_ast(before_src, after_src);
+    let node_cache = NodeCache::build(&before, &after);
     let text_diff = TextDiff::from(&before, &after, &ast, &node_cache);
     for (side, ranges) in [("before", &text_diff.all(0)), ("after", &text_diff.all(1))] {
         assert!(
@@ -2039,44 +2038,50 @@ fn unrelated_insertion_does_not_flag_shifted_content_as_moved() {
 /// agreement with what `ranges` paints.
 #[test]
 fn is_comment_only_diff_is_true_when_only_a_comments_text_changed() {
-    let (before, after, ast, node_cache) = diff_ast(
+    let (before, after, ast) = diff_ast(
         "// old comment\nfn main() {}",
         "// new comment\nfn main() {}",
     );
+    let node_cache = NodeCache::build(&before, &after);
     assert!(is_comment_only_diff(&before, &after, &ast, &node_cache));
 }
 
 #[test]
 fn is_comment_only_diff_is_true_when_a_comment_was_inserted() {
-    let (before, after, ast, node_cache) = diff_ast("fn main() {}", "// a comment\nfn main() {}");
+    let (before, after, ast) = diff_ast("fn main() {}", "// a comment\nfn main() {}");
+    let node_cache = NodeCache::build(&before, &after);
     assert!(is_comment_only_diff(&before, &after, &ast, &node_cache));
 }
 
 #[test]
 fn is_comment_only_diff_is_true_when_a_comment_was_deleted() {
-    let (before, after, ast, node_cache) = diff_ast("// a comment\nfn main() {}", "fn main() {}");
+    let (before, after, ast) = diff_ast("// a comment\nfn main() {}", "fn main() {}");
+    let node_cache = NodeCache::build(&before, &after);
     assert!(is_comment_only_diff(&before, &after, &ast, &node_cache));
 }
 
 #[test]
 fn is_comment_only_diff_is_false_for_a_real_code_change() {
-    let (before, after, ast, node_cache) = diff_ast("fn main() { old(); }", "fn main() { new(); }");
+    let (before, after, ast) = diff_ast("fn main() { old(); }", "fn main() { new(); }");
+    let node_cache = NodeCache::build(&before, &after);
     assert!(!is_comment_only_diff(&before, &after, &ast, &node_cache));
 }
 
 #[test]
 fn is_comment_only_diff_is_false_when_a_comment_and_real_code_both_changed() {
-    let (before, after, ast, node_cache) = diff_ast(
+    let (before, after, ast) = diff_ast(
         "// old comment\nfn main() { old(); }",
         "// new comment\nfn main() { new(); }",
     );
+    let node_cache = NodeCache::build(&before, &after);
     assert!(!is_comment_only_diff(&before, &after, &ast, &node_cache));
 }
 
 #[test]
 fn is_comment_only_diff_is_false_when_nothing_changed_at_all() {
     // "Comment-only" is a claim about what changed; with nothing changed it is false.
-    let (before, after, ast, node_cache) = diff_ast("fn main() {}", "fn main() {}");
+    let (before, after, ast) = diff_ast("fn main() {}", "fn main() {}");
+    let node_cache = NodeCache::build(&before, &after);
     assert!(!is_comment_only_diff(&before, &after, &ast, &node_cache));
 }
 
@@ -2084,10 +2089,11 @@ fn is_comment_only_diff_is_false_when_nothing_changed_at_all() {
 /// changed, so the diff is not comment-only.
 #[test]
 fn is_comment_only_diff_is_false_when_a_statement_moves_one_level_deeper() {
-    let (before, after, ast, node_cache) = diff_ast(
+    let (before, after, ast) = diff_ast(
         "fn main() {\n    foo();\n    bar();\n}",
         "fn main() {\n    foo();\n    if true {\n        bar();\n    }\n}",
     );
+    let node_cache = NodeCache::build(&before, &after);
     assert!(!is_comment_only_diff(&before, &after, &ast, &node_cache));
 }
 
@@ -2150,10 +2156,11 @@ fn summarize_diff_with_comment_check_ignores_the_flag_when_false() {
 /// Under `MINIMAL`, one changed character inside a long identifier is one narrow `Update`.
 #[test]
 fn ranges_decomposes_a_small_change_inside_a_long_identifier() {
-    let (before, after, ast, node_cache) = diff_ast(
+    let (before, after, ast) = diff_ast(
         "fn main() {\n    let long_identifier_name = 5;\n}",
         "fn main() {\n    let long_identifier_nome = 5;\n}",
     );
+    let node_cache = NodeCache::build(&before, &after);
     let before_ranges = ranges(
         &before,
         &after,
@@ -2206,10 +2213,11 @@ fn ranges_decomposes_a_small_change_inside_a_long_identifier() {
 /// invariant 16's `Full` half, via [`RenderOptions::whole_identifier_updates`].
 #[test]
 fn full_paints_a_renamed_identifier_whole() {
-    let (before, after, ast, node_cache) = diff_ast(
+    let (before, after, ast) = diff_ast(
         "fn main() {\n    let long_identifier_name = 5;\n}",
         "fn main() {\n    let long_identifier_nome = 5;\n}",
     );
+    let node_cache = NodeCache::build(&before, &after);
     for (source, destination, source_is_before) in
         [(&before, &after, true), (&after, &before, false)]
     {
@@ -2237,10 +2245,11 @@ fn full_paints_a_renamed_identifier_whole() {
 /// `FULL`.
 #[test]
 fn full_keeps_a_changed_comment_narrow() {
-    let (before, after, ast, node_cache) = diff_ast(
+    let (before, after, ast) = diff_ast(
         "// Copyright 2025 Example\nfn main() {}\n",
         "// Copyright 2026 Example\nfn main() {}\n",
     );
+    let node_cache = NodeCache::build(&before, &after);
     let updates: Vec<_> = ranges(
         &before,
         &after,
@@ -2264,10 +2273,11 @@ fn full_keeps_a_changed_comment_narrow() {
 /// identifier.
 #[test]
 fn ranges_reports_the_whole_identifier_when_whole_pair_updates_is_set() {
-    let (before, after, ast, node_cache) = diff_ast(
+    let (before, after, ast) = diff_ast(
         "fn main() {\n    let long_identifier_name = 5;\n}",
         "fn main() {\n    let long_identifier_nome = 5;\n}",
     );
+    let node_cache = NodeCache::build(&before, &after);
     let before_ranges = ranges(
         &before,
         &after,
@@ -2299,10 +2309,11 @@ fn ranges_reports_the_whole_identifier_when_whole_pair_updates_is_set() {
 /// With no common prefix or suffix, the whole span is the `Update`.
 #[test]
 fn ranges_falls_back_to_a_whole_span_update_when_there_is_no_common_affix() {
-    let (before, after, ast, node_cache) = diff_ast(
+    let (before, after, ast) = diff_ast(
         "fn main() {\n    let foo = 5;\n}",
         "fn main() {\n    let bar = 5;\n}",
     );
+    let node_cache = NodeCache::build(&before, &after);
     let before_ranges = ranges(
         &before,
         &after,
@@ -2329,10 +2340,11 @@ fn ranges_falls_back_to_a_whole_span_update_when_there_is_no_common_affix() {
 /// identifier's.
 #[test]
 fn ranges_decomposes_a_small_change_inside_a_comment() {
-    let (before, after, ast, node_cache) = diff_ast(
+    let (before, after, ast) = diff_ast(
         "// hello world!\nfn main() {}",
         "// hello universe!\nfn main() {}",
     );
+    let node_cache = NodeCache::build(&before, &after);
     let before_ranges = ranges(
         &before,
         &after,
@@ -2377,11 +2389,12 @@ fn ranges_decomposes_a_small_change_inside_a_comment() {
 /// `merge_ranges` stays aligned.
 #[test]
 fn ranges_decomposition_survives_an_unrelated_earlier_insertion() {
-    let (before, after, ast, node_cache) = diff_ast(
+    let (before, after, ast) = diff_ast(
         "fn main() {\n    let short = 1;\n    let long_identifier_name = 5;\n}",
         "fn main() {\n    let inserted_line = 0;\n    let short = 1;\n    \
          let long_identifier_nome = 5;\n}",
     );
+    let node_cache = NodeCache::build(&before, &after);
 
     // `MINIMAL`: the narrow split is what this guards, and `FULL` paints the rename whole.
     let text_diff =

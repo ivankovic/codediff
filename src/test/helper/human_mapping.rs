@@ -749,11 +749,11 @@ pub fn compare_painting(
 
 /// codediff's side of a painting comparison, built once per fixture and projected per preset by
 /// [`compare_painting_with_diff`].
-pub enum PaintingDiff {
+pub enum PaintingDiff<'code> {
     /// The ordinary case: a tree mapping, projected to text by [`crate::diff::text::TextDiff`].
     Ast {
         ast: crate::diff::ASTDiff,
-        node_cache: crate::diff::NodeCache,
+        node_cache: crate::diff::NodeCache<'code>,
     },
     /// No tree-sitter grammar for the language. Grades against
     /// [`crate::diff::text::plain_text_line_diff`] because that is what the product renders for
@@ -765,10 +765,10 @@ pub enum PaintingDiff {
 }
 
 /// See [`PaintingDiff`].
-pub fn codediff_diff_for_painting(
-    before: &crate::code::Code,
-    after: &crate::code::Code,
-) -> Result<PaintingDiff> {
+pub fn codediff_diff_for_painting<'code>(
+    before: &'code crate::code::Code,
+    after: &'code crate::code::Code,
+) -> Result<PaintingDiff<'code>> {
     // Keyed on the code, as the product is: `diff_code` returns `Some(ASTDiff)` even with no
     // trees, which would grade against an empty mapping instead of the fallback a reader sees.
     if before.ast.is_none() || after.ast.is_none() {
@@ -2584,11 +2584,11 @@ pub struct LineMismatches {
 
 /// The human mapping's per-line projection (see [`touched_lines`]), plus the [`NodeCache`] built
 /// for it, which the caller reuses to project a second diff onto the same pair.
-pub fn human_touched_lines_for_mapping(
+pub fn human_touched_lines_for_mapping<'code>(
     mapping: &HumanMapping,
-    before: &crate::code::Code,
-    after: &crate::code::Code,
-) -> Result<(Vec<bool>, Vec<bool>, NodeCache)> {
+    before: &'code crate::code::Code,
+    after: &'code crate::code::Code,
+) -> Result<(Vec<bool>, Vec<bool>, NodeCache<'code>)> {
     let human_diff = as_ast_diff_for_mapping(mapping, before, after)?;
     let node_cache = NodeCache::build(before, after);
     let (human_before, human_after) = touched_lines(before, after, &human_diff, &node_cache);
@@ -2596,11 +2596,11 @@ pub fn human_touched_lines_for_mapping(
 }
 
 /// [`human_touched_lines_for_mapping`] loading `name`'s mapping itself.
-pub fn human_touched_lines_for(
+pub fn human_touched_lines_for<'code>(
     name: &str,
-    before: &crate::code::Code,
-    after: &crate::code::Code,
-) -> Result<(Vec<bool>, Vec<bool>, NodeCache)> {
+    before: &'code crate::code::Code,
+    after: &'code crate::code::Code,
+) -> Result<(Vec<bool>, Vec<bool>, NodeCache<'code>)> {
     let mapping = load(name)?;
     human_touched_lines_for_mapping(&mapping, before, after)
 }

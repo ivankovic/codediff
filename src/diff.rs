@@ -44,32 +44,39 @@ use tree_sitter::Node;
 use crate::code::{Code, Language};
 use crate::diff::text::TextDiff;
 
-/// Every node of both sides' ASTs, keyed by node ID.
-#[derive(Debug, Clone, Default)]
-/// # Safety invariant
+/// Every node of both sides' ASTs, keyed by node ID. The cache borrows both `Code`s it was built
+/// from, so it cannot outlive them:
 ///
-/// The `'static` lifetime is erased via `transmute` in `build`: each node really borrows from the
-/// `tree_sitter::Tree` of the `Code` it was built from. A `NodeCache` must never be read from, or
-/// outlive, that `Code`, nor survive a reparse of its `ast`. The type system does not enforce
-/// this; breaking it is silent undefined behaviour.
-pub struct NodeCache {
+/// ```compile_fail
+/// use codediff::code::{Code, Language};
+/// use codediff::diff::NodeCache;
+///
+/// let cache = {
+///     let code = Code::from_string("fn main() { let x = 1; }", &Language::Rust);
+///     NodeCache::build(&code, &code)
+/// };
+/// for node in cache.before.values() {
+///     println!("{}", node.kind());
+/// }
+/// ```
+#[derive(Debug, Clone, Default)]
+pub struct NodeCache<'code> {
     /// `FxHashMap` because this small-integer-keyed map is read on every lookup of every pass,
     /// and SipHash's DoS resistance buys nothing here.
-    pub before: rustc_hash::FxHashMap<usize, tree_sitter::Node<'static>>,
-    pub after: rustc_hash::FxHashMap<usize, tree_sitter::Node<'static>>,
+    pub before: rustc_hash::FxHashMap<usize, tree_sitter::Node<'code>>,
+    pub after: rustc_hash::FxHashMap<usize, tree_sitter::Node<'code>>,
 }
 
-impl NodeCache {
-    /// The returned cache must not outlive `before`/`after` (see the safety invariant on
-    /// `NodeCache`). A side without an AST gets an empty map.
-    pub fn build(before: &Code, after: &Code) -> Self {
+impl<'code> NodeCache<'code> {
+    /// A side without an AST gets an empty map.
+    pub fn build(before: &'code Code, after: &'code Code) -> Self {
         NodeCache {
             before: Self::cache_for(before),
             after: Self::cache_for(after),
         }
     }
 
-    fn cache_for(code: &Code) -> rustc_hash::FxHashMap<usize, tree_sitter::Node<'static>> {
+    fn cache_for(code: &'code Code) -> rustc_hash::FxHashMap<usize, tree_sitter::Node<'code>> {
         code.ast
             .as_ref()
             .map(|ast| {
@@ -77,13 +84,7 @@ impl NodeCache {
                 let mut stack = vec![ast.root_node()];
 
                 while let Some(node) = stack.pop() {
-                    // SAFETY: see the safety invariant on `NodeCache`; this cache must not outlive
-                    // `code`.
-                    cache.insert(node.id(), unsafe {
-                        std::mem::transmute::<tree_sitter::Node<'_>, tree_sitter::Node<'static>>(
-                            node,
-                        )
-                    });
+                    cache.insert(node.id(), node);
 
                     let mut cursor = node.walk();
                     for child in node.children(&mut cursor) {
@@ -216,13 +217,13 @@ impl Diff {
 pub struct PassCtx<'a> {
     pub before: &'a Code,
     pub after: &'a Code,
-    pub node_cache: &'a NodeCache,
+    pub node_cache: &'a NodeCache<'a>,
     before_metadata: std::borrow::Cow<'a, crate::code::ASTMetadata>,
     after_metadata: std::borrow::Cow<'a, crate::code::ASTMetadata>,
 }
 
 impl<'a> PassCtx<'a> {
-    pub fn new(before: &'a Code, after: &'a Code, node_cache: &'a NodeCache) -> Self {
+    pub fn new(before: &'a Code, after: &'a Code, node_cache: &'a NodeCache<'a>) -> Self {
         Self {
             before,
             after,
@@ -256,16 +257,10 @@ impl<'a> PassCtx<'a> {
 pub const LARGE_RESIDUAL_THRESHOLD: usize = 5000;
 
 /// A diff paused after phase 4; [`PendingDiff::finish`] runs phases 6-10.
-///
-/// # Safety invariant
-///
-/// Holds a [`NodeCache`] under that struct's invariant; the `&'code Code` borrows are what make
-/// the compiler refuse to let it outlive the two sides. A caller that pauses for user input must
-/// block its own thread rather than hand a `PendingDiff` to another thread.
 pub struct PendingDiff<'code> {
     before: &'code Code,
     after: &'code Code,
-    node_cache: NodeCache,
+    node_cache: NodeCache<'code>,
     ast_diff: ASTDiff,
     unmatched_before: usize,
     unmatched_after: usize,

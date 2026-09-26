@@ -409,7 +409,7 @@ struct RangeWalk<'a> {
     source: &'a Code,
     destination: &'a Code,
     diff: &'a ASTDiff,
-    node_cache: &'a NodeCache,
+    node_cache: &'a NodeCache<'a>,
     source_columns: Vec<usize>,
     destination_columns: Vec<usize>,
     // Built once per walk: `RangeMatch::extends` reads them on every merge decision.
