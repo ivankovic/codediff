@@ -70,9 +70,11 @@ pub fn run() -> Result<()> {
     let difftool_cmd = difftool_command(&codediff_path);
     let set_difftool = ask_yes_no(
         &format!(
-            "{}Set codediff as the default `git difftool`? [Y/n] (`difftool.codediff.cmd` = \
+            "{}{}Set codediff as the default `git difftool`? [Y/n] (`difftool.codediff.cmd` = \
              `{difftool_cmd}`) ",
-            existing_value_note("difftool.codediff.cmd", scope)
+            existing_value_note("difftool.codediff.cmd", scope),
+            // `diff.tool` is overwritten too, so an existing choice (meld, vimdiff) is shown.
+            existing_value_note("diff.tool", scope)
         ),
         true,
     )?;
@@ -105,7 +107,9 @@ pub fn run() -> Result<()> {
         }
     }
     if set_external {
-        set_config(scope, "diff.external", "codediff")?;
+        // The resolved path, like the difftool command, so git runs this build rather than
+        // whatever `codediff` is first on PATH; git runs the value through a shell.
+        set_config(scope, "diff.external", &shell_quote(&codediff_path))?;
     }
 
     println!("\nDone - configured {}.", scope.label());

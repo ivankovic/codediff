@@ -25,7 +25,7 @@ use anyhow::Result;
 use clap::Parser;
 
 use codediff::diff::text::RenderOptions;
-use codediff::tui::positional::resolve_before_after;
+use codediff::tui::positional::{binary_notice, resolve_before_after};
 use codediff::web::server::Server;
 use codediff::web::session::Session;
 
@@ -133,32 +133,32 @@ fn open_browser(url: &str) {
     }
 }
 
+/// As in `codediff`: every failure exits 2 with one `codediff-web: ...` line; clap's own usage
+/// errors already exit 2.
 #[tokio::main]
-async fn main() -> Result<()> {
+async fn main() {
+    let code = match run().await {
+        Ok(()) => 0,
+        Err(error) => {
+            eprintln!("codediff-web: {error:#}");
+            2
+        }
+    };
+    std::process::exit(code);
+}
+
+async fn run() -> Result<()> {
     let args = Args::parse();
     let pair = resolve_before_after(&args.paths)?;
 
     // As in `codediff`: a binary side has no diff in any mode, so report it rather than open a
     // browser onto an error banner.
-    if let Some((before, after)) = pair.as_ref() {
-        let either_is_binary = codediff::code::is_binary_file(before)
-            .and_then(|binary| Ok(binary || codediff::code::is_binary_file(after)?));
-        match either_is_binary {
-            Ok(true) => {
-                let differed = std::fs::read(before)? != std::fs::read(after)?;
-                let (before, after) = (before.display(), after.display());
-                match differed {
-                    true => println!("Binary files {before} and {after} differ"),
-                    false => println!("Binary files {before} and {after} are identical"),
-                }
-                return Ok(());
-            }
-            Ok(false) => {}
-            Err(e) => {
-                eprintln!("codediff-web: {e:#}");
-                std::process::exit(2);
-            }
-        }
+    if let Some((before, after)) = pair.as_ref()
+        && (codediff::code::is_binary_file(before)? || codediff::code::is_binary_file(after)?)
+    {
+        let differed = std::fs::read(before)? != std::fs::read(after)?;
+        print!("{}", binary_notice(&args.paths, before, after, differed));
+        return Ok(());
     }
 
     let mut session = Session::from_config(initial_render_options(&args));

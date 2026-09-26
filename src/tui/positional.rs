@@ -15,10 +15,10 @@
  *  You should have received a copy of the GNU Affero General Public License
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-//! The positional-argument conventions both front-end binaries accept. The tests live in
-//! `main.rs`, next to the CLI behaviour they also exercise.
+//! The positional-argument conventions both front-end binaries accept, and the notice both print
+//! for a binary pair. The tests live in `main.rs`, next to the CLI behaviour they also exercise.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 
@@ -49,4 +49,22 @@ pub fn resolve_before_after(paths: &[PathBuf]) -> Result<Option<(PathBuf, PathBu
 /// recognizes (7 or 9). One predicate so every caller moves together if git adds an argument.
 pub fn invoked_as_git_external_diff(paths: &[PathBuf]) -> bool {
     matches!(paths.len(), 7 | 9)
+}
+
+/// The one-line stand-in for a binary diff, worded like git's. Under `GIT_EXTERNAL_DIFF` both
+/// sides are temp blobs, so it names git's repo-relative `path` once instead. `differed` is a
+/// byte comparison: a direct invocation may pass identical files.
+pub fn binary_notice(paths: &[PathBuf], before: &Path, after: &Path, differed: bool) -> String {
+    if invoked_as_git_external_diff(paths) {
+        let name = paths[0].display();
+        return match differed {
+            true => format!("Binary file {name} differs\n"),
+            false => format!("Binary file {name} is unchanged\n"),
+        };
+    }
+    let (before, after) = (before.display(), after.display());
+    match differed {
+        true => format!("Binary files {before} and {after} differ\n"),
+        false => format!("Binary files {before} and {after} are identical\n"),
+    }
 }

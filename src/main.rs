@@ -23,7 +23,9 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 
 use codediff::tui;
-use codediff::tui::positional::{invoked_as_git_external_diff, resolve_before_after};
+use codediff::tui::positional::{
+    binary_notice, invoked_as_git_external_diff, resolve_before_after,
+};
 
 mod configure_prompt;
 mod git_configure;
@@ -150,7 +152,7 @@ struct Args {
     mode: Mode,
 
     /// Shorthand for `--mode headless`. `--batch` is a synonym.
-    #[arg(long, alias = "batch")]
+    #[arg(long, alias = "batch", conflicts_with = "mode")]
     headless: bool,
 
     /// Paint only the ranges that carry meaning: every option of the TUI's `M` panel off (its
@@ -204,7 +206,7 @@ struct Args {
     /// Open on the git review picker - the repository around the current directory's unstaged
     /// files, staged files and recent commits - instead of an empty viewer (the `G` key, at
     /// startup). TUI only; takes no BEFORE/AFTER pair.
-    #[arg(long, conflicts_with = "headless")]
+    #[arg(long, conflicts_with_all = ["paths", "headless", "mode"])]
     review: bool,
 
     /// The TUI's tick rate, in ticks per second.
@@ -310,29 +312,6 @@ fn exit_code_for(differed: bool, want_exit_code: bool, invoked_as_git_external_d
         1
     } else {
         0
-    }
-}
-
-/// The one-line stand-in for a binary diff, worded like git's. Under `GIT_EXTERNAL_DIFF` both
-/// sides are temp blobs, so it names git's repo-relative `path` once instead. `differed` is a
-/// byte comparison: a direct invocation may pass identical files.
-fn binary_notice(
-    paths: &[PathBuf],
-    before: &std::path::Path,
-    after: &std::path::Path,
-    differed: bool,
-) -> String {
-    if invoked_as_git_external_diff(paths) {
-        let name = paths[0].display();
-        return match differed {
-            true => format!("Binary file {name} differs\n"),
-            false => format!("Binary file {name} is unchanged\n"),
-        };
-    }
-    let (before, after) = (before.display(), after.display());
-    match differed {
-        true => format!("Binary files {before} and {after} differ\n"),
-        false => format!("Binary files {before} and {after} are identical\n"),
     }
 }
 
@@ -591,6 +570,21 @@ mod tests {
         unsafe { std::env::remove_var(codediff::tui::theme::CONFIG_ENV) };
 
         assert!(options.whole_pair_updates);
+    }
+
+    /// Both used to be accepted silently: `--review` diffed the two files, and `--headless`
+    /// lost to `--mode json`.
+    #[test]
+    fn contradictory_mode_flags_are_rejected() {
+        for argv in [
+            &["codediff", "--review", "a.rs", "b.rs"][..],
+            &["codediff", "--review", "--mode", "json"],
+            &["codediff", "--headless", "--mode", "json"],
+        ] {
+            assert!(Args::try_parse_from(argv).is_err(), "{argv:?} was accepted");
+        }
+        assert!(Args::try_parse_from(["codediff", "--headless", "a.rs", "b.rs"]).is_ok());
+        assert!(Args::try_parse_from(["codediff", "--review"]).is_ok());
     }
 
     #[test]

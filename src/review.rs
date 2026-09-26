@@ -397,18 +397,35 @@ pub struct Workspace {
 impl Workspace {
     /// Under the system temp directory, which `tui::theme` treats as throwaway - so a reviewed
     /// pair never lands in the recent-pairs list, where it would dangle after this is dropped.
+    ///
+    /// Created exclusively (owner-only on Unix): in a shared temp directory the name is guessable,
+    /// and adopting a directory or symlink someone else put there first would write the reviewed
+    /// files into it. A name that already exists is skipped for the next.
     pub fn new() -> Result<Self> {
-        let dir = std::env::temp_dir().join(format!(
-            "codediff-review-{}-{}",
-            std::process::id(),
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map(|d| d.as_nanos())
-                .unwrap_or(0)
-        ));
-        std::fs::create_dir_all(&dir)
-            .with_context(|| format!("cannot create {}", dir.display()))?;
-        Ok(Self { dir })
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0);
+        let mut builder = std::fs::DirBuilder::new();
+        #[cfg(unix)]
+        std::os::unix::fs::DirBuilderExt::mode(&mut builder, 0o700);
+        for attempt in 0..100 {
+            let dir = std::env::temp_dir().join(format!(
+                "codediff-review-{}-{nanos}-{attempt}",
+                std::process::id()
+            ));
+            match builder.create(&dir) {
+                Ok(()) => return Ok(Self { dir }),
+                Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
+                Err(error) => {
+                    return Err(error).with_context(|| format!("cannot create {}", dir.display()));
+                }
+            }
+        }
+        anyhow::bail!(
+            "cannot create a review directory under {}: every name tried already exists",
+            std::env::temp_dir().display()
+        )
     }
 
     pub fn dir(&self) -> &Path {
@@ -627,6 +644,19 @@ mod tests {
 
     fn read(path: &Path) -> String {
         std::fs::read_to_string(path).unwrap()
+    }
+
+    #[test]
+    fn each_workspace_is_a_fresh_owner_only_directory() {
+        let first = Workspace::new().unwrap();
+        let second = Workspace::new().unwrap();
+        assert_ne!(first.dir(), second.dir());
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mode = std::fs::metadata(first.dir()).unwrap().permissions().mode();
+            assert_eq!(mode & 0o777, 0o700);
+        }
     }
 
     #[test]
