@@ -17,9 +17,8 @@
 
 # Research-only targets: corpus acquisition, measurement, analysis, and paper builds.
 #
-# Split out of the repository-root Makefile so that one holds only product concerns (build, test,
-# install, the quality gate, release) and this one holds everything that exists to produce the
-# papers and empirical studies. Run these from this directory (`cd research && make <target>`).
+# Everything that exists to produce the papers and empirical studies; product targets are in
+# ../Makefile. Run these from this directory (`cd research && make <target>`).
 #
 # Paths here are relative to research/, with two deliberate exceptions:
 #   * the compiled binaries live in ../target/release (one workspace, one target dir), and
@@ -32,8 +31,6 @@
 SCRIPTS_SAMPLING_DIR := ./sampling
 BIN_DIR := ../target/release
 
-# Repository lists live at the repository root, not under research/: they enumerate the corpus this
-# project studies, which is referenced from outside research/ too.
 LIST_FULL := ../list_of_repositories.csv
 LIST_SMALL := ../list_of_repositories_100.csv
 LIST_TINY := ../list_of_repositories_tiny.csv
@@ -63,8 +60,6 @@ RESEARCH_DIR = /var/tmp/research/$(MODE)/
 	paper-variables introductory-paper introductory-paper-empirical fetch-external \
 	measure-astdiff-oracle measure-astdiff-oracle-human measure-robustness-fixtures
 
-# Delegates to the root Makefile so the cargo invocation (and its `--features stats` requirement)
-# lives in exactly one place.
 build:
 	$(MAKE) -C .. build
 
@@ -114,10 +109,8 @@ measure-commit-stats: build
 	$(BIN_DIR)/commit_stats --path $(REPOSITORIES_DIR) --db $(RESEARCH_DIR)/stats.sqlite
 	uv run ./analysis/commit_stats.py $(RESEARCH_DIR)/stats.sqlite
 
-# Ad-hoc file_stats/commit_stats run over one specific directory (not the dataset-mode pipeline
-# above) - useful for debugging those binaries without the fetch/mode machinery. No `build`
-# prerequisite: measure/debug.sh already does its own `cargo build --release --features stats`, so
-# adding one here would just force a redundant full test+build first.
+# Ad-hoc file_stats/commit_stats run over one directory, outside the MODE machinery;
+# measure/debug.sh builds its own binaries.
 # Usage: make debug-stats DIR=/path/to/repos [DEBUG_MODE=dirs|all|repositories]
 DEBUG_MODE ?= dirs
 debug-stats:
@@ -159,10 +152,7 @@ LANGUAGES := c:C cpp:CPP csharp:CSharp css:CSS go:Go html:HTML java:Java \
 	typescript:TypeScript vimscript:Vimscript xml:XML yaml:YAML
 
 # Re-draws the whole sampled corpus, one CSV per language, with identical settings for every
-# language.
-# Previously only four languages had a target and the other fifteen CSVs were produced by ad-hoc
-# invocations, some with --max-commits-per-repo 100 and some without - so the committed corpus
-# mixed sampling methodologies. This target exists so the corpus is reproducible from one command.
+# language. This target exists so the corpus is reproducible from one command.
 #
 # Deliberately ONE sampling run for every language, then split by the output's own `language`
 # column - not one `--language` run per language. sample_code_pairs keys its reservoirs by
@@ -188,31 +178,12 @@ sample-pairs-all: build
 		echo "$$language -> $$out ($$(( $$(wc -l < $$out) - 1 )) pairs)"; \
 	done
 
-# There are deliberately no per-language sampling targets. `sample-pairs-all`, `-java`,
-# `-javascript` and `-typescript` used to exist and were deleted: they wrote to the *same*
-# data/samples/sampled_code_pairs_<lang>.csv files `sample-pairs-all` produces, with different
-# settings (rust passed neither --count nor --max-commits-per-repo; the other three passed both),
-# so running one silently replaced part of a consistently-drawn corpus with a differently-drawn
-# one. That is the exact failure the comment above sample-pairs-all describes, still live in four
-# targets next to the target written to fix it - and they cost hours to do it, since each re-walks
-# every repository's full history for one language's worth of pairs.
-#
-# Draw one language by drawing them all: `make sample-pairs-all` is one pass and splits by the
-# output's own `language` column.
+# No per-language sampling targets: draw one language by drawing them all (make sample-pairs-all).
 
 # ── Measurement ─────────────────────────────────────────────────────────────────────────────────
 
 # Measure diff_code's speed, memory, AST size and mapping operation count across one language's
 # sampled pairs.
-#
-# One LANGUAGE-parameterised target, not the five it replaced (`measure-pairs`, `-rust`, `-java`,
-# `-javascript`, `-typescript`). Those ran the same binary with per-target opinions nobody had
-# written down: three passed --max-combined-nodes 20000 and two did not, and they wrote to two
-# different conventions - data/diff_pairs_benchmark[_rust].csv loose in data/, against
-# data/performance/benchmark_<language>.csv for the rest. The second is canonical: it is what
-# measure/benchmark_all_extended.sh writes, what analysis/benchmark_report.py reads, and what the
-# 20-odd committed per-language CSVs in data/performance/ already use. The two loose paths were
-# never committed, so unifying on the canonical one moves no data.
 #
 #   make measure-pairs LANGUAGE=rust
 #   make measure-pairs LANGUAGE=all PAIRS_NODE_LIMIT=0     # 0 disables the cap
@@ -289,17 +260,9 @@ pairs-diff-report:
 
 # Speed and memory across a whole sampled corpus, via measure/benchmark_all_extended.sh.
 #
-# One target, LANGUAGE-parameterised, rather than the two it replaced
-# (`measure-sampled` and `measure-sampled`). Those differed only
-# in the flags they passed - the narrow one silently dropped --limit, --max-commits, --timeout-min
-# and --continue-on-error, so "the same benchmark on fewer languages" was not the same benchmark.
-# Naming a language set is not a reason to have a second copy of the settings.
-#
 #   make measure-sampled                                  # every supported language
 #   make measure-sampled LANGUAGE="Rust Python Go Kotlin"  # a subset
-# Deliberately no default. `measure-sampled` treats an unset LANGUAGE as "every language"; for
-# `measure-pairs` there is no sensible default and an unset one has to be an error, not a guess -
-# a shared `LANGUAGE ?= all` made the second silently measure the whole corpus.
+# Unset LANGUAGE means every language here; measure-pairs requires it.
 SAMPLED_REPOS ?= /var/tmp/research/small/repositories/
 SAMPLED_NODE_LIMIT ?= 20000
 SAMPLED_MAX_COMMITS ?= 100
@@ -333,13 +296,12 @@ shapes-report:
 	uv run ./analysis/human_mapping_shapes_report.py
 
 # Shape of real-world file edits: how many lines a commit touches, across how many files, and what
-# fraction of a file an edit changes. Section 3 of the introductory paper cited only Arafat and
-# Riehle's commit-size distribution for this and carried a TODO for our own numbers.
+# fraction of a file an edit changes.
 #
-# Reads the cloned corpus under $(CORPUS_ROOT)/$(MODE)/repositories directly with `git log
-# --numstat`, so it needs the clones (`make fetch MODE=<mode>`) but no build and no parse. It is a
-# census of each clone's (depth-limited) history, NOT a draw from data/samples/ - those pairs are
-# stratified by size bucket and so cannot answer "how big is a typical edit".
+# Reads the cloned corpus under $(REPOSITORIES_DIR) directly with `git log --numstat`, so it needs
+# the clones (`make fetch MODE=<mode>`) but no build and no parse. It is a census of each clone's
+# (depth-limited) history, NOT a draw from data/samples/ - those pairs are stratified by size
+# bucket and so cannot answer "how big is a typical edit".
 #
 # EDIT_SHAPE_COMMITS caps how many commits per repository are walked, and defaults to the corpus's
 # own clone depth. It is not a speed knob: these clones are shallow but NOT uniformly so, and an
@@ -406,14 +368,7 @@ measure-per-test-coverage:
 # Codediff against the other diff tools (Unix `diff`, GumTree, difftastic, diffsitter) over this
 # repository's own fixture corpus - timing, and agreement with the human ground truth.
 #
-# **In research/, not the root Makefile, because they measure other people's tools.** A benchmark
-# answers "how good is codediff"; the moment a number depends on which version of GumTree happens
-# to be installed in /var/tmp, it is a study of the field rather than product QA, and it belongs
-# here with everything else whose answer moves when someone else ships a release. That is the rule
-# even though these two do run against src/test/data/diffs/ and need no REPOSITORIES_DIR.
-#
-# `benchmark_other` itself stays in ../src/bin/: it is a dev tool gated behind `test-fixtures`, and
-# nothing about it needed duplicating to move these targets - only the entry points moved.
+# In research/ because they measure other people's tools (see the root Makefile's header).
 #
 # A tool that is not installed is skipped with a note, not an error, so both targets still produce
 # a codediff column on a machine with none of them. See data/comparison/PROVENANCE.md for which
@@ -531,7 +486,7 @@ measure-astdiff-oracle-human: fetch-external
 		--human-mappings src/test/data/diffs/defects4j \
 		--csv research/data/comparison/astdiff_oracle_defects4j_human.csv $(ASTDIFF_ORACLE_ARGS)
 
-# ── RQ1: whole-tree APTED against a 1-second budget ─────────────────────────────────────────────
+# ── RQ1 (the paper's RQ2): whole-tree APTED against a 1-second budget ───────────────────────────
 
 # Same slow/fast split as measure-tools-timing above: `apted-budget-report` re-renders from whatever
 # data/rq1/apted_only_group*.csv already holds, `measure-apted-budget` re-measures first.
@@ -620,15 +575,10 @@ introductory-paper:
 	$(MAKE) paper-variables
 	$(build-pdf)
 
-# Regenerates papers/introductory-paper's empirical-study numbers (Table 1, repository/file/language
-# counts, bytes-AST correlation - all \input from figures/variables.tex, a generated LaTeX-macro
-# file, not hand-transcribed - see write_paper_variables's own doc comment in analysis/file_stats.py
-# for exactly why that matters) and its file-types figure, from whatever $(RESEARCH_DIR)/stats.sqlite
-# already has on disk for the current MODE (default tiny - pass MODE=small or MODE=full to match
-# whatever `make measure-file-stats` run you actually have). Reuses the fast half of that split
-# (file-stats-report), not measure-file-stats itself, for the same reason introductory-paper depends on
-# timing-report and not measure-tools-timing: rebuilding a paper should never pay for the slow
-# step. Run `make measure-file-stats MODE=<mode>` yourself first to (re)populate that mode's stats.sqlite.
+# The paper's empirical-study numbers (Table 1, repository/file/language counts, bytes-AST
+# correlation) and file-types figure, from $(RESEARCH_DIR)/stats.sqlite for the current MODE - via
+# file-stats-report, so a paper rebuild never re-measures. Run `make measure-file-stats MODE=<mode>`
+# first to (re)populate that database.
 introductory-paper-empirical: file-stats-report
 	$(MAKE) paper-variables
 	$(build-pdf)

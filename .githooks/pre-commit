@@ -17,39 +17,14 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Two jobs, in order: format what is being committed, then keep src/test/data/diffs.csv in step
-# with the fixture corpus it describes. Git runs one pre-commit hook, so both live here.
+# Two jobs: format what is being committed (cargo fmt, ruff format), then regenerate
+# src/test/data/diffs.csv when the commit touches the fixture corpus.
 #
-# ── 1. Formatting ───────────────────────────────────────────────────────────────────────────────
+# Nothing unstaged is ever staged: a file with further unstaged changes is reported and left
+# alone. rustfmt cannot format one file without the modules it declares, so `cargo fmt --all`
+# runs and any other file it touches is listed, not staged.
 #
-# `cargo fmt` and `ruff format` are both CI gates (`make ci`'s `fmt` and `python-lint` jobs), and
-# forgetting either is the single most common way a commit lands red. Formatting here costs the
-# `--check` pass on the overwhelming majority of commits, where nothing needs doing.
-#
-# **Nothing unstaged is ever staged by this hook.** That is the whole constraint, because a partly
-# staged file is a deliberate act - `git add -p` exists - and a formatter that quietly committed the
-# rest of it would be worse than no formatter. So a file that is staged *and* has further unstaged
-# changes is reported and left alone, never re-added.
-#
-# The Rust half cannot avoid touching the working tree, and that is a rustfmt limitation rather than
-# a choice: `--skip-children` is not on stable (checked 2026-09-15, rustfmt 1.9.0), so running it on
-# one file reformats every module that file declares. `cargo fmt --all` is therefore the honest
-# spelling - it is also exactly what CI checks - and any file it touches that this hook will not
-# stage is listed afterwards, so the change is visible rather than silent. The Python half has no
-# such problem: `ruff format` formats the paths it is given and nothing else.
-#
-# Keeps src/test/data/diffs.csv in step with the fixture corpus it describes.
-#
-# The inventory (src/bin/diff_inventory.rs) is entirely derived from src/test/data/diffs/, so a
-# commit that adds, edits or deletes a fixture - or finishes a tree mapping, or paints text ranges -
-# leaves the checked-in CSV describing a corpus that no longer exists. Regenerating by hand works
-# right up until somebody forgets, and a stale inventory is worse than none: it reads as current.
-#
-# Runs *only* when the commit actually touches the corpus, which is a small minority of commits.
-# Everything else exits in one `git diff --cached` and costs nothing.
-#
-# Enable with `make install-hooks` (or `git config core.hooksPath .githooks`). Skip once with
-# `git commit --no-verify`.
+# Enable with `make install-hooks`; skip once with `git commit --no-verify`.
 
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
@@ -165,10 +140,7 @@ EOF
 fi
 
 echo "pre-commit: fixtures changed, regenerating $INVENTORY"
-# `--release`, not a debug build: the inventory parses every fixture with tree-sitter, which takes
-# a couple of seconds optimized and well over a minute unoptimized. The first run after a clean
-# checkout has to compile it, and this crate's release profile is `lto = "fat"` - so say what is
-# happening rather than leaving a silent multi-minute hang at commit time.
+# The first run on a clean checkout compiles the fat-LTO release binary: expect minutes.
 if ! make --quiet diff-inventory; then
     echo "pre-commit: diff_inventory failed - see the error above" >&2
     echo "  (commit with --no-verify to bypass, then fix the inventory separately)" >&2

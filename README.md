@@ -17,7 +17,7 @@ rewritten.](/assets/diff-vs-codediff.gif)
 **[Try it in the browser](https://ivankovic.github.io/codediff/showcase/)**: twenty real changes,
 compared side by side in Unix `diff` and in CodeDiff.
 
-Light theme is available:
+The terminal UI, in its light theme:
 
 ![A screenshot of CodeDiff's two-panel terminal UI in a light theme, showing the same Python
 refactoring, with the changed right-hand sides highlighted rather than whole
@@ -79,11 +79,10 @@ distribution's repository yet.
 
 ## Editor integration
 
-**Please note: VS Code doesn't yet support replacing the default diff. The API feature request for
-this functionality is currently implemented but not yet released. As soon as it is released,
-CodeDiff will support replacing the default VS Code diff**
+VS Code does not yet let an extension replace its built-in diff view. The API is implemented
+upstream but unreleased; the extension will adopt it when it ships.
 
-* **VS Code** - [codediff-vscode](https://github.com/ivankovic/codediff-vscode), v0.0.1. Search for
+* **VS Code** - [codediff-vscode](https://github.com/ivankovic/codediff-vscode). Search for
   **CodeDiff** in the Extensions view, or `code --install-extension ivankovic.codediff`. Also on
   [Open VSX](https://open-vsx.org/extension/ivankovic/codediff) for VSCodium, Cursor and Windsurf.
 * **Neovim** - [codediff.nvim](https://github.com/ivankovic/codediff.nvim).
@@ -207,8 +206,6 @@ nothing rather than as a failure.
 
 ## Jujutsu (jj) integration
 
-**Note:** jj support will be much improved in v0.2.*.
-
 jj does not read git's `difftool`/`diff.external` settings, even in a colocated repo, so it needs
 its own configuration. Run the setup wizard:
 
@@ -290,13 +287,13 @@ CodeDiff's goal is:
 * **A median diff in 100ms or less.**
 * **A 99th-percentile diff in 1000ms or less.**
 
-Both are met. Over the 2,001 fixtures in `src/test/data/diffs/`, measured on an Intel Xeon
-E3-1275 v5 (4 cores, 8 threads) with 64 GB RAM: **p50 7.6ms, p90 78.7ms, p99 347ms**, slowest
-1,355ms. **100ms is the 92.7th percentile** — 146 of 2,001 fixtures take longer than that, and 2
+Both are met. Over the fixtures in `src/test/data/diffs/`, about 2,000, measured 2026-09-18 on an
+Intel Xeon E3-1275 v5 (4 cores, 8 threads) with 64 GB RAM: **p50 7.6ms, p90 78.7ms, p99 347ms**,
+slowest 1,355ms. **100ms is the 92.7th percentile** — 146 fixtures take longer than that, and 2
 take longer than a second.
 
-Benchmarks make sure that performance does not regress. `make benchmark-quality` prints the
-distribution above; `make check-quality` compares it against the committed baseline on every push.
+Runtime is reported, never gated: `make check-quality` prints this distribution against the
+committed baseline on every push, and warns when the runtime is more than twice the baseline's.
 
 ## Robust
 
@@ -323,20 +320,20 @@ ground-truth mappings in `src/test/data/diffs/`:
 * **90% of test cases with zero mismatched bytes.**
 * **99% of test cases with at most 1% of bytes mismatched.**
 
-Neither is met yet. 792 of the 2,001 fixtures carry a hand-painted ground truth - every byte of
+Neither is met yet. 818 of about 2,000 fixtures carry a hand-painted ground truth - every byte of
 both files labelled with what a human says happened to it - and CodeDiff's own highlighting is
 compared against it byte by byte, under each of its two highlighting presets (`--full`, which keeps
 brackets, separators and leading whitespace, and `--minimal`, which drops them):
 
 | preset | zero mismatched bytes | at most 1% mismatched | mismatched bytes, whole corpus |
 |---|---|---|---|
-| `--full` | **528 (66.7%)** | **674 (85.1%)** | 27,094 of 26.3M (0.10%) |
-| `--minimal` | **559 (70.6%)** | **702 (88.6%)** | 16,524 of 26.3M (0.06%) |
+| `--full` | **539 (65.9%)** | **699 (85.5%)** | 27,865 of 28.5M (0.10%) |
+| `--minimal` | **576 (70.4%)** | **728 (89.0%)** | 17,134 of 28.5M (0.06%) |
 
 The whole-corpus rate is far below 1% because most of each file is unchanged and nobody gets that
 wrong; the per-test-case numbers are the ones that count, since a reader meets the mistakes one
 diff at a time. Most of what is left is not in the matching: rendering the human's own node
-mapping still disagrees with the painting on 78% of the `--full` bytes and 70% of the `--minimal`
+mapping still disagrees with the painting on 77% of the `--full` bytes and 69% of the `--minimal`
 ones, so the highlighting rules own the gap more than the matcher does.
 
 `make update-painting-attribution` measures this and writes one row per fixture and preset to
@@ -349,7 +346,8 @@ Copyright (C) 2026 Marko Ivankovic
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published
-by the Free Software Foundation.
+by the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
 See the LICENSE file for the full text of the License.
 

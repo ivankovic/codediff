@@ -59,7 +59,7 @@ coverage: test
 # Every test, JS, Python and Rust. `--all-features` because several features gate their own tests.
 # Not a substitute for `make ci`, which also proves each feature compiles alone and runs the
 # clippy matrix and baseline gates. Release, because the fixture tests run real diffs.
-test: test-mapping-site-js test-viewer-js test-python test-rust
+test: test-mapping-site-js test-viewer-js test-showcase-js test-python test-rust
 
 # The Rust suite alone, every feature on.
 test-rust:
@@ -102,7 +102,7 @@ install-hooks:
 	@echo "               re-staging only files with no further unstaged changes, and regenerates"
 	@echo "               src/test/data/diffs.csv when a commit touches the fixture corpus, so the"
 	@echo "               checked-in inventory never goes stale (.githooks/pre-commit)"
-	@echo "  pre-push   - fmt + clippy + site JS tests, the fast subset of CI (.githooks/pre-push)"
+	@echo "  pre-push   - fmt + clippy + ruff + site JS tests, CI's fast subset (.githooks/pre-push)"
 
 # Scores diff accuracy and speed against the hand-authored ground truth in src/test/data/.
 benchmark-quality:
@@ -195,7 +195,7 @@ BENCH_QUALITY := cargo run --release --features $(FEATURES) --bin benchmark_opti
 # The "Runtime: N ms/fixture" figure out of $(BENCH_OUTPUT), as a number.
 extract-ms = grep -oE '[0-9.]+ms/fixture' $(BENCH_OUTPUT) | grep -oE '[0-9.]+'
 
-# The release gate, run by `deploy`.
+# The quality gate: CI runs it on every push, deploy before tagging.
 #
 # Accuracy is compared per fixture, never aggregated: the corpus grows toward hard cases, so any
 # aggregate reads new data as a regression. Fixtures without a baseline row pass. Runtime only warns
@@ -230,8 +230,8 @@ update-painting-attribution:
 	cargo test --release --lib --features test-fixtures \
 		painting_failure_census -- --ignored --nocapture
 
-# Rewrites both baselines; never done by `deploy`. The accuracy columns come from the
-# `optimal_solutions` stubs, not the run, so this cannot re-baseline an accuracy regression away.
+# Rewrites both baselines; never done by `deploy`. A test pins the accuracy columns to the
+# `src/test/fixtures/` stubs' limits, so this cannot re-baseline an accuracy regression away.
 # Not gated on check-quality, which is red exactly after a reviewed trade-off this exists for.
 # `mkdir -p` for check-quality's tee race; without pipefail it would write an empty MS_PER_FIXTURE.
 update-quality-baseline:

@@ -2,8 +2,6 @@
 
 **At this time, to keep the development speed high, contributions are not accepted.**
 
-Thank you for considering a contribution, human or AI-assisted (see the README's AI policy).
-
 ## Technology
 
 The product is written in Rust. The showcase's browser viewer (`assets/viewer/`) is plain
@@ -13,8 +11,7 @@ CodeDiff stores user configuration, for example the active theme, on disk with `
 dataset-analysis tools in `src/bin/` use a separate SQLite database to store the stats that they
 collect.
 
-The UI is a terminal UI, written with the Ratatui and Crossterm libraries. The GitHub Pages
-showcase runs a port of the same viewer in the browser, on static files.
+The UI is a terminal UI, written with the Ratatui and Crossterm libraries.
 
 ### UI design patterns
 
@@ -110,13 +107,13 @@ different standards: `src/bin/` is samplers, benchmark harnesses and `human_solv
 which exist to be run once and read.
 
 **Not a CI gate.** It costs about ten minutes and 6GB peak, since it rebuilds the workspace with
-instrumentation - and a threshold mostly teaches people to write tests that touch lines. At 97.1%
+instrumentation - and a threshold mostly teaches people to write tests that touch lines. At 97%
 the engine would never be what tripped a floor; only the dev tools would.
 
 One test knows it is being measured: `rust_completely_unrelated_main_files_resolves_fast` asserts
-a five-second wall-clock bound, which instrumentation blows through (12.4s measured), so it skips
-that half of itself when `LLVM_PROFILE_FILE` or `CARGO_LLVM_COV` is set. It is the only
-wall-clock assertion in the library suite; add the same guard if another appears.
+a five-second wall-clock bound, which instrumentation blows through, so it skips that half of
+itself when `LLVM_PROFILE_FILE` or `CARGO_LLVM_COV` is set. It is the only wall-clock assertion in
+the library suite; add the same guard if another appears.
 
 The README badge reads `research/data/coverage/badge.json`, which `make coverage` rewrites.
 It is therefore only as current as the last run somebody committed - re-run and commit it when
@@ -143,11 +140,8 @@ Run `make benchmark-quality`. This command diffs every fixture in `src/test/data
 human-verified ground truth mapping. It reports how many nodes each fixture gets wrong. Use this
 output to see whether a change made diffs better or worse.
 
-The README's "Accurate" principle states the targets for what a reader sees - the painting, compared
-byte by byte against the hand-painted ground truth, under both `--full` and `--minimal`:
-
-* **90% of test cases with zero mismatched bytes.**
-* **99% of test cases with at most 1% of bytes mismatched.**
+The README's "Accurate" principle states the painting targets, compared byte by byte under both
+`--full` and `--minimal`.
 
 `make update-painting-attribution` measures them, one row per fixture and preset in
 `research/data/quality/painting_attribution.csv`, and `make check-painting-attribution` fails CI if
@@ -178,22 +172,15 @@ visibly wrong. `is_structurally_visible`'s doc comment has the reasoning in full
 
 ### Speed
 
-Two goals, stated in the README and repeated here for the same reason the accuracy ones are:
-
-* **p50 <= 100ms**
-* **p99 <= 1000ms**
-
-Both are met - p50 7.6ms and p99 347ms over the 2,001 fixtures, measured 2026-09-18 - so a change
-that costs speed has room to spend, and a change that costs an order of magnitude does not.
-`make benchmark-quality` prints the whole distribution as a side effect of measuring accuracy, and
-`make check-quality` compares it against the committed baseline on every push, warning rather than
-failing (wall-clock varies too much machine to machine to gate on).
+The README's "Fast" principle states the goals (p50 <= 100ms, p99 <= 1000ms). Both are met with
+room to spare, so a change may cost some speed but not an order of magnitude. `make
+benchmark-quality` prints the total runtime and the time per fixture; `make check-quality` prints
+the p50/p90/p99 distribution against the committed baseline, and warns, never fails, on a runtime
+above 2x the baseline.
 
 ## Code structure
 
 Follow Rust's standard project structure.
-
-Some directories in the list below do not exist yet. Create them if the need arises.
 
 ```
 <root of the repository>
@@ -218,7 +205,7 @@ Some directories in the list below do not exist yet. Create them if the need ari
     |- README.md        <- High-level project summary. Must be readable to humans.
     |- CONTRIBUTING.md  <- This file
     |- AGENTS.md        <- AI-only instructions
-    |- REVIEW.md        <- Comments about the codebase that need to be improved upon
+    |- REVIEW.md        <- Open code-health items
 ```
 
 `README.md` files can exist in any subdirectory: a high-level summary of it, readable by humans.
@@ -228,17 +215,17 @@ of the repository; `AGENT_LOG.md` at the root is git-ignored for that. `REVIEW.m
 
 ## Makefile targets
 
-These are the repository-root Makefile's targets - product concerns only: build, test, install, the
-quality gate, release. The corpus, measurement, analysis and paper targets live in
+These are the repository-root Makefile's main targets - product concerns only: build, test,
+install, the quality gate, release. The corpus, measurement, analysis and paper targets live in
 `research/Makefile`, are run from that directory (`cd research && make <target>`), and are
 documented there.
 
 ### Build, test, quality
 
-* `test` - `cargo nextest run --release --all-features`, plus `test-mapping-site-js` and
-  `test-viewer-js` (plain-Node tests of the human-mapping site's and the showcase viewer's vanilla JS, which
-  cargo's suite cannot cover - see the root Makefile) and `test-python` (`pytest` over the research
-  and script helpers, in `research/`'s uv environment).
+* `test` - `cargo nextest run --release --all-features`, plus `test-mapping-site-js`,
+  `test-viewer-js` and `test-showcase-js` (plain-Node tests of the human-mapping site's and the
+  showcase's vanilla JS, which cargo's suite cannot cover - see the root Makefile) and
+  `test-python` (`pytest` over the research and script helpers, in `research/`'s uv environment).
   Requires `cargo-nextest` (`cargo install cargo-nextest`, one-time), Node.js, and
   [`uv`](https://docs.astral.sh/uv/). Unlike `cargo test`, nextest
   runs each test in its own process rather than as a thread inside one long-lived binary, so the
@@ -281,8 +268,7 @@ Three verbs, and which file a target lives in follows from them:
   that moves when someone else ships a GumTree release is a study of the field, not product QA.
 
 * `benchmark-quality` - runs `benchmark_optimal_solutions`: mismatch count against the
-  human-authored ground truth, per fixture, and the runtime distribution (see "Quality" and
-  "Speed" above).
+  human-authored ground truth, per fixture, and the runtime (see "Quality" and "Speed" above).
 * `benchmark-ablation` - re-runs `benchmark-quality` with individual solver passes disabled, to see
   what each is worth. A one-off investigation rather than a routine measurement, which is why it is
   not folded into `benchmark-quality`.
@@ -290,10 +276,9 @@ Three verbs, and which file a target lives in follows from them:
   release. Fails hard on an accuracy regression against the checked-in baseline; only warns on a
   runtime jump of more than 2x.
 * `update-quality-baseline` - re-cuts both baselines after a reviewed change. `deploy` never runs
-  it automatically. Note what it does *not* do: the per-fixture accuracy columns are read from the
-  `fixtures` stubs, not from the run, so this cannot lower the accuracy bar. Raising a
-  limit means editing that fixture's stub - the same file that holds the prose explaining why -
-  and `quality_baseline.csv` is then a projection of those limits, pinned by a test.
+  it automatically. It cannot lower the accuracy bar: a test pins `quality_baseline.csv`'s
+  per-fixture accuracy columns to the `fixtures` stubs' limits, so raising a limit means editing
+  that fixture's stub - the same file that holds the prose explaining why.
 
 ### Release
 
@@ -331,6 +316,7 @@ Every push and pull request runs (see `.github/workflows/ci.yml`):
 * `ruff check` and `ruff format --check` over `research/`, `scripts/` and `assets/`, the Python
   unit tests (`make test-python`), the Gentoo `CRATES`/Manifest sync check and `make
   check-versions`
+* `make check-third-party-notices`
 * The quality gate (`make check-quality`) and the painting gate (`make
   check-painting-attribution`) - see "Quality" above
 * The non-fixture suite on macOS and Windows, with default features - the operating systems the
@@ -341,8 +327,8 @@ Every push and pull request runs (see `.github/workflows/ci.yml`):
 All of these checks must pass before a PR is done. Two things run them locally, before GitHub
 does - see "Makefile targets" above:
 
-* `make install-hooks` puts the fast subset (fmt, clippy, the JS tests) on every `git push`, so
-  the common mistakes never leave your machine.
+* `make install-hooks` puts the fast subset (fmt, clippy, ruff, the JS tests) on every `git push`,
+  so the common mistakes never leave your machine.
 * `make ci` runs *all* of the above, driven by parsing `ci.yml` itself so the two cannot drift.
   Minutes, not seconds - it does the release build and full test matrix. What it does not
   reproduce is the runner: it uses your toolchain and OS, where CI gets a clean pinned

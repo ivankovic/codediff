@@ -22,12 +22,11 @@
 #
 # Deliberately NOT a full CI mirror:
 #   - `cargo clippy` here, not CI's `cargo build --release` + `cargo nextest run --release` per
-#     feature config -
-#     this crate's release profile is `lto = "fat"`, `codegen-units = 1` (see Cargo.toml), which
-#     makes a release build genuinely slow; `cargo clippy` catches the same compile errors (it's a
-#     strict superset of `cargo check`) plus lint violations, in a fraction of the time and
-#     without running any tests at all. CI still runs the real build+test matrix and remains the
-#     authoritative gate.
+#     feature config - this crate's release profile is `lto = "fat"`, `codegen-units = 1` (see
+#     Cargo.toml), which makes a release build genuinely slow; `cargo clippy` catches the same
+#     compile errors (it's a strict superset of `cargo check`) plus lint violations, in a fraction
+#     of the time and without running any tests at all. CI still runs the real build+test matrix
+#     and remains the authoritative gate.
 #   - `cargo audit` is skipped - it needs `cargo-audit` installed and a network call to the
 #     RustSec advisory database, and it depends on Cargo.lock, not on what this push changed.
 # Enable this hook with `make install-hooks` (or `git config core.hooksPath .githooks` by hand).
@@ -44,9 +43,7 @@ cd "$(git rev-parse --show-toplevel)"
 echo "pre-push: cargo fmt --check"
 cargo fmt --check
 
-# Mirrors build-and-test's feature matrix (see ci.yml's own comment on why each of these three is
-# its own compilation unit) and CI's own (undocumented until now, see clippy job's own comment)
-# per-feature-config `cargo clippy -D warnings` gate.
+# Clippy once per feature config, as CI's clippy job.
 for features in "" "test-fixtures" "stats"; do
     label="${features:-default}"
     echo "pre-push: cargo clippy --tests --features \"$features\" -- -D warnings ($label)"
@@ -65,14 +62,13 @@ fi
 
 if command -v node >/dev/null 2>&1; then
     echo "pre-push: human_mapping site JS tests"
-    # Via the Makefile target rather than naming the files, so adding a third test file here is
-    # one edit and not three - this hook, CI's mapping-site-js job, and `make test` all have to
-    # agree, and viewer.test.js was already missed by this line once.
     make test-mapping-site-js
     echo "pre-push: showcase viewer JS tests"
     make test-viewer-js
+    echo "pre-push: showcase shim JS tests"
+    make test-showcase-js
 else
-    echo "pre-push: node not found, skipping human_mapping site JS tests (CI still runs these)"
+    echo "pre-push: node not found, skipping the JS tests (CI still runs these)"
 fi
 
 echo "pre-push: all checks passed (\`make ci\` runs the full CI mirror, if you want it)"

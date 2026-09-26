@@ -145,11 +145,8 @@ jobs:
 
       - uses: actions/configure-pages@v6
 
-      # v4 dropped dotfiles from the artifact. Nothing in `site` is one: `generate_mapping_site`
-      # wipes and recreates its output directory holding only index.html, fixtures/ and assets/,
-      # the showcase and the apt tree add plain directories, and Pages deployed from an Actions
-      # artifact never runs Jekyll, so no .nojekyll is needed either. If any of the three ever
-      # starts emitting a dotfile, this action will silently drop it.
+      # upload-pages-artifact drops dotfiles; nothing in site is one, and Pages from an artifact
+      # never runs Jekyll.
       - uses: actions/upload-pages-artifact@v5
         with:
           path: site

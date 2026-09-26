@@ -14,7 +14,7 @@ than a recipe here.
 | Debian/Ubuntu | `[package.metadata.deb]` in `../Cargo.toml` | **published** — signed apt repository at [ivankovic.github.io/codediff/apt](https://ivankovic.github.io/codediff/apt) |
 | Nix / NixOS | `nix/package.nix`, `../flake.nix`, `../flake.lock` | works today via `nix run`; built by the Nix workflow |
 | Homebrew | `homebrew/codediff.rb.in`, rendered by `../scripts/render_homebrew_formula.py` | tap at `ivankovic/homebrew-codediff`, pushed by the release workflow |
-| VS Code | [`vscode.md`](vscode.md) | **published** — v0.0.1 on the Marketplace and Open VSX, built from [codediff-vscode](https://github.com/ivankovic/codediff-vscode) |
+| VS Code | [codediff-vscode](https://github.com/ivankovic/codediff-vscode) | **published** — on the Marketplace and Open VSX |
 
 ## The one thing you cannot skip: checksums
 
@@ -28,12 +28,9 @@ old hash and do not build. `make check-versions` checks the version strings, not
 * Nix needs a `hash =` only if you switch `package.nix` to `fetchFromGitHub`; as long as `src` is
   a parameter and `cargoLock.lockFile` points at the in-tree lock, there is nothing to hash
 
-**The crate half is generated, and CI checks it.** The Manifest's crate digests drifted
-silently through every dependency bump between v0.0.13 and v0.0.14 - 65 of them named older
-versions and one crate had no line at all - because `generate_gentoo_crates.py --check` validated
-the ebuild's `CRATES` list and nothing looked at the Manifest. It checks both now, and
-`--manifest` rebuilds the crate lines from the cargo cache, verifying each `.crate` against the
-sha256 Cargo.lock already records before hashing it:
+**The crate half is generated, and CI checks it** (`generate_gentoo_crates.py --check` covers both
+the ebuild's `CRATES` and the Manifest). `--manifest` rebuilds the Manifest's crate lines from the
+cargo cache, verifying each `.crate` against Cargo.lock's sha256 first:
 
 ```sh
 python3 scripts/generate_gentoo_crates.py            # the ebuild's CRATES block
@@ -56,15 +53,7 @@ nix-prefetch-url --unpack https://github.com/ivankovic/codediff/archive/refs/tag
 `gh release download` returns). The recipes here all build from the source tarball, so its hash
 has to come from the tarball itself.
 
-Do not hand-write a checksum. A wrong one looks correct until the moment somebody's build fails.
-
-Computing one from the downloaded artifact is not hand-writing it, and is what those tools do
-anyway - but check your work. The v0.0.14 values were produced without `updpkgsums`/`ebuild`
-available, so: the tag tarball was fetched twice and both fetches hashed identically
-(`b9192d9c…`, 68,557,321 bytes), its BLAKE2B/SHA512 were cross-checked against `b2sum` and
-`sha512sum`, every crate file was verified against the sha256 `Cargo.lock` already records for it
-before being hashed, and `--check` confirmed both the ebuild's `CRATES` list and the Manifest's
-crate set against `Cargo.lock` afterwards (no drift).
+Do not hand-write a checksum: a wrong one looks correct until somebody's build fails.
 
 ## Decisions that apply to every recipe
 
@@ -93,7 +82,7 @@ release profile sets `lto = "fat"` with `codegen-units = 1`. Minutes, not second
 
 ## Gentoo
 
-`CRATES=` lists every dependency crate (327 as of 0.1.0) and is **generated, not edited**:
+`CRATES=` lists every dependency crate and is **generated, not edited**:
 
 ```sh
 python3 scripts/generate_gentoo_crates.py            # rewrite the block
@@ -197,13 +186,8 @@ so an environment secret would need that job attached to one first.
 gpg --armor --export-secret-keys '<KEYID>' | wc -c   # thousands of bytes, never 0
 ```
 
-`gh secret set` accepts empty stdin without complaint, so an export that produced nothing — a
-mistyped key id, a `<KEYID>` placeholder pasted literally, a pinentry with no terminal to prompt
-on — stores a secret that exists, lists under `gh secret list` with a timestamp, and expands to
-the empty string in the workflow. That is how this failed the first time it ran, and the run log
-is no help: Actions prints a non-empty secret as `***` and an empty one as nothing at all, which
-looks identical to a secret the job cannot read. `pages.yml` now rejects a value that is not an
-armoured private key block, so the next occurrence says so by name.
+`gh secret set` accepts empty stdin and stores a secret that lists normally but expands to nothing;
+pages.yml rejects a value that is not an armoured private key block.
 
 The private key exists only in that secret. **Back it up somewhere you control**: losing it means
 generating a new one, and every user who added the old key gets a signature failure on their next

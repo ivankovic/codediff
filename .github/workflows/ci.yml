@@ -54,9 +54,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Same reasoning as build-and-test's matrix below: each feature config is its own
-        # compilation unit (see Cargo.toml's [features]), so each needs its own clippy pass, not
-        # just a single default-feature run.
+        # One pass per feature config, as in build-and-test below.
         features: ["", "test-fixtures", "stats"]
     steps:
       - uses: actions/checkout@v7
@@ -101,12 +99,8 @@ jobs:
         with:
           node-version: 24
 
-      # The Makefile target, not the two `node` lines by hand: it is what `make test` and the
-      # pre-push hook run, and the three must not drift apart (see the target's own comment for
-      # what the tests do and do not cover).
+      # The Makefile targets, which make test and the pre-push hook also run.
       - run: make test-mapping-site-js
-
-      # The showcase viewer's model (assets/viewer/), same arrangement - see the target's comment.
       - run: make test-viewer-js
       - run: make test-showcase-js
 
@@ -292,30 +286,11 @@ jobs:
       - name: Build
         run: cargo build --release --features "${{ matrix.features }}"
 
-      # cargo-nextest, not `cargo test`: it runs each test in its own process instead of as a
-      # thread inside one long-lived binary, so this crate's test fixture caches (never-evicting,
-      # process-lifetime - see src/test/helper.rs) get reclaimed by the OS after every test rather
-      # than accumulating for the whole suite. Measured locally: same machine, same --release
-      # build, peak RSS 10.66GB under `cargo test --release` vs 5.37GB under `cargo nextest run
-      # --release`, at comparable wall-clock - the difference between a CI runner OOMing on this
-      # suite and not.
-      # Split in two because the 3209 `src/test/fixtures/` tests are byte-identical in all three
-      # feature sets - nothing they touch is feature-gated - so running them once per set was the
-      # same work three times over, and about two thirds of the suite's CPU time. The first
-      # step runs what genuinely differs between the sets, including the
-      # meta-tests that only exist under `test-fixtures`/`stats`; the second runs one third of
-      # the corpus, so the three jobs together still run every fixture test exactly once. This is
-      # redistribution, not selection: nothing is skipped.
-      #
-      # `--partition` is deterministic by test name, so a fixture always lands in the same shard
-      # and a CI failure reproduces locally either with the same `--partition` flag or by naming
-      # the test directly.
-      #
-      # `test()` matches the test name *without* the crate prefix, so the anchor is
-      # `^test::fixtures::` and not `^codediff::test::fixtures::`. Getting that wrong matches
-      # nothing, which does not fail: the first step would simply run the whole suite and the
-      # second none of it, and CI would stay green while doing exactly the work this split
-      # exists to avoid. Check `cargo nextest list -E '<expr>'` counts 3209 before editing these.
+      # nextest: one process per test, so src/test/helper.rs's fixture caches are freed after each
+      # (see CONTRIBUTING.md). The src/test/fixtures/ tests touch nothing feature-gated, so each job
+      # runs one third of them (--partition, deterministic by name) and the three jobs together run
+      # each once. test() matches names without the crate prefix: ^codediff::test::fixtures::
+      # matches nothing and CI stays green - check `cargo nextest list -E '<expr>'` before editing.
       - name: Test (what this feature set changes)
         run: cargo nextest run --release --features "${{ matrix.features }}"
           -E 'not test(/^test::fixtures::/)'

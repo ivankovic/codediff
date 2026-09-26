@@ -4,7 +4,8 @@
 - Always read README.md in any directory in this repository before you read or write any files in
 that directory.
 
-* You can run benchmark_optimal_solutions binary to check the impact of any changes.
+- `make benchmark-quality` (the `benchmark_optimal_solutions` binary) shows a change's effect on
+accuracy and speed.
 
 ## Markdown files
 
