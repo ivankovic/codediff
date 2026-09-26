@@ -41,7 +41,8 @@ pub(crate) fn node_label(node: Node, src: &[u8]) -> String {
 /// desyncs ratatui's buffer from the terminal and a `\r` overwrites the row from column 0. One
 /// space, not a tab stop, and C0 only (a C1 control is two bytes): a character's screen column
 /// must keep matching its byte offset, because paint cursors and `HumanTextSpan`s are stored in
-/// those coordinates. The product TUI's `display_safe` makes the same trade.
+/// those coordinates. The product viewer keeps the tab instead and maps byte columns to tab
+/// stops where it draws a row (`codediff::tui::display_columns`).
 pub(crate) fn display_safe_char(ch: char) -> char {
     if ch.is_ascii_control() { ' ' } else { ch }
 }

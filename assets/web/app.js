@@ -1165,6 +1165,8 @@
 
   // ----- mouse ----------------------------------------------------------------------------------
 
+  // `[column, isDisplayColumn]`: the UTF-16 column the browser reports under the pointer, or,
+  // where it reports none, the display column measured from the pointer's x.
   function columnFromPoint(textElement, x, y) {
     const position = document.caretPositionFromPoint
       ? document.caretPositionFromPoint(x, y)
@@ -1185,10 +1187,10 @@
         }
         node = node.parentNode;
       }
-      return column;
+      return [column, false];
     }
     const rect = textElement.getBoundingClientRect();
-    return Math.max(Math.round((x - rect.left) / state.cellWidth), 0);
+    return [Math.max(Math.floor((x - rect.left) / state.cellWidth), 0), true];
   }
 
   function onPanelClick(index, e) {
@@ -1197,8 +1199,10 @@
     if (!rowElement) return;
     const row = Number(rowElement.dataset.row);
     const textElement = rowElement.querySelector(".text");
-    const col = e.target.closest(".gutter") ? 0 : columnFromPoint(textElement, e.clientX, e.clientY);
-    state.model.clickAt(index, row, col);
+    const [col, isDisplayColumn] = e.target.closest(".gutter")
+      ? [0, false]
+      : columnFromPoint(textElement, e.clientX, e.clientY);
+    state.model.clickAt(index, row, col, isDisplayColumn);
     render();
   }
 
@@ -1234,6 +1238,8 @@
     if (state.info.config_error) setError(state.info.config_error);
     document.title = `codediff ${state.info.version}`;
 
+    state.model.setTabWidth(state.info.tab_width);
+    document.documentElement.style.setProperty("--tab-size", state.info.tab_width);
     measure();
     for (let i = 0; i < 2; i++) {
       const { code } = panelElements(i);

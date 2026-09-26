@@ -109,6 +109,8 @@ html, body {
 .rows {
   position: relative;
   white-space: pre;
+  /* The server's `tab_width`, set by app.js; model.js counts display columns with the same. */
+  tab-size: var(--tab-size);
 }
 
 /* Sized to the text, not the viewport, so the sticky gutter's containing block spans the whole

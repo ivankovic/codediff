@@ -62,24 +62,7 @@ const PALETTE = {
   assert.strictEqual(M.rangeAt(ranges, order, 2, 0), null);
 }
 
-// change_positions_collapses_a_multi_row_insert_split_into_one_stop, and does not collapse
-// adjacent but unrelated changes
-{
-  const split = [
-    rm("insert", [2, 4, 2, 9], [1, 0, 1, 0]),
-    rm("insert", [3, 4, 3, 7], [1, 0, 1, 0]),
-    rm("insert", [4, 2, 4, 5], [1, 0, 1, 0]),
-    rm("identical", [0, 0, 0, 3]),
-  ];
-  assert.deepStrictEqual(M.changePositions(split, M.buildRangeOrder(split)), [[2, 4]]);
-  const unrelated = [rm("insert", [2, 0, 2, 5], [1, 0, 1, 0]), rm("delete", [3, 0, 3, 5], [9, 0, 9, 0])];
-  assert.deepStrictEqual(M.changePositions(unrelated, M.buildRangeOrder(unrelated)), [
-    [2, 0],
-    [3, 0],
-  ]);
-}
-
-// next_change_position wraps; change_count_and_index counts at-or-before the cursor
+// next_search_match_position wraps; search_match_count_and_index counts at-or-before the cursor
 {
   const positions = [
     [2, 0],
@@ -173,6 +156,52 @@ const PALETTE = {
   assert.deepStrictEqual(panel.cursor(), [1, 3], "a no-op at the very end");
   assert.strictEqual(M.stepLeft("a😀", 3), 1);
   assert.strictEqual(M.stepRight("a😀", 1), 3);
+}
+
+// display_columns: tab stops, and the inverse mapping on every covered column
+{
+  const line = "\té😀x";
+  assert.strictEqual(M.displayColumn(line, 1, 4), 4, "after the tab");
+  assert.strictEqual(M.displayColumn(line, 2, 4), 5, "after é");
+  assert.strictEqual(M.displayColumn(line, 4, 4), 6, "after the emoji, one column here");
+  assert.strictEqual(M.displayColumn(line, 3, 4), 5, "inside a surrogate pair rounds down");
+  assert.strictEqual(M.displayColumn("ab\tx", 3, 4), 4, "a tab reaches the next stop");
+  assert.strictEqual(M.displayColumn("abcd\tx", 5, 4), 8, "at a stop, a tab is a whole stop");
+  for (const [display, col] of [[0, 0], [3, 0], [4, 1], [5, 2], [6, 4], [7, 5]]) {
+    assert.strictEqual(M.columnAtDisplay(line, display, 4), col, `display column ${display}`);
+  }
+}
+
+// move_cursor_vertical_keeps_the_display_column_across_tab_and_space_indentation
+{
+  const panel = new M.PanelModel();
+  panel.tabWidth = 4;
+  panel.load(side(["\tfoo", "    bar"], []));
+  panel.setCursorPosition(0, 2); // the second `o`, drawn in column 5
+  panel.moveVertical(1);
+  assert.deepStrictEqual(panel.cursor(), [1, 5], "the `a` of `bar`, also column 5");
+  panel.moveVertical(-1);
+  assert.deepStrictEqual(panel.cursor(), [0, 2]);
+}
+
+// horizontal_scroll_follows_the_cursor_in_display_columns,
+// set_cursor_at_display_col_lands_on_the_character_drawn_there
+{
+  const panel = new M.PanelModel();
+  panel.tabWidth = 4;
+  panel.load(side(["\t\t\t\tx", "\tab"], []));
+  panel.viewportWidth = 5;
+  panel.setCursorPosition(0, 4); // `x`, drawn in column 16
+  assert.strictEqual(panel.scrollCol, 12);
+  panel.setCursorPosition(0, 1); // the second tab, from column 4
+  assert.strictEqual(panel.scrollCol, 4);
+
+  panel.setCursorAtDisplayCol(1, 2);
+  assert.deepStrictEqual(panel.cursor(), [1, 0], "inside the tab");
+  panel.setCursorAtDisplayCol(1, 5);
+  assert.deepStrictEqual(panel.cursor(), [1, 2], "the `b`");
+  panel.setCursorAtDisplayCol(1, 40);
+  assert.deepStrictEqual(panel.cursor(), [1, 3], "past the end");
 }
 
 // load_ranges_places_cursor_on_first_navigable_position; scrolling follows the cursor
@@ -459,6 +488,88 @@ function pairModel() {
   const model = pairModel();
   model.clickAt(1, 3, 99);
   assert.deepStrictEqual([model.activePanel, model.focusedCursorPosition()], [1, [3, 6]]);
+}
+
+// The cursor lands on a change, search hit or counterpart after non-ASCII text or tabs, and the
+// range under it is the one it is drawn on - DiffViewer's `*_after_non_ascii_text_or_tabs` tests.
+// `oneUpdateOnOneLine` is `one_update_on_one_line`: one update between unchanged text.
+function oneUpdateOnOneLine(before, [start, end], after, [afterStart, afterEnd]) {
+  const ranges = (s, e, os, oe) => [
+    rm("identical", [0, 0, 0, s], [0, 0, 0, os]),
+    rm("update", [0, s, 0, e], [0, os, 0, oe]),
+    rm("identical", [0, e, 1, 0], [0, oe, 1, 0]),
+  ];
+  const model = new M.DiffModel();
+  model.setTabWidth(4);
+  model.panels.forEach((panel) => {
+    panel.viewportHeight = 10;
+    panel.viewportWidth = 80;
+  });
+  model.loadDiff({
+    before: side([before], ranges(start, end, afterStart, afterEnd), "before"),
+    after: side([after], ranges(afterStart, afterEnd, start, end), "after"),
+  });
+  return model;
+}
+
+// n_puts_the_cursor_on_a_change_after_non_ascii_text, n_and_p_..._after_tab_indentation
+{
+  const model = oneUpdateOnOneLine("let é = old;", [8, 11], "let é = new;", [8, 11]);
+  model.jumpToChange(true);
+  assert.deepStrictEqual(model.focusedCursorPosition(), [0, 8], "on the `o`");
+  assert.deepStrictEqual(model.panels[1].cursor(), [0, 8], "the other panel follows");
+
+  const tabbed = oneUpdateOnOneLine("\t\told();", [2, 5], "\t\tnew();", [2, 5]);
+  tabbed.jumpToChange(true);
+  assert.deepStrictEqual(tabbed.focusedCursorPosition(), [0, 2]);
+  assert.strictEqual(tabbed.focused().cursorDisplayCol(), 8, "drawn after two tab stops");
+  tabbed.focused().setCursorPosition(0, 0);
+  tabbed.jumpToChange(false);
+  assert.deepStrictEqual(tabbed.focusedCursorPosition(), [0, 2]);
+}
+
+// search_puts_the_cursor_on_a_match_after_non_ascii_text_or_tabs
+{
+  for (const [line, col, display] of [
+    ["é = world", 4, 4],
+    ["漢字 = world", 5, 5],
+    ["\t\tworld", 2, 8],
+  ]) {
+    const model = oneUpdateOnOneLine(line, [0, 0], "x", [0, 0]);
+    model.search("world");
+    assert.deepStrictEqual(model.focusedCursorPosition(), [0, col], line);
+    assert.strictEqual(model.focused().cursorDisplayCol(), display, line);
+  }
+}
+
+// enter_puts_the_cursor_on_a_counterpart_after_non_ascii_text_or_tabs
+{
+  for (const [after, range, display] of [
+    ["é = new;", [4, 7], 4],
+    ["\tnew;", [1, 4], 4],
+  ]) {
+    const model = oneUpdateOnOneLine("old;", [0, 3], after, range);
+    model.focused().setCursorPosition(0, 0);
+    model.jumpToCounterpart();
+    assert.strictEqual(model.activePanel, 1);
+    assert.deepStrictEqual(model.focusedCursorPosition(), [0, range[0]], after);
+    assert.strictEqual(model.focused().cursorDisplayCol(), display, after);
+  }
+}
+
+// the_range_under_a_cursor_moved_past_non_ascii_text_is_the_one_it_is_drawn_on,
+// a_click_on_a_tab_indented_row_selects_the_range_drawn_under_it
+{
+  const model = oneUpdateOnOneLine("é = ab", [4, 6], "x = ab", [4, 6]);
+  model.focused().setCursorPosition(0, 0);
+  for (let i = 0; i < 4; i++) model.moveCursorHorizontal(1);
+  assert.deepStrictEqual(model.focusedCursorPosition(), [0, 4]);
+  assert.deepStrictEqual(model.focused().cursorDestination(), [0, 4, 0, 6]);
+
+  const tabbed = oneUpdateOnOneLine("\tx = ab", [5, 7], "x = ab", [4, 6]);
+  tabbed.clickAt(0, 0, 9, true); // `    x = ab`: the `b` is in display column 9
+  assert.deepStrictEqual(tabbed.focusedCursorPosition(), [0, 6]);
+  assert.deepStrictEqual(tabbed.focused().cursorDestination(), [0, 4, 0, 6]);
 }
 
 // The git review picker's rows and navigation mirror ReviewDialog's tests

@@ -218,7 +218,6 @@ impl DiffViewer {
         }
         self.focused_viewer().set_cursor_position(row, column);
         self.focused_viewer().scroll_to_center_row(row);
-        self.focused_viewer().scroll_to_show_col(column);
         self.sync_cross_highlight();
         self.sync_scroll_centered();
     }
@@ -454,17 +453,27 @@ impl DiffViewer {
         self.active_panel
     }
 
-    /// The focused cursor's 0-indexed `(row, col)`, or `None` with no file loaded.
+    /// The focused cursor's 0-indexed `(row, byte column)`, the unit of the ranges it is
+    /// compared with, or `None` with no file loaded.
     pub fn focused_cursor_position(&self) -> Option<(usize, usize)> {
+        let viewer = self.focused_viewer_ref()?;
+        let state = viewer.state();
+        Some((state.cursor_row, state.cursor_col))
+    }
+
+    /// The focused cursor's 0-indexed `(row, character column)`, for the footer's `Ln`/`Col`,
+    /// or `None` with no file loaded.
+    pub fn focused_cursor_character_position(&self) -> Option<(usize, usize)> {
+        Some(self.focused_viewer_ref()?.cursor_character_position())
+    }
+
+    /// The focused viewer, or `None` with no file loaded.
+    fn focused_viewer_ref(&self) -> Option<&CodeViewer> {
         let viewer = match self.active_panel {
             Panel::Before => &self.left_viewer,
             Panel::After => &self.right_viewer,
         };
-        if viewer.line_count() == 0 {
-            return None;
-        }
-        let state = viewer.state();
-        Some((state.cursor_row, state.cursor_col))
+        (viewer.line_count() > 0).then_some(viewer)
     }
 
     /// Load a single file, with no diff overlay, into the Before panel.
@@ -724,9 +733,9 @@ impl Component for DiffViewer {
                 let viewer = self.viewer_for(panel);
                 let row = viewer.state().scroll + (mouse.row - rect.y) as usize;
                 let clicked_col = (mouse.column - rect.x) as usize;
-                let col =
+                let display_col =
                     viewer.state().scroll_col + clicked_col.saturating_sub(viewer.gutter_width());
-                viewer.set_cursor_position(row, col);
+                viewer.set_cursor_at_display_col(row, display_col);
                 self.sync_cross_highlight();
                 self.sync_scroll();
                 Ok(Some(Action::Render))
@@ -1629,5 +1638,255 @@ mod tests {
         viewer.jump_to_counterpart();
         assert_eq!(viewer.active_panel, Panel::Before);
         assert_eq!(viewer.focused_cursor_position(), Some((0, 0)));
+    }
+
+    /// What a terminal shows after drawing `viewer`: the focused panel's cursor row, as its text
+    /// after the gutter, and the symbol in the cell under the cursor.
+    fn drawn_cursor(viewer: &mut DiffViewer) -> (String, String) {
+        let mut terminal = ratatui::Terminal::new(ratatui::backend::TestBackend::new(240, 12))
+            .expect("a test terminal");
+        terminal
+            .draw(|frame| {
+                let area = frame.area();
+                viewer.draw(frame, area).unwrap();
+            })
+            .expect("draw");
+        let backend = terminal.backend();
+        assert!(backend.cursor_visible(), "the cursor should be on screen");
+        let cursor = backend.cursor_position();
+        let content = match viewer.active_panel {
+            Panel::Before => viewer.last_before_content,
+            Panel::After => viewer.last_after_content,
+        }
+        .expect("the focused panel was drawn");
+        let text_start = content.x + viewer.focused_viewer().gutter_width() as u16;
+        let buffer = backend.buffer();
+        // A wide character's second cell holds a blank, which is not part of the text.
+        let mut row = String::new();
+        let mut x = text_start;
+        while x < content.x + content.width {
+            let symbol = buffer[(x, cursor.y)].symbol();
+            row.push_str(symbol);
+            x += crate::diff::text_range::row_cells_of(symbol).get().max(1) as u16;
+        }
+        (
+            row.trim_end().to_string(),
+            buffer[(cursor.x, cursor.y)].symbol().to_string(),
+        )
+    }
+
+    /// One `Update` between unchanged text on each side's single line, at byte columns
+    /// `[start, end)` of the before line and `[after_start, after_end)` of the after line.
+    fn one_update_on_one_line(
+        before: &str,
+        (start, end): (usize, usize),
+        after: &str,
+        (after_start, after_end): (usize, usize),
+    ) -> DiffSessionData {
+        use crate::diff::text_range::TextRange;
+        let side = |start: usize, end: usize, other_start: usize, other_end: usize| {
+            vec![
+                range(
+                    TextRange::new(0, 0, 0, start),
+                    TextRange::new(0, 0, 0, other_start),
+                    TextOperation::Identical,
+                ),
+                range(
+                    TextRange::new(0, start, 0, end),
+                    TextRange::new(0, other_start, 0, other_end),
+                    TextOperation::Update,
+                ),
+                range(
+                    TextRange::new(0, end, 1, 0),
+                    TextRange::new(0, other_end, 1, 0),
+                    TextOperation::Identical,
+                ),
+            ]
+        };
+        DiffSessionData {
+            before_contents: format!("{before}\n"),
+            after_contents: format!("{after}\n"),
+            before_ranges: side(start, end, after_start, after_end),
+            after_ranges: side(after_start, after_end, start, end),
+            ..sample_diff_data()
+        }
+    }
+
+    #[test]
+    fn n_puts_the_cursor_on_a_change_after_non_ascii_text() {
+        let mut viewer = DiffViewer::new();
+        viewer.load_diff(&one_update_on_one_line(
+            "let é = old;",
+            (9, 12),
+            "let é = new;",
+            (9, 12),
+        ));
+
+        viewer.jump_to_change(true);
+
+        assert_eq!(
+            drawn_cursor(&mut viewer),
+            ("let é = old;".to_string(), "o".to_string())
+        );
+        viewer.toggle_active_panel();
+        assert_eq!(
+            drawn_cursor(&mut viewer),
+            ("let é = new;".to_string(), "n".to_string()),
+            "the other panel's cursor follows to the same change"
+        );
+    }
+
+    #[test]
+    fn n_and_p_put_the_cursor_on_a_change_after_tab_indentation() {
+        let mut viewer = DiffViewer::new();
+        viewer.load_diff(&one_update_on_one_line(
+            "\t\told();",
+            (2, 5),
+            "\t\tnew();",
+            (2, 5),
+        ));
+
+        viewer.jump_to_change(true);
+        assert_eq!(
+            drawn_cursor(&mut viewer),
+            ("        old();".to_string(), "o".to_string())
+        );
+        viewer.left_viewer.set_cursor_position(0, 0);
+        viewer.jump_to_change(false);
+        assert_eq!(
+            drawn_cursor(&mut viewer),
+            ("        old();".to_string(), "o".to_string())
+        );
+    }
+
+    #[test]
+    fn search_puts_the_cursor_on_a_match_after_non_ascii_text_or_tabs() {
+        for (line, shown) in [
+            ("é = world", "é = world"),
+            ("漢字 = world", "漢字 = world"),
+            ("\t\tworld", "        world"),
+        ] {
+            let mut viewer = DiffViewer::new();
+            let mut data = sample_diff_data();
+            data.before_contents = format!("{line}\n");
+            viewer.load_diff(&data);
+
+            viewer.search("world");
+
+            assert_eq!(
+                drawn_cursor(&mut viewer),
+                (shown.to_string(), "w".to_string()),
+                "{line:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn enter_puts_the_cursor_on_a_counterpart_after_non_ascii_text_or_tabs() {
+        for (after, (start, end), shown) in [
+            ("é = new;", (5, 8), "é = new;"),
+            ("\tnew;", (1, 4), "    new;"),
+        ] {
+            let mut viewer = DiffViewer::new();
+            viewer.load_diff(&one_update_on_one_line("old;", (0, 3), after, (start, end)));
+            viewer.left_viewer.set_cursor_position(0, 0);
+
+            viewer.jump_to_counterpart();
+
+            assert_eq!(viewer.active_panel, Panel::After);
+            assert_eq!(
+                drawn_cursor(&mut viewer),
+                (shown.to_string(), "n".to_string()),
+                "{after:?}"
+            );
+        }
+    }
+
+    /// The cursor, once moved there by keys, sits on `ab`: the range under it is `ab`'s, and the
+    /// node highlight paints the cell under it.
+    #[test]
+    fn the_range_under_a_cursor_moved_past_non_ascii_text_is_the_one_it_is_drawn_on() {
+        let mut viewer = DiffViewer::new();
+        let data = one_update_on_one_line("é = ab", (5, 7), "x = ab", (4, 6));
+        viewer.load_diff(&data);
+        viewer.set_node_highlight(true);
+        viewer.left_viewer.set_cursor_position(0, 0);
+
+        for _ in 0.."é = ".chars().count() {
+            viewer.move_cursor_horizontal(1);
+        }
+
+        assert_eq!(
+            drawn_cursor(&mut viewer),
+            ("é = ab".to_string(), "a".to_string())
+        );
+        assert_eq!(
+            viewer.left_viewer.cursor_destination(),
+            Some(data.before_ranges[1].destination.clone())
+        );
+        assert_eq!(
+            viewer.right_viewer.state().cursor_col,
+            4,
+            "the other panel follows to `ab`"
+        );
+    }
+
+    /// A click lands on the character drawn in the clicked cell, and the range lookup and node
+    /// highlight follow it.
+    #[test]
+    fn a_click_on_a_tab_indented_row_selects_the_range_drawn_under_it() {
+        use crossterm::event::{KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+        let mut viewer = DiffViewer::new();
+        let data = one_update_on_one_line("\tx = ab", (5, 7), "x = ab", (4, 6));
+        viewer.load_diff(&data);
+        viewer.set_node_highlight(true);
+        drawn_cursor(&mut viewer);
+        let content = viewer.last_before_content.expect("drawn");
+        let text_start = content.x + viewer.left_viewer.gutter_width() as u16;
+
+        // `    x = ab`: the `b` is in display column 9.
+        viewer
+            .handle_mouse_event(MouseEvent {
+                kind: MouseEventKind::Down(MouseButton::Left),
+                column: text_start + 9,
+                row: content.y,
+                modifiers: KeyModifiers::NONE,
+            })
+            .unwrap();
+
+        assert_eq!(
+            drawn_cursor(&mut viewer),
+            ("    x = ab".to_string(), "b".to_string())
+        );
+        assert_eq!(
+            viewer.left_viewer.cursor_destination(),
+            Some(data.before_ranges[1].destination.clone())
+        );
+    }
+
+    #[test]
+    fn the_node_highlight_paints_the_range_under_a_cursor_past_non_ascii_text() {
+        let mut viewer = DiffViewer::new();
+        viewer.load_diff(&one_update_on_one_line("é = ab", (5, 7), "x = ab", (4, 6)));
+        viewer.set_node_highlight(true);
+        viewer.left_viewer.set_cursor_position(0, 0);
+        for _ in 0..4 {
+            viewer.move_cursor_horizontal(1);
+        }
+
+        let mut terminal =
+            ratatui::Terminal::new(ratatui::backend::TestBackend::new(240, 12)).unwrap();
+        terminal
+            .draw(|frame| {
+                let area = frame.area();
+                viewer.draw(frame, area).unwrap();
+            })
+            .unwrap();
+        let cursor = terminal.backend().cursor_position();
+        assert_eq!(
+            terminal.backend().buffer()[(cursor.x, cursor.y)].bg,
+            viewer.overlay_theme.palette().cross_highlight_bg,
+            "the cell under the cursor carries the node highlight"
+        );
     }
 }

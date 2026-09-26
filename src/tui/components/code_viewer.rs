@@ -23,8 +23,9 @@ use tokio::sync::mpsc::UnboundedSender;
 
 use super::Component;
 use crate::diff::text::{RangeMatch, TextOperation};
-use crate::diff::text_range::TextRange;
+use crate::diff::text_range::{TextRange, floor_char_boundary};
 use crate::tui::actions::Action;
+use crate::tui::display_columns;
 use crate::tui::theme::OverlayTheme;
 
 /// One code panel: the `CodeViewerWidget` plus its cursor, scroll and range state.
@@ -34,20 +35,14 @@ pub struct CodeViewer {
     state: crate::tui::widgets::code_viewer::CodeViewerState,
     command_tx: Option<UnboundedSender<Action>>,
     /// The editor-style "sticky column" `move_cursor_vertical` returns to across a run of
-    /// vertical moves, so `k k k j j j` does not drift left. Any other cursor movement clears it.
+    /// vertical moves, so `k k k j j j` does not drift left. A display column, so the cursor keeps
+    /// its place on screen across rows indented differently. Any other cursor movement clears it.
     desired_col: Option<usize>,
 }
 
 impl CodeViewer {
     pub fn new() -> Self {
         Self::default()
-    }
-
-    pub fn with_file(path: PathBuf) -> Self {
-        Self {
-            widget: crate::tui::widgets::code_viewer::CodeViewerWidget::with_file(path),
-            ..Default::default()
-        }
     }
 
     pub fn load_file(&mut self, path: PathBuf) -> Result<()> {
@@ -166,13 +161,17 @@ impl CodeViewer {
         if total_lines == 0 || direction == 0 {
             return;
         }
-        let target_col = *self.desired_col.get_or_insert(self.state.cursor_col);
+        let cursor_display_col = self.cursor_display_col();
+        let target_col = *self.desired_col.get_or_insert(cursor_display_col);
 
         let new_row = (self.state.cursor_row as isize + direction.signum() as isize)
             .clamp(0, total_lines as isize - 1) as usize;
+        let line = self.widget.line_text(new_row);
         self.state.cursor_row = new_row;
-        self.state.cursor_col =
-            clamp_to_non_whitespace(target_col, &self.widget.line_text(new_row));
+        self.state.cursor_col = clamp_to_non_whitespace(
+            display_columns::byte_column_at_display(&line, target_col),
+            &line,
+        );
         self.scroll_to_cursor();
     }
 
@@ -183,38 +182,22 @@ impl CodeViewer {
             return;
         }
         self.desired_col = None;
+        let line = self.widget.line_text(self.state.cursor_row);
+        let col = floor_char_boundary(&line, self.state.cursor_col);
         if direction < 0 {
-            if self.state.cursor_col > 0 {
-                self.state.cursor_col -= 1;
+            if let Some(previous) = line[..col].chars().next_back() {
+                self.state.cursor_col = col - previous.len_utf8();
             } else if self.state.cursor_row > 0 {
                 self.state.cursor_row -= 1;
                 self.state.cursor_col = self.widget.line_len(self.state.cursor_row);
             }
-        } else {
-            let line_len = self.widget.line_len(self.state.cursor_row);
-            if self.state.cursor_col < line_len {
-                self.state.cursor_col += 1;
-            } else if self.state.cursor_row + 1 < self.line_count() {
-                self.state.cursor_row += 1;
-                self.state.cursor_col = 0;
-            }
+        } else if let Some(next) = line[col..].chars().next() {
+            self.state.cursor_col = col + next.len_utf8();
+        } else if self.state.cursor_row + 1 < self.line_count() {
+            self.state.cursor_row += 1;
+            self.state.cursor_col = 0;
         }
         self.scroll_to_cursor();
-    }
-
-    /// Move to the next or previous change, wrapping. Unlike other movement this centers the
-    /// target row: a jump across a large file needs context on both sides of the change.
-    pub fn jump_to_change(&mut self, forward: bool) {
-        if let Some((row, col)) = self.state.next_change_position(forward)
-            && self.clamp_and_set_cursor(row, col)
-        {
-            self.scroll_to_center_row(self.state.cursor_row);
-            self.scroll_to_show_col(self.state.cursor_col);
-        }
-    }
-
-    pub fn change_count_and_index(&self) -> Option<(usize, usize)> {
-        self.state.change_count_and_index()
     }
 
     /// Replace the search with case-insensitive `query` and jump to the nearest match at or
@@ -242,34 +225,61 @@ impl CodeViewer {
         self.state.search_match_count_and_index()
     }
 
-    /// Clamp and move the cursor without scrolling; `false` on an empty file. Resets
-    /// `desired_col`, since every caller is an explicit reposition.
+    /// Clamp and move the cursor without scrolling; `false` on an empty file. `col` is a byte
+    /// column, rounded down to a character boundary. Resets `desired_col`, since every caller is
+    /// an explicit reposition.
     fn clamp_and_set_cursor(&mut self, row: usize, col: usize) -> bool {
         let total_lines = self.line_count();
         if total_lines == 0 {
             return false;
         }
         let clamped_row = row.min(total_lines.saturating_sub(1));
-        let line_len = self.widget.line_len(clamped_row);
-        let clamped_col = col.min(line_len);
+        let line = self.widget.line_text(clamped_row);
         self.state.cursor_row = clamped_row;
-        self.state.cursor_col = clamped_col;
+        self.state.cursor_col = floor_char_boundary(&line, col);
         self.desired_col = None;
         true
     }
 
-    /// Clamp and move the cursor, scrolling only as far as needed to show it.
+    /// Clamp and move the cursor to byte column `col` of `row` - a range's or a search hit's
+    /// column - scrolling only as far as needed to show it.
     pub fn set_cursor_position(&mut self, row: usize, col: usize) {
         if self.clamp_and_set_cursor(row, col) {
             self.scroll_to_cursor();
         }
     }
 
+    /// Like `set_cursor_position`, for a display column: the character drawn there, as for a
+    /// mouse click.
+    pub fn set_cursor_at_display_col(&mut self, row: usize, display_col: usize) {
+        let row = row.min(self.line_count().saturating_sub(1));
+        let line = self.widget.line_text(row);
+        let col = display_columns::byte_column_at_display(&line, display_col);
+        self.set_cursor_position(row, col);
+    }
+
+    /// The cursor's display column: where on its row it is drawn.
+    fn cursor_display_col(&self) -> usize {
+        let line = self.widget.line_text(self.state.cursor_row);
+        display_columns::display_column(&line, self.state.cursor_col)
+    }
+
+    /// The cursor's `(row, character column)`, as the footer's `Ln`/`Col` counts.
+    pub fn cursor_character_position(&self) -> (usize, usize) {
+        let line = self.widget.line_text(self.state.cursor_row);
+        (
+            self.state.cursor_row,
+            display_columns::char_column(&line, self.state.cursor_col),
+        )
+    }
+
     /// The cursor's screen cell within `area` (the area passed to `draw`), or `None` when it is
     /// scrolled out of view.
     pub fn cursor_screen_position(&self, area: Rect) -> Option<(u16, u16)> {
         let row_in_viewport = self.state.cursor_row.checked_sub(self.state.scroll)?;
-        let col_in_viewport = self.state.cursor_col.checked_sub(self.state.scroll_col)?;
+        let col_in_viewport = self
+            .cursor_display_col()
+            .checked_sub(self.state.scroll_col)?;
         let gutter = self.widget.gutter_width();
         if row_in_viewport >= area.height as usize
             || gutter + col_in_viewport >= area.width as usize
@@ -284,11 +294,12 @@ impl CodeViewer {
 
     fn scroll_to_cursor(&mut self) {
         self.scroll_to_show_row(self.state.cursor_row);
-        self.scroll_to_show_col(self.state.cursor_col);
+        self.scroll_to_show_col(self.cursor_display_col());
     }
 
-    /// Scroll horizontally to show `col`. A no-op until the first frame sets `viewport_width`.
-    pub fn scroll_to_show_col(&mut self, col: usize) {
+    /// Scroll horizontally to show display column `col`. A no-op until the first frame sets
+    /// `viewport_width`.
+    fn scroll_to_show_col(&mut self, col: usize) {
         let width = self.state.viewport_width;
         if width == 0 {
             return;
@@ -298,10 +309,6 @@ impl CodeViewer {
         } else if col >= self.state.scroll_col + width {
             self.state.scroll_col = col + 1 - width;
         }
-    }
-
-    pub fn filename(&self) -> String {
-        self.widget.filename()
     }
 
     pub fn filename_or_hint(&self) -> String {
@@ -405,24 +412,25 @@ fn band_priority(op: &TextOperation) -> u8 {
     }
 }
 
-/// The `[first, last)` character columns of `line`'s non-whitespace content, or `None` for a
-/// blank line. `last` is itself a valid cursor column.
+/// The `[first, last)` byte columns of `line`'s non-whitespace content, or `None` for a blank
+/// line. `last` is itself a valid cursor column.
 fn non_whitespace_bounds(line: &str) -> Option<(usize, usize)> {
     let mut first = None;
     let mut last = None;
-    for (i, c) in line.chars().enumerate() {
+    for (i, c) in line.char_indices() {
         if !c.is_whitespace() {
             first.get_or_insert(i);
-            last = Some(i + 1);
+            last = Some(i + c.len_utf8());
         }
     }
     first.zip(last)
 }
 
+/// Byte column `col`, a character boundary, pulled into `line`'s non-whitespace content.
 fn clamp_to_non_whitespace(col: usize, line: &str) -> usize {
     match non_whitespace_bounds(line) {
         Some((first, last)) => col.clamp(first, last),
-        None => col.min(line.chars().count()),
+        None => col.min(line.len()),
     }
 }
 
@@ -641,6 +649,70 @@ mod tests {
     }
 
     #[test]
+    fn move_cursor_horizontal_steps_over_a_multi_byte_character_in_one_press() {
+        let mut viewer = viewer_with("é漢x\n");
+        viewer.move_cursor_horizontal(1);
+        assert_eq!(viewer.state.cursor_col, 2, "past the two-byte é");
+        viewer.move_cursor_horizontal(1);
+        assert_eq!(viewer.state.cursor_col, 5, "past the three-byte 漢");
+        viewer.move_cursor_horizontal(-1);
+        viewer.move_cursor_horizontal(-1);
+        assert_eq!(viewer.state.cursor_col, 0);
+    }
+
+    /// The sticky column is where the cursor is drawn, so it keeps its place on screen across a
+    /// tab-indented and a space-indented row.
+    #[test]
+    fn move_cursor_vertical_keeps_the_display_column_across_tab_and_space_indentation() {
+        let mut viewer = viewer_with("\tfoo\n    bar\n");
+        viewer.set_cursor_position(0, 2); // the second `o`, drawn in column 5
+
+        viewer.move_cursor_vertical(1);
+        assert_eq!(
+            viewer.state.cursor_col, 5,
+            "the `a` of `bar`, also column 5"
+        );
+
+        viewer.move_cursor_vertical(-1);
+        assert_eq!(viewer.state.cursor_col, 2);
+    }
+
+    #[test]
+    fn cursor_screen_position_is_in_display_columns_on_a_tab_indented_row() {
+        let mut viewer = viewer_with("\t\tx\n");
+        viewer.set_viewport_height(10);
+        viewer.set_cursor_position(0, 2);
+        let area = Rect::new(3, 1, 40, 10);
+        let gutter = viewer.gutter_width() as u16;
+        assert_eq!(
+            viewer.cursor_screen_position(area),
+            Some((3 + gutter + 8, 1))
+        );
+    }
+
+    #[test]
+    fn horizontal_scroll_follows_the_cursor_in_display_columns() {
+        let mut viewer = viewer_with("\t\t\t\tx\n");
+        viewer.state.viewport_width = 5;
+        viewer.set_cursor_position(0, 4); // `x`, drawn in column 16
+        assert_eq!(viewer.state.scroll_col, 12);
+
+        viewer.set_cursor_position(0, 1); // the second tab, from column 4
+        assert_eq!(viewer.state.scroll_col, 4);
+    }
+
+    #[test]
+    fn set_cursor_at_display_col_lands_on_the_character_drawn_there() {
+        let mut viewer = viewer_with("\tab\n");
+        viewer.set_cursor_at_display_col(0, 2);
+        assert_eq!(viewer.state.cursor_col, 0, "inside the tab");
+        viewer.set_cursor_at_display_col(0, 5);
+        assert_eq!(viewer.state.cursor_col, 2, "the `b`");
+        viewer.set_cursor_at_display_col(0, 40);
+        assert_eq!(viewer.state.cursor_col, 3, "past the end");
+    }
+
+    #[test]
     fn move_cursor_horizontal_with_zero_direction_is_a_no_op() {
         let mut viewer = viewer_with("abc\ndef\n");
         viewer.set_cursor_position(0, 1);
@@ -697,50 +769,21 @@ mod tests {
         assert_eq!(viewer.search_match_count_and_index(), Some((2, 2)));
     }
 
-    /// A `line_count`-line file with an `Update` range at each of `change_rows`.
-    fn viewer_with_changes_at(line_count: usize, change_rows: &[usize]) -> CodeViewer {
-        use crate::diff::text::TextOperation;
-
-        let contents: String = (0..line_count).map(|i| format!("line{i}\n")).collect();
-        let mut viewer = viewer_with(&contents);
-
-        let mut ranges = Vec::new();
-        let mut row = 0;
-        for &change_row in change_rows {
-            if change_row > row {
-                ranges.push(RangeMatch {
-                    source: TextRange::new(row, 0, change_row, 0),
-                    destination: TextRange::new(row, 0, change_row, 0),
-                    operation: TextOperation::Identical,
-                });
-            }
-            ranges.push(RangeMatch {
-                source: TextRange::new(change_row, 0, change_row, 4),
-                destination: TextRange::new(change_row, 0, change_row, 4),
-                operation: TextOperation::Update,
-            });
-            row = change_row + 1;
-        }
-        if row < line_count {
-            ranges.push(RangeMatch {
-                source: TextRange::new(row, 0, line_count, 0),
-                destination: TextRange::new(row, 0, line_count, 0),
-                operation: TextOperation::Identical,
-            });
-        }
-        viewer.set_ranges(ranges);
-        viewer
+    fn viewer_with_lines(line_count: usize) -> CodeViewer {
+        viewer_with(
+            &(0..line_count)
+                .map(|i| format!("line{i}\n"))
+                .collect::<String>(),
+        )
     }
 
     #[test]
-    fn jump_to_change_centers_the_destination_row() {
-        let mut viewer = viewer_with_changes_at(100, &[50]);
+    fn scroll_to_center_row_centers_the_row() {
+        let mut viewer = viewer_with_lines(100);
         viewer.set_viewport_height(10);
-        viewer.scroll_to_show_row(0); // destination (50) is already technically "visible"-adjacent
 
-        viewer.jump_to_change(true);
+        viewer.scroll_to_center_row(50);
 
-        assert_eq!(viewer.state.cursor_row, 50);
         assert_eq!(
             viewer.state.scroll, 45,
             "row 50 centered in a 10-row viewport should scroll to 50 - 10/2 = 45"
@@ -748,25 +791,23 @@ mod tests {
     }
 
     #[test]
-    fn jump_to_change_clamps_to_the_start_of_the_file() {
-        let mut viewer = viewer_with_changes_at(100, &[2]);
+    fn scroll_to_center_row_clamps_to_the_start_of_the_file() {
+        let mut viewer = viewer_with_lines(100);
         viewer.set_viewport_height(10);
         viewer.scroll_to_show_row(50); // start far from the destination
 
-        viewer.jump_to_change(true);
+        viewer.scroll_to_center_row(2);
 
-        assert_eq!(viewer.state.cursor_row, 2);
         assert_eq!(viewer.state.scroll, 0);
     }
 
     #[test]
-    fn jump_to_change_clamps_to_the_end_of_the_file() {
-        let mut viewer = viewer_with_changes_at(100, &[97]);
+    fn scroll_to_center_row_clamps_to_the_end_of_the_file() {
+        let mut viewer = viewer_with_lines(100);
         viewer.set_viewport_height(10);
 
-        viewer.jump_to_change(true);
+        viewer.scroll_to_center_row(97);
 
-        assert_eq!(viewer.state.cursor_row, 97);
         assert_eq!(
             viewer.state.scroll, 90,
             "a 100-line file with a 10-row viewport can scroll no further than row 90"

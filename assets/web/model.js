@@ -17,7 +17,7 @@
  */
 
 // The viewer's logic, ported from the TUI: what `tui::widgets::code_viewer` (range lookup,
-// change/search navigation, overlay painting order) and `tui::components::diff_viewer` (the
+// search navigation, overlay painting order) and `tui::components::diff_viewer` (the
 // merged change walk, cross-panel sync, layout mode) do between keystrokes. No DOM and no
 // network here - `app.js` owns both - so `node assets/web/model.test.js` covers this file the way
 // assets/mapping_site/ is covered, with no framework and no build step.
@@ -26,6 +26,11 @@
 // so the model indexes the strings it holds directly. Ranges are `[startRow, startCol, endRow,
 // endCol]`, half-open, and a range match is `{op, source, destination}` with `op` one of
 // insert/delete/update/move/identical/unset.
+//
+// Text keeps its tabs, which the page draws to the next multiple of the server's `tab_width`
+// (CSS `tab-size`). What is measured on screen - horizontal scroll, the viewport width, the sticky
+// column, a click's cell - is in display columns, converted from and to UTF-16 columns only by
+// `displayColumn`/`columnAtDisplay`: the split `tui::display_columns` makes on the Rust side.
 "use strict";
 
 const CodeDiffModel = (() => {
@@ -41,10 +46,6 @@ const CodeDiffModel = (() => {
 
   function comparePositions(a, b) {
     return a[0] - b[0] || a[1] - b[1];
-  }
-
-  function sameRange(a, b) {
-    return a[0] === b[0] && a[1] === b[1] && a[2] === b[2] && a[3] === b[3];
   }
 
   // `build_range_order`: indices sorted by source start, then end, so a zero-width placeholder
@@ -73,27 +74,6 @@ const CodeDiffModel = (() => {
     const candidate = order[lo - 1];
     const s = ranges[candidate].source;
     return row < s[2] || (row === s[2] && col < s[3]) ? candidate : null;
-  }
-
-  // `change_positions`: one stop per change, where a multi-row insert/delete split into per-row
-  // pieces (same op, same destination, consecutive rows) counts once.
-  function changePositions(ranges, order) {
-    const positions = [];
-    let previous = null;
-    for (const index of order) {
-      const rm = ranges[index];
-      if (UNCHANGED.has(rm.op) || isEmptyRange(rm.source)) continue;
-      const row = rm.source[0];
-      const continues =
-        previous !== null &&
-        previous.op === rm.op &&
-        sameRange(previous.destination, rm.destination) &&
-        row === previous.row + 1;
-      previous = { op: rm.op, destination: rm.destination, row };
-      if (continues) continue;
-      positions.push([row, rm.source[1]]);
-    }
-    return positions;
   }
 
   function nextPosition(positions, cursor, forward) {
@@ -163,6 +143,35 @@ const CodeDiffModel = (() => {
   function clampToNonWhitespace(col, line) {
     const bounds = nonWhitespaceBounds(line);
     return bounds ? clamp(col, bounds[0], bounds[1]) : Math.min(col, line.length);
+  }
+
+  // `display_columns::char_display_width`: a tab reaches the next tab stop; every other character
+  // is one column (a double-width character is one here, where the terminal draws two).
+  function charDisplayWidth(ch, column, tabWidth) {
+    return ch === "\t" ? tabWidth - (column % tabWidth) : 1;
+  }
+
+  // `display_columns::display_column`: the display column UTF-16 column `col` of `line` is drawn
+  // at.
+  function displayColumn(line, col, tabWidth) {
+    let column = 0;
+    for (const cp of codePoints(line)) {
+      if (cp.end > col) break;
+      column += charDisplayWidth(cp.ch, column, tabWidth);
+    }
+    return column;
+  }
+
+  // `display_columns::byte_column_at_display`: the UTF-16 column of the character drawn over
+  // display column `target`, or the line's length past its end.
+  function columnAtDisplay(line, target, tabWidth) {
+    let column = 0;
+    for (const cp of codePoints(line)) {
+      const width = charDisplayWidth(cp.ch, column, tabWidth);
+      if (target < column + width) return cp.start;
+      column += width;
+    }
+    return line.length;
   }
 
   // One character left/right of `col` in UTF-16 units - two for a surrogate pair.
@@ -509,6 +518,8 @@ const CodeDiffModel = (() => {
       this.highlightDestination = null;
       this.searchMatches = [];
       this.focused = false;
+      // Until `DiffModel.setTabWidth` hands over the server's `tab_width`, a tab is one column.
+      this.tabWidth = 1;
     }
 
     hasFile() {
@@ -525,6 +536,11 @@ const CodeDiffModel = (() => {
 
     lineLen(row) {
       return this.lineText(row).length;
+    }
+
+    // `CodeViewer::cursor_display_col`.
+    cursorDisplayCol() {
+      return displayColumn(this.lineText(this.cursorRow), this.cursorCol, this.tabWidth);
     }
 
     // `load_contents` + `set_ranges`: cursor on the first navigable range, scrolled into view.
@@ -598,7 +614,7 @@ const CodeDiffModel = (() => {
 
     scrollToCursor() {
       this.scrollToShowRow(this.cursorRow);
-      this.scrollToShowCol(this.cursorCol);
+      this.scrollToShowCol(this.cursorDisplayCol());
     }
 
     clampAndSetCursor(row, col) {
@@ -615,14 +631,22 @@ const CodeDiffModel = (() => {
       if (this.clampAndSetCursor(row, col)) this.scrollToCursor();
     }
 
+    // `set_cursor_at_display_col`: the character drawn at display column `displayCol`.
+    setCursorAtDisplayCol(row, displayCol) {
+      row = Math.min(row, Math.max(this.lineCount() - 1, 0));
+      this.setCursorPosition(row, columnAtDisplay(this.lineText(row), displayCol, this.tabWidth));
+    }
+
+    // The sticky column is a display column, as in `move_cursor_vertical`.
     moveVertical(direction) {
       const total = this.lineCount();
       if (total === 0 || direction === 0) return;
-      if (this.desiredCol === null) this.desiredCol = this.cursorCol;
+      if (this.desiredCol === null) this.desiredCol = this.cursorDisplayCol();
       const target = this.desiredCol;
       const row = clamp(this.cursorRow + Math.sign(direction), 0, total - 1);
+      const line = this.lineText(row);
       this.cursorRow = row;
-      this.cursorCol = clampToNonWhitespace(target, this.lineText(row));
+      this.cursorCol = clampToNonWhitespace(columnAtDisplay(line, target, this.tabWidth), line);
       this.scrollToCursor();
     }
 
@@ -647,14 +671,6 @@ const CodeDiffModel = (() => {
 
     cursor() {
       return [this.cursorRow, this.cursorCol];
-    }
-
-    changePositions() {
-      return changePositions(this.ranges, this.order);
-    }
-
-    changeCountAndIndex() {
-      return countAndIndex(this.changePositions(), this.cursor());
     }
 
     searchPositions() {
@@ -753,6 +769,10 @@ const CodeDiffModel = (() => {
 
     focused() {
       return this.panels[this.activePanel];
+    }
+
+    setTabWidth(tabWidth) {
+      this.panels.forEach((panel) => (panel.tabWidth = tabWidth));
     }
 
     other() {
@@ -854,7 +874,6 @@ const CodeDiffModel = (() => {
       if (this.activePanel !== panel) this.toggleActivePanel();
       this.focused().setCursorPosition(at[0], at[1]);
       this.focused().scrollToCenterRow(at[0]);
-      this.focused().scrollToShowCol(at[1]);
       this.syncCrossHighlight();
       this.syncScrollCentered();
       return true;
@@ -958,10 +977,12 @@ const CodeDiffModel = (() => {
       return this.focused().searchMatchCountAndIndex();
     }
 
-    // Mouse: focus the clicked panel and put the cursor on the clicked character.
-    clickAt(panel, row, col) {
+    // Mouse: focus the clicked panel and put the cursor on the clicked character, `col` a UTF-16
+    // column - or, with `displayCol`, the character drawn in that display column.
+    clickAt(panel, row, col, displayCol = false) {
       if (this.activePanel !== panel) this.toggleActivePanel();
-      this.focused().setCursorPosition(row, col);
+      if (displayCol) this.focused().setCursorAtDisplayCol(row, col);
+      else this.focused().setCursorPosition(row, col);
       this.syncCrossHighlight();
       this.syncScroll();
     }
@@ -983,11 +1004,12 @@ const CodeDiffModel = (() => {
     reviewFilesOf,
     reviewRows,
     reviewSelectable,
-    changePositions,
     changeStops,
     clampToNonWhitespace,
+    columnAtDisplay,
     columnsOnRow,
     countAndIndex,
+    displayColumn,
     displayMode,
     findMatches,
     footerLeft,

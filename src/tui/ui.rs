@@ -25,8 +25,7 @@ use anyhow::Result;
 use crossterm::{
     cursor,
     event::{
-        DisableBracketedPaste, DisableMouseCapture, EnableBracketedPaste, EnableMouseCapture,
-        Event as CrosstermEvent, EventStream, KeyEventKind,
+        DisableMouseCapture, EnableMouseCapture, Event as CrosstermEvent, EventStream, KeyEventKind,
     },
     terminal::{EnterAlternateScreen, LeaveAlternateScreen},
 };
@@ -47,7 +46,6 @@ pub struct UI {
     pub frame_rate: f64,
 
     pub mouse: bool,
-    pub paste: bool,
 
     color_depth: ColorDepth,
 
@@ -67,7 +65,6 @@ impl UI {
             frame_rate,
 
             mouse: false,
-            paste: false,
 
             color_depth: ColorDepth::detect(),
 
@@ -141,18 +138,12 @@ impl UI {
         if self.mouse {
             crossterm::execute!(stdout(), EnableMouseCapture)?;
         }
-        if self.paste {
-            crossterm::execute!(stdout(), EnableBracketedPaste)?;
-        }
         Ok(())
     }
 
     pub fn exit(&mut self) -> Result<()> {
         if crossterm::terminal::is_raw_mode_enabled()? {
             self.flush()?;
-            if self.paste {
-                crossterm::execute!(stdout(), DisableBracketedPaste)?;
-            }
             if self.mouse {
                 crossterm::execute!(stdout(), DisableMouseCapture)?;
             }
@@ -194,7 +185,6 @@ pub fn restore_terminal() {
     }
     let _ = crossterm::execute!(
         stdout(),
-        DisableBracketedPaste,
         DisableMouseCapture,
         LeaveAlternateScreen,
         cursor::Show

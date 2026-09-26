@@ -31,6 +31,7 @@ use crate::diff::text::{
 };
 use crate::tui::actions::DiffSessionData;
 use crate::tui::app::compute_diff_with_options;
+use crate::tui::display_columns;
 
 /// SGR grey for chrome (gutter, moved-chunk box). `90` rather than `37`: it is the one neutral
 /// legible on both light and dark terminals.
@@ -186,36 +187,44 @@ fn moved_chunk_destination(
     span.map(|(lo, hi)| (lo + 1, hi + 1))
 }
 
-/// Wraps each span of `line` in its operation's color. `spans` are **byte** columns
-/// (`text_range::SourceColumn`), not characters or screen cells. Malformed spans (off a char
-/// boundary, overlapping, past the end) are clamped; the text itself is never altered.
+/// Wraps each span of `line` in its operation's color, with every tab expanded to its tab stop
+/// (see `tui::display_columns`), counted from the start of the line's text so indentation lines
+/// up whatever the gutter's width. `spans` are **byte** columns (`text_range::SourceColumn`) into
+/// `line` as it is, tabs included; an expanded tab is colored with the span it belongs to.
+/// Malformed spans (off a char boundary, overlapping, past the end) are clamped; the text itself
+/// is never altered beyond the tabs.
 fn colorize_line(line: &str, spans: &[(usize, usize, TextOperation)], use_color: bool) -> String {
     if !use_color || spans.is_empty() {
-        return line.to_string();
+        return display_columns::expand_tabs(line);
     }
     let boundary = |index: usize| crate::diff::text_range::floor_char_boundary(line, index);
 
     let mut out = String::new();
+    let mut column = 0usize;
     let mut cut = 0usize;
     for (start, end, op) in spans {
         let start = boundary(*start);
         let end = boundary(*end);
         if start > cut {
-            out.push_str(&line[cut..start]);
+            display_columns::push_expanded(&mut out, &line[cut..start], &mut column);
         }
         // `cut`, not `start`: an overlapping span must never duplicate the user's text.
         let segment_start = start.max(cut);
         if end > segment_start {
             let segment = &line[segment_start..end];
             match ansi_color(op) {
-                Some(code) => out.push_str(&format!("\u{1b}[{code}m{segment}\u{1b}[0m")),
-                None => out.push_str(segment),
+                Some(code) => {
+                    out.push_str(&format!("\u{1b}[{code}m"));
+                    display_columns::push_expanded(&mut out, segment, &mut column);
+                    out.push_str("\u{1b}[0m");
+                }
+                None => display_columns::push_expanded(&mut out, segment, &mut column),
             }
         }
         cut = cut.max(end);
     }
     if cut < line.len() {
-        out.push_str(&line[cut..]);
+        display_columns::push_expanded(&mut out, &line[cut..], &mut column);
     }
     out
 }
@@ -313,7 +322,11 @@ fn render_side(
             && let Some(ref_row) = nearest_reference_line(parsed, lang, i)
             && !keep[ref_row]
         {
-            let breadcrumb = format!("{:>number_width$} @ {}", ref_row + 1, lines[ref_row]);
+            let breadcrumb = format!(
+                "{:>number_width$} @ {}",
+                ref_row + 1,
+                display_columns::expand_tabs(lines[ref_row])
+            );
             if use_color {
                 out.push_str(&format!("\u{1b}[90m{breadcrumb}\u{1b}[0m\n"));
             } else {
@@ -442,7 +455,8 @@ pub fn run(
         );
     }
     write_stdout(&render_text_diff(&data, use_color, context))?;
-    // Raw bytes: `data`'s contents went through `display_safe`, which maps tabs to spaces.
+    // Raw bytes: `data`'s contents went through `display_safe`, which replaces control
+    // characters.
     Ok(std::fs::read(before)? != std::fs::read(after)?)
 }
 
@@ -1029,6 +1043,61 @@ mod tests {
             !rendered.contains(" @ "),
             "`fn parse_args` is within context, so no breadcrumb: {rendered}"
         );
+    }
+
+    #[test]
+    fn colorize_line_expands_tabs_and_colors_exactly_the_spanned_characters() {
+        let line = "\tx\t= é\tnew;";
+        // The last tab starts in column 11 and so takes one column.
+        let new_start = line.find("new").unwrap();
+        let spans = vec![(new_start, new_start + 3, TextOperation::Update)];
+
+        assert_eq!(colorize_line(line, &spans, false), "    x   = é new;");
+        assert_eq!(
+            colorize_line(line, &spans, true),
+            "    x   = é \u{1b}[33mnew\u{1b}[0m;"
+        );
+    }
+
+    #[test]
+    fn colorize_line_colors_a_changed_tab_as_the_spaces_it_expands_to() {
+        let spans = vec![(0, 1, TextOperation::Insert)];
+        assert_eq!(
+            colorize_line("\tx", &spans, true),
+            "\u{1b}[32m    \u{1b}[0mx"
+        );
+        let spans = vec![(1, 2, TextOperation::Insert)];
+        assert_eq!(
+            colorize_line("a\tx", &spans, true),
+            "a\u{1b}[32m   \u{1b}[0mx",
+            "a tab after `a` reaches column 4, three columns on"
+        );
+    }
+
+    /// Tab stops count from the start of the text, not the terminal's left edge, so a gutter
+    /// of any width leaves the indentation of every row in line.
+    #[test]
+    fn render_side_expands_tab_indentation_from_the_start_of_each_rows_text() {
+        let contents = "a\n\tb\n\t\tc\n";
+        let ranges = vec![RangeMatch {
+            source: crate::diff::text_range::TextRange::new(2, 2, 2, 3),
+            destination: crate::diff::text_range::TextRange::new(2, 2, 2, 3),
+            operation: TextOperation::Update,
+        }];
+
+        let rendered = render_side(
+            contents,
+            &ranges,
+            true,
+            false,
+            Path::new("sample.txt"),
+            CONTEXT_LINES,
+        );
+
+        assert!(rendered.contains("1    a\n"), "{rendered}");
+        assert!(rendered.contains("2        b\n"), "{rendered}");
+        assert!(rendered.contains("3  ~         c\n"), "{rendered}");
+        assert!(!rendered.contains('\t'), "{rendered}");
     }
 
     #[test]

@@ -34,6 +34,7 @@ use crate::review::{self, Review, ReviewTarget};
 use crate::tui::actions::DiffSessionData;
 use crate::tui::components::diff_viewer::SINGLE_PANEL_THRESHOLD;
 use crate::tui::components::help_modal::HELP_TEXT;
+use crate::tui::display_columns::TAB_WIDTH;
 use crate::tui::theme::{self, CustomPalette, OverlayTheme, PanelLayout};
 use crate::tui::widgets::code_viewer::{DEFAULT_SYNTAX_THEME, syntax_theme_names};
 use crate::web::payload::{DiffPayload, HighlightPayload, diff_payload, highlight_payload};
@@ -129,6 +130,9 @@ pub struct StatePayload {
     /// `DiffViewer`'s dual/single cut-over, in character cells, so the page's auto layout flips
     /// at the same width the terminal's does.
     pub single_panel_threshold: u16,
+    /// Columns between tab stops, so the page draws a tab as wide as the terminal does and
+    /// scrolls to a cursor after one by the same count.
+    pub tab_width: usize,
     /// `--review`: the page opens the git review picker as soon as it loads.
     pub review_on_start: bool,
 }
@@ -306,6 +310,7 @@ impl Session {
             help_text: HELP_TEXT,
             config_error: self.config_error.clone(),
             single_panel_threshold: SINGLE_PANEL_THRESHOLD,
+            tab_width: TAB_WIDTH,
             review_on_start: self.review_on_start,
         }
     }
@@ -526,6 +531,7 @@ mod tests {
                 .any(|name| name == "base16-ocean.dark")
         );
         assert_eq!(state.single_panel_threshold, SINGLE_PANEL_THRESHOLD);
+        assert_eq!(state.tab_width, TAB_WIDTH);
         assert!(state.help_text.contains("Navigation"));
     }
 

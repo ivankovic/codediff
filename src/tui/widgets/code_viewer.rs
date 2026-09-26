@@ -27,6 +27,7 @@ use syntect::parsing::{SyntaxReference, SyntaxSet};
 use crate::code::language::language_for_path_and_content;
 use crate::diff::text::{RangeMatch, TextOperation};
 use crate::diff::text_range::TextRange;
+use crate::tui::display_columns;
 use crate::tui::theme::{OverlayPalette, OverlayTheme};
 
 static SYNTAX_SET: OnceLock<SyntaxSet> = OnceLock::new();
@@ -228,17 +229,18 @@ fn paint_columns(
 #[derive(Default, Clone)]
 pub struct CodeViewerState {
     pub scroll: usize,
-    /// Horizontal scroll, in characters.
+    /// Horizontal scroll, in display columns (see `tui::display_columns`).
     pub scroll_col: usize,
     pub viewport_height: usize,
-    /// Visible content columns, excluding the gutter. Set by `render`, the only place the width
-    /// is known; 0 until the first frame means "unknown, don't scroll".
+    /// Visible content columns, in display columns, excluding the gutter. Set by `render`, the
+    /// only place the width is known; 0 until the first frame means "unknown, don't scroll".
     pub viewport_width: usize,
     pub ranges: Vec<RangeMatch>,
     /// See `build_range_order`; must be rebuilt whenever `ranges` changes.
     range_order: Vec<usize>,
     pub cursor_row: usize,
-    /// In characters.
+    /// In bytes, the unit of every range and search hit it is compared with. `CodeViewer`
+    /// converts it to a display column for the screen.
     pub cursor_col: usize,
     /// The cross-highlight pushed from the other panel's cursor.
     pub highlight_destination: Option<TextRange>,
@@ -289,61 +291,11 @@ impl CodeViewerState {
         self.highlight_destination = None;
     }
 
-    /// Every change's start position, in document order. The per-row pieces
-    /// `split_into_per_row_pieces` leaves (same operation, same destination, contiguous rows, a
-    /// signature nothing else produces) collapse to one stop.
-    fn change_positions(&self) -> Vec<(usize, usize)> {
-        let mut positions = Vec::new();
-        let mut previous_group: Option<(TextOperation, TextRange, usize)> = None;
-        for range_match in self.range_order.iter().map(|&i| &self.ranges[i]) {
-            if matches!(
-                range_match.operation,
-                TextOperation::Identical | TextOperation::NotYetSet
-            ) || range_match.source.is_empty()
-            {
-                continue;
-            }
-            let row = range_match.source.start_row;
-            let continues_previous_group =
-                previous_group
-                    .as_ref()
-                    .is_some_and(|(operation, destination, previous_row)| {
-                        *operation == range_match.operation
-                            && *destination == range_match.destination
-                            && row == previous_row + 1
-                    });
-            previous_group = Some((
-                range_match.operation.clone(),
-                range_match.destination.clone(),
-                row,
-            ));
-            if continues_previous_group {
-                continue;
-            }
-            positions.push((row, range_match.source.start_column));
-        }
-        positions
-    }
-
     fn search_positions(&self) -> Vec<(usize, usize)> {
         self.search_matches
             .iter()
             .map(|range| (range.start_row, range.start_column))
             .collect()
-    }
-
-    /// The change `n`/`p` jump to: strictly after (or before) the cursor, wrapping.
-    pub fn next_change_position(&self, forward: bool) -> Option<(usize, usize)> {
-        next_position(
-            &self.change_positions(),
-            (self.cursor_row, self.cursor_col),
-            forward,
-        )
-    }
-
-    /// The footer's "change N/M"; see `count_and_index`.
-    pub fn change_count_and_index(&self) -> Option<(usize, usize)> {
-        count_and_index(&self.change_positions(), (self.cursor_row, self.cursor_col))
     }
 
     /// The match Enter jumps to: at or after the cursor, wrapping. Unlike `>`, a match under the
@@ -430,19 +382,6 @@ impl Default for CodeViewerWidget {
 }
 
 impl CodeViewerWidget {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn with_file(path: PathBuf) -> Self {
-        let mut widget = Self {
-            file_path: Some(path),
-            ..Default::default()
-        };
-        widget.rebuild_highlight_cache();
-        widget
-    }
-
     pub fn load_file(&mut self, path: PathBuf) -> Result<()> {
         let contents = fs::read_to_string(&path)
             .with_context(|| format!("Failed to read file: {:?}", path))?;
@@ -497,11 +436,11 @@ impl CodeViewerWidget {
         self.highlighted_lines.len()
     }
 
-    /// Characters on `row`, or 0 out of bounds.
+    /// Bytes on `row`, or 0 out of bounds.
     pub fn line_len(&self, row: usize) -> usize {
         self.highlighted_lines
             .get(row)
-            .map(|line| line.spans.iter().map(|s| s.content.chars().count()).sum())
+            .map(|line| line.spans.iter().map(|s| s.content.len()).sum())
             .unwrap_or(0)
     }
 
@@ -754,13 +693,16 @@ impl CodeViewerWidget {
 /// reads as dimmed on light and dark terminals.
 const GUTTER_STYLE: Style = Style::new().fg(Color::DarkGray);
 
-/// The `width`-character window of `line` from character `from`, keeping span styling. A cut
-/// edge shows a dimmed `…` in place of its outermost character.
+/// The `width`-column window of `line` from display column `from`, keeping span styling, with
+/// every tab expanded to spaces (see `tui::display_columns`). A cut edge shows a dimmed `…` in
+/// place of its outermost column. A tab or wide character the window cuts through shows as
+/// spaces for the part inside it, so everything after it stays in its display column.
 fn slice_columns(line: &Line<'static>, from: usize, width: usize) -> Line<'static> {
     if width == 0 {
         return Line::from("");
     }
-    let total: usize = line.spans.iter().map(|s| s.content.chars().count()).sum();
+    let text: String = line.spans.iter().map(|s| s.content.as_ref()).collect();
+    let total = display_columns::display_width(&text);
     let to = from + width;
     let mut out: Vec<Span<'static>> = Vec::new();
 
@@ -770,25 +712,35 @@ fn slice_columns(line: &Line<'static>, from: usize, width: usize) -> Line<'stati
     let content_from = if from > 0 { from + 1 } else { from };
     let content_to = if total > to { to - 1 } else { to };
 
-    let mut col = 0usize;
+    let mut column = 0usize;
+    // Whether the last character with a width was drawn as itself, so a zero-width one after it
+    // (a combining mark) goes with it.
+    let mut previous_shown = false;
     for span in &line.spans {
-        let len = span.content.chars().count();
-        let span_start = col;
-        col += len;
-        if col <= content_from {
-            continue;
-        }
-        if span_start >= content_to {
+        if column >= content_to {
             break;
         }
-        let take_from = content_from.saturating_sub(span_start);
-        let take_to = (content_to - span_start).min(len);
-        let content: String = span
-            .content
-            .chars()
-            .skip(take_from)
-            .take(take_to - take_from)
-            .collect();
+        let mut content = String::new();
+        for ch in span.content.chars() {
+            let start = column;
+            let char_width = display_columns::char_display_width(ch, start);
+            column += char_width;
+            if char_width == 0 {
+                if previous_shown {
+                    content.push(ch);
+                }
+                continue;
+            }
+            previous_shown = ch != '\t' && start >= content_from && column <= content_to;
+            let visible = column
+                .min(content_to)
+                .saturating_sub(start.max(content_from));
+            if previous_shown {
+                content.push(ch);
+            } else {
+                content.extend(std::iter::repeat_n(' ', visible));
+            }
+        }
         if !content.is_empty() {
             out.push(Span::styled(content, span.style));
         }
@@ -1266,205 +1218,6 @@ mod tests {
         assert_eq!((state.cursor_row, state.cursor_col), (0, 2));
     }
 
-    fn state_with_three_changes_on_rows_2_5_and_9() -> CodeViewerState {
-        let mut state = CodeViewerState::default();
-        state.load_ranges(vec![
-            RangeMatch {
-                source: TextRange::new(0, 0, 2, 0),
-                destination: TextRange::zero(),
-                operation: TextOperation::Identical,
-            },
-            RangeMatch {
-                source: TextRange::new(2, 0, 2, 4),
-                destination: TextRange::zero(),
-                operation: TextOperation::Delete,
-            },
-            RangeMatch {
-                source: TextRange::new(2, 4, 5, 0),
-                destination: TextRange::zero(),
-                operation: TextOperation::Identical,
-            },
-            RangeMatch {
-                source: TextRange::new(5, 0, 5, 4),
-                destination: TextRange::zero(),
-                operation: TextOperation::Update,
-            },
-            RangeMatch {
-                source: TextRange::new(5, 4, 9, 0),
-                destination: TextRange::zero(),
-                operation: TextOperation::Identical,
-            },
-            RangeMatch {
-                source: TextRange::new(9, 0, 9, 4),
-                destination: TextRange::zero(),
-                operation: TextOperation::Insert,
-            },
-        ]);
-        state
-    }
-
-    #[test]
-    fn next_change_position_finds_the_next_change_forward() {
-        let mut state = state_with_three_changes_on_rows_2_5_and_9();
-        state.cursor_row = 0;
-        state.cursor_col = 0;
-        assert_eq!(state.next_change_position(true), Some((2, 0)));
-
-        state.cursor_row = 2;
-        state.cursor_col = 0;
-        assert_eq!(
-            state.next_change_position(true),
-            Some((5, 0)),
-            "sitting exactly on a change should jump to the *next* one, not stay put"
-        );
-    }
-
-    #[test]
-    fn next_change_position_finds_the_previous_change_backward() {
-        let mut state = state_with_three_changes_on_rows_2_5_and_9();
-        state.cursor_row = 9;
-        state.cursor_col = 0;
-        assert_eq!(
-            state.next_change_position(false),
-            Some((5, 0)),
-            "sitting exactly on a change should jump to the *previous* one, not stay put"
-        );
-
-        state.cursor_row = 7;
-        state.cursor_col = 0;
-        assert_eq!(state.next_change_position(false), Some((5, 0)));
-    }
-
-    #[test]
-    fn next_change_position_wraps_around_at_the_ends() {
-        let mut state = state_with_three_changes_on_rows_2_5_and_9();
-
-        state.cursor_row = 9;
-        state.cursor_col = 4; // past the last change
-        assert_eq!(
-            state.next_change_position(true),
-            Some((2, 0)),
-            "forward past the last change should wrap to the first"
-        );
-
-        state.cursor_row = 0;
-        state.cursor_col = 0; // before the first change
-        assert_eq!(
-            state.next_change_position(false),
-            Some((9, 0)),
-            "backward before the first change should wrap to the last"
-        );
-    }
-
-    #[test]
-    fn next_change_position_is_none_when_the_file_has_no_changes() {
-        let mut state = CodeViewerState::default();
-        state.load_ranges(vec![RangeMatch {
-            source: TextRange::new(0, 0, 5, 0),
-            destination: TextRange::zero(),
-            operation: TextOperation::Identical,
-        }]);
-        assert_eq!(state.next_change_position(true), None);
-        assert_eq!(state.next_change_position(false), None);
-    }
-
-    #[test]
-    fn change_count_and_index_is_none_when_the_file_has_no_changes() {
-        let mut state = CodeViewerState::default();
-        state.load_ranges(vec![RangeMatch {
-            source: TextRange::new(0, 0, 5, 0),
-            destination: TextRange::zero(),
-            operation: TextOperation::Identical,
-        }]);
-        assert_eq!(state.change_count_and_index(), None);
-    }
-
-    /// The shape `split_into_per_row_pieces` leaves for one multi-line insert.
-    #[test]
-    fn change_positions_collapses_a_multi_row_insert_split_into_one_stop() {
-        let mut state = CodeViewerState::default();
-        let destination = TextRange::new(4, 0, 4, 0);
-        state.load_ranges(vec![
-            RangeMatch {
-                source: TextRange::new(0, 4, 0, 25),
-                destination: destination.clone(),
-                operation: TextOperation::Insert,
-            },
-            RangeMatch {
-                source: TextRange::new(1, 8, 1, 22),
-                destination: destination.clone(),
-                operation: TextOperation::Insert,
-            },
-            RangeMatch {
-                source: TextRange::new(2, 8, 2, 15),
-                destination,
-                operation: TextOperation::Insert,
-            },
-        ]);
-
-        assert_eq!(
-            state.change_count_and_index(),
-            Some((1, 1)),
-            "three per-row pieces of one insert must count as a single change"
-        );
-        state.cursor_row = 0;
-        state.cursor_col = 0;
-        assert_eq!(
-            state.next_change_position(true),
-            Some((0, 4)),
-            "pressing n from before the group should land on its first row and go nowhere else"
-        );
-    }
-
-    #[test]
-    fn change_positions_does_not_collapse_adjacent_but_unrelated_changes() {
-        let mut state = CodeViewerState::default();
-        state.load_ranges(vec![
-            RangeMatch {
-                source: TextRange::new(0, 0, 0, 4),
-                destination: TextRange::new(4, 0, 4, 0),
-                operation: TextOperation::Insert,
-            },
-            RangeMatch {
-                source: TextRange::new(1, 0, 1, 4),
-                destination: TextRange::new(9, 0, 9, 0),
-                operation: TextOperation::Insert,
-            },
-        ]);
-
-        assert_eq!(
-            state.change_count_and_index(),
-            Some((1, 2)),
-            "different destinations mean these are two separate changes, not a split group"
-        );
-    }
-
-    /// Landing on a change counts it, so `n` counts 1, 2, 3 in step with each jump.
-    #[test]
-    fn change_count_and_index_counts_changes_at_or_before_the_cursor() {
-        let mut state = state_with_three_changes_on_rows_2_5_and_9();
-
-        state.cursor_row = 0;
-        state.cursor_col = 0;
-        assert_eq!(
-            state.change_count_and_index(),
-            Some((1, 3)),
-            "before the first change, index should still report 1, not 0"
-        );
-
-        state.cursor_row = 2;
-        state.cursor_col = 0;
-        assert_eq!(state.change_count_and_index(), Some((1, 3)));
-
-        state.cursor_row = 5;
-        state.cursor_col = 0;
-        assert_eq!(state.change_count_and_index(), Some((2, 3)));
-
-        state.cursor_row = 9;
-        state.cursor_col = 0;
-        assert_eq!(state.change_count_and_index(), Some((3, 3)));
-    }
-
     fn state_with_three_search_matches_on_rows_1_4_and_8() -> CodeViewerState {
         CodeViewerState {
             search_matches: vec![
@@ -1488,8 +1241,9 @@ mod tests {
         assert_eq!(
             state.nearest_search_match_position(),
             Some((4, 2)),
-            "sitting exactly on a match should find that match, unlike next_change_position's \
-             strictly-after semantics - this is the first jump for a fresh search"
+            "sitting exactly on a match should find that match, unlike \
+             next_search_match_position's strictly-after semantics - this is the first jump for \
+             a fresh search"
         );
 
         state.cursor_row = 9;
@@ -1720,6 +1474,52 @@ mod tests {
         let empty = slice_columns(&line, 3, 0);
         let text: String = empty.spans.iter().map(|s| s.content.as_ref()).collect();
         assert_eq!(text, "");
+    }
+
+    fn sliced_text(line: &Line<'static>, from: usize, width: usize) -> String {
+        slice_columns(line, from, width)
+            .spans
+            .iter()
+            .map(|s| s.content.as_ref())
+            .collect()
+    }
+
+    #[test]
+    fn slice_columns_expands_tabs_to_the_next_tab_stop_keeping_their_style() {
+        let painted = Style::new().bg(Color::Red);
+        let line = Line::from(vec![
+            Span::styled("\t".to_string(), painted),
+            Span::from("a\tb".to_string()),
+        ]);
+
+        assert_eq!(sliced_text(&line, 0, 20), "    a   b");
+        let window = slice_columns(&line, 0, 20);
+        assert_eq!(window.spans[0].content, "    ");
+        assert_eq!(
+            window.spans[0].style, painted,
+            "a painted tab paints all of its columns"
+        );
+    }
+
+    #[test]
+    fn slice_columns_counts_display_columns_when_scrolled_past_a_tab() {
+        let line = Line::from("\tabcdef".to_string());
+        // Columns: the tab 0-3, then `a` at 4. From column 2, `…` takes column 2, the rest of the
+        // tab is column 3.
+        assert_eq!(sliced_text(&line, 2, 20), "… abcdef");
+        assert_eq!(sliced_text(&line, 5, 20), "…cdef");
+        assert_eq!(sliced_text(&line, 0, 6), "    a…");
+    }
+
+    #[test]
+    fn slice_columns_keeps_columns_aligned_across_a_cut_wide_character() {
+        let line = Line::from("漢字ab".to_string());
+        // `漢` is columns 0-1, `字` 2-3. From column 1, `…` takes column 1; `字` is whole.
+        assert_eq!(sliced_text(&line, 1, 20), "…字ab");
+        // From column 2, `…` takes column 2, and `字`'s second column is left as a space.
+        assert_eq!(sliced_text(&line, 2, 20), "… ab");
+        // A window ending inside `字`: column 2 is shown as a space, column 3 is the `…`.
+        assert_eq!(sliced_text(&line, 0, 4), "漢 …");
     }
 
     #[test]

@@ -63,7 +63,6 @@ pub enum Action {
     /// Ctrl-Z. Deferred rather than handled where raised, because suspending needs `&mut UI` to
     /// release and re-acquire the terminal.
     Suspend,
-    ClearScreen,
     /// A recoverable failure, shown in the one-line `App::last_error` banner.
     Error(String),
     /// A directory listing for the file dialog finished loading.

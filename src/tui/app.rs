@@ -684,7 +684,6 @@ impl App {
                 Action::Tick => self.tick_summary_toast(),
                 Action::Quit => self.should_exit = true,
                 Action::Suspend => self.pending_suspend = true,
-                Action::ClearScreen => ui.terminal.clear()?,
                 Action::Resize(w, h) => self.handle_resize(ui, *w, *h)?,
                 Action::Render => self.render(ui)?,
                 Action::FileSelected(path) => self.handle_file_selected(path.clone())?,
@@ -1141,7 +1140,7 @@ impl App {
 
     fn draw_footer(&self, frame: &mut ratatui::Frame, area: Rect) {
         let mut left_parts = Vec::with_capacity(3);
-        if let Some((row, col)) = self.diff_viewer.focused_cursor_position() {
+        if let Some((row, col)) = self.diff_viewer.focused_cursor_character_position() {
             left_parts.push(format!("Ln {}, Col {}", row + 1, col + 1));
         }
         if let Some(counts) = self.change_counts {
@@ -1458,9 +1457,10 @@ fn assemble_diff_session_data(
     })
 }
 
-/// Replaces every ASCII control character except line terminators with a space, for text handed
-/// to `ratatui`. A raw `\t` or `\r` moves the real terminal cursor away from the cell `ratatui`
-/// believes it is at, corrupting everything drawn after it.
+/// Replaces every ASCII control character except line terminators and tabs with a space, for
+/// text a front end draws. Written raw, a control character moves the real terminal cursor away
+/// from the cell `ratatui` believes it is at, corrupting everything drawn after it; a tab is kept
+/// because every renderer expands it to its tab stop (`tui::display_columns`).
 ///
 /// Offset-preserving: every substituted character is one UTF-8 byte, like the space, so ranges
 /// computed against the original text stay valid. That is why it is `is_ascii_control` and not
@@ -1471,9 +1471,10 @@ fn display_safe(text: &str) -> String {
     let bytes = text.as_bytes();
     text.char_indices()
         .map(|(index, character)| {
-            let terminator =
-                character == '\n' || (character == '\r' && bytes.get(index + 1) == Some(&b'\n'));
-            if !terminator && character.is_ascii_control() {
+            let kept = character == '\n'
+                || character == '\t'
+                || (character == '\r' && bytes.get(index + 1) == Some(&b'\n'));
+            if !kept && character.is_ascii_control() {
                 ' '
             } else {
                 character
@@ -3016,33 +3017,53 @@ mod tests {
         Ok(())
     }
 
-    /// A raw tab desyncs the terminal cursor from `ratatui`'s buffer and corrupts the screen.
+    /// Tabs reach the viewer as the ranges index them, and the viewer expands them: a raw tab
+    /// in `ratatui`'s buffer desyncs the terminal cursor and corrupts the screen.
     #[test]
-    fn compute_diff_never_puts_a_raw_tab_into_diff_session_data_contents() -> Result<()> {
+    fn a_tab_indented_file_keeps_its_tabs_and_the_viewer_draws_them_as_spaces() -> Result<()> {
         let before = Path::new(
             "src/test/data/diffs/small/html-gohugoio-hugo-enclose-table-with-div-and-add-thead-tbody/before.html.test",
         );
         let after = Path::new(
             "src/test/data/diffs/small/html-gohugoio-hugo-enclose-table-with-div-and-add-thead-tbody/after.html.test",
         );
-        // The fixture must actually contain a raw tab for this test to mean anything.
-        assert!(std::fs::read_to_string(before)?.contains('\t'));
+        let before_source = std::fs::read_to_string(before)?;
+        let first_tabbed_row = before_source
+            .lines()
+            .position(|line| line.starts_with('\t'))
+            .expect("the fixture must actually contain a tab for this test to mean anything");
 
         let (data, _large_residual) = compute_diff(before, after)?;
+        assert_eq!(data.before_contents, before_source);
 
-        assert!(
-            !data.before_contents.contains('\t'),
-            "before_contents still has a raw tab byte"
+        let mut viewer = DiffViewer::new();
+        viewer.load_diff(&data);
+        viewer.jump_to_line(first_tabbed_row + 1);
+        let mut terminal = ratatui::Terminal::new(ratatui::backend::TestBackend::new(240, 40))?;
+        terminal.draw(|frame| {
+            let area = frame.area();
+            viewer.draw(frame, area).unwrap();
+        })?;
+        let text: String = terminal
+            .backend()
+            .buffer()
+            .content()
+            .iter()
+            .map(|cell| cell.symbol())
+            .collect();
+        assert!(!text.contains('\t'), "a raw tab reached the buffer");
+        let expanded = crate::tui::display_columns::expand_tabs(
+            before_source.lines().nth(first_tabbed_row).unwrap(),
         );
         assert!(
-            !data.after_contents.contains('\t'),
-            "after_contents still has a raw tab byte"
+            text.contains(expanded.trim_end()),
+            "row {first_tabbed_row} should be drawn as {expanded:?}"
         );
         Ok(())
     }
 
-    /// The CRLF `\r` is kept (the renderers drop it); nothing else reaches a terminal raw, and
-    /// every byte offset and row boundary survives.
+    /// The CRLF `\r` is kept (the renderers drop it), and so is a tab (the renderers expand it);
+    /// no other control character survives, and every byte offset and row boundary does.
     #[test]
     fn compute_diff_leaves_a_crlf_file_offset_stable_and_free_of_other_control_bytes() -> Result<()>
     {
@@ -3067,8 +3088,10 @@ mod tests {
                 "a carriage return that is not a CRLF terminator survived"
             );
             assert!(
-                !contents.contains('\t'),
-                "a raw tab survived in a CRLF file"
+                !contents
+                    .chars()
+                    .any(|c| c.is_ascii_control() && !matches!(c, '\t' | '\r' | '\n')),
+                "a control character other than a tab or line terminator survived"
             );
         }
         assert_eq!(
@@ -3089,6 +3112,11 @@ mod tests {
         let safe = display_safe(text);
         assert_eq!(safe, "a\u{9c}b \n");
         assert_eq!(safe.len(), text.len());
+    }
+
+    #[test]
+    fn display_safe_keeps_tabs_for_the_renderers_to_expand() {
+        assert_eq!(display_safe("\tx\x0b\ty\n"), "\tx \ty\n");
     }
 
     #[test]
