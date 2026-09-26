@@ -15,6 +15,11 @@
  *  You should have received a copy of the GNU Affero General Public License
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
+//! What the diff passes need to know about node kinds, per language: which kinds are references,
+//! imports, comments, literals and identifiers, which carry a name that identifies them
+//! ([`is_semantically_structural`]), and which cross-kind pairs may count as an update
+//! ([`kinds_update_allowed`]). Plus a few mutators shared by several passes, such as
+//! [`map_identical_descendants`].
 use tree_sitter::Node;
 
 use crate::code::{ASTMetadata, Code, Language};

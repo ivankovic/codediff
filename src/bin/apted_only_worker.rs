@@ -32,8 +32,8 @@ use std::time::Instant;
 
 use codediff::code::Code;
 use codediff::code::language::language_for_path;
+use codediff::diff::ASTDiff;
 use codediff::diff::apted::{Algorithm, for_roots};
-use codediff::diff::{ASTDiff, NodeCache};
 
 #[derive(Parser)]
 struct Args {
@@ -68,14 +68,12 @@ fn main() -> Result<()> {
         return Err(anyhow!("failed to parse before/after as {language}"));
     }
 
-    let node_cache = NodeCache::build(&before, &after);
     let mut diff = ASTDiff::default();
 
     let start = Instant::now();
     for_roots(
         &before,
         &after,
-        &node_cache,
         Algorithm::AptedWholeTree,
         "apted_only",
         &mut diff,

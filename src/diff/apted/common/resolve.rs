@@ -461,7 +461,6 @@ pub fn for_nodes(
 pub fn for_roots(
     before: &Code,
     after: &Code,
-    _node_cache: &NodeCache,
     algorithm: Algorithm,
     source: &'static str,
     diff: &mut ASTDiff,

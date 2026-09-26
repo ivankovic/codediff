@@ -28,14 +28,14 @@
 //!
 //! | Code phase | Pass | Paper |
 //! |---|---|---|
-//! | 1 | [`solve_hash_descent`]: identical, then same-shape subtrees by hash | phase 1 |
-//! | 1b, 1c | [`solve_nested_condition_collapse`], [`solve_heritage_clause_growth`]: pairs phase 1 cannot see, attributions it cannot make | - |
-//! | 2 | [`solve_leading_siblings`], [`solve_identical_diagnostic_statements`] | phase 2 |
-//! | 4 | [`solve_syntax_aware_matching`]: flat containers by Myers, qualified names, imports, [`solve_greedy_anchor_blocks`]; APTED inside each matched pair | phase 3 |
-//! | 6 | residual: named-local prematch, [`solve_bottom_up_propagation`], [`solve_unique_type_matching`], the Myers-LCS fallback ([`apted::for_roots`]), propagation again, [`solve_orphaned_leaves`] | phase 4 |
-//! | 7 | [`solve_moved_subtrees`]: GumTree-style move recovery | phase 5 |
-//! | 8, 8b, 9 | [`solve_mutual_ancestors`], [`solve_leaf_neighbour_agreement`], [`solve_wrap_growth`]: refine and re-tag existing pairs | - |
-//! | 10 | [`solve_unresolved_nodes`]: delete/insert for every undecided node | closing step |
+//! | 1 | `solve_hash_descent`: identical, then same-shape subtrees by hash | phase 1 |
+//! | 1b, 1c | `solve_nested_condition_collapse`, `solve_heritage_clause_growth`: pairs phase 1 cannot see, attributions it cannot make | - |
+//! | 2 | `solve_leading_siblings`, `solve_identical_diagnostic_statements` | phase 2 |
+//! | 4 | `solve_syntax_aware_matching`: flat containers by Myers, qualified names, imports, `solve_greedy_anchor_blocks`; APTED inside each matched pair | phase 3 |
+//! | 6 | residual: named-local prematch, `solve_bottom_up_propagation`, `solve_unique_type_matching`, the Myers-LCS fallback ([`apted::for_roots`]), propagation again, `solve_orphaned_leaves` | phase 4 |
+//! | 7 | `solve_moved_subtrees`: GumTree-style move recovery | phase 5 |
+//! | 8, 8b, 9 | `solve_mutual_ancestors`, `solve_leaf_neighbour_agreement`, `solve_wrap_growth`: refine and re-tag existing pairs | - |
+//! | 10 | `solve_unresolved_nodes`: delete/insert for every undecided node | closing step |
 //!
 //! [`text`] turns the finished node mapping into the byte ranges the viewers paint.
 pub mod apted;
@@ -43,22 +43,22 @@ pub mod cost;
 pub(crate) mod grouped_greedy_matcher;
 pub(crate) mod hash_tree_matching;
 pub mod nodes;
-pub mod solve_bottom_up_propagation;
-pub mod solve_greedy_anchor_blocks;
-pub mod solve_hash_descent;
-pub mod solve_heritage_clause_growth;
-pub mod solve_identical_diagnostic_statements;
-pub mod solve_large_flat_subtrees;
-pub mod solve_leading_siblings;
-pub mod solve_leaf_neighbour_agreement;
-pub mod solve_moved_subtrees;
-pub mod solve_mutual_ancestors;
-pub mod solve_nested_condition_collapse;
-pub mod solve_orphaned_leaves;
-pub mod solve_syntax_aware_matching;
-pub mod solve_unique_type_matching;
-pub mod solve_unresolved_nodes;
-pub mod solve_wrap_growth;
+pub(crate) mod solve_bottom_up_propagation;
+pub(crate) mod solve_greedy_anchor_blocks;
+pub(crate) mod solve_hash_descent;
+pub(crate) mod solve_heritage_clause_growth;
+pub(crate) mod solve_identical_diagnostic_statements;
+pub(crate) mod solve_large_flat_subtrees;
+pub(crate) mod solve_leading_siblings;
+pub(crate) mod solve_leaf_neighbour_agreement;
+pub(crate) mod solve_moved_subtrees;
+pub(crate) mod solve_mutual_ancestors;
+pub(crate) mod solve_nested_condition_collapse;
+pub(crate) mod solve_orphaned_leaves;
+pub(crate) mod solve_syntax_aware_matching;
+pub(crate) mod solve_unique_type_matching;
+pub(crate) mod solve_unresolved_nodes;
+pub(crate) mod solve_wrap_growth;
 pub mod text;
 pub mod text_range;
 
@@ -456,8 +456,9 @@ impl ASTDiff {
     }
 
     /// Whether every real pair joins two nodes that exist and are of the same kind, or of a
-    /// cross-kind pair `nodes::kinds_update_allowed` permits. Null mappings always pass.
-    pub fn is_valid(&self, before: &Code, _after: &Code, node_cache: &NodeCache) -> bool {
+    /// cross-kind pair `nodes::kinds_update_allowed` permits. Null mappings always pass. `before`
+    /// gives the language; `node_cache` holds both sides' nodes.
+    pub fn is_valid(&self, before: &Code, node_cache: &NodeCache) -> bool {
         let language = before.metadata.language.unwrap_or_default();
 
         for (before_id, after_id) in self.mapping.keys() {
@@ -967,7 +968,7 @@ mod tests {
 
             let node_cache = NodeCache::build(code, code);
             assert!(
-                diff_ast.is_valid(code, code, &node_cache),
+                diff_ast.is_valid(code, &node_cache),
                 "Identical code must always produce a valid diff: {}",
                 filename
             );
@@ -1088,7 +1089,7 @@ mod tests {
         let diff_ast = diff.ast.unwrap();
 
         let node_cache = NodeCache::build(&before, &after);
-        assert!(diff_ast.is_valid(&before, &after, &node_cache));
+        assert!(diff_ast.is_valid(&before, &node_cache));
 
         Ok(())
     }
@@ -1103,7 +1104,7 @@ mod tests {
         let diff_ast = diff.ast.unwrap();
 
         let node_cache = NodeCache::build(&before, &after);
-        assert!(diff_ast.is_valid(&before, &after, &node_cache));
+        assert!(diff_ast.is_valid(&before, &node_cache));
 
         Ok(())
     }
@@ -1152,7 +1153,7 @@ mod tests {
 
         let node_cache = NodeCache::build(&before, &after);
         assert!(
-            !diff_ast.is_valid(&before, &after, &node_cache),
+            !diff_ast.is_valid(&before, &node_cache),
             "Mapping should be invalid for different node types: {} vs {}",
             before_leaf.kind(),
             after_leaf.kind()
@@ -1176,7 +1177,7 @@ mod tests {
 
         let node_cache = NodeCache::build(&before, &after);
         assert!(
-            diff_ast.is_valid(&before, &after, &node_cache),
+            diff_ast.is_valid(&before, &node_cache),
             "Null mappings (insert/delete) should be valid"
         );
 

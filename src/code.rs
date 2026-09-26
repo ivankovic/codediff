@@ -15,6 +15,10 @@
  *  You should have received a copy of the GNU Affero General Public License
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
+//! One side of a diff: [`Code`] holds the source text and what is derived from it - the
+//! tree-sitter AST, the detected [`Language`], and per-node [`ASTMetadata`] (hashes, depths,
+//! parents) that the diff passes read. [`Code::from_string`] parses; [`language`] maps file names
+//! to languages and languages to grammars.
 #[cfg(test)]
 mod gap_survey;
 pub mod hash;

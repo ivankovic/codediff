@@ -1145,7 +1145,6 @@ fn test_already_matched_nodes_are_skipped() -> Result<()> {
     // Pre-map two nodes to partners APTED would not choose; APTED must not map them again.
     let (before, after) = &*helper::handmade_test_code_pair("rust-leetcode-1-bugfix")?;
 
-    let node_cache = NodeCache::build(before, after);
     let mut diff = ASTDiff::default();
 
     let before_ast = before.ast.as_ref().unwrap();
@@ -1172,14 +1171,7 @@ fn test_already_matched_nodes_are_skipped() -> Result<()> {
         diff.add_mapping(before_node_2.id(), after_node_1.id(), wrong_mapping_2);
     }
 
-    for_roots(
-        before,
-        after,
-        &node_cache,
-        Algorithm::ZhangShasha,
-        "test",
-        &mut diff,
-    );
+    for_roots(before, after, Algorithm::ZhangShasha, "test", &mut diff);
 
     let mut before_node_counts = std::collections::HashMap::new();
     for (before_id, _) in diff.mapping.keys() {
@@ -1221,7 +1213,6 @@ fn test_already_matched_nodes_are_skipped() -> Result<()> {
 fn test_honors_pre_existing_match_and_still_finds_nested_reuse() -> Result<()> {
     let (before, after) = &*helper::handmade_test_code_pair("python-added-if-block-small")?;
 
-    let node_cache = NodeCache::build(before, after);
     let mut diff = ASTDiff::default();
 
     let before_ast = before.ast.as_ref().unwrap();
@@ -1239,14 +1230,7 @@ fn test_honors_pre_existing_match_and_still_finds_nested_reuse() -> Result<()> {
         ASTMapping::identical(ASTMappingReason::OptimalIDU),
     );
 
-    for_roots(
-        before,
-        after,
-        &node_cache,
-        Algorithm::ZhangShasha,
-        "test",
-        &mut diff,
-    );
+    for_roots(before, after, Algorithm::ZhangShasha, "test", &mut diff);
 
     assert_eq!(
         diff.mapping
@@ -1281,17 +1265,9 @@ fn test_honors_pre_existing_match_and_still_finds_nested_reuse() -> Result<()> {
 fn test_no_change() -> Result<()> {
     let (before, after) = &*helper::handmade_test_code_pair("rust-no-change")?;
 
-    let node_cache = NodeCache::build(before, after);
     let mut diff = ASTDiff::default();
 
-    for_roots(
-        before,
-        after,
-        &node_cache,
-        Algorithm::ZhangShasha,
-        "test",
-        &mut diff,
-    );
+    for_roots(before, after, Algorithm::ZhangShasha, "test", &mut diff);
 
     let before_ast = before.ast.as_ref().unwrap();
     let after_ast = after.ast.as_ref().unwrap();
@@ -1310,17 +1286,9 @@ fn test_no_change() -> Result<()> {
 fn test_hello_world_added_message() -> Result<()> {
     let (before, after) = &*helper::handmade_test_code_pair("rust-hello-world-added-message")?;
 
-    let node_cache = NodeCache::build(before, after);
     let mut diff = ASTDiff::default();
 
-    for_roots(
-        before,
-        after,
-        &node_cache,
-        Algorithm::ZhangShasha,
-        "test",
-        &mut diff,
-    );
+    for_roots(before, after, Algorithm::ZhangShasha, "test", &mut diff);
 
     let before_ast = before.ast.as_ref().unwrap();
     let after_ast = after.ast.as_ref().unwrap();
@@ -1356,17 +1324,9 @@ fn test_hello_world_added_message() -> Result<()> {
 fn test_hello_world_removed_message() -> Result<()> {
     let (before, after) = &*helper::handmade_test_code_pair("rust-hello-world-removed-message")?;
 
-    let node_cache = NodeCache::build(before, after);
     let mut diff = ASTDiff::default();
 
-    for_roots(
-        before,
-        after,
-        &node_cache,
-        Algorithm::ZhangShasha,
-        "test",
-        &mut diff,
-    );
+    for_roots(before, after, Algorithm::ZhangShasha, "test", &mut diff);
 
     let before_ast = before.ast.as_ref().unwrap();
     let after_ast = after.ast.as_ref().unwrap();
@@ -1402,17 +1362,9 @@ fn test_hello_world_removed_message() -> Result<()> {
 fn test_python_added_if_block_small() -> Result<()> {
     let (before, after) = &*helper::handmade_test_code_pair("python-added-if-block-small")?;
 
-    let node_cache = NodeCache::build(before, after);
     let mut diff = ASTDiff::default();
 
-    for_roots(
-        before,
-        after,
-        &node_cache,
-        Algorithm::ZhangShasha,
-        "test",
-        &mut diff,
-    );
+    for_roots(before, after, Algorithm::ZhangShasha, "test", &mut diff);
 
     let before_ast = before.ast.as_ref().unwrap();
     let after_ast = after.ast.as_ref().unwrap();
@@ -1435,17 +1387,9 @@ fn test_python_added_if_block_small() -> Result<()> {
 fn test_python_added_if_block() -> Result<()> {
     let (before, after) = &*helper::handmade_test_code_pair("python-added-if-block")?;
 
-    let node_cache = NodeCache::build(before, after);
     let mut diff = ASTDiff::default();
 
-    for_roots(
-        before,
-        after,
-        &node_cache,
-        Algorithm::ZhangShasha,
-        "test",
-        &mut diff,
-    );
+    for_roots(before, after, Algorithm::ZhangShasha, "test", &mut diff);
 
     let before_ast = before.ast.as_ref().unwrap();
     let after_ast = after.ast.as_ref().unwrap();
@@ -1480,17 +1424,9 @@ fn test_rust_add_if() -> Result<()> {
     // The old if/else becomes the new if's `else if` branch rather than sitting in a block.
     let (before, after) = &*helper::handmade_test_code_pair("rust-add-if")?;
 
-    let node_cache = NodeCache::build(before, after);
     let mut diff = ASTDiff::default();
 
-    for_roots(
-        before,
-        after,
-        &node_cache,
-        Algorithm::ZhangShasha,
-        "test",
-        &mut diff,
-    );
+    for_roots(before, after, Algorithm::ZhangShasha, "test", &mut diff);
 
     let before_ast = before.ast.as_ref().unwrap();
     let after_ast = after.ast.as_ref().unwrap();
@@ -1916,7 +1852,6 @@ fn apted_whole_tree_hands_an_oversized_pair_to_the_kernel_instead_of_decomposing
     };
     let before = Code::from_string(&source(usize::MAX), &Language::Python);
     let after = Code::from_string(&source(60), &Language::Python);
-    let node_cache = NodeCache::build(&before, &after);
     let nodes = |code: &Code| code.ast.as_ref().unwrap().root_node().descendant_count();
     let cells = nodes(&before) * nodes(&after);
     assert!(
@@ -1926,7 +1861,7 @@ fn apted_whole_tree_hands_an_oversized_pair_to_the_kernel_instead_of_decomposing
 
     let reasons = |algorithm: Algorithm| {
         let mut diff = ASTDiff::default();
-        for_roots(&before, &after, &node_cache, algorithm, "test", &mut diff);
+        for_roots(&before, &after, algorithm, "test", &mut diff);
         let reasons: std::collections::HashSet<_> =
             diff.mapping.values().map(|m| m.reason).collect();
         (diff.mapping.len(), reasons)
@@ -2167,15 +2102,7 @@ fn for_roots_and_the_fallback_are_no_ops_without_an_ast() {
     let before = Code::from_string("some text", &Language::Unknown);
     let after = Code::from_string("other text", &Language::Unknown);
     let mut diff = ASTDiff::default();
-    let node_cache = NodeCache::build(&before, &after);
-    for_roots(
-        &before,
-        &after,
-        &node_cache,
-        Algorithm::Apted,
-        "test",
-        &mut diff,
-    );
+    for_roots(&before, &after, Algorithm::Apted, "test", &mut diff);
     crate::diff::apted::for_roots_fallback(&before, &after, "test", &mut diff);
     assert!(diff.mapping.is_empty());
 }

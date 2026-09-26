@@ -22,7 +22,7 @@ use crate::code::{ASTMetadata, ASTNodeMetadata, Code, Language};
 use crate::diff::nodes::{self, kinds_update_allowed};
 use crate::diff::{
     ASTDiff, ASTMapping, ASTMappingOperation, ASTMappingReason, COST_DELETE, COST_INSERT,
-    COST_UPDATE, NodeCache,
+    COST_UPDATE,
 };
 
 use super::engine::compute_delta;

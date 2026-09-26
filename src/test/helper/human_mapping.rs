@@ -2716,7 +2716,7 @@ fn compute_mismatches_detailed_with_diff(
         Vec::new()
     };
 
-    if !diff_ast.is_valid(before, after, node_cache) {
+    if !diff_ast.is_valid(before, node_cache) {
         mismatches.push(Mismatch {
             message: "The produced diff is not valid according to ASTDiff::is_valid".to_string(),
             node_id: 0,
