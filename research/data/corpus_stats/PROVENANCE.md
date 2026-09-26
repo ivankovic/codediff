@@ -23,7 +23,7 @@ labelling them "curated" would have asserted something untrue. Regenerate them f
 |---|---|
 | Date | 2026-09-07 |
 | Corpus | `/var/tmp/research/full/repositories`, `DEPTH=50` |
-| List | `list_of_repositories.csv`, 7,491 data rows |
+| List | `list_of_repositories.csv`, 7,491 data rows at the time (7,482 since the nine malformed rows below were removed on 2026-09-26) |
 | Repositories cloned and measured | **7,444** |
 | Failed to fetch | 135 (see below) |
 | `files` rows in `stats.sqlite` | **7,045,754** |
@@ -52,8 +52,9 @@ The failure count overstates what is missing. Of the 135 entries that failed to 
 * **46** had no clone on disk.
 * **9** of the 135 are malformed rows in the source list, unclonable by construction: the Gentoo
   package list emitted symlink descriptions as project names, so `list_of_repositories.csv:101`
-  reads `akallabeth.gpg -> openpgp-keys-akallabeth-20240521.asc` and the derived URL is
-  `https://github.com/akallabeth.gpg -> .../...`.
+  read `akallabeth.gpg -> openpgp-keys-akallabeth-20240521.asc` and the derived URL was
+  `https://github.com/akallabeth.gpg -> .../...`. They were removed from the list on 2026-09-26,
+  which changes no number here: none of them was ever cloned.
 
 `7,491 - 135 = 7,356` would therefore have understated the corpus by 88 repositories. The number to
 quote is the one `analysis/file_stats.py` derives from the database itself

@@ -185,7 +185,7 @@ ci:
 #
 # Usage: make benchmark-ablation [OUT_DIR=path]  (default: research/data/ablation)
 benchmark-ablation:
-	./scripts/ablation_study.sh $(OUT_DIR)
+	FEATURES=$(FEATURES) ./scripts/ablation_study.sh $(OUT_DIR)
 
 QUALITY_BASELINE := research/data/quality/quality_baseline.csv
 RUNTIME_BASELINE := research/data/quality/quality_baseline.txt

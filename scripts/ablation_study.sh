@@ -36,10 +36,13 @@ mkdir -p "$OUT_DIR"
 
 BIN=./target/release/benchmark_optimal_solutions
 
-echo "Building benchmark_optimal_solutions (release)..."
-# --features test-fixtures: benchmark_optimal_solutions needs codediff::test's fixture-loading
-# helpers, gated behind this feature (see Cargo.toml's [features]) since it needs no git2/rusqlite.
-if ! cargo build --release --features test-fixtures --bin benchmark_optimal_solutions; then
+# The root Makefile's FEATURES, so this build shares the release binary its other targets link
+# rather than re-linking the fat-LTO build for a different feature set. Any set that implies
+# test-fixtures works: benchmark_optimal_solutions needs codediff::test's fixture loading.
+FEATURES="${FEATURES:-stats}"
+
+echo "Building benchmark_optimal_solutions (release, features: $FEATURES)..."
+if ! cargo build --release --features "$FEATURES" --bin benchmark_optimal_solutions; then
   echo "Build failed, aborting." >&2
   exit 1
 fi
@@ -83,7 +86,11 @@ if [ ${#UNKNOWN[@]} -gt 0 ]; then
   exit 1
 fi
 
+# Each run's CSV is removed first, so a run that fails leaves no file behind: the summary below
+# treats a missing CSV as a failed run, and a stale one from an earlier study would pass for a
+# result.
 echo "Running baseline (all heuristics enabled)..."
+rm -f "$OUT_DIR/baseline.csv"
 if ! "$BIN" --csv "$OUT_DIR/baseline.csv" > "$OUT_DIR/baseline.log" 2>&1; then
   echo "Baseline run FAILED - see $OUT_DIR/baseline.log" >&2
   exit 1
@@ -91,6 +98,7 @@ fi
 
 for flag in "${FLAGS[@]}"; do
   echo "Running with --no-$flag..."
+  rm -f "$OUT_DIR/$flag.csv"
   if ! "$BIN" "--no-$flag" --csv "$OUT_DIR/$flag.csv" > "$OUT_DIR/$flag.log" 2>&1; then
     echo "  FAILED - see $OUT_DIR/$flag.log" >&2
     FAILED+=("$flag")
@@ -100,7 +108,7 @@ done
 if [ ${#FAILED[@]} -gt 0 ]; then
   echo
   echo "${#FAILED[@]} run(s) failed to complete: ${FAILED[*]}"
-  echo "(their .csv files are missing/stale - excluded from the summary below)"
+  echo "(their .csv files are missing - excluded from the summary below)"
 fi
 
 python3 - "$OUT_DIR" "${FLAGS[@]}" <<'PYEOF'
