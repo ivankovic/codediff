@@ -2,9 +2,36 @@
 
 `benchmark_other.csv` is measured against the ground-truth fixtures in `src/test/data/diffs/`
 (same fixture set as `../quality/`, not the sampled corpus), by `benchmark_other` with external
-tool binaries supplied via GUMTREE_BIN / DIFFT_BIN / DIFFSITTER_BIN / BDIFF_PYTHON. Rows are only
+tool binaries supplied via GUMTREE_BIN / DIFFT_BIN / DIFFSITTER_BIN / BDIFF_PYTHON / NVIM_BIN /
+SRCDIFF_BIN. Rows are only
 comparable within one run: tool versions and machine are not recorded per row, so refresh the
 whole file, never append to it.
+
+## srcDiff (added 2026-09-26)
+
+**`srcdiff`** - srcDiff (Decker, Collard, Volkert and Maletic, TOSEM 2020), built from
+<https://github.com/srcDiff/srcDiff> into `/var/tmp/srcdiff-install` by `make install-srcdiff`,
+which pins both commits. It parses C, C++, C#, Java and Python through srcML and writes one merged
+srcML document; `src/bin/benchmark_other/srcdiff.rs` walks it with a cursor per side and trims
+whitespace off each changed run, the same reading the other AST tools get.
+
+**Three traps, all of which the adapter now catches or undoes.**
+
+1. **srcDiff's tip needs an unreleased srcML.** It calls `srcml_unit_get_archive`, which no srcML
+   release has (1.1.0, 2025-08, is the latest), so srcML is built from its development branch too.
+2. **srcML rewrites the file it reads**: it drops a leading byte-order mark and the `\r` of every
+   `\r\n` (JFreeChart and microsoft/terminal fixtures, several C# ones). Offsets over its text
+   are not offsets over the file. The adapter reassembles both sides from the XML, compares them
+   to the input as srcML read it, and maps offsets back; anything else that fails to reassemble
+   is scored `error`, never silently.
+3. **srcDiff can exit 0 with empty output.** On two Python fixtures it prints
+   `vector::_M_range_check` to stderr and writes an XML declaration and nothing else, which would
+   score as "nothing changed" - a near-perfect result on a small change. The reassembly check turns
+   it into `error`. With two signal kills and one `Fatal Error Occurred`, that is the 5 `error`
+   rows, all Python.
+
+`-t UTF-8` is passed explicitly: srcDiff's default source encoding is ISO-8859-1, which would split
+every non-ASCII character in two and shift every offset after it.
 
 ## Text-based tools (added 2026-08-23)
 
@@ -162,7 +189,31 @@ diff and the four git algorithms - *not* BDiff or `nvim -d`, see above).
 
 **Tool versions are not recorded per row - record them here on every refresh.**
 
-Refreshed **2026-09-16**, both CSVs, over 1116 fixtures (1056 of them in the paper's scope) -
+Refreshed **2026-09-26**, both CSVs, over 1278 fixtures (1217 of them in the paper's scope), to add
+srcDiff - 162 fixtures more than 2026-09-16, almost all of them newly solved Defects4J units (274
+in scope, from 113). Same binaries as below for the other five, re-verified by running each, plus:
+
+| tool | version | path |
+| --- | --- | --- |
+| srcDiff | `ef42b33` (reports 0.1.0) against srcML `c9f0014` (reports 1.1.0) | `/var/tmp/srcdiff-install/srcDiff/build/bin/srcdiff` (`SRCDIFF_BIN`) |
+
+The status counts of the five older tools are unchanged apart from the new fixtures: GumTree still
+11 `error` and 201 `unsupported`, difftastic 3 and 32, diffsitter 0 and 336, the same fixtures as
+before. srcDiff: 535 `ok`, 5 `error`, 738 `unsupported`.
+
+**The timing run needs more open files than a systemd unit allows by default.** `gumtree_warm_batch`
+keeps both temp files of every fixture open until the persistent JVM has read them all - about
+2,560 at this corpus size, past the 1,024 soft limit a `systemd-run --user` unit starts with, so the
+first attempt died with `Too many open files` before timing anything. A login shell here has a
+limit of 1,048,576, which is why no earlier refresh, all run from a shell, hit it. Run it with
+`-p LimitNOFILE=1048576`, or from a shell.
+
+**Timing was measured with the machine mostly idle, not verifiably idle throughout** (load average
+0.3 when the accuracy half started, around 1.5 between the halves). The line-based tools' maxima
+jumped - Unix `diff` from 27.8 to 246 ms, `git` (Myers) from 72 to 138 ms - on medians that did not
+move, which is a scheduling hiccup, not the tools. Read the Max column as noisy.
+
+Previously refreshed **2026-09-16**, both CSVs, over 1116 fixtures (1056 of them in the paper's scope) -
 the pass that added `defects4j` to `_common.PAPER_DATASETS`, so 113 solved Defects4J compilation
 units enter both files. Every binary verified by running it, not by reading a path:
 
@@ -255,6 +306,12 @@ not just the edit script, with real byte offsets). difftastic and diffsitter emi
 correspondences at all at any granularity, so they could never be included in such a comparison.
 
 ## astdiff_oracle_defects4j.csv (added 2026-09-11)
+
+**Both oracle CSVs were re-run on 2026-09-26** with the rest of the paper's refresh, against the
+same oracle checkout (`6e926908`, fetched 2026-09-15). The whole-corpus codediff run moved only
+with the engine: precision 99.42% -> 99.43%, recall 98.86% -> 98.87%, perfect 54.1% -> 55.4%. The
+human run now covers 274 solved units in 231 cases (113 in 101 before) and agrees with the oracle
+at 99.65% / 99.63%, 380 disagreeing pairs in 52,726, and 39 of 8,762 at statement level.
 
 The first accuracy number for codediff against ground truth this project did not write. Produced
 by `benchmark_astdiff_oracle` (`cd research && make measure-astdiff-oracle`) from two external

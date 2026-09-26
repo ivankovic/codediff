@@ -11,6 +11,32 @@ directly but restricts itself to the names listed here, so every Section 5 numbe
 corpus state. Refresh order after adding fixtures: `analyze_human_mappings --csv`, then
 `make ambiguity-report`.
 
+## Refresh of 2026-09-26
+
+Both files re-run, in the same order, alongside a full `benchmark_other` refresh that added
+srcDiff, so the paper's comparison, node accuracy, RQ3 and rendering blocks describe one corpus
+state again. Annotation had moved on since 2026-09-16: 161 more fixtures in scope, every one of
+them a Defects4J unit (274 solved, from 113).
+
+| | fixtures | with a `human_mapping.json` |
+|---|---|---|
+| `handmade` | 63 | 62 |
+| `small` (Curated) | 220 | 220 |
+| `full` (Full) | 232 | 232 |
+| `stratified` | 491 | 491 |
+| `defects4j` | 996 | 274 |
+| **total** | **2002** | **1279** |
+
+The paper's scope is **1217** fixtures (1056 before). Over them codediff maps 10,325,792 of
+10,333,777 nodes (99.92%), and 7,030,055 of 7,035,541 visible nodes; `paper_variables.py`'s
+authored CORPUS block carries these totals.
+
+The trigger was a crash, which is worth knowing about: `benchmark_other_report.py` joins its
+per-dataset node columns against this CSV, and a fixture solved after this CSV was written reads
+`-` there. The refreshed comparison CSV scored 143 such fixtures, and the report died on
+`int('-')`. A crash was the right outcome - the other reading was a comparison section over 1217
+fixtures inside a paper whose every other block said 1056.
+
 ## Refresh of 2026-09-16
 
 Both `optimal_solutions_benchmark.csv` and `human_mapping_analysis.csv` were re-run, in that

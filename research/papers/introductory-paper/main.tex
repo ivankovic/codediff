@@ -104,9 +104,10 @@ settled node mapping. \InvisibleNodeShare{}\% of AST nodes carry no text of thei
 the screen, so a node-level metric gives a third of its weight where no user can see. A
 whole-tree tree-edit-distance computation completes within one second for only \RqOneCodePct{}\%
 of \RqOnePairsAttempted{} code file pairs stratified-sampled by size. Against this corpus, no
-configuration of seven established tools renders more than \GumTreePerfectPct{}\% of changes
-perfectly, and line-based \texttt{diff}, the most popular tool, renders only
-\UnixDiffPerfectPct{}\%.
+configuration of eight established tools renders more than \SrcDiffPerfectPct{}\% of changes
+perfectly, and the one that reaches it, srcDiff, parses five of the corpus's languages; of the tools
+that parse most of it, none renders more than \DifftasticPerfectPct{}\%, and line-based
+\texttt{diff}, the most popular tool, renders only \UnixDiffPerfectPct{}\%.
 
 As a tool contribution, we present \textsc{CodeDiff}, which combines existing state-of-the-art
 algorithms into one robust tool. It maps \NodeAccuracyPct{}\% of AST nodes correctly and renders
@@ -316,6 +317,12 @@ generation of tree-sitter-based diffing tools. Both prioritise a diff a human re
 comfortably over an exact node-to-node mapping: difftastic reduces the parse tree to an s-expression
 and aligns it with its own structural algorithm, and diffsitter applies a related tree-sitter-based
 alignment over a smaller, hand-picked set of compiled-in grammars.
+
+\textbf{srcDiff}~\cite{decker-2020} diffs the srcML markup of C, C++, C\#, Java and Python
+source. It aligns the two files with a sequence difference and then applies syntactic rules,
+modelled on how developers edit code, to decide which differing elements are changes to one
+construct and which are a construct replaced by another. It detects moves, and it writes one merged
+srcML document in which the text of each side is marked as deleted, inserted or common.
 
 \section{Empirical Dataset}
 \label{sec:dataset}
@@ -726,23 +733,24 @@ visualisations?
 
 \textbf{RQ4.2.} How fast are real-world state-of-the-art tools?
 
-\textbf{Comparison tools.} We measure seven established tools, all introduced in
+\textbf{Comparison tools.} We measure eight established tools, all introduced in
 Section~\ref{sec:background}, on the \NumFixtures{}-fixture corpus described in
 Section~\ref{sec:dataset}. \texttt{git diff} is measured
-under each of its four algorithms, Myers, minimal, patience and histogram, giving ten configurations in all. Five configurations report at line granularity only: Unix
-\texttt{diff} and the four \texttt{git} algorithms. Five report sub-line detail: BDiff~\cite{bdiff},
-Neovim's diff mode, and the three AST-aware tools, GumTree (\GumTreeVersion{})~\cite{gumtreediff-2014},
-difftastic~\cite{difftastic} and diffsitter~\cite{diffsitter}. Our own tool's figures are reported in Section~\ref{sec:codediff}, on the same basis and against the same ground truth.
+under each of its four algorithms, Myers, minimal, patience and histogram, giving eleven configurations in all. Five configurations report at line granularity only: Unix
+\texttt{diff} and the four \texttt{git} algorithms. Six report sub-line detail: BDiff~\cite{bdiff},
+Neovim's diff mode, and the four AST-aware tools, GumTree (\GumTreeVersion{})~\cite{gumtreediff-2014},
+difftastic~\cite{difftastic}, diffsitter~\cite{diffsitter} and srcDiff~\cite{decker-2020}. Our own tool's figures are reported in Section~\ref{sec:codediff}, on the same basis and against the same ground truth.
 
 
 
-\textbf{Line-level agreement.} None of the ten configurations reports an AST-node mapping in a
+\textbf{Line-level agreement.} None of the eleven configurations reports an AST-node mapping in a
 form that can be compared directly, so we compare them on a common ground: which
 source lines each marks as touched, against the lines the human mapping touches. Coverage varies
 widely: of the \UnixDiffFixtures{} fixtures this comparison was run over, the text-based tools
 cover all of them, while diffsitter's compiled-in grammar set can process \DiffsitterFixtures{},
-GumTree's generator set \GumTreeFixtures{}, and difftastic's \DifftasticFixtures{}. Because those
-subsets differ, percentages are used.
+GumTree's generator set \GumTreeFixtures{}, difftastic's \DifftasticFixtures{}, and srcDiff,
+which parses five languages, \SrcDiffFixtures{}. Because those subsets differ, percentages are
+used.
 
 We report agreement per fixture rather than pooled over lines in
 Table~\ref{tab:agreement-buckets}, and Figure~\ref{fig:agreement-by-dataset} splits the same
@@ -751,7 +759,9 @@ reading by the dataset each fixture was sampled from.
 95--99\% is ``a developer has to check''. Below 95\% the tool is no longer usable.
 
 \begin{resultbox}{RA4.1 (Tool accuracy)}
-No tool maps much more than three fifths of the corpus perfectly. The choice of line-diff
+srcDiff renders \SrcDiffPerfectPct{}\% of the changes it parses perfectly, but it parses five
+languages; no tool that parses most of the corpus renders much more than three fifths of it
+perfectly, the best being difftastic at \DifftasticPerfectPct{}\%. The choice of line-diff
 algorithm barely registers: Unix \texttt{diff} and all four \texttt{git} algorithms sit within a
 percentage point of one another. Syntax-awareness alone does not guarantee that a tool recovers a
 change the way a human reads it: diffsitter, at \DiffsitterPerfectPct{}\%, is closer to the
@@ -785,7 +795,7 @@ GumTree's own matching cost; and BDiff likewise per process and inside one persi
 interpreter, for the same reason.
 
 \begin{table}
-  \caption{Wall-clock time percentiles for the ten tool configurations, milliseconds, sorted
+  \caption{Wall-clock time percentiles for the eleven tool configurations, milliseconds, sorted
   fastest to slowest by median, with \textsc{CodeDiff} on the last row. \emph{Max} is the slowest
   single one of the \TimingRepeats{} runs over any fixture. Every configuration is timed as a whole
   process except \textsc{CodeDiff}, which is timed in-process and so pays no process startup; see
@@ -796,16 +806,17 @@ interpreter, for the same reason.
     \toprule
     Tool & p50 & p90 & p99 & Max \\
     \midrule
-    Unix \texttt{diff} & \SpeedUnixDiffPFifty{} & \SpeedUnixDiffPNinety{} & \SpeedUnixDiffPNinetyNine{} & \SpeedUnixDiffMax{} \\
-    \texttt{git} (minimal) & \SpeedGitMinimalPFifty{} & \SpeedGitMinimalPNinety{} & \SpeedGitMinimalPNinetyNine{} & \SpeedGitMinimalMax{} \\
-    \texttt{git} (patience) & \SpeedGitPatiencePFifty{} & \SpeedGitPatiencePNinety{} & \SpeedGitPatiencePNinetyNine{} & \SpeedGitPatienceMax{} \\
     \texttt{git} (histogram) & \SpeedGitHistogramPFifty{} & \SpeedGitHistogramPNinety{} & \SpeedGitHistogramPNinetyNine{} & \SpeedGitHistogramMax{} \\
+    \texttt{git} (minimal) & \SpeedGitMinimalPFifty{} & \SpeedGitMinimalPNinety{} & \SpeedGitMinimalPNinetyNine{} & \SpeedGitMinimalMax{} \\
+    Unix \texttt{diff} & \SpeedUnixDiffPFifty{} & \SpeedUnixDiffPNinety{} & \SpeedUnixDiffPNinetyNine{} & \SpeedUnixDiffMax{} \\
+    \texttt{git} (patience) & \SpeedGitPatiencePFifty{} & \SpeedGitPatiencePNinety{} & \SpeedGitPatiencePNinetyNine{} & \SpeedGitPatienceMax{} \\
     \texttt{git} (Myers) & \SpeedGitMyersPFifty{} & \SpeedGitMyersPNinety{} & \SpeedGitMyersPNinetyNine{} & \SpeedGitMyersMax{} \\
     BDiff (warm interpreter) & \SpeedBDiffWarmPFifty{} & \SpeedBDiffWarmPNinety{} & \SpeedBDiffWarmPNinetyNine{} & \SpeedBDiffWarmMax{} \\
     diffsitter & \SpeedDiffsitterPFifty{} & \SpeedDiffsitterPNinety{} & \SpeedDiffsitterPNinetyNine{} & \SpeedDiffsitterMax{} \\
     GumTree (warm JVM) & \SpeedGumTreeWarmPFifty{} & \SpeedGumTreeWarmPNinety{} & \SpeedGumTreeWarmPNinetyNine{} & \SpeedGumTreeWarmMax{} \\
-    difftastic & \SpeedDifftasticPFifty{} & \SpeedDifftasticPNinety{} & \SpeedDifftasticPNinetyNine{} & \SpeedDifftasticMax{} \\
+    srcDiff & \SpeedSrcDiffPFifty{} & \SpeedSrcDiffPNinety{} & \SpeedSrcDiffPNinetyNine{} & \SpeedSrcDiffMax{} \\
     \texttt{nvim -d} & \SpeedNvimDiffPFifty{} & \SpeedNvimDiffPNinety{} & \SpeedNvimDiffPNinetyNine{} & \SpeedNvimDiffMax{} \\
+    difftastic & \SpeedDifftasticPFifty{} & \SpeedDifftasticPNinety{} & \SpeedDifftasticPNinetyNine{} & \SpeedDifftasticMax{} \\
     BDiff (cold, per-invocation) & \SpeedBDiffColdPFifty{} & \SpeedBDiffColdPNinety{} & \SpeedBDiffColdPNinetyNine{} & \SpeedBDiffColdMax{} \\
     GumTree (cold, per-invocation) & \SpeedGumTreeColdPFifty{} & \SpeedGumTreeColdPNinety{} & \SpeedGumTreeColdPNinetyNine{} & \SpeedGumTreeColdMax{} \\
     \midrule
@@ -815,7 +826,7 @@ interpreter, for the same reason.
 \end{table}
 
 \begin{resultbox}{RA4.2 (Tool cost)}
-The ten configurations span more than two orders of magnitude at the median, from Unix
+The eleven configurations span more than two orders of magnitude at the median, from Unix
 \texttt{diff}'s \SpeedUnixDiffPFifty{}\,ms to GumTree's \SpeedGumTreeColdPFifty{}\,ms per
 invocation. At the 99th percentile the same range runs from \SpeedUnixDiffPNinetyNine{}\,ms to
 \SpeedGumTreeColdPNinetyNine{}\,ms, three orders of magnitude apart.
@@ -836,7 +847,7 @@ repeat count is uniform, so no fixture is over-weighted.
 This section is the paper's tool contribution. Table~\ref{tab:findings-to-design} lists what
 each empirical result above decided in \textsc{CodeDiff}'s design; the phases that follow are the
 same list read top to bottom, and the tool is then evaluated against the same ground truth and on
-the same basis as Section~\ref{sec:tools}'s ten configurations.
+the same basis as Section~\ref{sec:tools}'s eleven configurations.
 
 \begin{table}
   \caption{What each empirical result decided in \textsc{CodeDiff}'s design.}
@@ -861,7 +872,9 @@ the same basis as Section~\ref{sec:tools}'s ten configurations.
         closing step marks what no phase claimed \\
     \InvisibleNodeShare{}\% of nodes never reach the screen (RA3.3)
       & Accuracy is reported on visible nodes and on rendered lines, not on the node count alone \\
-    No established tool renders more than \GumTreePerfectPct{}\% of changes perfectly (RA4.1)
+    No established tool that parses most of the corpus renders more than
+      \DifftasticPerfectPct{}\% of changes perfectly, and srcDiff \SrcDiffPerfectPct{}\% of the
+      five languages it parses (RA4.1)
       & The bar the evaluation has to clear, on the same basis \\
     Files reach \AstMax{} nodes (Section~\ref{sec:dataset})
       & The Robust target below \\
@@ -924,8 +937,10 @@ inserted on the other, when they are byte-identical and large enough to rule out
 Move is the operation existing tools lack, so the mapping is not closed until this pass has run.
 
 \textbf{Result.} \textsc{CodeDiff} renders \CodeDiffPerfectPct{}\% of the corpus perfectly,
-against \GumTreePerfectPct{}\% for the best established configuration, at a median of
-\SpeedCodeDiffPFifty{}\,ms including its parse, and it completes every fixture.
+against \DifftasticPerfectPct{}\% for the best established tool that parses most of it, at a
+median of \SpeedCodeDiffPFifty{}\,ms including its parse, and it completes every fixture. On the
+\SrcDiffFixtures{} changes srcDiff parses, it renders \SrcDiffSubsetCodeDiffPerfectPct{}\% perfectly
+against srcDiff's \SrcDiffPerfectPct{}\%.
 
 \textbf{Accuracy.} Against the human mapping, \textsc{CodeDiff} maps \NodeAccuracyPct{}\% of AST
 nodes correctly (\NodeMismatches{} mismatches in \NodesTotal{}), and \VisibleNodeAccuracyPct{}\% of
@@ -962,9 +977,10 @@ completed, one needed more memory still, and the rest ran past even that budget.
 \textbf{Speed.} Over the \CodeDiffFixtures{} fixtures, \textsc{CodeDiff}'s median wall-clock time
 is \SpeedCodeDiffPFifty{}\,ms, its 90th percentile \SpeedCodeDiffPNinety{}\,ms and its 99th
 percentile \SpeedCodeDiffPNinetyNine{}\,ms, parse included. The right panel of
-Figure~\ref{fig:time-budget} places that curve among the ten configurations of
-Table~\ref{tab:speed-vs-others}: the line-based tools sit to its left, the AST-aware tools to its
-right, and it is the only AST-aware curve that reaches 100\% before the budget line.
+Figure~\ref{fig:time-budget} places that curve among the eleven configurations of
+Table~\ref{tab:speed-vs-others}: at the median the line-based tools sit to its left and the
+AST-aware tools to its right, and besides diffsitter, over the \DiffsitterFixtures{} fixtures its
+grammars cover, it is the only AST-aware curve that reaches 100\% before the budget line.
 
 \section{Threats to Validity}
 \label{sec:threats}
@@ -972,14 +988,14 @@ right, and it is the only AST-aware curve that reaches 100\% before the budget l
 \textbf{Construct validity.} Every rate this paper reports about ambiguity is a floor rather than
 an estimate. A multi-map group exists where an annotator noticed that two pairings were equally
 correct and recorded it; a change whose alternative mapping nobody saw is filed as unique. The
-same holds for the paintings. We report these as existence results and lower bounds throughout, and RA3.1's second reading---cost ties at differing mappings, which needs no annotation to detect---exists precisely because it does not depend on annotator attention. For the same reason we score RA1.1 and RA3.1 over the \AmbiguityListScored{} changes whose ambiguity pass is complete rather than over all \NumFixtures{}. That pass covers the Curated and Full lists in full, so for those two lists the bound is one on annotator attention rather than one on coverage. The Stratified sample (\AmbiguityStratifiedWith{} groups in \AmbiguityStratifiedTotal{} changes) and the Defects4J units (\AmbiguityDefectsFourJWith{} in \AmbiguityDefectsFourJTotal{}) run far under the rate the two finished lists show, which is an annotation gap rather than a finding about those changes; Table~\ref{tab:expressibility} prints both rows and its \emph{All} row under that caveat.
+same holds for the paintings. We report these as existence results and lower bounds throughout, and RA3.1's second reading---cost ties at differing mappings, which needs no annotation to detect---exists precisely because it does not depend on annotator attention. For the same reason we score RA1.1 and RA3.1 over the \AmbiguityListScored{} changes whose ambiguity pass is complete rather than over all \NumFixtures{}. That pass covers the Curated and Full lists in full, so for those two lists the bound is one on annotator attention rather than one on coverage. The Stratified sample (\AmbiguityStratifiedWith{} of \AmbiguityStratifiedTotal{} changes) runs far under the rate the two finished lists show, and the Defects4J units (\AmbiguityDefectsFourJWith{} of \AmbiguityDefectsFourJTotal{}) under it, which is an annotation gap rather than a finding about those changes; Table~\ref{tab:expressibility} prints both rows and its \emph{All} row under that caveat.
 
 Because no whole-file exact computation is affordable at these sizes (RA2), RA1.2 compares the
 human mapping's cost to a heuristics-augmented computation's rather than to a proven optimum. Its
 rate is therefore a lower bound.
 
 Section~\ref{sec:tools} scores tools at the line level because that is the only granularity all
-ten configurations share. A line-level projection of a node mapping discards detail that the
+eleven configurations share. A line-level projection of a node mapping discards detail that the
 AST-aware tools compute and the line-based ones never had, which if anything favours the
 line-based tools. It also means the paintings---the only place the corpus records a second correct
 rendering---never enter that comparison, so RA3.2's error term sits in those tables unremoved.
@@ -1074,7 +1090,7 @@ full quality requirements that real changes impose. On \AmbiguityListPct{}\% of 
 best possible correspondence cannot be expressed with the four standard operations at all
 (RA1.1), on \CostHumanHigherPct{}\% the cheapest mapping is not the one humans judge correct
 (RA1.2), the mapping and its rendering are not unique (RA3.1, RA3.2), and no established tool
-maps much more than half of the corpus perfectly (RA4.1). Closing that gap needs a ground truth
+that parses most of the corpus maps much more than three fifths of it perfectly (RA4.1). Closing that gap needs a ground truth
 that records the correspondence itself, a cost model that agrees with readers, and tools that
 are measured against both; the corpus published with this paper and the \textsc{CodeDiff} tool
 are a first step towards all three.

@@ -100,36 +100,38 @@ STRATIFIED_PER_CELL = 10
 # Ground-truth corpus size and AST-node accuracy.
 # source: cargo run --release --features test-fixtures --bin benchmark_optimal_solutions -- --csv
 #         (research/data/quality/optimal_solutions_benchmark.csv), totalled over solved fixtures.
-# Measured 2026-09-16, over `_common.PAPER_DATASETS` - the `small`, `full`, `stratified` and
-# `defects4j` fixtures. The corpus directory also holds 62 `handmade` fixtures, hand-written
+# Measured 2026-09-26, over `_common.PAPER_DATASETS` - the `small`, `full`, `stratified` and
+# `defects4j` fixtures. The corpus directory also holds 63 `handmade` fixtures, hand-written
 # minimal examples of one change pattern each; the product benchmark scores them and this paper
 # does not, because no rate over cases written to exercise the matcher estimates anything about
 # real changes.
 #
-# `defects4j` contributes 113 solved Java compilation units, far longer than the corpus median,
-# which is why it carries so much of NodesTotal. Only solved fixtures count - the other 883
-# Defects4J directories carry no human_mapping.json and are invisible here.
+# `defects4j` contributes 274 solved Java compilation units (113 at the 2026-09-16 refresh), far
+# longer than the corpus median, which is why it carries so much of NodesTotal. Only solved
+# fixtures count - the other 722 Defects4J directories carry no human_mapping.json and are
+# invisible here.
 #
-# In scope: 1056 fixture directories, all 1056 carrying a human_mapping.json.
+# In scope: 1217 fixture directories carrying a human_mapping.json (220 small, 232 full, 491
+# stratified, 274 defects4j).
 # `rust-completely-unrelated-main-files`, which is deliberately ground-truth-free (a
 # pathological-latency case, not an accuracy case, reporting `human_unsolved` in the CSV), is a
 # `handmade` fixture and so is out of scope here rather than being an in-scope exception.
 #
-# NumFixtures is the ground-truth-bearing count, 1056, which is the denominator of every per-tool
-# row, the ablation study, and the node accuracy below.
+# NumFixtures is the ground-truth-bearing count, 1217, which is the denominator of every per-tool
+# row and the node accuracy below. The ablation study is older and names its own corpus state.
 #
-# Refreshed together, from one corpus state, on 2026-09-16. These four move as a set and must be
+# Refreshed together, from one corpus state, on 2026-09-26. These four move as a set and must be
 # refreshed as a set: re-run the benchmark with --csv, re-run `analyze_human_mappings --csv` so the
 # scope artifact agrees with it, then recompute here. Order matters in one direction: human_mapping_analysis.csv carries a
 # `current_mismatches` column read back from optimal_solutions_benchmark.csv, so the benchmark runs
 # first. The check at the bottom of this file compares NumFixtures against the corpus on disk
 # precisely because the previous values silently outlived the corpus they described.
 CORPUS = {
-    "NumFixtures": 1056,
-    "NodesMatched": 8_586_599,
-    "NodesTotal": 8_594_027,
+    "NumFixtures": 1217,
+    "NodesMatched": 10_325_792,
+    "NodesTotal": 10_333_777,
     # Distinct languages across the fixture corpus, from `analyze_human_mappings`' own "By
-    # language" census (24 as of 2026-09-16; `defects4j` is Java only, and the excluded handmade
+    # language" census restricted to these fixtures (24 as of 2026-09-26; `defects4j` is Java only, and the excluded handmade
     # fixtures cover no language the sampled ones lack).
     # Not the same number as the empirical study's \NumLanguages, which counts languages in the
     # 100-repository measure-file-stats corpus.
@@ -141,8 +143,8 @@ CORPUS = {
 # alongside the all-node figure because the all-node denominator includes every ancestor of every
 # change up to the root, so it partly measures how deep a grammar's tree is.
 CORPUS_VISIBLE = {
-    "VisibleNodesMatched": 5_838_776,
-    "VisibleNodesTotal": 5_843_886,
+    "VisibleNodesMatched": 7_030_055,
+    "VisibleNodesTotal": 7_035_541,
 }
 
 # Leave-one-out ablation deltas, in mismatches, against an all-enabled baseline. A positive number
@@ -304,21 +306,21 @@ RQ_ONE_MACROS = [
 ]
 
 # Every macro the comparison fragment (benchmark_other_report.py's write_paper_fragment) is
-# expected to define: three accuracy macros for each of the five tools scored at the line level,
-# and three wall-clock percentiles for each of the six timing series. GumTree appears in both
+# expected to define: four accuracy macros for each of the six tools scored at the line level,
+# and three wall-clock percentiles for each of the seven timing series. GumTree appears in both
 # halves under different stems - `GumTree*` for its accuracy row, `SpeedGumTreeCold*`/
 # `SpeedGumTreeWarm*` for its two timing series - which is why this list is written out per half
 # rather than as one product over a single tool list.
 COMPARISON_MACROS = (
     [
         f"{tool}{suffix}"
-        for tool in ("CodeDiff", "UnixDiff", "GumTree", "Difftastic", "Diffsitter")
+        for tool in ("CodeDiff", "UnixDiff", "GumTree", "Difftastic", "Diffsitter", "SrcDiff")
         for suffix in ("Fixtures", "LineMismatches", "LineRate", "PerfectPct")
     ]
     + ["CommonFixtures"]
     + [
         f"Common{tool}LineRate"
-        for tool in ("CodeDiff", "UnixDiff", "GumTree", "Difftastic", "Diffsitter")
+        for tool in ("CodeDiff", "UnixDiff", "GumTree", "Difftastic", "Diffsitter", "SrcDiff")
     ]
     + [
         f"Speed{tool}{suffix}"
@@ -329,6 +331,7 @@ COMPARISON_MACROS = (
             "GumTreeWarm",
             "Difftastic",
             "Diffsitter",
+            "SrcDiff",
         )
         for suffix in ("PFifty", "PNinety", "PNinetyNine")
     ]
@@ -644,6 +647,7 @@ COMMON_SUBSET_TOOLS = [
     "gumtree",
     "diffsitter",
     "difftastic",
+    "srcdiff",
 ]
 
 # How many of CodeDiff's worst fixtures the paper sets aside when showing that its common-subset

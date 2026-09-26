@@ -459,6 +459,26 @@ already false when the full run landed two days earlier, and which `main.tex` ha
 own header comment and into Section 3.2's "In the Curated dataset". All three are fixed. Check
 `\NumRepos` in `plots/variables_empirical.tex` before describing the scope again.
 
+**Everything corpus-dependent was refreshed together on 2026-09-26**, to 1217 fixtures (1056
+on 2026-09-16; all 161 new ones are solved Defects4J units): both `benchmark_other` CSVs, now with
+srcDiff as an eighth tool, `optimal_solutions_benchmark.csv` and `human_mapping_analysis.csv`, the
+authored CORPUS block, the ambiguity, rendering and shape reports, the fixture robustness run and
+both AST-diff oracle runs. The ablation study still names its own, older corpus state. Ordering
+claims re-read against the new numbers, and four had moved:
+
+* **The best established tool is no longer GumTree.** difftastic (64%) overtook it (62%) among the
+  tools that parse most of the corpus, and srcDiff reaches 79% on the five languages it parses. The
+  abstract, RA4.1, the findings table, CodeDiff's Result paragraph and the conclusion hard-coded
+  `\GumTreePerfectPct` as "the best"; they now name srcDiff with its coverage and difftastic as
+  the best broad tool, and `benchmark_other_report.py` warns if a refresh reorders those two.
+  CodeDiff against srcDiff is quoted on srcDiff's own subset only (`\SrcDiffSubsetCodeDiffPerfectPct`).
+* **The speed table's median order changed** (difftastic now below `nvim -d`, the `git` rows
+  reshuffled within 0.01 ms); rows re-sorted.
+* **"The only AST-aware curve that reaches 100% before the budget line" was false**, and already
+  was on 2026-09-16: diffsitter's slowest run is 512 ms (676 ms then). The sentence now names it.
+* **Defects4J ambiguity rose from 4.4% to 9.5%** as annotation reached more units, so Threats to
+  Validity no longer says it runs "far under" the finished lists; the Stratified sample still does.
+
 **The ground-truth corpus block was refreshed on 2026-09-05** to 597 fixtures (598 directories, 597
 of them carrying a `human_mapping.json`), moving `NumFixtures`, the node-accuracy totals, and the
 generated ambiguity and rendering blocks together. The refresh before it was 2026-09-02 (512), and

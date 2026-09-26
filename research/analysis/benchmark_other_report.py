@@ -117,8 +117,8 @@ BASELINE = "#c3c2b7"
 # validation pass - the dataviz skill and validate_palette.js aren't available in this
 # environment, so these two were picked by hand as the two hue families the rest don't already
 # cover, mirroring how Okabe-Ito's colorblind-safe 8-palette adds sky-blue and yellow to a base 5
-# for the same reason. Re-validate the full current set before treating it as confirmed
-# colorblind-safe.
+# for the same reason. srcDiff (magenta) was added the same way on 2026-09-26, the one hue family
+# still free. Re-validate the full current set before treating it as confirmed colorblind-safe.
 #
 # The four git variants are one engine reached through one flag, so they share a
 # single hue family (orange) at four lightnesses rather than taking four unrelated categorical
@@ -141,6 +141,7 @@ DISPLAY_NAMES = {
     "gumtree_warm": "GumTree (warm JVM)",
     "diffsitter": "diffsitter",
     "difftastic": "difftastic",
+    "srcdiff": "srcDiff",
 }
 DISPLAY_ORDER = list(DISPLAY_NAMES)
 
@@ -164,6 +165,7 @@ LATEX_NAMES = {
     "gumtree_warm": r"GumTree (warm JVM)",
     "diffsitter": r"diffsitter",
     "difftastic": r"difftastic",
+    "srcdiff": r"srcDiff",
 }
 
 
@@ -187,6 +189,7 @@ COLORS = {
     "gumtree_warm": "#e34948",
     "difftastic": "#c9a227",
     "diffsitter": "#1a9e96",
+    "srcdiff": "#b8418f",
 }
 
 # Which family each comparable tool belongs to. The accuracy chart is split on this: ten series in
@@ -201,7 +204,7 @@ TEXT_TOOLS = [
     "bdiff",
     "nvim_diff",
 ]
-AST_TOOLS = ["gumtree", "difftastic", "diffsitter"]
+AST_TOOLS = ["gumtree", "difftastic", "diffsitter", "srcdiff"]
 
 
 def ordered(ids: list[str]) -> list[str]:
@@ -350,7 +353,7 @@ def _plot_agreement_histogram(
 # Line-only means the tool's output contains no sub-line information at all - Unix diff and git
 # emit hunk headers and whole lines, and nothing finer exists to extract. Sub-line means the tool
 # reports character or column ranges inside a line: difftastic's per-change `start`/`end` columns,
-# GumTree's and diffsitter's character offsets (both go through `span_from_char_offsets` in
+# GumTree's, diffsitter's and srcDiff's character offsets (through `span_from_char_offsets` in
 # benchmark_other.rs), BDiff's `str_diff` ranges, and codediff's own `TextRange` columns.
 #
 # `nvim -d` is in the sub-line group: its line pass is libxdiff, the same engine as the four git
@@ -362,7 +365,7 @@ def _plot_agreement_histogram(
 # the tool. It is measured, and the corpus decides.
 GRANULARITY = {
     "line": ["unix_diff", "git_myers", "git_minimal", "git_patience", "git_histogram"],
-    "subline": ["bdiff", "nvim_diff", "diffsitter", "difftastic", "gumtree", "codediff"],
+    "subline": ["bdiff", "nvim_diff", "diffsitter", "difftastic", "gumtree", "srcdiff", "codediff"],
 }
 
 # Agreement buckets, most-accurate first. Checked in order and first match wins, so a fixture at
@@ -1243,6 +1246,7 @@ PAPER_MACRO_STEMS = {
     "gumtree": "GumTree",
     "difftastic": "Difftastic",
     "diffsitter": "Diffsitter",
+    "srcdiff": "SrcDiff",
 }
 PAPER_SPEED_STEMS = PAPER_MACRO_STEMS | {
     "gumtree": "GumTreeCold",
@@ -1467,6 +1471,32 @@ def write_paper_fragment(
                                         f"\\newcommand{{\\{stem}{prefix}{macro_stem(label)}}}"
                                         f"{{{100.0 * (total_n - miss_n) / total_n:.2f}}}"
                                     )
+
+        # srcDiff parses five languages, so its Perfect share and CodeDiff's are over different
+        # fixtures. The paper sets them side by side on srcDiff's own subset, and only there.
+        srcdiff_scored = [r for r in accuracy_rows if r.get("srcdiff_line_mismatches", "") != ""]
+        buckets = bucket_counts(srcdiff_scored, "codediff")
+        if buckets is not None:
+            scored, counts = buckets
+            lines.append(
+                f"\\newcommand{{\\SrcDiffSubsetCodeDiffPerfectPct}}{{{100.0 * counts[0] / scored:.0f}}}"
+            )
+
+        # main.tex names the best established tools in prose (the abstract, RA4.1, the findings
+        # table, Section 7's result): srcDiff overall, and difftastic among the tools that parse
+        # most of the corpus. A macro carries the number but not the name, so a refresh that
+        # reorders them is caught here rather than in review.
+        perfect = {}
+        for id_ in PAPER_MACRO_STEMS:
+            buckets = bucket_counts(accuracy_rows, id_)
+            if id_ != "codediff" and buckets is not None:
+                perfect[id_] = 100.0 * buckets[1][0] / buckets[0]
+        ranked = sorted(perfect, key=perfect.get, reverse=True)
+        if ranked[:2] != ["srcdiff", "difftastic"]:
+            print(
+                "WARNING: main.tex names srcDiff, then difftastic, as the established tools with "
+                f"the highest Perfect share; this run ranks {ranked[:3]}. Re-read the prose."
+            )
 
         shared = common_subset(accuracy_rows, list(PAPER_MACRO_STEMS))
         lines.append(f"% Common subset: the {len(shared)} fixtures every tool scored.")

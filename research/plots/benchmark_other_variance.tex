@@ -5,20 +5,21 @@
     \toprule
     Series & $n$ & Median CoV & p90 CoV \\
     \midrule
-    tree-sitter parse (lower bound) & 1056 & 5.9\% & 29.7\% \\
-    Unix \texttt{diff} & 1056 & 6.0\% & 9.1\% \\
-    \texttt{git} (Myers) & 1056 & 3.4\% & 5.2\% \\
-    \texttt{git} (minimal) & 1056 & 1.2\% & 3.1\% \\
-    \texttt{git} (patience) & 1056 & 1.3\% & 3.0\% \\
-    \texttt{git} (histogram) & 1056 & 1.3\% & 2.9\% \\
-    BDiff (cold, per-invocation) & 1056 & 0.8\% & 2.4\% \\
-    \texttt{nvim -d} & 1056 & 18.3\% & 31.6\% \\
-    BDiff (warm interpreter) & 1056 & 1.6\% & 8.9\% \\
-    \textsc{CodeDiff} & 1056 & 4.9\% & 18.7\% \\
-    GumTree (cold, per-invocation) & 844 & 4.5\% & 9.3\% \\
-    GumTree (warm JVM) & 844 & 2.9\% & 8.8\% \\
-    diffsitter & 730 & 3.4\% & 6.8\% \\
-    difftastic & 1021 & 2.3\% & 25.8\% \\
+    tree-sitter parse (lower bound) & 1217 & 6.3\% & 30.1\% \\
+    Unix \texttt{diff} & 1217 & 8.0\% & 11.8\% \\
+    \texttt{git} (Myers) & 1217 & 3.5\% & 6.0\% \\
+    \texttt{git} (minimal) & 1217 & 1.9\% & 4.8\% \\
+    \texttt{git} (patience) & 1217 & 1.8\% & 4.3\% \\
+    \texttt{git} (histogram) & 1217 & 1.9\% & 4.8\% \\
+    BDiff (cold, per-invocation) & 1217 & 0.9\% & 3.1\% \\
+    \texttt{nvim -d} & 1217 & 35.6\% & 60.8\% \\
+    BDiff (warm interpreter) & 1217 & 2.0\% & 8.8\% \\
+    \textsc{CodeDiff} & 1217 & 4.6\% & 18.9\% \\
+    GumTree (cold, per-invocation) & 1005 & 2.9\% & 6.0\% \\
+    GumTree (warm JVM) & 1005 & 3.4\% & 14.5\% \\
+    diffsitter & 891 & 4.0\% & 9.1\% \\
+    difftastic & 1182 & 1.2\% & 4.4\% \\
+    srcDiff & 519 & 1.3\% & 4.8\% \\
     \bottomrule
   \end{tabular}
 \end{table}

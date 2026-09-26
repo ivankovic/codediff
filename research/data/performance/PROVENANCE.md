@@ -6,6 +6,17 @@ the `size_bucket` column). `../samples/` has since been re-drawn under the LOC b
 DIFFERENT pair set than these files - do not mix rows across that boundary. `baselines/` snapshots
 are pinned to whatever corpus was current at their date; that is their point.
 
+## `robustness_fixtures.csv` (re-measured 2026-09-26)
+
+Re-run with the same command as part of the 2026-09-26 refresh, so the fixture robustness figures
+describe the same engine and corpus state as the paper's comparison and node-accuracy blocks. It
+now walks all four paper datasets, `defects4j` included, solved or not: 1939 fixture directories,
+every one `ok` - no timeout, no panic, nothing skipped. Scoped by `paper_variables.py` to the 1217
+in the paper. Largest input unchanged (`json-ipfs-ipfs-desktop-only-update-version-strings`,
+198,406 nodes a side); slowest still
+`rust-rustdesk-rustdesk-actual-logic-change-in-io-loop-medium-sized-file`, now 1,237 ms median
+(1,287 ms on the previous run); peak thread heap unchanged at 56.6 MB.
+
 ## `robustness_fixtures.csv` (2026-09-11)
 
 The paper's robustness run, over the fixture corpus rather than a sampled pair set. Written by
