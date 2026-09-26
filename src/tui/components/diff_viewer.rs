@@ -204,12 +204,7 @@ impl DiffViewer {
             Some(index) if forward => (index + 1) % stops.len(),
             Some(index) => (index + stops.len() - 1) % stops.len(),
             None => {
-                let cursor = self.focused_cursor_position().unwrap_or((0, 0));
-                let here = (self.active_panel, cursor);
-                let after = stops
-                    .iter()
-                    .position(|&(panel, at)| (panel, at) > here)
-                    .unwrap_or(stops.len());
+                let after = self.stops_before_cursor(&stops);
                 if forward {
                     after % stops.len()
                 } else {
@@ -228,20 +223,31 @@ impl DiffViewer {
         self.sync_scroll_centered();
     }
 
+    /// Off a stop, how many of `change_stops` come before the cursor: the index of the stop `n`
+    /// takes next, `stops.len()` past the last one.
+    fn stops_before_cursor(&self, stops: &[ChangeStop]) -> usize {
+        let cursor = self.focused_cursor_position().unwrap_or((0, 0));
+        let here = (self.active_panel, cursor);
+        stops
+            .iter()
+            .position(|&(panel, at)| (panel, at) > here)
+            .unwrap_or(stops.len())
+    }
+
     /// `(1-based index, total)` over the merged `change_stops` walk, for the footer's
-    /// `change N/M`; `None` when there are no changes.
+    /// `change N/M`; `None` when there are no changes. Counted in the order `n` walks, so it
+    /// climbs by one per `n` even across a panel switch; off a stop it is the last stop passed.
     pub fn merged_change_count_and_index(&self) -> Option<(usize, usize)> {
         let stops = self.change_stops();
         if stops.is_empty() {
             return None;
         }
-        let cursor = self.focused_cursor_position()?;
-        let here = (self.active_panel, cursor);
-        let passed = stops
-            .iter()
-            .filter(|&&(panel, at)| (panel, at) <= here)
-            .count();
-        Some((passed.max(1), stops.len()))
+        self.focused_cursor_position()?;
+        let index = match self.current_stop_index(&stops) {
+            Some(index) => index + 1,
+            None => self.stops_before_cursor(&stops),
+        };
+        Some((index.max(1), stops.len()))
     }
 
     /// `Ctrl-d`/`Ctrl-u`: half a viewport, built from single-line moves so the sticky column
@@ -1347,6 +1353,68 @@ mod tests {
             .merged_change_count_and_index()
             .expect("a diff with one change should report a total");
         assert_eq!(total, 1);
+    }
+
+    /// Four stops alternating panels: a deletion and its replacing insertion at row 5, a paired
+    /// update at row 12, an insertion at row 20. The same diff as the web viewer's `pairModel`.
+    fn alternating_panels_diff_data() -> DiffSessionData {
+        use crate::diff::text::{RangeMatch, TextOperation};
+        use crate::diff::text_range::TextRange;
+
+        let range = |operation,
+                     source: (usize, usize, usize, usize),
+                     destination: (usize, usize, usize, usize)| RangeMatch {
+            source: TextRange::new(source.0, source.1, source.2, source.3),
+            destination: TextRange::new(destination.0, destination.1, destination.2, destination.3),
+            operation,
+        };
+        let contents: String = (0..30).map(|i| format!("line {i}\n")).collect();
+        DiffSessionData {
+            before_path: PathBuf::from("before.txt"),
+            after_path: PathBuf::from("after.txt"),
+            before_contents: contents.clone(),
+            after_contents: contents,
+            before_ranges: vec![
+                range(TextOperation::Identical, (0, 0, 0, 6), (0, 0, 0, 6)),
+                range(TextOperation::Delete, (5, 0, 5, 6), (5, 0, 5, 0)),
+                range(TextOperation::Update, (12, 5, 12, 6), (12, 5, 12, 6)),
+            ],
+            after_ranges: vec![
+                range(TextOperation::Identical, (0, 0, 0, 6), (0, 0, 0, 6)),
+                range(TextOperation::Insert, (5, 0, 5, 6), (5, 0, 5, 0)),
+                range(TextOperation::Update, (12, 5, 12, 6), (12, 5, 12, 6)),
+                range(TextOperation::Insert, (20, 0, 20, 7), (19, 0, 19, 0)),
+            ],
+            comment_only: false,
+            plain_text_fallback: false,
+        }
+    }
+
+    /// Counted by (panel, position) instead of in walk order, these four `n`s read 1, 3, 2, 4.
+    #[test]
+    fn the_change_counter_climbs_by_one_per_n_across_panel_switches() {
+        let mut viewer = DiffViewer::new();
+        viewer.load_diff(&alternating_panels_diff_data());
+
+        let mut walked = Vec::new();
+        for _ in 0..4 {
+            viewer.jump_to_change(true);
+            walked.push((
+                viewer.active_panel,
+                viewer.focused_cursor_position(),
+                viewer.merged_change_count_and_index(),
+            ));
+        }
+
+        assert_eq!(
+            walked,
+            vec![
+                (Panel::Before, Some((5, 0)), Some((1, 4))),
+                (Panel::After, Some((5, 0)), Some((2, 4))),
+                (Panel::Before, Some((12, 5)), Some((3, 4))),
+                (Panel::After, Some((20, 0)), Some((4, 4))),
+            ]
+        );
     }
 
     #[test]

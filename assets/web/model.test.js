@@ -245,11 +245,11 @@ function pairModel() {
   assert.deepStrictEqual([model.activePanel, model.focusedCursorPosition()], [0, [5, 0]]);
   model.jumpToChange(true);
   assert.deepStrictEqual([model.activePanel, model.focusedCursorPosition()], [1, [5, 0]], "the replacing insertion, on the after side");
+  assert.deepStrictEqual(model.mergedChangeCountAndIndex(), [2, 4]);
   model.jumpToChange(true);
   assert.deepStrictEqual([model.activePanel, model.focusedCursorPosition()], [0, [12, 5]]);
-  // 2, not 3: `merged_change_count_and_index` counts stops ordered by (panel, position), which
-  // is not the order `n` walks them in - ported as it is, see the TUI note in src/web/SPECS.md.
-  assert.deepStrictEqual(model.mergedChangeCountAndIndex(), [2, 4]);
+  // Counted in walk order, so it climbs across the panel switch (by (panel, position) it read 2).
+  assert.deepStrictEqual(model.mergedChangeCountAndIndex(), [3, 4]);
   assert.strictEqual(model.panels[0].scroll, 7, "the focused panel centres the change");
   model.jumpToChange(true);
   assert.deepStrictEqual([model.activePanel, model.focusedCursorPosition()], [1, [20, 0]]);
@@ -409,11 +409,15 @@ function pairModel() {
   const presets = { full, minimal };
   assert.strictEqual(M.renderOptionsBadge(full, rows, presets), "");
   assert.strictEqual(M.renderOptionsBadge(minimal, rows, presets), "[minimal]");
-  // "Whole-pair updates" is off in FULL itself, so - as in the TUI's footer - it is named the
-  // moment anything else is off too.
+  // "Whole-pair updates" is off in FULL itself, so only a difference from FULL is named.
   assert.strictEqual(
     M.renderOptionsBadge({ ...full, leading_whitespace: false }, rows, presets),
-    "[Leading whitespace, Whole-pair updates off]"
+    "[Leading whitespace off]"
+  );
+  assert.strictEqual(M.renderOptionsBadge({ ...full, whole_pair_updates: true }, rows, presets), "[Whole-pair updates on]");
+  assert.strictEqual(
+    M.renderOptionsBadge({ ...full, leading_whitespace: false, whole_pair_updates: true }, rows, presets),
+    "[Leading whitespace off; Whole-pair updates on]"
   );
   assert.strictEqual(
     M.footerLeft({ cursor: [4, 9], counts: { insertions: 1, deletions: 0, updates: 0, moves: 0 }, changeProgress: [2, 5], plainText: true, layout: "Single", options: minimal, rows, presets }),

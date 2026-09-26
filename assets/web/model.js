@@ -366,13 +366,20 @@ const CodeDiffModel = (() => {
     return Object.keys(b).every((key) => a[key] === b[key]);
   }
 
-  // The footer's render-options badge: nothing for FULL, `[minimal]`, or the names of what is
-  // off.
+  // `render_options_badge`: nothing for FULL, `[minimal]`, or the names of what differs from
+  // FULL - not of what is off, since FULL itself leaves whole-pair updates off.
   function renderOptionsBadge(options, rows, presets) {
     if (sameOptions(options, presets.full)) return "";
     if (sameOptions(options, presets.minimal)) return "[minimal]";
-    const off = rows.filter((row) => !options[row.key]).map((row) => row.label);
-    return `[${off.join(", ")} off]`;
+    const differing = (state) =>
+      rows
+        .filter((row) => options[row.key] !== presets.full[row.key] && options[row.key] === state)
+        .map((row) => row.label);
+    const [off, on] = [differing(false), differing(true)];
+    const parts = [];
+    if (off.length > 0) parts.push(`${off.join(", ")} off`);
+    if (on.length > 0) parts.push(`${on.join(", ")} on`);
+    return `[${parts.join("; ")}]`;
   }
 
   // `DiffViewer::update_display_mode`.
@@ -840,9 +847,7 @@ const CodeDiffModel = (() => {
       if (current !== null) {
         next = forward ? (current + 1) % n : (current + n - 1) % n;
       } else {
-        const here = { panel: this.activePanel, at: this.focusedCursorPosition() || [0, 0] };
-        let after = stops.findIndex((stop) => compareStops(stop, here) > 0);
-        if (after < 0) after = n;
+        const after = this.stopsBeforeCursor(stops);
         next = forward ? after % n : (after + n - 1) % n;
       }
       const { panel, at } = stops[next];
@@ -855,14 +860,21 @@ const CodeDiffModel = (() => {
       return true;
     }
 
+    // `DiffViewer::stops_before_cursor`.
+    stopsBeforeCursor(stops) {
+      const here = { panel: this.activePanel, at: this.focusedCursorPosition() || [0, 0] };
+      const after = stops.findIndex((stop) => compareStops(stop, here) > 0);
+      return after < 0 ? stops.length : after;
+    }
+
+    // `DiffViewer::merged_change_count_and_index`: counted in the order `n` walks.
     mergedChangeCountAndIndex() {
       const stops = this.changeStops();
       if (stops.length === 0) return null;
-      const cursor = this.focusedCursorPosition();
-      if (!cursor) return null;
-      const here = { panel: this.activePanel, at: cursor };
-      const passed = stops.filter((stop) => compareStops(stop, here) <= 0).length;
-      return [Math.max(passed, 1), stops.length];
+      if (!this.focusedCursorPosition()) return null;
+      const current = this.currentStopIndex(stops);
+      const index = current !== null ? current + 1 : this.stopsBeforeCursor(stops);
+      return [Math.max(index, 1), stops.length];
     }
 
     moveCursorHalfPage(direction) {

@@ -1077,21 +1077,8 @@ impl App {
         if layout != crate::tui::theme::PanelLayout::Auto {
             left_parts.push(format!("[layout: {}]", layout.label()));
         }
-        // An option turned off leaves something unpainted, and the setting persists across runs,
-        // so without a badge missing highlights read as codediff having missed them.
-        let render_options = self.diff_viewer.render_options();
-        if render_options != RenderOptions::FULL {
-            if render_options == RenderOptions::MINIMAL {
-                left_parts.push("[minimal]".to_string());
-            } else {
-                let off: Vec<&str> = render_options
-                    .options()
-                    .into_iter()
-                    .filter(|(_, on)| !on)
-                    .map(|(label, _)| label)
-                    .collect();
-                left_parts.push(format!("[{} off]", off.join(", ")));
-            }
+        if let Some(badge) = render_options_badge(self.diff_viewer.render_options()) {
+            left_parts.push(badge);
         }
         let left = left_parts.join("   ");
 
@@ -1223,6 +1210,41 @@ impl App {
 /// Only the most-used keys; `?` is the full reference.
 pub(crate) const FOOTER_HINTS: &str =
     "?:help  o:open  G:git  r:reload  n/p:next/prev  /:search  M:options  Tab:switch  q:quit";
+
+/// The footer's render-options badge: `None` for `FULL`, `[minimal]`, or the options that differ
+/// from `FULL` by name. An option turned off leaves something unpainted, and the setting persists
+/// across runs, so without a badge missing highlights read as codediff having missed them.
+///
+/// Compared against `FULL` rather than against "everything on": `FULL` has whole-pair updates
+/// off, so an "is it off" list names that option whenever anything else is off, and has nothing
+/// to name when it alone is turned on.
+fn render_options_badge(options: RenderOptions) -> Option<String> {
+    if options == RenderOptions::FULL {
+        return None;
+    }
+    if options == RenderOptions::MINIMAL {
+        return Some("[minimal]".to_string());
+    }
+    let full = RenderOptions::FULL.options();
+    let differing = |state: bool| -> Vec<&str> {
+        options
+            .options()
+            .into_iter()
+            .zip(full)
+            .filter(|((_, on), (_, on_in_full))| on != on_in_full && *on == state)
+            .map(|((label, _), _)| label)
+            .collect()
+    };
+    let (off, on) = (differing(false), differing(true));
+    let mut parts = Vec::new();
+    if !off.is_empty() {
+        parts.push(format!("{} off", off.join(", ")));
+    }
+    if !on.is_empty() {
+        parts.push(format!("{} on", on.join(", ")));
+    }
+    Some(format!("[{}]", parts.join("; ")))
+}
 
 /// `+12 -4 ~2 M3`, omitting zero categories.
 fn format_change_counts(counts: ChangeCounts) -> String {
@@ -2536,6 +2558,42 @@ mod tests {
             "expected the footer's key hints to be drawn even with no status bar or error banner"
         );
         Ok(())
+    }
+
+    #[test]
+    fn the_options_badge_names_what_differs_from_full() {
+        let full = RenderOptions::FULL;
+        assert_eq!(render_options_badge(full), None);
+        assert_eq!(
+            render_options_badge(RenderOptions::MINIMAL).as_deref(),
+            Some("[minimal]")
+        );
+        // Whole-pair updates is off in FULL itself, so it is not named here.
+        let no_leading_whitespace = RenderOptions {
+            leading_whitespace: false,
+            ..full
+        };
+        assert_eq!(
+            render_options_badge(no_leading_whitespace).as_deref(),
+            Some("[Leading whitespace off]")
+        );
+        // Turning on the one option FULL leaves off is a difference too.
+        let whole_pairs = RenderOptions {
+            whole_pair_updates: true,
+            ..full
+        };
+        assert_eq!(
+            render_options_badge(whole_pairs).as_deref(),
+            Some("[Whole-pair updates on]")
+        );
+        assert_eq!(
+            render_options_badge(RenderOptions {
+                whole_pair_updates: true,
+                ..no_leading_whitespace
+            })
+            .as_deref(),
+            Some("[Leading whitespace off; Whole-pair updates on]")
+        );
     }
 
     #[test]
