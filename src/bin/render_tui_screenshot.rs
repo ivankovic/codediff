@@ -25,6 +25,7 @@ use std::path::PathBuf;
 use anyhow::{Context, Result, bail};
 use clap::Parser;
 
+use codediff::tui::color_depth::ColorDepth;
 use codediff::tui::screenshot::{overlay_theme_named, render};
 use codediff::tui::theme;
 use codediff::tui::widgets::code_viewer::syntax_theme_names;
@@ -46,6 +47,9 @@ struct Args {
     /// Syntax highlighting theme, by its syntect name.
     #[arg(long, default_value = "Solarized (light)")]
     syntax_theme: String,
+    /// Colors the terminal can show: 24 (truecolor) or 256, what e.g. macOS Terminal.app shows.
+    #[arg(long, default_value = "24", value_parser = ["24", "256"])]
+    colors: String,
     /// Where to write the JSON; stdout if omitted.
     #[arg(long)]
     out: Option<PathBuf>,
@@ -80,6 +84,11 @@ fn main() -> Result<()> {
         args.rows,
         overlay,
         Some(&args.syntax_theme),
+        if args.colors == "256" {
+            ColorDepth::Indexed256
+        } else {
+            ColorDepth::TrueColor
+        },
     );
     let _ = std::fs::remove_file(&scratch_config);
     let json = serde_json::to_string(&shot?)?;

@@ -932,7 +932,8 @@ impl App {
     }
 
     fn render(&mut self, ui: &mut UI) -> Result<()> {
-        ui.draw(|frame| {
+        let palette = self.diff_viewer.overlay_theme().palette();
+        ui.draw(&palette, |frame| {
             let area = frame.area();
             let result = match self.screen {
                 AppScreen::Viewer => self.draw_viewer(frame, area),

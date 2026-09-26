@@ -99,6 +99,11 @@ codediff BEFORE AFTER     # open directly into the diff of two files
 
 Press `?` in the viewer for the full list of keybindings.
 
+The TUI uses 24-bit color when the terminal advertises it with `COLORTERM=truecolor`, and the
+nearest 256 colors otherwise (macOS Terminal.app, or most terminals over ssh, which does not
+forward `COLORTERM`). If your terminal supports 24-bit color but does not set it, run
+`export COLORTERM=truecolor`.
+
 ## The web UI
 
 `codediff-web` is the same viewer served to a browser tab. It is behind the off-by-default `web`

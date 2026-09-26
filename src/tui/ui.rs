@@ -31,10 +31,10 @@ use crossterm::{
     terminal::{EnterAlternateScreen, LeaveAlternateScreen},
 };
 use futures::StreamExt;
-use ratatui::{backend::CrosstermBackend as Backend, layout::Rect};
+use ratatui::{Frame, backend::CrosstermBackend as Backend, layout::Rect};
 use tokio::time::{Interval, interval};
 
-use crate::tui::events::Event;
+use crate::tui::{color_depth::ColorDepth, events::Event, theme::OverlayPalette};
 
 /// Owns the terminal and its raw-mode/alternate-screen lifecycle, plus the merged input/tick/
 /// render event source. Input is an async `EventStream`, not a polling thread; see "Async event
@@ -47,6 +47,8 @@ pub struct UI {
 
     pub mouse: bool,
     pub paste: bool,
+
+    color_depth: ColorDepth,
 
     tick_interval: Interval,
     render_interval: Interval,
@@ -65,6 +67,8 @@ impl UI {
 
             mouse: false,
             paste: false,
+
+            color_depth: ColorDepth::detect(),
 
             tick_interval: interval(Duration::from_secs_f64(1.0 / tick_rate)),
             render_interval: interval(Duration::from_secs_f64(1.0 / frame_rate)),
@@ -88,6 +92,22 @@ impl UI {
     pub fn size(&self) -> Result<Rect> {
         let size = self.terminal.size()?;
         Ok(Rect::new(0, 0, size.width, size.height))
+    }
+
+    /// `Terminal::draw`, with the finished frame fitted to the terminal's color depth. `palette`
+    /// is the overlay on screen (see `ColorDepth::fit`). Shadows the `Deref` to `Terminal`, so no
+    /// caller can draw around the fitting.
+    pub fn draw(
+        &mut self,
+        palette: &OverlayPalette,
+        render: impl FnOnce(&mut Frame),
+    ) -> std::io::Result<()> {
+        let color_depth = self.color_depth;
+        self.terminal.draw(|frame| {
+            render(frame);
+            color_depth.fit(frame.buffer_mut(), palette);
+        })?;
+        Ok(())
     }
 
     /// Call after a resize event.

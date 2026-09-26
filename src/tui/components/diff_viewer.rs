@@ -397,6 +397,10 @@ impl DiffViewer {
             .set_focused(self.active_panel == Panel::After);
     }
 
+    pub fn overlay_theme(&self) -> OverlayTheme {
+        self.overlay_theme
+    }
+
     pub fn set_overlay_theme(&mut self, theme: OverlayTheme) {
         self.overlay_theme = theme;
         self.left_viewer.set_overlay_theme(theme);

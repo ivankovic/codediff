@@ -35,6 +35,7 @@ use serde::Serialize;
 use strum::IntoEnumIterator;
 
 use crate::tui::app::App;
+use crate::tui::color_depth::{ColorDepth, xterm_256};
 use crate::tui::theme::{OverlayTheme, format_hex_color};
 
 /// Consecutive cells of one row that share a style.
@@ -70,6 +71,7 @@ pub fn render(
     rows: u16,
     overlay: OverlayTheme,
     syntax_theme: Option<&str>,
+    color_depth: ColorDepth,
 ) -> Result<Screenshot> {
     let area = Rect::new(0, 0, cols, rows);
     let mut app = App::new(4.0, 60.0)?;
@@ -86,6 +88,7 @@ pub fn render(
     terminal.draw(|frame| {
         let area = frame.area();
         drawn = app.draw_viewer(frame, area);
+        color_depth.fit(frame.buffer_mut(), &overlay.palette());
     })?;
     drawn?;
 
@@ -153,43 +156,6 @@ fn hex(color: Color) -> Option<String> {
     }
 }
 
-fn xterm_256(index: u8) -> (u8, u8, u8) {
-    const NAMED: [Color; 16] = [
-        Color::Black,
-        Color::Red,
-        Color::Green,
-        Color::Yellow,
-        Color::Blue,
-        Color::Magenta,
-        Color::Cyan,
-        Color::Gray,
-        Color::DarkGray,
-        Color::LightRed,
-        Color::LightGreen,
-        Color::LightYellow,
-        Color::LightBlue,
-        Color::LightMagenta,
-        Color::LightCyan,
-        Color::White,
-    ];
-    match index {
-        0..=15 => {
-            let hex = format_hex_color(NAMED[index as usize]);
-            let channel = |at: usize| u8::from_str_radix(&hex[at..at + 2], 16).unwrap_or(0);
-            (channel(1), channel(3), channel(5))
-        }
-        16..=231 => {
-            let level = |n: u8| if n == 0 { 0 } else { 55 + 40 * n };
-            let cube = index - 16;
-            (level(cube / 36), level(cube / 6 % 6), level(cube % 6))
-        }
-        232..=255 => {
-            let grey = 8 + 10 * (index - 232);
-            (grey, grey, grey)
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -221,6 +187,7 @@ mod tests {
             20,
             OverlayTheme::SolarizedLight,
             Some("Solarized (light)"),
+            ColorDepth::TrueColor,
         )?;
 
         assert_eq!((shot.cols, shot.rows), (230, 20));

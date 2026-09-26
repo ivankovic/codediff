@@ -255,6 +255,13 @@ path = "tests/benchmark_other_e2e.rs"
 # a bare `cargo test` skips this target instead of failing to build.
 required-features = ["test-fixtures"]
 
+# The TUI's color depth, end to end: the real `codediff` binary on a pseudo-terminal, so gated like
+# that binary. Linux only, which the file gates itself.
+[[test]]
+name = "tui_color_depth"
+path = "tests/tui_color_depth.rs"
+required-features = ["tui"]
+
 [[bin]]
 name = "codediff"
 path = "src/main.rs"

@@ -17,6 +17,7 @@
  */
 pub mod actions;
 pub mod app;
+pub mod color_depth;
 pub mod components;
 pub mod events;
 pub mod headless;
