@@ -18,8 +18,10 @@
 
 //! Phase 7: pairs byte-identical subtrees between the wholly-deleted and wholly-inserted sets -
 //! code that *moved* across a matched boundary, which ordered tree edit distance can only express
-//! as delete+insert. GumTree's "recovery mappings", run after every matching pass so it only ever
-//! converts leftovers and never takes a node from a better mapping.
+//! as delete+insert. GumTree's "recovery mappings", run after every pass that matches by an anchor
+//! (a hash, a name, a matched ancestor or container), so it only converts leftovers and never takes
+//! a node from a better mapping. Only phases 8 and 8b follow it; they refine the pairs found so far
+//! rather than match by an anchor.
 //!
 //! Guardrails:
 //!

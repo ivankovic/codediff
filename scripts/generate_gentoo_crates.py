@@ -23,7 +23,7 @@ Lives here rather than beside the ebuild so ruff covers it: CI lints research/, 
 assets/ only.
 
 Gentoo's ``cargo.eclass`` fetches every crate in the dependency graph individually, so the ebuild
-has to name all of them - 265 at the time of writing. ``pycargoebuild`` is the usual tool for this,
+has to name all of them - 327 as of 0.1.0. ``pycargoebuild`` is the usual tool for this,
 but it is not always installed, and the job is small enough to not need it: every registry crate in
 Cargo.lock becomes one ``name@version`` line.
 

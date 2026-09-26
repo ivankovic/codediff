@@ -29,7 +29,8 @@ use super::engine::compute_delta;
 #[cfg(test)]
 use super::zhang_shasha::compute_delta_zhang_shasha;
 
-/// Cost for updating a literal leaf's value, kept as its own named tier.
+/// Cost for updating a literal leaf's value, kept as its own named tier for tuning. It currently
+/// equals `COST_UPDATE`, so literals cost what any other update does.
 ///
 /// The tie rule every rename cost here obeys: below `COST_DELETE + COST_INSERT` is a preference,
 /// above it is a prohibition, and nothing sits exactly on it - the DP resolves an exact tie toward

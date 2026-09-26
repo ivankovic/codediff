@@ -35,8 +35,8 @@ use crate::diff::{ASTDiff, ASTMappingReason};
 const MIN_CHILDREN: usize = 2;
 const MIN_SUBTREE_SIZE: usize = 4;
 /// Maximum accepted `cost_ratio`; a secondary filter behind the positional gate. Sits mid-plateau:
-/// tighter pushes legitimate anchors to the terminal APTED pass, looser buys cheaper-but-wronger
-/// reuse.
+/// tighter pushes legitimate anchors to the terminal fallback (`for_roots_fallback`), looser buys
+/// cheaper-but-wronger reuse.
 const MAX_COST_RATIO: f64 = 0.8;
 
 pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {

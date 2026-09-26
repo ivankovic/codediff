@@ -346,7 +346,7 @@ SRC_URI="
 	${CARGO_CRATE_URIS}
 "
 
-# The ebuild's own license is AGPL-3+; the trailing list covers the 265 vendored crates, whose
+# The ebuild's own license is AGPL-3+; the trailing list covers the vendored crates, whose
 # licenses cargo.eclass expects to be enumerated here. Regenerate with `pycargoebuild` if the
 # dependency set changes - the list below was read off the crates in Cargo.lock and is the usual
 # Rust-ecosystem spread.

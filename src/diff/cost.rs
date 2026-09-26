@@ -16,9 +16,9 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-/// Total edit cost of a finished mapping, root to every leaf (not APTED's internal DP). `diff_cost`
-/// and `human_mapping::human_mapping_cost` both sum `operation_cost`, so codediff's cost and the
-/// human's are comparable.
+//! Total edit cost of a finished mapping, root to every leaf (not APTED's internal DP). `diff_cost`
+//! and `human_mapping::human_mapping_cost` both sum `operation_cost`, so codediff's cost and the
+//! human's are comparable.
 use crate::code::ASTMetadata;
 use crate::diff::{ASTDiff, ASTMappingOperation, COST_DELETE, COST_INSERT, COST_UPDATE};
 

@@ -23,9 +23,9 @@ use crate::diff::apted::{self, Algorithm};
 use crate::diff::solve_syntax_aware_matching::solve_qualified_name_groups_within;
 use crate::diff::{ASTDiff, nodes};
 
-/// Matches `apted::common`'s `FLAT_MIN_CHILDREN`, so a container found here is guaranteed to take
-/// the Myers fast path once handed to `for_nodes`.
-const FLAT_CONTAINER_MIN_CHILDREN: usize = 50;
+/// `apted`'s own `FLAT_MIN_CHILDREN`, so a container found here is guaranteed to take the Myers fast
+/// path once handed to `for_nodes`.
+const FLAT_CONTAINER_MIN_CHILDREN: usize = apted::FLAT_MIN_CHILDREN;
 
 /// Pre-matches identity-matched top-level items that hold a large flat descendant: the flat pair
 /// is diffed on its own first (Myers, via `resolve_forest`'s fast path), then the item itself, with

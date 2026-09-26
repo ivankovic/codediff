@@ -247,7 +247,7 @@ jobs:
 
   # An *unofficial* .deb, built with cargo-deb from the [package.metadata.deb] block in Cargo.toml.
   # It is not, and cannot readily become, a package in the Debian archive: that would require all
-  # 265 dependency crates (24 tree-sitter grammars among them) to exist as `librust-*-dev` first.
+  # 300-odd dependency crates (23 tree-sitter grammars among them) to exist as `librust-*-dev` first.
   # See packaging/README.md. These are also what the apt repository on GitHub Pages is built from
   # - it pools the .deb assets of the last few releases, so every one of these is a file users
   # install through `apt`, not only a download link.

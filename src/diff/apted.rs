@@ -22,6 +22,7 @@
 //! test oracle.
 
 mod common;
+pub(crate) use common::FLAT_MIN_CHILDREN;
 mod engine;
 // Test oracle for the fuzz tests in `common/tests.rs`.
 #[cfg(test)]

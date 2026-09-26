@@ -1,10 +1,11 @@
 # Packaging
 
-Recipes for distributing `codediff` through system package managers. **None of the system-package
-recipes is submitted anywhere yet** — these are the source of truth for them, kept in-repo so they
-version alongside the code they build. The actual submission targets (the AUR, a Gentoo overlay,
-nixpkgs) all live outside this repository. The one entry below that *is* published is the VS Code
-extension, which is a separate repository rather than a recipe here.
+Recipes for distributing `codediff` through package managers, kept in-repo so they version
+alongside the code they build. Their status differs per target (table below): the Debian package
+and the Homebrew tap are published by the release workflow; the Arch, Gentoo and Nix recipes are
+not submitted to their distributions, whose submission targets (the AUR, a Gentoo overlay,
+nixpkgs) live outside this repository; and the VS Code extension is a separate repository rather
+than a recipe here.
 
 | Target | Files | Status |
 | --- | --- | --- |
@@ -22,8 +23,8 @@ be regenerated after the next tag exists, and until then the recipes name the ne
 old hash and do not build. `make check-versions` checks the version strings, not the hashes.
 
 * `aur/PKGBUILD` carries the sha256 of the tag tarball
-* `gentoo/dev-util/codediff/Manifest` carries 266 `DIST` lines - the tag tarball plus all 265
-  vendored crates, each with its size, BLAKE2B and SHA512
+* `gentoo/dev-util/codediff/Manifest` carries one `DIST` line for the tag tarball and one for each
+  vendored crate, each with its size, BLAKE2B and SHA512
 * Nix needs a `hash =` only if you switch `package.nix` to `fetchFromGitHub`; as long as `src` is
   a parameter and `cargoLock.lockFile` points at the in-tree lock, there is nothing to hash
 
@@ -36,7 +37,7 @@ sha256 Cargo.lock already records before hashing it:
 
 ```sh
 python3 scripts/generate_gentoo_crates.py            # the ebuild's CRATES block
-python3 scripts/generate_gentoo_crates.py --manifest  # the Manifest's 265 crate digests
+python3 scripts/generate_gentoo_crates.py --manifest  # the Manifest's crate digests
 ```
 
 The two *tarball* hashes are the part no script can do ahead of time, because they hash the GitHub
@@ -92,7 +93,7 @@ release profile sets `lto = "fat"` with `codegen-units = 1`. Minutes, not second
 
 ## Gentoo
 
-`CRATES=` lists all 265 dependency crates and is **generated, not edited**:
+`CRATES=` lists every dependency crate (327 as of 0.1.0) and is **generated, not edited**:
 
 ```sh
 python3 scripts/generate_gentoo_crates.py            # rewrite the block
@@ -110,7 +111,7 @@ The `LICENSE` variable enumerates the vendored crates' licenses alongside the pa
 The `.deb` is built with [`cargo-deb`](https://github.com/kornelski/cargo-deb), attached to each
 GitHub release for amd64 and arm64, and served from an apt repository on GitHub Pages. It is
 **unofficial**, and the distinction matters: a package in the Debian archive proper would require
-every one of the 265 dependency crates — 24 tree-sitter grammars among them — to be packaged as
+every one of the 300-odd dependency crates — 23 tree-sitter grammars among them — to be packaged as
 `librust-*-dev` first. Almost none are. That path is not reachable, so this is a `cargo-deb`
 artifact served from our own repository, not a route into Debian.
 

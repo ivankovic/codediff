@@ -16,6 +16,17 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+//! The APTED tree edit distance algorithm: an independent reimplementation, inspired by Mateusz
+//! Pawlik and Nikolaus Augsten, "Efficient Computation of the Tree Edit Distance", ACM Transactions
+//! on Database Systems 40(1), 2015, and by their reference implementation. Names follow the paper
+//! and that implementation (`spf_a`, `compute_opt_strategy_post_l`/`_post_r`, `ted_init`, key
+//! roots), so the long dynamic-programming functions here can be read side by side with them.
+//!
+//! The pipeline runs it only on scoped pairs (see `apted.rs`), where its exact computation,
+//! worst-case `O(n^3)` time, is affordable.
+//!
+//! Setting the `APTED_DEBUG` environment variable prints the DP's intermediate tables to stderr.
+
 use crate::code::{ASTMetadata, ASTNodeMetadata};
 
 use super::common::{

@@ -16,7 +16,7 @@ date. Line numbers are as of commit `ebcf904`.
 The previous review (2026-07-06, re-measured 2026-09-03) follows this section. Its open items are
 re-verified here rather than repeated: 1.7, 1.8, 1.9 (`was_*` helpers), §3 `DiffPass` trait, and
 §5 items 1-4 are still open; 1.9's `ranges` arm de-duplication and the `blob_content` sharing are
-done; the §4 typos are fixed except `symetric` (×3).
+done; the §4 typos are fixed.
 
 ## Status
 

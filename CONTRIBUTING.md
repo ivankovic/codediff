@@ -6,13 +6,15 @@ Thank you for considering a contribution, human or AI-assisted (see the README's
 
 ## Technology
 
-The project is completely written in Rust.
+The product is written in Rust. The browser viewer's front end (`assets/web/`) is plain
+JavaScript, and the research and analysis scripts are Python.
 
 CodeDiff stores user configuration, for example the active theme, on disk with `confy`. The
 dataset-analysis tools in `src/bin/` use a separate SQLite database to store the stats that they
 collect.
 
-The UI is a terminal UI, written with the Ratatui and Crossterm libraries.
+The main UI is a terminal UI, written with the Ratatui and Crossterm libraries; `codediff-web`
+shows the same viewer in a browser.
 
 ### UI design patterns
 
@@ -129,8 +131,8 @@ Use the real implementation where possible.
 Where the real implementation is not possible, for example for filesystem or database access, use
 a fake in-memory implementation.
 
-Install `jj` (`cargo install --root /var/tmp/tools jj-cli`, keeping it out of the system-wide
-cargo bin directory) if you touch `src/jj_configure.rs`. That module's claims about how jj invokes
+Install `jj` (`cargo install jj-cli`, or see jj's own install docs) if you touch
+`src/jj_configure.rs`. That module's claims about how jj invokes
 a diff tool - directory trees by default, file pairs with extensions preserved under
 `diff-invocation-mode = "file-by-file"` - were verified empirically against jj 0.44.0, and should
 be re-verified the same way rather than assumed.
@@ -235,10 +237,12 @@ documented there.
 
 ### Build, test, quality
 
-* `test` - `cargo nextest run --release`, plus `test-mapping-site-js` and `test-web-js` (plain-Node
-  tests of the human-mapping site's and the web viewer's vanilla JS, which cargo's suite cannot
-  cover - see the root Makefile).
-  Requires `cargo-nextest` (`cargo install cargo-nextest`, one-time). Unlike `cargo test`, nextest
+* `test` - `cargo nextest run --release --all-features`, plus `test-mapping-site-js` and
+  `test-web-js` (plain-Node tests of the human-mapping site's and the web viewer's vanilla JS, which
+  cargo's suite cannot cover - see the root Makefile) and `test-python` (`pytest` over the research
+  and script helpers, in `research/`'s uv environment).
+  Requires `cargo-nextest` (`cargo install cargo-nextest`, one-time), Node.js, and
+  [`uv`](https://docs.astral.sh/uv/). Unlike `cargo test`, nextest
   runs each test in its own process rather than as a thread inside one long-lived binary, so the
   `src/test/helper.rs` fixture caches (never-evicting, process-lifetime) get reclaimed by the OS
   after every test instead of accumulating for the whole suite. Measured on this repo's full suite,
@@ -250,20 +254,23 @@ documented there.
 * `lint-python` - `ruff check` then `ruff format --check` over `research`, `scripts` and `assets`,
   the same three directories CI's python job covers. Requires `ruff`
   (`uv tool install ruff@0.16.4`, one-time - see "Code quality" above).
-* `build` - the `test` target above + `cargo build --release --features stats` (the `stats` feature
-  builds the dataset-analysis binaries in `src/bin/`).
+* `build` - `cargo build --release --features stats` (the `stats` feature builds the
+  dataset-analysis binaries in `src/bin/`). It does not run the tests.
 * `install` - `cargo install --path . --force`, so `codediff` on `PATH` matches this checkout.
-* `install-hooks` - one-time setup that points git at `.githooks/pre-push`, which runs the fast
-  subset of what CI checks (`cargo fmt --check`, a per-feature-config `cargo check`, the
-  mapping-site JS tests) before a `git push` leaves your machine - see that file's own comment for
-  exactly what it does and does not cover. `git push --no-verify` skips it for one push.
+* `install-hooks` - one-time setup that points git at `.githooks/`. `pre-commit` formats the Rust
+  and Python a commit stages (`cargo fmt`, `ruff format`) and regenerates `src/test/data/diffs.csv`
+  when a commit touches the fixture corpus. `pre-push` runs the fast subset of what CI checks
+  (`cargo fmt --check`, a per-feature-config `cargo clippy`, `ruff`, the site JS tests) before a
+  `git push` leaves your machine - see each file's own comment for exactly what it does and does not
+  cover. `git push --no-verify` skips it for one push.
 * `ci` - the whole of CI, locally: every job in `.github/workflows/ci.yml`, in that file's own
   order. Unlike the pre-push hook above it includes the release build, the full test suite for all
-  three feature configs, and the quality gate, so it takes minutes rather than seconds - run it
+  four feature configs, and the quality gate, so it takes minutes rather than seconds - run it
   when you mean to push, not on every push. It reads the commands out of `ci.yml` itself rather
   than keeping a copy, so it cannot drift from CI; `python3 scripts/ci_local.py --list` shows the
   job ids and `--job <id>` runs one of them. See that script's module docstring for what it can
   and cannot mirror.
+
 Three verbs, and which file a target lives in follows from them:
 
 * **`benchmark-`** measures **codediff**, and lives in the root Makefile. `benchmark-quality`

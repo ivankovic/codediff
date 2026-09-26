@@ -1017,7 +1017,7 @@ fn plain_text_line_diff_handles_non_contiguous_matches() {
 /// An unmatched run's anchor is just past the preceding match's destination, not its own row
 /// number, which is in the other side's coordinate space.
 #[test]
-fn plain_text_line_diff_anchors_unmatched_runs_at_the_preceding_matchs_destination() {
+fn plain_text_line_diff_anchors_unmatched_runs_at_the_preceding_match_destination() {
     // before: same0, DEL, same1        (3 lines)
     // after:  same0, INS_A, INS_B, same1  (4 lines) - "same1" sits at a different row on
     // each side (before row 2, after row 3), so a correct anchor must use the *destination*

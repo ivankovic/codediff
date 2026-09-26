@@ -256,7 +256,8 @@ pub struct KindCostClass {
     /// `IDENTIFIER_KINDS.contains(kind)` - name-like leaves that may match each other across
     /// differing kinds in every language.
     pub identifier_like: bool,
-    /// `is_literal_kind(kind)` - drives the higher `COST_LITERAL_UPDATE` for a changed value.
+    /// `is_literal_kind(kind)` - selects `COST_LITERAL_UPDATE` for a changed value, a separate
+    /// tier kept for tuning that currently equals `COST_UPDATE`.
     pub literal_like: bool,
     /// Bit `i` set iff this kind is in `ALL_OPERATOR_FAMILIES[i]` (see
     /// [`crate::diff::nodes::operator_family_mask`]). A kind can be in several families at once.

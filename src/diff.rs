@@ -15,6 +15,29 @@
  *  You should have received a copy of the GNU Affero General Public License
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
+//! Matching two syntax trees, and the text ranges that matching implies.
+//!
+//! [`Diff::from_code`] is the entry point ([`diff_code`] is the same function). It runs a fixed
+//! pipeline of passes over both trees; each pass matches some of the nodes the passes before it
+//! left unmatched, and the last one records a delete or insert for whatever is still undecided. The
+//! order below is the code's; the call-site comments in `Diff::pending_with_config` and
+//! [`PendingDiff::finish`] say why each pass sits where it does, and each pass's `solve` doc
+//! explains its mechanism. The right-hand column maps the code's phase numbers to the paper's
+//! ("CodeDiff", `research/papers/introductory-paper`); the code's numbering has gaps where phases
+//! were merged or removed.
+//!
+//! | Code phase | Pass | Paper |
+//! |---|---|---|
+//! | 1 | [`solve_hash_descent`]: identical, then same-shape subtrees by hash | phase 1 |
+//! | 1b, 1c | [`solve_nested_condition_collapse`], [`solve_heritage_clause_growth`]: pairs phase 1 cannot see, attributions it cannot make | - |
+//! | 2 | [`solve_leading_siblings`], [`solve_identical_diagnostic_statements`] | phase 2 |
+//! | 4 | [`solve_syntax_aware_matching`]: flat containers by Myers, qualified names, imports, [`solve_greedy_anchor_blocks`]; APTED inside each matched pair | phase 3 |
+//! | 6 | residual: named-local prematch, [`solve_bottom_up_propagation`], [`solve_unique_type_matching`], the Myers-LCS fallback ([`apted::for_roots`]), propagation again, [`solve_orphaned_leaves`] | phase 4 |
+//! | 7 | [`solve_moved_subtrees`]: GumTree-style move recovery | phase 5 |
+//! | 8, 8b, 9 | [`solve_mutual_ancestors`], [`solve_leaf_neighbour_agreement`], [`solve_wrap_growth`]: refine and re-tag existing pairs | - |
+//! | 10 | [`solve_unresolved_nodes`]: delete/insert for every undecided node | closing step |
+//!
+//! [`text`] turns the finished node mapping into the byte ranges the viewers paint.
 pub mod apted;
 pub mod cost;
 pub(crate) mod grouped_greedy_matcher;
@@ -136,9 +159,9 @@ impl Default for Diff {
 }
 
 impl Diff {
-    /// The main entry point: diffs `before` against `after` with every pass enabled. The
-    /// pipeline itself is documented at its call sites in `pending_with_config` and
-    /// [`PendingDiff::finish`], not here, so it cannot go stale.
+    /// The main entry point: diffs `before` against `after` with every pass enabled. The module
+    /// doc lists the pipeline; why each pass sits where it does is documented at its call site in
+    /// `pending_with_config` and [`PendingDiff::finish`].
     pub fn from_code(before: &Code, after: &Code) -> Self {
         Self::from_code_with_config(before, after, &HeuristicConfig::default())
     }
@@ -169,9 +192,9 @@ impl Diff {
         };
 
         // The matching pipeline. Phases 1-4 run here and 6-10 in `PendingDiff::finish`; phases 3
-        // and 5 do not exist. 1b, 1c, 8b and 9 re-tag or re-point an existing match rather than
-        // make a new one. Each pass's module doc explains its mechanism; the comments here say
-        // only why it sits where it does.
+        // and 5 do not exist. 1c and 9 re-tag an existing match and 8b re-points one; 1b adds
+        // the wrapper pairs phase 1 cannot see. Each pass's `solve` doc explains its mechanism;
+        // the comments here say only why it sits where it does.
         solve_hash_descent::solve(&ctx, &mut ast_diff);
 
         // Phases 1b and 1c fix up attributions phase 1 cannot make on its own, so they react to
@@ -186,7 +209,8 @@ impl Diff {
         solve_leading_siblings::solve(&ctx, &mut ast_diff);
         solve_identical_diagnostic_statements::solve(&ctx, &mut ast_diff);
 
-        // Phase 4 also runs solve_greedy_anchor_blocks and solve_large_flat_subtrees.
+        // Phase 4 also runs solve_large_flat_subtrees, the two import passes and
+        // solve_greedy_anchor_blocks.
         solve_syntax_aware_matching::solve(&ctx, &mut ast_diff);
 
         // Map lengths count only real matches here: no phase above records a delete or insert.
@@ -293,13 +317,11 @@ impl<'code> PendingDiff<'code> {
         // with no enclosing named container (shell assignments), which phase 4's own call never
         // reaches.
         if let (Some(before_ast), Some(after_ast)) = (before.ast.as_ref(), after.ast.as_ref()) {
-            let before_metadata = crate::code::metadata::metadata_of(before);
-            let after_metadata = crate::code::metadata::metadata_of(after);
             apted::prematch_unique_named_locals(
                 before_ast.root_node().id(),
                 after_ast.root_node().id(),
-                &before_metadata,
-                &after_metadata,
+                ctx.before_metadata(),
+                ctx.after_metadata(),
                 "unique_named_local",
                 &mut ast_diff,
             );
@@ -603,7 +625,8 @@ pub enum ASTMappingReason {
     /// Matched as part of a `StructurallyIdenticalSubtrees` ancestor's subtree; a leaf whose value
     /// differs is an `Update` costing 1.
     StructurallyIdenticalAncestor,
-    /// Optimal under insert, delete, update and identical operations only.
+    /// Optimal under insert, delete, update and identical operations only. Never produced by the
+    /// pipeline; kept so the benchmark's reason labels (`OptIDU`) stay stable.
     OptimalIDU,
     /// Produced by the tree-edit-distance code in `apted`; the label names the call site that
     /// invoked it (`"fast_fallback"`, `"qualified_name"`, ...).
