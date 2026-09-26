@@ -77,9 +77,19 @@ matches the paper's shape. Left alone deliberately - retitling further is the au
 
 ## Status
 
-Compiles cleanly, 12 pages, builds with `latexmk -pdf -g main` (verified locally, `cm-super` +
+Compiles cleanly, 14 pages, builds with `latexmk -pdf -g main` (verified locally, `cm-super` +
 `texlive-publishers` installed). See the `TODO` comments in `main.tex` for the placeholder ACM
 conference/rights metadata and CCS concepts, still to fill in once a venue is chosen.
+
+### Review pass of 2026-09-26
+
+Resolved the author's Boox review of the 2026-09-25 PDF, recorded mark by mark in
+`REVIEW-2026-09-26.md`, on top of the same day's srcDiff refresh. Three marks exposed wrong claims
+rather than wording: the N:M paragraph said the tool comparison excludes multi-map nodes (it
+projects them through one representative pairing), Figure 5 described ASTs tree-sitter does not
+produce (one `boolean_operator` before, two after - now drawn), and Section 2 said `diff` computes
+a shortest script (not under GNU's default heuristic). Two authors were added, and the Fast target
+is now 99% of changes. Open: René Just's affiliation and both new authors' emails.
 
 ### Review pass of 2026-09-24
 

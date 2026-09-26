@@ -90,6 +90,7 @@ Usage (from research/):
 """
 
 import argparse
+import collections
 import glob
 import re
 from pathlib import Path
@@ -317,7 +318,10 @@ def per_category_table(rows: list[dict], loc_max: np.ndarray, ok: np.ndarray) ->
 
 
 def write_paper_fragment(
-    results: dict, total_attempted: int, output_path: Path = Path("plots/variables_rq1.tex")
+    results: dict,
+    total_attempted: int,
+    drawn: list[dict],
+    output_path: Path = Path("plots/variables_rq1.tex"),
 ) -> None:
     """Writes the RQ1 numbers the introductory paper cites as LaTeX macros, so the paper reads
     them from a generated file instead of hand-transcribed literals.
@@ -357,6 +361,21 @@ def write_paper_fragment(
     lines.append(f"\\newcommand{{\\RqOneCodeThirtyToHundredPct}}{{{pct(code_buckets['30-100'])}}}")
     lines.append(
         f"\\newcommand{{\\RqOneCodeHundredToThreeHundredPct}}{{{pct(code_buckets['100-300'])}}}"
+    )
+
+    # How the draw filled its (language, size bucket) cells. `sample_code_pairs --count` splits a
+    # per-language target evenly over the buckets, and a sparse cell (few very large files in some
+    # language) fills less, so the fullest cell is the target and the rest are reported beside it.
+    cells = collections.Counter((r["language"], r["size_bucket"]) for r in drawn)
+    languages = {language for language, _ in cells}
+    buckets = {bucket for _, bucket in cells}
+    per_cell = max(cells.values())
+    lines.append(f"\\newcommand{{\\RqOneLanguages}}{{{len(languages)}}}")
+    lines.append(f"\\newcommand{{\\RqOneBuckets}}{{{len(buckets)}}}")
+    lines.append(f"\\newcommand{{\\RqOnePerCell}}{{{per_cell}}}")
+    lines.append(f"\\newcommand{{\\RqOneCells}}{{{len(languages) * len(buckets)}}}")
+    lines.append(
+        f"\\newcommand{{\\RqOneFullCells}}{{{sum(1 for n in cells.values() if n == per_cell)}}}"
     )
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -570,7 +589,9 @@ def main() -> None:
     print(f"\nWrote {output_path}")
 
     plot_by_category(category_results, args.plots_dir / args.output_category_png, len(attempted))
-    write_paper_fragment(category_results, len(attempted), args.plots_dir / "variables_rq1.tex")
+    write_paper_fragment(
+        category_results, len(attempted), rows, args.plots_dir / "variables_rq1.tex"
+    )
 
 
 if __name__ == "__main__":

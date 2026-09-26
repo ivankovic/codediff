@@ -181,7 +181,8 @@ TARGETS = {
     # 1000 is the number the paper cites Nielsen for in Section 5, so the design target and the
     # budget RQ2 measures against are the same number.
     "SpeedTargetMs": "1000",
-    "SpeedTargetPct": "99.99",
+    # 99.99 until the 2026-09-25 review of the paper cut it to 99.
+    "SpeedTargetPct": "99",
     # Clone depth the corpus under /var/tmp/research/full/ was fetched at, per commit from each
     # branch tip (`make fetch MODE=full DEPTH=50`). Not a measurement - a parameter of how the
     # corpus was built - but it belongs in the paper: it bounds how far back RQ1's commit sampling

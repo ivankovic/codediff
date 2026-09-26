@@ -1521,9 +1521,8 @@ def write_paper_fragment(
         stem = PAPER_SPEED_STEMS[id_]
         for name, value in zip(("PFifty", "PNinety", "PNinetyNine"), percentiles):
             lines.append(f"\\newcommand{{\\Speed{stem}{name}}}{{{value:.1f}}}")
-        # The slowest single measurement: a percentile table says
-        # nothing about the tail a user can actually hit, and the paper states a target over
-        # 99.99% of commits, which no p99 can speak to.
+        # The slowest single measurement: a percentile table says nothing about the tail a user
+        # can actually hit.
         sample = speed_sample(rows, id_)
         if sample:
             lines.append(f"\\newcommand{{\\Speed{stem}Max}}{{{max(sample):.1f}}}")
