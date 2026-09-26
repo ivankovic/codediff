@@ -33,9 +33,11 @@ whitespace off each changed run, the same reading the other AST tools get.
 `-t UTF-8` is passed explicitly: srcDiff's default source encoding is ISO-8859-1, which would split
 every non-ASCII character in two and shift every offset after it.
 
-## Text-based tools (added 2026-08-23)
+## Text-based tools
 
-Nine tools are now scored, not four. Alongside Unix `diff` there are four git variants and BDiff:
+Eight tools are scored, in eleven configurations: Unix `diff`, `git diff` under four algorithms,
+BDiff and `nvim -d` (text-based), and GumTree, difftastic, diffsitter and srcDiff (AST-aware). The
+text-based ones beyond Unix `diff`:
 
 * **`git_myers` / `git_minimal` / `git_patience` / `git_histogram`** - one engine (libxdiff)
   reached through `git diff --diff-algorithm=`, so they share a single labeller. Motivated by
@@ -51,12 +53,10 @@ Nine tools are now scored, not four. Alongside Unix `diff` there are four git va
   alignment (`linematch:N`) - loading a user config would make this a measurement of that config.
   What is scored is Neovim's shipped defaults.
 
-  It was briefly left out on the grounds that its line pass is libxdiff, so its line set matched
-  `git_myers` on 38 of a 40-fixture sample. That was the wrong call: a 2-in-40 divergence is the
-  same order as `git_myers` against `unix_diff`, which get separate rows, and "redundant at the
-  granularity we happen to measure" is a claim about the metric rather than about the tool.
-  Measured over the full corpus it differs from `git_myers` on 13 of 486 fixtures - better on 6,
-  worse on 7, pooled rate 1.125% against 1.123%. Indistinguishable, but now by measurement.
+  Its line pass is libxdiff, so its line set is close to `git_myers`' - but no closer than
+  `git_myers` is to `unix_diff`, which get separate rows, and "redundant at the granularity we
+  happen to measure" is a claim about the metric rather than about the tool. Over 486 fixtures it
+  differs from `git_myers` on 13 - better on 6, worse on 7, pooled rate 1.125% against 1.123%.
 
 **Two traps, both of which produce a silently wrong number rather than an error.**
 
@@ -89,12 +89,12 @@ entirely plausible but wrong rates. `benchmark_other`'s unit tests pin both the 
 differential check that `git_myers` agrees with `unix_diff`, which are independent implementations
 of the same Myers family - a divergence there means the parser broke, not that a finding was made.
 
-**GumTree build, 2026-08-23.** The previously-installed beta8 tree was gone and GitHub publishes
-**no release asset for beta8** (only beta4 and beta3 ship zips), so beta8 was rebuilt from source
-at tag `v4.0.0-beta8` with JDK 17 into `/var/tmp/tools/gumtree-4.0.0-beta8`. Verified by running
-`gumtree list GENERATORS`: it registers `cpp-treesitter-ng` and `tsx-treesitter-ng` and no JSON
-generator, which is the beta8 signature this repository has documented. Do not substitute the
-beta4 zip: its generator set differs in both directions and its numbers are not comparable.
+**GumTree build.** GitHub publishes **no release asset for beta8** (only beta4 and beta3 ship
+zips), so beta8 is built from source at tag `v4.0.0-beta8` with JDK 17, into
+`/var/tmp/gumtree-installed/gumtree-4.0.0-beta8`. Verify it by running `gumtree list GENERATORS`:
+beta8 registers `cpp-treesitter-ng` and `tsx-treesitter-ng` and no JSON generator. Do not
+substitute the beta4 zip: its generator set differs in both directions (no C++ or TSX, but JSON),
+so GumTree's scored subset is not comparable across the two.
 
 ## `benchmark_accuracy.csv`
 
@@ -225,71 +225,19 @@ units enter both files. Every binary verified by running it, not by reading a pa
 | Neovim | 0.11.4 | `/opt/nvim-linux-x86_64/bin/nvim` (`NVIM_BIN`) |
 | BDiff | 0.1.0 | `/var/tmp/bdiff-install/venv/bin/python` (`BDIFF_PYTHON`) |
 
-**Two of those five moved since 2026-09-09, and the paths all did.** The previous refresh ran
-difftastic 0.70.0 and Neovim 0.10.2 from `/var/tmp/tools/`; that tree is gone from this machine and
-the binaries on it now are difftastic **0.69.0** (a *lower* version - this is not the same build
-the earlier numbers describe) and Neovim **0.11.4**. GumTree is the same 4.0.0-beta8, re-verified
-by `gumtree list GENERATORS` showing `cpp-treesitter-ng` and `tsx-treesitter-ng` and no JSON
-generator. BDiff was reinstalled from scratch by `make install-bdiff`, since
-`/var/tmp/bdiff-install` was gone too. Do not attribute a difftastic or `nvim -d` movement between
-the 2026-09-09 and 2026-09-16 numbers to the corpus alone.
+A run that scores none of the fixtures still exits 0, so read the `[i/N]` progress line before
+trusting a refresh.
 
-**`benchmark_other.csv` had been unrefreshable since 2026-09-09, and nothing said so.** The
-timing loop propagated a per-fixture scoring failure instead of skipping it, and
-`handmade/bazel-not-actually-supported-by-treesitter` - a BUILD file no grammar parses, carrying a
-human mapping - was committed a minute after that day's timing run finished. It sorts first
-alphabetically, so every `make measure-tools-timing` from then until 2026-09-16 died on fixture
-1 of N with "Before code has no AST" and wrote nothing, while `--accuracy-csv` kept working
-because `run_accuracy` already skipped such a fixture with a note. The timing loop now does the
-same (see `benchmark_other.rs`). A run that skips a fixture says which one; a run that scores
-none of them still exits 0 today, so read the `[i/N]` progress line before trusting a refresh.
-
-**The timing half of this refresh was not measured on an idle machine.** `benchmark_other --csv`
-ran with a load average around 3 from other users on the same host. The accuracy half
-(`benchmark_accuracy.csv`) is unaffected - it records no wall clock - but treat the speed
-percentiles as an upper bound rather than as comparable with the 2026-09-09 run.
-
-`NVIM_BIN` is the fifth variable and was undocumented here until 2026-09-09. **Set all five before
-either run.** A tool whose variable is unset is skipped with a note and exit 0, so a refresh done
-without them produces a clean-looking CSV missing most of the nine tools, and `timing-report` will
+**Set all six tool variables before either run** (`GUMTREE_BIN`, `DIFFT_BIN`, `DIFFSITTER_BIN`,
+`BDIFF_PYTHON`, `NVIM_BIN`, `SRCDIFF_BIN`). A tool whose variable is unset is skipped with a note
+and exit 0, so a refresh done without them produces a clean-looking CSV missing most of the tools, and `timing-report` will
 regenerate the paper's macros from it. Smoke-test first with `--fixtures a,b` on a language
 GumTree supports and check every `_status` reads `ok` or `line_only`.
 
-The GumTree build in use is **4.0.0-beta8**, at `/var/tmp/tools/gumtree-4.0.0-beta8`, which is what
-the paper's comparison section claims. Re-verified 2026-08-24 by running `gumtree list GENERATORS`
-against that path: `cpp-treesitter-ng` and `tsx-treesitter-ng` present, no JSON generator. This resolves the version question that stood open here: the
-beta4 tree under `/var/tmp/tools/` that earlier measurements ran against **is back on disk** at
-`/var/tmp/tools/gumtree-4.0.0-beta4` (re-checked 2026-08-24; an earlier revision of this file said
-it was gone). Do not point `GUMTREE_BIN` at it: its generator set differs from beta8's in both
-directions, so it fails no louder than producing a different scored subset. The whole generator
-table was re-verified against beta8 on 2026-08-20, entry by entry, by running each one on a real
-fixture pair rather than reading `gumtree list GENERATORS`.
-
-**The beta4 -> beta8 change moves GumTree's coverage in both directions**, so its scored subset is
-not comparable across that boundary:
-
-- **C++ and TSX gain support.** beta8 registers `cpp-treesitter-ng` and `tsx-treesitter-ng`, which
-  beta4 does not; 22 C++ and 19 TSX fixtures enter GumTree's scored set.
-- **JSON loses support.** beta4 registered `json-jackson`; beta8 does not, and running it errors
-  out on argument parsing. 18 JSON fixtures leave the scored set. beta8's `gen.json` package
-  registers only `xml-jsoup`.
-
-**GumTree coverage was substantially wrong before 2026-08-20, in both directions.** Any GumTree
-number from a run before that date is measured on a non-random 48% of the corpus and should not
-be quoted:
-
-- **104 of the 200 `unsupported` fixtures were not unsupported.** beta4 ships working generators
-  for PHP, Ruby, Swift, R, JSON, XML and YAML; `gumtree_generator` simply didn't list them, so
-  whole language families were silently dropped. All seven are now mapped, each verified against
-  a real fixture pair from this corpus (a `textdiff -f JSON` run producing a non-empty `matches`
-  array) rather than trusted from `gumtree list GENERATORS` alone.
-- **`cpp-treesitter-ng` does not exist in beta4**, but the table mapped C++ to it, so all 21 C++
-  fixtures counted as `error` - 21 of the 26 errors in the 2026-08-19 run. C++ was dropped from
-  the table on that basis, and is back only now that the installed build genuinely ships the
-  generator and it has been run. Verify by running, not by reading the generator list - that list
-  is what made this look supported in the first place.
-- Still genuinely unsupported by beta8, and correctly absent: HTML, LUA, Vimscript, ShellScript,
-  Scala.
+GumTree's generator table was verified against beta8 entry by entry, by running each generator on
+a real fixture pair (a `textdiff -f JSON` run producing a non-empty `matches` array) rather than
+reading `gumtree list GENERATORS`. Still unsupported by beta8, and correctly absent: HTML, Lua,
+Vimscript, ShellScript, Scala.
 
 **GumTree's tree is not codediff's tree, and how far apart they are is per-language.** Node
 counts on one fixture's before side, GumTree vs codediff: java-jdt 512/997 (1.95x),
@@ -305,20 +253,19 @@ emit a full node-to-node mapping (`textdiff -f JSON`'s `matches` array covers in
 not just the edit script, with real byte offsets). difftastic and diffsitter emit no node
 correspondences at all at any granularity, so they could never be included in such a comparison.
 
-## astdiff_oracle_defects4j.csv (added 2026-09-11)
+## astdiff_oracle_defects4j.csv
 
-**Both oracle CSVs were re-run on 2026-09-26** with the rest of the paper's refresh, against the
-same oracle checkout (`6e926908`, fetched 2026-09-15). The whole-corpus codediff run moved only
-with the engine: precision 99.42% -> 99.43%, recall 98.86% -> 98.87%, perfect 54.1% -> 55.4%. The
-human run now covers 274 solved units in 231 cases (113 in 101 before) and agrees with the oracle
-at 99.65% / 99.63%, 380 disagreeing pairs in 52,726, and 39 of 8,762 at statement level.
+**Both oracle CSVs were last re-run on 2026-09-26** with the rest of the paper's refresh. The human
+run (`astdiff_oracle_defects4j_human.csv`) covers 274 solved units in 231 cases and agrees with the
+oracle at 99.65% precision / 99.63% recall, 380 disagreeing pairs in 52,726, and 39 of 8,762 at
+statement level.
 
-The first accuracy number for codediff against ground truth this project did not write. Produced
+codediff's accuracy against ground truth this project did not write. Produced
 by `benchmark_astdiff_oracle` (`cd research && make measure-astdiff-oracle`) from two external
 inputs fetched by the scripts in `research/external/` (see its README for the datasets):
 
 * the Alikhanifard & Tsantalis AST node-mapping oracle, Defects4J half - RefactoringMiner
-  `9d8743c0f5de2966ce1ae4df5ba778630c97a129` (2026-09-10), `src/test/resources/astDiff/defects4j/`,
+  `6e926908a3fc9c03e290affe27564925679e0434` (fetched 2026-09-15), `src/test/resources/astDiff/defects4j/`,
   800 cases / 996 compilation units, 3,031,434 mapping records;
 * the source files those records index into, from Falleri & Martinez' ICSE 2024 replication
   package (Zenodo 10474674), `dataset/defects4j/{before,after}/`.
@@ -347,13 +294,13 @@ differ from tree-sitter's), `METHOD_INVOCATION_ARGUMENTS` (2,221 - empty argumen
 synthetic span is zero-width) and `SwitchCase` (349). Quote the resolution rate next to any
 precision/recall from this file.
 
-**Result (2026-09-11, codediff v0.0.13 at commit c091eea1 + this tool):**
+**Result (2026-09-26):**
 
 | population / granularity | cases | oracle pairs scored | precision | recall | perfect-diff rate |
 |---|---|---|---|---|---|
-| all 800 / statement + sub-expression | 800 | 242,749 | 99.42% | 98.86% | 54.1% |
+| all 800 / statement + sub-expression | 800 | 242,749 | 99.43% | 98.87% | 55.4% |
 | all 800 / statement | 800 | 40,024 | 99.46% | 98.67% | 80.8% |
-| cases.json (698) / statement + sub-expression | 698 | 198,572 | 99.57% | 99.42% | 59.0% |
+| cases.json (698) / statement + sub-expression | 698 | 198,572 | 99.57% | 99.43% | 60.5% |
 | cases-problematic.json (102) / statement + sub-expression | 102 | 44,177 | 98.76% | 96.35% | 20.6% |
 
 Against the paper's Table 12/14 (Defects4J, statement + sub-expression): RefactoringMiner 3.0
@@ -361,7 +308,7 @@ Against the paper's Table 12/14 (Defects4J, statement + sub-expression): Refacto
 97.5 / 93.1, perfect 18.1%. At statement level (Table 11/13): RM 99.8 / 99.6, perfect 89.4%;
 GumTree simple 99.1 / 98.5, perfect 72.4%. So codediff's precision and recall sit between GumTree
 simple and RefactoringMiner at both granularities; its perfect-diff rate beats GumTree simple at
-statement level (80.8 against 72.4) and trails it at sub-expression level (54.1 against 63.3).
+statement level (80.8 against 72.4) and trails it at sub-expression level (55.4 against 63.3).
 
 **Read those comparisons with two caveats.** (1) The paper's numbers were computed on JDT trees,
 ours on tree-sitter trees through the span equality above; the 12% of non-comment oracle records
@@ -372,8 +319,8 @@ inserted one is only counted as a false positive when its kind is whitelisted, a
 tree-sitter's nested pairs) fall below the 0.95 threshold. Both caveats push our precision up and
 neither is easy to remove without a JDT parse.
 
-**Where the errors are.** 429 of 996 files are imperfect, 230 of them by 1-3 pairs. The top 15
+**Where the errors are.** 418 of 996 files are imperfect, 223 of them by 1-3 pairs. The top 15
 files carry 43% of all FP+FN and the top 50 carry 65%; the worst three (Closure-157
 `CodeGenerator`, 455 FN / 0 FP; Closure-148 `SourceMap`, 325 FN; Time-23 `DateTimeZone`, 140 FP /
 143 FN) are all in the oracle's own `problematic` list. Per project the FP+FN rate ranges from
-0.28% (Gson) to 6.42% (Time). Rows are only comparable within one run; refresh the whole file.
+0.19% (Gson) to 6.42% (Time). Rows are only comparable within one run; refresh the whole file.

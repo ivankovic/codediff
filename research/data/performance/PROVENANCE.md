@@ -6,47 +6,32 @@ the `size_bucket` column). `../samples/` has since been re-drawn under the LOC b
 DIFFERENT pair set than these files - do not mix rows across that boundary. `baselines/` snapshots
 are pinned to whatever corpus was current at their date; that is their point.
 
-## `robustness_fixtures.csv` (re-measured 2026-09-26)
-
-Re-run with the same command as part of the 2026-09-26 refresh, so the fixture robustness figures
-describe the same engine and corpus state as the paper's comparison and node-accuracy blocks. It
-now walks all four paper datasets, `defects4j` included, solved or not: 1939 fixture directories,
-every one `ok` - no timeout, no panic, nothing skipped. Scoped by `paper_variables.py` to the 1217
-in the paper. Largest input unchanged (`json-ipfs-ipfs-desktop-only-update-version-strings`,
-198,406 nodes a side); slowest still
-`rust-rustdesk-rustdesk-actual-logic-change-in-io-loop-medium-sized-file`, now 1,237 ms median
-(1,287 ms on the previous run); peak thread heap unchanged at 56.6 MB.
-
-## `robustness_fixtures.csv` (2026-09-11)
+## `robustness_fixtures.csv` (2026-09-26)
 
 The paper's robustness run, over the fixture corpus rather than a sampled pair set. Written by
 `make measure-robustness-fixtures` (`benchmark_diff_pairs --fixtures --max-combined-nodes
 1000000000 --timeout-secs 120 --iterations 5`) on the machine the paper's `MACHINE` block
 describes. Same column schema as the `benchmark_<language>.csv` files above, but the naming
 columns mean something else: `repository` is the dataset directory under `src/test/data/diffs/`
-(`small`, `full` or `stratified` - the paper's datasets; `handmade` and `defects4j` are not
-walked), `path` is the fixture directory name, and `size_bucket` and `commit` are empty.
+(`small`, `full`, `stratified` or `defects4j` - the paper's datasets; `handmade` is not walked),
+`path` is the fixture directory name, and `size_bucket` and `commit` are empty.
 
-Result: 942 fixture directories on disk that day, every one `ok` - no timeout, no panic, nothing
-skipped (the node cap was set high enough to be inert). Largest input
-`json-ipfs-ipfs-desktop-only-update-version-strings` at 198,406 nodes a side; slowest
-`rust-rustdesk-rustdesk-actual-logic-change-in-io-loop-medium-sized-file` at 1,447 ms median;
-peak thread heap 56.6 MB. `analysis/paper_variables.py::robustness_fixtures` scopes these rows
-to the 775-fixture corpus frozen on 2026-09-09 (the `solution` column of
-`../comparison/benchmark_accuracy.csv`); the 167 fixtures solved after the freeze are in the CSV
-but not in the paper's macros. Every scoped figure above is unchanged by the scoping - the
-extremes all fall inside the frozen 775.
-
-Supersedes `robustness_rust.csv` (2026-08-20: 925 sampled Rust pairs, 16,000-node cap, 377 of
-them unreadable because their clones' histories had been rewritten), which stays on disk as the
-record of that earlier run but feeds nothing any more.
+Re-run as part of the 2026-09-26 refresh, so the figures describe the same engine and corpus state
+as the paper's comparison and node-accuracy blocks. It walks every fixture directory of the four
+paper datasets, solved or not: 1939 directories, every one `ok` - no timeout, no panic, nothing
+skipped (the node cap is set high enough to be inert). `analysis/paper_variables.py::robustness_fixtures`
+scopes the rows to the 1217 fixtures in the paper (the `solution` column of
+`../comparison/benchmark_accuracy.csv`, within `_common.PAPER_DATASETS`). Largest input
+`json-ipfs-ipfs-desktop-only-update-version-strings`, 198,406 nodes a side; slowest
+`rust-rustdesk-rustdesk-actual-logic-change-in-io-loop-medium-sized-file`, 1,237 ms median; peak
+thread heap 56.6 MB.
 
 ## `robustness_full_summary.json` and `robustness_full_exceptions.csv` (2026-09-19)
 
 The paper's Robust target exercised on the whole Full corpus: every modified code file in the
 corpus's recent history - the population `../corpus_stats/edit_shape.csv` summarises - pushed
-through `diff_code` with no node cap. Asked for by the 2026-09-18 review of the introductory paper
-(R48 in `../../papers/introductory-paper/REVIEW-2026-09-18.md`).
+through `diff_code` with no node cap. The 2026-09-18 review of the introductory paper asked for it:
+can codediff run on every diff in the Full corpus?
 
 | | |
 |---|---|
@@ -96,8 +81,8 @@ largest inputs, so quote it for the completed pairs only (p99 35 MB, max 1.9 GB)
 
 The first launch (05:21) ran the eight shards unconfined. Four minutes in, one shard's pair needed
 more memory than the machine has, the kernel OOM-killed it, and systemd stopped the whole scope
-the launching shell lived in - the other shards, the orchestrator and the Claude Code session that
-had started them (`setsid` leaves the cgroup alone). Since then the chain runs as its own unit
+the launching shell lived in - the other shards, the orchestrator and the interactive session
+that had started them (`setsid` leaves the cgroup alone). Since then the chain runs as its own unit
 (`systemd-run --user --unit codediff-overnight`), every shard in its own capped scope inside
 `codediff-r48.slice`, and a killed shard resumes from its own output with the offending pair
 recorded with the exit status it died with.

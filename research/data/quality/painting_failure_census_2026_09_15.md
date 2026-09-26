@@ -2,24 +2,21 @@
 
 **What this is.** A census of every place codediff's *rendering* disagrees with a hand-painted
 ground truth, over all **603 painted fixtures** (2001 diff cases, 1062 with a human tree mapping;
-287 of the paintings are two-preset). Companion to
-`painting_disagreement_census_2026_09_01.md` and `painting_disagreement_census_2026_09_05.md`,
-which named the families; what is new here is **attribution** - separating what a better node
-matcher could fix from what only a rendering rule can - and **counting by runs and fixtures
-instead of bytes**.
+287 of the paintings are two-preset). It **attributes** each disagreement - separating what a
+better node matcher could fix from what only a rendering rule can - and **counts by runs and
+fixtures instead of bytes**.
 
-Reproduce:
+Reproduce the census (its current output is `painting_attribution.csv`):
 ```
-cargo test --release --lib --features test-fixtures painting_failure_census   -- --ignored --nocapture
-cargo test --release --lib --features test-fixtures painting_rule_experiments -- --ignored --nocapture
-cargo test --release --lib --features test-fixtures painting_disagreement_report -- --ignored --nocapture
-FIXTURE=<name> SIDE=<0|1> cargo test --release --lib --features test-fixtures \
-  punctuation_move_provenance -- --ignored --nocapture
+cargo test --release --lib --features test-fixtures painting_failure_census -- --ignored --nocapture
 ```
+
+The whole-corpus byte aggregate, the rule experiments and the range dumps quoted below came from
+one-off exploratory tests that are not in the tree; their numbers are as measured on 2026-09-15.
 
 ## Why bytes stopped being the metric
 
-`painting_disagreement_report`'s whole-corpus aggregate now reads **0.1052%** (35,503 of
+The whole-corpus byte aggregate reads **0.1052%** (35,503 of
 33,750,624 bytes) against a `< 1%` goal. It clears the goal by a factor of ten and **steers
 nothing**: the number fell because the painted corpus grew to 33.75M bytes, not because the
 rendering got better. Handmade-only is still 0.8940%.
@@ -68,10 +65,12 @@ one-way one - *this much survives a perfect matcher* - and that claim is enough.
 
 **This inverts the whole prior record.** Every earlier painting pass was about `MINIMAL`
 over-painting, with `FULL` as the well-behaved side - `java-add-exception-handling` 60.786/6.399,
-`rust-add-if` 59.420/1.087 in the 2026-09-01 census; `paint_reindent_only_moves`,
+`rust-add-if` 59.420/1.087 (percent of bytes mismatched, `MINIMAL`/`FULL`, 2026-09-01); `paint_reindent_only_moves`,
 `paint_displaced_moves` and `paint_resized_moves` all exist to give `MINIMAL` a quieter reading
 than `FULL`'s. Those levers worked. The residue they left is `FULL`-shaped, and it has no fix
-history - which also means none of the three-times-reverted landmines around pattern 1.
+history - which also means none of the three reverted attempts at `MINIMAL`'s column-shift
+`Move` (the `minimal move -> - code` row below, which is calibration: every human-painted
+column-shift move it protects is a code span, never a lone bracket).
 
 ## The families, by how many fixtures they touch
 
@@ -98,7 +97,7 @@ Renderer's own errors (`ideal` vs `painted`), keyed on what the disagreeing text
 
 Note the bytes column on the two bold rows: 690 bytes over 41 fixtures, 300 over 63. **These are
 the two widest-spread families in the corpus and they are 1,000 bytes between them.** Both are
-invisible in every byte-ranked report ever run here, including `painting_disagreement_report`.
+invisible in every byte-ranked report.
 
 ### A. Punctuation painted grey - 150 runs, 41 fixtures
 
@@ -116,7 +115,7 @@ worklist runs to 46 preset/fixture pairs; most contribute 2 runs and 2 bytes, on
 side. `rust-turbopack-module-rule` (20), `java-defects4j-mockito-19-finalmockcandidatefilter` (16)
 and `typescript-refactor-interface` (16) are the only concentrations.
 
-`punctuation_move_provenance` confirms the range being painted is **the token itself**, not a span
+A dump of the raw and filtered range lists confirms the range being painted is **the token itself**, not a span
 coalesced across it by `RangeMatch::extends`: on
 `java-defects4j-mockito-17-mocksettingsimpl` the raw and filtered range lists both hold
 `";" (21:63-21:64) <-> ";" (23:19-23:20)`. A rule may therefore be written against the range's own
@@ -133,9 +132,8 @@ The widest-spread family in the corpus. Under `FULL` the human paints a run of a
 whitespace `Insert` (`c-freeciv-add-parameter-to-function`, 29 spaces on a continuation line);
 codediff paints nothing. The deletion mirror is 58 runs over 31 fixtures.
 
-This is the 2026-09-05 census's family E ("interior whitespace collapse is unpaintable")
-generalised from one fixture to sixty-three. The mechanism is the one that file read off
-`own_content_span`: `diff::text` derives every range from node spans, and inter-token gap text
+This is interior whitespace collapse being unpaintable, on sixty-three fixtures. The mechanism is
+in `own_content_span`: `diff::text` derives every range from node spans, and inter-token gap text
 belongs to no node, so there is nothing to hang a verdict on. `own_content_span` gives up entirely
 on a node whose own content is split across more than one gap, which is every container with
 content between several children.
@@ -146,8 +144,8 @@ are painted. Largest open item; not attempted here.
 ### C. Unpainted updates - 225 runs, 54 fixtures (`FULL`)
 
 `- -> update`: the human paints an identifier `Update` and codediff paints nothing there, having
-already narrowed the change to the inserted prefix. The 2026-09-05 census's family D, at corpus
-scale. The mirror, `update -> insert` (60 runs / 31 fixtures under `MINIMAL`), is the same seam
+already narrowed the change to the inserted prefix: rename granularity, a narrowed `Update`
+against a whole-identifier one. The mirror, `update -> insert` (60 runs / 31 fixtures under `MINIMAL`), is the same seam
 from the other side: where the narrowing leaves one side's middle empty, the edit *is* an
 insertion and the painter calls it one.
 
@@ -168,15 +166,15 @@ Renderer's own errors are not uniform by language. By fixtures affected:
 `rust` 28 (`FULL`) / 23 (`MINIMAL`), `java` 27/22, `c` 20/16, `cpp` 15/14, `javascript` 12/11,
 `go` 12/7, `html` 10/8, `css` 9/9, `xml` 9/2, `tsx` 8/7.
 
-Two shapes worth separating. `css` disagreements are large-percentage whole-file reformats (family
-A of the 2026-09-05 census) - 9 of 16 painted CSS fixtures. `xml` is the opposite: **11 of 11
+Two shapes worth separating. `css` disagreements are large-percentage whole-file reformats
+(reformat-only relocations painted `Move` where `MINIMAL` wants nothing) - 9 of 16 painted CSS fixtures. `xml` is the opposite: **11 of 11
 painted XML fixtures disagree**, at 0.011%-0.03% each - six bytes here, eight there, on 100KB
 files. A uniform tiny error across an entire language is exactly what a fixtures-affected count
 finds and a byte rate buries.
 
 ## Rules, measured
 
-`painting_rule_experiments` scores a candidate rule against the same paintings by post-processing
+The rule experiments scored a candidate rule against the same paintings by post-processing
 the range list (or rebuilding under different options), **without changing the product**. A rule
 that does not improve the corpus here never needs to be written.
 
@@ -235,7 +233,7 @@ with - an agreement, so it is not a disagreement run and nothing here records it
 reason-based predicate would have to be measured over the agreeing population as well, which this
 census does not collect. Filed as the next measurement, not as a rejected idea.
 
-**Where these lone punctuation ranges come from.** `punctuation_move_provenance` on
+**Where these lone punctuation ranges come from.** The range dump on
 `c-cpython-autogenerated-code` shows the raw range list holding *no* punctuation-only `Move` at
 all, and the filtered list holding two: `"{"` and `");"`. They are the residue of larger `Move`
 ranges after `ranges_for_options`' unconditional trailing-whitespace trim - what a reader is left
@@ -277,32 +275,3 @@ Read once, from the census tables: every family assignment above; the language r
 between "reformat" and "uniform tiny error"; and the causal story about R1's 19 regressions - that
 the punctuation there belongs to a construct that genuinely relocated - which is an inference from
 the fixture names, not something read out of those fixtures' paintings.
-
-## What this suggests, in order of value against effort
-
-1. **Measure the punctuation `Move`s the painting agrees with**, which no census here collects -
-   only the disagreeing ones. That is the population R1c's 13 regressions live in, and without it
-   no predicate (reason-based or otherwise) can be told apart from noise. Cheapest useful next
-   step, and it decides whether item 3 ships as is or gets narrowed further.
-2. **The untested alternative: the ground truth is inconsistent here.** If painters differ on
-   whether a lone bracket that shifted sideways is painted under `FULL`, no rule can beat it. Not
-   measured. The check that settles it is small: read the `FULL` painting on two of the 28 and two
-   of the 19 and see whether the moved-construct story actually holds. The 46-row worklist in the
-   census output is the list, and `human_solver`'s `V` popup plus `A` alignment are the tools.
-3. **Then ship R1c** (or whatever beats it), and measure it as a real change to
-   `identical_or_move`, not as a post-filter. Returning `Identical` also advances
-   `last_non_move_range`, the anchor every later node in the walk is compared against; a
-   post-filter leaves it stale, so every delta in the table above is a lower bound and can be
-   wrong in either direction.
-4. **R2**, as a correctness fix under `MINIMAL`: punctuation that was inserted or deleted is kept.
-   Small in bytes, states a rule the corpus's own painters follow, and has an existing home in
-   `ranges_for_options`/`restore_paired_brackets`.
-5. **Family B is the largest open item** - 63 fixtures, and nothing in `RenderOptions` reaches it.
-   It needs `own_content_update_ranges` to handle a node whose own content is split across several
-   gaps. Scope it before attempting it.
-6. **Do not re-attempt pattern 1** (`minimal move -> - code`, 259 runs / 61 fixtures, the largest
-   single row in the table). It is calibration, backed by a 16-move/6-fixture measurement, and
-   reverted three times. The punctuation carve-out above is deliberately *not* that rule: every
-   human-painted column-shift move the calibration protects is a code span, never a lone bracket.
-7. **Expect clamp churn.** Any of these moves `assert_matches_human_painting_within_limit` across
-   dozens of fixture files. Batch the re-measure; do not do it per change.

@@ -1,6 +1,6 @@
 # Cross-fixture painting conventions, 2026-09-18
 
-The seventeen rules in `invariants.rs` are all *intra*-fixture: they ask whether one fixture's
+The nineteen rules in `invariants.rs` are all *intra*-fixture: they ask whether one fixture's
 mapping and paintings agree with each other. None compares two fixtures, so a pair whose paintings
 answer the same question differently is invisible to all of them — and a corpus that disagrees with
 itself across fixtures grades the renderer against a coin flip however self-consistent each fixture
@@ -13,20 +13,10 @@ beside it as the denominator.
 
 ## Method
 
-The population is the one place two fixtures are comparable: a leaf the human's **own tree
-mapping** pairs with a leaf reading the same text. No matcher is involved and no judgement about
-what the change *is* — the human has already said this text survived. What is left is where it
-ended up (geometry) and whether the painting colours it (convention).
-
-Four facts, all about the files rather than about any rule in `diff::text` — a class defined by the
-renderer's own predicates could only re-discover the renderer:
-
-* `row_moved`, `column_moved` — the leaf's start against its partner's.
-* `row_edited` — whether its whole row reads differently on the two sides.
-* `drift_matches_neighbours` — whether its row delta is the one its immediate neighbours also
-  carry. This is what separates the two things `row_moved` conflates: text pushed down by an
-  insertion above moves by the same amount as everything around it; a block that genuinely
-  relocated does not.
+The population (leaves the human's own tree mapping pairs with a leaf reading the same text) and
+the four geometry facts it is classed by (`row_moved`, `column_moved`, `row_edited`,
+`drift_matches_neighbours`) are defined in `cross_fixture_convention_census`'s doc comment, in
+`src/test/helper/human_mapping/tests/exploratory.rs`.
 
 **3,276,710 leaves, 4,736 exceptions (0.14%).**
 
@@ -112,15 +102,3 @@ seven are not evidence for it.
 leaves `Move` and are **not** in either table: every one of their painted leaves has a row delta
 its neighbours do not share, which is a genuine relocation. Two of them say so in their own names.
 `drift_matches_neighbours` is what keeps them out, and they are the check on it.
-
-## Suggested order
-
-1. **The 38 in-place leaves** (4 fixture-presets). Unpaintable by any reading; no decision needed.
-2. **The 7 self-contradicting displacement fixtures** — `chart-22`, `jsoup-52`, `cli-14-groupimpl`,
-   `mockito-11`, `lang-28`, `jacksondatabind-94`, `grafana` — plus the five `Full`-side ones with
-   the same shape. Each needs its minority leaves unpainted to match its own majority.
-3. **`rust-multi-map-duplicate-calls` and `c-neovim-neovim-small-change`** — a real decision, and
-   the only one here. Two fixtures against 255.
-4. **The `Full` displacement convention itself** — `rust-add-if` is on record for it, 235 fixtures
-   are against it, and nothing in the corpus states which is meant. Worth settling in writing
-   before either side is edited.

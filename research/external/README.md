@@ -78,14 +78,9 @@ kind of synthetic node has no tree-sitter counterpart; Javadoc is one `block_com
 tree-sitter and a subtree to JDT). The scorer reports how much of the oracle it could resolve, and
 that number belongs next to any precision/recall quoted from it.
 
-## First result (2026-09-11)
+## Results
 
-All 800 Defects4J cases, statement + sub-expression level: codediff **99.42% precision, 98.86%
-recall**, perfect diff on 54.1% of cases; statement level 99.46 / 98.67, perfect 80.8%. Between
-GumTree 3.0 simple and RefactoringMiner 3.0 on precision and recall at both granularities. The
-per-file CSV, the exact oracle commit, the resolution rate (78% of records; 88% of those not
-inside a comment) and the caveats that go with the comparison are in
-`../data/comparison/PROVENANCE.md`.
+Current precision, recall and resolution rate, with the caveats: `../data/comparison/PROVENANCE.md`.
 
 ## The oracle cases in the corpus
 

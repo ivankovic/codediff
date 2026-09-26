@@ -111,8 +111,8 @@ correct those entries, not to build a rule.
    `field_identifier` and `property_identifier` - and a predicate that never compares kind strings
    is immune to all of it.
 3. **R3's children inherit; they are never an independent choice.**
-4. **Three entries are wrong as recorded** - the `raw_string` -> `string_content` pair in
-   `shellscript-langchain-ai-langchain-some-interesting-raw-string-to-string-content` and
-   `string_content` -> `regex` in `shellscript-scikit-learn-scikit-learn-...`. A container matched
+4. **Three entries are wrong as recorded** - the two `raw_string` -> `string_content` pairs in
+   `shellscript-langchain-ai-langchain-some-interesting-raw-string-to-string-content` and the
+   `string_content` -> `regex` pair in `shellscript-scikit-learn-scikit-learn-string-to-regex`. A container matched
    against the counterpart container's child. These are the only entries in this census that
    should be edited rather than modelled.

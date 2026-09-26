@@ -16,7 +16,9 @@ data/
   performance/    output  - diff speed/memory over the sampled pairs
     baselines/            - pinned point-in-time snapshots, kept for comparison
   comparison/     output  - codediff against other diff tools, and against external oracles
-  measure-apted-budget/            output  - whole-tree APTED against a 1-second budget (the paper's RQ1)
+  rq1/            output  - whole-tree APTED against a 1-second budget (the paper's RQ2, named RQ1
+                            in files and macros)
+  coverage/       output  - line coverage of the test suite: the README badge and per-test sets
   ablation/       output  - leave-one-out heuristic study (gitignored: regenerable scratch)
 ```
 
@@ -58,10 +60,12 @@ kernel and calls it the corpus.
 
 How well the diff algorithm reproduces the human-authored ground-truth mappings in
 `src/test/data/diffs/`. `optimal_solutions_benchmark.csv` is the per-fixture mismatch count,
-`human_mapping_analysis.csv` the shape analysis of the mappings themselves, and
-`quality_baseline.txt` the pinned numbers `make check-quality` (and therefore `make deploy`) gates
-against. That last file is read from the *root* Makefile - it is a release gate, not a research
-artifact, and is only filed here because it describes the same measurement.
+`human_mapping_analysis.csv` the shape analysis of the mappings themselves. Three files are
+product gates rather than research artifacts, read by the *root* Makefile and filed here because
+they describe the same measurement: `quality_baseline.csv`, the per-fixture accuracy baseline
+`make check-quality` (and therefore `make deploy`) gates on; `quality_baseline.txt`, its runtime
+baseline, which only warns; and `painting_attribution.csv`, the per-fixture painting baseline
+`make check-painting-attribution` gates on. `PROVENANCE.md` lists the rest.
 
 ## performance/
 
@@ -74,7 +78,7 @@ script's own comment about Lua sampling zero pairs).
 `benchmark_<language>_baseline_pre_<change>.csv`) kept for before/after comparison across a
 specific algorithm change. These are never regenerated - that is the point of them.
 
-## measure-apted-budget/
+## rq1/
 
 `apted_only_group<N>.csv`, the per-pair output of `apted_only_benchmark`: whether a single
 whole-tree APTED run finished inside a 1-second budget, for every sampled pair. Four groups purely
@@ -82,3 +86,9 @@ so each file (and each restart, if a run is interrupted) stays a manageable size
 serially, never in parallel, because the measurement is wall-clock against a fixed budget.
 
 Read with `make apted-budget-report`; re-measure with `make measure-apted-budget` (hours, needs an idle machine).
+
+## coverage/
+
+`badge.json` is the README's coverage badge, rewritten by the root Makefile's `make coverage`.
+`per_test/` holds one line-coverage set per test, written by `make measure-per-test-coverage` in
+`research/` and gitignored apart from its `PROVENANCE.md`.

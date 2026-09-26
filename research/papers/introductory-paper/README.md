@@ -1,556 +1,74 @@
 # Introductory paper
 
-An ACM `sigconf`-format LaTeX paper about syntax-aware code diffing. **It is a research paper with
-a tool contribution at the end, not a tool paper** - a distinction set deliberately on 2026-08-29
-and easy to erode. Restructured on 2026-09-02 around four research question *groups*, stated in the
-introduction and each answered in its own section, in order; the tool comes last. Structure:
-
-1. **Introduction** (the four RQ groups, sub-numbered RQ1.1, RQ1.2, RQ2, RQ3.1-RQ3.3, RQ4.1,
-   RQ4.2, plus the page-1 motivating figure added 2026-09-09), 2. **Background** (the algorithms
-   and tools the field is built on - now including Unix diff, git's four algorithms, BDiff and
-   Neovim's diff mode)
-3. **Empirical Dataset** - the repository lists, file/edit shape, how the fixture corpus was
-   sampled and solved, and how the human mapping (multi-map groups included) and the human painting
-   were authored. Methodology only; no RQ is answered here. Its "Shape of real-world file edits"
-   subsection (Table 2) is our own census, added 2026-09-02 - see below.
-4. **Viability** (RA1.1 expressibility: the N:M rate from the multi-map groups; RA1.2 cost: how
-   often the human mapping is strictly costlier than a heuristic's under unit costs)
-5. **Speed** (RA2) - what a whole-tree tree-edit-distance computation costs on real files
-6. **Uniqueness** (RA3.1 mapping uniqueness, RA3.2 visualization uniqueness, RA3.3 the visible
-   share of the AST) - the ground truth measured against itself, no diffing tool in the section
-7. **Implementation** (RA4.1 accuracy, RA4.2 cost) - nine established tools against that ground
-   truth. CodeDiff is absent by construction.
-8. **CodeDiff** - the tool contribution: the pipeline, then its own node-level accuracy, its
-   line-level rate on the same basis as Section 7's tools, and speed.
-9. **Threats to Validity**, 10. **Related Work**, 11. **Conclusions**.
-
-**Discussion was deleted on 2026-09-10**, on the annotated review, along with the six
-recommendations and the "the answer is less well defined than the metrics assume" argument it
-carried. Those had moved *into* Discussion from the Conclusion the day before, so the paper has now
-dropped them rather than relocated them - if they are wanted back, they are in git history at
-`d481ce5e:research/papers/introductory-paper/main.tex`. **Section 8's Robustness paragraph went in
-the same pass**, with the note that the measure needs drastically improving; the Robust design
-target therefore still stands in Section 8 with no evidence reported against it, and Section 8 now
-promises only the Fast target.
-
-**Sections 10 and 11 changed shape on 2026-09-09.** The paper had no Threats to Validity
-section at all - its caveats were scattered as inline asides - so the Conclusion carried the
-implications, the recommendations and a summary at once. The caveats were collected into Threats
-to Validity, grouped construct/internal/external, with the annotator-bias risk stated for the first
-time; and Conclusions (plural, per convention) now answers "so what" in one paragraph. Section 7
-was renamed **State of the Art** the same day: it was called "Implementation" while measuring other
-people's tools, immediately before the section that is the implementation.
-
-**The two agreement tables became one on 2026-09-10.** Line-level and node-level agreement were
-separate `table*` floats with byte-identical column headers, landing on the same page, so the
-second read as a continuation of the first. They are now one table with the granularity as a row
-group - see `write_combined_bucket_table` in `research/analysis/benchmark_other_report.py`, which
-is what generates it. No number changed.
-
-**The comparison is seven tools in ten configurations, not "nine tools".** The paper said "nine"
-in twelve places against tables with ten rows, and its own breakdown sentence said "Four report
-sub-line detail" over a list of five. Unix diff + git x4 = five line-granularity configurations;
-BDiff, nvim -d, GumTree, difftastic, diffsitter = five reporting sub-line detail. If a series is
-ever added, the count appears in prose, two authored table captions and `benchmark_other_report.py`
-- fix all four.
-
-The tool comparison is written to be read as generous, not competitive: difftastic and diffsitter
-optimize for human readability rather than ground-truth mapping fidelity, and GumTree's own
-evaluation, on its own pipeline and corpus, is what motivated adopting its move-detection
-heuristic in the first place - Section 7 and the Conclusion both frame the numbers as one
-way of combining what each tool already does well, not as a claim that any of them are lesser.
-
-**A framing decision made in the 2026-09-02 restructure, worth knowing before editing Sections
-4 and 6:** the author's Dataset section reads a `MultiMapGroup` as an *N:M site* - a
-correspondence the four operations cannot express - and RA1.1 counts groups on that reading. The
-older text (and `data/quality/nm_instances.md`) read a group as a set of *interchangeable*
-candidates and kept N:M as an unencoded existence result. The paper now reconciles the two in
-one sentence in Section 3: a group records the N:M site, and the ground truth scores it by its
-closest one-to-one approximations (any consistent `min(N,M)` pairing). RA3.1 then derives
-"multiple optimal mappings" from the same sites plus a second, format-independent reading: cost
-ties between the human mapping and the harness's own matcher's mapping at a *different* mapping
-(`CostTieDifferent*` macros). Do not re-split them without touching both sections.
-
-**The title still reads as a tool-paper title** ("CodeDiff: A Fast, Robust, Syntax-Aware Code
-Diffing Tool"; "Production-Ready" was dropped on the author's 2026-09-13 review) and no longer
-matches the paper's shape. Left alone deliberately - retitling further is the author's call.
-
-## Status
-
-Compiles cleanly, 14 pages, builds with `latexmk -pdf -g main` (verified locally, `cm-super` +
-`texlive-publishers` installed). See the `TODO` comments in `main.tex` for the placeholder ACM
-conference/rights metadata and CCS concepts, still to fill in once a venue is chosen.
-
-### Review pass of 2026-09-26
-
-Resolved the author's Boox review of the 2026-09-25 PDF, recorded mark by mark in
-`REVIEW-2026-09-26.md`, on top of the same day's srcDiff refresh. Three marks exposed wrong claims
-rather than wording: the N:M paragraph said the tool comparison excludes multi-map nodes (it
-projects them through one representative pairing), Figure 5 described ASTs tree-sitter does not
-produce (one `boolean_operator` before, two after - now drawn), and Section 2 said `diff` computes
-a shortest script (not under GNU's default heuristic). Two authors were added, and the Fast target
-is now 99% of changes.
-
-### Review pass of 2026-09-24
-
-Resolved the author's handwritten review of the 2026-09-23 PDF, recorded mark by mark in
-`REVIEW-2026-09-24.md`. The structural change is a reversal: the four *properties* the
-introduction had derived since the second author's 2026-09-18 review (Expressible, Agreed, Timely,
-Faithful on screen) are gone, and the four research-question
-groups are back as the introduction's list, restored from `0a51541d^`. Every section opener that
-named a property was struck on the same review and now names its question instead. Table 4 (what
-each result decided in CodeDiff's design) stays. Section 3.4 is retitled "Cross-validation with
-existing datasets" and no longer compares CodeDiff against the oracle - only the human annotation
-against it - so the `\OracleHumanCodeDiff*` macros are generated and unused. Section 8's Limits
-paragraph and the by-dataset accuracy sentence are gone; Table 5 keeps a one-sentence pointer.
-Figure 4 draws CodeDiff dash-dotted.
-
-The same day, the point behind the second author's F4 (the paper never said *why* diff quality
-matters) was answered by expanding outward: two evidence paragraphs in the introduction and
-seventeen new `references.bib` entries - review is understanding (Bacchelli & Bird, Tao et al.),
-presentation alone moves outcomes (file position, unified vs. split view, decomposition, working
-memory), and size, latency and move-aware diffs shape quality, time and satisfaction - closing on
-the gap that none of them varies the correspondence a diff draws. `REVIEW-2026-09-24.md` lists
-them by strand and names the three read from abstracts only. 13 pages.
-
-The one measurement item, Figure 2's Unknown share, is answered at the foot of the review file:
-the classifier improvement of 2026-09-13 was never written back into the corpus database's `tip`
-column (`make reclassify-tips RECLASSIFY_FLAGS=--write` does that; a file moved out of Unknown by
-path alone still has no size or node numbers until `measure-file-stats` re-walks the corpus).
-The re-walk ran the same evening (2h53m, see `data/corpus_stats/PROVENANCE.md`), so Figure 2 and
-the empirical macros now reflect the 2026-09-13 classifier: Unknown 6.2%, Code 66.5%, and a
-code-file population a fifth larger, whose medians are correspondingly smaller. Because a sixth
-of that population is code codediff has no grammar for, the AST-node percentiles and the nodes
-panel of Figure 3 are computed over the code files that parse (`\ParsedCodeFiles` of
-`\CodeFiles`), while lines and bytes stay over every code file - see `data/corpus_stats/PROVENANCE.md`.
-
-### Review pass of 2026-09-11
-
-Resolved the author's handwritten review of the 2026-09-10 PDF. Prose: the abstract now opens with
-the introduction's first two sentences; GumTree moved from Algorithms to Tools in Section 2;
-the N:M paragraph moved from Section 3.3 to Section 4 under RQ1.1; Section 8 no longer compares
-CodeDiff to other tools except in its Summary sentence (absolute CodeDiff numbers only); the
-Conclusions were rewritten to the reviewer's one-sentence message (speed requirements are met,
-full quality requirements are not, RA1-RA3); Defects4J is cited under Empirical studies.
-
-Data: RA2 now names the 31-100 bucket (`\RqOneCodeThirtyToHundredPct`, new in
-`apted_only_report.py`) instead of calling 101-300 "one bucket up"; Table 3 dropped its
-node-granularity block; every accuracy result is also split by dataset
-(`figures/benchmark_other_buckets_by_dataset.pdf` for the ten configurations,
-`figures/benchmark_codediff_by_dataset.tex` for CodeDiff, both from `benchmark_other_report.py`);
-the robustness evaluation was re-run over the fixture corpus (`make measure-robustness-fixtures`,
-`benchmark_diff_pairs --fixtures`) and Section 8 gained a Robustness paragraph, with the 905k-node
-ceiling marked as unexercised in Threats. Table 2's rewrite-share p99 and max stay empty: the
-2026-09-07 run recorded only p50/p90 and the Full-list clones no longer exist on disk;
-`edit_shape_stats.py` now emits both so the next run fills them. The 255 Full-list sample is
-explained in the text (R and Scala re-drawn, `\SampleFullResampled`).
-
-### The corpus is four datasets since 2026-09-16
-
-`defects4j` is a reported dataset, not a side experiment. It sits in `_common.PAPER_DATASETS`
-beside `small` (Curated), `full` (Full) and `stratified`, so every research report scores it
-alongside them and folds it into each pooled total, and the paper carries a Defects4J row wherever
-it splits a result by dataset: Table 2 (`ambiguity_report.py`), Table 5
-(`benchmark_codediff_by_dataset.tex`) and Figure 6 (`benchmark_other_buckets_by_dataset.pdf`).
-
-Three things to know before editing anything that touches it:
-
-* **Only the solved units are ever scored.** 996 Defects4J compilation units are fixture
-  directories; 113 carry a `human_mapping.json`. The other 883 have no ground truth and are
-  invisible to every report, so they are never counted as anything. Which 113 are solved is how
-  far annotation has reached rather than a draw, and they run shorter than the rest - Section 3
-  and Threats both say so, and `research/external/README.md` has the measured medians.
-* **`Defects4J` is not a LaTeX macro name.** A control sequence is letters only, so the per-dataset
-  macros are spelled `DefectsFourJ` (`\AmbiguityDefectsFourJPct`,
-  `\CodeDiffPerfectPctDefectsFourJ`). `benchmark_other_report.macro_stem` and
-  `ambiguity_report.PER_LIST_DATASETS` are the two places that translate; the display name stays
-  `Defects4J` everywhere a reader sees it.
-* **Write as though every dataset were finished, and footnote the ones that are not.** The paper
-  and the annotation are being written in parallel, so the body text describes a four-dataset
-  corpus with no hedging, and the unfinished passes are handled in exactly two places: footnote
-  `fn:in-progress` in Section 3, and the asterisk on Table 2's Stratified, Defects4J and
-  \emph{All} rows. Do not scatter "in progress" back into the prose.
-
-The ambiguity pass is the one measurement where this matters numerically. It is complete for
-Curated and Full and unfinished for the other two, so `ambiguity_report.REVIEWED_LISTS` is still
-`("small", "full")` and RA1.1 states the rate over those 452 changes (11.5%). The table prints all
-four datasets plus an \emph{All} row (5.8% of 1056) under the footnote, so the annotation gap is
-visible rather than pooled away. Fold a dataset into `REVIEWED_LISTS` when its pass finishes.
-
-### Every number is a macro
-
-**`main.tex` contains no bare numeric literal that came from a measurement.** Every number in the
-paper - prose, tables, and abstract alike - is a LaTeX macro defined in the single generated file
-`figures/variables.tex`, which `main.tex` `\input`s exactly once. Regenerate it with `make
-paper-variables` (fast; reads only artifacts already on disk), or via either paper target below,
-which run it for you.
-
-This matters because several numbers appear more than once - the fixture count appears nine times,
-the node accuracy three, and each line-level mismatch rate appears in both Table 3 and the prose
-discussing it. When those were literals, a data refresh could update one occurrence and miss
-another. A single macro used in every position cannot drift.
-
-`research/analysis/paper_variables.py` assembles that file and documents, per block, where each
-number comes from. Two populations, kept visibly distinct in the generated output:
-
-* **Generated** - read back from a measurement artifact. Refreshing is "re-run the producer, re-run
-  the assembler." Five blocks: the empirical study (`file_stats.py` -> `variables_empirical.tex`),
-  RQ1 (`apted_only_report.py` -> `variables_rq1.tex`), the tool comparison
-  (`benchmark_other_report.py` -> `variables_comparison.tex`), RQ3's ground-truth ambiguity
-  (`ambiguity_report.py` -> `variables_ambiguity.tex`, via `make ambiguity-report`), what reaches
-  the reader (`rendering_report.py` -> `variables_rendering.tex`, via `make rendering-report`), and
-  the change-shape census (`human_mapping_shapes_report.py` -> `variables_shapes.tex`, via `make
-  shapes-report`) - the last currently generated but unreferenced, see the RQ rule below.
-* **Authored** - no saved producer to read back from, so the value is transcribed, but into one
-  version-controlled place with a comment naming the command that produced it. This covers the
-  corpus/node-accuracy totals, the robustness run, and the design targets. The `Ablation*` block is
-  still generated and now entirely unreferenced - see the 2026-08-29 note in the RQ rule below.
-
-The per-tool comparison and speed tables moved from Authored to Generated on 2026-08-20. At ~30
-hand-transcribed numbers they were the largest authored group and the one every data refresh
-touches, so they were the likeliest to drift. `benchmark_other_report.py` now derives them from
-`benchmark_accuracy.csv` (accuracy, which carries an explicit per-tool `_status` column and is
-machine-independent) and `benchmark_other.csv` (timing).
-
-**Edit authored values in `paper_variables.py`, never in `figures/variables.tex`.** That file is
-generated output: `make introductory-paper` regenerates and overwrites it on every routine PDF
-rebuild, so a hand-edit there survives only until the next build. The authored numbers live in the
-`CORPUS` / `ABLATION` / `COMPARISON` / `SPEED` / `TARGETS` dicts near the top of the script (the
-`ROBUSTNESS` dict was replaced on 2026-09-11 by a block derived from
-`data/performance/robustness_fixtures.csv`).
-
-**`figures/` contains symlinks, not copies.** Every entry in `figures/` points at
-`research/plots/`, which is the single source of truth for generated figures and for
-`variables.tex`. There is no copy step: regenerating a chart or the macro file updates what the
-paper builds from, immediately. `research/plots/` is committed for exactly this reason.
-
-If the empirical fragment (`plots/variables_empirical.tex`, written by the slow `measure-file-stats` run)
-is missing, the assembler carries the previous values forward from the `variables.tex` already on
-disk rather than overwriting good numbers with placeholders - `measure-file-stats` is deliberately not a
-prerequisite of the paper targets, so a routine rebuild must not destroy them. It only emits a
-loud `\textbf{??}` when a macro has no value from any source - never silently omits one, because
-`main.tex` builds under `-interaction=nonstopmode`, where an *undefined* macro does not fail the
-build; it just yields a PDF with the number quietly missing.
-
-### Every RQ is answered without reference to CodeDiff
-
-Set on 2026-08-22 for RQ1-RQ3, widened on 2026-08-29 to all six, and kept through the 2026-09-02
-regrouping with one deliberate exception: RA1.2 and RA3.1's cost readings need *some* algorithm's
-mapping to compare the human's cost against, and the harness's own (CodeDiff's) is the one on
-disk. Section 4 names it in a footnote, tool-neutrally, for the same reason Section 5 names the
-APTED implementation - so the "lower bound" caveat is checkable. The section numbers in the rest
-of this note predate the regrouping (old Section 5 = Uniqueness/Viability material, old Section 6
-= Implementation, old Section 7 = CodeDiff). It is a structural rule, not a
-stylistic preference: an RQ answer describes the problem or the state of the art, so no RA box and
-none of the argument supporting one mentions CodeDiff. Section 3 keeps one attribution - the RQ1
-measurement names the APTED implementation it ran, because that is what makes its "lower bound, not
-upper bound" caveat checkable - but states it tool-neutrally. **RQ2, RQ3 and RQ4 go further: their
-whole section (5) names no diffing tool at all**, not even the four compared later, because they
-are properties of code change rather than of any implementation. Consequences that are easy to undo
-by accident:
-
-* **The four-tool comparison excludes CodeDiff entirely.** Table 2 has four rows, and
-  `benchmark_other_report.py::plot_accuracy` deliberately drops the `codediff` series (see its doc
-  comment). Since 2026-08-29 the speed table (`tab:speed-vs-others`) excludes it too, because
-  RQ6 makes tool cost an RA rather than a production-viability note; CodeDiff's own percentiles are
-  prose in Section 7, quoting the same macros, so nothing can drift. `plot_runtime` still keeps
-  CodeDiff in `fig:runtime`, which is why that figure sits in Section 7 rather than Section 6 - it
-  cannot be regenerated without CodeDiff's series. The `\CodeDiffLineRate{}` family of macros is
-  still generated and simply unused; that is intentional, so the number is one edit away if the
-  framing changes back.
-* **RQ3 was pivoted** from "which change shapes need a dedicated heuristic" to "when does a change
-  have no single correct mapping". It now covers two phenomena that are deliberately kept apart,
-  because they have different consequences and different epistemic status:
-  * *Multiple optimal solutions exist* - several one-to-one mappings are equally correct, recorded
-    as a `MultiMapGroup`. Measured, and reported as a rate, by `analysis/ambiguity_report.py`
-    (`make ambiguity-report`).
-  * *No one-to-one optimal solution exists* - the true correspondence is N:M, which ordered tree
-    edit distance cannot express by definition and `human_mapping.json` cannot express either.
-    Reported as an existence result with named instances and **no denominator**; the curated list,
-    the grep that found it, and the two exclusions live in `data/quality/nm_instances.md`. Do not
-    turn that list into a generated macro - the file explains why. The change-shape census that answered
-  the old RQ3's first half was cut from the paper; `human_mapping_shapes_report.py`, `make
-  shapes-report`, and the whole `Shape*` macro block still exist and still run - only `main.tex`'s
-  references were removed.
-* **The ablation study was cut on 2026-08-29.** It is a measurement of *this pipeline*, which is
-  a tool-paper result; it says nothing about the problem or the state of the art, and it was the
-  last thing in the paper arguing from CodeDiff's internals. Removed together with its table, its
-  Related Work and Conclusion citations, and the phase-5 sentence that quoted it. **Nothing about
-  the study itself was retracted** - `ablation_study.sh`, the `Ablation*` macros and the
-  `HeuristicConfig` doc comment are all untouched and still correct, so it is one edit from
-  returning if a tool paper wants it. Its "unique type matching fires zero times" result is still
-  the sharpest thing measured about this pipeline.
-* **RQ4 (rendering) and RQ3 (visibility) were added on 2026-08-29**, both answered by
-  `analysis/rendering_report.py` (`make rendering-report`). They are the reason Section 4 exists as
-  a separate methodology section: the painted text ground truth needed describing before either
-  could be stated. Two properties of that script matter. It scopes itself to
-  `human_mapping_analysis.csv` **and** to `_common.PAPER_DATASETS` exactly as `ambiguity_report.py`
-  does, so its denominators match the rest of the paper. And **the painted subset is still not a
-  random sample** - painting is manual, and which changes have been painted is an artifact of the
-  order the annotators worked in. `\PaintingDualPct{}` is a rate over the painted set, not over
-  the corpus.
-
-  **Changed 2026-09-09: the `handmade` fixtures left the paper entirely.** They are hand-written
-  minimal examples of one change pattern each, written to exercise the matcher, so no rate over
-  them estimates anything about real changes - and mixing them in made every rendering rate a
-  mixture whose proportions were set by annotation order. The paper now reports the `small`, `full`
-  and `stratified` datasets alone: 775 scored fixtures, 317 of them painted. The
-  `\PaintingHandmade*` / `\PaintingSampled*` macros and the handmade-versus-sampled comparison
-  Section 5 used to draw are gone with them, and `\PaintingDualPct{}` is now simply the rate over
-  changes taken from real commits (the figure that block used to call the sampled one).
-
-  **The product benchmark still scores `handmade`**, and should: `benchmark_optimal_solutions`,
-  `quality_baseline.csv` and each fixture's own `#[test]` are regression coverage, where a
-  hand-built minimal case is worth more than a sampled one. The two corpus sizes differ on purpose;
-  every report reading `optimal_solutions_benchmark.csv` filters it itself.
-
-One property of `ambiguity_report.py` is load-bearing and easy to break: it scopes itself to the
-fixture set in `data/quality/human_mapping_analysis.csv`, so Section 5 keeps describing one corpus
-state.
-
-**Removed 2026-09-05: the annotation-era split.** The script used to hold apart the fixtures whose
-mapping file had not been touched since the multi-mapping facility landed, on the grounds that they
-could not have recorded an ambiguity. Every fixture has since been reviewed by an annotator with
-multi-mapping available, and a review that finds nothing to add leaves the file untouched - so a
-file date was never evidence about the annotation, and splitting on it understated the corpus. One
-rate now, over every in-scope fixture. Do not reintroduce it: it measures file timestamps, not code.
-
-### The comparison covers nine tools, and since 2026-09-02 the paper's tables show all of them
-
-Added 2026-08-23: four git algorithm variants (`git_myers`, `git_minimal`, `git_patience`,
-`git_histogram`) and BDiff (`bdiff`), all text-based, all covering the full corpus. They are wired
-into `measure-tools-timing`, `measure-tools-accuracy`, both CSVs, the charts and the generated macros, so
-every future re-benchmark includes them with no further work.
-
-**Why CodeDiff's line rate flips sign between the two subsets** (0.795% on its own 493 fixtures,
-1.265% on the 262 common ones): a pooled line rate weights a fixture by its length, and 5 long
-fixtures hold 89% of CodeDiff's common-subset mismatched lines on 16% of its lines. Without them
-it is 0.161% against git's 0.541%, and per fixture it never trails at all (221 perfect vs 123, 114
-fixtures better vs 25 worse). `common_subset_concentration` in `paper_variables.py` derives the
-`Common*` macros Section 8 uses to say this; its `COMMON_SUBSET_TOOLS` must stay in step with
-`benchmark_other_report.py`'s `PAPER_MACRO_STEMS`, and it warns if the two disagree about
-`\CommonFixtures`. An earlier draft of that paragraph blamed the subset's mainstream-language mix,
-which the data does not support - the concentration is 5 named fixtures, three of them documented
-RA1.1/RA1.2 cases and two open unreviewed gaps.
-
-`main.tex` was changed on 2026-09-02 to add rows for them: `tab:accuracy-vs-others` and
-`tab:speed-vs-others` now carry every series the macros define, grouped like the generated bucket
-table, and `\CodeDiffLineRate{}`/`\CommonCodeDiffLineRate{}` are printed in Section 8 (both
-subsets, with the sign flip between them stated rather than chosen away). `Shape*` and `Ablation*`
-remain generated and unreferenced. What the run found:
-
-* The four git variants and Unix `diff` agree with the human mapping to within 0.01 percentage
-  points of each other (1.12-1.13%). `git_minimal` is bit-identical to `git_myers` on every
-  fixture. Choice of line-diff algorithm does not move this metric, which closes the obvious
-  reviewer objection that RA2's baseline used "only" Myers.
-* Nugroho et al.'s "use --histogram for code changes" (EMSE 2020) does **not** transfer here:
-  histogram is marginally the *worst* of the four against human ground truth. Their criterion is
-  edit-script size and miner readability, not agreement with a human mapping - a different
-  question, answered differently, which is the same "a published benefit is a property of the
-  metric and pipeline it was measured in" point the ablation makes.
-* BDiff (1.18%) does not beat plain git on this metric either, despite being block-aware.
-
-Two measurement notes worth keeping. BDiff's per-process time is ~97% Python import overhead, so
-it is reported cold *and* warm exactly like GumTree's JVM (315.6 ms against 7.8 ms median). And
-per-tool *mean* runtimes in this corpus are distorted by run order - whichever tool goes first per
-fixture absorbs cold-cache cost, which is why `unix_diff` and `git_myers` show ~18 ms means
-against ~2.5 ms medians. Quote percentiles, not means; the paper's speed table already does.
-
-### The measure-edit-shape census (Section 3.2, Table 2)
-
-`analysis/edit_shape_stats.py` (`make measure-edit-shape MODE=<mode>`) walks the most recent
-`EDIT_SHAPE_COMMITS` (50, matching `\CorpusCloneDepth`) non-merge commits of each cloned
-repository and reports how big a real-world edit is.
-
-**The committed fragment is a full-corpus run, not `MODE=small`** - `\EditsRepositories` is 7,444
-and `\EditsCommits` 114,817, which 100 repositories at a 50-commit cap cannot produce. This README
-said `MODE=small` until 2026-09-09, and the paper had copied that error into Section 3.2 as "In the
-Curated dataset". Both are fixed; check `\EditsRepositories` before describing the scope again. It replaced a "TODO: Add our own metrics
-here" that had stood in Section 3.2 next to the Arafat and Riehle citation.
-
-Four decisions in it are load-bearing, each made after measuring the alternative:
-
-* **The commit cap is not a speed knob.** These clones are shallow but *not uniformly so*:
-  `torvalds-linux.git` alone holds 1.29M of the corpus's 2.31M reachable commits. An uncapped walk
-  produced 19.7M file edits with a median of 65 changed lines per file - which is the Linux
-  kernel's median, not the corpus's. Capped at 50 per repository the median is 2.
-* **Creations and deletions are excluded** from every distribution (they are 9.5% of code-file
-  edits). A file with only one version presents nothing to map, and including them roughly doubled
-  the churn median.
-* **Churn is derived, not joined.** `lines_after` comes from one `git cat-file --batch` per
-  repository, and `lines_before = lines_after - added + removed` follows exactly, so all 47,980
-  modifications get a fraction. An earlier version joined `stats.sqlite`'s `commits` table and
-  covered 6,000 of 19.7M edits, 0.03%, selected differently - not a usable denominator.
-* **`stats.sqlite` cannot answer this question at all.** Its `lines_added`, `lines_removed`,
-  `lines_changed` and three `nodes_*` columns are hardcoded to zero in `commit_stats.rs` ("the
-  actual diff processing will be implemented later"), and its `nodes_before`/`nodes_after` are
-  `root_node().child_count()`, i.e. direct children rather than subtree size (max 3,495 over the
-  whole corpus). Do not read any of those seven columns.
-
-Consequences worth keeping: the census reports **no AST-node churn** - that needs both sides
-parsed, which is exactly what `commit_stats.rs` would do if the columns above were implemented -
-so Section 3.2 labels its line-level fraction as a proxy and Section 8's phase 1 leans on it as
-one. The artifact in `data/corpus_stats/edit_shape.csv` is per-language rows only; the per-edit
-population is far too large to commit.
-
-### Generated tables name the series exactly as main.tex does
-
-Added 2026-09-09. `benchmark_other_report.py` now carries two name maps: `DISPLAY_NAMES` feeds
-matplotlib (which cannot render LaTeX) and `LATEX_NAMES` feeds the three generated `.tex` tables.
-Before the split the paper showed the same ten series under three naming schemes across four
-tables - "UNIX diff (baseline)" against "Unix \texttt{diff}", "GumTree (binary)" against
-"GumTree", "BDiff (per process)" against "BDiff (cold, per-invocation)". Keep any new series in
-step with `main.tex`, not with `DISPLAY_NAMES`. `_escape_tex` is deliberately **not** applied to
-`LATEX_NAMES` values: escaping `\texttt{git}` would print the markup.
-
-### Figures are vector and greyscale-safe
-
-Added 2026-09-09. Every plot script writes a `.pdf` beside its `.png`, `figures/` symlinks both,
-and `main.tex` includes figures without an extension so LaTeX takes the vector copy.
-`apted_only_report.py`'s bars carry hatching as well as hue, because colour alone says nothing in
-a printed paper. Both in-image chart titles were removed: they duplicated the LaTeX caption and
-went stale independently of it - one still read "RQ1" a week after the 2026-09-02 restructure
-renumbered that question to RQ2.
-
-`plots/tips.png` is a horizontal bar chart (the earlier pie's two smallest labels overprinted into
-an illegible smear, and five wedges separated by hue alone are unreadable in greyscale).
-Regenerating it needs `stats.sqlite`, which is not committed: `make file-stats-report MODE=full`
-re-reads the database on the measuring machine, `make measure-file-stats MODE=full` re-walks the
-corpus first (about three hours, see `data/corpus_stats/PROVENANCE.md`).
-
-### Known-stale numbers
-
-**Refresh of 2026-09-16.** Re-measured together, from one corpus state, and all describing the
-same \NumFixtures{} = 1056 fixtures: the ground-truth corpus block (`benchmark_optimal_solutions
---csv`, then `analyze_human_mappings --csv`), the ambiguity, rendering and shape blocks, the
-per-tool accuracy and speed comparison (`measure-tools-accuracy` then `measure-tools-timing`), the
-robustness run, and both halves of the AST-diff oracle. This is the pass that made `defects4j` a
-reported dataset.
-
-Three things that pass turned up, each worth knowing before the next one:
-
-* **The timing benchmark had been silently unrunnable since 2026-09-09.** `benchmark_other.csv`
-  could not be refreshed at all - the run died on its first fixture and wrote nothing. See
-  `research/data/comparison/PROVENANCE.md`. Fixed; check the `[i/N]` progress line before
-  believing a refresh.
-* **`benchmark_diff_pairs.rs` carried its own copy of the dataset list** and so kept excluding
-  `defects4j` from the robustness run after `PAPER_DATASETS` had been updated. Both are now
-  correct and each names the other; if a third copy ever appears, make it name them too.
-* **Four measured numbers in `main.tex` were bare literals**, in Section 8.1's "pairs claimed and
-  not corroborated" sentence, and three of the four had gone stale. They are macros now
-  (`\OracleHuman*FalsePositives`). The claim in "Every number is a macro" below was not true when
-  it was written; it is now.
-
-Two things were deliberately **not** re-measured in that pass:
-
-* **The ablation block** (`\Ablation*`, still the 2026-08-20 / 468-fixture run). The paper does not
-  reference it - the table was cut earlier - and the author's instruction on 2026-09-16 was that
-  the paper does not need an ablation study. The macros are emitted and unused.
-* **RQ1** (`data/rq1/`, the whole-tree APTED budget). It is measured over sampled code pairs rather
-  than over the fixture corpus, so adding a fixture dataset does not stale it, and re-running it is
-  hours on a machine that must be otherwise idle.
-
-Two comparability caveats on the 2026-09-16 tool numbers, both in
-`research/data/comparison/PROVENANCE.md`: difftastic on the measuring machine was **0.69.0**
-against the 0.70.0 the 2026-09-09 run used - a lower version, not a newer one - and Neovim was
-0.11.4 against 0.10.2; and the timing half ran on a machine with other users' load on it, so the
-speed percentiles are an upper bound rather than a like-for-like comparison with 2026-09-09.
-
-
-**The empirical-study numbers (Section 3, Table 1, corpus size) are the full
-\NumRepos{}-repository measurement**, run on the server on 2026-09-07 and landed in commit
-`1d0102d`; `research/data/corpus_stats/PROVENANCE.md` records the run in full (7,444 repositories
-cloned and measured, 7,045,754 `files` rows, 27 GB database, 2h38m to fetch). The superseded
-Curated-100 values are kept beside them under a `_curated` suffix.
-
-This block said the opposite until 2026-09-09 - that the numbers "currently reflect the
-100-repository `small` sample, not the paper's eventual full 7,423-repository corpus" - which was
-already false when the full run landed two days earlier, and which `main.tex` had copied into its
-own header comment and into Section 3.2's "In the Curated dataset". All three are fixed. Check
-`\NumRepos` in `plots/variables_empirical.tex` before describing the scope again.
-
-**Everything corpus-dependent was refreshed together on 2026-09-26**, to 1217 fixtures (1056
-on 2026-09-16; all 161 new ones are solved Defects4J units): both `benchmark_other` CSVs, now with
-srcDiff as an eighth tool, `optimal_solutions_benchmark.csv` and `human_mapping_analysis.csv`, the
-authored CORPUS block, the ambiguity, rendering and shape reports, the fixture robustness run and
-both AST-diff oracle runs. The ablation study still names its own, older corpus state. Ordering
-claims re-read against the new numbers, and four had moved:
-
-* **The best established tool is no longer GumTree.** difftastic (64%) overtook it (62%) among the
-  tools that parse most of the corpus, and srcDiff reaches 79% on the five languages it parses. The
-  abstract, RA4.1, the findings table, CodeDiff's Result paragraph and the conclusion hard-coded
-  `\GumTreePerfectPct` as "the best"; they now name srcDiff with its coverage and difftastic as
-  the best broad tool, and `benchmark_other_report.py` warns if a refresh reorders those two.
-  CodeDiff against srcDiff is quoted on srcDiff's own subset only (`\SrcDiffSubsetCodeDiffPerfectPct`).
-* **The speed table's median order changed** (difftastic now below `nvim -d`, the `git` rows
-  reshuffled within 0.01 ms); rows re-sorted.
-* **"The only AST-aware curve that reaches 100% before the budget line" was false**, and already
-  was on 2026-09-16: diffsitter's slowest run is 512 ms (676 ms then). The sentence now names it.
-* **Defects4J ambiguity rose from 4.4% to 9.5%** as annotation reached more units, so Threats to
-  Validity no longer says it runs "far under" the finished lists; the Stratified sample still does.
-
-**The ground-truth corpus block was refreshed on 2026-09-05** to 597 fixtures (598 directories, 597
-of them carrying a `human_mapping.json`), moving `NumFixtures`, the node-accuracy totals, and the
-generated ambiguity and rendering blocks together. The refresh before it was 2026-09-02 (512), and
-before that **2026-08-20** against a 468-fixture corpus, replacing numbers measured on 98 fixtures.
-The ablation study, the per-tool comparison, the speed percentiles and the robustness run were
-**not** re-measured on 2026-09-05 and still describe the corpus states their own blocks name. Refreshed together, deliberately: AST-node accuracy, the ablation study, the
-per-tool line-level comparison, the speed percentiles, and the robustness run were all measured
-against the same corpus, so refreshing one block alone would leave the paper internally
-inconsistent. Keep that property on the next refresh. **Those numbers are now spread across
-Sections 5, 6 and 7** after the 2026-08-29 restructure - the constraint is unchanged and now spans
-three sections rather than one. The rendering block (Section 5's RQ3 and RQ4) was added on
-2026-08-29 against the same corpus state, `rendering_report.py` scoping itself to the same CSV.
-
-That pass changed more than the values:
-
-* **The ablation table is a different table.** All four passes it lists are different passes from
-  the four it listed before. `ablation_study.sh`'s `FLAGS` array had gone stale against the binary
-  (it named `solver-import-nodes` and `solver-bottom-up-expansion`, neither of which exists), and
-  a stale flag makes clap exit before scoring a single fixture, which the script reported as a
-  per-flag `FAILED` row rather than as the list being wrong. It now pre-flights every flag against
-  `--help` and fails loudly instead.
-* **The result inverted.** Three of the four passes now measurably help, where three of the old
-  four were net-negative. Move-detection recovery is worth more than the other three combined.
-* **Section 4's pipeline description was rewritten**, because the pipeline itself had changed: the
-  whole-residual APTED call is gone (Myers-LCS runs unconditionally, and APTED survives only
-  scoped to individual container pairs inside phase 3), phases 3 and 5 were deleted outright, and
-  the paper now describes five phases rather than seven.
-* **GumTree is v4.0.0-beta8**, not the beta4 earlier runs used; the beta4 tree no longer exists on
-  disk. beta8 adds C++ and TSX generators and drops JSON, so GumTree's scored subset is not
-  comparable across that boundary. See `research/data/comparison/PROVENANCE.md`.
-* **RQ3 gained a change-shape census** (then Table 3), which was the "which shapes occur" half the
-  section previously left to the ablation alone. **Superseded on 2026-08-22** - RQ3 was pivoted to
-  ground-truth ambiguity and the census was cut from the paper (see the RQ1-RQ3 rule above). Its
-  producer, macros and `make shapes-report` target are all still live and still describe the
-  corpus: reparenting is 26.7% of *fixtures* but 58.5% of CodeDiff's *mismatches*, and 35.3% of
-  that error sits in fixtures matching none of the censused shapes. Restoring the table is a
-  `main.tex`-only edit.
-
-### Why this mechanism exists
-
-A real, already-happened failure: this paper's original Table 1 (before `variables.tex` existed)
-had its numbers hand-transcribed from a conference slide deck
-(`research/presentations/MUC-2026-03`), and that slide deck's own source computation was never
-saved anywhere in this repository. By the time anyone asked why Bytes' and LOC's Max column was
-blank, there was no way to answer it, and no way to regenerate the numbers except starting the full
-pipeline from scratch. `write_paper_variables`'s own doc comment in `file_stats.py` tells this story
-in full.
-
-Everything else the paper embeds also traces to a file in this repository: the
-accuracy/speed/robustness charts and the variance table to `research/data/comparison/benchmark_other.csv` and
-`research/analysis/benchmark_other_report.py`'s output (`benchmark_other_accuracy.png`,
-`benchmark_other_runtime.png`, and `benchmark_other_variance.tex` - the last is a generated LaTeX
-table, not a chart, `\input` directly rather than copied as a PNG).
-`figures/files_per_project.png` was dropped from an earlier draft after turning out to be a stale,
-empty scratch artifact.
-
-**The RQ1 measurement block is generated, not authored** (`plots/variables_rq1.tex`, written by
-`analysis/apted_only_report.py` via `make apted-budget-report`), so a full `make measure-apted-budget` re-measurement flows
-into the paper with no hand-editing. The numbers currently on disk were measured against the
-pre-2026-08-18 sampled corpus (see `data/rq1/PROVENANCE.md`); the prose cites only the code and
-config/data categories, deliberately - the scripting category does not exist in that measurement
-and its macros are not emitted until the re-measurement lands.
+"CodeDiff: A Fast, Robust, Syntax-Aware Code Diffing Tool", an ACM `sigconf` LaTeX paper. It is a
+research paper with a tool contribution at the end, not a tool paper: the introduction states four
+groups of research questions, each is answered in its own section, and the tool comes last.
+
+1 Introduction, 2 Background, 3 Empirical Dataset (methodology only, no RQ answered),
+4 Viability (RQ1.1, RQ1.2), 5 Speed (RQ2), 6 Uniqueness (RQ3.1-RQ3.3), 7 State of the Art
+(RQ4.1, RQ4.2: eight established tools in eleven configurations), 8 CodeDiff, 9 Threats to
+Validity, 10 Related Work, 11 Conclusions. The ACM conference, DOI, ISBN and rights fields are
+placeholders until a venue is chosen.
+
+## Rules that are easy to break
+
+* **No RQ answer names CodeDiff.** An RA box and its supporting argument describe the problem or
+  the state of the art. RA1.2 and RA3.1 compare the human mapping's cost with the harness's own
+  matcher; the text describes it tool-neutrally. CodeDiff's own results are in Section 8.
+* **RA1.1 and RA3.1 read the same multi-map groups two ways**: as an N:M site the four edit
+  operations cannot express (RA1.1), and as a set of equally correct one-to-one pairings (RA3.1).
+  RA3.1 adds a second reading that needs no annotation, cost ties at a different mapping
+  (`CostTieDifferent*`). Change the two sections together.
+* **Every measured number is a macro.** `main.tex` has no bare numeric literal from a
+  measurement. Macros live in `figures/variables.tex`, written by
+  `research/analysis/paper_variables.py`, which documents each block's source. Generated blocks
+  are read back from measurement files; authored values (`CORPUS`, `TARGETS`, `MACHINE`, ...) are
+  edited in `paper_variables.py`, never in `variables.tex`, which every build overwrites. A macro
+  with no value prints a bold `??`: `-interaction=nonstopmode` does not fail on an undefined macro.
+  If `plots/variables_empirical.tex` is missing, the assembler carries the previous empirical
+  values forward rather than printing `??`, because the slow `measure-file-stats` run is not a
+  prerequisite of the paper targets.
+* **`figures/` holds symlinks into `research/plots/`**, not copies.
+* **Refresh corpus-dependent blocks together** - ground-truth totals, the ambiguity, rendering and
+  shape reports, the tool comparison, the fixture robustness run and the AST-diff oracle runs. The
+  order: `benchmark_optimal_solutions --csv`, then `analyze_human_mappings --csv` (see
+  `data/quality/PROVENANCE.md`) and the `CORPUS` block; `make ambiguity-report`,
+  `rendering-report` and `shapes-report`; `make measure-tools-accuracy` before `make
+  measure-tools-timing`; `make measure-robustness-fixtures`; `make measure-astdiff-oracle` and
+  `measure-astdiff-oracle-human`. Afterwards, re-read the prose's ordering claims (best tool,
+  fastest tool): macros cannot check them. `benchmark_other_report.py` warns when srcDiff and
+  difftastic are no longer the two established tools with the highest Perfect share.
+* **Four datasets**, `_common.PAPER_DATASETS`: Curated (`small`), Full, Stratified, Defects4J.
+  `handmade` fixtures are regression tests, not a sample, and stay out of the paper. Only fixtures
+  with a `human_mapping.json` are scored, and which Defects4J units are solved is how far
+  annotation has reached, not a draw. The painted fixtures are not a random sample either (see
+  `analysis/rendering_report.py`). The text is written as if every dataset were finished;
+  unfinished passes are marked only in footnote `fn:in-progress` and the asterisked rows of the
+  expressibility table. `REVIEWED_LISTS` in `ambiguity_report.summarize` names the datasets whose
+  ambiguity pass is complete.
+* **`Defects4J` is not a valid macro name**; macros spell it `DefectsFourJ`
+  (`benchmark_other_report.macro_stem`, `ambiguity_report.PER_LIST_DATASETS`).
+* **"RQ1" in file and macro names is the paper's RQ2** (`data/rq1/`, `\RqOne*`, the `RQ1_GROUP_*`
+  lists in `research/Makefile`); see `analysis/apted_only_report.py`'s docstring.
+* **Lists that must stay in step**: `paper_variables.COMMON_SUBSET_TOOLS` with
+  `benchmark_other_report.PAPER_MACRO_STEMS`, and the dataset list in
+  `src/bin/benchmark_diff_pairs.rs` with `_common.PAPER_DATASETS`.
+* **Generated tables use `main.tex`'s series names** (`LATEX_NAMES`; `DISPLAY_NAMES` is for
+  matplotlib only, and `_escape_tex` is not applied to `LATEX_NAMES`). The tool count appears in
+  the prose, the table captions and the captions `benchmark_other_report.py` generates; change them
+  together.
+* **Figures are vector and greyscale-safe**: each plot script writes a `.pdf` beside its `.png`,
+  `main.tex` includes figures without an extension, and bars carry hatching as well as hue.
+  `plots/tips.png` needs the corpus database `stats.sqlite`, which is not committed: `make
+  file-stats-report MODE=full` re-reads it on the measuring machine.
+* **Some generated macros are unused on purpose** - `Shape*`, `Ablation*`
+  (`scripts/ablation_study.sh`, an older corpus state), `OracleHumanCodeDiff*` - so a cut result
+  can return with a `main.tex` edit only.
+
+## Reviews
+
+`REVIEW-<date>.md` records each of the author's annotated reviews of a PDF: every mark and what was
+done about it.
 
 ## Building
 
@@ -569,12 +87,13 @@ copying this directory alone, without dereferencing them, leaves every figure da
 Regenerating from `research/` (not the repository root - these targets live in
 `research/Makefile`):
 
-* `make introductory-paper` - fast (seconds). Re-renders the benchmark_other charts/table from
-  whatever `research/data/comparison/benchmark_other.csv` already has, regenerates `plots/variables.tex`, and
-  rebuilds the PDF.
-* `make introductory-paper-empirical MODE=<tiny|small|full>` - fast (seconds), re-renders Table 1
-  and friends from whatever `MODE`'s `stats.sqlite` already has, and rebuilds the PDF. Does *not*
-  run `file_stats` itself - that's `make measure-file-stats MODE=<mode>`, and it's the slow one (see
-  "Status" above).
+* `make introductory-paper` - fast (seconds). Regenerates `plots/variables.tex` from whatever is
+  on disk and rebuilds the PDF. It does not re-render the tool-comparison charts and tables; `make
+  timing-report` does that, from `research/data/comparison/`.
+* `make introductory-paper-empirical MODE=<tiny|small|full>` - re-renders Table 1 and friends from
+  whatever `MODE`'s `stats.sqlite` already has, and rebuilds the PDF. Seconds on `tiny`, about half
+  an hour on `full`. Does *not*
+  run `file_stats` itself - that's `make measure-file-stats MODE=<mode>`, and it's the slow one
+  (hours on the full corpus; see `data/corpus_stats/PROVENANCE.md`).
 * `make paper-variables` - fast (instant). Just regenerates `plots/variables.tex` from whatever
   is already on disk, without rebuilding the PDF.

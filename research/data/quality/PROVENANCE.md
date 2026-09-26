@@ -6,15 +6,16 @@ corpus does not stale these files). `quality_baseline.txt` is updated only via
 `make update-quality-baseline` at the repository root.
 
 `human_mapping_analysis.csv` also defines *which* fixtures are in scope for
-`analysis/ambiguity_report.py` (the paper's RQ3): that script reads the `human_mapping.json` files
-directly but restricts itself to the names listed here, so every Section 5 number describes one
-corpus state. Refresh order after adding fixtures: `analyze_human_mappings --csv`, then
+`analysis/ambiguity_report.py` (the paper's RA1.1): that script reads the `human_mapping.json`
+files directly but restricts itself to the names listed here, so every number it produces
+describes one corpus state. Refresh order after adding fixtures: `analyze_human_mappings --csv`, then
 `make ambiguity-report`.
 
 ## Refresh of 2026-09-26
 
-Both files re-run, in the same order, alongside a full `benchmark_other` refresh that added
-srcDiff, so the paper's comparison, node accuracy, RQ3 and rendering blocks describe one corpus
+`optimal_solutions_benchmark.csv` (`benchmark_optimal_solutions --csv`) and
+`human_mapping_analysis.csv` (`analyze_human_mappings --csv`) re-run, in that order, alongside a full `benchmark_other` refresh that added
+srcDiff, so the paper's comparison, node accuracy, ambiguity and rendering blocks describe one corpus
 state again. Annotation had moved on since 2026-09-16: 161 more fixtures in scope, every one of
 them a Defects4J unit (274 solved, from 113).
 
@@ -37,34 +38,29 @@ per-dataset node columns against this CSV, and a fixture solved after this CSV w
 `int('-')`. A crash was the right outcome - the other reading was a comparison section over 1217
 fixtures inside a paper whose every other block said 1056.
 
-## Refresh of 2026-09-16
+## Scope
 
-Both `optimal_solutions_benchmark.csv` and `human_mapping_analysis.csv` were re-run, in that
-order, against the corpus at commit `4ad53c4f` plus the working tree. What the run covers:
+The paper's scope is `_common.PAPER_DATASETS`: every dataset above except `handmade`, which stays
+a regression suite. Only fixtures with a `human_mapping.json` are ever scored; the unsolved
+Defects4J directories are invisible to every report. Which Defects4J units are solved is how far
+annotation has reached, not a draw - do not read a Defects4J figure as an estimate over Defects4J.
 
-| | fixtures | with a `human_mapping.json` |
-|---|---|---|
-| `handmade` | 62 | 61 (60 scored - one mapping is empty) |
-| `small` (Curated) | 220 | 220 |
-| `full` (Full) | 232 | 232 |
-| `stratified` | 491 | 491 |
-| `defects4j` | 996 | 113 |
-| **total** | **2001** | **1117** |
+## Other files in this directory
 
-`optimal_solutions_benchmark.csv` therefore has 2001 rows, 1116 of them with ground truth, against
-951 and 949 before, and `human_mapping_analysis.csv` has 1117 rows against 836. The paper's scope - `_common.PAPER_DATASETS`, which is now these four minus
-`handmade` - is **1056** fixtures, against 775 at the 2026-09-09 state.
+- `quality_baseline.csv` - the per-fixture accuracy gate of `make check-quality`, written by
+  `make update-quality-baseline` as a projection of the `fixtures` stubs' limits.
+- `painting_attribution.csv` - the painting gate of `make check-painting-attribution`, one row per
+  fixture and preset, written by `make update-painting-attribution` (the `painting_failure_census`
+  test).
+- `mismatch_census.csv` - every mismatch against the human mapping, classified by operation,
+  reason and node kind, written by the `mismatch_census` test.
+- `convention_census.csv` - leaves whose text survived but whose painting differs between
+  fixtures, written by the `cross_fixture_convention_census` test.
+- `kind_mismatches.csv` - every ground-truth pair whose two nodes differ in kind, written by
+  `analyze_human_mappings --kind-mismatches`.
+- `kind_invariant_candidates.csv` - the delete+insert leaf pairs the kind invariants would force
+  to match, written by `analyze_human_mappings --kind-invariant-cost`.
 
-**`defects4j` became a reported dataset in this pass** (see `_common.PAPER_DATASETS` and
-`research/external/README.md`). It is scored beside the other three and folded into every pooled
-total. Only its 113 solved units are ever scored; the remaining 883 directories carry no mapping
-and are invisible to every report. Which 113 are solved is how far annotation has reached, not a
-draw - do not read a Defects4J figure as an estimate over Defects4J.
-
-The run also picked up the ground-truth repairs and invariant corrections of commits `523ffb23`
-and `4ad53c4f`, so the numbers move slightly even on fixtures that were already in scope: over the
-same 775 fixtures as 2026-09-09, `NodesMatched` went 5,475,305 -> 5,475,322.
-
-`nm_instances.md` is the authored counterpart: the changes whose true correspondence is N:M, which
-neither this CSV nor `human_mapping.json` can represent. It is hand-curated from annotator
-commentary on purpose - see its own header.
+The three census tests live in `src/test/helper/human_mapping/tests/exploratory.rs`, are
+`#[ignore]`d, and run with `cargo test --release --lib --features test-fixtures <name> --
+--ignored`.

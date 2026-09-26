@@ -1,10 +1,9 @@
-# Writing style for Marko Ivanković's papers
+# Writing style for the papers
 
-Instructions for an LLM agent drafting or revising academic prose in this directory. Derived by
-reading 12 of Marko's published papers (PDFs archived in `/var/tmp/papers`, converted to text in
-`/var/tmp/papers/txt`, both outside this repo) and measuring what actually recurs, not from a
-general impression of "good academic writing." Every rule below is backed by a frequency count or
-a direct quote from that corpus; see "Evidence" at the end for the raw numbers.
+The style guide for the papers in this directory, for whoever drafts or revises their prose. It was
+derived by reading 12 of Marko Ivanković's published papers and measuring what actually recurs, not
+from a general impression of "good academic writing." Every rule below is backed by a frequency
+count or a direct quote from that corpus; see "Evidence" at the end for the raw numbers.
 
 Papers sampled: Code Coverage at Google (2019), State of Mutation Testing at Google (2018),
 Practical Mutation Testing at Scale (2021, TSE + arXiv), Does Mutation Testing Improve Testing
@@ -80,9 +79,8 @@ work, which is stylistically consistent with itself.
   making this kind of unproven-but-plausible claim, rather than overstating it as "we found."
 - **Bold run-in paragraph labels** for a set of parallel sub-topics within one section — a short
   bold term, a period, then the explanation continuing on the same line: *"Probabilistic. For each
-  line, at most one mutant is generated..."* `main.tex`'s evaluation section already does this
-  correctly (`\textbf{Dataset.}`, `\textbf{Ablation study.}`, `\textbf{Speed.}`) — keep doing it
-  there and elsewhere a section has several parallel sub-topics to walk through.
+  line, at most one mutant is generated..."* Use it wherever a section has several parallel
+  sub-topics to walk through.
 
 ## Preferred words
 
@@ -122,9 +120,6 @@ convention — do not imitate it.
 - A figure or table is always referenced from prose at or near its first appearance — never dropped
   in without an in-text pointer, and never referenced only from a caption cross-reference with no
   sentence in the body pointing to it.
-- `main.tex` already follows this: its captions are short noun phrases, and Table~\ref{...} and
-  Figure~\ref{...} are consistently introduced with "reports" / a body sentence pointing at them —
-  keep this as-is.
 
 ## Structure (section-level)
 
@@ -172,9 +167,7 @@ Every sampled paper (post-2018) follows the same skeleton, in this order:
 
 An explicit **"Threats to Validity"** subsection appears in only 1 of the 12 papers (Productive
 Coverage) — too rare to call a hard convention, but a reasonable option when a paper's evaluation
-has a specific, nameable limitation worth flagging on its own rather than folding into prose (as
-`main.tex`'s Robustness paragraph currently does, calling itself "a sampled, bounded-scale result,
-not a claim over the full corpus" inline).
+has specific, nameable limitations worth flagging on their own rather than folding into prose.
 
 ## Evidence claims: always attach a number
 
@@ -184,20 +177,10 @@ sitting in the same sentence or the next one: "6,000 engineers... more than 13,0
 unquantified strength words ("significant", "many", "substantial") unless a number is within the
 same sentence or the immediately following one.
 
-## What this means for `introductory-paper/main.tex`
-
-As of 2026-08-19 the draft follows these conventions: prose dashes are unspaced em-dashes (the
-spaced-hyphen substitutes were converted in one pass; a few remain in `%%` comments, which are not
-prose), the introduction ends with a parallel "It reports/It details" contributions list, the
-evaluation uses explicit RQ/RA numbering (RQ1-RQ3, with \textsc{CodeDiff} itself framed as the
-system contribution rather than an RQ), Background (Section 2) and Related Work (second-to-last
-section) are separate, and the conclusion closes with a prescriptive recommendations list. Keep
-new text consistent with all of the above rather than re-diverging.
-
 ## Evidence
 
-Frequency counts across the 12-paper corpus (`/var/tmp/papers/txt`, generated via `pdftotext
--layout`), for anyone re-verifying or extending this guide:
+Frequency counts across the 12-paper corpus (text extracted with `pdftotext -layout`), for anyone
+re-verifying or extending this guide:
 
 | Signal | Count |
 |---|---|
@@ -218,6 +201,3 @@ Frequency counts across the 12-paper corpus (`/var/tmp/papers/txt`, generated vi
 | "test suite" vs. "testsuite" | 93 vs. 0 |
 | codebase vs. code base | 48 vs. 31 |
 | Comma vs. apostrophe thousands-separator | 84 vs. 0 (one paper uses a stray right-quote separator once; not a convention) |
-| `main.tex` draft: spaced-hyphen-as-dash occurrences | 12 |
-| `main.tex` draft: bulleted contributions list | absent |
-| `main.tex` draft: RQ/RA structure | absent |

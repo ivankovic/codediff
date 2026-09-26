@@ -98,7 +98,7 @@ genuinely about, and cutting there would report one edit as two.
 This one is a rule about `Minimal` specifically. `Full` accounts for every byte whose role changed,
 padding included, and is left alone.
 
-**Shipped, and measured both ways.** `diff::text::ranges_for_mode` trims leading and trailing
+**Shipped, and measured both ways.** `diff::text::ranges_for_options` trims leading and trailing
 whitespace off every surviving `Minimal` range - the real rendering path, so the TUI, `--headless`
 and `--mode json` all get it. Across the 33 painted fixtures:
 
@@ -123,21 +123,3 @@ first row is blank but whose later rows hold real content is not whitespace, and
 that answered the "is this all whitespace?" question from the first row alone would have dropped
 it. Checking runs the covered rows, and the newline joining them counts as whitespace, so a range
 that is blank on *every* row is still dropped.
-
-## What this suggests building
-
-In rough order of value against effort:
-
-1. **A split-bracket lint** in the solver - report, don't block, per the exception above. Rule 2 is
-   exceptionless over 426 samples and invisible to the eye, which is the ideal profile for a check.
-2. **Paint both styles by default on ambiguous fixtures.** The 16 single-solution fixtures are the
-   ones where the painter judged the answer unique; the 10 two-solution ones are where they did
-   not. That judgement is itself data, and it is already recorded in the solution names.
-3. **A line-tail hint**, much more cautiously. Rule 3 holds 15 times in 16, but the trap above
-   shows how easily a naive version misfires - and at one exception in sixteen it would be firing
-   about as often as it is right.
-
-Rule 4 is already shipped rather than suggested, and it is the pattern the other three should
-follow: a rule stated from painting by hand, turned into a change in the real renderer, then scored
-against the paintings both before and after - including a check that the mode it was *not* meant to
-touch did not move.

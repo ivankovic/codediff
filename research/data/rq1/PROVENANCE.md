@@ -1,9 +1,10 @@
 # Provenance
 
-`apted_only_group*.csv` hold the **2026-09-19** measurement, run unattended by
-`measure/overnight_benchmarks.sh` (build -> R22 -> R48), whose R22 stage is stages 3 and 4 of
-`measure/overnight_rq1_refresh.sh` (verify -> measure -> rebuild the paper) against a sample that
-script's stage 2 had drawn the evening before at `COUNT=1000`.
+`apted_only_group*.csv` hold the **2026-09-19** measurement, re-measured at 1000 pairs per
+language, as requested in the 2026-09-18 paper review. It ran unattended under
+`measure/overnight_benchmarks.sh`, as stages 3 and 4 of `measure/overnight_rq1_refresh.sh`
+(verify -> measure -> rebuild the paper), against a sample that script's stage 2 had drawn the
+evening before at `COUNT=1000`.
 
 | | |
 |---|---|
@@ -24,7 +25,7 @@ RQ2 asks about *a single, whole-tree* tree-edit-distance computation. `apted_onl
 the engine's `for_roots`, and by 2026-09-18 that path no longer ran the kernel on a whole file:
 `resolve_forest` settles any node with 50 or more children by a Myers pass over them (present in
 August too), and since 2026-09-02 (`16399838`) decomposes any single pair above 600,000 cells
-instead of running APTED on it. The first R22 pass of 2026-09-18/19 measured that engine: on the
+instead of running APTED on it. The first pass of 2026-09-18/19 measured that engine: on the
 308 pairs it shared with the August sample, 77 of the 84 August timeouts completed, a 1,182-node
 file that had timed out took 0.5 ms, and group 1 came back with 5% timeouts against August's 44%.
 That pass was stopped and discarded.
@@ -63,8 +64,8 @@ resolvability in place.
 ## Sample size
 
 `COUNT` (pairs per language, split over the 7 LOC buckets) is a parameter of
-`measure/overnight_rq1_refresh.sh`, not a constant in it, since 2026-09-18 - the paper review asked
-for 1000 per language, roughly 24,000 pairs, against the 140 (20 per bucket) this measurement used:
+`measure/overnight_rq1_refresh.sh`, not a constant in it. This measurement used 1000 per language,
+roughly 24,000 pairs:
 
     cd research && COUNT=1000 SKIP_FETCH=1 ./measure/overnight_rq1_refresh.sh
 
@@ -77,6 +78,6 @@ it.
 ## Coverage
 
 All 24 languages are in this measurement. The 2026-08-21 run covered 22: `Makefile`'s
-`LANGUAGES` and the four `measure-apted-budget` groups then lacked R and Scala, which was fixed
+`LANGUAGES` and its four `RQ1_GROUP_1..4` lists then lacked R and Scala, which was fixed
 the same day, and this is the first measurement since. R (110 pairs) and Scala (214) are the two
 languages the corpus could not supply 1,000 pairs of.

@@ -148,7 +148,7 @@ DISPLAY_ORDER = list(DISPLAY_NAMES)
 # The same series, spelled as papers/introductory-paper/main.tex spells them. [`DISPLAY_NAMES`]
 # feeds matplotlib, which cannot render LaTeX markup, so the two maps cannot be one: chart labels
 # stay plain and table cells carry \texttt{} on the things that are literally command names.
-# Without this map the same ten series appear under different names across tables. Keep any new
+# Without this map the same series appear under different names across tables. Keep any new
 # series in step with main.tex, not with DISPLAY_NAMES.
 LATEX_NAMES = {
     "treesitter_parse": r"tree-sitter parse (lower bound)",
@@ -192,7 +192,7 @@ COLORS = {
     "srcdiff": "#b8418f",
 }
 
-# Which family each comparable tool belongs to. The accuracy chart is split on this: ten series in
+# Which family each comparable tool belongs to. The accuracy chart is split on this: eleven series in
 # one grouped histogram is unreadable, and text-vs-AST is the split the comparison is actually
 # about, not an arbitrary halving to fit the page.
 TEXT_TOOLS = [
@@ -575,7 +575,7 @@ def write_combined_bucket_table(accuracy_rows, output_path, include_codediff):
 
     **No node block.** Node-granularity rows would be a second reading of the same tools under a
     metric only half of them can be scored on. Line granularity is the single common
-    ground all ten configurations share, and it is the basis Section 8 scores \textsc{CodeDiff}
+    ground all eleven configurations share, and it is the basis Section 8 scores \textsc{CodeDiff}
     on too, so the table now carries the two line-level blocks only. The node numbers stay
     available in `write_node_bucket_table`'s own file for anything that wants them.
     """
@@ -590,9 +590,9 @@ def write_combined_bucket_table(accuracy_rows, output_path, include_codediff):
         r"\begin{table*}",
         (
             r"  \caption{Per-fixture line-level agreement with the human mapping, bucketed, for"
-            r" all ten configurations. The upper block holds the tools that report whole lines"
+            r" all eleven configurations. The upper block holds the tools that report whole lines"
             r" only; the lower block holds the tools whose output carries sub-line detail, scored"
-            r" on the same line-level basis so that the ten are comparable. ``Perfect'' means zero"
+            r" on the same line-level basis so that the eleven are comparable. ``Perfect'' means zero"
             r" mismatched lines, not a rounded 100\%. Each tool is scored on its own applicable"
             r" subset ($n$), so percentages, not counts, are comparable across rows.}"
         ),
@@ -1155,10 +1155,9 @@ def _escape_tex(text: str) -> str:
 
 
 def variance_table_rows(rows: list[dict], tools: list[str]) -> list[tuple[str, int, float, float]]:
-    """Per-tool `(display_name, n, median_cov_pct, p90_cov_pct)` - the same
-    `coefficients_of_variation` data `plot_variance`'s box plot used to draw, reduced to the two
-    numbers that actually matter for "how much should one run's number be trusted": the typical
-    case (median) and a worst-case-but-not-a-single-outlier case (p90). Same
+    """Per-tool `(display_name, n, median_cov_pct, p90_cov_pct)` - the `coefficients_of_variation`
+    data reduced to the two numbers that actually matter for "how much should one run's number be
+    trusted": the typical case (median) and a worst-case-but-not-a-single-outlier case (p90). Same
     `DISPLAY_ORDER`/`DISPLAY_NAMES`/`ordered` sequence as `plot_runtime`/`plot_accuracy`. A tool
     scored on too few multi-repeat fixtures (e.g. GumTree on a corpus with only 1-2 fixtures in its
     language scope) can't support a meaningful median/p90 - dropped rather than reported from 1-2
@@ -1449,10 +1448,10 @@ def write_paper_fragment(
                             f"\\newcommand{{\\{stem}LineRate{macro_stem(label)}}}"
                             f"{{{100.0 * mismatches / total:.3f}}}"
                         )
-                    # Node and visible-node accuracy per dataset. These used to be columns of
-                    # `write_codediff_dataset_table`; that table now carries the agreement buckets
-                    # instead (see its doc comment), and the prose that reads the four datasets in
-                    # the same order on all three metrics needs the numbers to stay checkable.
+                    # Node and visible-node accuracy per dataset. `write_codediff_dataset_table`
+                    # carries the agreement buckets (see its doc comment), and the prose that reads
+                    # the four datasets in the same order on all three metrics needs these numbers
+                    # to stay checkable.
                     if quality_rows is not None:
                         q = [
                             quality_rows[r["solution"]]

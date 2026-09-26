@@ -3,19 +3,9 @@
 Everything in this directory, plus `../../plots/variables_empirical.tex`,
 `../../plots/variables_edits.tex` and the three corpus figures
 (`../../plots/{tips,language_distribution,ast_nodes_bytes_correlation}.png`), comes from one
-measurement of **The Full List** on 2026-09-07. It replaces the Curated-100 measurement that every
-empirical number in `papers/introductory-paper` was previously based on.
-
-The superseded Curated values are kept alongside under a `_curated` suffix, but **only where their
-provenance could be established from git**: `variables_empirical_curated.tex`,
-`variables_edits_curated.tex`, `code_percentiles_curated.csv`,
-`top_node_kinds_by_language_curated.md` and `tips_curated.png` are all copies of committed files.
-
-There is deliberately no `language_distribution_curated.png` or
-`ast_nodes_bytes_correlation_curated.png`. Both figures were untracked working-tree leftovers
-before this run, not committed artifacts, so which corpus produced them cannot be established and
-labelling them "curated" would have asserted something untrue. Regenerate them from
-`/var/tmp/research/small/stats.sqlite` if a genuine Curated pair is wanted.
+measurement of **The Full List** on 2026-09-07. The sections below record the passes that later
+re-measured part of it: the files above 1 MiB (2026-09-20) and the file statistics under the current
+file-type classifier (2026-09-24).
 
 ## The run
 
@@ -143,18 +133,6 @@ quoting four percentiles of each. Neither is a new measurement:
 `make measure-commit-stats MODE=full` was deliberately not run. No paper macro reads the `commits`
 table, and `stats.sqlite`'s `lines_added`/`lines_removed`/`nodes_*` columns are hardcoded to zero
 by `commit_stats.rs`.
-
-## The file-type classifier changed after this run
-
-`src/code/tip.rs` was widened on 2026-09-13 (many more extensions and file names, measured with
-the new `reclassify_tips` binary), so `tips.png` and the `Unknown` share it shows reflect the
-*old* tables: on the dev machine's Full List snapshot the same change moves Unknown from 29.3% to
-6.6%, almost all of it into Data and Code. To refresh the figure without re-walking the corpus,
-run `make reclassify-tips MODE=full RECLASSIFY_FLAGS=--write` and then `make file-stats-report`
-against this run's `stats.sqlite`, and record it here. Rows reclassified that way carry no
-size/AST numbers (they were never read), so `code_percentiles.csv` is unaffected by them until the
-corpus is re-walked. **Superseded:** the corpus was re-walked on 2026-09-24, see the last section
-of this file; every figure and macro now reflects the widened tables.
 
 ## The files above 1 MiB, 2026-09-20
 
