@@ -23,6 +23,7 @@ rust-version = "1.88"
 description = "Fast, robust, syntax-aware code diffing using tree-sitter ASTs"
 license = "AGPL-3.0-or-later"
 repository = "https://github.com/ivankovic/codediff"
+homepage = "https://ivankovic.github.io/codediff/showcase/"
 readme = "README.md"
 keywords = ["diff", "ast", "tree-sitter", "cli", "git"]
 categories = ["command-line-utilities", "development-tools", "text-processing"]
@@ -31,15 +32,14 @@ categories = ["command-line-utilities", "development-tools", "text-processing"]
 # ship by default. `src/test/*.rs` stays because `mod test` compiles under `cfg(test)`; its data
 # under `src/test/data/` does not, so `cargo install codediff --features test-fixtures` fails with
 # a "no such bin target" error rather than building the checkout-only dev tools. `assets/web/` is
-# `include_str!`-ed by src/web/server.rs; the two images are the README's.
+# `include_str!`-ed by src/web/server.rs. The README's images are left out: crates.io shows them
+# from the repository.
 include = [
     "/Cargo.toml",
     "/LICENSE",
     "/LICENSE-COMMERCIAL",
     "/THIRD-PARTY-NOTICES.md",
     "/README.md",
-    "/assets/readme-screenshot.png",
-    "/assets/diff-vs-codediff.gif",
     "/assets/web/*.html",
     "/assets/web/*.js",
     "/assets/web/*.css",
@@ -47,6 +47,8 @@ include = [
     "/src/**/*.rs",
     "!/src/bin/**",
     "!/src/test/data/**",
+    # One stub per fixture, compiled only under `cfg(test)` and useless without src/test/data.
+    "!/src/test/fixtures/*/**",
 ]
 
 # docs.rs documents the viewers too: `web` implies `tui`, and neither adds a build dependency
