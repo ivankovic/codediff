@@ -24,7 +24,9 @@ use crate::diff::{ASTDiff, ASTMapping, ASTMappingOperation, ASTMappingReason, CO
 /// children force a single answer:
 ///
 /// 1. Any undecided child: `B` is skipped.
-/// 2. Every child deleted: `B` is `DeleteWithChildren` (mirrored as `InsertWithChildren`).
+/// 2. Every child deleted: `B` is deleted too (mirrored for inserts). A plain `Delete` of `B`
+///    alone, not `DeleteWithChildren`: each child already has its own entry, and a descendant
+///    below a deleted child may still be matched elsewhere, so `B` cannot claim its whole subtree.
 /// 3. Every child matched into the same direct after-parent `P`, `P` unmapped and the kinds
 ///    compatible per `kinds_update_allowed`: `B`/`P` is proposed to APTED via
 ///    `anchor_pair_via_apted`, so the cost and operation are never invented.
@@ -105,7 +107,7 @@ pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
                 0,
                 ASTMapping {
                     cost: COST_DELETE,
-                    operation: ASTMappingOperation::DeleteWithChildren,
+                    operation: ASTMappingOperation::Delete,
                     reason: ASTMappingReason::BottomUpPropagation,
                 },
             );
@@ -170,7 +172,7 @@ pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
             after_id,
             ASTMapping {
                 cost: COST_INSERT,
-                operation: ASTMappingOperation::InsertWithChildren,
+                operation: ASTMappingOperation::Insert,
                 reason: ASTMappingReason::BottomUpPropagation,
             },
         );
@@ -286,10 +288,76 @@ mod tests {
             .map(|(_, m)| m.clone())
     }
 
+    /// The parent alone: its children keep their own entries, so a `DeleteWithChildren` here would
+    /// count them twice in `diff_cost` and paint them as one pruned subtree.
     #[test]
-    fn parent_of_only_deleted_children_is_deleted_with_children() {
+    fn parent_of_only_deleted_children_is_deleted_alone() {
         let mapping = statement_after_deleting(2).expect("statement should be decided");
-        assert_eq!(mapping.operation, ASTMappingOperation::DeleteWithChildren);
+        assert_eq!(mapping.operation, ASTMappingOperation::Delete);
+        assert_eq!(mapping.cost, COST_DELETE);
+    }
+
+    /// Every child of the `block` deleted, but a grandchild (`1;`) matched elsewhere: the block is
+    /// deleted, and the grandchild keeps its match rather than being claimed by a whole-subtree
+    /// deletion (`ruby-jmespath-jmespath-go-from-conditional-to-unless` had ~530 such nodes).
+    #[test]
+    fn a_deleted_parent_never_claims_a_descendant_matched_elsewhere() {
+        let before = Code::from_string("fn f() { { 1; } }\n", &Language::Rust);
+        let after = Code::from_string("fn g() { 1; }\n", &Language::Rust);
+        let node_cache = NodeCache::build(&before, &after);
+        let root = before.ast.as_ref().unwrap().root_node();
+        let outer_block = crate::test::helper::find_first_of_kind(root, "block").unwrap();
+        let inner_block = outer_block.named_child(0).unwrap().child(0).unwrap();
+        let statement = inner_block.named_child(0).unwrap();
+        let after_statement = crate::test::helper::find_first_of_kind(
+            after.ast.as_ref().unwrap().root_node(),
+            "expression_statement",
+        )
+        .unwrap();
+
+        let mut diff = ASTDiff::default();
+        diff.add_mapping(
+            statement.id(),
+            after_statement.id(),
+            ASTMapping {
+                cost: 0,
+                operation: ASTMappingOperation::Identical,
+                reason: ASTMappingReason::BottomUpPropagation,
+            },
+        );
+        // The inner block's own tokens and the statement wrapping it are deleted; the `1;` inside
+        // is matched above.
+        let mut cursor = inner_block.walk();
+        for child in inner_block.children(&mut cursor) {
+            if child.id() != statement.id() {
+                diff.add_mapping(child.id(), 0, deletion());
+            }
+        }
+        let wrapper = outer_block.named_child(0).unwrap();
+        let mut cursor = outer_block.walk();
+        for child in outer_block.children(&mut cursor) {
+            if child.id() != wrapper.id() {
+                diff.add_mapping(child.id(), 0, deletion());
+            }
+        }
+        diff.add_mapping(inner_block.id(), 0, deletion());
+
+        solve(
+            &crate::diff::PassCtx::new(&before, &after, &node_cache),
+            &mut diff,
+        );
+
+        assert!(
+            diff.mapping.values().all(|mapping| !matches!(
+                mapping.operation,
+                ASTMappingOperation::DeleteWithChildren | ASTMappingOperation::InsertWithChildren
+            )),
+            "no entry may claim a whole subtree"
+        );
+        assert_eq!(
+            diff.before_node_map.get(&statement.id()).copied(),
+            Some(after_statement.id())
+        );
     }
 
     #[test]

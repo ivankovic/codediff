@@ -34,6 +34,9 @@ release does: a minor bump may change the JSON output or the library API, a patc
 - `$VISUAL`/`$EDITOR` may carry arguments (`code -w`, `emacsclient -t`).
 - Omitting `--whole-updates` no longer switches a saved "Whole-pair updates" setting off.
 - The TUI exits when its input stream closes.
+- A block whose children were all deleted no longer takes its whole subtree with it: code matched
+  inside it (a body moved from an `if` into an `unless`) is shown as matched, not deleted and
+  inserted.
 - Library: `NodeCache` borrows the `Code` it was built from, so a cache that outlives its `Code`
   no longer compiles; before, safe code could read freed memory through it.
 

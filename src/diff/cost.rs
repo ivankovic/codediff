@@ -23,8 +23,8 @@ use crate::code::ASTMetadata;
 use crate::diff::{ASTDiff, ASTMappingOperation, COST_DELETE, COST_INSERT, COST_UPDATE};
 
 /// Unit cost of one mapping entry, mirroring `apted::common::UnitCostModel`. `subtree_size` is
-/// read only by the `*WithChildren` operations, which stand in for a whole subtree (human mappings
-/// use them, and so does `solve_bottom_up_propagation`).
+/// read only by the `*WithChildren` operations, which stand in for a whole subtree. Only human
+/// mappings use them; the pipeline records every node on its own.
 ///
 /// `MatchButNotIdentical` is free, since its descendants' differences carry their own entries,
 /// unless `owned_text_changed`: text a node owns in the gaps between its children has no
