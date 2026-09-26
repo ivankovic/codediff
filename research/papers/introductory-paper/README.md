@@ -89,7 +89,7 @@ rather than wording: the N:M paragraph said the tool comparison excludes multi-m
 projects them through one representative pairing), Figure 5 described ASTs tree-sitter does not
 produce (one `boolean_operator` before, two after - now drawn), and Section 2 said `diff` computes
 a shortest script (not under GNU's default heuristic). Two authors were added, and the Fast target
-is now 99% of changes. Open: René Just's affiliation and both new authors' emails.
+is now 99% of changes.
 
 ### Review pass of 2026-09-24
 
