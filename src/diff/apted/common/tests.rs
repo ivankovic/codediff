@@ -875,7 +875,7 @@ fn debug_dump_minimal_repro() {
     let mut aidx = AptedIndexer::build(&after, &[7], &empty_map);
     bidx.fill_subtree_costs(&before, &cost_model);
     aidx.fill_subtree_costs(&after, &cost_model);
-    let strategy = compute_opt_strategy_post_l(&bidx, &aidx, false);
+    let strategy = optimal_strategy_left_postorder(&bidx, &aidx, false);
     let path_id_offset = bidx.size as i64;
     for v in 0..bidx.size {
         for w in 0..aidx.size {
@@ -891,8 +891,8 @@ fn debug_dump_minimal_repro() {
                 (&aidx, w, aidx.sizes[w])
             };
             let local_node = if is_t1 { node } else { node - path_id_offset };
-            let ty = get_strategy_path_type(sp, path_id_offset, root, sz);
-            if ty == 2 {
+            let ty = decode_path_type(sp, path_id_offset, root, sz);
+            if ty == PathType::Inner {
                 eprintln!(
                     "INNER: v={v} w={w} sp={sp} is_t1={is_t1} local_node={local_node} (idx size={})",
                     idx.size

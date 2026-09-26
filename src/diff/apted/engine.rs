@@ -40,8 +40,8 @@ fn apted_debug() -> bool {
     *DEBUG
 }
 
-/// `strategy[(pre_v, pre_w)]` from [`compute_opt_strategy_post_l`] or
-/// [`compute_opt_strategy_post_r`]: a signed, encoded path id, not a distance. Kept apart from
+/// `strategy[(pre_v, pre_w)]` from [`optimal_strategy_left_postorder`] or
+/// [`optimal_strategy_right_postorder`]: a signed, encoded path id, not a distance. Kept apart from
 /// `DeltaTable` so correctness does not rest on `gted` consuming each strategy cell before `delta`
 /// reuses it.
 pub(crate) struct StrategyTable {
@@ -410,7 +410,7 @@ pub(crate) struct EngineCtx<'a> {
     pub(crate) containment: Option<&'a ContainmentCtx<'a>>,
     /// `spf_path`'s `forestdist` table per path orientation (`[0]` path on before, `[1]` on
     /// after), sized by the whole forest and reused by every `spf_path` call: allocating it per
-    /// call makes zeroing it dominate the run. Reuse is sound because `apted_tree_edit_dist`
+    /// call makes zeroing it dominate the run. Reuse is sound because `sweep_forest_distances`
     /// writes every cell it reads. `RefCell` because the borrow never spans a `gted` re-entry.
     forestdist_scratch: std::cell::RefCell<[Option<ForestDist>; 2]>,
 }
@@ -1077,7 +1077,7 @@ pub(crate) fn spf_a(
 }
 
 /// `spf1`: closed-form distance when either subtree is a single node. Writes nothing into
-/// `delta`; `ted_init` already covers those cells.
+/// `delta`; `fill_single_node_distances` already covers those cells.
 pub(crate) fn spf1(ctx: &EngineCtx, root1: usize, root2: usize) -> u64 {
     let size1 = ctx.before_idx.sizes[root1];
     let size2 = ctx.after_idx.sizes[root2];
@@ -1155,7 +1155,7 @@ fn pre_to_extreme_leaf(idx: &AptedIndexer, dir: PostDir, pre: usize) -> usize {
 
 /// The key roots of `subtree_root` for a sweep in `dir`: appends `subtree_root` and, recursively,
 /// every off-path sibling met walking up from `path_id` (its extreme leaf in `dir`) to it.
-pub(crate) fn compute_keyroots(
+pub(crate) fn collect_key_roots(
     idx: &AptedIndexer,
     dir: PostDir,
     subtree_root: usize,
@@ -1168,7 +1168,7 @@ pub(crate) fn compute_keyroots(
         let parent = idx.parents[path_node] as usize;
         for &child in &idx.children[parent] {
             if child != path_node {
-                compute_keyroots(
+                collect_key_roots(
                     idx,
                     dir,
                     child,
@@ -1185,7 +1185,7 @@ pub(crate) fn compute_keyroots(
 /// writing `delta` at every aligned (tree-vs-tree) point. `path_is_before` says which of the two
 /// trees holds the path.
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn apted_tree_edit_dist(
+pub(crate) fn sweep_forest_distances(
     ctx: &EngineCtx,
     delta: &mut DeltaTable,
     dir: PostDir,
@@ -1294,7 +1294,7 @@ pub(crate) fn spf_path(
         // would absorb its first child into the path, and that child would never get the aligned
         // boundary `compute_edit_mapping`'s backtrace reads.
         for &root in &other_idx.children[0] {
-            compute_keyroots(
+            collect_key_roots(
                 other_idx,
                 dir,
                 root,
@@ -1303,7 +1303,7 @@ pub(crate) fn spf_path(
             );
         }
     } else {
-        compute_keyroots(
+        collect_key_roots(
             other_idx,
             dir,
             other_subtree,
@@ -1315,7 +1315,7 @@ pub(crate) fn spf_path(
 
     ctx.with_forestdist(path_is_before, |forestdist| {
         for &kr in &keyroots {
-            apted_tree_edit_dist(
+            sweep_forest_distances(
                 ctx,
                 delta,
                 dir,
@@ -1337,12 +1337,12 @@ const INNER_DISABLED: i64 = i64::MAX / 4;
 
 /// The optimal strategy: for every `(v, w)` pair, picks the LEFT/RIGHT/INNER path on either side
 /// that minimizes `gted`'s single-path work, encoded as a signed path id (decoded by
-/// `get_strategy_path_type`). Costs are exact `i64`, not the paper's floats.
+/// [`decode_path_type`]). Costs are exact `i64`, not the paper's floats.
 ///
 /// `clamp_to_left_right` excludes INNER candidates from selection (their costs are still
 /// propagated), to test the L/R machinery apart from `spfA`. Any valid strategy yields the exact
 /// distance, so this changes speed only.
-pub(crate) fn compute_opt_strategy_post_l(
+pub(crate) fn optimal_strategy_left_postorder(
     before_idx: &AptedIndexer,
     after_idx: &AptedIndexer,
     clamp_to_left_right: bool,
@@ -1514,9 +1514,9 @@ pub(crate) fn compute_opt_strategy_post_l(
     strategy
 }
 
-/// [`compute_opt_strategy_post_l`] over descending preorder (children before parents), with the
+/// [`optimal_strategy_left_postorder`] over descending preorder (children before parents), with the
 /// L/R roles of the parent propagation swapped.
-pub(crate) fn compute_opt_strategy_post_r(
+pub(crate) fn optimal_strategy_right_postorder(
     before_idx: &AptedIndexer,
     after_idx: &AptedIndexer,
     clamp_to_left_right: bool,
@@ -1678,30 +1678,40 @@ pub(crate) fn compute_opt_strategy_post_r(
     strategy
 }
 
-/// The path type a strategy cell encodes: 0 LEFT, 1 RIGHT, 2 INNER.
-pub(crate) fn get_strategy_path_type(
+/// Which of a subtree's root-to-leaf paths a strategy cell chose, and so which single-path
+/// function resolves the pair: `spf_path` for the leftmost and rightmost, `spf_a` for any other.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum PathType {
+    Left,
+    Right,
+    Inner,
+}
+
+/// The path type a strategy cell's signed path id encodes, for the subtree rooted at
+/// `current_root_node_pre_l`.
+pub(crate) fn decode_path_type(
     path_id_with_offset: i64,
     path_id_offset: i64,
     current_root_node_pre_l: usize,
     current_subtree_size: usize,
-) -> u8 {
+) -> PathType {
     if path_id_with_offset.is_negative() {
-        return 0; // LEFT
+        return PathType::Left;
     }
     let mut path_id = path_id_with_offset.abs() - 1;
     if path_id >= path_id_offset {
         path_id -= path_id_offset;
     }
     if path_id == (current_root_node_pre_l as i64 + current_subtree_size as i64) - 1 {
-        return 1; // RIGHT
+        return PathType::Right;
     }
-    2 // INNER
+    PathType::Inner
 }
 
 /// Fills `delta` for every pair where either subtree has size 1, from the subtree cost sums.
 /// `gted` sends those pairs to `spf1`, which writes nothing, so a pair absorbed into a path's
 /// sweep would otherwise read 0. Runs before `gted`, whose writes never touch these cells.
-pub(crate) fn ted_init(ctx: &EngineCtx, delta: &mut DeltaTable) {
+pub(crate) fn fill_single_node_distances(ctx: &EngineCtx, delta: &mut DeltaTable) {
     for x in 1..ctx.before_idx.size {
         let size_x = ctx.before_idx.sizes[x];
         for y in 1..ctx.after_idx.size {
@@ -1749,7 +1759,7 @@ pub(crate) fn gted(
     let size1 = ctx.before_idx.sizes[current1];
     let size2 = ctx.after_idx.sizes[current2];
     // `||`, not `&&`: a size-1 pair that reaches `spf_path`/`spf_a` has its sweep overwrite the
-    // `ted_init` cells a sibling call still reads.
+    // `fill_single_node_distances` cells a sibling call still reads.
     if size1 <= 1 || size2 <= 1 {
         return spf1(ctx, current1, current2);
     }
@@ -1759,7 +1769,7 @@ pub(crate) fn gted(
 
     if current_path_node_global < path_id_offset {
         let strategy_path_type =
-            get_strategy_path_type(strategy_path_id, path_id_offset, current1, size1);
+            decode_path_type(strategy_path_id, path_id_offset, current1, size1);
         let mut current_path_node = current_path_node_global as usize;
         loop {
             let parent = ctx.before_idx.parents[current_path_node];
@@ -1776,13 +1786,13 @@ pub(crate) fn gted(
         }
         if apted_debug() {
             eprintln!(
-                "gted T1-path: current1={current1} current2={current2} type={strategy_path_type} path_id={current_path_node_global}"
+                "gted T1-path: current1={current1} current2={current2} type={strategy_path_type:?} path_id={current_path_node_global}"
             );
         }
         return match strategy_path_type {
-            0 => spf_path(ctx, delta, PostDir::Left, true, current1, current2),
-            1 => spf_path(ctx, delta, PostDir::Right, true, current1, current2),
-            _ => spf_a(
+            PathType::Left => spf_path(ctx, delta, PostDir::Left, true, current1, current2),
+            PathType::Right => spf_path(ctx, delta, PostDir::Right, true, current1, current2),
+            PathType::Inner => spf_a(
                 ctx,
                 delta,
                 true,
@@ -1794,8 +1804,7 @@ pub(crate) fn gted(
     }
 
     let current_path_node_global = current_path_node_global - path_id_offset;
-    let strategy_path_type =
-        get_strategy_path_type(strategy_path_id, path_id_offset, current2, size2);
+    let strategy_path_type = decode_path_type(strategy_path_id, path_id_offset, current2, size2);
     let mut current_path_node = current_path_node_global as usize;
     loop {
         let parent = ctx.after_idx.parents[current_path_node];
@@ -1812,13 +1821,13 @@ pub(crate) fn gted(
     }
     if apted_debug() {
         eprintln!(
-            "gted T2-path: current1={current1} current2={current2} type={strategy_path_type} path_id={current_path_node_global}"
+            "gted T2-path: current1={current1} current2={current2} type={strategy_path_type:?} path_id={current_path_node_global}"
         );
     }
     match strategy_path_type {
-        0 => spf_path(ctx, delta, PostDir::Left, false, current2, current1),
-        1 => spf_path(ctx, delta, PostDir::Right, false, current2, current1),
-        _ => spf_a(
+        PathType::Left => spf_path(ctx, delta, PostDir::Left, false, current2, current1),
+        PathType::Right => spf_path(ctx, delta, PostDir::Right, false, current2, current1),
+        PathType::Inner => spf_a(
             ctx,
             delta,
             false,
@@ -1884,9 +1893,9 @@ pub(crate) fn compute_delta(
     // `lchl < rchl` [APTED paper, Section 5.3] picks the cheaper strategy direction; both
     // produce the same path-id encoding.
     let strategy = if before_idx.lchl < before_idx.rchl {
-        compute_opt_strategy_post_l(&before_idx, &after_idx, false)
+        optimal_strategy_left_postorder(&before_idx, &after_idx, false)
     } else {
-        compute_opt_strategy_post_r(&before_idx, &after_idx, false)
+        optimal_strategy_right_postorder(&before_idx, &after_idx, false)
     };
     let path_id_offset = before_idx.size as i64;
 
@@ -1899,7 +1908,7 @@ pub(crate) fn compute_delta(
         containment,
     );
     let mut virtual_delta = DeltaTable::new(before_idx.size, after_idx.size);
-    ted_init(&ctx, &mut virtual_delta);
+    fill_single_node_distances(&ctx, &mut virtual_delta);
     gted(&ctx, &mut virtual_delta, &strategy, path_id_offset, 0, 0);
 
     // Virtual index `pre + 1` is real preorder `pre`.
