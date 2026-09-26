@@ -129,7 +129,7 @@ def apted_columns(fieldnames: list[str]) -> list[str]:
 
 
 def apted_display_label(column: str) -> str:
-    """ "APTED:final_pass" -> "APTED (final_pass)" for the axis tick / legend label."""
+    """ "APTED:fast_fallback" -> "APTED (fast_fallback)" for the axis tick / legend label."""
     return f"APTED ({column.split(':', 1)[1]})"
 
 

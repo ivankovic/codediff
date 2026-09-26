@@ -18,9 +18,9 @@
 
 //! The APTED tree edit distance algorithm: an independent reimplementation, inspired by Mateusz
 //! Pawlik and Nikolaus Augsten, "Efficient Computation of the Tree Edit Distance", ACM Transactions
-//! on Database Systems 40(1), 2015, and by their reference implementation. Names follow the paper
-//! and that implementation (`spf_a`, `compute_opt_strategy_post_l`/`_post_r`, `ted_init`, key
-//! roots), so the long dynamic-programming functions here can be read side by side with them.
+//! on Database Systems 40(1), 2015. Names follow the paper (`gted`, `spf_a`, the single-path
+//! functions, key roots), so the long dynamic-programming functions here can be read side by side
+//! with its pseudocode.
 //!
 //! The pipeline runs it only on scoped pairs, bounded by `common::resolve`'s `APTED_MAX_CELLS`,
 //! where its exact computation, worst-case `O(n^3)` time, is affordable.
@@ -40,9 +40,10 @@ fn apted_debug() -> bool {
     *DEBUG
 }
 
-/// `strategy[(pre_v, pre_w)]` from `computeOptStrategy_postL`/`_postR`: a signed, encoded path
-/// id, not a distance. Kept apart from `DeltaTable` so correctness does not rest on `gted`
-/// consuming each strategy cell before `delta` reuses it.
+/// `strategy[(pre_v, pre_w)]` from [`compute_opt_strategy_post_l`] or
+/// [`compute_opt_strategy_post_r`]: a signed, encoded path id, not a distance. Kept apart from
+/// `DeltaTable` so correctness does not rest on `gted` consuming each strategy cell before `delta`
+/// reuses it.
 pub(crate) struct StrategyTable {
     grid: Grid<i64>,
 }
@@ -505,10 +506,10 @@ fn update_ft_array(fna: &[i64], fta: &mut [i64], ln_for_node: i64, node: i64) {
     }
 }
 
-/// `spfA` (Algorithm 3 of the APTED paper), specialized to `pathType == INNER`: `gted` routes
-/// LEFT/RIGHT paths to `spf_path`, so those branches are omitted and their guards simplified.
-/// `path_is_before` plays the role of `treesSwapped`. Costs are `i64` because several `sp3`
-/// intermediates are differences.
+/// `spfA` (Algorithm 3 of the APTED paper), specialized to inner paths: `gted` routes LEFT/RIGHT
+/// paths to `spf_path`, so those branches are omitted and their guards simplified.
+/// `path_is_before` says which of the two trees holds the path. Costs are `i64` because several
+/// `sp3` intermediates are differences.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn spf_a(
     ctx: &EngineCtx,
@@ -1152,8 +1153,8 @@ fn pre_to_extreme_leaf(idx: &AptedIndexer, dir: PostDir, pre: usize) -> usize {
     }
 }
 
-/// `computeKeyRoots`/`computeRevKeyRoots`: appends `subtree_root` and, recursively, every
-/// off-path sibling met walking up from `path_id` (its extreme leaf in `dir`) to it.
+/// The key roots of `subtree_root` for a sweep in `dir`: appends `subtree_root` and, recursively,
+/// every off-path sibling met walking up from `path_id` (its extreme leaf in `dir`) to it.
 pub(crate) fn compute_keyroots(
     idx: &AptedIndexer,
     dir: PostDir,
@@ -1180,9 +1181,9 @@ pub(crate) fn compute_keyroots(
     }
 }
 
-/// `treeEditDist`/`treeEditDistR`, the core of `spfL`/`spfR`: the same recurrence as
-/// `forest_dist`, over `dir`'s postorder, writing `delta` at every aligned (tree-vs-tree) point.
-/// `path_is_before` replaces the paper's `treesSwapped`.
+/// The core of `spfL`/`spfR`: the same recurrence as `forest_dist`, over `dir`'s postorder,
+/// writing `delta` at every aligned (tree-vs-tree) point. `path_is_before` says which of the two
+/// trees holds the path.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn apted_tree_edit_dist(
     ctx: &EngineCtx,
@@ -1334,8 +1335,8 @@ pub(crate) fn spf_path(
 /// "Infinite" strategy cost, with headroom so the `cost*_i` propagation's sums cannot overflow.
 const INNER_DISABLED: i64 = i64::MAX / 4;
 
-/// `computeOptStrategy_postL`: for every `(v, w)` pair, picks the LEFT/RIGHT/INNER path on
-/// either side that minimizes `gted`'s single-path work, encoded as a signed path id (decoded by
+/// The optimal strategy: for every `(v, w)` pair, picks the LEFT/RIGHT/INNER path on either side
+/// that minimizes `gted`'s single-path work, encoded as a signed path id (decoded by
 /// `get_strategy_path_type`). Costs are exact `i64`, not the paper's floats.
 ///
 /// `clamp_to_left_right` excludes INNER candidates from selection (their costs are still
@@ -1513,8 +1514,8 @@ pub(crate) fn compute_opt_strategy_post_l(
     strategy
 }
 
-/// `computeOptStrategy_postR`: `compute_opt_strategy_post_l` over descending preorder (children
-/// before parents), with the L/R roles of the parent propagation swapped.
+/// [`compute_opt_strategy_post_l`] over descending preorder (children before parents), with the
+/// L/R roles of the parent propagation swapped.
 pub(crate) fn compute_opt_strategy_post_r(
     before_idx: &AptedIndexer,
     after_idx: &AptedIndexer,
@@ -1677,7 +1678,7 @@ pub(crate) fn compute_opt_strategy_post_r(
     strategy
 }
 
-/// `getStrategyPathType`: 0 LEFT, 1 RIGHT, 2 INNER.
+/// The path type a strategy cell encodes: 0 LEFT, 1 RIGHT, 2 INNER.
 pub(crate) fn get_strategy_path_type(
     path_id_with_offset: i64,
     path_id_offset: i64,
@@ -1697,9 +1698,9 @@ pub(crate) fn get_strategy_path_type(
     2 // INNER
 }
 
-/// `tedInit`: fills `delta` for every pair where either subtree has size 1, from the subtree
-/// cost sums. `gted` sends those pairs to `spf1`, which writes nothing, so a pair absorbed into a
-/// path's sweep would otherwise read 0. Runs before `gted`, whose writes never touch these cells.
+/// Fills `delta` for every pair where either subtree has size 1, from the subtree cost sums.
+/// `gted` sends those pairs to `spf1`, which writes nothing, so a pair absorbed into a path's
+/// sweep would otherwise read 0. Runs before `gted`, whose writes never touch these cells.
 pub(crate) fn ted_init(ctx: &EngineCtx, delta: &mut DeltaTable) {
     for x in 1..ctx.before_idx.size {
         let size_x = ctx.before_idx.sizes[x];
