@@ -22,6 +22,16 @@ on:
     branches: [main]
   pull_request:
 
+# Read-only: CI builds and tests, it never writes to the repository.
+permissions:
+  contents: read
+
+# A new push to a pull request supersedes the run for the previous one. Runs on main are never
+# cancelled, so every commit there keeps a complete result.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 env:
   CARGO_TERM_COLOR: always
 

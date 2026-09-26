@@ -55,7 +55,7 @@ LIST = $(if $(filter tiny,$(MODE)),$(LIST_TINY),$(if $(filter small,$(MODE)),$(L
 REPOSITORIES_DIR = /var/tmp/research/$(MODE)/repositories/
 RESEARCH_DIR = /var/tmp/research/$(MODE)/
 
-.PHONY: build clean clean-db fetch file-stats-report measure-file-stats reclassify-tips measure-commit-stats \
+.PHONY: build require-full-corpus clean clean-db fetch file-stats-report measure-file-stats reclassify-tips measure-commit-stats \
 	debug-stats analyze tiny small full sample-pairs sample-pairs-all measure-pairs \
 	measure-code-pair-diffs pairs-diff-report measure-sampled matching-reasons-report \
 	shapes-report measure-edit-shape ambiguity-report rendering-report measure-tools-timing \
@@ -220,7 +220,18 @@ sample-pairs-all: build
 # Input is data/samples/sampled_code_pairs_$(LANGUAGE).csv, which `sample-pairs-all` produces for
 # every language in $(LANGUAGES) in one pass.
 PAIRS_NODE_LIMIT ?= 20000
-measure-pairs: build
+
+# The committed samples (data/samples/) were drawn from the full corpus, so any other MODE resolves
+# none of their pairs, and the measure targets that read them would overwrite committed results
+# with `failed_to_read` rows. Their first prerequisite, so it fails before the release build.
+require-full-corpus:
+	@if [ "$(MODE)" != full ] || [ ! -d "$(REPOSITORIES_DIR)" ]; then \
+		echo "$(MAKECMDGOALS) measures the committed samples, which come from the full corpus:" >&2; \
+		echo "run 'make fetch MODE=full' once, then 'make $(MAKECMDGOALS) MODE=full'" >&2; \
+		exit 1; \
+	fi
+
+measure-pairs: require-full-corpus build
 	@if [ -z "$(LANGUAGE)" ]; then \
 		echo "usage: make measure-pairs LANGUAGE=<slug>" >&2; \
 		echo "slugs: $(foreach e,$(LANGUAGES),$(firstword $(subst :, ,$(e)))) all" >&2; \
@@ -543,7 +554,7 @@ RQ1_GROUP_2 := json typescript go cpp ruby
 RQ1_GROUP_3 := javascript yaml shellscript swift java kotlin
 RQ1_GROUP_4 := php tsx rust html lua r scala
 rq1-sample-csvs = $(foreach lang,$(1),data/samples/sampled_code_pairs_$(lang).csv)
-measure-apted-budget: build
+measure-apted-budget: require-full-corpus build
 	$(foreach g,1 2 3 4,$(BIN_DIR)/apted_only_benchmark \
 		--csv $(call rq1-sample-csvs,$(RQ1_GROUP_$(g))) \
 		--repo-root $(REPOSITORIES_DIR) --output data/rq1/apted_only_group$(g).csv &&) true

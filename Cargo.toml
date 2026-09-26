@@ -275,8 +275,9 @@ required-features = ["web"]
 [[bin]]
 name = "render_tui_screenshot"
 path = "src/bin/render_tui_screenshot.rs"
-# The README's screenshot (`make readme-screenshot`), drawn by the TUI's own widgets.
-required-features = ["tui"]
+# The README's screenshot (`make readme-screenshot`), drawn by the TUI's own widgets. A
+# checkout-only dev tool: gated like fake_diff_tool, so `cargo install --path .` leaves it out.
+required-features = ["test-fixtures"]
 
 [[bin]]
 name = "ascii_visualizer"
