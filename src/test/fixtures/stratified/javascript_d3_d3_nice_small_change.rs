@@ -25,7 +25,7 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 fn mapping() -> Result<()> {
     // All one disagreement (`APTED("qualified_name")`): the human pairs the first
     // `call_expression` on each side, codediff pairs before's first with after's second, and the
-    // whole subtree follows. The qualified_name family; not written up in TODO.md.
+    // whole subtree follows. The qualified_name family.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "javascript-d3-d3-nice-small-change",
         20,

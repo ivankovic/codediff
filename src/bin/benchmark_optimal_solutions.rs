@@ -439,7 +439,7 @@ fn main() -> Result<()> {
 
 /// The second accuracy goal's per-fixture ceiling on the share of *visible* nodes that may
 /// disagree with the human mapping. It is tied to the structural visible set, which is most of
-/// the tree; a looser rate stops discriminating. See `src/diff/TODO.md` item 0.
+/// the tree; a looser rate stops discriminating.
 const VISIBLE_RATE_GOAL: f64 = 0.01;
 
 /// Progress against the README's two accuracy goals, in visible nodes, over solved fixtures only.

@@ -206,12 +206,10 @@ Some directories in the list below do not exist yet. Create them if the need ari
         |- tui.rs       <- Declares the TUI's submodules and sets up logging
         |- tui/         <- The TUI itself: app.rs (controller), ui.rs (terminal rendering),
         |                  components/, widgets/
-        |   |- SPECS.md <- TUI specs
         |- web_main.rs  <- Entry point of `codediff-web` (feature `web`): the viewer in a browser
         |- web.rs       <- Declares the web front end's submodules
         |- web/         <- The local HTTP server and JSON API behind codediff-web: session.rs
         |                  (controller), payload.rs (wire format), server.rs, http.rs
-        |   |- SPECS.md <- Web front end specs
         |- test/        <- Shared test helpers, plus slower fixture-driven tests (see "Testing")
         |- bin/         <- Standalone developer tools: benchmarking, dataset sampling, and more
     |- /assets/web      <- The page codediff-web serves (embedded at build time): model.js is the
@@ -221,18 +219,12 @@ Some directories in the list below do not exist yet. Create them if the need ari
     |- CONTRIBUTING.md  <- This file
     |- AGENTS.md        <- AI-only instructions
     |- REVIEW.md        <- Comments about the codebase that need to be improved upon
-    |- TODO.md          <- List of small to mid size TODO items that need to be fixed in the future
 ```
 
-`SPECS.md` and `README.md` files can exist in any subdirectory. They always serve the same purpose
-in every location:
-
-* `README.md` — a high-level summary. It must be readable by humans.
-* `SPECS.md` — a semi-structured collection of specifications, plus a decision log of every
-  decision made during implementation.
-
-`TODO.md` and `REVIEW.md` are normally root-only. A subsystem can have its own `TODO.md` for issues
-specific to that subsystem, for example `src/diff/TODO.md`. `REVIEW.md` stays root-only.
+`README.md` files can exist in any subdirectory: a high-level summary of it, readable by humans.
+Why the code is the way it is lives next to the code, in module-level doc comments (`//!`), not in
+separate design documents. Working notes (follow-ups, experiments, negative results) are kept out
+of the repository; `AGENT_LOG.md` at the root is git-ignored for that. `REVIEW.md` stays root-only.
 
 ## Makefile targets
 

@@ -96,7 +96,7 @@ is now 99% of changes.
 Resolved the author's handwritten review of the 2026-09-23 PDF, recorded mark by mark in
 `REVIEW-2026-09-24.md`. The structural change is a reversal: the four *properties* the
 introduction had derived since the second author's 2026-09-18 review (Expressible, Agreed, Timely,
-Faithful on screen; `REVIEW-2026-09-18-fraser.md`, F2/F4) are gone, and the four research-question
+Faithful on screen) are gone, and the four research-question
 groups are back as the introduction's list, restored from `0a51541d^`. Every section opener that
 named a property was struck on the same review and now names its question instead. Table 4 (what
 each result decided in CodeDiff's design) stays. Section 3.4 is retitled "Cross-validation with

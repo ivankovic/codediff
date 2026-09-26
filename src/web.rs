@@ -17,8 +17,7 @@
  */
 //! The browser front end: `codediff-web` (`src/web_main.rs`) serves the page under `assets/web/`
 //! from a local HTTP server, and the page drives the same diff the TUI draws through a small JSON
-//! API. Feature-gated (`web`), off by default. See `SPECS.md` in this directory for the design and
-//! its decision log.
+//! API. Feature-gated (`web`), off by default.
 //!
 //! Division of labour, mirroring the TUI's own split between `app.rs` and its components:
 //!

@@ -16,8 +16,8 @@ Every rule here is **intra-fixture**: it asks whether one fixture's mapping and 
 with each other. None of them compares two fixtures, so a pair of fixtures whose paintings imply
 *opposite conventions* for the same shape is invisible to all seventeen. That question is open, and
 it is the harder one: it needs a shape classifier over painted runs before two fixtures can be said
-to disagree about the same thing. See `src/diff/TODO.md`'s 2026-09-17 painting entry for the one
-case that prompted it and why that case turned out not to be evidence.
+to disagree about the same thing. The one case that prompted it (2026-09-17) turned out not to be
+evidence.
 
 ## By rule
 

@@ -19,7 +19,7 @@
 //!
 //! Hand-written rather than a server crate: the page only needs `GET`s and small JSON `POST`s from
 //! one local browser, one response per connection, and every crate in `Cargo.lock` costs packaging
-//! (gentoo's `CRATES=` and `LICENSE` lists) whether or not its feature is enabled. See `SPECS.md`.
+//! (gentoo's `CRATES=` and `LICENSE` lists) whether or not its feature is enabled.
 //!
 //! Not supported, because no browser sends it here: chunked bodies, keep-alive, pipelining,
 //! anything but HTTP/1.x. Such requests get a 4xx rather than being misread.
