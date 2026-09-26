@@ -264,7 +264,7 @@ fn headless_needs_files_message(args: &Args) -> &'static str {
 /// The render options the command line asks for, or `None` when it names none, so the `M`
 /// panel's saved setting applies. A preset flag replaces that setting outright (a script's output
 /// then does not depend on the machine); the single-option flags only ever turn an option on, on
-/// top of whichever applies. `codediff-web`'s `initial_render_options` is the same rule.
+/// top of whichever applies.
 fn render_option_flags(args: &Args) -> Option<codediff::diff::text::RenderOptions> {
     use codediff::diff::text::RenderOptions;
     let preset = if args.minimal {

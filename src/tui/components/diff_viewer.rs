@@ -1368,7 +1368,8 @@ mod tests {
     }
 
     /// Four stops alternating panels: a deletion and its replacing insertion at row 5, a paired
-    /// update at row 12, an insertion at row 20. The same diff as the web viewer's `pairModel`.
+    /// update at row 12, an insertion at row 20. The same diff as the showcase viewer's `pairModel`
+    /// (assets/viewer/model.test.js).
     fn alternating_panels_diff_data() -> DiffSessionData {
         use crate::diff::text::{RangeMatch, TextOperation};
         use crate::diff::text_range::TextRange;

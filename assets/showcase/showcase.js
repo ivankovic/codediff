@@ -16,7 +16,7 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-// The showcase's half of the page: a `fetch` shim that answers codediff-web's `/api/*` calls from
+// The showcase's half of the page: a `fetch` shim that answers the viewer's `/api/*` calls from
 // the JSON `generate_showcase` baked, and the strip of chrome above the viewer that picks a case
 // and flips between `diff`'s view and codediff's. app.js and model.js are the product's own files,
 // byte for byte; nothing here reaches into them. Switching a case or a view rewrites what the

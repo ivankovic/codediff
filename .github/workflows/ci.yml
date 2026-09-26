@@ -57,7 +57,7 @@ jobs:
         # Same reasoning as build-and-test's matrix below: each feature config is its own
         # compilation unit (see Cargo.toml's [features]), so each needs its own clippy pass, not
         # just a single default-feature run.
-        features: ["", "test-fixtures", "stats", "web"]
+        features: ["", "test-fixtures", "stats"]
     steps:
       - uses: actions/checkout@v7
 
@@ -92,7 +92,7 @@ jobs:
       - run: cargo audit
 
   mapping-site-js:
-    name: JS tests (human_mapping site, web viewer)
+    name: JS tests (human_mapping site, showcase viewer)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -106,8 +106,8 @@ jobs:
       # what the tests do and do not cover).
       - run: make test-mapping-site-js
 
-      # The browser viewer's model (assets/web/), same arrangement - see the target's comment.
-      - run: make test-web-js
+      # The showcase viewer's model (assets/viewer/), same arrangement - see the target's comment.
+      - run: make test-viewer-js
       - run: make test-showcase-js
 
   # The analysis scripts under research/ compute the numbers that go into the papers, so they
@@ -267,18 +267,17 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # "" = default features (tui only). test-fixtures, stats and web are each their own
+        # "" = default features (tui only). test-fixtures and stats are each their own
         # compilation unit - see Cargo.toml's [features] - so each needs its own build+test pass,
         # not just a single default-feature run.
         #
-        # `shard` pairs each of those with one quarter of the fixture corpus - see the two Test
+        # `shard` pairs each of those with one third of the fixture corpus - see the two Test
         # steps below for why. Written as `include:` so the two stay paired; a second list axis
-        # would give sixteen jobs.
+        # would give nine jobs.
         include:
           - { features: "", shard: 1 }
           - { features: "test-fixtures", shard: 2 }
           - { features: "stats", shard: 3 }
-          - { features: "web", shard: 4 }
     steps:
       - uses: actions/checkout@v7
 
@@ -300,12 +299,12 @@ jobs:
       # build, peak RSS 10.66GB under `cargo test --release` vs 5.37GB under `cargo nextest run
       # --release`, at comparable wall-clock - the difference between a CI runner OOMing on this
       # suite and not.
-      # Split in two because the 3209 `src/test/fixtures/` tests are byte-identical in all four
+      # Split in two because the 3209 `src/test/fixtures/` tests are byte-identical in all three
       # feature sets - nothing they touch is feature-gated - so running them once per set was the
-      # same work four times over, and about three quarters of the suite's CPU time. The first
+      # same work three times over, and about two thirds of the suite's CPU time. The first
       # step runs what genuinely differs between the sets, including the
-      # meta-tests that only exist under `test-fixtures`/`stats`; the second runs one quarter of
-      # the corpus, so the four jobs together still run every fixture test exactly once. This is
+      # meta-tests that only exist under `test-fixtures`/`stats`; the second runs one third of
+      # the corpus, so the three jobs together still run every fixture test exactly once. This is
       # redistribution, not selection: nothing is skipped.
       #
       # `--partition` is deterministic by test name, so a fixture always lands in the same shard
@@ -321,7 +320,7 @@ jobs:
         run: cargo nextest run --release --features "${{ matrix.features }}"
           -E 'not test(/^test::fixtures::/)'
 
-      - name: Test (one quarter of the fixture corpus)
+      - name: Test (one third of the fixture corpus)
         run: cargo nextest run --release --features "${{ matrix.features }}"
           -E 'test(/^test::fixtures::/)'
-          --partition count:${{ matrix.shard }}/4
+          --partition count:${{ matrix.shard }}/3

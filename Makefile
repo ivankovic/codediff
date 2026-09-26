@@ -37,7 +37,7 @@ OUT_DIR ?= research/data/ablation
 .PHONY: coverage test test-rust test-mapping-site-js test-python build install install-hooks \
 	benchmark-quality diff-inventory lint-python ci benchmark-ablation check-quality \
 	update-quality-baseline check-painting-attribution update-painting-attribution diff-gif \
-	readme-screenshot test-web-js test-showcase-js check-versions deploy-checks deploy-crates \
+	readme-screenshot test-viewer-js test-showcase-js check-versions deploy-checks deploy-crates \
 	deploy-github deploy third-party-notices check-third-party-notices
 
 # Line coverage of the suite `make test` runs (`--all-features`), with a per-area summary (see
@@ -59,7 +59,7 @@ coverage: test
 # Every test, JS, Python and Rust. `--all-features` because several features gate their own tests.
 # Not a substitute for `make ci`, which also proves each feature compiles alone and runs the
 # clippy matrix and baseline gates. Release, because the fixture tests run real diffs.
-test: test-mapping-site-js test-web-js test-python test-rust
+test: test-mapping-site-js test-viewer-js test-python test-rust
 
 # The Rust suite alone, every feature on.
 test-rust:
@@ -77,10 +77,10 @@ test-mapping-site-js:
 	node assets/mapping_site/viewer.test.js
 	node assets/mapping_site/reviewed.test.js
 
-# The browser viewer's logic (assets/web/model.js), ported from the TUI and pinned to it test by
-# test; its only coverage, since Rust only embeds it.
-test-web-js:
-	node assets/web/model.test.js
+# The showcase viewer's logic (assets/viewer/model.js), ported from the TUI and pinned to it test
+# by test; its only coverage, since Rust only embeds it.
+test-viewer-js:
+	node assets/viewer/model.test.js
 
 # The GitHub Pages showcase shim (assets/showcase/showcase.js); Rust only embeds it.
 test-showcase-js:
@@ -120,7 +120,7 @@ DIFF_GIF_CASE ?= python-refactoring
 DIFF_GIF_OUT ?= assets/diff-vs-codediff.gif
 diff-gif:
 	@tmp=$$(mktemp -d) && trap 'rm -rf "$$tmp"' EXIT; \
-	cargo run --release --features test-fixtures,web --bin generate_showcase -- --out "$$tmp" >/dev/null && \
+	cargo run --release --features test-fixtures --bin generate_showcase -- --out "$$tmp" >/dev/null && \
 	cd research && uv run python ../scripts/record_diff_gif.py \
 		--showcase "$$tmp" --case $(DIFF_GIF_CASE) --out ../$(DIFF_GIF_OUT)
 

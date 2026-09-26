@@ -15,7 +15,7 @@
  *  You should have received a copy of the GNU Affero General Public License
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-//! What the server sends the page: a computed diff, and a re-highlighting of one.
+//! What the viewer is sent for a pair: the computed diff, and a re-highlighting of it.
 //!
 //! **Every column here is a UTF-16 code unit, not a byte.** The rest of the crate works in bytes,
 //! as tree-sitter does; a browser indexes strings in UTF-16, so the conversion happens once, here.
@@ -42,7 +42,7 @@ pub const DEFAULT_SYNTAX_THEME: &str = "base16-ocean.dark";
 
 /// The UTF-16 index of `byte_column` in `line`. Past the end clamps to the line's length; inside a
 /// multi-byte character rounds down to its start, as every renderer in this crate does.
-pub fn utf16_column(line: &str, byte_column: usize) -> usize {
+fn utf16_column(line: &str, byte_column: usize) -> usize {
     let end = floor_char_boundary(line, byte_column.min(line.len()));
     line[..end].encode_utf16().count()
 }
@@ -161,15 +161,6 @@ pub struct DiffPayload {
     pub syntax: SyntaxPayload,
 }
 
-/// A re-highlighting of the loaded pair in another syntect theme - the theme dialog's live
-/// preview. Nothing but the spans changes, so nothing but the spans is sent.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct HighlightPayload {
-    pub before: Vec<Vec<SpanPayload>>,
-    pub after: Vec<Vec<SpanPayload>>,
-    pub syntax: SyntaxPayload,
-}
-
 fn hex(color: syntect::highlighting::Color) -> String {
     format!("#{:02x}{:02x}{:02x}", color.r, color.g, color.b)
 }
@@ -186,7 +177,7 @@ fn resolve_theme(name: Option<&str>) -> (String, &'static syntect::highlighting:
 }
 
 /// The page colours of a theme; a theme without them falls back to dark-on-light.
-pub fn syntax_payload(name: Option<&str>) -> SyntaxPayload {
+fn syntax_payload(name: Option<&str>) -> SyntaxPayload {
     let (theme, resolved) = resolve_theme(name);
     SyntaxPayload {
         theme,
@@ -205,7 +196,7 @@ pub fn syntax_payload(name: Option<&str>) -> SyntaxPayload {
 
 /// Highlights `lines` as `CodeViewerWidget::highlight_lines` does, one span list per line in UTF-16
 /// columns, with adjacent same-colour runs merged. A language syntect lacks yields empty lists.
-pub fn highlight(
+fn highlight(
     lines: &[&str],
     language: Option<Language>,
     theme_name: Option<&str>,
@@ -246,7 +237,7 @@ pub fn highlight(
 
 /// The language a side is shown as. `/dev/null` takes the other side's, as
 /// `tui::app::substitute_missing_language` parses it.
-pub fn side_language(path: &Path, contents: &str, other: Option<Language>) -> Option<Language> {
+fn side_language(path: &Path, contents: &str, other: Option<Language>) -> Option<Language> {
     match language_for_path_and_content(path, contents) {
         None if contents.is_empty() => other,
         detected => detected,
@@ -290,7 +281,7 @@ fn side_payload(
 }
 
 /// Both sides' languages, each falling back to the other's for an empty `/dev/null` side.
-pub fn pair_languages(data: &DiffSessionData) -> (Option<Language>, Option<Language>) {
+fn pair_languages(data: &DiffSessionData) -> (Option<Language>, Option<Language>) {
     let before_detected = language_for_path_and_content(&data.before_path, &data.before_contents);
     let after_detected = language_for_path_and_content(&data.after_path, &data.after_contents);
     (
@@ -346,18 +337,6 @@ pub fn diff_payload(
         large_residual,
         render_options: options,
         syntax: syntax_payload(syntax_theme),
-    }
-}
-
-/// Just the spans, for a syntax-theme preview.
-pub fn highlight_payload(data: &DiffSessionData, syntax_theme: &str) -> HighlightPayload {
-    let (before_language, after_language) = pair_languages(data);
-    let before: Vec<&str> = data.before_contents.lines().collect();
-    let after: Vec<&str> = data.after_contents.lines().collect();
-    HighlightPayload {
-        before: highlight(&before, before_language, Some(syntax_theme)),
-        after: highlight(&after, after_language, Some(syntax_theme)),
-        syntax: syntax_payload(Some(syntax_theme)),
     }
 }
 
@@ -513,15 +492,6 @@ mod tests {
             .expect("identical content is worth a summary");
         assert_eq!(summary.kind, "no_changes");
         assert_eq!(summary.label, DiffSummary::NoChanges.label());
-    }
-
-    #[test]
-    fn the_highlight_payload_only_reswaps_spans() {
-        let data = sample_data();
-        let payload = highlight_payload(&data, "Solarized (light)");
-        assert_eq!(payload.before.len(), 3);
-        assert_eq!(payload.after.len(), 3);
-        assert_eq!(payload.syntax.theme, "Solarized (light)");
     }
 
     #[test]

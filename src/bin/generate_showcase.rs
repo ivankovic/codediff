@@ -18,8 +18,8 @@
 
 //! The GitHub Pages showcase: the real browser viewer, running on static files.
 //!
-//! `codediff-web`'s page only paints the JSON its server sends, so this bakes that JSON for the
-//! cases in [`CASES`] and serves the same page with a `fetch` shim (`assets/showcase/showcase.js`)
+//! The viewer (`assets/viewer/`) only paints the JSON it is sent, so this bakes that JSON for the
+//! cases in [`CASES`] and serves the viewer with a `fetch` shim (`assets/showcase/showcase.js`)
 //! answering `/api/*` from files. Each case is baked twice: as codediff maps it and as GNU `diff`
 //! marks it. Published by `.github/workflows/pages.yml` under `showcase/`; nothing is committed.
 
@@ -33,13 +33,13 @@ use serde::Serialize;
 
 use codediff::diff::text::{RangeMatch, RenderOptions, TextOperation};
 use codediff::diff::text_range::TextRange;
+use codediff::showcase::payload::{DiffPayload, RangePayload, diff_payload};
+use codediff::showcase::state::default_state;
 use codediff::test::helper;
 use codediff::test::helper::human_mapping;
 use codediff::tui::actions::DiffSessionData;
 use codediff::tui::app::compute_diff_with_options;
-use codediff::tui::theme::{CustomPalette, OverlayTheme, PanelLayout};
-use codediff::web::payload::{DiffPayload, RangePayload, diff_payload};
-use codediff::web::session::Session;
+use codediff::tui::theme::PanelLayout;
 
 #[derive(Parser)]
 struct Args {
@@ -262,27 +262,20 @@ fn main() -> Result<()> {
             "showcase.css",
             include_str!("../../assets/showcase/showcase.css"),
         ),
-        ("model.js", include_str!("../../assets/web/model.js")),
-        ("app.js", include_str!("../../assets/web/app.js")),
-        ("style.css", include_str!("../../assets/web/style.css")),
+        ("model.js", include_str!("../../assets/viewer/model.js")),
+        ("app.js", include_str!("../../assets/viewer/app.js")),
+        ("style.css", include_str!("../../assets/viewer/style.css")),
     ] {
         fs::write(args.out.join(name), contents)?;
     }
 
-    // What `/api/state` answers. Every visible setting is pinned, not read from the local
-    // `.codediff.toml`, so CI and a laptop generate the same site. Dual, not Auto: Auto's
-    // 220-column cut-over is single-panel on most browser windows. The paths are placeholders;
-    // the shim answers with the selected case.
-    let mut state = Session::from_config(Some(RenderOptions::default())).state();
+    // What `/api/state` answers: the defaults, never the local config, so CI and a laptop generate
+    // the same site. Dual, not Auto: Auto's 220-column cut-over is single-panel on most browser
+    // windows. The paths are placeholders; the shim answers with the selected case.
+    let mut state = default_state();
     state.before = Some("before".to_string());
     state.after = Some("after".to_string());
-    state.settings.theme = OverlayTheme::default();
     state.settings.layout = PanelLayout::Dual;
-    state.settings.node_highlight = false;
-    state.settings.syntax_theme = None;
-    state.settings.custom_palette = CustomPalette::from_palette(&state.settings.theme.palette());
-    state.recent_pairs = Vec::new();
-    state.config_error = None;
     fs::write(args.out.join("state.json"), serde_json::to_vec(&state)?)?;
 
     let provenance = helper::sample_provenance()?;
@@ -336,7 +329,7 @@ fn bake(
         .unwrap_or_default();
     let (before_path, after_path) = side_files(&dir)?;
 
-    // The same computation codediff-web runs for `/api/diff` and `/api/render_options`.
+    // The diff `/api/diff` and `/api/render_options` answer with, under each preset.
     let (data, large_residual) =
         compute_diff_with_options(&before_path, &after_path, RenderOptions::default())?;
     let codediff = diff_payload(&data, large_residual, RenderOptions::default(), None);
@@ -573,7 +566,7 @@ mod tests {
             source: [0; 4],
             destination: [0; 4],
         };
-        let side = |ops: &[&'static str], lines: usize| codediff::web::payload::SidePayload {
+        let side = |ops: &[&'static str], lines: usize| codediff::showcase::payload::SidePayload {
             path: String::new(),
             name: String::new(),
             language: String::new(),

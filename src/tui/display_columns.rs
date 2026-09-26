@@ -32,12 +32,13 @@
 //!   and to bytes here, and nowhere else.
 //! * **characters** - only the footer's `Col`, via [`char_column`].
 //!
-//! The browser viewer (`assets/web/model.js`) keeps the same split in UTF-16 code units, the unit
-//! a JavaScript string is indexed by, and receives `TAB_WIDTH` in the state payload.
+//! The showcase's browser viewer (`assets/viewer/model.js`) keeps the same split in UTF-16 code
+//! units, the unit a JavaScript string is indexed by, and receives `TAB_WIDTH` in its state.
 
 use crate::diff::text_range::{cell_width_of, floor_char_boundary};
 
-/// Columns between tab stops, in every front end: the TUI, headless output and the browser.
+/// Columns between tab stops, everywhere a line is drawn: the TUI, headless output and the
+/// showcase's browser viewer.
 pub const TAB_WIDTH: usize = 4;
 
 /// How many display columns `ch` takes when it starts at display column `column`.

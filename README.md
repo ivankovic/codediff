@@ -104,22 +104,9 @@ nearest 256 colors otherwise (macOS Terminal.app, or most terminals over ssh, wh
 forward `COLORTERM`). If your terminal supports 24-bit color but does not set it, run
 `export COLORTERM=truecolor`.
 
-## The web UI
+## In a browser
 
-`codediff-web` is the same viewer served to a browser tab. It is behind the off-by-default `web`
-feature:
-
-```
-cargo install codediff --features web
-codediff-web BEFORE AFTER
-```
-
-It starts a local server, prints the URL, and opens your browser (`--no-open` to skip that,
-`--port` and `--host` to pick where it listens - the default is a random port on 127.0.0.1). With
-no arguments it starts empty, like the TUI, and it accepts git's `GIT_EXTERNAL_DIFF` argument list
-too.
-
-The web UI is available, but not recommended.
+For reviewing changes in a browser, see [codereview](https://github.com/ivankovic/codereview).
 
 ## Headless / batch mode
 

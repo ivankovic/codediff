@@ -17,7 +17,7 @@
  */
 //! Git commit review: what a repository has pending (unstaged), staged, and recently committed,
 //! and how to turn any one of those changes into the two files on disk the diff engine reads.
-//! Shared by both front ends (`tui::components::review_dialog`, `web::session`).
+//! The TUI's review picker (`tui::components::review_dialog`) is its caller.
 //!
 //! Talks to the `git` binary, not `git2`, whose OpenSSL/libssh2 build `cargo install codediff`
 //! should not pay for; anyone reviewing has `git` on `PATH`.

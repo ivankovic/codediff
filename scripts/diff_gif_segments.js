@@ -20,12 +20,12 @@
 // draw.
 //
 // This exists so the GIF is painted by the viewer's own logic rather than by a second
-// implementation of it. `assets/web/model.js` decides which columns a range covers on a row, that
+// implementation of it. `assets/viewer/model.js` decides which columns a range covers on a row, that
 // trailing whitespace is never painted, and which paint wins where they overlap - rules with
 // enough corners (`columnsOnRow`, `trimmedRowLen`, the paint order in `rowPaints`) that a Python
 // re-implementation would drift from the browser without anyone noticing, and the GIF would then
 // advertise a rendering the product does not produce. Node is already a dev dependency here: this
-// is the same file `make test-web-js` covers.
+// is the same file `make test-viewer-js` covers.
 //
 //   node scripts/diff_gif_segments.js <payload.json> <state.json>
 //
@@ -37,7 +37,7 @@
 const fs = require("fs");
 const path = require("path");
 
-const M = require(path.join(__dirname, "..", "assets", "web", "model.js"));
+const M = require(path.join(__dirname, "..", "assets", "viewer", "model.js"));
 
 function sideRows(side, palette) {
   const panel = new M.PanelModel();

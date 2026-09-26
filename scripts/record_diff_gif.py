@@ -24,7 +24,7 @@ not move, so a bar sweeping across it swaps one reading for the other in place a
 stays on the line it was already looking at.
 
 Nothing here decides what to paint. `scripts/diff_gif_segments.js` runs the browser viewer's own
-`assets/web/model.js` over each baked payload and hands back per-row coloured runs; this file only
+`assets/viewer/model.js` over each baked payload and hands back per-row coloured runs; this file only
 turns those runs into pixels. See that script's header for why.
 
     make diff-gif
@@ -47,7 +47,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 
-# The viewer's own chrome (assets/web/style.css `:root`).
+# The viewer's own chrome (assets/viewer/style.css `:root`).
 PAGE_BG = "#1e1e1e"
 PAGE_FG = "#d4d4d4"
 CHROME = "#7f7f7f"

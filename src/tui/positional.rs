@@ -15,8 +15,8 @@
  *  You should have received a copy of the GNU Affero General Public License
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-//! The positional-argument conventions both front-end binaries accept, and the notice both print
-//! for a binary pair. The tests live in `main.rs`, next to the CLI behaviour they also exercise.
+//! The positional-argument conventions `codediff` accepts, and the notice it prints for a binary
+//! pair. The tests live in `main.rs`, next to the CLI behaviour they also exercise.
 
 use std::path::{Path, PathBuf};
 

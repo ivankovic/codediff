@@ -69,7 +69,7 @@ crate set against `Cargo.lock` afterwards (no drift).
 ## Decisions that apply to every recipe
 
 **Source is the GitHub tag, not the crates.io tarball.** `Cargo.toml`'s `include` list ships only
-the source, the browser viewer's page, the license and the README - not `tests/**`, `src/bin/**`
+the source, the licenses and the README - not `tests/**`, `src/bin/**`
 or `src/test/data/**` - so a package built from crates.io has no test suite to run in its check
 phase. The GitHub tag tarball has them — at the cost of also carrying `research/` and the fixture
 corpus in the download.

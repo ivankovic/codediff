@@ -19,13 +19,13 @@
 //!
 //! [`diff_strings`] is the entry point: it parses both sides into [`code::Code`] and returns a
 //! [`diff::Diff`]: the mapping between the two syntax trees plus the changed text ranges it implies.
-//! The `tui` and `web` features add the terminal and browser viewers built on it.
+//! The `tui` feature adds the terminal viewer built on it.
 //!
 //! # Stability
 //!
 //! This crate is published for the `codediff` binary. Its stable contracts are the command line
 //! and the `--mode json` output, which the editor integrations consume. The library API - the
-//! `diff` module's solver passes, the `tui` and `web` modules, and the `tree_sitter` and `ratatui`
+//! `diff` module's solver passes, the `tui` module, and the `tree_sitter` and `ratatui`
 //! types in their signatures - is the binary's internals made visible, and changes between 0.x
 //! minor versions without notice. [`diff_strings`] and the [`code`] and [`diff`] module roots are
 //! the parts meant for use from another crate.
@@ -35,14 +35,15 @@ pub mod code;
 pub mod diff;
 #[cfg(feature = "stats")]
 pub mod stats;
-// Needs no TUI dependency itself, but both consumers (TUI picker, web session) are behind `tui`, so
+// Needs no TUI dependency itself, but its one consumer (the TUI's review picker) is behind `tui`, so
 // it shares that gate rather than widen a `default-features = false` consumer's surface.
 #[cfg(feature = "tui")]
 pub mod review;
 #[cfg(feature = "tui")]
 pub mod tui;
-#[cfg(feature = "web")]
-pub mod web;
+// The GitHub Pages showcase's data, for src/bin/generate_showcase.rs alone.
+#[cfg(feature = "test-fixtures")]
+pub mod showcase;
 
 // Unit tests across the crate use `crate::test::helper` whatever the features, so `cfg(test)` always
 // sees it; `test-fixtures` exposes it to the src/bin/ tools that depend on it outside tests.

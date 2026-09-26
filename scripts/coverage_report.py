@@ -51,12 +51,12 @@ AREAS = [
     (("src/code/", "src/code.rs"), "code/ - parsing, metadata"),
     (("src/tui/", "src/tui.rs"), "tui/ - viewer, headless"),
     (("src/stats/", "src/stats.rs"), "stats/ - sampling, git"),
-    (("src/web/", "src/web.rs"), "web/ - server, session"),
+    (("src/showcase/", "src/showcase.rs"), "showcase/ - showcase data"),
     (("src/test/", "src/test.rs"), "test/ - fixture helpers"),
     (("src/bin/",), "bin/ - dev tools"),
 ]
 
-# Files sitting directly in `src/` that are nobody's module root: `main.rs`, `web_main.rs`,
+# Files sitting directly in `src/` that are nobody's module root: `main.rs`,
 # `review.rs`, the git/jj integrations. Product code, so it belongs in the product total, but it
 # is not part of any module above and reads better as its own line than folded into one.
 TOP_LEVEL = "src/ - entry points, integrations"
@@ -141,7 +141,7 @@ def main() -> int:
     product = [0, 0]
     # `other` is `area_of`'s fallback and is deliberately printed last rather than skipped: a
     # source directory nobody added to AREAS used to vanish from every row while still counting
-    # toward EVERYTHING, which is exactly how `src/web/` stayed invisible. A row that reads
+    # toward EVERYTHING, which is how a whole module once stayed invisible. A row that reads
     # "other" is a prompt to add the prefix above.
     for label in [name for _, name in AREAS] + [TOP_LEVEL, "other"]:
         if label not in totals:

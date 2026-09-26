@@ -6,15 +6,15 @@ Thank you for considering a contribution, human or AI-assisted (see the README's
 
 ## Technology
 
-The product is written in Rust. The browser viewer's front end (`assets/web/`) is plain
+The product is written in Rust. The showcase's browser viewer (`assets/viewer/`) is plain
 JavaScript, and the research and analysis scripts are Python.
 
 CodeDiff stores user configuration, for example the active theme, on disk with `confy`. The
 dataset-analysis tools in `src/bin/` use a separate SQLite database to store the stats that they
 collect.
 
-The main UI is a terminal UI, written with the Ratatui and Crossterm libraries; `codediff-web`
-shows the same viewer in a browser.
+The UI is a terminal UI, written with the Ratatui and Crossterm libraries. The GitHub Pages
+showcase runs a port of the same viewer in the browser, on static files.
 
 ### UI design patterns
 
@@ -28,7 +28,7 @@ Format all code with `cargo fmt`, the standard Rust formatter. CI enforces this 
 pull request.
 
 No Rust check errors are allowed. Run `cargo clippy` frequently. CI also enforces `cargo clippy`,
-across all four Cargo feature configs (see "CI" below).
+across all three Cargo feature configs (see "CI" below).
 
 The Python under `research/`, `scripts/` and `assets/` has the same two halves, as `ruff format`
 and `ruff check` - run both with `make lint-python`. `ruff` is the one tool neither a bare checkout
@@ -94,18 +94,18 @@ per-area table:
 
 | area | lines | |
 | --- | --- | --- |
-| `src/diff/` - the engine | 12033/12387 | 97.1% |
-| `src/test/` - fixture helpers | 17910/18537 | 96.6% |
-| `src/code/` - parsing, metadata | 1483/1575 | 94.2% |
-| `src/web/` - server, session | 1322/1475 | 89.6% |
-| `src/stats/` - sampling, git | 560/658 | 85.1% |
-| `src/tui/` - viewer, headless | 6383/7697 | 82.9% |
-| `src/` - entry points, integrations | 895/1394 | 64.2% |
-| `src/bin/` - dev tools | 9776/17439 | 56.1% |
-| **product (everything but `src/bin/`)** | **40586/43723** | **92.8%** |
-| everything | 50362/61162 | 82.3% |
+| `src/showcase/` - showcase data | 374/384 | 97.4% |
+| `src/diff/` - the engine | 12514/12861 | 97.3% |
+| `src/test/` - fixture helpers | 18600/19231 | 96.7% |
+| `src/code/` - parsing, metadata | 1625/1719 | 94.5% |
+| `src/tui/` - viewer, headless | 7789/8892 | 87.6% |
+| `src/stats/` - sampling, git | 566/662 | 85.5% |
+| `src/` - entry points, integrations | 985/1372 | 71.8% |
+| `src/bin/` - dev tools | 10801/18135 | 59.6% |
+| **product (everything but `src/bin/`)** | **42453/45121** | **94.1%** |
+| everything | 53254/63256 | 84.2% |
 
-Measured 2026-09-22 over 4428 tests. The engine and the dev tools are deliberately held to
+Measured 2026-09-26 over 4777 tests. The engine and the dev tools are deliberately held to
 different standards: `src/bin/` is samplers, benchmark harnesses and `human_solver`, several of
 which exist to be run once and read.
 
@@ -208,14 +208,12 @@ Some directories in the list below do not exist yet. Create them if the need ari
         |- tui.rs       <- Declares the TUI's submodules and sets up logging
         |- tui/         <- The TUI itself: app.rs (controller), ui.rs (terminal rendering),
         |                  components/, widgets/
-        |- web_main.rs  <- Entry point of `codediff-web` (feature `web`): the viewer in a browser
-        |- web.rs       <- Declares the web front end's submodules
-        |- web/         <- The local HTTP server and JSON API behind codediff-web: session.rs
-        |                  (controller), payload.rs (wire format), server.rs, http.rs
+        |- showcase.rs  <- The GitHub Pages showcase's data: the diff and first-frame state the
+        |- showcase/       browser viewer is fed (feature `test-fixtures`)
         |- test/        <- Shared test helpers, plus slower fixture-driven tests (see "Testing")
         |- bin/         <- Standalone developer tools: benchmarking, dataset sampling, and more
-    |- /assets/web      <- The page codediff-web serves (embedded at build time): model.js is the
-    |                      TUI's viewer logic ported to the browser, app.js the DOM wiring
+    |- /assets/viewer   <- The showcase's browser viewer: model.js is the TUI's viewer logic ported
+    |                      to the browser, app.js the DOM wiring
     |- /research        <- Datasets and analysis scripts used to guide design decisions
     |- README.md        <- High-level project summary. Must be readable to humans.
     |- CONTRIBUTING.md  <- This file
@@ -238,7 +236,7 @@ documented there.
 ### Build, test, quality
 
 * `test` - `cargo nextest run --release --all-features`, plus `test-mapping-site-js` and
-  `test-web-js` (plain-Node tests of the human-mapping site's and the web viewer's vanilla JS, which
+  `test-viewer-js` (plain-Node tests of the human-mapping site's and the showcase viewer's vanilla JS, which
   cargo's suite cannot cover - see the root Makefile) and `test-python` (`pytest` over the research
   and script helpers, in `research/`'s uv environment).
   Requires `cargo-nextest` (`cargo install cargo-nextest`, one-time), Node.js, and
@@ -265,7 +263,7 @@ documented there.
   cover. `git push --no-verify` skips it for one push.
 * `ci` - the whole of CI, locally: every job in `.github/workflows/ci.yml`, in that file's own
   order. Unlike the pre-push hook above it includes the release build, the full test suite for all
-  four feature configs, and the quality gate, so it takes minutes rather than seconds - run it
+  three feature configs, and the quality gate, so it takes minutes rather than seconds - run it
   when you mean to push, not on every push. It reads the commands out of `ci.yml` itself rather
   than keeping a copy, so it cannot drift from CI; `python3 scripts/ci_local.py --list` shows the
   job ids and `--job <id>` runs one of them. See that script's module docstring for what it can
@@ -322,14 +320,14 @@ Three verbs, and which file a target lives in follows from them:
 Every push and pull request runs (see `.github/workflows/ci.yml`):
 
 * `cargo fmt --check`
-* `cargo clippy --tests -- -D warnings`, once each for the four Cargo feature configs (default,
-  `test-fixtures`, `stats`, `web` - see Cargo.toml's `[features]`)
-* `cargo build --release` + `cargo nextest run --release`, once each for the same four feature
-  configs; the fixture-corpus tests, which no feature changes, run once, split four ways across
+* `cargo clippy --tests -- -D warnings`, once each for the three Cargo feature configs (default,
+  `test-fixtures`, `stats` - see Cargo.toml's `[features]`)
+* `cargo build --release` + `cargo nextest run --release`, once each for the same three feature
+  configs; the fixture-corpus tests, which no feature changes, run once, split three ways across
   those jobs
 * `cargo audit` (checks Cargo.lock against the RustSec advisory database)
-* The vanilla-JS tests of the `human_mapping` site, the browser viewer and the showcase
-  (`make test-mapping-site-js`, `test-web-js`, `test-showcase-js`)
+* The vanilla-JS tests of the `human_mapping` site, the showcase viewer and the showcase shim
+  (`make test-mapping-site-js`, `test-viewer-js`, `test-showcase-js`)
 * `ruff check` and `ruff format --check` over `research/`, `scripts/` and `assets/`, the Python
   unit tests (`make test-python`), the Gentoo `CRATES`/Manifest sync check and `make
   check-versions`

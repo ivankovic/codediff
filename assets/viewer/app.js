@@ -1221,7 +1221,7 @@
     try {
       state.info = await api("/api/state");
     } catch (error) {
-      document.body.textContent = `codediff-web: ${error.message}`;
+      document.body.textContent = `codediff: ${error.message}`;
       return;
     }
     const settings = state.info.settings;

@@ -17,7 +17,7 @@
  */
 
 // Plain-Node tests for model.js - no framework, no npm dependency, same convention as
-// assets/mapping_site/. Run: `node assets/web/model.test.js` (wired into `make test` and CI).
+// assets/mapping_site/. Run: `node assets/viewer/model.test.js` (wired into `make test` and CI).
 //
 // Each block mirrors a test in src/tui/widgets/code_viewer.rs or
 // src/tui/components/diff_viewer.rs, so the page's behaviour is pinned to the terminal's.

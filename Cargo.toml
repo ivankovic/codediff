@@ -31,30 +31,20 @@ categories = ["command-line-utilities", "development-tools", "text-processing"]
 # corpus, research/, packaging recipes, working notes), and a new file at the root would otherwise
 # ship by default. `src/test/*.rs` stays because `mod test` compiles under `cfg(test)`; its data
 # under `src/test/data/` does not, so `cargo install codediff --features test-fixtures` fails with
-# a "no such bin target" error rather than building the checkout-only dev tools. `assets/web/` is
-# `include_str!`-ed by src/web/server.rs. The README's images are left out: crates.io shows them
-# from the repository.
+# a "no such bin target" error rather than building the checkout-only dev tools. The README's
+# images are left out: crates.io shows them from the repository.
 include = [
     "/Cargo.toml",
     "/LICENSE",
     "/LICENSE-COMMERCIAL",
     "/THIRD-PARTY-NOTICES.md",
     "/README.md",
-    "/assets/web/*.html",
-    "/assets/web/*.js",
-    "/assets/web/*.css",
-    "!/assets/web/*.test.js",
     "/src/**/*.rs",
     "!/src/bin/**",
     "!/src/test/data/**",
     # One stub per fixture, compiled only under `cfg(test)` and useless without src/test/data.
     "!/src/test/fixtures/*/**",
 ]
-
-# docs.rs documents the viewers too: `web` implies `tui`, and neither adds a build dependency
-# docs.rs lacks. `stats` is left out (git2's OpenSSL/libssh2 build).
-[package.metadata.docs.rs]
-features = ["web"]
 
 # `cargo binstall codediff`: the release workflow's asset names, as release.yml packages them -
 # `codediff-<target>.tar.gz` with the binary at the archive root, `.zip` for Windows.
@@ -243,10 +233,6 @@ stats = [
     "dep:walkdir",
     "test-fixtures",
 ]
-# The browser front end, `codediff-web`. Implies `tui`, whose diff assembly, config persistence
-# and highlighting it reuses, and adds no dependency of its own (see src/web/http.rs). Off by
-# default.
-web = ["tui"]
 
 # `benchmark_other`'s harness end to end, through the stand-in `fake_diff_tool`. In tests/ because
 # `CARGO_BIN_EXE_<name>` is only set for integration tests.
@@ -268,11 +254,6 @@ required-features = ["tui"]
 name = "codediff"
 path = "src/main.rs"
 required-features = ["tui"]
-
-[[bin]]
-name = "codediff-web"
-path = "src/web_main.rs"
-required-features = ["web"]
 
 [[bin]]
 name = "render_tui_screenshot"
@@ -308,13 +289,13 @@ path = "src/bin/generate_mapping_site.rs"
 required-features = ["test-fixtures"]
 
 [[bin]]
-# The GitHub Pages showcase: twenty fixture changes baked into static JSON in the exact shape
-# codediff-web's page consumes, so the real browser viewer runs on Pages with no server - one
-# JSON per case as `diff` marks it and as codediff maps it. `web` for the payload and the page
-# assets, `test-fixtures` for the corpus and the unix-diff labeller.
+# The GitHub Pages showcase: twenty fixture changes baked into static JSON in the shape the
+# browser viewer (assets/viewer/) asks for, so it runs on Pages with no server - one JSON per case
+# as `diff` marks it and as codediff maps it. `test-fixtures` for the corpus, the unix-diff
+# labeller and the `showcase` module.
 name = "generate_showcase"
 path = "src/bin/generate_showcase.rs"
-required-features = ["test-fixtures", "web"]
+required-features = ["test-fixtures"]
 
 [[bin]]
 # Research-only: scores codediff against the Alikhanifard & Tsantalis AST node-mapping oracle

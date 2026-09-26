@@ -19,10 +19,10 @@
 // The viewer's logic, ported from the TUI: what `tui::widgets::code_viewer` (range lookup,
 // search navigation, overlay painting order) and `tui::components::diff_viewer` (the
 // merged change walk, cross-panel sync, layout mode) do between keystrokes. No DOM and no
-// network here - `app.js` owns both - so `node assets/web/model.test.js` covers this file the way
+// network here - `app.js` owns both - so `node assets/viewer/model.test.js` covers this file the way
 // assets/mapping_site/ is covered, with no framework and no build step.
 //
-// Every column is a UTF-16 code unit: the server converts from bytes once (src/web/payload.rs),
+// Every column is a UTF-16 code unit: the generator converts from bytes once (src/showcase/payload.rs),
 // so the model indexes the strings it holds directly. Ranges are `[startRow, startCol, endRow,
 // endCol]`, half-open, and a range match is `{op, source, destination}` with `op` one of
 // insert/delete/update/move/identical/unset.

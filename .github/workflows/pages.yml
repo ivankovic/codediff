@@ -66,7 +66,7 @@ jobs:
       # `site`. Needs GNU diff on PATH (ubuntu-latest has it): every case is baked once as `diff`
       # marks it, by running the real tool.
       - name: Generate showcase
-        run: cargo run --release --features test-fixtures,web --bin generate_showcase -- --out site/showcase
+        run: cargo run --release --features test-fixtures --bin generate_showcase -- --out site/showcase
 
       # Last of the three, and that ordering is load-bearing: `generate_mapping_site` wipes and
       # recreates `site`, so an apt tree built before it would simply be deleted.

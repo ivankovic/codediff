@@ -30,8 +30,8 @@ use super::Component;
 use crate::tui::actions::Action;
 use crate::tui::theme::OverlayTheme;
 
-/// The keybinding reference and About section, one source for both front ends: the TUI draws it
-/// in this modal and `web` serves it verbatim to the browser's `?` overlay. Every key
+/// The keybinding reference and About section: the TUI draws it in this modal, and the showcase
+/// bakes it verbatim for its browser viewer's `?` overlay. Every key
 /// `App::handle_events` and the components bind belongs in here. The color legend is not in here
 /// because it is theme-dependent; see `HelpModal::legend_lines`.
 pub const HELP_TEXT: &str = "\
