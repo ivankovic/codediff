@@ -90,6 +90,7 @@ Other
   ?                Toggle this help
   q or Esc         Quit, from the viewer. In a dialog, Esc closes the dialog and q is
                    an ordinary letter (a search for 'query' does not end the session)
+  Ctrl-C           Quit, from any screen (terminal only; in a browser it copies)
   Ctrl-Z           Suspend to the shell (Unix); `fg` comes back to the same view
 
 About

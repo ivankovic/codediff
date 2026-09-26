@@ -51,6 +51,7 @@ use crate::tui::components::{
 use crate::tui::events::Event;
 use crate::tui::theme::{self, OverlayTheme};
 use crate::tui::ui::UI;
+use crate::tui::widgets::code_viewer::DEFAULT_SYNTAX_THEME;
 
 /// Which top-level screen is currently shown.
 #[derive(Default, Debug, Copy, Clone, PartialEq, Eq, Hash)]
@@ -171,6 +172,10 @@ pub struct App {
     plain_text_fallback: bool,
 
     should_exit: bool,
+
+    /// Render options from the command line (`--minimal`, `--full`, ...), used instead of the
+    /// saved ones for this run and not saved. `None` without such a flag.
+    render_options_override: Option<RenderOptions>,
 }
 
 /// A free function so it can be tested without reaching `App::suspend`, which would stop the test
@@ -180,6 +185,61 @@ fn is_suspend_key(key: &crossterm::event::KeyEvent) -> bool {
         && key
             .modifiers
             .contains(crossterm::event::KeyModifiers::CONTROL)
+}
+
+/// The editor to open `path` at `line` with: `$VISUAL`, then `$EDITOR`, then `vi` (an empty value
+/// counts as unset), given `+line` and the path, which vi, nano, emacs and micro all accept.
+/// Returned with the editor's name, for an error message.
+///
+/// The value may carry arguments (`code -w`, `emacsclient -t`), so on Unix it runs through
+/// `sh -c '<editor> "$@"'` as git runs it, which also honours quoting inside it; elsewhere it is
+/// split on whitespace.
+pub(crate) fn editor_command(path: &Path, line: usize) -> (String, std::process::Command) {
+    let set = |name| {
+        std::env::var(name)
+            .ok()
+            .filter(|value: &String| !value.trim().is_empty())
+    };
+    let editor = set("VISUAL")
+        .or_else(|| set("EDITOR"))
+        .unwrap_or_else(|| "vi".to_string());
+    let line_arg = format!("+{line}");
+    #[cfg(unix)]
+    let command = {
+        let mut command = std::process::Command::new("sh");
+        command
+            .arg("-c")
+            .arg(format!("{editor} \"$@\""))
+            .arg(&editor)
+            .arg(line_arg)
+            .arg(path);
+        command
+    };
+    #[cfg(not(unix))]
+    let command = {
+        let mut words = editor.split_whitespace();
+        let mut command = std::process::Command::new(words.next().unwrap_or("vi"));
+        command.args(words).arg(line_arg).arg(path);
+        command
+    };
+    (editor, command)
+}
+
+/// Ctrl-C, which raw mode (no ISIG) delivers as an ordinary `Char('c')` rather than SIGINT. Quits
+/// from every screen, as a terminal user expects of it.
+fn is_interrupt_key(key: &crossterm::event::KeyEvent) -> bool {
+    key.code == KeyCode::Char('c')
+        && key
+            .modifiers
+            .contains(crossterm::event::KeyModifiers::CONTROL)
+}
+
+/// Ctrl or Alt held. The global keys below are bare letters; with a modifier the keystroke is a
+/// different key (the viewer's Ctrl-E/Ctrl-Y scroll, Ctrl-D/Ctrl-U half-page), and must reach the
+/// active screen instead of opening the editor or a dialog.
+fn has_command_modifier(key: &crossterm::event::KeyEvent) -> bool {
+    key.modifiers
+        .intersects(crossterm::event::KeyModifiers::CONTROL | crossterm::event::KeyModifiers::ALT)
 }
 
 impl App {
@@ -220,6 +280,7 @@ impl App {
             change_counts: None,
             plain_text_fallback: false,
             should_exit: false,
+            render_options_override: None,
         })
     }
 
@@ -231,8 +292,10 @@ impl App {
             .set_layout_override(theme::load_panel_layout());
         self.diff_viewer
             .set_node_highlight(theme::load_node_highlight());
-        self.diff_viewer
-            .set_render_options(theme::load_render_options());
+        self.diff_viewer.set_render_options(
+            self.render_options_override
+                .unwrap_or_else(theme::load_render_options),
+        );
         // Before anything renders: `OverlayTheme::Custom` resolves through this process-global
         // palette, and would otherwise show Dracula's defaults for the first frame.
         theme::set_custom_palette(theme::load_custom_palette());
@@ -278,8 +341,15 @@ impl App {
 
     async fn handle_events(&mut self, ui: &mut UI) -> Result<()> {
         let Some(event) = ui.next_event().await else {
+            // The input stream has closed and nothing will arrive again; looping would spin.
+            self.should_exit = true;
             return Ok(());
         };
+        self.handle_event(event, ui.size()?)
+    }
+
+    /// One input, tick or render event. `area` is the whole terminal, for a dialog it opens.
+    fn handle_event(&mut self, event: Event, area: Rect) -> Result<()> {
         let action_tx = self.action_tx.clone();
 
         // A keystroke that opened a screen must not also reach it: `?` is also HelpModal's close
@@ -298,7 +368,16 @@ impl App {
                 action_tx.send(Action::Suspend)?;
                 return Ok(());
             }
-            match key.code {
+            if is_interrupt_key(key) {
+                action_tx.send(Action::Quit)?;
+                return Ok(());
+            }
+            let bare_key = if has_command_modifier(key) {
+                KeyCode::Null
+            } else {
+                key.code
+            };
+            match bare_key {
                 KeyCode::Char('q') if q_should_quit(self.screen) => {
                     action_tx.send(Action::Quit)?;
                 }
@@ -367,7 +446,7 @@ impl App {
                         Panel::Before => "Select the BEFORE file",
                         Panel::After => "Select the AFTER file",
                     };
-                    self.open_file_dialog(title, ui)?;
+                    self.open_file_dialog(title, area)?;
                     action_tx.send(Action::Render)?;
                     globally_handled = true;
                 }
@@ -481,6 +560,11 @@ impl App {
     }
 
     /// `--review`: start on the picker instead of the empty viewer.
+    /// Paint with `options` instead of the saved render options, for this run only.
+    pub fn override_render_options(&mut self, options: RenderOptions) {
+        self.render_options_override = Some(options);
+    }
+
     pub fn start_in_review(&mut self) {
         self.open_review();
     }
@@ -583,10 +667,10 @@ impl App {
         })
     }
 
-    fn open_file_dialog(&mut self, title: &str, ui: &mut UI) -> Result<()> {
+    fn open_file_dialog(&mut self, title: &str, area: Rect) -> Result<()> {
         let mut dialog = FileDialog::new(title);
         dialog.register_action_handler(self.action_tx.clone())?;
-        dialog.init(ui.size()?)?;
+        dialog.init(area)?;
         self.file_dialog = Some(dialog);
         Ok(())
     }
@@ -734,18 +818,12 @@ impl App {
         Ok(())
     }
 
-    /// Runs `$VISUAL`, then `$EDITOR`, then `vi` with `+line` (which vi, nano, emacs and micro
-    /// all accept), then re-diffs. Blocking the async loop is intended: there is no terminal to
-    /// draw on until the editor exits.
+    /// Runs the user's editor (see [`editor_command`]), then re-diffs. Blocking the async loop is
+    /// intended: there is no terminal to draw on until the editor exits.
     fn run_editor(&mut self, ui: &mut UI, path: &Path, line: usize) -> Result<()> {
-        let editor = std::env::var("VISUAL")
-            .or_else(|_| std::env::var("EDITOR"))
-            .unwrap_or_else(|_| "vi".to_string());
+        let (editor, mut command) = editor_command(path, line);
         ui.exit()?;
-        let status = std::process::Command::new(&editor)
-            .arg(format!("+{line}"))
-            .arg(path)
-            .status();
+        let status = command.status();
         ui.enter()?;
         ui.terminal.clear()?;
         if let Err(err) = status {
@@ -839,7 +917,15 @@ impl App {
 
     fn handle_dialog_cancelled(&mut self) -> Result<()> {
         if self.theme_dialog.is_some() {
+            // Everything the dialog previews: the overlay, the syntax theme, and a color edit,
+            // which installs the process-global custom palette as it is typed.
             self.diff_viewer.set_overlay_theme(self.current_theme);
+            self.diff_viewer.set_syntax_theme(
+                self.syntax_theme
+                    .clone()
+                    .unwrap_or_else(|| DEFAULT_SYNTAX_THEME.to_string()),
+            );
+            theme::set_custom_palette(theme::load_custom_palette());
         }
         if self.search_modal.is_some() {
             let last = self.last_search_query.clone().unwrap_or_default();
@@ -883,6 +969,9 @@ impl App {
 
     fn apply_theme_selection(&mut self, selected_theme: OverlayTheme) {
         self.current_theme = selected_theme;
+        // The dialog saved it; kept here too, or the next open and the next Esc would use a stale
+        // one.
+        self.syntax_theme = theme::load_syntax_theme();
         self.diff_viewer.set_overlay_theme(selected_theme);
         theme::save_overlay_theme(selected_theme);
         self.theme_dialog = None;
@@ -1912,6 +2001,74 @@ mod tests {
             KeyCode::Char('z'),
             KeyModifiers::SHIFT
         )));
+    }
+
+    /// `EDITOR="code -w"` used to be run as a program named `code -w`.
+    #[cfg(unix)]
+    #[test]
+    fn an_editor_with_arguments_gets_them_and_then_the_line_and_path() {
+        unsafe {
+            std::env::set_var("VISUAL", "");
+            std::env::set_var("EDITOR", "printf '%s|'");
+        }
+        let (editor, mut command) = editor_command(Path::new("/tmp/a file.rs"), 7);
+        let output = command.output().expect("run sh");
+        unsafe {
+            std::env::remove_var("VISUAL");
+            std::env::remove_var("EDITOR");
+        }
+
+        assert_eq!(editor, "printf '%s|'", "an empty VISUAL counts as unset");
+        assert_eq!(
+            String::from_utf8_lossy(&output.stdout),
+            "+7|/tmp/a file.rs|"
+        );
+    }
+
+    #[test]
+    fn ctrl_c_quits_and_ctrl_e_reaches_the_viewer_instead_of_the_editor() -> Result<()> {
+        use crossterm::event::{KeyEvent, KeyModifiers};
+
+        let mut app = App::new(4.0, 60.0)?;
+        app.screen = AppScreen::Viewer;
+        app.before_path = Some(PathBuf::from("before.rs"));
+        app.diff_viewer.load_diff(&DiffSessionData {
+            before_path: PathBuf::from("before.rs"),
+            after_path: PathBuf::from("after.rs"),
+            before_contents: "foo\nbar\n".to_string(),
+            after_contents: "foo\nbar\n".to_string(),
+            before_ranges: Vec::new(),
+            after_ranges: Vec::new(),
+            comment_only: false,
+            plain_text_fallback: false,
+        });
+        let area = Rect::new(0, 0, 120, 40);
+        let press = |app: &mut App, code, modifiers| -> Result<Vec<Action>> {
+            app.handle_event(Event::Key(KeyEvent::new(code, modifiers)), area)?;
+            let mut actions = Vec::new();
+            while let Ok(action) = app.action_rx.try_recv() {
+                actions.push(action);
+            }
+            Ok(actions)
+        };
+
+        assert!(
+            press(&mut app, KeyCode::Char('c'), KeyModifiers::CONTROL)?.contains(&Action::Quit),
+            "Ctrl-C must quit"
+        );
+        assert_eq!(app.screen, AppScreen::Viewer, "not open the theme dialog");
+
+        press(&mut app, KeyCode::Char('e'), KeyModifiers::CONTROL)?;
+        assert!(
+            app.pending_editor.is_none(),
+            "Ctrl-E is the viewer's scroll, not the editor"
+        );
+        // The bare letters keep their jobs.
+        press(&mut app, KeyCode::Char('e'), KeyModifiers::NONE)?;
+        assert!(app.pending_editor.is_some(), "a bare e opens the editor");
+        press(&mut app, KeyCode::Char('c'), KeyModifiers::NONE)?;
+        assert_eq!(app.screen, AppScreen::SelectTheme);
+        Ok(())
     }
 
     #[test]

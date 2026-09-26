@@ -153,17 +153,18 @@ struct Args {
     #[arg(long, alias = "batch")]
     headless: bool,
 
-    /// Paint only the ranges that carry meaning: drop standalone brackets/separators and trim
-    /// leading whitespace (the TUI's `M` panel's "everything off" preset). Without this or
-    /// `--full`, the panel's last saved setting applies.
+    /// Paint only the ranges that carry meaning: every option of the TUI's `M` panel off (its
+    /// Minimal preset), so standalone brackets and separators, leading whitespace, and moves that
+    /// only reindent or resize go unpainted. Without this or `--full`, the panel's last saved
+    /// setting applies; either one applies to this run only and is not saved.
     ///
     /// `--minimal` and `--full` are two faithful readings of the same diff, not a right and a
     /// wrong one.
     #[arg(long, conflicts_with = "full")]
     minimal: bool,
 
-    /// Keep standalone brackets/separators and leading whitespace (the `M` panel's "everything
-    /// on" preset).
+    /// Paint the fullest reading: every option of the `M` panel on except whole-pair updates
+    /// (its Full preset).
     #[arg(long)]
     full: bool,
 
@@ -187,7 +188,7 @@ struct Args {
     color: ColorChoice,
 
     /// Exit 1 when the files differ (0 when identical, 2 on error) - the `diff(1)` convention,
-    /// for scripts and CI conditionals.
+    /// for scripts and CI conditionals. Headless and JSON modes only.
     ///
     /// Off by default because version control systems read any non-zero exit from a display
     /// tool as a failure: jj warns on every file, and `git difftool` with
@@ -221,6 +222,9 @@ async fn tui_main(args: &Args, before_after: Option<(PathBuf, PathBuf)>) -> Resu
     tui::ui::install_panic_hook();
 
     let mut app = tui::app::App::new(args.tui_tick_rate, args.tui_frame_rate)?;
+    if let Some(options) = render_option_flags(args) {
+        app.override_render_options(options);
+    }
     if let Some((before, after)) = before_after {
         app.open_files(before, after)?;
     }
@@ -255,22 +259,31 @@ fn headless_needs_files_message(args: &Args) -> &'static str {
     }
 }
 
-/// The [`RenderOptions`](codediff::diff::text::RenderOptions) to paint with: a preset flag
-/// replaces the saved `M` panel setting outright (so a script's output doesn't depend on the
-/// machine), and the single-option flags layer on top of whichever applies.
-fn render_options(args: &Args) -> codediff::diff::text::RenderOptions {
-    let mut options = if args.minimal {
-        codediff::diff::text::RenderOptions::MINIMAL
+/// The render options the command line asks for, or `None` when it names none, so the `M`
+/// panel's saved setting applies. A preset flag replaces that setting outright (a script's output
+/// then does not depend on the machine); the single-option flags only ever turn an option on, on
+/// top of whichever applies. `codediff-web`'s `initial_render_options` is the same rule.
+fn render_option_flags(args: &Args) -> Option<codediff::diff::text::RenderOptions> {
+    use codediff::diff::text::RenderOptions;
+    let preset = if args.minimal {
+        Some(RenderOptions::MINIMAL)
     } else if args.full {
-        codediff::diff::text::RenderOptions::FULL
+        Some(RenderOptions::FULL)
     } else {
-        codediff::tui::theme::load_render_options()
+        None
     };
-    options.whole_pair_updates = args.whole_updates;
-    if args.paint_reindent_moves {
-        options.paint_reindent_only_moves = true;
+    if !args.whole_updates && !args.paint_reindent_moves {
+        return preset;
     }
-    options
+    let mut options = preset.unwrap_or_else(codediff::tui::theme::load_render_options);
+    options.whole_pair_updates |= args.whole_updates;
+    options.paint_reindent_only_moves |= args.paint_reindent_moves;
+    Some(options)
+}
+
+/// The render options a headless or JSON run paints with.
+fn render_options(args: &Args) -> codediff::diff::text::RenderOptions {
+    render_option_flags(args).unwrap_or_else(codediff::tui::theme::load_render_options)
 }
 
 /// Whether headless output should be ANSI-colored. `Auto` deliberately ignores whether stdout is a
@@ -560,6 +573,24 @@ mod tests {
             tui_tick_rate: 4.0,
             tui_frame_rate: 60.0,
         }
+    }
+
+    /// Without any render flag the saved `M` panel setting must apply untouched; leaving out
+    /// `--whole-updates` used to switch a saved "Whole-pair updates" off.
+    #[test]
+    fn no_render_flag_leaves_the_saved_setting_alone() {
+        assert_eq!(render_option_flags(&args_with(Mode::Tui, false)), None);
+
+        let config = tempfile::NamedTempFile::new().expect("temp config");
+        unsafe { std::env::set_var(codediff::tui::theme::CONFIG_ENV, config.path()) };
+        codediff::tui::theme::save_render_options(codediff::diff::text::RenderOptions {
+            whole_pair_updates: true,
+            ..codediff::diff::text::RenderOptions::FULL
+        });
+        let options = render_options(&args_with(Mode::Headless, false));
+        unsafe { std::env::remove_var(codediff::tui::theme::CONFIG_ENV) };
+
+        assert!(options.whole_pair_updates);
     }
 
     #[test]

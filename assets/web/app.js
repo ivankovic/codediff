@@ -730,10 +730,11 @@
   function themeDialog() {
     const themes = state.info.themes;
     const syntaxThemes = state.info.syntax_themes;
-    const savedSyntax = state.syntaxTheme;
+    // The theme in use, not index 0: that is InspiredGitHub, a light theme, and Enter saves it.
+    const savedSyntax = state.syntaxTheme || state.info.default_syntax_theme;
     const dialog = {
       themeIndex: Math.max(themes.findIndex((theme) => theme.id === state.themeId), 0),
-      syntaxIndex: Math.max(syntaxThemes.indexOf(state.syntaxTheme), 0),
+      syntaxIndex: Math.max(syntaxThemes.indexOf(savedSyntax), 0),
       working: paletteFor(state.themeId),
       selected: 0,
       editing: null,
@@ -797,21 +798,24 @@
         }
         render();
       },
+      // The custom palette is saved only when Custom is the choice: with a preset selected,
+      // `working` holds the preset's colors and would overwrite the user's edits.
       commit() {
+        const isCustom = this.theme().id === "Custom";
         const custom = themes.find((theme) => theme.id === "Custom");
-        if (custom) custom.palette = { ...this.working };
+        if (custom && isCustom) custom.palette = { ...this.working };
         const syntaxName = syntaxThemes[this.syntaxIndex];
         state.themeId = this.theme().id;
         state.palette = { ...this.working };
         state.syntaxTheme = syntaxName || state.syntaxTheme;
-        saveSettings({ theme: state.themeId, custom_palette: this.working, syntax_theme: syntaxName });
+        saveSettings({ theme: state.themeId, custom_palette: isCustom ? this.working : undefined, syntax_theme: syntaxName });
         closeDialog();
       },
       cancel() {
         state.palette = paletteFor(state.themeId);
         const previewed = syntaxThemes[this.syntaxIndex];
         state.dialog = null;
-        if (previewed !== savedSyntax && state.diff) this.previewSyntax(savedSyntax || "base16-ocean.dark");
+        if (previewed !== savedSyntax && state.diff) this.previewSyntax(savedSyntax);
         else render();
       },
       render(container) {

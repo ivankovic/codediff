@@ -59,7 +59,7 @@ use anyhow::Result;
 use serde::Serialize;
 
 use crate::code::Code;
-use crate::code::language::{language_for_path, language_for_path_and_content};
+use crate::code::language::{language_for_path, language_for_path_and_content, stable_name};
 use crate::diff::text::{
     DiffSummary, RangeMatch, RenderOptions, TextOperation, ranges_for_options,
     summarize_diff_with_comment_check,
@@ -201,7 +201,7 @@ fn build_side(contents: &str, path: &Path, ranges: &[RangeMatch]) -> JsonSide {
 
     JsonSide {
         path: path.to_path_buf(),
-        language: language.map(|lang| lang.to_string()),
+        language: language.map(|lang| stable_name(lang).to_string()),
         hunks,
     }
 }
@@ -235,7 +235,7 @@ fn build_diff(data: &DiffSessionData, large_residual: bool) -> JsonDiff {
 pub fn binary_diff_json(before: &Path, after: &Path) -> Result<String> {
     let side = |path: &Path| JsonSide {
         path: path.to_path_buf(),
-        language: language_for_path(path).map(|lang| lang.to_string()),
+        language: language_for_path(path).map(|lang| stable_name(lang).to_string()),
         hunks: Vec::new(),
     };
     let diff = JsonDiff {

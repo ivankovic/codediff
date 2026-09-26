@@ -902,17 +902,16 @@ const CodeDiffModel = (() => {
       });
     }
 
+    // `KeyCode::Home`/`End` in `DiffViewer`: the cursor moves too, not just the view, and in
+    // dual mode the other panel shows its own top or bottom.
     home() {
-      this.eachScrolling((panel) => panel.scrollTo(0));
+      this.jumpToLine(1);
+      if (this.displayMode === "dual") this.panels.forEach((panel) => panel.scrollToCenterRow(0));
     }
 
     end() {
-      if (this.displayMode === "dual") {
-        const max = Math.max(this.panels[0].lineCount(), this.panels[1].lineCount());
-        this.panels.forEach((panel) => panel.scrollTo(Math.max(max - 1, 0)));
-      } else {
-        this.focused().scrollTo(Math.max(this.focused().lineCount() - 1, 0));
-      }
+      this.jumpToLine(this.focused().lineCount());
+      if (this.displayMode === "dual") this.panels.forEach((panel) => panel.scrollToCenterRow(panel.lineCount()));
     }
 
     jumpToCounterpart() {

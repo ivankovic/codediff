@@ -35,7 +35,7 @@ use crate::tui::actions::DiffSessionData;
 use crate::tui::components::diff_viewer::SINGLE_PANEL_THRESHOLD;
 use crate::tui::components::help_modal::HELP_TEXT;
 use crate::tui::theme::{self, CustomPalette, OverlayTheme, PanelLayout};
-use crate::tui::widgets::code_viewer::syntax_theme_names;
+use crate::tui::widgets::code_viewer::{DEFAULT_SYNTAX_THEME, syntax_theme_names};
 use crate::web::payload::{DiffPayload, HighlightPayload, diff_payload, highlight_payload};
 
 /// The last successful diff, unfiltered - `DiffViewer::full_ranges` - so a render-options change
@@ -117,6 +117,8 @@ pub struct StatePayload {
     pub settings: SettingsPayload,
     pub themes: Vec<ThemePayload>,
     pub syntax_themes: Vec<String>,
+    /// The syntax theme until the user picks one, which the theme dialog opens on.
+    pub default_syntax_theme: &'static str,
     pub render_option_rows: Vec<RenderOptionRow>,
     /// `RenderOptions::MINIMAL`/`FULL`, for the `M` panel's `1`/`2` keys and the footer badge -
     /// sent rather than duplicated in JavaScript, so a preset can only mean one thing.
@@ -290,6 +292,7 @@ impl Session {
                 })
                 .collect(),
             syntax_themes: syntax_theme_names(),
+            default_syntax_theme: DEFAULT_SYNTAX_THEME,
             render_option_rows: render_option_rows(),
             presets: Presets {
                 minimal: RenderOptions::MINIMAL,
@@ -456,17 +459,13 @@ pub fn list_directory(dir: &Path) -> ListingPayload {
     }
 }
 
-/// `App::run_editor` without the terminal handover: `$VISUAL`, else `$EDITOR`, else `vi`, on
-/// `path` at `line`, inheriting this process's stdio - so a terminal editor opens in the terminal
+/// `App::run_editor` without the terminal handover: `editor_command`'s editor on `path` at
+/// `line`, inheriting this process's stdio - so a terminal editor opens in the terminal
 /// `codediff-web` was started from, and a GUI one opens wherever it opens. Blocks until the
 /// editor exits; the caller re-diffs afterwards.
 pub fn run_editor(path: &Path, line: usize) -> Result<(), String> {
-    let editor = std::env::var("VISUAL")
-        .or_else(|_| std::env::var("EDITOR"))
-        .unwrap_or_else(|_| "vi".to_string());
-    std::process::Command::new(&editor)
-        .arg(format!("+{line}"))
-        .arg(path)
+    let (editor, mut command) = crate::tui::app::editor_command(path, line);
+    command
         .status()
         .map(|_| ())
         .map_err(|err| format!("failed to launch editor '{editor}': {err}"))

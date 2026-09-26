@@ -665,25 +665,28 @@ impl Component for DiffViewer {
                 }
                 Ok(Some(Action::Render))
             }
+            // The cursor moves too, as in an editor: scrolling alone left it off screen, and the
+            // next `j`/`k` snapped the view back to it.
+            // In dual mode the other panel shows its own top or bottom too, since the last line
+            // often has no counterpart for it to follow.
             crossterm::event::KeyCode::Home => {
+                self.jump_to_line(1);
                 if self.display_mode == DisplayMode::Dual {
-                    self.left_viewer.scroll_to(0);
-                    self.right_viewer.scroll_to(0);
-                } else {
-                    self.focused_viewer().scroll_to(0);
+                    self.left_viewer.scroll_to_center_row(0);
+                    self.right_viewer.scroll_to_center_row(0);
                 }
                 Ok(Some(Action::Render))
             }
             crossterm::event::KeyCode::End => {
+                let last_line = self.focused_viewer().line_count();
+                self.jump_to_line(last_line);
                 if self.display_mode == DisplayMode::Dual {
-                    let left_lines = self.left_viewer.line_count();
-                    let right_lines = self.right_viewer.line_count();
-                    let max_lines = std::cmp::max(left_lines, right_lines);
-                    self.left_viewer.scroll_to(max_lines.saturating_sub(1));
-                    self.right_viewer.scroll_to(max_lines.saturating_sub(1));
-                } else {
-                    let lines = self.focused_viewer().line_count();
-                    self.focused_viewer().scroll_to(lines.saturating_sub(1));
+                    let (left, right) = (
+                        self.left_viewer.line_count(),
+                        self.right_viewer.line_count(),
+                    );
+                    self.left_viewer.scroll_to_center_row(left);
+                    self.right_viewer.scroll_to_center_row(right);
                 }
                 Ok(Some(Action::Render))
             }
@@ -1415,6 +1418,25 @@ mod tests {
                 (Panel::After, Some((20, 0)), Some((4, 4))),
             ]
         );
+    }
+
+    #[test]
+    fn end_and_home_move_the_cursor_to_the_last_and_first_line() {
+        let mut viewer = DiffViewer::new();
+        viewer.load_diff(&alternating_panels_diff_data());
+        let press = |viewer: &mut DiffViewer, code| {
+            viewer
+                .handle_key_event(crossterm::event::KeyEvent::new(
+                    code,
+                    crossterm::event::KeyModifiers::NONE,
+                ))
+                .unwrap();
+        };
+
+        press(&mut viewer, crossterm::event::KeyCode::End);
+        assert_eq!(viewer.focused_cursor_position(), Some((29, 0)));
+        press(&mut viewer, crossterm::event::KeyCode::Home);
+        assert_eq!(viewer.focused_cursor_position(), Some((0, 0)));
     }
 
     #[test]

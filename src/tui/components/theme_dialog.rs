@@ -33,7 +33,7 @@ use crate::tui::theme::{
     CustomPalette, OverlayTheme, parse_hex_color, save_custom_palette, save_syntax_theme,
     set_custom_palette,
 };
-use crate::tui::widgets::code_viewer::syntax_theme_names;
+use crate::tui::widgets::code_viewer::{DEFAULT_SYNTAX_THEME, syntax_theme_names};
 
 /// One editable color in the dialog, and the [`CustomPalette`] field it reads and writes. Declared
 /// in display order.
@@ -139,8 +139,11 @@ impl ThemeDialog {
         let themes: Vec<OverlayTheme> = OverlayTheme::iter().collect();
         let theme_index = themes.iter().position(|&t| t == current).unwrap_or(0);
         let syntax_themes = syntax_theme_names();
-        let syntax_index = syntax_theme
-            .and_then(|name| syntax_themes.iter().position(|t| t == name))
+        // Opening on the theme actually in use: index 0 is `InspiredGitHub`, a light theme, and
+        // Enter would save it.
+        let syntax_index = syntax_themes
+            .iter()
+            .position(|t| t == syntax_theme.unwrap_or(DEFAULT_SYNTAX_THEME))
             .unwrap_or(0);
         Self {
             themes,
@@ -198,9 +201,13 @@ impl ThemeDialog {
     }
 
     /// Persists the custom palette and syntax theme here rather than in `app.rs`: no `Action`
-    /// carries them, and both are dialog-owned state.
+    /// carries them, and both are dialog-owned state. The custom palette only when Custom is the
+    /// choice: with a preset selected `working` holds the preset's colors, and saving them would
+    /// discard the user's edits, which the config keeps for switching back.
     fn commit_dialog(&self) -> Action {
-        save_custom_palette(self.working.clone());
+        if self.theme() == OverlayTheme::Custom {
+            save_custom_palette(self.working.clone());
+        }
         if let Some(name) = self.syntax_themes.get(self.syntax_index) {
             save_syntax_theme(name);
         }
@@ -370,6 +377,37 @@ mod tests {
         for _ in 0..DROPDOWN_ROWS {
             dialog.handle_key_event(key(KeyCode::Down)).unwrap();
         }
+    }
+
+    #[test]
+    fn with_no_saved_syntax_theme_the_dialog_opens_on_the_default() {
+        let dialog = ThemeDialog::with_syntax_theme(OverlayTheme::Dracula, None);
+        assert_eq!(
+            dialog.syntax_themes[dialog.syntax_index],
+            DEFAULT_SYNTAX_THEME
+        );
+    }
+
+    /// Enter on a preset used to save the preset's colors over the user's custom palette.
+    #[test]
+    fn accepting_a_preset_keeps_the_saved_custom_palette() {
+        let config = tempfile::NamedTempFile::new().expect("temp config");
+        unsafe { std::env::set_var(crate::tui::theme::CONFIG_ENV, config.path()) };
+        let edited = CustomPalette {
+            insert_bg: "#010203".to_string(),
+            ..CustomPalette::default()
+        };
+        save_custom_palette(edited.clone());
+
+        let dialog = ThemeDialog::with_syntax_theme(OverlayTheme::Nord, None);
+        let action = dialog.commit_dialog();
+        let saved = crate::tui::theme::load_custom_palette();
+        let syntax = crate::tui::theme::load_syntax_theme();
+        unsafe { std::env::remove_var(crate::tui::theme::CONFIG_ENV) };
+
+        assert_eq!(action, Action::ThemeSelected(OverlayTheme::Nord));
+        assert_eq!(saved, edited);
+        assert_eq!(syntax.as_deref(), Some(DEFAULT_SYNTAX_THEME));
     }
 
     #[test]

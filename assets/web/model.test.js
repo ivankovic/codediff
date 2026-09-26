@@ -259,6 +259,15 @@ function pairModel() {
   assert.deepStrictEqual([model.activePanel, model.focusedCursorPosition()], [1, [20, 0]], "p wraps the other way");
 }
 
+// End and Home move the cursor to the last and first line, not just the view
+{
+  const model = pairModel();
+  model.end();
+  assert.deepStrictEqual(model.focusedCursorPosition(), [29, 0]);
+  model.home();
+  assert.deepStrictEqual(model.focusedCursorPosition(), [0, 0]);
+}
+
 // Enter jumps to the counterpart and back; the other panel's cursor follows the match
 {
   const model = pairModel();
@@ -332,7 +341,8 @@ function pairModel() {
   model.scrollView(-1);
   assert.deepStrictEqual(model.panels.map((p) => p.scroll), [9, 9]);
   model.end();
-  assert.deepStrictEqual(model.panels.map((p) => p.scroll), [29, 29]);
+  // The last full screen, not the last line alone at the top.
+  assert.deepStrictEqual(model.panels.map((p) => p.scroll), [20, 20]);
   model.home();
   assert.deepStrictEqual(model.panels.map((p) => p.scroll), [0, 0]);
   model.layoutOverride = "Single";

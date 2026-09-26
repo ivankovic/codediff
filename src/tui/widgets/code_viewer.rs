@@ -89,6 +89,10 @@ pub(crate) fn language_to_syntect(lang: &crate::code::Language) -> Option<&'stat
     }
 }
 
+/// The syntax theme until the user picks one: one of syntect's bundled themes, and a dark one,
+/// since most terminals are.
+pub const DEFAULT_SYNTAX_THEME: &str = "base16-ocean.dark";
+
 fn syntect_color_to_ratatui(color: syntect::highlighting::Color) -> ratatui::style::Color {
     ratatui::style::Color::Rgb(color.r, color.g, color.b)
 }
@@ -559,14 +563,15 @@ impl CodeViewerWidget {
         syntax_set().find_syntax_by_name(syntect_name)
     }
 
-    /// `theme_name`, or `base16-ocean.dark` if unset or unknown: `set_theme` does not validate.
+    /// `theme_name`, or [`DEFAULT_SYNTAX_THEME`] if unset or unknown: `set_theme` does not
+    /// validate.
     fn get_theme(&self) -> Theme {
         let theme_set = theme_set();
-        let theme_name = self.theme_name.as_deref().unwrap_or("base16-ocean.dark");
+        let theme_name = self.theme_name.as_deref().unwrap_or(DEFAULT_SYNTAX_THEME);
         theme_set
             .themes
             .get(theme_name)
-            .or_else(|| theme_set.themes.get("base16-ocean.dark"))
+            .or_else(|| theme_set.themes.get(DEFAULT_SYNTAX_THEME))
             .expect("base16-ocean.dark is one of syntect's own bundled default themes")
             .clone()
     }
@@ -737,10 +742,10 @@ impl CodeViewerWidget {
             .unwrap_or_else(|| "Untitled".to_string())
     }
 
+    /// As a person writes it (`C++`, not the variant's `CPP`), for the panel title.
     pub fn language_name(&self) -> String {
         self.language
-            .as_ref()
-            .map(|l| format!("{:?}", l))
+            .map(crate::code::language::human_name)
             .unwrap_or_else(|| "Plain Text".to_string())
     }
 }

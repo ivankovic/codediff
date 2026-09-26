@@ -255,7 +255,7 @@ pub fn side_language(path: &Path, contents: &str, other: Option<Language>) -> Op
 
 fn language_name(language: Option<Language>) -> String {
     language
-        .map(|language| format!("{language:?}"))
+        .map(crate::code::language::human_name)
         .unwrap_or_else(|| "Plain Text".to_string())
 }
 

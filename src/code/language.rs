@@ -111,6 +111,44 @@ pub fn language_for_extension(ext: &str) -> Option<Language> {
         .map(|(_, language)| *language)
 }
 
+/// The language's name in `--mode json` output, which editor integrations read, so it must not
+/// change when a variant is renamed. These are the variant names as of 0.1.0, spelled out.
+pub fn stable_name(language: Language) -> &'static str {
+    match language {
+        Language::Unknown => "Unknown",
+        Language::Bazel => "Bazel",
+        Language::C => "C",
+        Language::CPP => "CPP",
+        Language::CSS => "CSS",
+        Language::CSharp => "CSharp",
+        Language::Dart => "Dart",
+        Language::Go => "Go",
+        Language::HTML => "HTML",
+        Language::JSON => "JSON",
+        Language::Java => "Java",
+        Language::JavaScript => "JavaScript",
+        Language::Kotlin => "Kotlin",
+        Language::LUA => "LUA",
+        Language::Lisp => "Lisp",
+        Language::MarkDown => "MarkDown",
+        Language::PHP => "PHP",
+        Language::ProtoBuf => "ProtoBuf",
+        Language::Python => "Python",
+        Language::R => "R",
+        Language::Ruby => "Ruby",
+        Language::Rust => "Rust",
+        Language::SQL => "SQL",
+        Language::Scala => "Scala",
+        Language::ShellScript => "ShellScript",
+        Language::Swift => "Swift",
+        Language::TSX => "TSX",
+        Language::TypeScript => "TypeScript",
+        Language::Vimscript => "Vimscript",
+        Language::XML => "XML",
+        Language::YAML => "YAML",
+    }
+}
+
 /// The language's name as a person writes it, where the variant name is not that.
 pub fn human_name(language: Language) -> String {
     match language {
@@ -321,6 +359,50 @@ mod tests {
             readme[from..to].trim_end(),
             expected.trim_end(),
             "README.md's language section is stale; paste this between the markers:\n\n{expected}"
+        );
+    }
+
+    /// `--mode json`'s `language` values are a published contract; this pins every one, so a
+    /// variant rename cannot change the output.
+    #[test]
+    fn the_json_language_names_are_the_0_1_0_spellings() {
+        use strum::IntoEnumIterator;
+        let names: Vec<&str> = Language::iter().map(stable_name).collect();
+        assert_eq!(
+            names,
+            [
+                "Unknown",
+                "Bazel",
+                "C",
+                "CPP",
+                "CSS",
+                "CSharp",
+                "Dart",
+                "Go",
+                "HTML",
+                "JSON",
+                "Java",
+                "JavaScript",
+                "Kotlin",
+                "LUA",
+                "Lisp",
+                "MarkDown",
+                "PHP",
+                "ProtoBuf",
+                "Python",
+                "R",
+                "Ruby",
+                "Rust",
+                "SQL",
+                "Scala",
+                "ShellScript",
+                "Swift",
+                "TSX",
+                "TypeScript",
+                "Vimscript",
+                "XML",
+                "YAML",
+            ]
         );
     }
 
