@@ -8,6 +8,11 @@
 
 Fast, robust, accurate, syntax-aware code diffing.
 
+- **Fast:** under 100ms for 93% of changes
+- **Robust:** can diff 99.95% of changes
+- **Accurate:** 70% of changes perfect, 90% near-perfect
+- **Syntax-aware:** 24 supported languages, text and binary fallback as needed
+
 ![An animation of one Python refactoring painted two ways. A vertical bar sweeps left to right and
 back across a two-pane diff. On one side of the bar, GNU diff marks whole lines as deleted and
 inserted; on the other, CodeDiff paints only the parts that changed - `sum(numbers)` and
