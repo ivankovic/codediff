@@ -2667,3 +2667,41 @@ fn toggling_an_out_of_range_option_is_a_no_op() {
     options.toggle(options.options().len());
     assert_eq!(options, RenderOptions::FULL);
 }
+
+#[test]
+fn every_member_of_an_identical_group_paints_as_a_move_even_in_place() {
+    use crate::code::Language;
+    use crate::diff::{ASTMapping, ASTMappingReason};
+
+    let before = Code::from_string("fn main() {\n    foo();\n}\n", &Language::Rust);
+    let after = Code::from_string("fn main() {\n    foo();\n    foo();\n}\n", &Language::Rust);
+    let statements = |code: &Code| -> Vec<usize> {
+        let root = code.ast.as_ref().unwrap().root_node();
+        let body = root.child(0).unwrap().child_by_field_name("body").unwrap();
+        let mut cursor = body.walk();
+        body.named_children(&mut cursor)
+            .map(|node| node.id())
+            .collect()
+    };
+    let mut diff = ASTDiff::default();
+    // One call became two: the first copy is still in place, the second is new text.
+    diff.add_group(
+        &statements(&before),
+        &statements(&after),
+        ASTMapping::identical(ASTMappingReason::IdenticalHash),
+    );
+    let node_cache = NodeCache::build(&before, &after);
+
+    for options in [RenderOptions::MINIMAL, RenderOptions::FULL] {
+        let text = TextDiff::from_with_options(&before, &after, &diff, &node_cache, options);
+        let moved_rows = |side: usize| -> Vec<usize> {
+            text.all(side)
+                .iter()
+                .filter(|range| range.operation == TextOperation::Move)
+                .map(|range| range.source.start_row)
+                .collect()
+        };
+        assert_eq!(moved_rows(0), vec![1], "{options:?}");
+        assert_eq!(moved_rows(1), vec![1, 2], "{options:?}");
+    }
+}
