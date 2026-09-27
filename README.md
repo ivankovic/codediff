@@ -14,8 +14,8 @@ inserted; on the other, CodeDiff paints only the parts that changed - `sum(numbe
 `len(numbers)` rather than the whole assignment, and `numbers` shown as moved rather than
 rewritten.](/assets/diff-vs-codediff.gif)
 
-**[Try it in the browser](https://ivankovic.github.io/codediff/showcase/)**: twenty real changes,
-compared side by side in Unix `diff` and in CodeDiff.
+**[See it in the browser](https://ivankovic.github.io/codediff/showcase/)**: twenty real changes,
+recorded from the command-line tool and compared side by side in Unix `diff` and in CodeDiff.
 
 The terminal UI, in its light theme:
 

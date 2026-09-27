@@ -334,7 +334,7 @@ if (typeof module !== "undefined") {
 
     function updateTitle() {
       const entry = cases.find((c) => c.name === selected);
-      if (entry) document.title = `${entry.title} · ${S.VIEW_LABEL[ctx.view]} · CodeDiff live examples`;
+      if (entry) document.title = `${entry.title} · ${S.VIEW_LABEL[ctx.view]} · CodeDiff examples`;
     }
   })();
 }
