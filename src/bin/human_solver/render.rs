@@ -118,6 +118,8 @@ pub(crate) fn render_panel(
     algo_diff: Option<&ASTDiff>,
     show_reason: bool,
     total_unmarked: usize,
+    // `None` until codediff's diff is in; see `FrameState::before_mismatches`.
+    mismatches: Option<usize>,
     multi_selected: &std::collections::BTreeSet<usize>,
     groups: &[MultiMapGroup],
 ) {
@@ -201,12 +203,21 @@ pub(crate) fn render_panel(
     };
     let block = Block::default()
         .borders(Borders::ALL)
-        .title(format!(
-            "{} — {} nodes, {} unmarked",
-            title,
-            flat.len(),
-            total_unmarked
-        ))
+        .title(match mismatches {
+            Some(mismatches) => format!(
+                "{} — {} nodes, {} unmarked, {} mismatches",
+                title,
+                flat.len(),
+                total_unmarked,
+                mismatches
+            ),
+            None => format!(
+                "{} — {} nodes, {} unmarked",
+                title,
+                flat.len(),
+                total_unmarked
+            ),
+        })
         .border_style(border_style);
 
     frame.render_widget(List::new(items).block(block), area);
@@ -281,6 +292,8 @@ pub(crate) fn draw_ui(
     after_src: &[u8],
     before_unmarked: usize,
     after_unmarked: usize,
+    before_mismatches: Option<usize>,
+    after_mismatches: Option<usize>,
     name: &str,
     // No grammar, so no nodes (see `FrameState::before_root`).
     text_only: bool,
@@ -313,26 +326,29 @@ pub(crate) fn draw_ui(
         render_unsupported_language_panels(frame, chunks[1], single_panel, app.focus);
     } else if single_panel {
         let panel_area = chunks[1];
-        let (title, flat, panel, side, src, total_unmarked, multi_selected) = match app.focus {
-            Focus::Before => (
-                "Before",
-                before_flat,
-                &mut app.before,
-                Side::Before,
-                before_src,
-                before_unmarked,
-                &app.before_multi_select,
-            ),
-            Focus::After => (
-                "After",
-                after_flat,
-                &mut app.after,
-                Side::After,
-                after_src,
-                after_unmarked,
-                &app.after_multi_select,
-            ),
-        };
+        let (title, flat, panel, side, src, total_unmarked, mismatches, multi_selected) =
+            match app.focus {
+                Focus::Before => (
+                    "Before",
+                    before_flat,
+                    &mut app.before,
+                    Side::Before,
+                    before_src,
+                    before_unmarked,
+                    before_mismatches,
+                    &app.before_multi_select,
+                ),
+                Focus::After => (
+                    "After",
+                    after_flat,
+                    &mut app.after,
+                    Side::After,
+                    after_src,
+                    after_unmarked,
+                    after_mismatches,
+                    &app.after_multi_select,
+                ),
+            };
         render_panel(
             frame,
             panel_area,
@@ -346,6 +362,7 @@ pub(crate) fn draw_ui(
             app.algo_diff.as_ref(),
             app.show_reason,
             total_unmarked,
+            mismatches,
             multi_selected,
             &app.mapping.groups,
         );
@@ -368,6 +385,7 @@ pub(crate) fn draw_ui(
             app.algo_diff.as_ref(),
             app.show_reason,
             before_unmarked,
+            before_mismatches,
             &app.before_multi_select,
             &app.mapping.groups,
         );
@@ -384,6 +402,7 @@ pub(crate) fn draw_ui(
             app.algo_diff.as_ref(),
             app.show_reason,
             after_unmarked,
+            after_mismatches,
             &app.after_multi_select,
             &app.mapping.groups,
         );

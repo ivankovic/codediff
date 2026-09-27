@@ -27,6 +27,7 @@
 //!
 //! Keybindings: press `?`, or read `HELP_TEXT` below.
 use std::io::{self, Stdout, Write};
+use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::{Context, Result, anyhow, bail};
@@ -132,7 +133,10 @@ X              flip the pending selection to all-to-all and back: every
                  body duplicated). Shown as G instead of g once committed
 c              clear the pending multi-map selection
 a / A          align other panel to the human mapping / to codediff's mapping
-p              run codediff's own diff, show its verdict next to each node
+p              re-run codediff's own diff in the foreground; it runs by itself in
+                 the background when a case opens, and its verdict then shows
+                 next to each node (`*` where it disagrees with you) with the
+                 count of those in each panel's header
 r              toggle showing the ASTMappingReason (which pass matched it) next
                  to each node's algo verdict
 n / N          jump to next / previous mismatch (`*`) vs. codediff's verdict

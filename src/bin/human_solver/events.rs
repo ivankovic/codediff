@@ -41,6 +41,23 @@ pub(crate) struct FrameState<'a> {
     /// header. Kept here because counting walks every node, not just the visible ones.
     pub(crate) before_unmarked: usize,
     pub(crate) after_unmarked: usize,
+    /// How many nodes in `before_flat`/`after_flat` codediff disagrees with the human on
+    /// (`algo_disagrees`, the `*` rows `n`/`N` visit), for the same header; `None` until
+    /// codediff's diff has arrived. Here for the same reason as the unmarked counts.
+    pub(crate) before_mismatches: Option<usize>,
+    pub(crate) after_mismatches: Option<usize>,
+}
+
+/// How many nodes of `flat` draw a `*`: the human has marked them and codediff says otherwise.
+pub(crate) fn count_mismatches(
+    flat: &[(Node, usize)],
+    caches: &Caches,
+    diff_ast: &ASTDiff,
+    side: Side,
+) -> usize {
+    flat.iter()
+        .filter(|(node, _)| algo_disagrees(side, *node, caches, diff_ast))
+        .count()
 }
 
 pub(crate) fn count_unmarked(
@@ -72,6 +89,8 @@ pub(crate) fn compute_frame_state<'a>(
             after_flat: FlatIndex::new(Vec::new()),
             before_unmarked: 0,
             after_unmarked: 0,
+            before_mismatches: None,
+            after_mismatches: None,
         });
     };
     let before_root = before_tree.root_node();
@@ -99,6 +118,14 @@ pub(crate) fn compute_frame_state<'a>(
 
     let before_unmarked = count_unmarked(&before_flat, &caches, status_before);
     let after_unmarked = count_unmarked(&after_flat, &caches, status_after);
+    let before_mismatches = app
+        .algo_diff
+        .as_ref()
+        .map(|diff| count_mismatches(&before_flat, &caches, diff, Side::Before));
+    let after_mismatches = app
+        .algo_diff
+        .as_ref()
+        .map(|diff| count_mismatches(&after_flat, &caches, diff, Side::After));
 
     Ok(FrameState {
         before_root: Some(before_root),
@@ -110,6 +137,8 @@ pub(crate) fn compute_frame_state<'a>(
         after_flat,
         before_unmarked,
         after_unmarked,
+        before_mismatches,
+        after_mismatches,
     })
 }
 
@@ -129,9 +158,13 @@ pub(crate) enum SessionEnd {
 pub(crate) fn run_event_loop(
     terminal: &mut Terminal<CrosstermBackend<Stdout>>,
     app: &mut App,
-    mut before: Code,
-    mut after: Code,
+    before: Code,
+    after: Code,
 ) -> Result<()> {
+    // `Arc`, not owned: the background codediff run (`start_algo_diff`) must diff these very
+    // trees, since `ASTDiff` is keyed by node id and a re-parse would number the nodes afresh.
+    let mut before = Arc::new(before);
+    let mut after = Arc::new(after);
     loop {
         // The session borrows `before`/`after` immutably, so its cached `FrameState` can live for
         // the whole session; only this loop reassigns them, between sessions.
@@ -141,8 +174,8 @@ pub(crate) fn run_event_loop(
                 Ok((new_before, new_after)) => {
                     let before_root_id = starting_cursor_id(&new_before);
                     let after_root_id = starting_cursor_id(&new_after);
-                    before = new_before;
-                    after = new_after;
+                    before = Arc::new(new_before);
+                    after = Arc::new(new_after);
                     app.mapping = human_mapping::load(&name).unwrap_or_default();
                     app.name = name;
                     app.origin = CaseOrigin::Diffs;
@@ -151,6 +184,7 @@ pub(crate) fn run_event_loop(
                     app.focus = Focus::Before;
                     app.dirty = false;
                     app.algo_diff = None;
+                    app.algo_diff_pending = None;
                     app.algo_text_spans = None;
                     app.tree_text_spans = None;
                     app.text_overlay = TextOverlay::default();
@@ -167,8 +201,8 @@ pub(crate) fn run_event_loop(
                 Ok((new_before, new_after, source)) => {
                     let before_root_id = starting_cursor_id(&new_before);
                     let after_root_id = starting_cursor_id(&new_after);
-                    before = new_before;
-                    after = new_after;
+                    before = Arc::new(new_before);
+                    after = Arc::new(new_after);
                     app.mapping = HumanMapping::default();
                     app.name = name;
                     app.origin = CaseOrigin::Sample(source);
@@ -177,6 +211,7 @@ pub(crate) fn run_event_loop(
                     app.focus = Focus::Before;
                     app.dirty = false;
                     app.algo_diff = None;
+                    app.algo_diff_pending = None;
                     app.algo_text_spans = None;
                     app.tree_text_spans = None;
                     app.text_overlay = TextOverlay::default();
@@ -199,8 +234,8 @@ pub(crate) fn run_event_loop(
                 Ok((new_before, new_after)) => {
                     let before_root_id = starting_cursor_id(&new_before);
                     let after_root_id = starting_cursor_id(&new_after);
-                    before = new_before;
-                    after = new_after;
+                    before = Arc::new(new_before);
+                    after = Arc::new(new_after);
                     app.mapping = HumanMapping::default();
                     app.name = format!("{path}@{}", short_hash(&hash));
                     app.status = Some(format!(
@@ -216,6 +251,7 @@ pub(crate) fn run_event_loop(
                     app.focus = Focus::Before;
                     app.dirty = false;
                     app.algo_diff = None;
+                    app.algo_diff_pending = None;
                     app.algo_text_spans = None;
                     app.tree_text_spans = None;
                     app.text_overlay = TextOverlay::default();
@@ -404,15 +440,69 @@ pub(crate) fn history_key(
     }
 }
 
+/// Runs codediff on `before`/`after` on a background thread; `poll_algo_diff` collects the
+/// result. The `Arc`s keep the trees alive for the thread, and the thread diffs the same trees
+/// the panels show, so the node ids in its `ASTDiff` are the panels' ids.
+pub(crate) fn start_algo_diff(app: &mut App, before: &Arc<Code>, after: &Arc<Code>) {
+    let (sender, receiver) = std::sync::mpsc::channel();
+    let before = Arc::clone(before);
+    let after = Arc::clone(after);
+    std::thread::spawn(move || {
+        // A failed send means the case was switched meanwhile; the result is simply dropped.
+        let _ = sender.send(diff_code(&before, &after).ast);
+    });
+    app.algo_diff_pending = Some(receiver);
+}
+
+/// Takes a finished background run into `App::algo_diff`. `true` when one arrived this call, so
+/// the caller redraws and recomputes what reads the diff. A run that never reports (the thread
+/// panicked) is forgotten rather than waited on forever.
+pub(crate) fn poll_algo_diff(app: &mut App) -> bool {
+    let Some(receiver) = app.algo_diff_pending.as_ref() else {
+        return false;
+    };
+    match receiver.try_recv() {
+        Ok(ast_diff) => {
+            app.algo_diff_pending = None;
+            app.status = Some(match &ast_diff {
+                Some(ast_diff) => format!(
+                    "codediff ran: {} before-node(s), {} after-node(s) mapped; n/N jump to \
+                     where you disagree",
+                    ast_diff.before_node_map.len(),
+                    ast_diff.after_node_map.len()
+                ),
+                None => "codediff produced no AST diff".to_string(),
+            });
+            app.algo_diff = ast_diff;
+            true
+        }
+        Err(std::sync::mpsc::TryRecvError::Empty) => false,
+        Err(std::sync::mpsc::TryRecvError::Disconnected) => {
+            app.algo_diff_pending = None;
+            app.status = Some("codediff's background run failed; p re-runs it".to_string());
+            false
+        }
+    }
+}
+
 /// Runs the event loop for a single case until the user quits or asks to switch to a different
 /// one. Separate from `run_event_loop` so the cached `FrameState`, which borrows `before`/`after`,
 /// never coexists with their reassignment; a case switch is returned as `SessionEnd::Open`.
 pub(crate) fn run_case_session(
     terminal: &mut Terminal<CrosstermBackend<Stdout>>,
     app: &mut App,
-    before: &Code,
-    after: &Code,
+    before: &Arc<Code>,
+    after: &Arc<Code>,
 ) -> Result<SessionEnd> {
+    // codediff's verdicts (`*`, `n`/`N`, the header count) are wanted from the first frame, and
+    // the run takes up to a second on a large fixture, so it starts now and lands via
+    // `poll_algo_diff` while the human reads.
+    if app.algo_diff.is_none() && app.algo_diff_pending.is_none() {
+        start_algo_diff(app, before, after);
+    }
+    let before: &Code = before;
+    let after: &Code = after;
+
     // An idle poll timeout redraws nothing.
     let mut needs_redraw = true;
 
@@ -439,6 +529,8 @@ pub(crate) fn run_case_session(
                     frame_state.after_src,
                     frame_state.before_unmarked,
                     frame_state.after_unmarked,
+                    frame_state.before_mismatches,
+                    frame_state.after_mismatches,
                     &current_name,
                     frame_state.roots().is_none(),
                 )
@@ -447,6 +539,11 @@ pub(crate) fn run_case_session(
         }
 
         if !event::poll(Duration::from_millis(250))? {
+            if poll_algo_diff(app) {
+                // The mismatch counts read the diff, so the frame state goes with it.
+                needs_redraw = true;
+                state = None;
+            }
             continue;
         }
 
@@ -535,6 +632,10 @@ pub(crate) fn run_case_session(
         }
 
         watch.finish(app);
+        // Also here, so a run that landed while keys were streaming in shows without an idle tick.
+        if poll_algo_diff(app) {
+            state = None;
+        }
 
         needs_redraw = true;
         if !state_preserving {

@@ -125,10 +125,9 @@ pub(crate) fn action_next_mismatch(
     caches: &Caches,
     forward: bool,
 ) -> Result<String> {
-    let diff_ast = app
-        .algo_diff
-        .as_ref()
-        .context("No codediff result yet; press 'p' to run it first")?;
+    let diff_ast = app.algo_diff.as_ref().context(
+        "codediff has not finished yet; it runs in the background when a case opens, p runs it now",
+    )?;
     let found = match focus {
         Focus::Before => advance_to_next_mismatch(
             &mut app.before,
@@ -341,7 +340,7 @@ pub(crate) fn action_align_algo(
         let diff_ast = app
             .algo_diff
             .as_ref()
-            .context("No codediff result yet; press 'p' to run it first")?;
+            .context("codediff has not finished yet; it runs in the background when a case opens, p runs it now")?;
         let own_cursor = match focus {
             Focus::Before => app.before.cursor_id,
             Focus::After => app.after.cursor_id,

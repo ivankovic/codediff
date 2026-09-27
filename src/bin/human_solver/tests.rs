@@ -324,6 +324,7 @@ fn render_panel_only_scans_the_visible_window_not_the_whole_flat_list() {
                 None,
                 false,
                 424242,
+                None,
                 &std::collections::BTreeSet::new(),
                 &[],
             )
@@ -4872,6 +4873,8 @@ fn draw_ui_shows_only_the_focused_panel_below_the_single_panel_width_threshold()
                 after_source.as_bytes(),
                 before_unmarked,
                 after_unmarked,
+                None,
+                None,
                 "test",
                 false,
             )
@@ -4901,6 +4904,8 @@ fn draw_ui_shows_only_the_focused_panel_below_the_single_panel_width_threshold()
                 after_source.as_bytes(),
                 before_unmarked,
                 after_unmarked,
+                None,
+                None,
                 "test",
                 false,
             )
@@ -7635,6 +7640,7 @@ fn render_panel_marks_an_all_to_all_member_with_a_capital_g() {
                 None,
                 false,
                 0,
+                None,
                 &std::collections::BTreeSet::new(),
                 &app.mapping.groups,
             );
@@ -7718,6 +7724,7 @@ fn render_panel_marks_a_group_matched_node_and_a_pending_selection_distinctly() 
                 None,
                 false,
                 0,
+                None,
                 &pending,
                 &mapping.groups,
             );
@@ -8483,6 +8490,8 @@ fn draw_ui_names_the_missing_grammar_instead_of_drawing_an_empty_tree() {
                 after.contents.as_bytes(),
                 0,
                 0,
+                None,
+                None,
                 "bazel-not-actually-supported-by-treesitter",
                 true,
             )
@@ -9586,4 +9595,142 @@ fn may_edit_mapping_covers_the_marking_keys_and_not_navigation() {
     }
     assert!(!may_edit_mapping(Some(&text_view), KeyCode::Char('v')));
     assert!(!may_edit_mapping(Some(&text_view), KeyCode::Char('o')));
+}
+
+// ---------------------------------------------------------------------------------------------
+// codediff in the background
+// ---------------------------------------------------------------------------------------------
+
+/// Polls until the background run lands, or gives up after a few seconds so a broken thread
+/// fails the test instead of hanging it.
+fn wait_for_algo_diff(app: &mut App) -> bool {
+    for _ in 0..200 {
+        if poll_algo_diff(app) {
+            return true;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(25));
+    }
+    false
+}
+
+#[test]
+fn start_algo_diff_lands_through_poll_algo_diff_keyed_by_the_panels_own_node_ids() {
+    let before = Arc::new(Code::from_string("fn main() { a(); }\n", &Language::Rust));
+    let after = Arc::new(Code::from_string("fn main() { b(); }\n", &Language::Rust));
+    let root_id = before.ast.as_ref().unwrap().root_node().id();
+    let mut app = test_app();
+
+    assert!(!poll_algo_diff(&mut app), "nothing in flight yet");
+    start_algo_diff(&mut app, &before, &after);
+    assert!(app.algo_diff_pending.is_some());
+
+    assert!(wait_for_algo_diff(&mut app), "the run never reported");
+    assert!(app.algo_diff_pending.is_none(), "the channel is spent");
+    let diff = app
+        .algo_diff
+        .as_ref()
+        .expect("the run produced an AST diff");
+    assert!(
+        diff.before_node_map.contains_key(&root_id),
+        "the diff must be of the very tree the panels show, not a re-parse"
+    );
+    assert!(
+        app.status
+            .as_deref()
+            .unwrap_or("")
+            .starts_with("codediff ran"),
+        "{:?}",
+        app.status
+    );
+    assert!(
+        !poll_algo_diff(&mut app),
+        "a landed run is not delivered twice"
+    );
+}
+
+#[test]
+fn compute_frame_state_counts_mismatches_only_once_codediff_has_run() -> Result<()> {
+    let source = "fn main() {}\n";
+    let before = Code::from_string(source, &Language::Rust);
+    let after = Code::from_string(source, &Language::Rust);
+    let root_id = before.ast.as_ref().unwrap().root_node().id();
+    let mut app = App::new(
+        "test".to_string(),
+        CaseOrigin::Diffs,
+        root_id,
+        root_id,
+        HumanMapping::default(),
+    );
+    // The human says the whole file was deleted (`D` on the root); codediff will say it is
+    // identical.
+    let root = before.ast.as_ref().unwrap().root_node();
+    press_with_watch(&mut app, root, source, KeyCode::Char('D'));
+    assert!(!app.mapping.entries.is_empty(), "D marked the root");
+
+    let state = compute_frame_state(&before, &after, &app)?;
+    assert_eq!(
+        (state.before_mismatches, state.after_mismatches),
+        (None, None),
+        "no verdicts to disagree with yet"
+    );
+
+    app.algo_diff = diff_code(&before, &after).ast;
+    let state = compute_frame_state(&before, &after, &app)?;
+    assert_eq!(
+        state.before_mismatches,
+        Some(state.before_flat.len()),
+        "every marked-deleted node is one codediff mapped"
+    );
+    assert_eq!(
+        state.after_mismatches,
+        Some(0),
+        "nothing on the after side is marked, so nothing there can disagree"
+    );
+    Ok(())
+}
+
+#[test]
+fn the_panel_header_shows_the_mismatch_count_only_once_there_is_one() {
+    let source = "fn main() {}\n";
+    let tree = parse_rust(source);
+    let root = tree.root_node();
+    let flat = FlatIndex::new(flatten_visible(
+        root,
+        &std::collections::HashSet::new(),
+        None,
+    ));
+    let caches = Caches::default();
+    let mut panel = PanelState::new(root.id());
+    let area = Rect::new(0, 0, 60, 6);
+
+    for (mismatches, expected) in [(None, "2 unmarked─"), (Some(3), "2 unmarked, 3 mismatches")] {
+        let backend = ratatui::backend::TestBackend::new(60, 6);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal
+            .draw(|f| {
+                render_panel(
+                    f,
+                    area,
+                    "Before",
+                    &flat,
+                    &mut panel,
+                    &caches,
+                    Side::Before,
+                    source.as_bytes(),
+                    true,
+                    None,
+                    false,
+                    2,
+                    mismatches,
+                    &std::collections::BTreeSet::new(),
+                    &[],
+                )
+            })
+            .unwrap();
+        let text = rendered_text(&terminal);
+        assert!(
+            text.contains(expected),
+            "for {mismatches:?} expected {expected:?} in the header: {text}"
+        );
+    }
 }

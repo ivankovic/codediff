@@ -1718,8 +1718,12 @@ pub(crate) struct App {
     pub(crate) status: Option<String>,
     pub(crate) modal: Option<Modal>,
     pub(crate) should_quit: bool,
-    /// codediff's own diff, from `p`. `None` until `p` runs for this case.
+    /// codediff's own diff of the open case. `None` until the background run
+    /// (`start_algo_diff`, begun when the case opens) lands, or `p` runs it in the foreground.
     pub(crate) algo_diff: Option<ASTDiff>,
+    /// The background run's result channel while it is in flight; `poll_algo_diff` drains it.
+    /// Dropped with the case it was started for.
+    pub(crate) algo_diff_pending: Option<std::sync::mpsc::Receiver<Option<ASTDiff>>>,
     /// `H`: hides fully marked subtrees in both panels, recomputed every frame.
     pub(crate) hide_solved: bool,
     /// `r`: shows each node's `ASTMappingReason` label after its codediff glyph (needs `p`).
@@ -1800,6 +1804,7 @@ impl App {
             modal: None,
             should_quit: false,
             algo_diff: None,
+            algo_diff_pending: None,
             hide_solved: false,
             show_reason: false,
             sample_view: SamplePickerView::default(),
