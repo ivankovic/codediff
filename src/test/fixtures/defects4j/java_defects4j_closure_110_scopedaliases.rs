@@ -26,6 +26,7 @@ fn mapping() -> Result<()> {
     // Recorded as found, not examined.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "java-defects4j-closure-110-scopedaliases",
+        // Includes the N:M floor: 7 all-to-all group members a one-to-one output cannot reach.
         31,
         19,
     )

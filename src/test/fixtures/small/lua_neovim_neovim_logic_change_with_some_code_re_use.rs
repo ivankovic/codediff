@@ -24,7 +24,7 @@ fn mapping() -> Result<()> {
     // The remaining unmarked nodes are an N:M correspondence the format cannot express.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "lua-neovim-neovim-logic-change-with-some-code-re-use",
-        // Includes all-to-all group members a one-to-one output cannot reach: the N:M floor.
+        // Includes the N:M floor: 9 all-to-all group members a one-to-one output cannot reach.
         16,
         14,
     )
