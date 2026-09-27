@@ -9273,3 +9273,317 @@ fn first_leaf_from_skips_whitespace_to_the_next_leaf_and_is_none_past_the_last_o
 
     assert!(first_leaf_from(root, source.len() - 2).is_none());
 }
+
+// ---------------------------------------------------------------------------------------------
+// Undo and redo
+// ---------------------------------------------------------------------------------------------
+
+/// `m` on the roots through `EditWatch`, as `run_case_session` does it. Returns the app and the
+/// case's source so the caller can press more keys.
+fn app_after_m_with_watch() -> App {
+    let source = "fn main() {}\n";
+    let tree = parse_rust(source);
+    let root = tree.root_node();
+    let mut app = App::new(
+        "test".to_string(),
+        CaseOrigin::Diffs,
+        root.id(),
+        root.id(),
+        HumanMapping::default(),
+    );
+    press_with_watch(&mut app, root, source, KeyCode::Char('m'));
+    app
+}
+
+fn press_with_watch(app: &mut App, root: Node, source: &str, code: KeyCode) {
+    let flat = FlatIndex::new(flatten_visible(root, &app.before.collapsed, None));
+    let caches = rebuild_caches(&app.mapping.entries, root, root);
+    let hashes = rustc_hash::FxHashMap::default();
+    let watch = EditWatch::start(app, code);
+    handle_key(
+        app,
+        code,
+        &flat,
+        &flat,
+        root,
+        root,
+        &caches,
+        source.as_bytes(),
+        source.as_bytes(),
+        &hashes,
+        &hashes,
+        &Code::from_string(source, &Language::Rust),
+        &Code::from_string(source, &Language::Rust),
+    );
+    watch.finish(app);
+}
+
+#[test]
+fn m_pushes_an_undo_step_that_u_restores_and_ctrl_r_reapplies() {
+    let mut app = app_after_m_with_watch();
+    assert_eq!(app.mapping.entries.len(), 1, "m matched the roots");
+    assert_eq!(app.undo_stack.len(), 1);
+    assert!(app.redo_stack.is_empty());
+
+    let message = app.undo().unwrap();
+    assert!(app.mapping.entries.is_empty(), "undo takes the match back");
+    assert!(app.undo_stack.is_empty());
+    assert_eq!(app.redo_stack.len(), 1);
+    assert!(app.dirty, "an undo is itself an unsaved change");
+    assert!(message.contains("0 more to undo"), "{message}");
+
+    app.redo().unwrap();
+    assert_eq!(app.mapping.entries.len(), 1, "redo puts the match back");
+    assert_eq!(app.undo_stack.len(), 1);
+    assert!(app.redo_stack.is_empty());
+}
+
+#[test]
+fn undo_and_redo_report_when_there_is_nothing_to_do() {
+    let mut app = test_app();
+    assert!(app.undo().is_err());
+    assert!(app.redo().is_err());
+    assert!(!app.dirty, "a refused undo is not a change");
+}
+
+#[test]
+fn a_key_that_changes_nothing_pushes_no_undo_step() {
+    let source = "fn main() {}\n";
+    let tree = parse_rust(source);
+    let root = tree.root_node();
+    let mut app = App::new(
+        "test".to_string(),
+        CaseOrigin::Diffs,
+        root.id(),
+        root.id(),
+        HumanMapping::default(),
+    );
+    // `u` on an unmarked node: listed as an editing key, but nothing to unmark.
+    press_with_watch(&mut app, root, source, KeyCode::Char('u'));
+    assert!(app.mapping.entries.is_empty());
+    assert!(
+        app.undo_stack.is_empty(),
+        "a no-op must not become an undo step"
+    );
+}
+
+#[test]
+fn an_edit_after_an_undo_forgets_the_redo_history() {
+    let source = "fn main() {}\n";
+    let tree = parse_rust(source);
+    let root = tree.root_node();
+    let mut app = App::new(
+        "test".to_string(),
+        CaseOrigin::Diffs,
+        root.id(),
+        root.id(),
+        HumanMapping::default(),
+    );
+    press_with_watch(&mut app, root, source, KeyCode::Char('m'));
+    app.undo().unwrap();
+    assert_eq!(app.redo_stack.len(), 1);
+
+    press_with_watch(&mut app, root, source, KeyCode::Char('m'));
+    assert!(
+        app.redo_stack.is_empty(),
+        "the undone match no longer applies"
+    );
+    assert_eq!(app.undo_stack.len(), 1);
+}
+
+#[test]
+fn an_edit_on_a_key_may_edit_mapping_does_not_list_is_flagged_not_undoable() {
+    let mut app = test_app();
+    app.status = Some("Did something".to_string());
+    let watch = EditWatch::start(&app, KeyCode::Char('k'));
+    app.mark_dirty();
+    watch.finish(&mut app);
+
+    assert!(app.undo_stack.is_empty());
+    assert_eq!(app.status.as_deref(), Some("Did something [not undoable]"));
+}
+
+#[test]
+fn push_undo_within_drops_the_oldest_steps_past_the_budget_but_keeps_the_newest() {
+    let mapping_with = |entries: usize| HumanMapping {
+        entries: (0..entries)
+            .map(|_| HumanMappingEntry {
+                operation: HumanOperation::Delete,
+                before_path: Some(vec!["source_file:1".to_string()]),
+                after_path: None,
+            })
+            .collect(),
+        ..HumanMapping::default()
+    };
+    let mut app = test_app();
+    app.push_undo_within(mapping_with(2), 5);
+    app.push_undo_within(mapping_with(2), 5);
+    assert_eq!(app.undo_stack.len(), 2, "4 entries fit a budget of 5");
+
+    app.push_undo_within(mapping_with(4), 5);
+    assert_eq!(
+        app.undo_stack.len(),
+        1,
+        "8 entries do not; the oldest go first"
+    );
+    assert_eq!(
+        app.undo_stack[0].entries.len(),
+        4,
+        "the step just pushed stays"
+    );
+
+    app.push_undo_within(mapping_with(9), 5);
+    assert_eq!(
+        app.undo_stack.len(),
+        1,
+        "a step over the whole budget is still kept, so one undo is always possible"
+    );
+    assert_eq!(app.undo_stack[0].entries.len(), 9);
+}
+
+#[test]
+fn undo_restores_a_case_after_a_confirmed_reset() {
+    let source = "fn main() {}\n";
+    let tree = parse_rust(source);
+    let root = tree.root_node();
+    let flat = FlatIndex::new(flatten_visible(
+        root,
+        &std::collections::HashSet::new(),
+        None,
+    ));
+    let mut mapping = HumanMapping::default();
+    mapping.entries.push(HumanMappingEntry {
+        operation: HumanOperation::Delete,
+        before_path: Some(vec!["source_file:1".to_string()]),
+        after_path: None,
+    });
+    let mut app = App::new(
+        "test".to_string(),
+        CaseOrigin::Diffs,
+        root.id(),
+        root.id(),
+        mapping,
+    );
+    app.modal = Some(Modal::ConfirmResetCase {
+        entries: 1,
+        groups: 0,
+        paintings: 0,
+    });
+    let caches = rebuild_caches(&app.mapping.entries, root, root);
+
+    let watch = EditWatch::start(&app, KeyCode::Char('y'));
+    handle_modal_key(
+        &mut app,
+        KeyCode::Char('y'),
+        &flat,
+        &flat,
+        Some(root),
+        Some(root),
+        &caches,
+        source.as_bytes(),
+        source.as_bytes(),
+        &Code::from_string(source, &Language::Rust),
+        &Code::from_string(source, &Language::Rust),
+    );
+    watch.finish(&mut app);
+    assert!(app.mapping.entries.is_empty(), "the reset went through");
+
+    app.undo().unwrap();
+    assert_eq!(app.mapping.entries.len(), 1, "and U brings the case back");
+}
+
+#[test]
+fn undo_in_the_text_view_takes_back_z_and_drops_the_painting_name_it_created() {
+    let mut app = test_app();
+    app.modal = Some(Modal::TextView {
+        state: TextPaintState::default(),
+    });
+    let watch = EditWatch::start(&app, KeyCode::Char('Z'));
+    action_paint_mark_empty(&mut app);
+    watch.finish(&mut app);
+    assert_eq!(app.mapping.text_mappings.len(), 1);
+    let created = app.text_solution.clone();
+    assert_eq!(app.mapping.text_mappings[0].name, created);
+
+    app.undo().unwrap();
+    assert!(app.mapping.text_mappings.is_empty());
+    assert_eq!(
+        app.text_solution,
+        starting_solution(&app.mapping),
+        "the edited painting's name falls back to what a fresh case would use"
+    );
+}
+
+#[test]
+fn history_key_is_u_and_ctrl_r_only_in_the_tree_panels_and_the_text_view() {
+    use crossterm::event::{KeyEvent, KeyModifiers};
+    let u = KeyEvent::new(KeyCode::Char('U'), KeyModifiers::NONE);
+    let ctrl_r = KeyEvent::new(KeyCode::Char('r'), KeyModifiers::CONTROL);
+    let text_view = Modal::TextView {
+        state: TextPaintState::default(),
+    };
+    let prompt = Modal::PromptSearch {
+        input: String::new(),
+    };
+
+    assert!(matches!(history_key(None, u), Some(HistoryStep::Undo)));
+    assert!(matches!(history_key(None, ctrl_r), Some(HistoryStep::Redo)));
+    assert!(matches!(
+        history_key(Some(&text_view), u),
+        Some(HistoryStep::Undo)
+    ));
+    assert!(matches!(
+        history_key(Some(&text_view), ctrl_r),
+        Some(HistoryStep::Redo)
+    ));
+    // A prompt types its `U`.
+    assert!(history_key(Some(&prompt), u).is_none());
+    // Plain `r` is the reason toggle; Ctrl-U is nothing.
+    assert!(history_key(None, KeyEvent::new(KeyCode::Char('r'), KeyModifiers::NONE)).is_none());
+    assert!(
+        history_key(
+            None,
+            KeyEvent::new(KeyCode::Char('U'), KeyModifiers::CONTROL)
+        )
+        .is_none()
+    );
+}
+
+#[test]
+fn may_edit_mapping_covers_the_marking_keys_and_not_navigation() {
+    for code in [
+        KeyCode::Char('m'),
+        KeyCode::Char('M'),
+        KeyCode::Char('f'),
+        KeyCode::Char('d'),
+        KeyCode::Char('D'),
+        KeyCode::Char('i'),
+        KeyCode::Char('I'),
+        KeyCode::Char('u'),
+    ] {
+        assert!(may_edit_mapping(None, code), "{code:?}");
+    }
+    for code in [
+        KeyCode::Char('j'),
+        KeyCode::Char('x'),
+        KeyCode::Char('p'),
+        KeyCode::Tab,
+    ] {
+        assert!(!may_edit_mapping(None, code), "{code:?}");
+    }
+    let text_view = Modal::TextView {
+        state: TextPaintState::default(),
+    };
+    for code in [
+        KeyCode::Char('d'),
+        KeyCode::Char('i'),
+        KeyCode::Char('m'),
+        KeyCode::Char('u'),
+        KeyCode::Char('Z'),
+        KeyCode::Char('P'),
+    ] {
+        assert!(may_edit_mapping(Some(&text_view), code), "{code:?}");
+    }
+    assert!(!may_edit_mapping(Some(&text_view), KeyCode::Char('v')));
+    assert!(!may_edit_mapping(Some(&text_view), KeyCode::Char('o')));
+}

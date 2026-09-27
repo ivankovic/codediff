@@ -303,6 +303,107 @@ pub(crate) fn is_state_preserving_key(modal: Option<&Modal>, code: KeyCode) -> b
     }
 }
 
+/// Whether `code`, delivered in the current `modal` state, can change `App::mapping`: the keys
+/// `run_case_session` snapshots the mapping before. A key listed here that ends up changing
+/// nothing costs one clone; a key missing here that does change something is reported on the
+/// status line as not undoable, so an omission is visible rather than silent.
+pub(crate) fn may_edit_mapping(modal: Option<&Modal>, code: KeyCode) -> bool {
+    match modal {
+        None => matches!(
+            code,
+            KeyCode::Char('m')
+                | KeyCode::Char('M')
+                | KeyCode::Char('f')
+                | KeyCode::Char('d')
+                | KeyCode::Char('D')
+                | KeyCode::Char('i')
+                | KeyCode::Char('I')
+                | KeyCode::Char('u')
+        ),
+        Some(Modal::ConfirmKindMismatch { .. })
+        | Some(Modal::ConfirmMultiMapGroup { .. })
+        | Some(Modal::ConfirmResetCase { .. }) => {
+            matches!(code, KeyCode::Char('y') | KeyCode::Char('Y'))
+        }
+        Some(Modal::TextView { .. }) => matches!(
+            code,
+            KeyCode::Char('d')
+                | KeyCode::Char('i')
+                | KeyCode::Char('m')
+                | KeyCode::Char('u')
+                | KeyCode::Char('Z')
+                | KeyCode::Char('P')
+        ),
+        // Enter saves or loads a painting (a typed free-form name included), `e` starts one
+        // empty, and the second `D` deletes one.
+        Some(Modal::SolutionPicker { .. }) => {
+            matches!(
+                code,
+                KeyCode::Enter | KeyCode::Char('e') | KeyCode::Char('D')
+            )
+        }
+        Some(_) => false,
+    }
+}
+
+/// The undo bookkeeping around one key: `start` before its handler runs, `finish` after. Two
+/// halves rather than a wrapper around the dispatch, so a test can drive `handle_key` between
+/// them exactly as `run_case_session` does.
+pub(crate) struct EditWatch {
+    /// The mapping before the key, taken only for keys that can edit: a clone of a large
+    /// fixture's mapping is not free, and most keys navigate.
+    snapshot: Option<HumanMapping>,
+    edits_before: u64,
+}
+
+impl EditWatch {
+    pub(crate) fn start(app: &App, code: KeyCode) -> Self {
+        EditWatch {
+            snapshot: may_edit_mapping(app.modal.as_ref(), code).then(|| app.mapping.clone()),
+            edits_before: app.edits,
+        }
+    }
+
+    pub(crate) fn finish(self, app: &mut App) {
+        if app.edits == self.edits_before {
+            return;
+        }
+        match self.snapshot {
+            Some(snapshot) => app.push_undo(snapshot),
+            // An edit path `may_edit_mapping` does not list: the change stands, but `U` cannot
+            // take it back, and the status line says so rather than hide it.
+            None => {
+                let status = app.status.take().unwrap_or_default();
+                app.status = Some(format!("{status} [not undoable]"));
+            }
+        }
+    }
+}
+
+pub(crate) enum HistoryStep {
+    Undo,
+    Redo,
+}
+
+/// `U` undoes and Ctrl-r redoes, in the tree panels and in the `t` view, where the painting keys
+/// edit the same mapping. In every other modal the keys are the modal's own, or type text.
+pub(crate) fn history_key(
+    modal: Option<&Modal>,
+    key: crossterm::event::KeyEvent,
+) -> Option<HistoryStep> {
+    if !matches!(modal, None | Some(Modal::TextView { .. })) {
+        return None;
+    }
+    let control = key
+        .modifiers
+        .contains(crossterm::event::KeyModifiers::CONTROL);
+    match key.code {
+        KeyCode::Char('U') if !control => Some(HistoryStep::Undo),
+        KeyCode::Char('r') if control => Some(HistoryStep::Redo),
+        _ => None,
+    }
+}
+
 /// Runs the event loop for a single case until the user quits or asks to switch to a different
 /// one. Separate from `run_event_loop` so the cached `FrameState`, which borrows `before`/`after`,
 /// never coexists with their reassignment; a case switch is returned as `SessionEnd::Open`.
@@ -358,7 +459,21 @@ pub(crate) fn run_case_session(
             continue;
         }
 
+        // Undo and redo live here rather than in a handler: the same two keys serve the tree
+        // panels and the `t` view, and Ctrl-r needs the modifier the handlers never see.
+        if let Some(step) = history_key(app.modal.as_ref(), key) {
+            let result = match step {
+                HistoryStep::Undo => app.undo(),
+                HistoryStep::Redo => app.redo(),
+            };
+            app.status = Some(result.unwrap_or_else(|err| format!("{err:#}")));
+            needs_redraw = true;
+            state = None;
+            continue;
+        }
+
         let state_preserving = is_state_preserving_key(app.modal.as_ref(), key.code);
+        let watch = EditWatch::start(app, key.code);
 
         let mut open_request: Option<OpenTarget> = None;
 
@@ -418,6 +533,8 @@ pub(crate) fn run_case_session(
                 false,
             );
         }
+
+        watch.finish(app);
 
         needs_redraw = true;
         if !state_preserving {
@@ -534,7 +651,7 @@ pub(crate) fn handle_key(
             };
             match outcome {
                 Ok(ActionOutcome::Done(msg)) => {
-                    app.dirty = true;
+                    app.mark_dirty();
                     app.status = Some(msg);
                     app.clear_multi_select();
                     advance_both_to_next_unmarked(
@@ -619,7 +736,7 @@ pub(crate) fn handle_key(
             };
             match outcome {
                 Ok(ActionOutcome::Done(msg)) => {
-                    app.dirty = true;
+                    app.mark_dirty();
                     app.status = Some(msg);
                     app.clear_multi_select();
                     advance_both_to_next_unmarked(
@@ -651,7 +768,7 @@ pub(crate) fn handle_key(
                     caches,
                 );
                 if res.is_ok() {
-                    app.dirty = true;
+                    app.mark_dirty();
                     advance_side_to_next_unmarked(
                         app,
                         Side::Before,
@@ -679,7 +796,7 @@ pub(crate) fn handle_key(
                     caches,
                 );
                 if res.is_ok() {
-                    app.dirty = true;
+                    app.mark_dirty();
                     advance_side_to_next_unmarked(
                         app,
                         Side::After,
@@ -706,7 +823,7 @@ pub(crate) fn handle_key(
                 caches,
             );
             if res.is_ok() {
-                app.dirty = true;
+                app.mark_dirty();
             }
             Some(res)
         }
@@ -802,8 +919,8 @@ pub(crate) fn handle_tree_independent_key(
             app.should_quit = true;
             None
         }
-        // Shift-1 rather than a letter: this is the one action that cannot be undone, so it
-        // should not be one slip away from a harmless key.
+        // Shift-1 rather than a letter: this throws away the whole case, so it should not be one
+        // slip away from a harmless key, even though `U` can bring it back.
         KeyCode::Char('!') => {
             app.modal = Some(Modal::ConfirmResetCase {
                 entries: app.mapping.entries.len(),
@@ -1080,7 +1197,7 @@ pub(crate) fn handle_modal_key(
                     app.status = Some(NO_TREE_TO_MAP.to_string());
                     return None;
                 };
-                app.dirty = true;
+                app.mark_dirty();
                 app.status = Some(apply_modal_choice(
                     &mut app.mapping,
                     before_flat,
@@ -1147,7 +1264,7 @@ pub(crate) fn handle_modal_key(
                         pairing,
                     ) {
                         Ok(msg) => {
-                            app.dirty = true;
+                            app.mark_dirty();
                             msg
                         }
                         Err(err) => format!("Error: {:#}", err),
@@ -2126,8 +2243,8 @@ fn handle_solution_picker(
             action_save_solution_as(app, &chosen, false, before_text, after_text);
             app.modal = Some(Modal::TextView { state });
         }
-        // Twice, because there is no undo. The second press acts on the name the first one
-        // armed, not on whatever row the cursor reached in between.
+        // Twice, as a guard on the one painting key that removes work in bulk. The second press
+        // acts on the name the first one armed, not on whatever row the cursor reached in between.
         (None, KeyCode::Char('D')) if selected < free_form_index => {
             let chosen = names[selected].clone();
             let exists = app

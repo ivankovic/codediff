@@ -141,7 +141,7 @@ pub(crate) fn solution_entries_mut<'a>(
 /// `s`: stores the current painting under another name, **keeping the source**: a fixture with
 /// more than one defensible rendering needs both on disk. `copy` decides whether a *new* name
 /// starts from the current ranges or from nothing. An existing name is only switched to, as `L`
-/// would: merging would duplicate ranges and replacing would discard work, with no undo.
+/// would: merging would duplicate ranges and replacing would discard work.
 pub(crate) fn action_save_solution_as(
     app: &mut App,
     target: &str,
@@ -193,7 +193,7 @@ pub(crate) fn action_save_solution_as(
         mapping: HumanTextMapping { entries },
     });
     app.text_solution = target.to_string();
-    app.dirty = true;
+    app.mark_dirty();
     app.status = Some(if copy {
         let widened = match extended {
             0 => String::new(),
@@ -224,7 +224,7 @@ pub(crate) fn action_delete_solution(app: &mut App, target: &str) {
         app.status = Some(format!("No painting called '{target}'"));
         return;
     }
-    app.dirty = true;
+    app.mark_dirty();
 
     // Only deleting the painting being edited moves the reader; switching them silently would
     // invite painting into the wrong one.
@@ -437,7 +437,8 @@ pub(crate) fn spans_overlap(spans: &[(HumanTextSpan, HumanTextVerdict)]) -> bool
 
 /// `P` in the text view: seeds the current painting with codediff's rendering, so a fixture is
 /// corrected rather than painted from scratch. Refuses a painting that already has ranges, as
-/// `action_paint_mark_empty` does: there is no undo. `s` branches to seed a second reading.
+/// `action_paint_mark_empty` does: a seed is a starting point, never a replacement. `s` branches
+/// to seed a second reading.
 pub(crate) fn action_paint_seed_from_codediff(app: &mut App, before: &Code, after: &Code) {
     let solution = app.text_solution.clone();
     if !solution_entries(&app.mapping, &solution).is_empty() {
@@ -464,7 +465,7 @@ pub(crate) fn action_paint_seed_from_codediff(app: &mut App, before: &Code, afte
 
     let count = entries.len();
     *solution_entries_mut(&mut app.mapping, &solution) = entries;
-    app.dirty = true;
+    app.mark_dirty();
     app.status = Some(format!(
         "Copied codediff's {count} range(s) into '{solution}' - correct them from here (u removes one)"
     ));
@@ -1323,7 +1324,7 @@ pub(crate) fn action_paint_match(
         return;
     }
     solution_entries_mut(&mut app.mapping, &solution).push(entry);
-    app.dirty = true;
+    app.mark_dirty();
     state.anchor = [None; 2];
     state.pending = [Vec::new(), Vec::new()];
     app.status = Some(match verdict {
@@ -1421,7 +1422,7 @@ pub(crate) fn action_paint_one_sided(
         return;
     }
     solution_entries_mut(&mut app.mapping, &solution).push(entry);
-    app.dirty = true;
+    app.mark_dirty();
     state.anchor[side] = None;
     state.pending[side].clear();
     let note = if split_any {
@@ -1495,7 +1496,7 @@ pub(crate) fn action_paint_unmark(
         app.status = Some("Nothing painted here".to_string());
         return;
     }
-    app.dirty = true;
+    app.mark_dirty();
     app.status = Some(format!("Removed {removed} painted range(s)"));
 }
 
@@ -1515,7 +1516,7 @@ pub(crate) fn action_reset_case(app: &mut App) -> String {
     app.tree_text_spans = None;
     app.text_solution = starting_solution(&app.mapping);
     app.clear_multi_select();
-    app.dirty = true;
+    app.mark_dirty();
 
     format!(
         "Reset: cleared {entries} mapping entries, {groups} groups and {paintings} paintings - \
@@ -1534,7 +1535,7 @@ pub(crate) fn action_paint_mark_empty(app: &mut App) {
         return;
     }
     solution_entries_mut(&mut app.mapping, &solution);
-    app.dirty = true;
+    app.mark_dirty();
     app.status = Some(format!("Marked '{solution}' as painted with no changes"));
 }
 
@@ -1584,8 +1585,8 @@ pub(crate) enum Modal {
         /// Same contract as `OpenDiffPicker::name_input`.
         name_input: Option<String>,
     },
-    /// Raised by `!`: confirms throwing away everything recorded for this case. There is no
-    /// undo.
+    /// Raised by `!`: confirms throwing away everything recorded for this case (`U` restores
+    /// it).
     ConfirmResetCase {
         entries: usize,
         groups: usize,
@@ -1704,6 +1705,16 @@ pub(crate) struct App {
     pub(crate) after: PanelState,
     pub(crate) mapping: HumanMapping,
     pub(crate) dirty: bool,
+    /// Bumped by every `mark_dirty`: how the event loop tells an edit from a key that only opened
+    /// a modal or was refused, so an undo step is pushed only when `mapping` actually changed.
+    pub(crate) edits: u64,
+    /// `mapping` as it was before each edit, oldest first; `U` pops one. Whole snapshots rather
+    /// than inverse operations: a fixture's mapping is small next to its trees, and every edit
+    /// path (tree marks, groups, paintings, `!`) is covered without each knowing how to reverse
+    /// itself. Bounded by `UNDO_ENTRY_BUDGET`.
+    pub(crate) undo_stack: Vec<HumanMapping>,
+    /// What `U` undid, for Ctrl-r; cleared by the next edit.
+    pub(crate) redo_stack: Vec<HumanMapping>,
     pub(crate) status: Option<String>,
     pub(crate) modal: Option<Modal>,
     pub(crate) should_quit: bool,
@@ -1779,6 +1790,9 @@ impl App {
             after: PanelState::new(after_root_id),
             mapping,
             dirty: false,
+            edits: 0,
+            undo_stack: Vec::new(),
+            redo_stack: Vec::new(),
             status: Some(
                 "Loaded. m match, d/D delete, i/I insert, u unmark, s save, q quit, o open."
                     .to_string(),
@@ -1815,4 +1829,76 @@ impl App {
         self.after_multi_select.clear();
         self.multi_select_pairing = GroupPairing::default();
     }
+
+    /// Records that `mapping` changed and is not on disk. Every edit path calls this, so `edits`
+    /// is the one counter the undo bookkeeping in `run_case_session` has to watch.
+    pub(crate) fn mark_dirty(&mut self) {
+        self.dirty = true;
+        self.edits += 1;
+    }
+
+    /// Pushes the pre-edit `snapshot` as the next thing `U` restores, and forgets any redo
+    /// history: after a fresh edit, what was undone before no longer applies.
+    pub(crate) fn push_undo(&mut self, snapshot: HumanMapping) {
+        self.push_undo_within(snapshot, UNDO_ENTRY_BUDGET);
+    }
+
+    /// `push_undo` with the budget as a parameter, so a test can hit it without two million
+    /// entries.
+    pub(crate) fn push_undo_within(&mut self, snapshot: HumanMapping, budget: usize) {
+        self.undo_stack.push(snapshot);
+        self.redo_stack.clear();
+        let mut held: usize = self.undo_stack.iter().map(|m| m.entries.len()).sum();
+        // Oldest first, and never the step just pushed: one undo must always be possible.
+        while held > budget && self.undo_stack.len() > 1 {
+            held -= self.undo_stack.remove(0).entries.len();
+        }
+    }
+
+    /// `U`: restores the mapping from before the last edit. `Err` with nothing to restore.
+    pub(crate) fn undo(&mut self) -> Result<String> {
+        let previous = self.undo_stack.pop().context("Nothing to undo")?;
+        let current = std::mem::replace(&mut self.mapping, previous);
+        self.redo_stack.push(current);
+        self.after_history_step();
+        Ok(format!(
+            "Undid the last change ({} more to undo, Ctrl-r redoes)",
+            self.undo_stack.len()
+        ))
+    }
+
+    /// Ctrl-r: re-applies what `U` undid. `Err` with nothing to redo.
+    pub(crate) fn redo(&mut self) -> Result<String> {
+        let next = self.redo_stack.pop().context("Nothing to redo")?;
+        let current = std::mem::replace(&mut self.mapping, next);
+        self.undo_stack.push(current);
+        self.after_history_step();
+        Ok(format!(
+            "Redid the last undone change ({} more to redo)",
+            self.redo_stack.len()
+        ))
+    }
+
+    /// The bookkeeping both `undo` and `redo` need once `mapping` is swapped: the case is
+    /// unsaved, whatever derived from the old mapping is stale, and a pending selection or a
+    /// painting name may refer to something the restored mapping does not have.
+    fn after_history_step(&mut self) {
+        self.dirty = true;
+        self.edits += 1;
+        self.tree_text_spans = None;
+        self.clear_multi_select();
+        let names_current = self
+            .mapping
+            .text_mappings
+            .iter()
+            .any(|painting| painting.name == self.text_solution);
+        if !names_current {
+            self.text_solution = starting_solution(&self.mapping);
+        }
+    }
 }
+
+/// How many mapping entries the undo stack may hold in total before its oldest snapshots are
+/// dropped. A median fixture has under a thousand entries, so this is hundreds of steps there; on
+/// the largest fixture (about 200k entries) it is a handful, which is still every recent slip.
+pub(crate) const UNDO_ENTRY_BUDGET: usize = 2_000_000;

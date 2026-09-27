@@ -118,6 +118,9 @@ d / D          mark Before node deleted / deleted with subtree
 i / I          mark After node inserted / inserted with subtree
 u              unmark the focused cursor node, or remove its whole multi-map
                  group if it's a group member
+U / Ctrl-r     undo / redo the last change to the mapping - a mark, a group, a
+                 painting, a ! reset - here and in the t view alike; nothing is
+                 written until s
 x              toggle the focused cursor node in/out of a pending multi-map
                  selection -- select several nodes on each side, then m/M to
                  commit them as a group where any Before node may pair with

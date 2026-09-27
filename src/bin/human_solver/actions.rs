@@ -760,7 +760,7 @@ pub(crate) fn action_match_to_end(
             .before_match
             .insert(before_node.id(), after_node.id());
         caches.after_match.insert(after_node.id(), before_node.id());
-        app.dirty = true;
+        app.mark_dirty();
         matched += 1;
 
         let next_before = next_unmarked_index(before_idx + 1, before_flat, &caches, status_before);
@@ -1299,5 +1299,7 @@ pub(crate) fn action_unmark(
         );
     }
 
-    Ok(format!("'{}' was not marked", node.kind()))
+    // A refusal, not a report: nothing changed, so the case is neither dirty nor one undo step
+    // longer.
+    bail!("'{}' was not marked", node.kind())
 }
