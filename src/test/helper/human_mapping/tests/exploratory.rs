@@ -17,10 +17,10 @@
  */
 
 // Hand-run instruments: every fn here is `#[test] #[ignore]` and prints or writes an analysis.
-// `painting_failure_census`, `mismatch_census` and `cross_fixture_convention_census` write
-// artifacts, and `painting_failure_census` is also the painting gate (`make
-// check-painting-attribution`, `PAINTING_ATTRIBUTION_CHECK=1`, run in CI). The rest answer "why
-// does *this* fixture disagree" for the fixtures named in an env var.
+// `painting_failure_census`, `mismatch_census`, `cross_fixture_convention_census` and
+// `nm_candidate_census` write artifacts, and `painting_failure_census` is also the painting gate
+// (`make check-painting-attribution`, `PAINTING_ATTRIBUTION_CHECK=1`, run in CI). The rest answer
+// "why does *this* fixture disagree" for the fixtures named in an env var.
 
 use super::*;
 
@@ -1572,5 +1572,390 @@ fn painting_failure_census() -> Result<()> {
             eprintln!("  {error}");
         }
     }
+    Ok(())
+}
+
+/// **Which identical leftovers the ground truth calls a copy.** Measures, before any engine code
+/// exists, what a pass that attaches leftovers to N:M groups would gain and break.
+///
+/// A *candidate* is a node codediff deletes or inserts together with its whole subtree, whose
+/// full hash equals a node on the same side that codediff pairs with an identical node (its
+/// *twin*): the leftover a copy-attaching pass could add to its twin's pair as a group. Only
+/// maximal candidates are rows; their descendants ride along and are counted in `size`.
+///
+/// Each row is labelled by the human's verdict on the candidate's root:
+/// * `all_to_all` - a member of an all-to-all group: attaching it is right.
+/// * `any_one_to_one` - a group leftover the human says is really gone or new: attaching it
+///   turns a correct node into a mismatch.
+/// * `removed` - a plain `Delete`/`Insert`, or inside a `*WithChildren` one: likewise.
+/// * `matched` - the human pairs it one-to-one elsewhere: a mismatch either way.
+/// * `ungraded`.
+///
+/// Then recall: every all-to-all member whose codediff partner is outside its group, and whether
+/// a candidate covers it (is it, or an ancestor of it). Writes
+/// `research/data/quality/nm_candidates.csv`.
+///
+/// `cargo test --release --lib --features test-fixtures nm_candidate_census -- --ignored
+/// --nocapture`
+#[test]
+#[ignore]
+#[cfg(feature = "test-fixtures")]
+fn nm_candidate_census() -> Result<()> {
+    use crate::diff::nodes::is_structurally_visible;
+    use rustc_hash::{FxHashMap, FxHashSet};
+    use std::collections::BTreeMap;
+
+    const FUNCTION_WORDS: [&str; 6] = [
+        "function",
+        "method",
+        "constructor",
+        "lambda",
+        "closure",
+        "arrow",
+    ];
+    fn enclosing_function(node: Node) -> Option<usize> {
+        let mut current = node.parent();
+        while let Some(ancestor) = current {
+            if FUNCTION_WORDS
+                .iter()
+                .any(|word| ancestor.kind().contains(word))
+            {
+                return Some(ancestor.id());
+            }
+            current = ancestor.parent();
+        }
+        None
+    }
+    fn all_nodes(root: Node) -> Vec<Node> {
+        let mut nodes = Vec::new();
+        let mut stack = vec![root];
+        while let Some(node) = stack.pop() {
+            nodes.push(node);
+            let mut cursor = node.walk();
+            for child in node.children(&mut cursor) {
+                stack.push(child);
+            }
+        }
+        nodes
+    }
+    fn size_bucket(size: usize) -> &'static str {
+        match size {
+            1 => "1",
+            2..=3 => "2-3",
+            4..=7 => "4-7",
+            8..=19 => "8-19",
+            _ => "20+",
+        }
+    }
+
+    let diffs_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("src")
+        .join("test")
+        .join("data")
+        .join("diffs");
+    let mut names: Vec<String> = Vec::new();
+    for dataset in crate::test::helper::DIFF_DATASETS {
+        let dir = diffs_dir.join(dataset);
+        if !dir.is_dir() {
+            continue;
+        }
+        for entry in fs::read_dir(&dir)?.filter_map(|entry| entry.ok()) {
+            if entry.path().is_dir() {
+                names.push(entry.file_name().to_string_lossy().into_owned());
+            }
+        }
+    }
+    names.sort();
+
+    let header = [
+        "fixture",
+        "side",
+        "label",
+        "group_holds_twin",
+        "kind",
+        "size",
+        "visible_nodes",
+        "bytes",
+        "same_side_count",
+        "other_side_count",
+        "twins",
+        "sibling_of_twin",
+        "parent_unmatched",
+        "same_function_as_twin",
+        "twin_distance_bytes",
+        "row",
+        "twin_row",
+        "twin_displaced",
+    ];
+    let mut rows: Vec<Vec<String>> = Vec::new();
+    // label -> size bucket -> (candidates, nodes)
+    let mut by_label: BTreeMap<String, BTreeMap<&'static str, (usize, usize)>> = BTreeMap::new();
+    let (mut missed_members, mut covered_members) = (0usize, 0usize);
+    let (mut solved, mut skipped) = (0usize, 0usize);
+
+    for name in &names {
+        let Ok(mapping) = load(name) else {
+            continue;
+        };
+        let Ok(pair) = crate::test::helper::handmade_test_code_pair(name) else {
+            skipped += 1;
+            continue;
+        };
+        let (before, after) = &*pair;
+        let (Some(before_tree), Some(after_tree)) = (before.ast.as_ref(), after.ast.as_ref())
+        else {
+            skipped += 1;
+            continue;
+        };
+        let config = crate::diff::HeuristicConfig::default();
+        let diff = crate::diff::diff_code_with_config(before, after, &config);
+        let Some(diff_ast) = diff.ast.as_ref() else {
+            skipped += 1;
+            continue;
+        };
+        solved += 1;
+        let roots = [before_tree.root_node(), after_tree.root_node()];
+        let metadata = [
+            crate::code::metadata::metadata_of(before),
+            crate::code::metadata::metadata_of(after),
+        ];
+        let sources = [before.contents.as_bytes(), after.contents.as_bytes()];
+        let node_maps = [&diff_ast.before_node_map, &diff_ast.after_node_map];
+        let caches = rebuild_caches_for_mapping(&mapping, roots[0], roots[1]);
+        let groups = [&caches.before_group, &caches.after_group];
+        let matches = [&caches.before_match, &caches.after_match];
+        let removed = [&caches.before_removed, &caches.after_removed];
+        let mut candidate_roots: [FxHashSet<usize>; 2] = Default::default();
+        let node_cache = NodeCache::build(before, after);
+        let node_caches = [&node_cache.before, &node_cache.after];
+
+        for side in 0..2 {
+            let other = 1 - side;
+            let meta = &metadata[side];
+            let node_map = node_maps[side];
+            let nodes = all_nodes(roots[side]);
+            let hash_of = |id: usize| meta.node_to_full_hash.get(&id).copied();
+
+            // Post-order: children before parents, so a parent reads its children's verdicts.
+            let mut fully_unmatched: FxHashMap<usize, bool> = FxHashMap::default();
+            for node in nodes.iter().rev() {
+                let own = node_map.get(&node.id()) == Some(&0);
+                let mut cursor = node.walk();
+                let children = node
+                    .children(&mut cursor)
+                    .all(|child| fully_unmatched.get(&child.id()) == Some(&true));
+                fully_unmatched.insert(node.id(), own && children);
+            }
+
+            // Hash -> the nodes on this side codediff pairs with an identical node.
+            let mut twins: FxHashMap<u64, Vec<Node>> = FxHashMap::default();
+            for node in &nodes {
+                let Some(&partner) = node_map.get(&node.id()) else {
+                    continue;
+                };
+                if partner == 0 {
+                    continue;
+                }
+                let (Some(own), Some(theirs)) = (
+                    hash_of(node.id()),
+                    metadata[other].node_to_full_hash.get(&partner).copied(),
+                ) else {
+                    continue;
+                };
+                if own == theirs {
+                    twins.entry(own).or_default().push(*node);
+                }
+            }
+
+            let is_candidate = |node: Node| {
+                fully_unmatched.get(&node.id()) == Some(&true)
+                    && hash_of(node.id()).is_some_and(|hash| twins.contains_key(&hash))
+            };
+            for node in &nodes {
+                if !is_candidate(*node) || node.parent().is_some_and(&is_candidate) {
+                    continue;
+                }
+                candidate_roots[side].insert(node.id());
+                let hash = hash_of(node.id()).expect("candidates have a hash");
+                let node_twins = &twins[&hash];
+
+                let in_removed_subtree = || {
+                    if removed[side].contains_key(&node.id()) {
+                        return true;
+                    }
+                    let mut current = node.parent();
+                    while let Some(ancestor) = current {
+                        if removed[side].get(&ancestor.id()) == Some(&true) {
+                            return true;
+                        }
+                        current = ancestor.parent();
+                    }
+                    false
+                };
+                let group = groups[side]
+                    .get(&node.id())
+                    .map(|&idx| &mapping.groups[idx]);
+                let label = match group {
+                    Some(group) if group.pairing == GroupPairing::AllToAll => "all_to_all",
+                    Some(_) => "any_one_to_one",
+                    None if matches[side].contains_key(&node.id()) => "matched",
+                    None if in_removed_subtree() => "removed",
+                    None => "ungraded",
+                };
+                let group_holds_twin = groups[side].get(&node.id()).is_some_and(|idx| {
+                    node_twins
+                        .iter()
+                        .any(|twin| groups[side].get(&twin.id()) == Some(idx))
+                });
+
+                let subtree = all_nodes(*node);
+                let size = subtree.len();
+                let visible_nodes = subtree
+                    .iter()
+                    .filter(|n| is_structurally_visible(**n, sources[side]))
+                    .count();
+                let same_side_count = meta.full_hash_to_node.get(&hash).map_or(0, Vec::len);
+                let other_side_count = metadata[other]
+                    .full_hash_to_node
+                    .get(&hash)
+                    .map_or(0, Vec::len);
+                let sibling_of_twin = node_twins
+                    .iter()
+                    .any(|twin| twin.parent().map(|p| p.id()) == node.parent().map(|p| p.id()));
+                let parent_unmatched = node
+                    .parent()
+                    .is_some_and(|parent| node_map.get(&parent.id()) == Some(&0));
+                let function = enclosing_function(*node);
+                let same_function_as_twin = function.is_some()
+                    && node_twins
+                        .iter()
+                        .any(|twin| enclosing_function(*twin) == function);
+                let nearest_twin = node_twins
+                    .iter()
+                    .min_by_key(|twin| twin.start_byte().abs_diff(node.start_byte()))
+                    .expect("a candidate has a twin");
+                let twin_distance_bytes = nearest_twin.start_byte().abs_diff(node.start_byte());
+                // The edit moved or re-wrapped a twin: its parent does not pair with its partner's
+                // parent. A twin left in place reads as unrelated code that happens to match.
+                let twin_displaced = node_twins.iter().any(|twin| {
+                    let partner = node_map[&twin.id()];
+                    let partner_parent = node_caches[other]
+                        .get(&partner)
+                        .and_then(|partner| partner.parent())
+                        .map(|parent| parent.id());
+                    let twin_parent_partner = twin
+                        .parent()
+                        .and_then(|parent| node_map.get(&parent.id()).copied());
+                    twin_parent_partner != partner_parent
+                });
+
+                let bucket = by_label
+                    .entry(label.to_string())
+                    .or_default()
+                    .entry(size_bucket(size))
+                    .or_default();
+                bucket.0 += 1;
+                bucket.1 += size;
+                rows.push(vec![
+                    name.clone(),
+                    if side == 0 { "before" } else { "after" }.to_string(),
+                    label.to_string(),
+                    group_holds_twin.to_string(),
+                    node.kind().to_string(),
+                    size.to_string(),
+                    visible_nodes.to_string(),
+                    node.byte_range().len().to_string(),
+                    same_side_count.to_string(),
+                    other_side_count.to_string(),
+                    node_twins.len().to_string(),
+                    sibling_of_twin.to_string(),
+                    parent_unmatched.to_string(),
+                    same_function_as_twin.to_string(),
+                    twin_distance_bytes.to_string(),
+                    (node.start_position().row + 1).to_string(),
+                    (nearest_twin.start_position().row + 1).to_string(),
+                    twin_displaced.to_string(),
+                ]);
+            }
+        }
+
+        // Recall over the all-to-all members codediff leaves outside their group.
+        let mut before_cache = PathCache::new();
+        let mut after_cache = PathCache::new();
+        for group in &mapping.groups {
+            if group.pairing != GroupPairing::AllToAll {
+                continue;
+            }
+            let before_members: FxHashSet<usize> = group
+                .before_paths
+                .iter()
+                .filter_map(|path| before_cache.resolve(roots[0], &path_refs(path)).ok())
+                .map(|node| node.id())
+                .collect();
+            let after_members: FxHashSet<usize> = group
+                .after_paths
+                .iter()
+                .filter_map(|path| after_cache.resolve(roots[1], &path_refs(path)).ok())
+                .map(|node| node.id())
+                .collect();
+            let members = [before_members, after_members];
+            for side in 0..2 {
+                for &member in &members[side] {
+                    let partner = node_maps[side].get(&member).copied().unwrap_or(0);
+                    if members[1 - side].contains(&partner) {
+                        continue;
+                    }
+                    missed_members += 1;
+                    let side_nodes = if side == 0 {
+                        &node_cache.before
+                    } else {
+                        &node_cache.after
+                    };
+                    let node = side_nodes[&member];
+                    let mut current = Some(node);
+                    while let Some(n) = current {
+                        if candidate_roots[side].contains(&n.id()) {
+                            covered_members += 1;
+                            break;
+                        }
+                        current = n.parent();
+                    }
+                }
+            }
+        }
+    }
+
+    let csv_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("research")
+        .join("data")
+        .join("quality")
+        .join("nm_candidates.csv");
+    let mut writer = csv::Writer::from_path(&csv_path)?;
+    writer.write_record(header)?;
+    for row in &rows {
+        writer.write_record(row)?;
+    }
+    writer.flush()?;
+
+    println!(
+        "{} candidates over {solved} solved fixtures ({skipped} skipped) -> {}",
+        rows.len(),
+        csv_path.display()
+    );
+    println!("\ncandidates (nodes) by human label and subtree size:");
+    for (label, buckets) in &by_label {
+        let line: Vec<String> = ["1", "2-3", "4-7", "8-19", "20+"]
+            .iter()
+            .map(|bucket| {
+                let (count, nodes) = buckets.get(bucket).copied().unwrap_or((0, 0));
+                format!("{bucket}: {count} ({nodes})")
+            })
+            .collect();
+        println!("  {label:<15} {}", line.join("  "));
+    }
+    println!(
+        "\nall-to-all members codediff leaves outside their group: {missed_members}, \
+         covered by a candidate: {covered_members}"
+    );
     Ok(())
 }
