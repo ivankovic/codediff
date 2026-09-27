@@ -23,19 +23,12 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // A moved import: the import-list alignment family, where a rotation in a run of same-kind
-    // siblings mis-pairs the members. The import-path similarity matcher reduces it, not closes it.
-    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
-        "tsx-mui-material-ui-move-import",
-        10,
-        7,
-    )
+    test::helper::human_mapping::assert_matches_human_mapping("tsx-mui-material-ui-move-import")
 }
 
 #[test]
 fn painting() -> Result<()> {
-    // The import-list alignment family, as in the mapping clamp.
-    assert_matches_human_painting_within_limit("tsx-mui-material-ui-move-import", 6.97)
+    assert_matches_human_painting_within_limit("tsx-mui-material-ui-move-import", 4.77)
 }
 
 #[test]

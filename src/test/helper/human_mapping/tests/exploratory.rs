@@ -1959,3 +1959,78 @@ fn nm_candidate_census() -> Result<()> {
     );
     Ok(())
 }
+
+/// **Where codediff gives a node a second partner and silently drops the first**
+/// ([`ASTDiff::node_map_disagreements`]), per fixture, with the passes that wrote each side of the
+/// disagreement. Every fixture, solved or not.
+///
+/// `cargo test --release --lib --features test-fixtures node_map_disagreement_census -- --ignored
+/// --nocapture`
+#[test]
+#[ignore]
+fn node_map_disagreement_census() -> Result<()> {
+    use std::collections::BTreeMap;
+
+    let diffs_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("src")
+        .join("test")
+        .join("data")
+        .join("diffs");
+    let mut names: Vec<String> = Vec::new();
+    for dataset in crate::test::helper::DIFF_DATASETS {
+        let dir = diffs_dir.join(dataset);
+        if !dir.is_dir() {
+            continue;
+        }
+        for entry in fs::read_dir(&dir)?.filter_map(|entry| entry.ok()) {
+            if entry.path().is_dir() {
+                names.push(entry.file_name().to_string_lossy().into_owned());
+            }
+        }
+    }
+    names.sort();
+
+    let mut by_reasons: BTreeMap<String, usize> = BTreeMap::new();
+    let (mut fixtures, mut total, mut diffed) = (0usize, 0usize, 0usize);
+    for name in &names {
+        let Ok(pair) = crate::test::helper::handmade_test_code_pair(name) else {
+            continue;
+        };
+        let (before, after) = &*pair;
+        let diff = crate::diff::diff_code(before, after);
+        let Some(ast) = diff.ast.as_ref() else {
+            continue;
+        };
+        diffed += 1;
+        let found = ast.node_map_disagreements();
+        if found.is_empty() {
+            continue;
+        }
+        fixtures += 1;
+        total += found.len();
+        println!("{:>5}  {name}", found.len());
+        for (b, a) in found {
+            let reason_of = |key: (usize, usize)| {
+                ast.mapping
+                    .get(&key)
+                    .map_or("-".to_string(), |m| format!("{:?}", m.reason))
+            };
+            let before_side = ast.before_node_map.get(&b).copied().unwrap_or(0);
+            let after_side = ast.after_node_map.get(&a).copied().unwrap_or(0);
+            *by_reasons
+                .entry(format!(
+                    "{} / {}",
+                    reason_of((b, before_side)),
+                    reason_of((after_side, a))
+                ))
+                .or_default() += 1;
+        }
+    }
+    println!("\n{total} disagreements in {fixtures} of {diffed} fixtures");
+    let mut reasons: Vec<_> = by_reasons.into_iter().collect();
+    reasons.sort_by_key(|(_, count)| std::cmp::Reverse(*count));
+    for (reasons, count) in reasons.iter().take(20) {
+        println!("  {count:>5}  {reasons}");
+    }
+    Ok(())
+}

@@ -87,7 +87,11 @@ pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
         let Some(queue) = after_by_hash.get_mut(hash) else {
             continue;
         };
-        let Some(after_node_id) = queue.pop_front() else {
+        // The queue was filled before any pairing: an earlier, enclosing candidate's descent may
+        // have mapped a nested one since.
+        let Some(after_node_id) = std::iter::from_fn(|| queue.pop_front())
+            .find(|id| !diff.after_node_map.contains_key(id))
+        else {
             continue;
         };
         let Some(after_node) = node_cache.after.get(&after_node_id).copied() else {

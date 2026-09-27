@@ -23,13 +23,11 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // One shape repeated down a subtree: the human maps an include to where it moved, while
-    // `StructurallyIdenticalAncestor` pairs includes by index under the identical `preproc_ifdef`,
-    // dragging the wrongly-paired include's string subtree along. The move-detection gap.
-    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
+    // Pins that no pass overwrites a partner an earlier pass gave
+    // (`ASTDiff::node_map_disagreements`): the includes under the identical `preproc_ifdef` keep
+    // the partners phase 1 gave them.
+    test::helper::human_mapping::assert_matches_human_mapping(
         "c-genymobile-scrcpy-add-to-import-path-and-move-imports-around",
-        6,
-        4,
     )
 }
 
@@ -37,7 +35,7 @@ fn mapping() -> Result<()> {
 fn painting() -> Result<()> {
     assert_matches_human_painting_within_limit(
         "c-genymobile-scrcpy-add-to-import-path-and-move-imports-around",
-        5.41,
+        3.73,
     )
 }
 

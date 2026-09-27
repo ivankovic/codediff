@@ -27,14 +27,14 @@ fn mapping() -> Result<()> {
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "java-defects4j-closure-110-scopedaliases",
         // Includes the N:M floor: 7 all-to-all group members a one-to-one output cannot reach.
-        31,
-        19,
+        18,
+        11,
     )
 }
 
 #[test]
 fn painting() -> Result<()> {
-    assert_matches_human_painting_within_limit("java-defects4j-closure-110-scopedaliases", 0.29)
+    assert_matches_human_painting_within_limit("java-defects4j-closure-110-scopedaliases", 0.21)
 }
 
 #[test]

@@ -23,17 +23,14 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // Recorded as found, not examined.
-    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
+    test::helper::human_mapping::assert_matches_human_mapping(
         "java-defects4j-closure-108-scopedaliases",
-        13,
-        8,
     )
 }
 
 #[test]
 fn painting() -> Result<()> {
-    assert_matches_human_painting_within_limit("java-defects4j-closure-108-scopedaliases", 0.62)
+    assert_matches_human_painting_within_limit("java-defects4j-closure-108-scopedaliases", 0.54)
 }
 
 #[test]

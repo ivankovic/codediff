@@ -456,8 +456,9 @@ impl ASTDiff {
     }
 
     /// Whether every real pair joins two nodes that exist and are of the same kind, or of a
-    /// cross-kind pair `nodes::kinds_update_allowed` permits. Null mappings always pass. `before`
-    /// gives the language; `node_cache` holds both sides' nodes.
+    /// cross-kind pair `nodes::kinds_update_allowed` permits, and the node maps agree
+    /// ([`Self::node_map_disagreements`]). Null mappings always pass. `before` gives the language;
+    /// `node_cache` holds both sides' nodes.
     pub fn is_valid(&self, before: &Code, node_cache: &NodeCache) -> bool {
         let language = before.metadata.language.unwrap_or_default();
 
@@ -486,7 +487,26 @@ impl ASTDiff {
             }
         }
 
-        true
+        self.node_map_disagreements().is_empty()
+    }
+
+    /// Pairs the two node maps disagree on: `before_node_map[b] = a` with `after_node_map[a] != b`,
+    /// or the other way round. A pair here means a node was given a second partner and the first
+    /// was silently overwritten (`add_mapping` never evicts one). As `(before_id, after_id)`,
+    /// sorted.
+    pub fn node_map_disagreements(&self) -> Vec<(usize, usize)> {
+        let mut found = std::collections::BTreeSet::new();
+        for (&b, &a) in &self.before_node_map {
+            if b != 0 && a != 0 && self.after_node_map.get(&a) != Some(&b) {
+                found.insert((b, a));
+            }
+        }
+        for (&a, &b) in &self.after_node_map {
+            if a != 0 && b != 0 && self.before_node_map.get(&b) != Some(&a) {
+                found.insert((b, a));
+            }
+        }
+        found.into_iter().collect()
     }
 
     /// Whether every node of both trees except the roots has a mapping.
