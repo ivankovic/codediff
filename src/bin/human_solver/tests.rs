@@ -1375,7 +1375,7 @@ fn painting_names(app: &App) -> Vec<String> {
         .collect()
 }
 
-/// There is no undo for a painting, so `D` needs two presses.
+/// Deleting a painting is the one bulk removal in the text view, so `D` needs two presses.
 #[test]
 fn deleting_a_painting_takes_two_presses_of_d() {
     let armed = press_in_solution_picker(&["Full", "Minimal"], &[KeyCode::Char('D')]);
@@ -1794,7 +1794,7 @@ fn codediff_text_spans_reports_the_changed_regions_of_a_real_diff() {
     let before = Code::from_string("fn main() {\n    foo();\n}\n", &Language::Rust);
     let after = Code::from_string("fn main() {\n    bar();\n}\n", &Language::Rust);
 
-    let [before_spans, after_spans] = codediff_text_spans(&before, &after);
+    let [before_spans, after_spans] = codediff_text_spans(&before, &after, None);
 
     assert!(
         !before_spans.is_empty(),
@@ -5465,10 +5465,15 @@ fn action_match_to_end_stops_at_a_kind_mismatch_but_keeps_prior_matches() {
                 before_kind,
                 after_kind,
                 recursive,
+                resume_match_to_end,
             } => {
                 assert!(
                     !recursive,
                     "f should raise a single-pair mismatch, not a recursive one"
+                );
+                assert!(
+                    resume_match_to_end,
+                    "an f stop offers to mark the node and carry on"
                 );
                 (before_id, after_id, before_kind, after_kind)
             }
@@ -7917,7 +7922,7 @@ fn codediff_text_entries_keeps_the_pairing_that_the_span_view_drops() {
     let before = Code::from_string("fn main() {\n    foo();\n}\n", &Language::Rust);
     let after = Code::from_string("fn main() {\n    bar();\n}\n", &Language::Rust);
 
-    let entries = codediff_text_entries(&before, &after).expect("this pair pairs up cleanly");
+    let entries = codediff_text_entries(&before, &after, None).expect("this pair pairs up cleanly");
     assert!(!entries.is_empty(), "an edited pair should produce entries");
 
     for entry in &entries {
@@ -7958,7 +7963,7 @@ fn seeding_a_painting_reproduces_codediffs_own_spans_on_both_sides() {
     action_paint_seed_from_codediff(&mut app, &before, &after);
     assert!(app.dirty, "seeding is an unsaved change to the mapping");
 
-    let algo = codediff_text_spans(&before, &after);
+    let algo = codediff_text_spans(&before, &after, None);
     for side in [0usize, 1usize] {
         let mut painted: Vec<_> = painted_spans(
             &app.mapping,
@@ -8024,7 +8029,7 @@ fn seeding_refuses_a_pair_whose_codediff_ranges_overlap() {
         .expect("fixture should exist");
     let (before, after) = &*pair;
 
-    let overlapping = codediff_text_spans(before, after)
+    let overlapping = codediff_text_spans(before, after, None)
         .iter()
         .any(|side| spans_overlap(side));
     assert!(
@@ -8032,7 +8037,7 @@ fn seeding_refuses_a_pair_whose_codediff_ranges_overlap() {
         "this test is pointless unless the fixture still has overlapping codediff ranges"
     );
 
-    let error = codediff_text_entries(before, after)
+    let error = codediff_text_entries(before, after, None)
         .expect_err("an overlapping pair must not produce a painting");
     assert!(
         error.contains("overlap"),
@@ -8569,7 +8574,7 @@ fn the_same_key_is_not_explained_away_when_there_is_a_tree() {
 #[test]
 fn codediff_text_spans_falls_back_to_the_plain_text_diff() {
     let (before, after) = unparseable_pair();
-    let [before_spans, after_spans] = codediff_text_spans(&before, &after);
+    let [before_spans, after_spans] = codediff_text_spans(&before, &after, None);
 
     assert!(
         !before_spans.is_empty() && !after_spans.is_empty(),
@@ -10524,4 +10529,208 @@ fn v_toggles_the_focused_panels_anchor_and_preserves_the_frame_state() {
     assert_eq!(app.before.anchor, Some(app.before.cursor_id));
     assert!(app.after.anchor.is_none());
     assert!(is_state_preserving_key(None, KeyCode::Char('v')));
+}
+
+// ---------------------------------------------------------------------------------------------
+// The f stop marks and carries on; scans are cached; the overlay reuses the diff
+// ---------------------------------------------------------------------------------------------
+
+/// `key` on a kind-mismatch modal whose Before node is `fn main`'s first statement and whose
+/// After node is `b();` in a two-statement after file.
+fn press_on_kind_mismatch(key: KeyCode, resume: bool) -> App {
+    let before_src = "fn main() {\n    a();\n}\n";
+    let after_src = "fn main() {\n    b();\n    a();\n}\n";
+    let before = Code::from_string(before_src, &Language::Rust);
+    let after = Code::from_string(after_src, &Language::Rust);
+    let before_root = before.ast.as_ref().unwrap().root_node();
+    let after_root = after.ast.as_ref().unwrap().root_node();
+    let before_statement = body_statements(before_root)[0];
+    let after_statement = body_statements(after_root)[0];
+    let mut app = App::new(
+        "test".to_string(),
+        CaseOrigin::Diffs,
+        before_root.id(),
+        after_root.id(),
+        HumanMapping::default(),
+    );
+    // As `f` leaves them when it stops: both cursors on the pair that did not match.
+    app.before.cursor_id = before_statement.id();
+    app.after.cursor_id = after_statement.id();
+    app.modal = Some(Modal::ConfirmKindMismatch {
+        before_id: before_statement.id(),
+        after_id: after_statement.id(),
+        before_kind: before_statement.kind().to_string(),
+        after_kind: after_statement.kind().to_string(),
+        recursive: false,
+        resume_match_to_end: resume,
+    });
+    let before_flat = FlatIndex::new(flatten_visible(before_root, &app.before.collapsed, None));
+    let after_flat = FlatIndex::new(flatten_visible(after_root, &app.after.collapsed, None));
+    let caches = rebuild_caches(&app.mapping.entries, before_root, after_root);
+    handle_modal_key(
+        &mut app,
+        key,
+        &before_flat,
+        &after_flat,
+        Some(before_root),
+        Some(after_root),
+        &caches,
+        before_src.as_bytes(),
+        after_src.as_bytes(),
+        &before,
+        &after,
+    );
+    app
+}
+
+#[test]
+fn capital_i_on_an_f_stop_marks_the_insert_and_f_carries_on() {
+    let app = press_on_kind_mismatch(KeyCode::Char('I'), true);
+    assert!(app.modal.is_none(), "the stop is answered: {:?}", app.modal);
+    assert!(app.dirty);
+    let inserts = app
+        .mapping
+        .entries
+        .iter()
+        .filter(|e| e.operation == HumanOperation::InsertWithChildren)
+        .count();
+    assert_eq!(inserts, 1, "{:?}", app.mapping.entries);
+    assert!(
+        app.mapping.entries.len() > 1,
+        "f carried on and matched the rest: {:?}",
+        app.mapping.entries
+    );
+    let status = app.status.clone().unwrap_or_default();
+    assert!(
+        status.contains("; Matched") || status.contains("; Nothing matched"),
+        "{status}"
+    );
+}
+
+#[test]
+fn d_on_a_kind_mismatch_raised_by_m_marks_and_stops_there() {
+    let app = press_on_kind_mismatch(KeyCode::Char('d'), false);
+    assert_eq!(app.mapping.entries.len(), 1, "{:?}", app.mapping.entries);
+    assert_eq!(app.mapping.entries[0].operation, HumanOperation::Delete);
+    assert!(
+        app.status.as_deref().unwrap_or("").starts_with("Marked"),
+        "{:?}",
+        app.status
+    );
+    let kind_mismatch = Modal::ConfirmKindMismatch {
+        before_id: 0,
+        after_id: 0,
+        before_kind: String::new(),
+        after_kind: String::new(),
+        recursive: false,
+        resume_match_to_end: true,
+    };
+    for code in [KeyCode::Char('d'), KeyCode::Char('I'), KeyCode::Char('y')] {
+        assert!(may_edit_mapping(Some(&kind_mismatch), code), "{code:?}");
+    }
+    assert!(!may_edit_mapping(Some(&kind_mismatch), KeyCode::Char('n')));
+}
+
+#[test]
+fn scan_corpus_cached_with_rescans_only_cases_whose_stamp_moved() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("scans").join("kind.json");
+    let names: Vec<String> = ["a", "b", "c"].iter().map(|n| n.to_string()).collect();
+    let scans = AtomicUsize::new(0);
+    // `c` has no answer; `b`'s stamp is unknown (its directory is gone).
+    let scan = |name: &str| {
+        scans.fetch_add(1, Ordering::SeqCst);
+        match name {
+            "a" => Some(1usize),
+            "b" => Some(2),
+            _ => None,
+        }
+    };
+    let stamps = |name: &str| match name {
+        "a" => Some(10),
+        "c" => Some(30),
+        _ => None,
+    };
+
+    let first = scan_corpus_cached_with(Some(&path), &names, stamps, scan);
+    assert_eq!(first.get("a"), Some(&1));
+    assert_eq!(first.get("b"), Some(&2));
+    assert_eq!(first.get("c"), None);
+    assert_eq!(
+        scans.swap(0, Ordering::SeqCst),
+        3,
+        "everything scanned once"
+    );
+    assert!(path.exists());
+
+    let second = scan_corpus_cached_with(Some(&path), &names, stamps, scan);
+    assert_eq!(second, first);
+    assert_eq!(
+        scans.swap(0, Ordering::SeqCst),
+        1,
+        "only the unstamped case is rescanned; a remembered `None` is not"
+    );
+
+    let moved = |name: &str| match name {
+        "a" => Some(11),
+        "c" => Some(30),
+        _ => None,
+    };
+    let third = scan_corpus_cached_with(Some(&path), &names, moved, scan);
+    assert_eq!(third, first);
+    assert_eq!(
+        scans.swap(0, Ordering::SeqCst),
+        2,
+        "a moved, b has no stamp"
+    );
+
+    // No cache file: every call scans everything.
+    scan_corpus_cached_with(None, &names, stamps, scan);
+    assert_eq!(scans.swap(0, Ordering::SeqCst), 3);
+}
+
+#[test]
+fn the_codediff_overlay_from_a_known_diff_matches_a_fresh_run() {
+    let before = Code::from_string("fn main() {\n    a();\n}\n", &Language::Rust);
+    let after = Code::from_string("fn main() {\n    b();\n    a();\n}\n", &Language::Rust);
+    let known = diff_code(&before, &after).ast.expect("an AST diff");
+    let fresh = codediff_text_spans(&before, &after, None);
+    let reused = codediff_text_spans(&before, &after, Some(&known));
+    assert_eq!(reused, fresh);
+    assert!(!reused[1].is_empty(), "the insert shows on the after side");
+}
+
+/// Not a test of anything: prints how long the per-key work takes on the largest fixture, for
+/// deciding whether the caches need to update incrementally. `--run-ignored` to see it.
+#[test]
+#[ignore]
+fn timing_of_the_per_key_work_on_the_largest_fixture() -> Result<()> {
+    for name in [
+        "json-ipfs-ipfs-desktop-only-update-version-strings",
+        "cpp-godotengine-godot-add-one-include",
+    ] {
+        let (before, after) = load_case(name)?;
+        let mapping = human_mapping::load(name)?;
+        let root_id = starting_cursor_id(&before);
+        let app = App::new(
+            name.to_string(),
+            CaseOrigin::Diffs,
+            root_id,
+            starting_cursor_id(&after),
+            mapping,
+        );
+        let started = std::time::Instant::now();
+        let state = compute_frame_state(&before, &after, &app)?;
+        let frame = started.elapsed();
+        let started = std::time::Instant::now();
+        let _clone = app.mapping.clone();
+        let clone = started.elapsed();
+        eprintln!(
+            "{name}: {} entries, compute_frame_state {frame:?}, mapping clone {clone:?}, {} flat rows",
+            app.mapping.entries.len(),
+            state.before_flat.len()
+        );
+    }
+    Ok(())
 }

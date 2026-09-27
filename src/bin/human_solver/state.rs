@@ -305,6 +305,7 @@ pub(crate) fn is_text_only(before: &Code, after: &Code) -> bool {
 pub(crate) fn codediff_text_spans(
     before: &Code,
     after: &Code,
+    known: Option<&ASTDiff>,
 ) -> [Vec<(HumanTextSpan, HumanTextVerdict)>; 2] {
     // Keyed on the code, as the product is: `diff_code` returns `Some(ASTDiff)` even with no
     // trees, which would show an empty projection instead of the fallback.
@@ -313,14 +314,19 @@ pub(crate) fn codediff_text_spans(
             codediff::diff::text::plain_text_line_diff(&before.contents, &after.contents);
         [before_ranges, after_ranges]
     } else {
-        let diff = diff_code(before, after);
-        match diff.ast.as_ref() {
-            Some(ast_diff) => {
-                let node_cache = NodeCache::build(before, after);
-                let text_diff = TextDiff::from(before, after, ast_diff, &node_cache);
-                [text_diff.all(0), text_diff.all(1)]
-            }
-            None => [Vec::new(), Vec::new()],
+        let project = |ast_diff: &ASTDiff| {
+            let node_cache = NodeCache::build(before, after);
+            let text_diff = TextDiff::from(before, after, ast_diff, &node_cache);
+            [text_diff.all(0), text_diff.all(1)]
+        };
+        // `known` is the background run's diff of these same trees (`App::algo_diff`), so the
+        // projection needs no second run.
+        match known {
+            Some(ast_diff) => project(ast_diff),
+            None => match diff_code(before, after).ast.as_ref() {
+                Some(ast_diff) => project(ast_diff),
+                None => [Vec::new(), Vec::new()],
+            },
         }
     };
 
@@ -359,8 +365,9 @@ pub(crate) fn codediff_text_spans(
 pub(crate) fn codediff_text_entries(
     before: &Code,
     after: &Code,
+    known: Option<&ASTDiff>,
 ) -> Result<Vec<HumanTextEntry>, &'static str> {
-    let [before_spans, after_spans] = codediff_text_spans(before, after);
+    let [before_spans, after_spans] = codediff_text_spans(before, after, known);
 
     // Overlapping ranges are refused: the renderer resolves an overlap by highest verdict but
     // `label_bytes` (what grading reads) by last entry, so it would render as one thing and score
@@ -449,7 +456,7 @@ pub(crate) fn action_paint_seed_from_codediff(app: &mut App, before: &Code, afte
         return;
     }
 
-    let entries = match codediff_text_entries(before, after) {
+    let entries = match codediff_text_entries(before, after, app.algo_diff.as_ref()) {
         Ok(entries) if entries.is_empty() => {
             app.status = Some("codediff paints nothing on this pair - nothing to copy".to_string());
             return;
@@ -1661,6 +1668,9 @@ pub(crate) enum Modal {
         after_kind: String,
         /// From `M`: confirming also auto-matches the rest of the subtree.
         recursive: bool,
+        /// From `f`: `d`/`D`/`i`/`I` mark the node that stopped it and `f` carries on from
+        /// there, so a stop costs one key instead of four.
+        resume_match_to_end: bool,
     },
     /// Raised by `m`/`M` when the multi-map selection mixes AST kinds; the set form of
     /// `ConfirmKindMismatch`.

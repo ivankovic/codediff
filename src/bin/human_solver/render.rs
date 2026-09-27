@@ -516,20 +516,29 @@ pub(crate) fn render_modal(
             area,
             "Start this case from scratch?",
             &format!(
-                "This throws away everything recorded for this case:\n\n  {entries} mapping entries\n  {groups} multi-map groups\n  {paintings} named paintings\n\nThere is no undo. Nothing is written until you press s, so reopening\nthe case without saving still gets it back.\n\n[y] clear it   [any other key] cancel"
+                "This throws away everything recorded for this case:\n\n  {entries} mapping entries\n  {groups} multi-map groups\n  {paintings} named paintings\n\nU undoes it, and nothing is written until you press s.\n\n[y] clear it   [any other key] cancel"
             ),
         ),
         Modal::ConfirmKindMismatch {
             before_kind,
             after_kind,
+            resume_match_to_end,
             ..
         } => render_text_modal(
             frame,
             area,
             "Node kinds do not match!",
             &format!(
-                "Before: {}\nAfter:  {}\n\nAre you sure you want to add this mapping? (y/n)",
-                before_kind, after_kind
+                "Before: {}\nAfter:  {}\n\n[y] match them anyway\n[d] / [D] mark the Before node \
+                 deleted / with its subtree\n[i] / [I] mark the After node inserted / with its \
+                 subtree{}\n[n] cancel",
+                before_kind,
+                after_kind,
+                if *resume_match_to_end {
+                    ", and f carries on"
+                } else {
+                    ""
+                }
             ),
         ),
         Modal::ConfirmMultiMapGroup {

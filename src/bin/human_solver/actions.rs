@@ -573,6 +573,7 @@ pub(crate) fn kind_mismatch_modal(
     before_node: Node,
     after_node: Node,
     recursive: bool,
+    resume_match_to_end: bool,
 ) -> ActionOutcome {
     ActionOutcome::NeedsModal(Box::new(Modal::ConfirmKindMismatch {
         before_id: before_node.id(),
@@ -580,6 +581,7 @@ pub(crate) fn kind_mismatch_modal(
         before_kind: before_node.kind().to_string(),
         after_kind: after_node.kind().to_string(),
         recursive,
+        resume_match_to_end,
     }))
 }
 
@@ -638,7 +640,7 @@ pub(crate) fn action_match(
     }
 
     if before_node.kind() != after_node.kind() {
-        return Ok(kind_mismatch_modal(before_node, after_node, false));
+        return Ok(kind_mismatch_modal(before_node, after_node, false, false));
     }
 
     let operation = classify_match_operation(
@@ -740,7 +742,7 @@ pub(crate) fn action_match_to_end(
                     after_node.kind(),
                 )));
             }
-            return Ok(kind_mismatch_modal(before_node, after_node, false));
+            return Ok(kind_mismatch_modal(before_node, after_node, false, true));
         }
 
         let operation = classify_match_operation(
@@ -832,7 +834,7 @@ pub(crate) fn action_match_subtree(
     }
 
     if before_node.kind() != after_node.kind() {
-        return Ok(kind_mismatch_modal(before_node, after_node, true));
+        return Ok(kind_mismatch_modal(before_node, after_node, true, false));
     }
 
     if before_node.child_count() == 0 && after_node.child_count() == 0 {

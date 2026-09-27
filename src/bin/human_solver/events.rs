@@ -359,9 +359,16 @@ pub(crate) fn may_edit_mapping(modal: Option<&Modal>, code: KeyCode) -> bool {
                 | KeyCode::Char('I')
                 | KeyCode::Char('u')
         ),
-        Some(Modal::ConfirmKindMismatch { .. })
-        | Some(Modal::ConfirmMultiMapGroup { .. })
-        | Some(Modal::ConfirmResetCase { .. }) => {
+        Some(Modal::ConfirmKindMismatch { .. }) => matches!(
+            code,
+            KeyCode::Char('y')
+                | KeyCode::Char('Y')
+                | KeyCode::Char('d')
+                | KeyCode::Char('D')
+                | KeyCode::Char('i')
+                | KeyCode::Char('I')
+        ),
+        Some(Modal::ConfirmMultiMapGroup { .. }) | Some(Modal::ConfirmResetCase { .. }) => {
             matches!(code, KeyCode::Char('y') | KeyCode::Char('Y'))
         }
         Some(Modal::TextView { .. }) => matches!(
@@ -1418,7 +1425,83 @@ pub(crate) fn handle_modal_key(
             before_kind,
             after_kind,
             recursive,
+            resume_match_to_end,
         } => match code {
+            // The stop is a delete or an insert: mark it here and, when `f` raised the modal,
+            // carry on matching from the next unmarked pair.
+            KeyCode::Char('d') | KeyCode::Char('D') | KeyCode::Char('i') | KeyCode::Char('I') => {
+                let Some((before_root, after_root)) = roots else {
+                    app.status = Some(NO_TREE_TO_MAP.to_string());
+                    return None;
+                };
+                let with_children = matches!(code, KeyCode::Char('D') | KeyCode::Char('I'));
+                let deleting = matches!(code, KeyCode::Char('d') | KeyCode::Char('D'));
+                let marked = if deleting {
+                    action_delete(
+                        &mut app.mapping,
+                        before_flat,
+                        before_id,
+                        before_root,
+                        after_root,
+                        with_children,
+                        caches,
+                    )
+                } else {
+                    action_insert(
+                        &mut app.mapping,
+                        after_flat,
+                        after_id,
+                        before_root,
+                        after_root,
+                        with_children,
+                        caches,
+                    )
+                };
+                let marked = match marked {
+                    Ok(marked) => marked,
+                    Err(err) => {
+                        app.status = Some(format!("Error: {err:#}"));
+                        return None;
+                    }
+                };
+                app.mark_dirty();
+                let (side, flat) = if deleting {
+                    (Side::Before, before_flat)
+                } else {
+                    (Side::After, after_flat)
+                };
+                advance_side_to_next_unmarked(app, side, flat, before_root, after_root);
+                if !resume_match_to_end {
+                    app.status = Some(marked);
+                    return None;
+                }
+                let hashes = (
+                    before.metadata.ast_metadata.as_ref(),
+                    after.metadata.ast_metadata.as_ref(),
+                );
+                let (Some(before_meta), Some(after_meta)) = hashes else {
+                    app.status = Some(marked);
+                    return None;
+                };
+                match action_match_to_end(
+                    app,
+                    before_flat,
+                    after_flat,
+                    before_root,
+                    after_root,
+                    before_src,
+                    after_src,
+                    &before_meta.node_to_full_hash,
+                    &after_meta.node_to_full_hash,
+                ) {
+                    Ok(ActionOutcome::Done(msg)) => app.status = Some(format!("{marked}; {msg}")),
+                    Ok(ActionOutcome::NeedsModal(modal)) => {
+                        app.status = Some(marked);
+                        app.modal = Some(*modal);
+                    }
+                    Err(err) => app.status = Some(format!("{marked}; then: {err:#}")),
+                }
+            }
             KeyCode::Char('y') | KeyCode::Char('Y') => {
                 let Some((before_root, after_root)) = roots else {
                     app.status = Some(NO_TREE_TO_MAP.to_string());
@@ -1459,6 +1542,7 @@ pub(crate) fn handle_modal_key(
                     before_kind,
                     after_kind,
                     recursive,
+                    resume_match_to_end,
                 });
             }
         },
@@ -2711,7 +2795,8 @@ fn handle_text_view(
             let next = app.text_overlay.next();
             // Lazy, and kept for the case: running codediff is slow on a large fixture.
             if next != TextOverlay::Human && app.algo_text_spans.is_none() {
-                app.algo_text_spans = Some(codediff_text_spans(before, after));
+                app.algo_text_spans =
+                    Some(codediff_text_spans(before, after, app.algo_diff.as_ref()));
             }
             app.text_overlay = next;
             let human_spans_for_status = || {

@@ -115,7 +115,9 @@ m / M          match cursor nodes (M also recurses into matching children);
                  per position, every node down to the leaves - the subtrees
                  must agree on kind and child count everywhere, or nothing is
                  committed and the first divergence is reported)
-f              repeat m until end of file or a kind mismatch needs your input
+f              repeat m until end of file or a kind mismatch needs your input:
+                 there, y matches anyway, d/D or i/I mark the stopping node
+                 deleted or inserted (with subtree) and f carries on, n stops
 d / D          mark Before node deleted / deleted with subtree
 i / I          mark After node inserted / inserted with subtree
 u              unmark the focused cursor node, or remove its whole multi-map
@@ -249,8 +251,10 @@ o              open a different test case (src/test/data/diffs/) as a table:
                  Size is the diff's changed lines, as in the O picker.
                  The scans behind Cmpl/Unmarked, Paint, Disagree, Invariant and
                  Size run on the first s or f on that column (Cmpl/Unmarked blocks
-                 for ~12s and Disagree ~7s on the full corpus); until then those
-                 columns read ?, and a ? row survives either filter direction.
+                 for ~12s and Disagree ~7s on the full corpus the first time; their
+                 results are cached under ~/.local/state/codediff/scans/ and only
+                 cases changed since are rescanned); until then those columns read
+                 ?, and a ? row survives either filter direction.
                  Cursor, sort and filters persist across o, and with the case
                  last open across runs (~/.local/state/codediff/human_solver.json):
                  started with no name, the tool reopens where it left off
@@ -677,6 +681,146 @@ fn neighbouring_case(app: &mut App, forward: bool) -> Result<Option<OpenTarget>>
     Ok(Some(target))
 }
 
+/// One corpus scan's results on disk, so the `o` picker's `s`/`f` and `}`/`{` do not redo
+/// seconds of work every session for fixtures that have not changed. Per case, the stamp its value
+/// was computed under and the value - `None` for a case the scan had no answer for, so that is
+/// remembered too. Keyed on the binary as well: a scan's meaning can change with the code.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+struct ScanCache<T> {
+    binary: u64,
+    cases: HashMap<String, (u64, Option<T>)>,
+}
+
+// By hand: the derive would demand `T: Default`, which a scan's value need not be.
+impl<T> Default for ScanCache<T> {
+    fn default() -> Self {
+        ScanCache {
+            binary: 0,
+            cases: HashMap::new(),
+        }
+    }
+}
+
+/// `<session memory dir>/scans/<kind>.json`.
+fn scan_cache_path(kind: &str) -> Option<PathBuf> {
+    Some(
+        session_memory_path()?
+            .parent()?
+            .join("scans")
+            .join(format!("{kind}.json")),
+    )
+}
+
+fn mtime_secs(path: &Path) -> Option<u64> {
+    let modified = fs::metadata(path).ok()?.modified().ok()?;
+    Some(
+        modified
+            .duration_since(std::time::UNIX_EPOCH)
+            .ok()?
+            .as_secs(),
+    )
+}
+
+/// The newest modification time among a case's files: its mapping, sources and note. Any edit
+/// to the case moves it, which is all the cache needs.
+fn case_stamp(name: &str) -> Option<u64> {
+    let dir = diffs_case_dir(name)?;
+    fs::read_dir(&dir)
+        .ok()?
+        .flatten()
+        .filter_map(|entry| mtime_secs(&entry.path()))
+        .max()
+}
+
+fn binary_stamp() -> u64 {
+    std::env::current_exe()
+        .ok()
+        .and_then(|exe| mtime_secs(&exe))
+        .unwrap_or(0)
+}
+
+/// [`scan_corpus`] through the on-disk cache: only cases whose stamp moved since they were last
+/// scanned, or that were never scanned, run `scan`; the rest come from the cache, which is then
+/// rewritten. A case with no stamp (its directory is gone) is scanned and not cached.
+fn scan_corpus_cached<T, F>(kind: &str, names: &[String], scan: F) -> HashMap<String, T>
+where
+    T: Serialize + serde::de::DeserializeOwned + Clone + Send,
+    F: Fn(&str) -> Option<T> + Sync,
+{
+    scan_corpus_cached_with(scan_cache_path(kind).as_deref(), names, case_stamp, scan)
+}
+
+/// `scan_corpus_cached` with the cache file and the stamp function as parameters, for tests.
+fn scan_corpus_cached_with<T, F, S>(
+    cache_path: Option<&Path>,
+    names: &[String],
+    stamp_of: S,
+    scan: F,
+) -> HashMap<String, T>
+where
+    T: Serialize + serde::de::DeserializeOwned + Clone + Send,
+    F: Fn(&str) -> Option<T> + Sync,
+    S: Fn(&str) -> Option<u64>,
+{
+    let binary = binary_stamp();
+    let mut cache: ScanCache<T> = cache_path
+        .and_then(|path| fs::read_to_string(path).ok())
+        .and_then(|contents| serde_json::from_str(&contents).ok())
+        .filter(|cache: &ScanCache<T>| cache.binary == binary)
+        .unwrap_or_default();
+    cache.binary = binary;
+
+    let stamps: Vec<(String, Option<u64>)> = names
+        .iter()
+        .map(|name| (name.clone(), stamp_of(name)))
+        .collect();
+    let stale: Vec<String> = stamps
+        .iter()
+        .filter(|(name, stamp)| {
+            stamp.is_none_or(|stamp| {
+                cache
+                    .cases
+                    .get(name)
+                    .is_none_or(|(cached_stamp, _)| *cached_stamp != stamp)
+            })
+        })
+        .map(|(name, _)| name.clone())
+        .collect();
+    let fresh = scan_corpus(&stale, scan);
+
+    let mut result = HashMap::new();
+    for (name, stamp) in &stamps {
+        if stale.contains(name) {
+            if let Some(value) = fresh.get(name) {
+                result.insert(name.clone(), value.clone());
+            }
+            if let Some(stamp) = stamp {
+                cache
+                    .cases
+                    .insert(name.clone(), (*stamp, fresh.get(name).cloned()));
+            }
+        } else if let Some((_, Some(value))) = cache.cases.get(name) {
+            result.insert(name.clone(), value.clone());
+        }
+    }
+    // Cases no longer in the corpus drop out of the cache.
+    cache.cases.retain(|name, _| names.contains(name));
+
+    if let Some(path) = cache_path
+        && !stale.is_empty()
+    {
+        // Best effort: a cache that could not be written costs the next session a scan.
+        let written = path
+            .parent()
+            .map(fs::create_dir_all)
+            .unwrap_or(Ok(()))
+            .and_then(|_| fs::write(path, serde_json::to_string(&cache).unwrap_or_default()));
+        let _ = written;
+    }
+    result
+}
+
 /// The `o` picker's next dataset filter: `DIFF_DATASETS` in order, then back to "all" (`None`).
 fn next_dataset_filter(current: Option<&'static str>) -> Option<&'static str> {
     match current {
@@ -857,7 +1001,7 @@ fn compute_diff_unmarked() -> std::collections::HashMap<String, usize> {
     let Ok(names) = list_available_case_names() else {
         return std::collections::HashMap::new();
     };
-    scan_corpus(&names, diff_case_unmarked_count)
+    scan_corpus_cached("unmarked", &names, diff_case_unmarked_count)
 }
 
 /// Whether `name`'s human mapping carries any text painting; `None` if the file can't be read.
@@ -933,7 +1077,7 @@ fn compute_diff_disagreement() -> std::collections::HashMap<String, usize> {
     let Ok(names) = list_available_case_names() else {
         return std::collections::HashMap::new();
     };
-    scan_corpus(&names, diff_case_disagreement_bytes)
+    scan_corpus_cached("disagreement", &names, diff_case_disagreement_bytes)
 }
 
 /// How many ground-truth invariants `name`'s human mapping breaks - the number its fixture's
@@ -950,7 +1094,7 @@ fn compute_diff_invariants() -> std::collections::HashMap<String, usize> {
     let Ok(names) = list_available_case_names() else {
         return std::collections::HashMap::new();
     };
-    scan_corpus(&names, diff_case_invariant_violations)
+    scan_corpus_cached("invariants", &names, diff_case_invariant_violations)
 }
 
 /// Refreshes `name`'s entry in `App::diff_invariants`, if that scan has run. Called after a save.
@@ -1286,7 +1430,7 @@ fn compute_diff_sizes() -> std::collections::HashMap<String, usize> {
     let Ok(names) = list_available_case_names() else {
         return std::collections::HashMap::new();
     };
-    scan_corpus(&names, diff_case_size)
+    scan_corpus_cached("sizes", &names, diff_case_size)
 }
 
 /// One column of the `o` picker's table; `h`/`l` move between them, `s`/`f` act on the current one.
