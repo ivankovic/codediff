@@ -205,10 +205,16 @@
     rows.style.setProperty("--gutter-cells", gutter);
 
     // Keep the native scroll position in step with the model without re-entering the scroll
-    // handler's own model update.
+    // handler's own model update. Written only when the model has moved off what is on screen (a
+    // key, a jump): writing a user's own scroll back, rounded to whole rows, would pin a panel that
+    // moves a few pixels per event, which is how a finger scrolls it.
     state.syncingScroll = true;
-    code.scrollTop = panel.scroll * state.rowHeight;
-    code.scrollLeft = panel.scrollCol * state.cellWidth;
+    if (Math.floor(code.scrollTop / state.rowHeight) !== panel.scroll) {
+      code.scrollTop = panel.scroll * state.rowHeight;
+    }
+    if (Math.floor(code.scrollLeft / state.cellWidth) !== panel.scrollCol) {
+      code.scrollLeft = panel.scrollCol * state.cellWidth;
+    }
     state.syncingScroll = false;
 
     const first = Math.max(panel.scroll - 2, 0);
@@ -1209,8 +1215,10 @@
     if (state.syncingScroll) return;
     const panel = state.model.panels[index];
     const { code } = panelElements(index);
-    panel.scroll = Math.round(code.scrollTop / state.rowHeight);
-    panel.scrollCol = Math.round(code.scrollLeft / state.cellWidth);
+    // The row and column at the top-left edge; a partly scrolled row still counts, so this
+    // agrees with `renderPanel`'s check above.
+    panel.scroll = Math.floor(code.scrollTop / state.rowHeight);
+    panel.scrollCol = Math.floor(code.scrollLeft / state.cellWidth);
     renderPanel(index);
   }
 

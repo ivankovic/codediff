@@ -153,3 +153,18 @@ body {
     flex-basis: 100%;
   }
 }
+
+/* A phone, or any short window: the strip alone can take most of the screen, so the page scrolls
+   instead of squeezing the viewer, and the viewer keeps a usable height of its own below it. */
+@media (max-width: 640px), (max-height: 600px) {
+  html,
+  body {
+    height: auto;
+    overflow: auto;
+  }
+  #app {
+    flex: none;
+    height: 85vh;
+    height: 85dvh;
+  }
+}
