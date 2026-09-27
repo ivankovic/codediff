@@ -120,6 +120,11 @@ d / D          mark Before node deleted / deleted with subtree
 i / I          mark After node inserted / inserted with subtree
 u              unmark the focused cursor node, or remove its whole multi-map
                  group if it's a group member
+v              start a range at the cursor node (again: clear it); move, and
+                 the next d/D/i/I/u acts on every visible node from there to
+                 the cursor - a run of inserted statements is v, j j j, I.
+                 Nodes already marked are skipped, and with D/I so is anything
+                 under an earlier node of the range
 U / Ctrl-r     undo / redo the last change to the mapping - a mark, a group, a
                  painting, a ! reset - here and in the t view alike; nothing is
                  written until s

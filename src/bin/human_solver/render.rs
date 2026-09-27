@@ -127,6 +127,11 @@ pub(crate) fn render_panel(
     panel.viewport_height = inner_height;
     let cursor_idx = flat.index_of(panel.cursor_id).unwrap_or(0);
     ensure_visible(&mut panel.scroll, cursor_idx, inner_height);
+    // The `v` range, as rows: the anchor's row to the cursor's, either way round.
+    let range_rows = panel
+        .anchor
+        .and_then(|anchor| flat.index_of(anchor))
+        .map(|anchor_idx| anchor_idx.min(cursor_idx)..=anchor_idx.max(cursor_idx));
 
     // Only on-screen rows are built; `total_unmarked` comes from `FrameState`, not from `flat`.
     let visible_end = (panel.scroll + inner_height.max(1)).min(flat.len());
@@ -181,6 +186,10 @@ pub(crate) fn render_panel(
         // A pending, uncommitted multi-map selection (`x`).
         if multi_selected.contains(&node.id()) {
             style = style.fg(Color::Magenta).add_modifier(Modifier::BOLD);
+        }
+        // A `v` range awaiting its mark.
+        if range_rows.as_ref().is_some_and(|rows| rows.contains(&idx)) {
+            style = style.bg(Color::Blue);
         }
 
         if idx == cursor_idx {

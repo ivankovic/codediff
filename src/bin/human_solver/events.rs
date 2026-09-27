@@ -311,6 +311,7 @@ pub(crate) fn is_navigation_or_display_key(code: KeyCode) -> bool {
             | KeyCode::Char('N')
             | KeyCode::Char(']')
             | KeyCode::Char('[')
+            | KeyCode::Char('v')
             | KeyCode::Char('/')
             | KeyCode::Char('t')
             | KeyCode::Char('T')
@@ -853,21 +854,64 @@ pub(crate) fn handle_key(
             }
             None
         }
+        KeyCode::Char('v') => {
+            let panel = match focus {
+                Focus::Before => &mut app.before,
+                Focus::After => &mut app.after,
+            };
+            panel.anchor = match panel.anchor {
+                Some(_) => None,
+                None => Some(panel.cursor_id),
+            };
+            app.status = Some(match panel.anchor {
+                Some(_) => {
+                    "Selecting a range - move, then d/D/i/I/u act on every node in it".to_string()
+                }
+                None => "Range selection cleared".to_string(),
+            });
+            None
+        }
         KeyCode::Char('d') | KeyCode::Char('D') => {
             if focus != Focus::Before {
                 Some(Err(anyhow!(
                     "d/D only apply to the Before panel; press Tab to switch"
                 )))
             } else {
-                let res = action_delete(
-                    &mut app.mapping,
-                    before_flat,
-                    app.before.cursor_id,
-                    before_root,
-                    after_root,
-                    code == KeyCode::Char('D'),
-                    caches,
-                );
+                let with_children = code == KeyCode::Char('D');
+                let res = match app.before.anchor.take() {
+                    Some(anchor) => {
+                        let ids = range_node_ids(before_flat, anchor, app.before.cursor_id);
+                        let mapping = &mut app.mapping;
+                        action_mark_range(
+                            before_flat,
+                            &ids,
+                            caches,
+                            status_before,
+                            with_children,
+                            "deleted",
+                            |id| {
+                                action_delete(
+                                    mapping,
+                                    before_flat,
+                                    id,
+                                    before_root,
+                                    after_root,
+                                    with_children,
+                                    caches,
+                                )
+                            },
+                        )
+                    }
+                    None => action_delete(
+                        &mut app.mapping,
+                        before_flat,
+                        app.before.cursor_id,
+                        before_root,
+                        after_root,
+                        with_children,
+                        caches,
+                    ),
+                };
                 if res.is_ok() {
                     app.mark_dirty();
                     advance_side_to_next_unmarked(
@@ -887,15 +931,41 @@ pub(crate) fn handle_key(
                     "i/I only apply to the After panel; press Tab to switch"
                 )))
             } else {
-                let res = action_insert(
-                    &mut app.mapping,
-                    after_flat,
-                    app.after.cursor_id,
-                    before_root,
-                    after_root,
-                    code == KeyCode::Char('I'),
-                    caches,
-                );
+                let with_children = code == KeyCode::Char('I');
+                let res = match app.after.anchor.take() {
+                    Some(anchor) => {
+                        let ids = range_node_ids(after_flat, anchor, app.after.cursor_id);
+                        let mapping = &mut app.mapping;
+                        action_mark_range(
+                            after_flat,
+                            &ids,
+                            caches,
+                            status_after,
+                            with_children,
+                            "inserted",
+                            |id| {
+                                action_insert(
+                                    mapping,
+                                    after_flat,
+                                    id,
+                                    before_root,
+                                    after_root,
+                                    with_children,
+                                    caches,
+                                )
+                            },
+                        )
+                    }
+                    None => action_insert(
+                        &mut app.mapping,
+                        after_flat,
+                        app.after.cursor_id,
+                        before_root,
+                        after_root,
+                        with_children,
+                        caches,
+                    ),
+                };
                 if res.is_ok() {
                     app.mark_dirty();
                     advance_side_to_next_unmarked(
@@ -912,17 +982,55 @@ pub(crate) fn handle_key(
         KeyCode::Char('a') => Some(action_align(app, focus, before_root, after_root, caches)),
         KeyCode::Char('A') => Some(action_align_algo(app, focus, before_root, after_root)),
         KeyCode::Char('u') => {
-            let res = action_unmark(
-                &mut app.mapping,
-                focus,
-                before_flat,
-                after_flat,
-                app.before.cursor_id,
-                app.after.cursor_id,
-                before_root,
-                after_root,
-                caches,
-            );
+            let (panel, flat) = match focus {
+                Focus::Before => (&mut app.before, before_flat),
+                Focus::After => (&mut app.after, after_flat),
+            };
+            let res = match panel.anchor.take() {
+                // Every node of the range, one `u` each; a node with nothing to unmark is not an
+                // error here, as the point is the ones that have.
+                Some(anchor) => {
+                    let ids = range_node_ids(flat, anchor, panel.cursor_id);
+                    let mut unmarked = 0usize;
+                    for id in ids {
+                        let (before_id, after_id) = match focus {
+                            Focus::Before => (id, app.after.cursor_id),
+                            Focus::After => (app.before.cursor_id, id),
+                        };
+                        if action_unmark(
+                            &mut app.mapping,
+                            focus,
+                            before_flat,
+                            after_flat,
+                            before_id,
+                            after_id,
+                            before_root,
+                            after_root,
+                            caches,
+                        )
+                        .is_ok()
+                        {
+                            unmarked += 1;
+                        }
+                    }
+                    if unmarked == 0 {
+                        Err(anyhow!("Nothing in the range was marked"))
+                    } else {
+                        Ok(format!("Unmarked {unmarked} node(s)"))
+                    }
+                }
+                None => action_unmark(
+                    &mut app.mapping,
+                    focus,
+                    before_flat,
+                    after_flat,
+                    app.before.cursor_id,
+                    app.after.cursor_id,
+                    before_root,
+                    after_root,
+                    caches,
+                ),
+            };
             if res.is_ok() {
                 app.mark_dirty();
             }

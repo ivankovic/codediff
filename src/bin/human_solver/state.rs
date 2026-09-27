@@ -40,6 +40,10 @@ impl Focus {
 
 pub(crate) struct PanelState {
     pub(crate) cursor_id: usize,
+    /// `v`: the node a range selection started on. While set, `d`/`D`/`i`/`I`/`u` act on every
+    /// visible node from it to the cursor, as vim's visual mode would; cleared by the mark, or by
+    /// `v` again. An id rather than a row: the rows shift when a subtree collapses.
+    pub(crate) anchor: Option<usize>,
     pub(crate) collapsed: std::collections::HashSet<usize>,
     pub(crate) scroll: usize,
     /// List rows available as of the last render; 0 before the first frame. `reveal_node` reads
@@ -51,6 +55,7 @@ impl PanelState {
     pub(crate) fn new(root_id: usize) -> Self {
         Self {
             cursor_id: root_id,
+            anchor: None,
             collapsed: std::collections::HashSet::new(),
             scroll: 0,
             viewport_height: 0,

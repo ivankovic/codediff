@@ -10328,3 +10328,200 @@ fn measure_saved_case_reads_a_real_fixture_as_its_tests_do() -> Result<()> {
     );
     Ok(())
 }
+
+// ---------------------------------------------------------------------------------------------
+// v ranges in the tree panels
+// ---------------------------------------------------------------------------------------------
+
+/// The `expression_statement`s directly in `fn main`'s body, in order.
+fn body_statements(root: Node) -> Vec<Node> {
+    let block = find_first(root, "block").unwrap();
+    let mut cursor = block.walk();
+    block
+        .children(&mut cursor)
+        .filter(|n| n.kind() == "expression_statement")
+        .collect()
+}
+
+#[test]
+fn range_node_ids_runs_from_anchor_to_cursor_either_way_and_falls_back_to_the_cursor() {
+    let source = "fn main() {\n    a();\n    b();\n    c();\n}\n";
+    let tree = parse_rust(source);
+    let root = tree.root_node();
+    let flat = FlatIndex::new(flatten_visible(
+        root,
+        &std::collections::HashSet::new(),
+        None,
+    ));
+    let statements = body_statements(root);
+    let (a, c) = (statements[0], statements[2]);
+
+    let forward = range_node_ids(&flat, a.id(), c.id());
+    let backward = range_node_ids(&flat, c.id(), a.id());
+    assert_eq!(forward, backward);
+    assert_eq!(forward[0], a.id());
+    assert_eq!(*forward.last().unwrap(), c.id());
+    assert!(
+        forward.contains(&statements[1].id()),
+        "the middle statement and every node under a and b are in between"
+    );
+
+    // An anchor hidden by a collapse is no range at all.
+    let mut collapsed = std::collections::HashSet::new();
+    collapsed.insert(a.parent().unwrap().id());
+    let flat_collapsed = FlatIndex::new(flatten_visible(root, &collapsed, None));
+    assert_eq!(
+        range_node_ids(&flat_collapsed, a.id(), root.id()),
+        vec![root.id()]
+    );
+}
+
+/// `v` at `anchor`, cursor on `cursor`, then `key`, in the After panel, through `handle_key`.
+fn press_after_range(source: &str, key: KeyCode, pick: fn(&[Node]) -> (usize, usize)) -> App {
+    let tree = parse_rust(source);
+    let root = tree.root_node();
+    let statements = body_statements(root);
+    let (anchor, cursor) = pick(&statements);
+    let mut app = App::new(
+        "test".to_string(),
+        CaseOrigin::Diffs,
+        root.id(),
+        root.id(),
+        HumanMapping::default(),
+    );
+    app.focus = Focus::After;
+    app.after.anchor = Some(anchor);
+    app.after.cursor_id = cursor;
+    let flat = FlatIndex::new(flatten_visible(root, &app.after.collapsed, None));
+    let caches = rebuild_caches(&app.mapping.entries, root, root);
+    let hashes = rustc_hash::FxHashMap::default();
+    handle_key(
+        &mut app,
+        key,
+        &flat,
+        &flat,
+        root,
+        root,
+        &caches,
+        source.as_bytes(),
+        source.as_bytes(),
+        &hashes,
+        &hashes,
+        &Code::from_string(source, &Language::Rust),
+        &Code::from_string(source, &Language::Rust),
+    );
+    app
+}
+
+#[test]
+fn capital_i_over_a_v_range_marks_each_statement_with_its_subtree_once() {
+    let source = "fn main() {\n    a();\n    b();\n    c();\n}\n";
+    let app = press_after_range(source, KeyCode::Char('I'), |s| (s[0].id(), s[2].id()));
+    let inserted: Vec<_> = app
+        .mapping
+        .entries
+        .iter()
+        .filter(|e| e.operation == HumanOperation::InsertWithChildren)
+        .collect();
+    assert_eq!(
+        inserted.len(),
+        3,
+        "one subtree mark per statement, nothing under them: {:?}",
+        app.mapping.entries
+    );
+    assert_eq!(app.mapping.entries.len(), 3);
+    assert!(app.after.anchor.is_none(), "the mark consumes the range");
+    assert!(app.dirty);
+    assert_eq!(app.status.as_deref(), Some("Marked 3 node(s) inserted"));
+}
+
+#[test]
+fn a_v_range_skips_nodes_already_marked_and_says_so() {
+    let source = "fn main() {\n    a();\n    b();\n    c();\n}\n";
+    let tree = parse_rust(source);
+    let root = tree.root_node();
+    let statements = body_statements(root);
+    let mut app = App::new(
+        "test".to_string(),
+        CaseOrigin::Diffs,
+        root.id(),
+        root.id(),
+        HumanMapping::default(),
+    );
+    app.focus = Focus::After;
+    // `b();` is already an insert; the range then covers a and c.
+    app.mapping.entries.push(HumanMappingEntry {
+        operation: HumanOperation::InsertWithChildren,
+        before_path: None,
+        after_path: Some(path_for_node(statements[1])),
+    });
+    app.after.anchor = Some(statements[0].id());
+    app.after.cursor_id = statements[2].id();
+    let flat = FlatIndex::new(flatten_visible(root, &app.after.collapsed, None));
+    let caches = rebuild_caches(&app.mapping.entries, root, root);
+    let hashes = rustc_hash::FxHashMap::default();
+    handle_key(
+        &mut app,
+        KeyCode::Char('I'),
+        &flat,
+        &flat,
+        root,
+        root,
+        &caches,
+        source.as_bytes(),
+        source.as_bytes(),
+        &hashes,
+        &hashes,
+        &Code::from_string(source, &Language::Rust),
+        &Code::from_string(source, &Language::Rust),
+    );
+    assert_eq!(app.mapping.entries.len(), 3);
+    let status = app.status.clone().unwrap_or_default();
+    assert!(
+        status.starts_with("Marked 2 node(s) inserted;") && status.contains("already marked"),
+        "{status}"
+    );
+}
+
+#[test]
+fn u_over_a_v_range_unmarks_everything_in_it() {
+    let source = "fn main() {\n    a();\n    b();\n    c();\n}\n";
+    let mut app = press_after_range(source, KeyCode::Char('I'), |s| (s[0].id(), s[2].id()));
+    assert_eq!(app.mapping.entries.len(), 3);
+    let tree = parse_rust(source);
+    let root = tree.root_node();
+    let statements = body_statements(root);
+    // Ids are per parse; re-derive the range on this tree.
+    app.after.anchor = Some(statements[0].id());
+    app.after.cursor_id = statements[2].id();
+    app.before.cursor_id = root.id();
+    let flat = FlatIndex::new(flatten_visible(root, &app.after.collapsed, None));
+    let caches = rebuild_caches(&app.mapping.entries, root, root);
+    let hashes = rustc_hash::FxHashMap::default();
+    handle_key(
+        &mut app,
+        KeyCode::Char('u'),
+        &flat,
+        &flat,
+        root,
+        root,
+        &caches,
+        source.as_bytes(),
+        source.as_bytes(),
+        &hashes,
+        &hashes,
+        &Code::from_string(source, &Language::Rust),
+        &Code::from_string(source, &Language::Rust),
+    );
+    assert!(app.mapping.entries.is_empty(), "{:?}", app.mapping.entries);
+    assert_eq!(app.status.as_deref(), Some("Unmarked 3 node(s)"));
+    assert!(app.after.anchor.is_none());
+}
+
+#[test]
+fn v_toggles_the_focused_panels_anchor_and_preserves_the_frame_state() {
+    let app = press_on_case(CaseOrigin::Diffs, "test", KeyCode::Char('v'));
+    assert_eq!(app.before.anchor, Some(app.before.cursor_id));
+    assert!(app.after.anchor.is_none());
+    assert!(is_state_preserving_key(None, KeyCode::Char('v')));
+}
