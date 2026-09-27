@@ -133,11 +133,17 @@ mod java_defects4j_cli_2_posixparser;
 #[cfg(test)]
 mod java_defects4j_cli_30_defaultparser;
 #[cfg(test)]
+mod java_defects4j_cli_30_parser;
+#[cfg(test)]
 mod java_defects4j_cli_31_helpformatter;
 #[cfg(test)]
 mod java_defects4j_cli_31_option;
 #[cfg(test)]
 mod java_defects4j_cli_31_optionbuilder;
+#[cfg(test)]
+mod java_defects4j_cli_32_helpformatter;
+#[cfg(test)]
+mod java_defects4j_cli_33_helpformatter;
 #[cfg(test)]
 mod java_defects4j_cli_34_option;
 #[cfg(test)]
@@ -145,39 +151,91 @@ mod java_defects4j_cli_34_optionbuilder;
 #[cfg(test)]
 mod java_defects4j_cli_35_options;
 #[cfg(test)]
+mod java_defects4j_cli_36_optiongroup;
+#[cfg(test)]
+mod java_defects4j_cli_36_options;
+#[cfg(test)]
+mod java_defects4j_cli_37_defaultparser;
+#[cfg(test)]
+mod java_defects4j_cli_38_defaultparser;
+#[cfg(test)]
+mod java_defects4j_cli_39_typehandler;
+#[cfg(test)]
 mod java_defects4j_cli_3_typehandler;
 #[cfg(test)]
 mod java_defects4j_cli_40_typehandler;
 #[cfg(test)]
+mod java_defects4j_cli_4_parser;
+#[cfg(test)]
 mod java_defects4j_cli_5_util;
 #[cfg(test)]
+mod java_defects4j_cli_7_patternbuilder;
+#[cfg(test)]
 mod java_defects4j_cli_8_helpformatter;
+#[cfg(test)]
+mod java_defects4j_cli_9_parser;
+#[cfg(test)]
+mod java_defects4j_closure_100_checkglobalthis;
+#[cfg(test)]
+mod java_defects4j_closure_101_commandlinerunner;
 #[cfg(test)]
 mod java_defects4j_closure_102_normalize;
 #[cfg(test)]
 mod java_defects4j_closure_103_controlflowanalysis;
 #[cfg(test)]
+mod java_defects4j_closure_103_disambiguateproperties;
+#[cfg(test)]
 mod java_defects4j_closure_104_uniontype;
+#[cfg(test)]
+mod java_defects4j_closure_105_foldconstants;
+#[cfg(test)]
+mod java_defects4j_closure_106_globalnamespace;
 #[cfg(test)]
 mod java_defects4j_closure_106_jsdocinfobuilder;
 #[cfg(test)]
 mod java_defects4j_closure_107_commandlinerunner;
 #[cfg(test)]
+mod java_defects4j_closure_108_scopedaliases;
+#[cfg(test)]
+mod java_defects4j_closure_109_jsdocinfoparser;
+#[cfg(test)]
 mod java_defects4j_closure_10_nodeutil;
+#[cfg(test)]
+mod java_defects4j_closure_110_node;
+#[cfg(test)]
+mod java_defects4j_closure_110_scopedaliases;
+#[cfg(test)]
+mod java_defects4j_closure_111_closurereverseabstractinterpreter;
+#[cfg(test)]
+mod java_defects4j_closure_112_typeinference;
 #[cfg(test)]
 mod java_defects4j_closure_113_processclosureprimitives;
 #[cfg(test)]
 mod java_defects4j_closure_114_nameanalyzer;
 #[cfg(test)]
+mod java_defects4j_closure_115_functioninjector;
+#[cfg(test)]
+mod java_defects4j_closure_116_functioninjector;
+#[cfg(test)]
+mod java_defects4j_closure_117_typevalidator;
+#[cfg(test)]
+mod java_defects4j_closure_118_disambiguateproperties;
+#[cfg(test)]
 mod java_defects4j_closure_119_globalnamespace;
 #[cfg(test)]
 mod java_defects4j_closure_11_typecheck;
+#[cfg(test)]
+mod java_defects4j_closure_120_referencecollectingcallback;
+#[cfg(test)]
+mod java_defects4j_closure_121_inlinevariables;
 #[cfg(test)]
 mod java_defects4j_closure_123_codegenerator;
 #[cfg(test)]
 mod java_defects4j_closure_124_exploitassigns;
 #[cfg(test)]
 mod java_defects4j_closure_125_typecheck;
+#[cfg(test)]
+mod java_defects4j_closure_12_maybereachingvariableuse;
 #[cfg(test)]
 mod java_defects4j_closure_130_collapseproperties;
 #[cfg(test)]
