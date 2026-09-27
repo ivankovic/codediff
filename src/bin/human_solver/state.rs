@@ -267,9 +267,6 @@ pub(crate) enum TextOverlay {
     /// Only bytes where human and codediff disagree, coloured by the human's label. Empty means
     /// they agree.
     Disagreements,
-    /// Only bytes where the human's painting and their own tree mapping disagree (the
-    /// human-vs-human comparison `text_mapping_disagreements` makes; `diff_code` is not involved).
-    TreeDisagreement,
 }
 
 impl TextOverlay {
@@ -277,8 +274,7 @@ impl TextOverlay {
         match self {
             TextOverlay::Human => TextOverlay::CodeDiff,
             TextOverlay::CodeDiff => TextOverlay::Disagreements,
-            TextOverlay::Disagreements => TextOverlay::TreeDisagreement,
-            TextOverlay::TreeDisagreement => TextOverlay::Human,
+            TextOverlay::Disagreements => TextOverlay::Human,
         }
     }
 
@@ -287,7 +283,6 @@ impl TextOverlay {
             TextOverlay::Human => "human",
             TextOverlay::CodeDiff => "codediff",
             TextOverlay::Disagreements => "disagreements",
-            TextOverlay::TreeDisagreement => "tree vs painting",
         }
     }
 }
@@ -471,49 +466,8 @@ pub(crate) fn action_paint_seed_from_codediff(app: &mut App, before: &Code, afte
     ));
 }
 
-/// The human's own tree mapping (`HumanMapping::entries`, never `diff_code`) as painting spans,
-/// through the pipeline `text_mapping_disagreements` uses; backs `TextOverlay::TreeDisagreement`.
-/// A mapping that fails to load gives empty spans.
-pub(crate) fn tree_mapping_text_spans(
-    mapping: &HumanMapping,
-    before: &Code,
-    after: &Code,
-) -> [Vec<(HumanTextSpan, HumanTextVerdict)>; 2] {
-    let Ok(ast_diff) = human_mapping::as_ast_diff_for_mapping(mapping, before, after) else {
-        return [Vec::new(), Vec::new()];
-    };
-    let node_cache = NodeCache::build(before, after);
-    let text_diff = TextDiff::from(before, after, &ast_diff, &node_cache);
-
-    let convert = |ranges: Vec<codediff::diff::text::RangeMatch>| {
-        ranges
-            .into_iter()
-            .filter(|range_match| !range_match.source.is_empty())
-            .filter_map(|range_match| {
-                let verdict = match range_match.operation {
-                    codediff::diff::text::TextOperation::Move => HumanTextVerdict::Move,
-                    codediff::diff::text::TextOperation::Update => HumanTextVerdict::Update,
-                    codediff::diff::text::TextOperation::Delete => HumanTextVerdict::Delete,
-                    codediff::diff::text::TextOperation::Insert => HumanTextVerdict::Insert,
-                    _ => return None,
-                };
-                Some((
-                    HumanTextSpan {
-                        start_row: range_match.source.start_row,
-                        start_column: range_match.source.start_column,
-                        end_row: range_match.source.end_row,
-                        end_column: range_match.source.end_column,
-                    },
-                    verdict,
-                ))
-            })
-            .collect()
-    };
-    [convert(text_diff.all(0)), convert(text_diff.all(1))]
-}
-
-/// Spans where the human's painting and `other` disagree, labelled with the human's verdict.
-/// `other` is codediff's spans for `Disagreements` and the tree mapping's for `TreeDisagreement`.
+/// Spans where the human's painting and `other` (codediff's spans) disagree, labelled with the
+/// human's verdict.
 pub(crate) fn overlay_disagreement_spans(
     painted: &[Vec<(HumanTextSpan, HumanTextVerdict)>; 2],
     other: &[Vec<(HumanTextSpan, HumanTextVerdict)>; 2],
@@ -746,6 +700,25 @@ pub(crate) struct TextPaintState {
     pub(crate) vertical: bool,
 }
 
+/// vim's word classes: a small word (`w`) is a run of keyword characters or a run of other
+/// non-blanks; a big word (`W`) is any run of non-blanks.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum WordClass {
+    Blank,
+    Keyword,
+    Punctuation,
+}
+
+pub(crate) fn word_class(ch: char, big: bool) -> WordClass {
+    if ch.is_whitespace() {
+        WordClass::Blank
+    } else if big || ch.is_alphanumeric() || ch == '_' {
+        WordClass::Keyword
+    } else {
+        WordClass::Punctuation
+    }
+}
+
 impl Default for TextPaintState {
     fn default() -> Self {
         Self {
@@ -816,6 +789,140 @@ impl TextPaintState {
             let previous_row = row - 1;
             self.cursor[self.side] = (previous_row, Self::row_text(source, previous_row).len());
         }
+    }
+
+    /// `w`/`W`: the start of the next word, across rows. A word is a run of one character class
+    /// ([`word_class`]); with `big`, any run of non-blanks. Past the last word the cursor goes to
+    /// the end of the text. Unlike vim, an empty row is not a stop.
+    pub(crate) fn word_forward(&mut self, big: bool, source: &str) {
+        let mut ahead = Self::positions_from(source, self.cursor[self.side]);
+        let Some((_, _, first)) = ahead.next() else {
+            return;
+        };
+        let class = word_class(first, big);
+        let mut landing = None;
+        for (row, column, ch) in ahead {
+            let this = word_class(ch, big);
+            // Leave the run under the cursor, then the blanks after it.
+            if this != WordClass::Blank && (class == WordClass::Blank || this != class) {
+                landing = Some((row, column));
+                break;
+            }
+            if class != WordClass::Blank && this == WordClass::Blank {
+                // The run is over; from here only blanks are skipped, whatever came before.
+                return self.word_forward_from_blank(big, source, (row, column));
+            }
+        }
+        self.cursor[self.side] = landing.unwrap_or_else(|| Self::end_of_text(source));
+    }
+
+    /// The `word_forward` tail once a blank is reached: the next non-blank, or the text's end.
+    fn word_forward_from_blank(&mut self, big: bool, source: &str, from: (usize, usize)) {
+        let landing = Self::positions_from(source, from)
+            .find(|(_, _, ch)| word_class(*ch, big) != WordClass::Blank)
+            .map(|(row, column, _)| (row, column));
+        self.cursor[self.side] = landing.unwrap_or_else(|| Self::end_of_text(source));
+    }
+
+    /// `e`/`E`: the last character of the word the cursor is in, or of the next word when it is
+    /// already there or on a blank.
+    pub(crate) fn word_end(&mut self, big: bool, source: &str) {
+        let mut ahead = Self::positions_from(source, self.cursor[self.side]).skip(1);
+        let Some((row, column, ch)) =
+            ahead.find(|(_, _, ch)| word_class(*ch, big) != WordClass::Blank)
+        else {
+            self.cursor[self.side] = Self::end_of_text(source);
+            return;
+        };
+        let class = word_class(ch, big);
+        let mut last = (row, column);
+        for (row, column, ch) in ahead {
+            if word_class(ch, big) != class {
+                break;
+            }
+            last = (row, column);
+        }
+        self.cursor[self.side] = last;
+    }
+
+    /// `b`/`B`: the start of the word before the cursor (of this word, when the cursor is inside
+    /// it).
+    pub(crate) fn word_backward(&mut self, big: bool, source: &str) {
+        let mut behind = Self::positions_before(source, self.cursor[self.side]);
+        let Some((row, column, ch)) =
+            behind.find(|(_, _, ch)| word_class(*ch, big) != WordClass::Blank)
+        else {
+            self.cursor[self.side] = (0, 0);
+            return;
+        };
+        let class = word_class(ch, big);
+        let mut first = (row, column);
+        for (row, column, ch) in behind {
+            if word_class(ch, big) != class {
+                break;
+            }
+            first = (row, column);
+        }
+        self.cursor[self.side] = first;
+    }
+
+    /// Every character from `from` on, as `(row, byte column, char)`, rows joined by a newline
+    /// so a row end reads as a blank.
+    fn positions_from(
+        source: &str,
+        from: (usize, usize),
+    ) -> impl Iterator<Item = (usize, usize, char)> + '_ {
+        source
+            .split('\n')
+            .enumerate()
+            .skip(from.0)
+            .flat_map(move |(row, line)| {
+                let line = line.strip_suffix('\r').unwrap_or(line);
+                let start = if row == from.0 {
+                    from.1.min(line.len())
+                } else {
+                    0
+                };
+                line[start..]
+                    .char_indices()
+                    .map(move |(offset, ch)| (row, start + offset, ch))
+                    .chain(std::iter::once((row, line.len(), '\n')))
+            })
+    }
+
+    /// Every character before `from`, nearest first, as `positions_from` gives them.
+    fn positions_before(
+        source: &str,
+        from: (usize, usize),
+    ) -> impl Iterator<Item = (usize, usize, char)> + '_ {
+        let rows: Vec<&str> = source
+            .split('\n')
+            .take(from.0 + 1)
+            .map(|line| line.strip_suffix('\r').unwrap_or(line))
+            .collect();
+        rows.into_iter()
+            .enumerate()
+            .rev()
+            .flat_map(move |(row, line)| {
+                let end = if row == from.0 {
+                    from.1.min(line.len())
+                } else {
+                    line.len()
+                };
+                let terminator = (row != from.0).then_some((row, line.len(), '\n'));
+                terminator.into_iter().chain(
+                    line[..end]
+                        .char_indices()
+                        .rev()
+                        .map(move |(offset, ch)| (row, offset, ch)),
+                )
+            })
+    }
+
+    /// The end of the last row: where a forward motion stops when no word is left.
+    fn end_of_text(source: &str) -> (usize, usize) {
+        let last = Self::row_count(source).saturating_sub(1);
+        (last, Self::row_text(source, last).len())
     }
 
     /// The live selection on `side`: one span per row, or one sweep (see `vertical`); empty if
@@ -1511,9 +1618,7 @@ pub(crate) fn action_reset_case(app: &mut App) -> String {
     app.mapping.groups.clear();
     app.mapping.text_mappings.clear();
 
-    // A stale `tree_text_spans` would draw the discarded mapping, and `text_solution` would name
-    // a painting that no longer exists.
-    app.tree_text_spans = None;
+    // `text_solution` would name a painting that no longer exists.
     app.text_solution = starting_solution(&app.mapping);
     app.clear_multi_select();
     app.mark_dirty();
@@ -1754,9 +1859,6 @@ pub(crate) struct App {
     pub(crate) text_overlay: TextOverlay,
     /// codediff's text ranges per side, computed on first use and dropped on case change.
     pub(crate) algo_text_spans: Option<[Vec<(HumanTextSpan, HumanTextVerdict)>; 2]>,
-    /// The human's tree mapping as text ranges (`tree_mapping_text_spans`), for
-    /// `TextOverlay::TreeDisagreement`; cached like `algo_text_spans`.
-    pub(crate) tree_text_spans: Option<[Vec<(HumanTextSpan, HumanTextVerdict)>; 2]>,
     /// The painting the `t` view edits; see `starting_solution`. Changed by `s`/`L`.
     pub(crate) text_solution: String,
     /// `NodeStatus::Unmarked` count per case across both trees (`diff_case_unmarked_count`), for
@@ -1818,7 +1920,6 @@ impl App {
             text_solution,
             text_overlay: TextOverlay::default(),
             algo_text_spans: None,
-            tree_text_spans: None,
             diff_unmarked: None,
             last_search: None,
             before_multi_select: std::collections::BTreeSet::new(),
@@ -1890,7 +1991,6 @@ impl App {
     fn after_history_step(&mut self) {
         self.dirty = true;
         self.edits += 1;
-        self.tree_text_spans = None;
         self.clear_multi_select();
         let names_current = self
             .mapping

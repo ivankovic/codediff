@@ -794,7 +794,6 @@ fn render_modal_prompt_search_shows_the_prefilled_query_and_instructions() {
                 "Minimal",
                 TextOverlay::Human,
                 None,
-                None,
                 DiffPickerData::default(),
                 None,
             )
@@ -833,7 +832,6 @@ fn render_modal_prompt_promote_name_shows_the_actual_target_dataset_not_a_fixed_
                 &HumanMapping::default(),
                 "Minimal",
                 TextOverlay::Human,
-                None,
                 None,
                 DiffPickerData::default(),
                 None,
@@ -1782,15 +1780,11 @@ fn ranges_painted_under_one_name_stay_out_of_another() {
 }
 
 #[test]
-fn the_text_overlay_cycles_human_codediff_disagreements_tree_disagreement() {
+fn the_text_overlay_cycles_human_codediff_disagreements() {
     assert_eq!(TextOverlay::default(), TextOverlay::Human);
     assert_eq!(TextOverlay::Human.next(), TextOverlay::CodeDiff);
     assert_eq!(TextOverlay::CodeDiff.next(), TextOverlay::Disagreements);
-    assert_eq!(
-        TextOverlay::Disagreements.next(),
-        TextOverlay::TreeDisagreement
-    );
-    assert_eq!(TextOverlay::TreeDisagreement.next(), TextOverlay::Human);
+    assert_eq!(TextOverlay::Disagreements.next(), TextOverlay::Human);
 }
 
 /// codediff's side comes from `TextDiff`, the projection the TUI draws, not a second reading of
@@ -3352,9 +3346,11 @@ fn z_refuses_to_touch_a_fixture_that_already_has_painted_ranges() {
 
 #[test]
 fn the_text_view_renders_painted_ranges() {
-    let backend = ratatui::backend::TestBackend::new(100, 24);
+    // Two columns need `SINGLE_PANEL_WIDTH_THRESHOLD`; narrower draws the focused side only.
+    let width = SINGLE_PANEL_WIDTH_THRESHOLD + 20;
+    let backend = ratatui::backend::TestBackend::new(width, 24);
     let mut terminal = Terminal::new(backend).unwrap();
-    let area = Rect::new(0, 0, 100, 24);
+    let area = Rect::new(0, 0, width, 24);
     let mapping = HumanMapping {
         entries: vec![],
         groups: vec![],
@@ -3385,7 +3381,6 @@ fn the_text_view_renders_painted_ranges() {
                 &mapping,
                 "Minimal",
                 TextOverlay::Human,
-                None,
                 None,
                 &TextPaintState::default(),
             );
@@ -3449,7 +3444,6 @@ fn render_open_diff_picker_shows_the_unmarked_column_and_the_sort_and_filter_mar
                 "Minimal",
                 TextOverlay::Human,
                 None,
-                None,
                 DiffPickerData {
                     unmarked: Some(&unmarked),
                     ..DiffPickerData::default()
@@ -3501,7 +3495,6 @@ fn the_diff_picker_title_keeps_its_filter_list_when_the_terminal_truncates_it() 
                 "Minimal",
                 TextOverlay::Human,
                 None,
-                None,
                 DiffPickerData::default(),
                 None,
             )
@@ -3517,9 +3510,12 @@ fn the_diff_picker_title_keeps_its_filter_list_when_the_terminal_truncates_it() 
 
 #[test]
 fn text_view_modal_renders_both_sides_content() {
-    let backend = ratatui::backend::TestBackend::new(80, 24);
+    // Wide enough for two columns; below `SINGLE_PANEL_WIDTH_THRESHOLD` only the focused side
+    // draws (`the_text_view_draws_only_the_focused_side_on_a_narrow_terminal`).
+    let width = SINGLE_PANEL_WIDTH_THRESHOLD + 20;
+    let backend = ratatui::backend::TestBackend::new(width, 24);
     let mut terminal = Terminal::new(backend).unwrap();
-    let area = Rect::new(0, 0, 80, 24);
+    let area = Rect::new(0, 0, width, 24);
 
     terminal
         .draw(|f| {
@@ -3531,7 +3527,6 @@ fn text_view_modal_renders_both_sides_content() {
                 &HumanMapping::default(),
                 "Minimal",
                 TextOverlay::Human,
-                None,
                 None,
                 &TextPaintState::default(),
             );
@@ -8369,10 +8364,6 @@ fn resetting_a_case_clears_the_mapping_the_groups_and_every_painting() {
         "every painting should be gone"
     );
     assert!(app.dirty, "a reset is an unsaved change");
-    assert!(
-        app.tree_text_spans.is_none(),
-        "spans derived from the discarded mapping must not survive it"
-    );
     assert!(status.contains("Reset"), "status should say so: {status}");
 }
 
@@ -9976,4 +9967,179 @@ fn bracket_keys_walk_the_unmarked_nodes_of_the_focused_panel_and_wrap() {
 fn is_state_preserving_key_is_true_for_the_bracket_jumps() {
     assert!(is_state_preserving_key(None, KeyCode::Char(']')));
     assert!(is_state_preserving_key(None, KeyCode::Char('[')));
+}
+
+// ---------------------------------------------------------------------------------------------
+// Word motions in the t view
+// ---------------------------------------------------------------------------------------------
+
+/// Presses `key` in the text view on `source` from `cursor`, returning where the cursor lands.
+fn word_motion(source: &str, cursor: (usize, usize), key: char) -> (usize, usize) {
+    let mut state = TextPaintState::default();
+    state.cursor[0] = cursor;
+    match key {
+        'w' => state.word_forward(false, source),
+        'W' => state.word_forward(true, source),
+        'b' => state.word_backward(false, source),
+        'B' => state.word_backward(true, source),
+        'e' => state.word_end(false, source),
+        'E' => state.word_end(true, source),
+        other => panic!("not a word motion: {other}"),
+    }
+    state.cursor[0]
+}
+
+#[test]
+fn w_stops_at_each_word_and_punctuation_run_as_vim_does() {
+    //             0123456789012345678
+    let source = "let x_1 = foo(bar);\n    next();\n";
+    let mut at = (0, 0);
+    let mut stops = Vec::new();
+    for _ in 0..12 {
+        at = word_motion(source, at, 'w');
+        stops.push(at);
+    }
+    assert_eq!(
+        stops,
+        vec![
+            (0, 4),  // x_1: `_` and digits are keyword characters
+            (0, 8),  // =
+            (0, 10), // foo
+            (0, 13), // (
+            (0, 14), // bar
+            (0, 17), // );
+            (1, 4),  // next, on the next row past its indentation
+            (1, 8),  // ();
+            (2, 0),  // the end of the text - the empty row after the last newline, as G
+            (2, 0),  // counts rows - and it stays there
+            (2, 0),
+            (2, 0),
+        ]
+    );
+}
+
+#[test]
+fn big_w_treats_any_non_blank_run_as_one_word() {
+    let source = "foo(bar); baz\n";
+    assert_eq!(word_motion(source, (0, 0), 'W'), (0, 10));
+    assert_eq!(
+        word_motion(source, (0, 10), 'W'),
+        (1, 0),
+        "past the last word: the end"
+    );
+}
+
+#[test]
+fn e_goes_to_the_end_of_this_word_then_the_next() {
+    let source = "foo(bar); baz\n";
+    assert_eq!(
+        word_motion(source, (0, 0), 'e'),
+        (0, 2),
+        "foo's last character"
+    );
+    assert_eq!(
+        word_motion(source, (0, 1), 'e'),
+        (0, 2),
+        "from inside the word too"
+    );
+    assert_eq!(word_motion(source, (0, 2), 'e'), (0, 3), "then the ( run");
+    assert_eq!(word_motion(source, (0, 3), 'e'), (0, 6), "bar");
+    assert_eq!(
+        word_motion(source, (0, 6), 'E'),
+        (0, 8),
+        "E: the whole `);` run"
+    );
+    assert_eq!(
+        word_motion(source, (0, 8), 'e'),
+        (0, 12),
+        "baz, across the blank"
+    );
+    assert_eq!(
+        word_motion(source, (0, 12), 'e'),
+        (1, 0),
+        "past the last word: the end"
+    );
+}
+
+#[test]
+fn b_goes_to_the_start_of_this_word_then_the_previous_across_rows() {
+    let source = "foo(bar);\n    baz\n";
+    assert_eq!(
+        word_motion(source, (1, 6), 'b'),
+        (1, 4),
+        "from inside baz to its start"
+    );
+    assert_eq!(
+        word_motion(source, (1, 4), 'b'),
+        (0, 7),
+        "the `);` run on the row above"
+    );
+    assert_eq!(word_motion(source, (0, 7), 'b'), (0, 4), "bar");
+    assert_eq!(
+        word_motion(source, (0, 4), 'B'),
+        (0, 0),
+        "B: the whole first run"
+    );
+    assert_eq!(
+        word_motion(source, (0, 0), 'b'),
+        (0, 0),
+        "nothing before the start"
+    );
+}
+
+#[test]
+fn word_motions_step_by_character_not_byte_in_non_ascii_text() {
+    // `é` is two bytes; a landing column must be a character boundary.
+    let source = "café au_lait\n";
+    assert_eq!(word_motion(source, (0, 0), 'e'), (0, 3), "on the é itself");
+    assert_eq!(
+        word_motion(source, (0, 0), 'w'),
+        (0, 6),
+        "past the two-byte é and the blank"
+    );
+    assert_eq!(word_motion(source, (0, 8), 'b'), (0, 6));
+    assert_eq!(word_motion(source, (0, 6), 'b'), (0, 0));
+}
+
+#[test]
+fn the_text_view_draws_only_the_focused_side_on_a_narrow_terminal() {
+    for (width, side, expect_before, expect_after) in [
+        (SINGLE_PANEL_WIDTH_THRESHOLD, 0, true, true),
+        (SINGLE_PANEL_WIDTH_THRESHOLD - 1, 0, true, false),
+        (SINGLE_PANEL_WIDTH_THRESHOLD - 1, 1, false, true),
+        (60, 1, false, true),
+    ] {
+        let backend = ratatui::backend::TestBackend::new(width, 12);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let state = TextPaintState {
+            side,
+            ..Default::default()
+        };
+        terminal
+            .draw(|f| {
+                render_text_view_modal(
+                    f,
+                    Rect::new(0, 0, width, 12),
+                    "fn old_name() {}",
+                    "fn new_name() {}",
+                    &HumanMapping::default(),
+                    "Minimal",
+                    TextOverlay::Human,
+                    None,
+                    &state,
+                )
+            })
+            .unwrap();
+        let text = rendered_text(&terminal);
+        assert_eq!(
+            text.contains("old_name"),
+            expect_before,
+            "width {width}, side {side}: {text}"
+        );
+        assert_eq!(
+            text.contains("new_name"),
+            expect_after,
+            "width {width}, side {side}: {text}"
+        );
+    }
 }

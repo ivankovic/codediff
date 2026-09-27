@@ -436,7 +436,6 @@ pub(crate) fn draw_ui(
             &app.text_solution,
             app.text_overlay,
             app.algo_text_spans.as_ref(),
-            app.tree_text_spans.as_ref(),
             DiffPickerData::from_app(app),
             app.diff_comments.as_ref(),
         );
@@ -495,7 +494,6 @@ pub(crate) fn render_modal(
     text_solution: &str,
     text_overlay: TextOverlay,
     algo_text_spans: Option<&[Vec<(HumanTextSpan, HumanTextVerdict)>; 2]>,
-    tree_text_spans: Option<&[Vec<(HumanTextSpan, HumanTextVerdict)>; 2]>,
     diff_data: DiffPickerData<'_>,
     diff_comments: Option<&std::collections::HashMap<String, String>>,
 ) {
@@ -648,7 +646,6 @@ pub(crate) fn render_modal(
                 text_solution,
                 text_overlay,
                 algo_text_spans,
-                tree_text_spans,
                 state,
             );
         }
@@ -1010,16 +1007,23 @@ pub(crate) fn render_text_view_modal(
     solution: &str,
     overlay: TextOverlay,
     algo_spans: Option<&[Vec<(HumanTextSpan, HumanTextVerdict)>; 2]>,
-    tree_spans: Option<&[Vec<(HumanTextSpan, HumanTextVerdict)>; 2]>,
     state: &TextPaintState,
 ) {
     let popup_area = centered_rect(96, 92, area);
     frame.render_widget(Clear, popup_area);
 
-    let columns = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
-        .split(popup_area);
+    // As `draw_ui`: on a narrow terminal (a phone, say) two half-width columns wrap almost every
+    // line, so only the focused side is drawn, and Tab is how to see the other.
+    let single_panel = area.width < SINGLE_PANEL_WIDTH_THRESHOLD;
+    let columns: Vec<Rect> = if single_panel {
+        vec![popup_area, popup_area]
+    } else {
+        Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+            .split(popup_area)
+            .to_vec()
+    };
 
     let height = popup_area.height.saturating_sub(2) as usize;
 
@@ -1033,15 +1037,11 @@ pub(crate) fn render_text_view_modal(
     ];
     let empty = [Vec::new(), Vec::new()];
     let algo = algo_spans.unwrap_or(&empty);
-    let tree = tree_spans.unwrap_or(&empty);
     let shown = match overlay {
         TextOverlay::Human => human_spans,
         TextOverlay::CodeDiff => algo.clone(),
         TextOverlay::Disagreements => {
             overlay_disagreement_spans(&human_spans, algo, before_src, after_src)
-        }
-        TextOverlay::TreeDisagreement => {
-            overlay_disagreement_spans(&human_spans, tree, before_src, after_src)
         }
     };
 
@@ -1076,6 +1076,9 @@ pub(crate) fn render_text_view_modal(
             },
         ),
     ] {
+        if single_panel && side != state.side {
+            continue;
+        }
         let inner_width = columns[side].width.saturating_sub(2) as usize;
         let lines = render_paint_side(source, &shown[side], state, side, height, inner_width);
         let border_style = if state.side == side {

@@ -189,7 +189,6 @@ pub(crate) fn run_event_loop(
                     app.algo_diff = None;
                     app.algo_diff_pending = None;
                     app.algo_text_spans = None;
-                    app.tree_text_spans = None;
                     app.text_overlay = TextOverlay::default();
                     // The previous case's solution name would start a near-duplicate painting here.
                     app.text_solution = starting_solution(&app.mapping);
@@ -216,7 +215,6 @@ pub(crate) fn run_event_loop(
                     app.algo_diff = None;
                     app.algo_diff_pending = None;
                     app.algo_text_spans = None;
-                    app.tree_text_spans = None;
                     app.text_overlay = TextOverlay::default();
                     app.text_solution = starting_solution(&app.mapping);
                     app.clear_multi_select();
@@ -256,7 +254,6 @@ pub(crate) fn run_event_loop(
                     app.algo_diff = None;
                     app.algo_diff_pending = None;
                     app.algo_text_spans = None;
-                    app.tree_text_spans = None;
                     app.text_overlay = TextOverlay::default();
                     app.text_solution = starting_solution(&app.mapping);
                     app.clear_multi_select();
@@ -2464,6 +2461,14 @@ fn handle_text_view(
         KeyCode::Right | KeyCode::Char('l') => state.step_column(true, focused_source),
         KeyCode::PageUp => state.step_row(-(VIEWPORT_ROWS as isize), focused_source),
         KeyCode::PageDown => state.step_row(VIEWPORT_ROWS as isize, focused_source),
+        // As in vim: by word, a lowercase key for keyword/punctuation runs, uppercase for any
+        // run of non-blanks.
+        KeyCode::Char('w') => state.word_forward(false, focused_source),
+        KeyCode::Char('W') => state.word_forward(true, focused_source),
+        KeyCode::Char('b') => state.word_backward(false, focused_source),
+        KeyCode::Char('B') => state.word_backward(true, focused_source),
+        KeyCode::Char('e') => state.word_end(false, focused_source),
+        KeyCode::Char('E') => state.word_end(true, focused_source),
         KeyCode::Char('0') | KeyCode::Home => state.cursor[state.side].1 = 0,
         // As in vi. Where a painted range wants to start: `0` would sweep in the indentation.
         KeyCode::Char('^') => {
@@ -2571,9 +2576,6 @@ fn handle_text_view(
             if next != TextOverlay::Human && app.algo_text_spans.is_none() {
                 app.algo_text_spans = Some(codediff_text_spans(before, after));
             }
-            if next == TextOverlay::TreeDisagreement && app.tree_text_spans.is_none() {
-                app.tree_text_spans = Some(tree_mapping_text_spans(&app.mapping, before, after));
-            }
             app.text_overlay = next;
             let human_spans_for_status = || {
                 [
@@ -2604,30 +2606,6 @@ fn handle_text_view(
                         "You and codediff agree everywhere".to_string()
                     } else {
                         format!("Showing {differing} disagreeing range(s)")
-                    }
-                }
-                TextOverlay::TreeDisagreement => {
-                    let differing: usize = app
-                        .tree_text_spans
-                        .as_ref()
-                        .map(|tree| {
-                            overlay_disagreement_spans(
-                                &human_spans_for_status(),
-                                tree,
-                                before_text,
-                                after_text,
-                            )
-                            .iter()
-                            .map(Vec::len)
-                            .sum()
-                        })
-                        .unwrap_or(0);
-                    if differing == 0 {
-                        "Your painting and your tree mapping agree everywhere".to_string()
-                    } else {
-                        format!(
-                            "Showing {differing} disagreeing range(s) between your painting and your tree mapping"
-                        )
                     }
                 }
             });
