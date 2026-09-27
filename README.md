@@ -28,17 +28,17 @@ lines](/assets/readme-screenshot.png)
 ## From source
 
 ```
-cargo install codediff
+cargo install --locked codediff
 ```
 
-This command builds CodeDiff from source. You need a C compiler on `PATH` and a Rust toolchain,
-edition 2024 or later (rustc 1.88 or later). The build compiles every tree-sitter grammar from C.
+This command builds CodeDiff from source, with the dependency versions it was tested with. You
+need a C compiler on `PATH` and a Rust toolchain, rustc 1.88 or later. The build compiles every tree-sitter grammar from C.
 The first `cargo install` takes a few minutes, because of this and the `lto = "fat"` release
 profile.
 
 ## Prebuilt binaries
 
-Pre-built binaries for Linux, macOS (Intel and Apple Silicon), and Windows are attached to every
+Prebuilt binaries for Linux, macOS (Intel and Apple Silicon), and Windows are attached to every
 [GitHub release](https://github.com/ivankovic/codediff/releases/latest).
 
 ## Homebrew
@@ -72,10 +72,13 @@ On NixOS, or anywhere with Nix installed, no installation step is needed at all:
 nix run github:ivankovic/codediff
 ```
 
+If flakes are not enabled in your Nix configuration, add
+`--extra-experimental-features 'nix-command flakes'` after `nix`.
+
 ## Arch and Gentoo
 
-Recipes for Arch (AUR) and Gentoo live in [`packaging/`](packaging/). Neither is submitted to its
-distribution's repository yet.
+Recipes for Arch and Gentoo live in [`packaging/`](packaging/): the PKGBUILD builds locally with
+`makepkg -si`, and the Gentoo ebuild is ready for an overlay.
 
 ## Editor integration
 
@@ -106,7 +109,7 @@ forward `COLORTERM`). If your terminal supports 24-bit color but does not set it
 ## In a browser
 
 For reviewing changes in a browser, see [codereview](https://github.com/ivankovic/codereview).
-Please note, codereview is v0.0.0. Use at your own risk.
+Note: codereview is at v0.0.0; use it at your own risk.
 
 ## Headless / batch mode
 
@@ -148,17 +151,19 @@ side's own file:
     "path": "old.rs",
     "language": "Rust",
     "hunks": [
-      { "operation": "delete", "range": { "start_row": 12, "start_column": 4, "end_row": 12, "end_column": 20 } }
+      { "operation": "delete", "range": { "start_row": 12, "start_column": 4, "end_row": 12, "end_column": 20 },
+        "reference_line": 10 }
     ]
   },
-  "after": { "path": "new.rs", "language": "Rust", "hunks": [ ... ] },
+  "after": { "path": "new.rs", "language": "Rust", "hunks": [] },
   "large_residual": false,
   "summary": "comment_only"
 }
 ```
 
 Rows and columns are 0-indexed, and columns are byte offsets within their row, as tree-sitter
-reports them. `summary` is present only when the diff is one of the special shapes the TUI's
+reports them. `reference_line` is the row of the nearest enclosing named declaration, and a
+`move` also carries a `move_target` range in the other file. `summary` is present only when the diff is one of the special shapes the TUI's
 status bar names, such as `comment_only` or `whitespace_only`. A binary file on either side
 answers with `"binary": true` and empty hunks. Unlike headless mode, JSON output is never chosen
 automatically: only `--mode json` selects it, so a pipe never receives it by surprise. The
@@ -320,7 +325,7 @@ committed baseline on every push, and warns when the runtime is more than twice 
 
 CodeDiff's goal is to process 100% of all commits.
 
-The full test dataset holds the git commit history of about 7,400 open-source git repositories,
+The full test dataset holds the git commit history of about 7,500 open-source git repositories,
 as available on the main branch. This list of repositories comes from the Gentoo Linux
 distribution. Find it in `list_of_repositories.csv`.
 
@@ -328,9 +333,9 @@ Measured over every modified code file in the most recent 50 commits of each of 
 repositories - 442,530 readable before/after pairs in 25 languages, diffed with no size cap under
 a 120-second budget and a 6 GB memory cap per process - **442,322 (99.95%) completed
 successfully.** 96 pairs ran past the budget and 112 past the memory cap; the latter are twenty
-generated or embedded files - tree-sitter parser tables, codegen, minified bundles, a PNG as a C
-array - plus one commit of a 40,000-line single-header C++ library. Given 24 GB, eleven of those
-files complete. The run, its harness and every pair that did not complete are documented in
+files, nineteen of them generated or embedded - tree-sitter parser tables, codegen, minified
+bundles, a PNG as a C array - and one commit of a 40,000-line single-header C++ library. Given
+24 GB and 300 s, 11 of the 28 files that first hit the cap complete. The run, its harness and every pair that did not complete are documented in
 `research/data/performance/PROVENANCE.md`.
 
 ## Accurate
