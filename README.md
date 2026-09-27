@@ -106,6 +106,7 @@ forward `COLORTERM`). If your terminal supports 24-bit color but does not set it
 ## In a browser
 
 For reviewing changes in a browser, see [codereview](https://github.com/ivankovic/codereview).
+Please note, codereview is v0.0.0. Use at your own risk.
 
 ## Headless / batch mode
 
@@ -278,6 +279,26 @@ plain text, line by line, so nothing is refused.
 Recognised by extension but diffed as plain text, since no grammar is compiled in: Bazel (`.bazel`), Dart (`.dart`), Emacs Lisp (`.el`), Markdown (`.md`, `.markdown`), Protocol Buffers (`.proto`), SQL (`.sql`).
 <!-- languages:end -->
 
+# License
+
+Copyright (C) 2026 Marko Ivankovic
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published
+by the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+See the LICENSE file for the full text of the License.
+
+## Cannot use AGPL software?
+
+A commercial license is available as a monthly subscription through
+[GitHub Sponsors](https://github.com/sponsors/ivankovic). It covers internal use of codediff
+by your organisation without the source-disclosure obligations of the AGPL. The terms are in
+[LICENSE-COMMERCIAL](LICENSE-COMMERCIAL). Pick the tier that names the commercial license as a
+benefit. For invoicing or other arrangements, contact me at
+[marko@ivankovic.me](mailto:marko@ivankovic.me).
+
 # Guiding principles
 
 ## Fast
@@ -339,26 +360,6 @@ ones, so the highlighting rules own the gap more than the matcher does.
 `make update-painting-attribution` measures this and writes one row per fixture and preset to
 `research/data/quality/painting_attribution.csv`, which the table is counted from;
 `make check-painting-attribution` fails if any fixture gets worse.
-
-# License
-
-Copyright (C) 2026 Marko Ivankovic
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published
-by the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-See the LICENSE file for the full text of the License.
-
-## Cannot use AGPL software?
-
-A commercial license is available as a monthly subscription through
-[GitHub Sponsors](https://github.com/sponsors/ivankovic). It covers internal use of codediff
-by your organisation without the source-disclosure obligations of the AGPL. The terms are in
-[LICENSE-COMMERCIAL](LICENSE-COMMERCIAL). Pick the tier that names the commercial license as a
-benefit. For invoicing or other arrangements, contact me at
-[marko@ivankovic.me](mailto:marko@ivankovic.me).
 
 # AI policy
 
