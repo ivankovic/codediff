@@ -10143,3 +10143,188 @@ fn the_text_view_draws_only_the_focused_side_on_a_narrow_terminal() {
         );
     }
 }
+
+// ---------------------------------------------------------------------------------------------
+// A save records what it measures
+// ---------------------------------------------------------------------------------------------
+
+const EXACT_STUB: &str = "use anyhow::Result;
+
+use crate::test;
+use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
+
+#[test]
+fn mapping() -> Result<()> {
+    test::helper::human_mapping::assert_matches_human_mapping(\"rust-x\")
+}
+
+#[test]
+fn painting() -> Result<()> {
+    // Not measured yet: 100.0 passes unconditionally. Run this test and record the
+    // limit it reports instead.
+    assert_matches_human_painting_within_limit(\"rust-x\", 100.0)
+}
+";
+
+fn measured(mismatches: Option<(usize, usize)>, painting_percent: Option<f64>) -> SaveMeasurement {
+    SaveMeasurement {
+        mismatches,
+        painting_percent,
+        invariant_violations: 0,
+    }
+}
+
+#[test]
+fn round_up_percent_goes_to_the_next_hundredth_without_drifting_on_exact_ones() {
+    assert_eq!(round_up_percent(0.0), 0.0);
+    assert_eq!(round_up_percent(18.0 / 10_000.0 * 100.0), 0.18);
+    assert_eq!(round_up_percent(0.18001), 0.19);
+    assert_eq!(round_up_percent(26.275), 26.28);
+    assert_eq!(format_percent(0.0), "0.0");
+    assert_eq!(format_percent(1.5), "1.5");
+    assert_eq!(format_percent(26.28), "26.28");
+}
+
+#[test]
+fn a_saved_painting_replaces_the_placeholder_with_the_measured_limit() {
+    let (out, notes) =
+        rewrite_stub_source(EXACT_STUB, "rust-x", &measured(Some((0, 0)), Some(3.85)));
+    assert!(!out.contains("Not measured yet"), "{out}");
+    assert!(
+        out.contains("assert_matches_human_painting_within_limit(\"rust-x\", 3.85)"),
+        "{out}"
+    );
+    assert!(
+        out.contains("assert_matches_human_mapping(\"rust-x\")"),
+        "exact stays exact: {out}"
+    );
+    assert_eq!(notes, vec!["painting limit recorded: 3.85%"]);
+
+    // Saying the same thing again changes nothing and reports nothing.
+    let (again, notes) = rewrite_stub_source(&out, "rust-x", &measured(Some((0, 0)), Some(3.85)));
+    assert_eq!(again, out);
+    assert!(notes.is_empty());
+
+    // A limit follows the measurement in both directions: it records a distance.
+    let (down, notes) = rewrite_stub_source(&out, "rust-x", &measured(Some((0, 0)), Some(0.0)));
+    assert!(down.contains("within_limit(\"rust-x\", 0.0)"), "{down}");
+    assert_eq!(notes, vec!["painting limit 3.85% -> 0.0%"]);
+}
+
+#[test]
+fn an_exact_mapping_with_mismatches_becomes_an_unexamined_clamp() {
+    let (out, notes) = rewrite_stub_source(EXACT_STUB, "rust-x", &measured(Some((4, 3)), None));
+    assert!(
+        out.contains(
+            "    // Recorded as found, not examined.\n    \
+             test::helper::human_mapping::assert_matches_human_mapping_within_limit(\"rust-x\", 4, 3)"
+        ),
+        "{out}"
+    );
+    assert!(
+        out.contains("100.0"),
+        "an unpainted save leaves the painting placeholder: {out}"
+    );
+    assert_eq!(
+        notes,
+        vec!["mapping clamped at 4 mismatches (3 visible), not examined"]
+    );
+
+    // A test that already explains itself keeps its own comment and gets no second one.
+    let explained = EXACT_STUB.replace(
+        "fn mapping() -> Result<()> {\n",
+        "fn mapping() -> Result<()> {\n    // The rename is not recovered.\n",
+    );
+    let (out, _) = rewrite_stub_source(&explained, "rust-x", &measured(Some((4, 3)), None));
+    assert!(!out.contains("Recorded as found"), "{out}");
+    assert!(out.contains("// The rename is not recovered.\n"), "{out}");
+}
+
+#[test]
+fn a_clamp_tightens_in_place_keeps_its_prose_and_never_loosens() {
+    let clamped = "#[test]
+fn mapping() -> Result<()> {
+    // The rename is not recovered.
+    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
+        \"rust-x\",
+        // Includes the N:M floor: 2 members a one-to-one output cannot reach.
+        6,
+        4,
+    )
+}
+";
+    let (out, notes) = rewrite_stub_source(clamped, "rust-x", &measured(Some((5, 4)), None));
+    assert!(out.contains("        5,\n        4,\n"), "{out}");
+    assert!(
+        out.contains("Includes the N:M floor"),
+        "inner prose stays: {out}"
+    );
+    assert!(out.contains("// The rename is not recovered."), "{out}");
+    assert_eq!(notes, vec!["mapping clamp tightened 6/4 -> 5/4"]);
+
+    let (same, notes) = rewrite_stub_source(clamped, "rust-x", &measured(Some((6, 4)), None));
+    assert_eq!(same, clamped);
+    assert!(notes.is_empty());
+
+    let (untouched, notes) = rewrite_stub_source(clamped, "rust-x", &measured(Some((7, 4)), None));
+    assert_eq!(untouched, clamped, "loosening is a decision, not a save");
+    assert_eq!(
+        notes,
+        vec![
+            "7 mismatches (4 visible) exceed the clamp of 6/4: mapping() will fail until the stub \
+             is examined and edited"
+        ]
+    );
+}
+
+#[test]
+fn a_clamp_measured_at_zero_becomes_exact_and_drops_only_the_unexamined_note() {
+    let (clamped, _) = rewrite_stub_source(EXACT_STUB, "rust-x", &measured(Some((4, 3)), None));
+    let (out, notes) = rewrite_stub_source(&clamped, "rust-x", &measured(Some((0, 0)), None));
+    assert!(
+        out.contains("assert_matches_human_mapping(\"rust-x\")"),
+        "{out}"
+    );
+    assert!(!out.contains("Recorded as found"), "{out}");
+    assert_eq!(notes, vec!["mapping is exact now (was clamped at 4/3)"]);
+
+    let explained = clamped.replace(
+        "    // Recorded as found, not examined.\n",
+        "    // A note a human wrote.\n",
+    );
+    let (out, _) = rewrite_stub_source(&explained, "rust-x", &measured(Some((0, 0)), None));
+    assert!(
+        out.contains("// A note a human wrote."),
+        "human prose survives: {out}"
+    );
+}
+
+#[test]
+fn a_text_only_or_hand_written_stub_is_left_alone() {
+    let (out, notes) = rewrite_stub_source(EXACT_STUB, "rust-x", &measured(None, None));
+    assert_eq!(out, EXACT_STUB);
+    assert!(notes.is_empty());
+
+    let other_name = EXACT_STUB.replace("rust-x", "rust-y");
+    let (out, notes) =
+        rewrite_stub_source(&other_name, "rust-x", &measured(Some((3, 3)), Some(1.0)));
+    assert_eq!(
+        out, other_name,
+        "another fixture's calls are not this fixture's"
+    );
+    assert!(notes.is_empty());
+}
+
+#[test]
+fn measure_saved_case_reads_a_real_fixture_as_its_tests_do() -> Result<()> {
+    // Its stub records an exact mapping and a 0.0 painting limit, so that is what measuring finds.
+    let measurement = measure_saved_case("java-add-logging", false)?;
+    assert_eq!(measurement.mismatches, Some((0, 0)));
+    assert_eq!(measurement.painting_percent, Some(0.0));
+    assert_eq!(measurement.invariant_violations, 0);
+    assert_eq!(
+        describe_measurement(&measurement),
+        "codediff: 0 mismatch(es), 0 visible, painting 0.0%, invariants hold"
+    );
+    Ok(())
+}

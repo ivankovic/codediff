@@ -1846,14 +1846,43 @@ pub(crate) fn action_save(
     // The invariants also cover the tree mapping, which every saved fixture has.
     ensure_invariants_stub_test(name)?;
     *dirty = false;
-    Ok(if created {
+    let mut status = if created {
         format!(
             "Saved human_mapping.json and created fixtures/{}.rs",
             module_name(name)
         )
     } else {
         "Saved human_mapping.json".to_string()
-    })
+    };
+    // The save stands whatever measuring does; a failure there is reported, not raised.
+    match measure_saved_case(name, text_only) {
+        Ok(measurement) => {
+            status.push_str(&format!(". {}", describe_measurement(&measurement)));
+            match record_measurement_in_stub(name, &measurement) {
+                Ok(notes) if notes.is_empty() => {}
+                Ok(notes) => status.push_str(&format!("; stub: {}", notes.join("; "))),
+                Err(err) => status.push_str(&format!("; stub not updated ({err:#})")),
+            }
+        }
+        Err(err) => status.push_str(&format!(". Not measured ({err:#})")),
+    }
+    Ok(status)
+}
+
+/// The status line's summary of a `SaveMeasurement`.
+pub(crate) fn describe_measurement(measurement: &SaveMeasurement) -> String {
+    let mut parts = Vec::new();
+    if let Some((total, visible)) = measurement.mismatches {
+        parts.push(format!("codediff: {total} mismatch(es), {visible} visible"));
+    }
+    if let Some(percent) = measurement.painting_percent {
+        parts.push(format!("painting {}%", format_percent(percent)));
+    }
+    parts.push(match measurement.invariant_violations {
+        0 => "invariants hold".to_string(),
+        n => format!("{n} invariant violation(s), V lists them"),
+    });
+    parts.join(", ")
 }
 
 /// Rust keywords (2015 through 2024 edition, strict and reserved). A case name becomes a module
