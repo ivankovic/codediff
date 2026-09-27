@@ -37,6 +37,11 @@ const cases = [
   assert.deepEqual(S.parseQuery("?case=nope&view=banana", cases), { name: "a", view: "diff" });
   assert.deepEqual(S.parseQuery("?view=codediff", cases), { name: "a", view: "codediff" });
   assert.deepEqual(S.parseQuery("", []), { name: null, view: "diff" });
+  // Without a `?case=`, the landing case when the site has it, not the first in the list.
+  const withLanding = [...cases, { ...cases[0], name: S.LANDING_CASE }];
+  assert.deepEqual(S.parseQuery("", withLanding), { name: S.LANDING_CASE, view: "diff" });
+  assert.deepEqual(S.parseQuery("?case=nope", withLanding), { name: S.LANDING_CASE, view: "diff" });
+  assert.deepEqual(S.parseQuery("?case=b", withLanding), { name: "b", view: "diff" });
   assert.equal(S.buildQuery("b", "codediff"), "?case=b&view=codediff");
   const round = S.parseQuery(S.buildQuery("b", "codediff"), cases);
   assert.deepEqual(round, { name: "b", view: "codediff" });

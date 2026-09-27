@@ -41,7 +41,17 @@ const CodeDiffShowcase = (() => {
 
   // ----- URL <-> selection ------------------------------------------------------------------
 
-  // `?case=<name>&view=diff|codediff`. Anything missing or unknown falls back to the first case
+  // The case a visitor lands on without a `?case=` (the README's link): two loops replaced by
+  // built-ins, where `diff` marks whole blocks and CodeDiff shows what each line became.
+  const LANDING_CASE = "python-refactoring";
+
+  // LANDING_CASE, or the first case if the site has no such case.
+  function landingCase(cases) {
+    if (cases.some((c) => c.name === LANDING_CASE)) return LANDING_CASE;
+    return cases.length ? cases[0].name : null;
+  }
+
+  // `?case=<name>&view=diff|codediff`. Anything missing or unknown falls back to the landing case
   // and to `diff` - the view a newcomer already knows, so the flip to CodeDiff is the reveal.
   function parseQuery(search, cases) {
     const params = new URLSearchParams(search || "");
@@ -49,7 +59,7 @@ const CodeDiffShowcase = (() => {
     const known = cases.find((c) => c.name === wanted);
     const view = params.get("view");
     return {
-      name: known ? known.name : cases.length ? cases[0].name : null,
+      name: known ? known.name : landingCase(cases),
       view: VIEWS.includes(view) ? view : "diff",
     };
   }
@@ -163,6 +173,7 @@ const CodeDiffShowcase = (() => {
     VIEWS,
     VIEW_LABEL,
     parseQuery,
+    LANDING_CASE,
     buildQuery,
     payloadFor,
     routeApi,
