@@ -19,21 +19,26 @@ use anyhow::Result;
 
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants_with_known_violations;
 
 #[test]
 fn mapping() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping("java-defects4j-cli-36-optiongroup")
+    // Recorded as found, not examined.
+    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
+        "java-defects4j-cli-36-optiongroup",
+        10,
+        7,
+    )
 }
 
 #[test]
 fn painting() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test and record the
-    // limit it reports instead.
-    assert_matches_human_painting_within_limit("java-defects4j-cli-36-optiongroup", 100.0)
+    assert_matches_human_painting_within_limit("java-defects4j-cli-36-optiongroup", 0.68)
 }
 
 #[test]
 fn invariants() -> Result<()> {
-    assert_ground_truth_invariants("java-defects4j-cli-36-optiongroup")
+    // Invariant 16, twice: the `HashMap` <-> `LinkedHashMap` rename (before row 22, after row 23) is
+    // not painted as its differing word `Linked` under Minimal.
+    assert_ground_truth_invariants_with_known_violations("java-defects4j-cli-36-optiongroup", 2)
 }

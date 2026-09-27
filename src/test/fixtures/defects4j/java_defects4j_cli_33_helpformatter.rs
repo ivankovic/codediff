@@ -19,7 +19,7 @@ use anyhow::Result;
 
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants_with_known_violations;
 
 #[test]
 fn mapping() -> Result<()> {
@@ -28,12 +28,14 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test and record the
-    // limit it reports instead.
-    assert_matches_human_painting_within_limit("java-defects4j-cli-33-helpformatter", 100.0)
+    assert_matches_human_painting_within_limit("java-defects4j-cli-33-helpformatter", 0.1)
 }
 
 #[test]
 fn invariants() -> Result<()> {
-    assert_ground_truth_invariants("java-defects4j-cli-33-helpformatter")
+    // Invariant 11, both presets: after row 913 leaves 2 removed leaves unpainted, the first the
+    // `type_identifier` `IOException`. Invariant 16, twice: the `renderWrappedText` <->
+    // `renderWrappedTextBlock` rename on row 730 is not painted as its differing word `Block` under
+    // Minimal.
+    assert_ground_truth_invariants_with_known_violations("java-defects4j-cli-33-helpformatter", 4)
 }

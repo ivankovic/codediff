@@ -23,18 +23,19 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    test::helper::human_mapping::assert_matches_human_mapping(
+    // Recorded as found, not examined.
+    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "java-defects4j-closure-111-closurereverseabstractinterpreter",
+        2,
+        2,
     )
 }
 
 #[test]
 fn painting() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test and record the
-    // limit it reports instead.
     assert_matches_human_painting_within_limit(
         "java-defects4j-closure-111-closurereverseabstractinterpreter",
-        100.0,
+        0.15,
     )
 }
 

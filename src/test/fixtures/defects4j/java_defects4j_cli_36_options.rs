@@ -28,9 +28,7 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // Not measured yet: 100.0 passes unconditionally. Run this test and record the
-    // limit it reports instead.
-    assert_matches_human_painting_within_limit("java-defects4j-cli-36-options", 100.0)
+    assert_matches_human_painting_within_limit("java-defects4j-cli-36-options", 0.25)
 }
 
 #[test]
