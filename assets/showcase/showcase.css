@@ -130,13 +130,21 @@ body {
   opacity: 0.85;
 }
 
-#case-blurb {
+/* The keys' stand-in on a touch screen, which has no `M` to press. */
+#touch-actions {
+  display: none;
   margin: 8px 0 2px;
-  max-width: 110ch;
 }
 
-#case-blurb .group-note {
-  opacity: 0.7;
+#touch-actions .view-button {
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+}
+
+@media (hover: none), (max-width: 640px) {
+  #touch-actions {
+    display: block;
+  }
 }
 
 .hint {

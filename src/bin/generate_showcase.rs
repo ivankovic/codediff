@@ -63,7 +63,6 @@ struct Case {
     name: &'static str,
     group: Group,
     title: &'static str,
-    blurb: &'static str,
 }
 
 /// The twenty. Order is display order within each group.
@@ -72,145 +71,101 @@ const CASES: &[Case] = &[
         name: "rust-add-if",
         group: Group::DiffWrong,
         title: "Wrap existing code in a new branch",
-        blurb: "An `if` grows an `else if` in front of it. `diff` reports the old condition deleted \
-                and three lines inserted; codediff shows the old branch as moved and marks only \
-                the new one as inserted.",
     },
     Case {
         name: "python-refactoring",
         group: Group::DiffWrong,
         title: "Replace two loops with built-ins",
-        blurb: "Hand-rolled sum/count and max/min loops become `sum`, `len`, `max` and `min`. \
-                `diff` shows a block deleted and a block inserted; codediff keeps the four \
-                assignments and shows what each right-hand side became.",
     },
     Case {
         name: "typescript-add-type-annotations",
         group: Group::DiffWrong,
         title: "Add type annotations",
-        blurb: "A function signature gains parameter and return types and an interface appears \
-                above it. `diff` marks the signature line deleted and re-inserted; codediff marks \
-                the annotations and the interface as inserted, and shades what merely shifted to \
-                make room for them as moved.",
     },
     Case {
         name: "c-genymobile-scrcpy-rename-defines",
         group: Group::DiffWrong,
         title: "Prefix five macro names",
-        blurb: "Five `#define`s get an `SC_` prefix. `diff` marks every line deleted and inserted; \
-                codediff marks five identifiers as updated.",
     },
     Case {
         name: "lua-neovim-neovim-rename",
         group: Group::DiffWrong,
         title: "Rename a field in three tables",
-        blurb: "`buffer = 0` becomes `buf = 0` in three keymap option tables. `diff` marks the \
-                three long lines; codediff marks the three words.",
     },
     Case {
         name: "csharp-radarr-radarr-remove-import-and-func",
         group: Group::DiffWrong,
         title: "Delete a method and its import",
-        blurb: "One `using` and one method go away. `diff` also charges the blank line before the \
-                method; codediff deletes exactly the method and the import.",
     },
     Case {
         name: "python-nvbn-thefuck-add-three-arguments",
         group: Group::DiffWrong,
         title: "Add a parameter and pass it through",
-        blurb: "A function gains an `expanded` parameter and forwards it in two calls. `diff` \
-                marks three whole lines; codediff marks the three new arguments.",
     },
     Case {
         name: "yaml-twbs-bootstrap-remove-v-semicolon-from-version-numbers",
         group: Group::DiffWrong,
         title: "Drop a key from every list item",
-        blurb: "Fifty-odd `- v: \"x.y.z\"` entries become `- \"x.y.z\"`. `diff` marks every \
-                line on both sides; codediff keeps every version string and shows the key that \
-                was removed from each.",
     },
     Case {
         name: "ruby-jekyll-jekyll-whitespace-only",
         group: Group::DiffWrong,
         title: "Change line endings only",
-        blurb: "The file was re-saved with different line endings. `diff` marks every line in \
-                the file; codediff reports a whitespace-only change and marks nothing.",
     },
     Case {
         name: "xml-antlr-antlr3-comment-out-part-of-code-interesting-case",
         group: Group::DiffWrong,
         title: "Comment out a block of XML",
-        blurb: "A Maven plugin declaration is disabled by wrapping it in a comment. `diff` \
-                reports one line replaced and one inserted and shows the plugin itself as \
-                untouched; codediff reports the plugin gone and a comment in its place, which is \
-                what a reviewer has to notice.",
     },
     Case {
         name: "go-gin-gonic-gin-update-version-string",
         group: Group::BothRight,
         title: "Bump a version string",
-        blurb: "`\"v1.6.0\"` becomes `\"v1.6.1\"`. One line, one string; both tools agree.",
     },
     Case {
         name: "java-genymobile-scrcpy-char-to-string-bugfix",
         group: Group::BothRight,
         title: "Fix a char literal that should have been a string",
-        blurb: "`'\"'` becomes `\"'\"` in an error message. Both tools mark the one line; codediff \
-                marks the one literal.",
     },
     Case {
         name: "kotlin-fix-loop-bug",
         group: Group::BothRight,
         title: "Change a loop's range operator",
-        blurb: "`0 until items.size` becomes `0..items.size`. Both tools see one changed line.",
     },
     Case {
         name: "cpp-ladybirdbrowser-ladybird-change-inherited-class-name",
         group: Group::BothRight,
         title: "Change a base class",
-        blurb: "A constructor's initializer switches from `FormAssociatedLabelableNode` to \
-                `ReplacedBox`. Both tools mark the line; codediff marks the name.",
     },
     Case {
         name: "swift-nextcloud-ios-different-func",
         group: Group::BothRight,
         title: "Rename an overridden method",
-        blurb: "`createRightMenu` becomes `createOptionMenu`. Both tools mark the line; codediff \
-                marks the name.",
     },
     Case {
         name: "tsx-mitmproxy-mitmproxy-array-to-object",
         group: Group::BothRight,
         title: "Export an object instead of an array",
-        blurb: "`export default [OptionModal]` becomes a three-line object literal. The line \
-                diff's delete-plus-insert is the right reading, and codediff reads it that way.",
     },
     Case {
         name: "rust-tauri-apps-tauri-add-use-and-function",
         group: Group::BothRight,
         title: "Add a field and the import for its type",
-        blurb: "A struct gains a `work_area` field and the `use` line gains `PhysicalRect`. Two \
-                touched lines, both tools agree on both.",
     },
     Case {
         name: "python-nvbn-thefuck-stdout-stderr-change",
         group: Group::BothRight,
         title: "Switch four reads from stderr to output",
-        blurb: "`command.stderr` becomes `command.output` in four places. Both tools mark the \
-                four lines; codediff marks the four attribute names.",
     },
     Case {
         name: "css-wordpress-wordpress-rename-attribute",
         group: Group::BothRight,
         title: "Change a CSS property",
-        blurb: "`border-top` becomes `outline` with the same value. One line, both tools agree.",
     },
     Case {
         name: "shellscript-genymobile-scrcpy-insert-only",
         group: Group::BothRight,
         title: "Add one file to a release list",
-        blurb: "One more line in a shell script's argument list. Pure insertion, the easy case \
-                for every diff.",
     },
 ];
 
@@ -220,7 +175,6 @@ struct CaseIndex {
     name: &'static str,
     group: Group,
     title: &'static str,
-    blurb: &'static str,
     dataset: String,
     language: String,
     /// Lines in the after-side file.
@@ -235,8 +189,6 @@ struct CaseIndex {
     summary: Option<String>,
     /// The upstream commit the change was taken from, when the fixture is a sampled one.
     upstream: Option<String>,
-    /// The fixture's page on the human-mapping site next door.
-    mapping: String,
 }
 
 fn main() -> Result<()> {
@@ -359,7 +311,6 @@ fn bake(
         name: case.name,
         group: case.group,
         title: case.title,
-        blurb: case.blurb,
         dataset,
         language: codediff.after.language.clone(),
         lines: codediff.after.lines.len(),
@@ -367,7 +318,6 @@ fn bake(
         codediff: PaintedCounts::of(&codediff),
         summary: codediff.summary.as_ref().map(|s| s.label.to_string()),
         upstream,
-        mapping: format!("../fixtures/{}.html", case.name),
     };
 
     Ok(Baked {

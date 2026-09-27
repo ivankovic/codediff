@@ -559,17 +559,35 @@
     footer.textContent = hint;
     dialog.append(heading, body, footer);
     container.append(dialog);
-    return { dialog, body, heading };
+    return { dialog, body, heading, footer };
   }
 
+  // Returns the rows, for a dialog that also takes taps.
   function listRows(body, labels, selected) {
-    labels.forEach((label, index) => {
+    return labels.map((label, index) => {
       const row = document.createElement("div");
       row.className = "list-row" + (index === selected ? " selected" : "");
       row.textContent = label;
       body.append(row);
       if (index === selected) row.scrollIntoView({ block: "nearest" });
+      return row;
     });
+  }
+
+  // A row of footer buttons, for the dialogs a touch screen can open (the showcase's "Diff
+  // options"): `[label, action]` pairs.
+  function dialogButtons(footer, buttons) {
+    const row = document.createElement("div");
+    row.className = "dialog-buttons";
+    for (const [label, action] of buttons) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "dialog-button";
+      button.textContent = label;
+      button.addEventListener("click", action);
+      row.append(button);
+    }
+    footer.append(row);
   }
 
   function moveSelection(selected, delta, length) {
@@ -893,9 +911,21 @@
         }
         render();
       },
+      // Every key has a tap too: a row toggles, the footer buttons are 1, 2 and Esc.
       render(container) {
-        const { body } = box(container, "Render options", "↑/↓ move  Enter/Space toggle  1: minimal  2: full  Esc: close");
-        listRows(body, rows.map((row) => `[${this.options[row.key] ? "x" : " "}] ${row.label}`), this.selected);
+        const { body, footer } = box(container, "Render options", "↑/↓ move  Enter/Space toggle  1: minimal  2: full  Esc: close");
+        const labels = rows.map((row) => `[${this.options[row.key] ? "x" : " "}] ${row.label}`);
+        listRows(body, labels, this.selected).forEach((element, index) => {
+          element.addEventListener("click", () => {
+            this.selected = index;
+            this.key({ key: " " });
+          });
+        });
+        dialogButtons(footer, [
+          ["Minimal", () => this.key({ key: "1" })],
+          ["Full", () => this.key({ key: "2" })],
+          ["Close", () => this.key({ key: "Escape" })],
+        ]);
       },
     };
     return dialog;

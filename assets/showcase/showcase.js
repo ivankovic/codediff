@@ -33,20 +33,8 @@
 
 const CodeDiffShowcase = (() => {
   const GROUPS = [
-    {
-      id: "diff_wrong",
-      label: "Where diff gets it wrong and CodeDiff is exact",
-      note:
-        "On each of these, Unix diff marks whole lines a reader then has to diff again by eye, " +
-        "and CodeDiff's mapping agrees with the human one line for line.",
-    },
-    {
-      id: "both_right",
-      label: "Where both are right",
-      note:
-        "On each of these a plain line diff is already the right answer, and CodeDiff says the " +
-        "same thing. A syntax-aware tool must not invent structure where there is none.",
-    },
+    { id: "diff_wrong", label: "Where diff gets it wrong and CodeDiff is exact" },
+    { id: "both_right", label: "Where both are right" },
   ];
   const VIEWS = ["diff", "codediff"];
   const VIEW_LABEL = { diff: "Unix diff", codediff: "CodeDiff" };
@@ -279,6 +267,10 @@ if (typeof module !== "undefined") {
       select.addEventListener("change", () => select_(select.value, ctx.view));
       $("#view-diff").addEventListener("click", () => select_(selected, "diff"));
       $("#view-codediff").addEventListener("click", () => select_(selected, "codediff"));
+      // The viewer's own `M`, for a touch screen with no keyboard to press it on.
+      $("#diff-options").addEventListener("click", () =>
+        document.dispatchEvent(new KeyboardEvent("keydown", { key: "M", bubbles: true }))
+      );
       // `q` and Escape quit the real viewer. Here they would leave the reader on a dead screen,
       // so at the top level (no dialog open) they are swallowed; inside a dialog they still close
       // it, which is app.js's own handling.
@@ -326,29 +318,15 @@ if (typeof module !== "undefined") {
         button.setAttribute("aria-pressed", String(active));
       }
       $("#case-stats").textContent = S.statsLine(entry);
-      const group = S.GROUPS.find((g) => g.id === entry.group);
-      $("#case-blurb").innerHTML = "";
-      const strong = document.createElement("strong");
-      strong.textContent = entry.title + ". ";
-      $("#case-blurb").append(strong, entry.blurb, " ");
-      const note = document.createElement("span");
-      note.className = "group-note";
-      note.textContent = group ? group.note : "";
-      $("#case-blurb").append(note);
       const links = $("#case-links");
       links.innerHTML = "";
-      const mapping = document.createElement("a");
-      mapping.href = entry.mapping;
-      mapping.textContent = "Human mapping for this change";
-      links.append(mapping);
       if (entry.upstream) {
-        links.append(" · ");
         const commit = document.createElement("a");
         commit.href = entry.upstream;
         commit.textContent = "Upstream commit";
         links.append(commit);
       } else {
-        links.append(" · hand-written example");
+        links.append("Hand-written example");
       }
       links.append(" · ");
       updateTitle();
