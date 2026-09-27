@@ -1,7 +1,7 @@
 # Maintainer: Marko Ivankovic <marko@ivankovic.me>
 
 pkgname=codediff
-pkgver=0.1.0
+pkgver=0.1.1
 pkgrel=1
 pkgdesc="Fast, robust, syntax-aware code diffing using tree-sitter ASTs"
 arch=('x86_64' 'aarch64')

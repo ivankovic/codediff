@@ -4,7 +4,7 @@ All notable changes to CodeDiff. The format follows [Keep a Changelog](https://k
 and the version numbers follow [Semantic Versioning](https://semver.org/) as far as a 0.x
 release does: a minor bump may change the JSON output or the library API, a patch bump does not.
 
-## [0.1.1] - unreleased
+## [0.1.1] - 2026-09-27
 
 ### Changed
 
