@@ -377,8 +377,8 @@ html-mozilla-firefox-firefox-interesting-case,full,964,188,188,0,2,0
 html-mozilla-firefox-firefox-interesting-case,minimal,964,188,188,0,2,0
 html-mozilla-firefox-firefox-path,full,1996,0,0,0,1,0
 html-mozilla-firefox-firefox-path,minimal,1996,0,0,0,1,0
-html-mozilla-firefox-firefox-test-span,full,739,20,16,9,2,1
-html-mozilla-firefox-firefox-test-span,minimal,739,8,4,9,2,1
+html-mozilla-firefox-firefox-test-span,full,739,20,17,4,2,1
+html-mozilla-firefox-firefox-test-span,minimal,739,8,5,4,2,1
 html-mozilla-pdf-add-closing-tags,full,482,0,0,0,1,0
 html-mozilla-pdf-add-closing-tags,minimal,482,0,0,0,1,0
 html-prettier-prettier-not-pure-html-includes-yaml-as-well,full,181,75,75,0,2,0
@@ -480,7 +480,7 @@ java-defects4j-cli-17-posixparser,minimal,21173,0,0,0,2,0
 java-defects4j-cli-18-posixparser,full,20560,25,48,73,2,1
 java-defects4j-cli-18-posixparser,minimal,20560,27,18,41,2,1
 java-defects4j-cli-19-posixparser,full,20456,82,32,66,2,0
-java-defects4j-cli-19-posixparser,minimal,20456,54,18,54,2,0
+java-defects4j-cli-19-posixparser,minimal,20456,54,18,36,2,0
 java-defects4j-cli-2-posixparser,full,21043,8,0,8,2,0
 java-defects4j-cli-2-posixparser,minimal,21043,8,0,8,2,0
 java-defects4j-cli-20-posixparser,full,20598,410,54,365,2,0
@@ -513,8 +513,8 @@ java-defects4j-cli-30-defaultparser,full,40822,485,281,466,2,0
 java-defects4j-cli-30-defaultparser,minimal,40822,341,262,327,2,0
 java-defects4j-cli-30-parser,full,27409,424,210,424,2,0
 java-defects4j-cli-30-parser,minimal,27409,274,222,274,2,0
-java-defects4j-cli-31-helpformatter,full,62704,97,22,79,2,0
-java-defects4j-cli-31-helpformatter,minimal,62704,98,19,79,2,0
+java-defects4j-cli-31-helpformatter,full,62704,97,60,60,2,0
+java-defects4j-cli-31-helpformatter,minimal,62704,98,57,60,2,0
 java-defects4j-cli-31-option,full,37142,0,0,0,1,0
 java-defects4j-cli-31-option,minimal,37142,0,0,0,1,0
 java-defects4j-cli-31-optionbuilder,full,20237,0,0,0,1,0
@@ -535,8 +535,8 @@ java-defects4j-cli-36-options,full,19382,48,48,0,2,0
 java-defects4j-cli-36-options,minimal,19382,6,6,0,2,0
 java-defects4j-cli-37-defaultparser,full,40900,42,29,40,2,0
 java-defects4j-cli-37-defaultparser,minimal,40900,99,4,96,2,0
-java-defects4j-cli-38-defaultparser,full,41316,188,152,169,2,0
-java-defects4j-cli-38-defaultparser,minimal,41316,151,150,133,2,0
+java-defects4j-cli-38-defaultparser,full,41316,188,46,175,2,0
+java-defects4j-cli-38-defaultparser,minimal,41316,151,42,170,2,0
 java-defects4j-cli-39-typehandler,full,15749,0,0,0,2,0
 java-defects4j-cli-39-typehandler,minimal,15749,6,6,0,2,0
 java-defects4j-cli-4-parser,full,25669,0,0,0,2,0
@@ -583,8 +583,8 @@ java-defects4j-closure-11-typecheck,full,134513,0,10,10,2,0
 java-defects4j-closure-11-typecheck,minimal,134513,0,10,10,2,0
 java-defects4j-closure-110-node,full,134746,0,0,0,2,0
 java-defects4j-closure-110-node,minimal,134746,0,0,0,2,0
-java-defects4j-closure-110-scopedaliases,full,41480,83,80,43,2,0
-java-defects4j-closure-110-scopedaliases,minimal,41480,72,67,41,2,0
+java-defects4j-closure-110-scopedaliases,full,41480,83,42,61,2,0
+java-defects4j-closure-110-scopedaliases,minimal,41480,72,29,63,2,0
 java-defects4j-closure-111-closurereverseabstractinterpreter,full,17992,26,5,22,2,0
 java-defects4j-closure-111-closurereverseabstractinterpreter,minimal,17992,15,0,15,2,0
 java-defects4j-closure-112-typeinference,full,114002,104,104,0,2,0
@@ -847,7 +847,7 @@ java-defects4j-jacksondatabind-25-simpleabstracttyperesolver,full,7123,45,7,38,2
 java-defects4j-jacksondatabind-25-simpleabstracttyperesolver,minimal,7123,34,4,38,2,0
 java-defects4j-jacksondatabind-34-numberserializer,full,6444,0,0,0,2,0
 java-defects4j-jacksondatabind-34-numberserializer,minimal,6444,0,0,0,2,0
-java-defects4j-jacksondatabind-39-nullifyingdeserializer,full,3534,57,91,63,2,0
+java-defects4j-jacksondatabind-39-nullifyingdeserializer,full,3534,57,57,29,2,0
 java-defects4j-jacksondatabind-39-nullifyingdeserializer,minimal,3534,51,51,17,2,0
 java-defects4j-jacksondatabind-49-writableobjectid,full,4834,0,0,0,2,0
 java-defects4j-jacksondatabind-49-writableobjectid,minimal,4834,0,0,0,2,0
@@ -881,7 +881,7 @@ java-defects4j-jsoup-39-datautil,full,16276,0,0,0,2,0
 java-defects4j-jsoup-39-datautil,minimal,16276,0,0,0,2,0
 java-defects4j-jsoup-40-documenttype,full,2799,0,0,0,2,0
 java-defects4j-jsoup-40-documenttype,minimal,2799,0,0,0,2,0
-java-defects4j-jsoup-52-xmldeclaration,full,3934,305,318,108,2,0
+java-defects4j-jsoup-52-xmldeclaration,full,3934,305,317,109,2,0
 java-defects4j-jsoup-52-xmldeclaration,minimal,3934,197,198,52,2,0
 java-defects4j-jsoup-54-w3cdom,full,13700,0,0,0,2,0
 java-defects4j-jsoup-54-w3cdom,minimal,13700,0,0,0,2,0
@@ -985,8 +985,8 @@ java-defects4j-mockito-29-same,full,2244,34,34,0,1,0
 java-defects4j-mockito-29-same,minimal,2244,0,0,0,1,0
 java-defects4j-mockito-30-returnssmartnulls,full,6461,0,0,0,1,0
 java-defects4j-mockito-30-returnssmartnulls,minimal,6461,0,0,0,1,0
-java-defects4j-mockito-31-returnssmartnulls,full,6324,11,9,7,2,0
-java-defects4j-mockito-31-returnssmartnulls,minimal,6324,9,8,9,2,0
+java-defects4j-mockito-31-returnssmartnulls,full,6324,11,11,4,2,0
+java-defects4j-mockito-31-returnssmartnulls,minimal,6324,9,8,4,2,0
 java-defects4j-mockito-32-spyannotationengine,full,6035,28,36,56,2,0
 java-defects4j-mockito-32-spyannotationengine,minimal,6035,27,5,28,2,0
 java-defects4j-mockito-37-answersvalidator,full,4853,0,0,0,2,0
@@ -1029,8 +1029,8 @@ java-refactor-constants,full,594,76,60,26,2,0
 java-refactor-constants,minimal,594,23,0,23,2,0
 javascript-add-array-method,full,385,2,2,0,2,0
 javascript-add-array-method,minimal,385,0,0,0,2,0
-javascript-add-destructuring,full,335,80,57,84,2,0
-javascript-add-destructuring,minimal,335,83,55,88,2,0
+javascript-add-destructuring,full,335,80,60,84,2,0
+javascript-add-destructuring,minimal,335,83,73,88,2,0
 javascript-add-event-listener,full,401,17,17,0,2,0
 javascript-add-event-listener,minimal,401,36,36,0,2,0
 javascript-axios-axios-real-small-change,full,716,84,72,16,2,0
@@ -1333,8 +1333,8 @@ rust-adding-many-identical-cfg-test-statements-to-a-signle-file-doesnt-prefer-th
 rust-adding-many-identical-cfg-test-statements-to-a-signle-file-doesnt-prefer-the-local-insert-but-rather-goes-to-some-other-existing-cfg,minimal,12189,0,0,0,1,0
 rust-adding-to-a-list-of-identical-attributes-should-favour-near-matches,full,26704,0,0,0,1,0
 rust-adding-to-a-list-of-identical-attributes-should-favour-near-matches,minimal,26704,0,0,0,1,0
-rust-algorithm-change,full,972,266,133,173,2,1
-rust-algorithm-change,minimal,972,166,78,95,2,1
+rust-algorithm-change,full,972,266,145,177,2,1
+rust-algorithm-change,minimal,972,166,84,101,2,1
 rust-cost-optimization,full,1456,37,37,0,2,0
 rust-cost-optimization,minimal,1456,38,38,0,2,0
 rust-data-structure,full,812,61,61,0,2,0
@@ -1541,7 +1541,7 @@ tsx-langflow-ai-langflow-split-import,full,487,46,108,93,2,0
 tsx-langflow-ai-langflow-split-import,minimal,487,68,59,37,2,0
 tsx-langflow-ai-langflow-split-import-2,full,471,48,105,93,2,0
 tsx-langflow-ai-langflow-split-import-2,minimal,471,68,59,37,2,0
-tsx-langflow-ai-langflow-split-import-3,full,601,48,38,32,2,0
+tsx-langflow-ai-langflow-split-import-3,full,601,48,50,46,2,0
 tsx-langflow-ai-langflow-split-import-3,minimal,601,68,55,33,2,0
 tsx-microsoft-typescript-delete-only,full,955,0,0,0,1,0
 tsx-microsoft-typescript-delete-only,minimal,955,0,0,0,1,0
