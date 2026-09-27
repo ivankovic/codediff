@@ -168,7 +168,10 @@ pub(crate) fn run_event_loop(
     loop {
         // The session borrows `before`/`after` immutably, so its cached `FrameState` can live for
         // the whole session; only this loop reassigns them, between sessions.
-        match run_case_session(terminal, app, &before, &after)? {
+        let end = run_case_session(terminal, app, &before, &after)?;
+        // Before the switch, so the memory names the case being left; on quit it is the last.
+        remember_session(app);
+        match end {
             SessionEnd::Quit => break,
             SessionEnd::Open(OpenTarget::Diffs(name)) => match load_case(&name) {
                 Ok((new_before, new_after)) => {
@@ -309,6 +312,8 @@ pub(crate) fn is_navigation_or_display_key(code: KeyCode) -> bool {
             | KeyCode::Char('p')
             | KeyCode::Char('n')
             | KeyCode::Char('N')
+            | KeyCode::Char(']')
+            | KeyCode::Char('[')
             | KeyCode::Char('/')
             | KeyCode::Char('t')
             | KeyCode::Char('T')
@@ -572,10 +577,8 @@ pub(crate) fn run_case_session(
         let state_preserving = is_state_preserving_key(app.modal.as_ref(), key.code);
         let watch = EditWatch::start(app, key.code);
 
-        let mut open_request: Option<OpenTarget> = None;
-
-        if app.modal.is_some() {
-            open_request = handle_modal_key(
+        let open_request = if app.modal.is_some() {
+            handle_modal_key(
                 app,
                 key.code,
                 &frame_state.before_flat,
@@ -587,7 +590,7 @@ pub(crate) fn run_case_session(
                 frame_state.after_src,
                 before,
                 after,
-            );
+            )
         } else if let Some((before_root, after_root)) = frame_state.roots() {
             // Every loader runs `ensure_parsed` when there is a tree, so the hashes exist here.
             let before_hash = &before
@@ -617,7 +620,7 @@ pub(crate) fn run_case_session(
                 after_hash,
                 before,
                 after,
-            );
+            )
         } else {
             // Text-only mode (see `FrameState::before_root`).
             handle_tree_independent_key(
@@ -628,8 +631,8 @@ pub(crate) fn run_case_session(
                 before,
                 after,
                 false,
-            );
-        }
+            )
+        };
 
         watch.finish(app);
         // Also here, so a run that landed while keys were streaming in shows without an idle tick.
@@ -667,7 +670,7 @@ pub(crate) fn handle_key(
     after_hash: &rustc_hash::FxHashMap<usize, u64>,
     before: &Code,
     after: &Code,
-) {
+) -> Option<OpenTarget> {
     let focus = app.focus;
 
     let result: Option<Result<String>> = match code {
@@ -968,6 +971,14 @@ pub(crate) fn handle_key(
             caches,
             false,
         )),
+        KeyCode::Char(']') | KeyCode::Char('[') => Some(action_next_unmarked(
+            app,
+            focus,
+            before_flat,
+            after_flat,
+            caches,
+            code == KeyCode::Char(']'),
+        )),
         KeyCode::Char('/') => {
             app.modal = Some(Modal::PromptSearch {
                 input: app.last_search.clone().unwrap_or_default(),
@@ -993,12 +1004,14 @@ pub(crate) fn handle_key(
             None
         }
         _ => {
-            handle_tree_independent_key(app, code, before_src, after_src, before, after, true);
-            return;
+            return handle_tree_independent_key(
+                app, code, before_src, after_src, before, after, true,
+            );
         }
     };
 
     apply_key_result(app, result);
+    None
 }
 
 /// The keys that read no tree. [`handle_key`] falls through to this, and text-only mode calls it
@@ -1014,7 +1027,7 @@ pub(crate) fn handle_tree_independent_key(
     before: &Code,
     after: &Code,
     tree_available: bool,
-) {
+) -> Option<OpenTarget> {
     let result: Option<Result<String>> = match code {
         KeyCode::Char('q') | KeyCode::Esc => {
             app.should_quit = true;
@@ -1231,6 +1244,13 @@ pub(crate) fn handle_tree_independent_key(
             }
             None
         }
+        KeyCode::Char('}') | KeyCode::Char('{') => {
+            match neighbouring_case(app, code == KeyCode::Char('}')) {
+                Ok(Some(target)) => return Some(target),
+                Ok(None) => None,
+                Err(err) => Some(Err(err)),
+            }
+        }
         _ if !tree_available => Some(Ok(
             "No tree-sitter grammar for this file: the tree keys do nothing here, but t (paint) \
              and T (unix diff) work"
@@ -1240,6 +1260,7 @@ pub(crate) fn handle_tree_independent_key(
     };
 
     apply_key_result(app, result);
+    None
 }
 
 fn apply_key_result(app: &mut App, result: Option<Result<String>>) {

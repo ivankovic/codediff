@@ -9734,3 +9734,246 @@ fn the_panel_header_shows_the_mismatch_count_only_once_there_is_one() {
         );
     }
 }
+
+// ---------------------------------------------------------------------------------------------
+// Resume, } / {, and ] / [
+// ---------------------------------------------------------------------------------------------
+
+#[test]
+fn session_memory_round_trips_through_its_file_including_the_dataset_filter() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("nested").join("human_solver.json");
+    let memory = SessionMemory {
+        last_case: Some("rust-add-if".to_string()),
+        diff_view: DiffPickerView {
+            column: DiffColumn::Unmarked,
+            sort: DiffSort {
+                column: DiffColumn::Size,
+                descending: true,
+            },
+            filters: DiffFilters {
+                name: Some("rust".to_string()),
+                dataset: Some(DIFF_DATASETS[2]),
+                unmarked: FlagFilter::Yes,
+                ..DiffFilters::default()
+            },
+        },
+    };
+
+    save_session_memory(&path, &memory).unwrap();
+    assert_eq!(load_session_memory(&path), memory);
+}
+
+#[test]
+fn session_memory_is_the_default_for_a_missing_corrupt_or_stale_file() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("human_solver.json");
+    assert_eq!(load_session_memory(&path), SessionMemory::default());
+
+    std::fs::write(&path, "{ not json").unwrap();
+    assert_eq!(load_session_memory(&path), SessionMemory::default());
+
+    // A dataset that no longer exists reads as "all"; unknown keys and missing ones are fine.
+    std::fs::write(
+        &path,
+        r#"{"last_case":"x","diff_view":{"filters":{"dataset":"gone"}},"future":1}"#,
+    )
+    .unwrap();
+    let memory = load_session_memory(&path);
+    assert_eq!(memory.last_case.as_deref(), Some("x"));
+    assert_eq!(memory.diff_view.filters.dataset, None);
+}
+
+#[test]
+fn starting_case_prefers_the_remembered_case_only_while_it_exists() -> Result<()> {
+    let first = list_available_cases()?[0].0.clone();
+    let second = list_available_cases()?[1].0.clone();
+    assert_eq!(starting_case(None)?, first);
+    assert_eq!(starting_case(Some("no-such-case-anywhere"))?, first);
+    assert_eq!(starting_case(Some(&second))?, second);
+    Ok(())
+}
+
+#[test]
+fn remember_session_keeps_the_last_diffs_case_and_the_picker_view() {
+    let dir = tempfile::tempdir().unwrap();
+    // `remember_session` reads the path from the environment; point it at the temp dir.
+    // SAFETY: tests in this binary that read XDG_STATE_HOME all set it to their own directory,
+    // and this one is the only reader at the moment.
+    unsafe { std::env::set_var("XDG_STATE_HOME", dir.path()) };
+    let mut app = App::new(
+        "rust-add-if".to_string(),
+        CaseOrigin::Diffs,
+        0,
+        0,
+        HumanMapping::default(),
+    );
+    app.diff_view.sort = DiffSort {
+        column: DiffColumn::Unmarked,
+        descending: false,
+    };
+    remember_session(&mut app);
+
+    let path = dir.path().join("codediff").join("human_solver.json");
+    let memory = load_session_memory(&path);
+    assert_eq!(memory.last_case.as_deref(), Some("rust-add-if"));
+    assert_eq!(memory.diff_view.sort.column, DiffColumn::Unmarked);
+
+    // A case that is not a diffs case keeps the last one as it was, but still saves the view.
+    app.origin = CaseOrigin::GitCommitFile {
+        path: "src/x.rs".to_string(),
+    };
+    app.name = "src/x.rs@abcdef01".to_string();
+    app.diff_view.sort.descending = true;
+    remember_session(&mut app);
+    let memory = load_session_memory(&path);
+    assert_eq!(memory.last_case.as_deref(), Some("rust-add-if"));
+    assert!(memory.diff_view.sort.descending);
+    unsafe { std::env::remove_var("XDG_STATE_HOME") };
+}
+
+/// `}` or `{` on a real case through `handle_key`, with the default picker view (name order, no
+/// filters, so no corpus scan runs).
+fn press_brace_on(name: &str, code: KeyCode, dirty: bool) -> (App, Option<OpenTarget>) {
+    let source = "fn main() {}\n";
+    let tree = parse_rust(source);
+    let root = tree.root_node();
+    let mut app = App::new(
+        name.to_string(),
+        CaseOrigin::Diffs,
+        root.id(),
+        root.id(),
+        HumanMapping::default(),
+    );
+    app.dirty = dirty;
+    let flat = FlatIndex::new(flatten_visible(root, &app.before.collapsed, None));
+    let caches = rebuild_caches(&app.mapping.entries, root, root);
+    let hashes = rustc_hash::FxHashMap::default();
+    let target = handle_key(
+        &mut app,
+        code,
+        &flat,
+        &flat,
+        root,
+        root,
+        &caches,
+        source.as_bytes(),
+        source.as_bytes(),
+        &hashes,
+        &hashes,
+        &Code::from_string(source, &Language::Rust),
+        &Code::from_string(source, &Language::Rust),
+    );
+    (app, target)
+}
+
+#[test]
+fn close_brace_opens_the_next_case_in_the_pickers_listing_and_wraps() -> Result<()> {
+    let names: Vec<String> = list_available_cases()?
+        .into_iter()
+        .map(|(name, _)| name)
+        .collect();
+    let (first, second, last) = (&names[0], &names[1], &names[names.len() - 1]);
+
+    let (_, target) = press_brace_on(first, KeyCode::Char('}'), false);
+    assert!(
+        matches!(target, Some(OpenTarget::Diffs(ref n)) if n == second),
+        "{target:?}"
+    );
+
+    let (_, target) = press_brace_on(first, KeyCode::Char('{'), false);
+    assert!(
+        matches!(target, Some(OpenTarget::Diffs(ref n)) if n == last),
+        "{target:?}"
+    );
+
+    let (_, target) = press_brace_on(last, KeyCode::Char('}'), false);
+    assert!(
+        matches!(target, Some(OpenTarget::Diffs(ref n)) if n == first),
+        "{target:?}"
+    );
+    Ok(())
+}
+
+#[test]
+fn close_brace_with_unsaved_changes_asks_before_switching() -> Result<()> {
+    let names = list_available_cases()?;
+    let (app, target) = press_brace_on(&names[0].0, KeyCode::Char('}'), true);
+    assert!(target.is_none());
+    assert!(
+        matches!(
+            app.modal,
+            Some(Modal::ConfirmDiscardUnsaved {
+                target: OpenTarget::Diffs(ref n),
+                can_save: true
+            }) if *n == names[1].0
+        ),
+        "{:?}",
+        app.modal
+    );
+    Ok(())
+}
+
+#[test]
+fn close_brace_from_a_case_outside_the_listing_starts_at_its_edge() -> Result<()> {
+    let names = list_available_cases()?;
+    let (_, target) = press_brace_on("not-a-case", KeyCode::Char('}'), false);
+    assert!(matches!(target, Some(OpenTarget::Diffs(ref n)) if *n == names[0].0));
+    let (_, target) = press_brace_on("not-a-case", KeyCode::Char('{'), false);
+    assert!(matches!(target, Some(OpenTarget::Diffs(ref n)) if *n == names[names.len() - 1].0));
+    Ok(())
+}
+
+#[test]
+fn bracket_keys_walk_the_unmarked_nodes_of_the_focused_panel_and_wrap() {
+    let source = "fn main() {\n    a();\n}\n";
+    let tree = parse_rust(source);
+    let root = tree.root_node();
+    let mut app = App::new(
+        "test".to_string(),
+        CaseOrigin::Diffs,
+        root.id(),
+        root.id(),
+        HumanMapping::default(),
+    );
+    let flat = FlatIndex::new(flatten_visible(root, &app.before.collapsed, None));
+    let last = flat[flat.len() - 1].0;
+
+    // `d` marks the root alone deleted; every other node stays unmarked.
+    press_with_watch(&mut app, root, source, KeyCode::Char('d'));
+    app.before.cursor_id = root.id();
+    let caches = rebuild_caches(&app.mapping.entries, root, root);
+    assert_eq!(
+        count_unmarked(&flat, &caches, status_before),
+        flat.len() - 1
+    );
+
+    action_next_unmarked(&mut app, Focus::Before, &flat, &flat, &caches, true).unwrap();
+    assert_eq!(
+        app.before.cursor_id,
+        flat[1].0.id(),
+        "] lands on the first unmarked node"
+    );
+    app.before.cursor_id = root.id();
+    action_next_unmarked(&mut app, Focus::Before, &flat, &flat, &caches, false).unwrap();
+    assert_eq!(app.before.cursor_id, last.id(), "[ wraps to the last");
+    action_next_unmarked(&mut app, Focus::Before, &flat, &flat, &caches, true).unwrap();
+    assert_eq!(
+        app.before.cursor_id,
+        flat[1].0.id(),
+        "] from the last skips the marked root and wraps"
+    );
+
+    // `D` on the root marks its whole subtree: nowhere left to go.
+    app.before.cursor_id = root.id();
+    app.mapping = HumanMapping::default();
+    press_with_watch(&mut app, root, source, KeyCode::Char('D'));
+    let caches = rebuild_caches(&app.mapping.entries, root, root);
+    assert!(action_next_unmarked(&mut app, Focus::Before, &flat, &flat, &caches, true).is_err());
+}
+
+#[test]
+fn is_state_preserving_key_is_true_for_the_bracket_jumps() {
+    assert!(is_state_preserving_key(None, KeyCode::Char(']')));
+    assert!(is_state_preserving_key(None, KeyCode::Char('[')));
+}

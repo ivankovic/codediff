@@ -116,6 +116,41 @@ pub(crate) fn advance_to_next_mismatch<'a>(
     None
 }
 
+/// `]`/`[`: the next/previous `Unmarked` node in the focused panel, wrapping around like `n`/`N`.
+/// Errors when the panel has none left.
+pub(crate) fn action_next_unmarked(
+    app: &mut App,
+    focus: Focus,
+    before_flat: &FlatIndex,
+    after_flat: &FlatIndex,
+    caches: &Caches,
+    forward: bool,
+) -> Result<String> {
+    let (panel, flat, status_fn): (&mut PanelState, &FlatIndex, fn(Node, &Caches) -> NodeStatus) =
+        match focus {
+            Focus::Before => (&mut app.before, before_flat, status_before),
+            Focus::After => (&mut app.after, after_flat, status_after),
+        };
+    if flat.is_empty() {
+        bail!("No unmarked nodes in this panel");
+    }
+    let len = flat.len();
+    let idx = flat.index_of(panel.cursor_id).unwrap_or(0);
+    for step in 1..=len {
+        let i = if forward {
+            (idx + step) % len
+        } else {
+            (idx + len - step) % len
+        };
+        let (node, _) = flat[i];
+        if status_fn(node, caches) == NodeStatus::Unmarked {
+            panel.cursor_id = node.id();
+            return Ok(format!("Jumped to unmarked '{}'", node.kind()));
+        }
+    }
+    bail!("No unmarked nodes in this panel")
+}
+
 /// `n`/`N`: the next/previous node drawn with a trailing `*`. Errors if `p` has not run.
 pub(crate) fn action_next_mismatch(
     app: &mut App,

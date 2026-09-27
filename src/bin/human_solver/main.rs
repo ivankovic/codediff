@@ -46,7 +46,7 @@ use ratatui::{
     text::{Line, Span},
     widgets::{Block, Borders, Cell, Clear, List, ListItem, Paragraph, Row, Table, Wrap},
 };
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 mod actions;
 mod events;
@@ -93,7 +93,8 @@ use codediff::tui::theme::{self, OverlayPalette, OverlayTheme};
 )]
 struct Args {
     /// A directory under `src/test/data/diffs/<dataset>/` (e.g. "rust-add-if"). If omitted, the
-    /// first case alphabetically opens.
+    /// case open when the tool last exited reopens (see `SessionMemory`), or else the first case
+    /// alphabetically.
     name: Option<String>,
 }
 
@@ -140,6 +141,10 @@ p              re-run codediff's own diff in the foreground; it runs by itself i
 r              toggle showing the ASTMappingReason (which pass matched it) next
                  to each node's algo verdict
 n / N          jump to next / previous mismatch (`*`) vs. codediff's verdict
+] / [          jump to the next / previous unmarked node in this panel (wraps)
+} / {          open the next / previous case as the o picker lists it - its
+                 sort and filters apply, so with Unmarked filtered to yes this
+                 walks the unfinished cases; unsaved changes prompt first
 /              search: jump to the next leaf node whose text contains the
                  given string (plain substring, no regex)
 
@@ -239,7 +244,9 @@ o              open a different test case (src/test/data/diffs/) as a table:
                  Size run on the first s or f on that column (Cmpl/Unmarked blocks
                  for ~12s and Disagree ~7s on the full corpus); until then those
                  columns read ?, and a ? row survives either filter direction.
-                 Cursor, sort and filters persist across o
+                 Cursor, sort and filters persist across o, and with the case
+                 last open across runs (~/.local/state/codediff/human_solver.json):
+                 started with no name, the tool reopens where it left off
 O              open a sampled candidate (src/test/data/samples/) as a table:
                  Name, Lang, Bucket, Status, Size. Same keys as o -- j/k pick a
                  row, h/l pick a column, s sorts by that column (again to
@@ -495,6 +502,172 @@ fn open_diff_picker_modal(
         view,
         name_input: None,
     }
+}
+
+/// `DiffFilters` on disk: the dataset by name. Hand-written impls rather than serde's `from`/`into`,
+/// which still derive over the `&'static str` field and demand the input outlive `'static`. A
+/// name no longer in `DIFF_DATASETS` reads as "all" rather than failing the whole file.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(default)]
+struct DiffFiltersRecord {
+    name: Option<String>,
+    dataset: Option<String>,
+    cmpl: FlagFilter,
+    unmarked: FlagFilter,
+    paint: FlagFilter,
+    disagree: FlagFilter,
+    invariant: FlagFilter,
+    size: FlagFilter,
+}
+
+impl From<DiffFilters> for DiffFiltersRecord {
+    fn from(filters: DiffFilters) -> Self {
+        DiffFiltersRecord {
+            name: filters.name,
+            dataset: filters.dataset.map(str::to_string),
+            cmpl: filters.cmpl,
+            unmarked: filters.unmarked,
+            paint: filters.paint,
+            disagree: filters.disagree,
+            invariant: filters.invariant,
+            size: filters.size,
+        }
+    }
+}
+
+impl Serialize for DiffFilters {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        DiffFiltersRecord::from(self.clone()).serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for DiffFilters {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        DiffFiltersRecord::deserialize(deserializer).map(DiffFilters::from)
+    }
+}
+
+impl From<DiffFiltersRecord> for DiffFilters {
+    fn from(record: DiffFiltersRecord) -> Self {
+        DiffFilters {
+            name: record.name.filter(|name| !name.is_empty()),
+            dataset: record
+                .dataset
+                .and_then(|name| DIFF_DATASETS.iter().copied().find(|d| *d == name)),
+            cmpl: record.cmpl,
+            unmarked: record.unmarked,
+            paint: record.paint,
+            disagree: record.disagree,
+            invariant: record.invariant,
+            size: record.size,
+        }
+    }
+}
+
+/// What the tool keeps between runs: where it was, and how the `o` picker was set up. Written
+/// after every case switch and on quit (`remember_session`), read by `main` when no case is named.
+/// Lives outside the repository, since it is one person's place, not the corpus's.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+struct SessionMemory {
+    /// The `src/test/data/diffs/` case last open; samples and commit files are not resumable
+    /// by name, so they leave this as it was.
+    last_case: Option<String>,
+    diff_view: DiffPickerView,
+}
+
+/// `$XDG_STATE_HOME/codediff/human_solver.json`, or `~/.local/state/...` without the variable;
+/// `None` with neither set.
+fn session_memory_path() -> Option<PathBuf> {
+    let state_home = match std::env::var_os("XDG_STATE_HOME") {
+        Some(dir) if !dir.is_empty() => PathBuf::from(dir),
+        _ => PathBuf::from(std::env::var_os("HOME")?).join(".local/state"),
+    };
+    Some(state_home.join("codediff").join("human_solver.json"))
+}
+
+/// The memory at `path`, or the default when the file is missing or unreadable: a corrupt file
+/// costs the resume, never the session.
+fn load_session_memory(path: &Path) -> SessionMemory {
+    fs::read_to_string(path)
+        .ok()
+        .and_then(|contents| serde_json::from_str(&contents).ok())
+        .unwrap_or_default()
+}
+
+fn save_session_memory(path: &Path, memory: &SessionMemory) -> Result<()> {
+    if let Some(dir) = path.parent() {
+        fs::create_dir_all(dir)?;
+    }
+    fs::write(path, serde_json::to_string_pretty(memory)?)?;
+    Ok(())
+}
+
+/// Writes the session memory for `app`'s current state; a failure lands on the status line, so
+/// a run that could not remember itself says so instead of silently opening elsewhere next time.
+fn remember_session(app: &mut App) {
+    let Some(path) = session_memory_path() else {
+        return;
+    };
+    let mut memory = load_session_memory(&path);
+    if matches!(app.origin, CaseOrigin::Diffs) {
+        memory.last_case = Some(app.name.clone());
+    }
+    memory.diff_view = app.diff_view.clone();
+    if let Err(err) = save_session_memory(&path, &memory) {
+        app.status = Some(format!("Could not write {}: {err:#}", path.display()));
+    }
+}
+
+/// The case to open when the command line names none: `remembered` if it still exists, else the
+/// first case alphabetically.
+fn starting_case(remembered: Option<&str>) -> Result<String> {
+    if let Some(name) = remembered
+        && diffs_case_dir(name).is_some()
+    {
+        return Ok(name.to_string());
+    }
+    list_available_cases()?
+        .into_iter()
+        .next()
+        .map(|(name, _)| name)
+        .ok_or_else(|| anyhow!("No test cases found in src/test/data/diffs"))
+}
+
+/// `}` / `{`: the case after or before the open one in the `o` picker's current listing, wrapping.
+/// `Ok(None)` when there is nowhere to go (the status line says why) or when unsaved changes
+/// raised `ConfirmDiscardUnsaved`, which returns the target itself once answered. Runs the scans
+/// the view's sort and filters read, as the picker's `s`/`f` would have.
+fn neighbouring_case(app: &mut App, forward: bool) -> Result<Option<OpenTarget>> {
+    let options = list_available_cases()?;
+    let view = app.diff_view.clone();
+    ensure_diff_column_data(app, view.sort.column);
+    for column in view.filters.active_columns() {
+        ensure_diff_column_data(app, column);
+    }
+    let visible = visible_diff_options(&options, &view, DiffPickerData::from_app(app));
+    if visible.is_empty() {
+        bail!("No case passes the o picker's filters");
+    }
+    let target = match visible.iter().position(|name| *name == app.name) {
+        Some(index) if forward => &visible[(index + 1) % visible.len()],
+        Some(index) => &visible[(index + visible.len() - 1) % visible.len()],
+        // The open case is outside the listing (filtered out, or not a diffs case): start at
+        // its edge.
+        None if forward => &visible[0],
+        None => &visible[visible.len() - 1],
+    };
+    if *target == app.name {
+        app.status = Some("This is the only case in the o picker's listing".to_string());
+        return Ok(None);
+    }
+    let target = OpenTarget::Diffs(target.clone());
+    if app.dirty {
+        let can_save = matches!(app.origin, CaseOrigin::Diffs);
+        app.modal = Some(Modal::ConfirmDiscardUnsaved { target, can_save });
+        return Ok(None);
+    }
+    Ok(Some(target))
 }
 
 /// The `o` picker's next dataset filter: `DIFF_DATASETS` in order, then back to "all" (`None`).
@@ -1113,7 +1286,7 @@ fn compute_diff_sizes() -> std::collections::HashMap<String, usize> {
 ///
 /// `Cmpl` and `Unmarked` read one number (`App::diff_unmarked`) and filter identically; both exist
 /// because `Cmpl` sorts the corpus into two halves while `Unmarked` orders it by work left.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 enum DiffColumn {
     #[default]
     Name,
@@ -1189,7 +1362,7 @@ impl DiffColumn {
 ///
 /// A row whose value is unknown survives either direction: unknown means "not scanned yet" or
 /// "failed to load", and the picker exists to surface fixtures that need attention.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 enum FlagFilter {
     #[default]
     Off,
@@ -1233,6 +1406,22 @@ struct DiffFilters {
 }
 
 impl DiffFilters {
+    /// The columns whose flag filter is on: the scans a listing under these filters depends on.
+    fn active_columns(&self) -> Vec<DiffColumn> {
+        [
+            (DiffColumn::Cmpl, self.cmpl),
+            (DiffColumn::Unmarked, self.unmarked),
+            (DiffColumn::Paint, self.paint),
+            (DiffColumn::Disagree, self.disagree),
+            (DiffColumn::Invariant, self.invariant),
+            (DiffColumn::Size, self.size),
+        ]
+        .into_iter()
+        .filter(|(_, flag)| *flag != FlagFilter::Off)
+        .map(|(column, _)| column)
+        .collect()
+    }
+
     fn flag_mut(&mut self, column: DiffColumn) -> Option<&mut FlagFilter> {
         match column {
             DiffColumn::Cmpl => Some(&mut self.cmpl),
@@ -1294,7 +1483,7 @@ impl DiffFilters {
 
 /// The single column the `o` picker sorts by, and its direction. One column, not a stack: a hidden
 /// secondary key would make two identical-looking tables order differently.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 struct DiffSort {
     column: DiffColumn,
     descending: bool,
@@ -1330,7 +1519,8 @@ impl DiffSort {
 }
 
 /// The `o` picker's cursor/sort/filter state, persisted on `App::diff_view` across reopenings.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
 struct DiffPickerView {
     /// The cursor column: what `s` and `f` act on.
     column: DiffColumn,
@@ -1785,13 +1975,12 @@ fn main() -> Result<()> {
     theme::set_custom_palette(theme::load_custom_palette());
     let _ = OVERLAY_THEME.set(theme::load_overlay_theme());
 
+    let memory = session_memory_path()
+        .map(|path| load_session_memory(&path))
+        .unwrap_or_default();
     let name = match args.name {
         Some(name) => name,
-        None => list_available_cases()?
-            .into_iter()
-            .next()
-            .map(|(name, _)| name)
-            .ok_or_else(|| anyhow!("No test cases found in src/test/data/diffs"))?,
+        None => starting_case(memory.last_case.as_deref())?,
     };
 
     let (before, after) = load_case(&name)?;
@@ -1807,6 +1996,7 @@ fn main() -> Result<()> {
         after_root_id,
         mapping,
     );
+    app.diff_view = memory.diff_view;
 
     let panic_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
