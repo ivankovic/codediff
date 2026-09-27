@@ -2368,6 +2368,80 @@ pub fn graded_node_count_for(
     )
 }
 
+/// The fewest mismatches a one-to-one output can score on a mapping's all-to-all groups: the
+/// larger side's surplus, `|N - M|` per group (see [`MultiMapGroup`]). `visible` is the same floor
+/// counted as the visible mismatches are: a one-to-one output does best by pairing the visible
+/// members, so only visible surplus beyond `min(N, M)` is forced.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct NmFloor {
+    pub total: usize,
+    pub visible: usize,
+}
+
+pub fn nm_floor(
+    mapping: &HumanMapping,
+    before: &crate::code::Code,
+    after: &crate::code::Code,
+) -> Result<NmFloor> {
+    use crate::diff::nodes::is_structurally_visible;
+
+    let before_root = before
+        .ast
+        .as_ref()
+        .context("Before code has no AST")?
+        .root_node();
+    let after_root = after
+        .ast
+        .as_ref()
+        .context("After code has no AST")?
+        .root_node();
+    let mut before_cache = PathCache::new();
+    let mut after_cache = PathCache::new();
+    let mut floor = NmFloor::default();
+    for group in &mapping.groups {
+        if group.pairing != GroupPairing::AllToAll {
+            continue;
+        }
+        let (n, m) = (group.before_paths.len(), group.after_paths.len());
+        let surplus = n.abs_diff(m);
+        if surplus == 0 {
+            continue;
+        }
+        let visible_on_larger_side = if n > m {
+            let source = before.contents.as_bytes();
+            group
+                .before_paths
+                .iter()
+                .map(|path| before_cache.resolve(before_root, &path_refs(path)))
+                .collect::<Result<Vec<_>>>()?
+                .into_iter()
+                .filter(|node| is_structurally_visible(*node, source))
+                .count()
+        } else {
+            let source = after.contents.as_bytes();
+            group
+                .after_paths
+                .iter()
+                .map(|path| after_cache.resolve(after_root, &path_refs(path)))
+                .collect::<Result<Vec<_>>>()?
+                .into_iter()
+                .filter(|node| is_structurally_visible(*node, source))
+                .count()
+        };
+        floor.total += surplus;
+        floor.visible += visible_on_larger_side.saturating_sub(n.min(m));
+    }
+    Ok(floor)
+}
+
+pub fn nm_floor_for(
+    name: &str,
+    before: &crate::code::Code,
+    after: &crate::code::Code,
+) -> Result<NmFloor> {
+    nm_floor(&load(name)?, before, after)
+}
+
 /// Reduces one side's `TextOperation`s to "touched or not", the only signal a line-only tool
 /// also has.
 fn touched(ops: &[crate::diff::text::TextOperation]) -> Vec<bool> {
