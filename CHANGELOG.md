@@ -6,6 +6,10 @@ release does: a minor bump may change the JSON output or the library API, a patc
 
 ## [0.1.1] - 2026-09-27
 
+Responding to initial user reports for v0.1.0.
+
+Note the removal of "--web" and sending users to CodeReview instead.
+
 ### Changed
 
 - Tabs display at tab stops, in the TUI and in headless output, instead of as one space.
