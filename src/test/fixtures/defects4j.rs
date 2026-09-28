@@ -229,23 +229,53 @@ mod java_defects4j_closure_120_referencecollectingcallback;
 #[cfg(test)]
 mod java_defects4j_closure_121_inlinevariables;
 #[cfg(test)]
+mod java_defects4j_closure_122_irfactory;
+#[cfg(test)]
 mod java_defects4j_closure_123_codegenerator;
 #[cfg(test)]
 mod java_defects4j_closure_124_exploitassigns;
 #[cfg(test)]
 mod java_defects4j_closure_125_typecheck;
 #[cfg(test)]
+mod java_defects4j_closure_126_minimizeexitpoints;
+#[cfg(test)]
+mod java_defects4j_closure_127_unreachablecodeelimination;
+#[cfg(test)]
+mod java_defects4j_closure_128_codegenerator;
+#[cfg(test)]
+mod java_defects4j_closure_129_prepareast;
+#[cfg(test)]
 mod java_defects4j_closure_12_maybereachingvariableuse;
 #[cfg(test)]
 mod java_defects4j_closure_130_collapseproperties;
 #[cfg(test)]
+mod java_defects4j_closure_131_tokenstream;
+#[cfg(test)]
+mod java_defects4j_closure_132_peepholesubstitutealternatesyntax;
+#[cfg(test)]
 mod java_defects4j_closure_133_jsdocinfoparser;
 #[cfg(test)]
+mod java_defects4j_closure_134_ambiguateproperties;
+#[cfg(test)]
+mod java_defects4j_closure_134_typedscopecreator;
+#[cfg(test)]
 mod java_defects4j_closure_135_devirtualizeprototypemethods;
+#[cfg(test)]
+mod java_defects4j_closure_135_functiontype;
+#[cfg(test)]
+mod java_defects4j_closure_136_methodcompilerpass;
+#[cfg(test)]
+mod java_defects4j_closure_136_renamevars;
+#[cfg(test)]
+mod java_defects4j_closure_137_makedeclarednamesunique;
+#[cfg(test)]
+mod java_defects4j_closure_137_nodeutil;
 #[cfg(test)]
 mod java_defects4j_closure_137_normalize;
 #[cfg(test)]
 mod java_defects4j_closure_138_closurereverseabstractinterpreter;
+#[cfg(test)]
+mod java_defects4j_closure_138_typeinference;
 #[cfg(test)]
 mod java_defects4j_closure_13_peepholeoptimizationspass;
 #[cfg(test)]
