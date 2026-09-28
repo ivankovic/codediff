@@ -1094,6 +1094,13 @@ pub(crate) fn handle_key(
             caches,
             false,
         )),
+        // The text on the nodes the panels are on, not the top of the file.
+        KeyCode::Char('t') => {
+            app.modal = Some(Modal::TextView {
+                state: text_view_at_cursors(app, before_flat, after_flat),
+            });
+            None
+        }
         KeyCode::Char(']') | KeyCode::Char('[') => Some(action_next_unmarked(
             app,
             focus,
@@ -1135,6 +1142,26 @@ pub(crate) fn handle_key(
 
     apply_key_result(app, result);
     None
+}
+
+/// The rows the text view opens on: `TextPaintState::at_nodes` over the panels' cursor nodes.
+/// Empty flats (text-only mode) give the default view.
+pub(crate) fn text_view_at_cursors(
+    app: &App,
+    before_flat: &FlatIndex,
+    after_flat: &FlatIndex,
+) -> TextPaintState {
+    // The same stand-in for the popup height `handle_text_view` uses.
+    const VIEWPORT_ROWS: usize = 20;
+    TextPaintState::at_nodes(
+        before_flat.node_for_id(app.before.cursor_id),
+        after_flat.node_for_id(app.after.cursor_id),
+        match app.focus {
+            Focus::Before => 0,
+            Focus::After => 1,
+        },
+        VIEWPORT_ROWS,
+    )
 }
 
 /// The keys that read no tree. [`handle_key`] falls through to this, and text-only mode calls it
@@ -1955,7 +1982,7 @@ pub(crate) fn handle_modal_key(
             }
             KeyCode::Char('t') => {
                 app.modal = Some(Modal::TextView {
-                    state: TextPaintState::default(),
+                    state: text_view_at_cursors(app, before_flat, after_flat),
                 });
             }
             KeyCode::Esc => {

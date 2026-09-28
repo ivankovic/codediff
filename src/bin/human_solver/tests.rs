@@ -11103,3 +11103,73 @@ fn m_over_a_minimal_vertical_selection_is_untouched() {
         app.status
     );
 }
+
+// ---------------------------------------------------------------------------------------------
+// t opens on the panels' nodes
+// ---------------------------------------------------------------------------------------------
+
+#[test]
+fn at_nodes_puts_each_cursor_on_its_node_and_scrolls_it_into_view() {
+    let mut source = String::from("fn main() {\n");
+    for i in 0..40 {
+        source.push_str(&format!("    stmt_{i}();\n"));
+    }
+    source.push_str("}\n");
+    let tree = parse_rust(&source);
+    let root = tree.root_node();
+    let statements = body_statements(root);
+    let (early, late) = (statements[2], statements[30]);
+
+    let state = TextPaintState::at_nodes(Some(early), Some(late), 1, 20);
+    assert_eq!(state.side, 1);
+    assert_eq!(state.cursor[0], (3, 4), "row 3, past the indentation");
+    assert_eq!(state.cursor[1], (31, 4));
+    assert_eq!(state.scroll[0], 0);
+    assert_eq!(
+        state.scroll[1], 12,
+        "row 31 is the last of a 20-row viewport"
+    );
+
+    let state = TextPaintState::at_nodes(None, None, 0, 20);
+    assert_eq!(state, TextPaintState::default());
+}
+
+#[test]
+fn t_opens_the_text_view_on_the_selected_nodes_with_the_focused_side_first() {
+    let source = "fn main() {\n    alpha();\n    beta();\n}\n";
+    let tree = parse_rust(source);
+    let root = tree.root_node();
+    let statements = body_statements(root);
+    let mut app = App::new(
+        "test".to_string(),
+        CaseOrigin::Diffs,
+        statements[0].id(),
+        statements[1].id(),
+        HumanMapping::default(),
+    );
+    app.focus = Focus::After;
+    let flat = FlatIndex::new(flatten_visible(root, &app.before.collapsed, None));
+    let caches = rebuild_caches(&app.mapping.entries, root, root);
+    let hashes = rustc_hash::FxHashMap::default();
+    handle_key(
+        &mut app,
+        KeyCode::Char('t'),
+        &flat,
+        &flat,
+        root,
+        root,
+        &caches,
+        source.as_bytes(),
+        source.as_bytes(),
+        &hashes,
+        &hashes,
+        &Code::from_string(source, &Language::Rust),
+        &Code::from_string(source, &Language::Rust),
+    );
+    let Some(Modal::TextView { state }) = app.modal else {
+        panic!("t opens the text view, got {:?}", app.modal);
+    };
+    assert_eq!(state.side, 1, "the After panel had the focus");
+    assert_eq!(state.cursor[0], (1, 4), "alpha");
+    assert_eq!(state.cursor[1], (2, 4), "beta");
+}

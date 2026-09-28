@@ -751,6 +751,29 @@ impl Default for TextPaintState {
 }
 
 impl TextPaintState {
+    /// The view as `t` opens it from the tree panels: each side's cursor on its panel's node, the
+    /// focused side first, both scrolled into a viewport of `height` rows. A side with no node
+    /// (text-only mode) starts at the top.
+    pub(crate) fn at_nodes(
+        before: Option<Node>,
+        after: Option<Node>,
+        side: usize,
+        height: usize,
+    ) -> Self {
+        let mut state = TextPaintState {
+            side,
+            ..Default::default()
+        };
+        for (index, node) in [before, after].into_iter().enumerate() {
+            if let Some(node) = node {
+                let start = node.start_position();
+                state.cursor[index] = (start.row, start.column);
+            }
+            state.scroll_side_into_view(index, height);
+        }
+        state
+    }
+
     /// The row's text without a trailing CRLF `\r`, or `""` past the end. The `\r` is part of the
     /// terminator: kept, it would be a phantom column the cursor, `$` and spans could reach. It is
     /// the row's last byte, so stored columns are unaffected.

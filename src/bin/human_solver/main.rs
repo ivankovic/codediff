@@ -162,7 +162,8 @@ n / N          jump to next / previous mismatch (`*`) vs. codediff's verdict
 
 t              text view: read the source, and paint the human text-range ground
                  truth onto it (stored beside the tree mapping, not derived from
-                 it). Tab side, hjkl/g/G move, w/b/e by word and W/B/E by
+                 it). It opens with each side's cursor on the node that side's
+                 panel is on, the focused panel's side first. Tab side, hjkl/g/G move, w/b/e by word and W/B/E by
                  blank-separated word as in vim, 0/^/$ to a line's start/first
                  code character/end, v select. On a terminal narrower than
                  220 columns only the focused side is drawn; Tab shows the other. By default a selection spanning
