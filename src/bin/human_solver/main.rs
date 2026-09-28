@@ -174,11 +174,16 @@ t              text view: read the source, and paint the human text-range ground
                  selections as a match (move vs update derived from whether the
                  spans' text is identical), u removes the range under the cursor,
                  Z marks a nothing-to-paint fixture, : jumps to a line number,
-                 Esc unselects or closes.
+                 / searches this side's text (plain substring; Enter jumps to the
+                 next match, wrapping; the last query is offered again, so / Enter
+                 repeats it), Esc unselects or closes.
                  In a painting named Minimal, d/i on a multi-row full-line (V)
                  sweep is recorded as one range per row starting at that row's
                  first code character, never through the indentation -- the rule
                  invariant 6 states, kept for you instead of reported afterwards.
+                 m on a full-line sweep on each side does the same and pairs the
+                 rows one to one (the same number of rows on both sides, or it is
+                 refused), one match per row, each a move or an update by itself.
                  A blank row in the sweep drops out; a vertical selection and a
                  Full or free-named painting are left exactly as drawn.
                  Branching a Minimal painting to one named Full (s, Enter) does

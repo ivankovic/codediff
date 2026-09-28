@@ -2651,6 +2651,43 @@ fn handle_text_view(
     };
     let mut close = false;
 
+    // The `/` prompt takes every keystroke; Enter jumps this side's cursor to the next match.
+    if let Some(mut typed) = state.search_prompt.take() {
+        match code {
+            KeyCode::Char(c) => {
+                typed.push(c);
+                state.search_prompt = Some(typed);
+            }
+            KeyCode::Backspace => {
+                typed.pop();
+                state.search_prompt = Some(typed);
+            }
+            KeyCode::Enter => {
+                let query = typed.trim().to_string();
+                if query.is_empty() {
+                    app.status = Some("Search cancelled (empty)".to_string());
+                } else {
+                    app.status = Some(match state.find_next(state.side, focused_source, &query) {
+                        Some(found) => {
+                            state.cursor[state.side] = found;
+                            format!(
+                                "Found {query:?} on line {} - / Enter finds the next",
+                                found.0 + 1
+                            )
+                        }
+                        None => format!("No {query:?} on this side"),
+                    });
+                    app.last_search = Some(query);
+                }
+            }
+            KeyCode::Esc => app.status = Some("Search cancelled".to_string()),
+            _ => state.search_prompt = Some(typed),
+        }
+        state.scroll_into_view(VIEWPORT_ROWS);
+        app.modal = Some(Modal::TextView { state });
+        return None;
+    }
+
     // The `:` prompt takes every keystroke, so a digit is not a movement command.
     if let Some(mut typed) = state.line_prompt.take() {
         match code {
@@ -2686,6 +2723,16 @@ fn handle_text_view(
             state.line_prompt = Some(String::new());
             app.status =
                 Some("Jump to line: type a number, Enter to go, Esc to cancel".to_string());
+        }
+        // The same search as the tree's `/`, over this side's text; the last query is offered
+        // again so `/` Enter repeats it.
+        KeyCode::Char('/') => {
+            state.search_prompt = Some(app.last_search.clone().unwrap_or_default());
+            app.status = Some(
+                "Search this side: type text, Enter jumps to the next match (wrapping), Esc \
+                 cancels"
+                    .to_string(),
+            );
         }
         KeyCode::Up | KeyCode::Char('k') => state.step_row(-1, focused_source),
         KeyCode::Down | KeyCode::Char('j') => state.step_row(1, focused_source),

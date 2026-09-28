@@ -1076,20 +1076,26 @@ pub(crate) fn render_text_view_modal(
             } else {
                 String::new()
             };
-            format!(
-                "Before [{solution}] {painted} painted{banked} — showing {} (o cycles)",
-                overlay.label()
-            )
+            match (&state.search_prompt, &state.line_prompt, state.side) {
+                (Some(typed), _, 0) => format!("Before — search: {typed}_"),
+                (_, Some(typed), 0) => format!("Before — jump to line: {typed}_"),
+                _ => format!(
+                    "Before [{solution}] {painted} painted{banked} — showing {} (o cycles)",
+                    overlay.label()
+                ),
+            }
         }),
         (
             1usize,
             after_src,
-            match (&state.line_prompt, state.side) {
-                (Some(typed), 1) => format!("After — jump to line: {typed}_"),
+            match (&state.search_prompt, &state.line_prompt, state.side) {
+                (Some(typed), _, 1) => format!("After — search: {typed}_"),
+                (_, Some(typed), 1) => format!("After — jump to line: {typed}_"),
                 _ if others > 0 => {
                     format!("After — s save-as, L load ({others} other) — u/Tab/Esc")
                 }
-                _ => "After — v sel/i ins/u unmark, n/p diff, a align, s save-as, : jump, Tab, Esc"
+                _ => "After — v sel/i ins/u unmark, n/p diff, a align, s save-as, : jump, / find, \
+                      Tab, Esc"
                     .to_string(),
             },
         ),

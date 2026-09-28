@@ -10854,3 +10854,252 @@ fn summarize_key_log_charges_the_pause_before_a_key_to_it_and_drops_breaks() {
     );
     assert_eq!(summarize_key_log(&[]), "No keys logged yet.\n");
 }
+
+// ---------------------------------------------------------------------------------------------
+// Search in the t view, and m over a Minimal sweep
+// ---------------------------------------------------------------------------------------------
+
+#[test]
+fn find_next_looks_past_the_cursor_wraps_and_finds_the_occurrence_under_it_again() {
+    let source = "let café = 1;\nfoo(café);\n";
+    let mut state = TextPaintState::default();
+    state.cursor[0] = (0, 0);
+    assert_eq!(state.find_next(0, source, "café"), Some((0, 4)));
+    state.cursor[0] = (0, 4);
+    assert_eq!(
+        state.find_next(0, source, "café"),
+        Some((1, 4)),
+        "past the cursor first"
+    );
+    state.cursor[0] = (1, 4);
+    assert_eq!(
+        state.find_next(0, source, "café"),
+        Some((0, 4)),
+        "then wraps"
+    );
+    state.cursor[0] = (0, 4);
+    assert_eq!(
+        state.find_next(0, source, "let"),
+        Some((0, 0)),
+        "a lone occurrence before the cursor is reached on the wrap-around pass"
+    );
+    assert_eq!(state.find_next(0, source, "nothing"), None);
+    assert_eq!(state.find_next(0, source, ""), None);
+    // Starting one byte into `é` must not slice mid-character.
+    state.cursor[0] = (0, 7);
+    assert_eq!(state.find_next(0, source, ";"), Some((0, 13)));
+}
+
+/// One key on the text view `app` already has open, keeping `app` (and so `last_search`).
+fn press_text_view_again(app: &mut App, source: &str, code: KeyCode) -> TextPaintState {
+    let tree = parse_rust(source);
+    let root = tree.root_node();
+    let flat = FlatIndex::new(flatten_visible(root, &app.before.collapsed, None));
+    let caches = rebuild_caches(&app.mapping.entries, root, root);
+    handle_modal_key(
+        app,
+        code,
+        &flat,
+        &flat,
+        Some(root),
+        Some(root),
+        &caches,
+        source.as_bytes(),
+        source.as_bytes(),
+        &Code::from_string(source, &Language::Rust),
+        &Code::from_string(source, &Language::Rust),
+    );
+    let Some(Modal::TextView { state }) = &app.modal else {
+        panic!("the text view should still be open, got {:?}", app.modal);
+    };
+    state.clone()
+}
+
+#[test]
+fn slash_in_the_text_view_prompts_jumps_and_remembers_the_query() {
+    let source = "fn main() {\n    alpha();\n    beta();\n}\n";
+    let (mut app, state) = press_in_text_view(
+        source,
+        source,
+        TextPaintState::default(),
+        KeyCode::Char('/'),
+    );
+    assert_eq!(
+        state.search_prompt.as_deref(),
+        Some(""),
+        "empty: nothing searched yet"
+    );
+
+    for code in "beta".chars().map(KeyCode::Char) {
+        press_text_view_again(&mut app, source, code);
+    }
+    let state = press_text_view_again(&mut app, source, KeyCode::Enter);
+    assert_eq!(state.cursor[0], (2, 4), "on `beta`");
+    assert!(state.search_prompt.is_none());
+    assert_eq!(app.last_search.as_deref(), Some("beta"));
+    assert_eq!(
+        app.status.as_deref(),
+        Some("Found \"beta\" on line 3 - / Enter finds the next")
+    );
+
+    // `/` again offers the last query; Esc leaves everything as it was.
+    let state = press_text_view_again(&mut app, source, KeyCode::Char('/'));
+    assert_eq!(state.search_prompt.as_deref(), Some("beta"));
+    let state = press_text_view_again(&mut app, source, KeyCode::Esc);
+    assert!(state.search_prompt.is_none());
+    assert_eq!(state.cursor[0], (2, 4));
+    assert_eq!(app.status.as_deref(), Some("Search cancelled"));
+
+    // Enter on the offered query finds the next occurrence, wrapping to the only one.
+    press_text_view_again(&mut app, source, KeyCode::Char('/'));
+    let state = press_text_view_again(&mut app, source, KeyCode::Enter);
+    assert_eq!(state.cursor[0], (2, 4));
+}
+
+#[test]
+fn the_text_view_title_shows_the_search_prompt_on_the_focused_side() {
+    let width = SINGLE_PANEL_WIDTH_THRESHOLD + 20;
+    let backend = ratatui::backend::TestBackend::new(width, 12);
+    let mut terminal = Terminal::new(backend).unwrap();
+    let state = TextPaintState {
+        side: 1,
+        search_prompt: Some("bet".to_string()),
+        ..Default::default()
+    };
+    terminal
+        .draw(|f| {
+            render_text_view_modal(
+                f,
+                Rect::new(0, 0, width, 12),
+                "fn old_name() {}",
+                "fn new_name() {}",
+                &HumanMapping::default(),
+                "Minimal",
+                TextOverlay::Human,
+                None,
+                &state,
+            )
+        })
+        .unwrap();
+    let text = rendered_text(&terminal);
+    assert!(text.contains("After — search: bet_"), "{text}");
+}
+
+/// Before: an indented block; after: the same block moved down past a new line and re-indented.
+fn moved_block() -> (&'static str, &'static str) {
+    (
+        "fn main() {\n    let a = 1;\n    let b = 2;\n    println!();\n}\n",
+        "fn main() {\n    println!();\n        let a = 1;\n        let b = 2;\n}\n",
+    )
+}
+
+/// Full-line sweeps over rows 1-2 before and rows 2-3 after.
+fn sweeps_over_the_moved_block() -> TextPaintState {
+    let (before, after) = moved_block();
+    TextPaintState {
+        vertical: false,
+        anchor: [Some((1, 0)), Some((2, 0))],
+        cursor: [
+            (2, TextPaintState::row_text(before, 2).len()),
+            (3, TextPaintState::row_text(after, 3).len()),
+        ],
+        ..Default::default()
+    }
+}
+
+#[test]
+fn m_over_minimal_sweeps_pairs_the_rows_one_to_one_without_indentation() {
+    let (before, after) = moved_block();
+    let (app, _) = press_in_text_view_painting(
+        "Minimal",
+        before,
+        after,
+        sweeps_over_the_moved_block(),
+        KeyCode::Char('m'),
+    );
+    let entries = solution_entries(&app.mapping, &app.text_solution);
+    assert_eq!(entries.len(), 2, "one match per row: {:?}", app.status);
+    for (entry, (before_row, after_row)) in entries.iter().zip([(1, 2), (2, 3)]) {
+        assert_eq!(entry.operation, HumanTextOperation::Match);
+        assert_eq!(entry.before.len(), 1);
+        assert_eq!(entry.after.len(), 1);
+        assert_eq!(
+            (entry.before[0].start_row, entry.before[0].start_column),
+            (before_row, 4),
+            "starts at the first code character"
+        );
+        assert_eq!(
+            (entry.after[0].start_row, entry.after[0].start_column),
+            (after_row, 8)
+        );
+        assert_eq!(
+            entry.verdict(before, after).unwrap(),
+            HumanTextVerdict::Move
+        );
+    }
+    assert_eq!(
+        app.status.as_deref(),
+        Some(
+            "Matched 2 line(s) one to one: 2 move(s), 0 update(s) - indentation left unpainted (Minimal)"
+        )
+    );
+    assert!(app.dirty);
+}
+
+#[test]
+fn m_over_full_sweeps_is_one_match_as_drawn() {
+    let (before, after) = moved_block();
+    let (app, _) = press_in_text_view_painting(
+        "Full",
+        before,
+        after,
+        sweeps_over_the_moved_block(),
+        KeyCode::Char('m'),
+    );
+    let entries = solution_entries(&app.mapping, &app.text_solution);
+    assert_eq!(entries.len(), 1, "{:?}", app.status);
+    assert_eq!(
+        entries[0].before[0].start_column, 0,
+        "Full keeps the indentation as drawn"
+    );
+    assert_eq!(entries[0].before[0].end_row, 2);
+}
+
+#[test]
+fn m_over_minimal_sweeps_of_unequal_length_is_refused() {
+    let (before, after) = moved_block();
+    let mut state = sweeps_over_the_moved_block();
+    // Three rows before, two after.
+    state.cursor[0] = (3, TextPaintState::row_text(before, 3).len());
+    let (app, _) = press_in_text_view_painting("Minimal", before, after, state, KeyCode::Char('m'));
+    assert!(solution_entries(&app.mapping, &app.text_solution).is_empty());
+    assert!(
+        app.status
+            .as_deref()
+            .unwrap_or("")
+            .starts_with("Not matched: 3 line(s) against 2"),
+        "{:?}",
+        app.status
+    );
+}
+
+#[test]
+fn m_over_a_minimal_vertical_selection_is_untouched() {
+    let (before, after) = moved_block();
+    let mut state = sweeps_over_the_moved_block();
+    state.vertical = true;
+    state.anchor = [Some((1, 4)), Some((2, 8))];
+    state.cursor = [(2, 9), (3, 13)];
+    let (app, _) = press_in_text_view_painting("Minimal", before, after, state, KeyCode::Char('m'));
+    // The old path: a vertical selection is one entry with a span per row, and a Match's spans
+    // on a side must read the same, which `let a` and `let b` do not.
+    assert!(solution_entries(&app.mapping, &app.text_solution).is_empty());
+    assert!(
+        app.status
+            .as_deref()
+            .unwrap_or("")
+            .starts_with("Not matched:"),
+        "{:?}",
+        app.status
+    );
+}

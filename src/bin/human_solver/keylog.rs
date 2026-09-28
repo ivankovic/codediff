@@ -82,7 +82,7 @@ pub(crate) fn mode_name(modal: Option<&Modal>) -> &'static str {
     match modal {
         None => "tree",
         Some(Modal::TextView { state }) => {
-            if state.line_prompt.is_some() {
+            if state.line_prompt.is_some() || state.search_prompt.is_some() {
                 "text-typing"
             } else {
                 "text"

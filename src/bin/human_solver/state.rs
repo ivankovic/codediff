@@ -701,6 +701,10 @@ pub(crate) struct TextPaintState {
     /// The digits typed so far at the `:` line prompt, if open. Kept here rather than as a nested
     /// modal, which would have to carry this whole state through and back.
     pub(crate) line_prompt: Option<String>,
+    /// The text typed so far at the `/` search prompt, if open; same arrangement as `line_prompt`.
+    /// Pre-filled from `App::last_search`, so `/` Enter repeats a search, as `n` would in vim
+    /// (`n`/`p` here step through diff hunks).
+    pub(crate) search_prompt: Option<String>,
     /// Ranges banked with `x`, per side, for `d`/`i`/`m` to commit together: what makes an N:M
     /// match possible with one live selection.
     pub(crate) pending: [Vec<HumanTextSpan>; 2],
@@ -738,6 +742,7 @@ impl Default for TextPaintState {
             cursor: [(0, 0); 2],
             anchor: [None; 2],
             line_prompt: None,
+            search_prompt: None,
             pending: [Vec::new(), Vec::new()],
             scroll: [0; 2],
             vertical: true,
@@ -801,6 +806,45 @@ impl TextPaintState {
             let previous_row = row - 1;
             self.cursor[self.side] = (previous_row, Self::row_text(source, previous_row).len());
         }
+    }
+
+    /// The next occurrence of `query` on `side`, strictly after that side's cursor and wrapping
+    /// to the top, as `(row, byte column)`. Plain substring, case-sensitive, like the tree
+    /// search. `None` when the side has no occurrence at all.
+    pub(crate) fn find_next(
+        &self,
+        side: usize,
+        source: &str,
+        query: &str,
+    ) -> Option<(usize, usize)> {
+        if query.is_empty() {
+            return None;
+        }
+        let (cursor_row, cursor_column) = self.cursor[side];
+        let rows: Vec<&str> = source
+            .split('\n')
+            .map(|line| line.strip_suffix('\r').unwrap_or(line))
+            .collect();
+        let count = rows.len();
+        for step in 0..=count {
+            let row = (cursor_row + step) % count;
+            // On the cursor's row the first pass looks past the cursor, the wrap-around pass
+            // (step == count) looks before it - so a lone occurrence under the cursor is found
+            // again, not skipped.
+            let line = rows[row];
+            let from = if step == 0 {
+                (cursor_column + 1).min(line.len())
+            } else {
+                0
+            };
+            let from = (from..=line.len())
+                .find(|&at| line.is_char_boundary(at))
+                .unwrap_or(line.len());
+            if let Some(at) = line[from..].find(query) {
+                return Some((row, from + at));
+            }
+        }
+        None
     }
 
     /// `w`/`W`: the start of the next word, across rows. A word is a run of one character class
@@ -1406,6 +1450,11 @@ fn spans_share_a_byte(a: HumanTextSpan, b: HumanTextSpan, source: &str) -> bool 
 
 /// `m`: pairs everything selected on the before side with everything on the after side as one
 /// `Match`; banked ranges make it N:M. Needs ranges on both sides, like the tree's `m`.
+///
+/// In a `Minimal` painting a full-line sweep on each side (one live range per side, several rows)
+/// is committed as `d`/`i` would commit it: without indentation, one range per row (invariant 6).
+/// Since a `Match` needs its spans on a side to read the same, the rows are paired one to one as
+/// separate matches, each a move or an update by itself. Unequal row counts are refused.
 pub(crate) fn action_paint_match(
     app: &mut App,
     state: &mut TextPaintState,
@@ -1417,6 +1466,16 @@ pub(crate) fn action_paint_match(
     if before.is_empty() || after.is_empty() {
         app.status =
             Some("Match needs a selection on both sides - press v on each, then m".to_string());
+        return;
+    }
+
+    let minimal_mode =
+        human_mapping::invariants::designates_minimal(&app.text_solution) && !state.vertical;
+    let one_sweep_each = before.len() == 1
+        && after.len() == 1
+        && (before[0].end_row > before[0].start_row || after[0].end_row > after[0].start_row);
+    if minimal_mode && one_sweep_each {
+        action_paint_match_rows(app, state, before[0], after[0], before_src, after_src);
         return;
     }
 
@@ -1455,6 +1514,75 @@ pub(crate) fn action_paint_match(
         }
         other => format!("Matched {shape} ({other:?})"),
     });
+}
+
+/// The `Minimal` multi-row branch of [`action_paint_match`]: `before` and `after` are the two
+/// sweeps. All or nothing: every row pair is checked before any is painted.
+fn action_paint_match_rows(
+    app: &mut App,
+    state: &mut TextPaintState,
+    before: HumanTextSpan,
+    after: HumanTextSpan,
+    before_src: &str,
+    after_src: &str,
+) {
+    let before_rows = skip_leading_whitespace(before, before_src);
+    let after_rows = skip_leading_whitespace(after, after_src);
+    if before_rows.len() != after_rows.len() {
+        app.status = Some(format!(
+            "Not matched: {} line(s) against {} after dropping blank lines and indentation - \
+             Minimal pairs the rows one to one, so sweep the same number of lines on each side, \
+             or use a vertical selection (V)",
+            before_rows.len(),
+            after_rows.len()
+        ));
+        return;
+    }
+    if before_rows.is_empty() {
+        app.status = Some(
+            "Only blank lines selected - Minimal claims no indentation, so nothing to match"
+                .to_string(),
+        );
+        return;
+    }
+
+    let solution = app.text_solution.clone();
+    let mut entries = Vec::with_capacity(before_rows.len());
+    let mut moves = 0usize;
+    for (before_row, after_row) in before_rows.into_iter().zip(after_rows) {
+        let entry = HumanTextEntry {
+            operation: HumanTextOperation::Match,
+            before: vec![before_row],
+            after: vec![after_row],
+        };
+        match entry.verdict(before_src, after_src) {
+            Ok(HumanTextVerdict::Move) => moves += 1,
+            Ok(_) => {}
+            Err(err) => {
+                app.status = Some(format!("Not matched: {err:#}"));
+                return;
+            }
+        }
+        if let Some(clash) =
+            overlapping_painted_range(&app.mapping, &solution, &entry, before_src, after_src)
+        {
+            app.status = Some(format!("Not matched: {clash} - u removes it first"));
+            return;
+        }
+        entries.push(entry);
+    }
+    // The rows of one sweep cannot overlap each other, so checking each against the painting
+    // as it was is enough.
+    let count = entries.len();
+    solution_entries_mut(&mut app.mapping, &solution).extend(entries);
+    app.mark_dirty();
+    state.anchor = [None; 2];
+    state.pending = [Vec::new(), Vec::new()];
+    let updates = count - moves;
+    app.status = Some(format!(
+        "Matched {count} line(s) one to one: {moves} move(s), {updates} update(s) - indentation \
+         left unpainted (Minimal)"
+    ));
 }
 
 /// `d` / `i`: paints everything selected on the focused side as one removal or addition. Unlike a
