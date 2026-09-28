@@ -10734,3 +10734,123 @@ fn timing_of_the_per_key_work_on_the_largest_fixture() -> Result<()> {
     }
     Ok(())
 }
+
+// ---------------------------------------------------------------------------------------------
+// The keystroke log
+// ---------------------------------------------------------------------------------------------
+
+#[test]
+fn key_name_hides_typed_characters_and_spells_out_modifiers_and_special_keys() {
+    use crossterm::event::{KeyEvent, KeyModifiers};
+    let plain = |code| KeyEvent::new(code, KeyModifiers::NONE);
+    assert_eq!(key_name(plain(KeyCode::Char('m')), "tree"), "m");
+    assert_eq!(
+        key_name(plain(KeyCode::Char('m')), "prompt-typing"),
+        "typed"
+    );
+    assert_eq!(key_name(plain(KeyCode::Char(' ')), "tree"), "Space");
+    assert_eq!(key_name(plain(KeyCode::Enter), "prompt-typing"), "Enter");
+    assert_eq!(key_name(plain(KeyCode::Up), "tree"), "Up");
+    assert_eq!(
+        key_name(
+            KeyEvent::new(KeyCode::Char('r'), KeyModifiers::CONTROL),
+            "text"
+        ),
+        "Ctrl-r"
+    );
+}
+
+#[test]
+fn mode_name_tells_a_typing_state_from_its_view() {
+    assert_eq!(mode_name(None), "tree");
+    let mut state = TextPaintState::default();
+    assert_eq!(
+        mode_name(Some(&Modal::TextView {
+            state: state.clone()
+        })),
+        "text"
+    );
+    state.line_prompt = Some(String::new());
+    assert_eq!(mode_name(Some(&Modal::TextView { state })), "text-typing");
+    assert_eq!(
+        mode_name(Some(&Modal::PromptSearch {
+            input: String::new()
+        })),
+        "prompt-typing"
+    );
+    assert_eq!(
+        mode_name(Some(&Modal::OpenDiffPicker {
+            options: vec![],
+            selected: 0,
+            view: DiffPickerView::default(),
+            name_input: Some("ru".to_string()),
+        })),
+        "picker-typing"
+    );
+}
+
+#[test]
+fn the_key_log_appends_one_line_per_key_that_parses_back() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("deeper").join("keys.tsv");
+    let mut log = KeyLog::open(&path).unwrap();
+    log.record("rust-add-if", "tree", "m", true);
+    log.record("rust-add-if", "prompt-typing", "typed", false);
+    drop(log);
+    let mut again = KeyLog::open(&path).unwrap();
+    again.record("other", "text", "d", true);
+
+    let records = parse_key_log(&std::fs::read_to_string(&path).unwrap());
+    assert_eq!(records.len(), 3, "appended across opens");
+    assert_eq!(records[0].case, "rust-add-if");
+    assert_eq!(records[0].key, "m");
+    assert!(records[0].edited);
+    assert_eq!(records[1].mode, "prompt-typing");
+    assert!(!records[1].edited);
+    assert!(records[0].at_ms <= records[2].at_ms);
+}
+
+#[test]
+fn parse_key_log_skips_a_torn_line() {
+    let records = parse_key_log("1000\ta\ttree\tm\t1\n2000\ta\ttree\n3000\ta\ttext\td\t0");
+    assert_eq!(records.len(), 2);
+    assert_eq!(records[1].key, "d");
+}
+
+#[test]
+fn summarize_key_log_charges_the_pause_before_a_key_to_it_and_drops_breaks() {
+    let log = "\
+1000\tcase-a\ttree\tj\t0
+3000\tcase-a\ttree\tm\t1
+4000\tcase-a\tkind-mismatch\ti\t1
+104000\tcase-b\ttext\td\t1
+105500\tcase-b\ttext\td\t1
+";
+    let summary = summarize_key_log(&parse_key_log(log));
+    // 2s before m, 1s before i, the 100s gap is a break, 1.5s before the last d: 4.5s active.
+    assert!(
+        summary.starts_with("5 keys, 4 of them edits, 4.5s active"),
+        "{summary}"
+    );
+    assert!(
+        summary.contains("tree                           2 keys       2.0s"),
+        "{summary}"
+    );
+    assert!(
+        summary.contains("kind-mismatch                  1 keys       1.0s"),
+        "{summary}"
+    );
+    assert!(
+        summary.contains("text                           2 keys       1.5s"),
+        "{summary}"
+    );
+    assert!(
+        summary.contains("tree m                         1 keys       2.0s"),
+        "{summary}"
+    );
+    assert!(
+        summary.contains("3.0s       3 keys       2 edits  case-a"),
+        "{summary}"
+    );
+    assert_eq!(summarize_key_log(&[]), "No keys logged yet.\n");
+}

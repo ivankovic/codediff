@@ -1835,6 +1835,8 @@ pub(crate) struct App {
     pub(crate) undo_stack: Vec<HumanMapping>,
     /// What `U` undid, for Ctrl-r; cleared by the next edit.
     pub(crate) redo_stack: Vec<HumanMapping>,
+    /// The keystroke log (`keylog`), `None` when it could not be opened.
+    pub(crate) key_log: Option<KeyLog>,
     pub(crate) status: Option<String>,
     pub(crate) modal: Option<Modal>,
     pub(crate) should_quit: bool,
@@ -1914,6 +1916,7 @@ impl App {
             edits: 0,
             undo_stack: Vec::new(),
             redo_stack: Vec::new(),
+            key_log: None,
             status: Some(
                 "Loaded. m match, d/D delete, i/I insert, u unmark, s save, q quit, o open."
                     .to_string(),

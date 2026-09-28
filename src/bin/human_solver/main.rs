@@ -51,6 +51,7 @@ use serde::{Deserialize, Serialize};
 mod actions;
 mod events;
 mod flatten;
+mod keylog;
 mod navigate;
 mod render;
 mod state;
@@ -58,6 +59,7 @@ mod stubs;
 use actions::*;
 use events::*;
 use flatten::*;
+use keylog::*;
 use navigate::*;
 use render::*;
 use state::*;
@@ -96,6 +98,9 @@ struct Args {
     /// case open when the tool last exited reopens (see `SessionMemory`), or else the first case
     /// alphabetically.
     name: Option<String>,
+    /// Print where the logged keys and the time between them went (see `keylog`), and exit.
+    #[arg(long)]
+    key_log_summary: bool,
 }
 
 /// The `?` help popup (`Modal::Help`): a terse sheet that fits on one screen.
@@ -257,7 +262,11 @@ o              open a different test case (src/test/data/diffs/) as a table:
                  ?, and a ? row survives either filter direction.
                  Cursor, sort and filters persist across o, and with the case
                  last open across runs (~/.local/state/codediff/human_solver.json):
-                 started with no name, the tool reopens where it left off
+                 started with no name, the tool reopens where it left off.
+                 Every key is appended to human_solver_keys.tsv beside it (which
+                 view took it, the key, whether it edited; typed text is not
+                 recorded); `human_solver --key-log-summary` shows where the
+                 keys and the time between them went
 O              open a sampled candidate (src/test/data/samples/) as a table:
                  Name, Lang, Bucket, Status, Size. Same keys as o -- j/k pick a
                  row, h/l pick a column, s sorts by that column (again to
@@ -2121,6 +2130,13 @@ fn promote_target_dataset(origin: &CaseOrigin) -> Option<&str> {
 fn main() -> Result<()> {
     let args = Args::parse();
 
+    if args.key_log_summary {
+        let path = key_log_path().context("no home directory to hold the key log")?;
+        let contents = fs::read_to_string(&path).unwrap_or_default();
+        print!("{}", summarize_key_log(&parse_key_log(&contents)));
+        return Ok(());
+    }
+
     // The same theme as the `codediff` binary. `set_custom_palette` must come first:
     // `OverlayTheme::Custom` resolves its colours from that process-global.
     theme::set_custom_palette(theme::load_custom_palette());
@@ -2148,6 +2164,8 @@ fn main() -> Result<()> {
         mapping,
     );
     app.diff_view = memory.diff_view;
+    // Without a log file the session simply goes unrecorded.
+    app.key_log = key_log_path().and_then(|path| KeyLog::open(&path).ok());
 
     let panic_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {

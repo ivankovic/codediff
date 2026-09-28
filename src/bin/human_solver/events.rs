@@ -566,6 +566,11 @@ pub(crate) fn run_case_session(
             continue;
         }
 
+        // For the log: which view takes the key, read before the key can change it.
+        let mode = mode_name(app.modal.as_ref());
+        let key_text = key_name(key, mode);
+        let edits_before = app.edits;
+
         // Undo and redo live here rather than in a handler: the same two keys serve the tree
         // panels and the `t` view, and Ctrl-r needs the modifier the handlers never see.
         if let Some(step) = history_key(app.modal.as_ref(), key) {
@@ -574,6 +579,9 @@ pub(crate) fn run_case_session(
                 HistoryStep::Redo => app.redo(),
             };
             app.status = Some(result.unwrap_or_else(|err| format!("{err:#}")));
+            if let Some(log) = app.key_log.as_mut() {
+                log.record(&app.name, mode, &key_text, app.edits != edits_before);
+            }
             needs_redraw = true;
             state = None;
             continue;
@@ -640,6 +648,9 @@ pub(crate) fn run_case_session(
         };
 
         watch.finish(app);
+        if let Some(log) = app.key_log.as_mut() {
+            log.record(&app.name, mode, &key_text, app.edits != edits_before);
+        }
         // Also here, so a run that landed while keys were streaming in shows without an idle tick.
         if poll_algo_diff(app) {
             state = None;
