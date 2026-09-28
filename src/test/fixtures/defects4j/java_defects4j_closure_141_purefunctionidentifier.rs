@@ -15,28 +15,31 @@
  *  You should have received a copy of the GNU Affero General Public License
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
+use anyhow::Result;
+
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
 use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
-use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // Mostly `APTED("qualified_name")` (a name-keyed search that does not reach across a changed
-    // path) and `APTED("fast_fallback")` (a Myers LCS that cannot align a moved node).
+    // Recorded as found, not examined.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
-        "rust-yannjor-krabby-actual-normal-change",
-        147,
-        110,
+        "java-defects4j-closure-141-purefunctionidentifier",
+        3,
+        1,
+    )
+}
+
+#[test]
+fn painting() -> Result<()> {
+    assert_matches_human_painting_within_limit(
+        "java-defects4j-closure-141-purefunctionidentifier",
+        0.46,
     )
 }
 
 #[test]
 fn invariants() -> Result<()> {
-    assert_ground_truth_invariants("rust-yannjor-krabby-actual-normal-change")
-}
-
-#[test]
-fn painting() -> Result<()> {
-    assert_matches_human_painting_within_limit("rust-yannjor-krabby-actual-normal-change", 18.55)
+    assert_ground_truth_invariants("java-defects4j-closure-141-purefunctionidentifier")
 }

@@ -279,6 +279,8 @@ mod java_defects4j_closure_138_typeinference;
 #[cfg(test)]
 mod java_defects4j_closure_13_peepholeoptimizationspass;
 #[cfg(test)]
+mod java_defects4j_closure_141_purefunctionidentifier;
+#[cfg(test)]
 mod java_defects4j_closure_144_functiontype;
 #[cfg(test)]
 mod java_defects4j_closure_147_checkglobalthis;
