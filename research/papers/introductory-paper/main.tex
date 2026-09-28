@@ -22,6 +22,12 @@
 \usepackage[most]{tcolorbox}
 \usepackage{array}
 \usepackage{forest}
+%% The draft watermark, on every page. Edit or blank \WatermarkText to change or drop it; the
+%% package stays so the change is one line. Light and diagonal, so it reads as a stamp, not as a
+%% figure, in print and in greyscale.
+\usepackage{draftwatermark}
+\newcommand{\WatermarkText}{\sffamily\bfseries PRE-DRAFT}
+\DraftwatermarkOptions{text=\WatermarkText, color={[gray]{0.85}}, angle=50, fontsize=4cm}
 \newtcolorbox{resultbox}[1]{%
   breakable,
   enhanced,
