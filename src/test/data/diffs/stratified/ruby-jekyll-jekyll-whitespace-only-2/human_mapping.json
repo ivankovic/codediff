@@ -421,5 +421,23 @@
         "end:1"
       ]
     }
+  ],
+  "text_mappings": [
+    {
+      "name": "Minimal",
+      "entries": [
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 0,
+              "start_column": 29,
+              "end_row": 1,
+              "end_column": 0
+            }
+          ]
+        }
+      ]
+    }
   ]
 }

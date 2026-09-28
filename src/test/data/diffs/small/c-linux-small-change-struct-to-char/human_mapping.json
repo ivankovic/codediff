@@ -231901,5 +231901,205 @@
         "}:1"
       ]
     }
+  ],
+  "text_mappings": [
+    {
+      "name": "Minimal",
+      "entries": [
+        {
+          "operation": "Delete",
+          "before": [
+            {
+              "start_row": 1354,
+              "start_column": 1,
+              "end_row": 1354,
+              "end_column": 14
+            }
+          ]
+        },
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 1354,
+              "start_column": 1,
+              "end_row": 1354,
+              "end_column": 11
+            }
+          ]
+        },
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 1374,
+              "start_column": 25,
+              "end_row": 1374,
+              "end_column": 31
+            }
+          ]
+        },
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 1397,
+              "start_column": 2,
+              "end_row": 1397,
+              "end_column": 16
+            },
+            {
+              "start_row": 1398,
+              "start_column": 3,
+              "end_row": 1398,
+              "end_column": 26
+            }
+          ]
+        },
+        {
+          "operation": "Delete",
+          "before": [
+            {
+              "start_row": 1400,
+              "start_column": 17,
+              "end_row": 1400,
+              "end_column": 23
+            }
+          ]
+        },
+        {
+          "operation": "Delete",
+          "before": [
+            {
+              "start_row": 1407,
+              "start_column": 17,
+              "end_row": 1407,
+              "end_column": 23
+            }
+          ]
+        },
+        {
+          "operation": "Delete",
+          "before": [
+            {
+              "start_row": 1413,
+              "start_column": 17,
+              "end_row": 1413,
+              "end_column": 23
+            }
+          ]
+        },
+        {
+          "operation": "Delete",
+          "before": [
+            {
+              "start_row": 1424,
+              "start_column": 16,
+              "end_row": 1424,
+              "end_column": 22
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Full",
+      "entries": [
+        {
+          "operation": "Delete",
+          "before": [
+            {
+              "start_row": 1354,
+              "start_column": 1,
+              "end_row": 1354,
+              "end_column": 14
+            }
+          ]
+        },
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 1354,
+              "start_column": 1,
+              "end_row": 1354,
+              "end_column": 11
+            }
+          ]
+        },
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 1374,
+              "start_column": 25,
+              "end_row": 1374,
+              "end_column": 31
+            }
+          ]
+        },
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 1397,
+              "start_column": 0,
+              "end_row": 1397,
+              "end_column": 16
+            },
+            {
+              "start_row": 1398,
+              "start_column": 0,
+              "end_row": 1398,
+              "end_column": 26
+            }
+          ]
+        },
+        {
+          "operation": "Delete",
+          "before": [
+            {
+              "start_row": 1400,
+              "start_column": 17,
+              "end_row": 1400,
+              "end_column": 23
+            }
+          ]
+        },
+        {
+          "operation": "Delete",
+          "before": [
+            {
+              "start_row": 1407,
+              "start_column": 17,
+              "end_row": 1407,
+              "end_column": 23
+            }
+          ]
+        },
+        {
+          "operation": "Delete",
+          "before": [
+            {
+              "start_row": 1413,
+              "start_column": 17,
+              "end_row": 1413,
+              "end_column": 23
+            }
+          ]
+        },
+        {
+          "operation": "Delete",
+          "before": [
+            {
+              "start_row": 1424,
+              "start_column": 16,
+              "end_row": 1424,
+              "end_column": 22
+            }
+          ]
+        }
+      ]
+    }
   ]
 }
