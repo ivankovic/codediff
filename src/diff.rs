@@ -65,6 +65,7 @@ pub(crate) mod solve_moved_subtrees;
 pub(crate) mod solve_mutual_ancestors;
 pub(crate) mod solve_nested_condition_collapse;
 pub(crate) mod solve_orphaned_leaves;
+pub(crate) mod solve_stray_renames;
 pub(crate) mod solve_syntax_aware_matching;
 pub(crate) mod solve_unique_type_matching;
 pub(crate) mod solve_unresolved_nodes;
@@ -381,6 +382,10 @@ impl<'code> PendingDiff<'code> {
         // resolved by the fallback (`rust-add-if`, `typescript-add-error-handling`); any earlier
         // and it finds no ancestor to climb to and silently does nothing.
         solve_wrap_growth::solve(&ctx, &mut ast_diff);
+
+        // Phase 9b: after every pass that can pair a leaf, so no later one re-pairs what it unpairs;
+        // before phase 10, which records the delete and insert.
+        solve_stray_renames::solve(&ctx, &mut ast_diff);
 
         // Phase 10 must be last: it records a delete/insert for every undecided node, so a pass
         // after it would find every node claimed.
