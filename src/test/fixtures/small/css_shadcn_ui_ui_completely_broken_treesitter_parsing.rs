@@ -26,8 +26,8 @@ fn mapping() -> Result<()> {
     // neighbour guard telling "the neighbour disagrees" from "nothing matched the neighbour either".
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "css-shadcn-ui-ui-completely-broken-treesitter-parsing",
-        74,
-        74,
+        71,
+        71,
     )
 }
 

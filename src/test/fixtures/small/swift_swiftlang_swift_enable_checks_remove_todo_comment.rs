@@ -21,12 +21,8 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // Nine `// TODO:` lines collapse into two `// RUN:` lines. The human updates the last two and
-    // deletes the first; codediff the reverse. Nothing syntactic prefers either.
-    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
+    test::helper::human_mapping::assert_matches_human_mapping(
         "swift-swiftlang-swift-enable-checks-remove-todo-comment",
-        2,
-        2,
     )
 }
 

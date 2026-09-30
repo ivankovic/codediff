@@ -25,8 +25,8 @@ fn mapping() -> Result<()> {
     // `fast_fallback` leaves the human's pairs across the new wrapper unmatched.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "ruby-jmespath-jmespath-go-from-conditional-to-unless",
-        37,
-        16,
+        27,
+        10,
     )
 }
 

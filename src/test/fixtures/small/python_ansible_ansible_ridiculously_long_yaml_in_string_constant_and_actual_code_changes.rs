@@ -23,8 +23,8 @@ use anyhow::Result;
 fn mapping() -> Result<()> {
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "python-ansible-ansible-ridiculously-long-yaml-in-string-constant-and-actual-code-changes",
-        13,
-        9,
+        5,
+        4,
     )
 }
 

@@ -26,14 +26,14 @@ fn mapping() -> Result<()> {
     // Recorded as found, not examined.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "c-python-cpython-interesting-case",
-        248,
-        170,
+        219,
+        143,
     )
 }
 
 #[test]
 fn painting() -> Result<()> {
-    assert_matches_human_painting_within_limit("c-python-cpython-interesting-case", 12.01)
+    assert_matches_human_painting_within_limit("c-python-cpython-interesting-case", 11.28)
 }
 
 #[test]

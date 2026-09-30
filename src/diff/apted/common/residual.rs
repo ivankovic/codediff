@@ -348,12 +348,37 @@ pub(crate) fn resolve_unequal_segment_via_kind_only_anchors(
 
     // The size floor and ambiguity check guard kind-only hash collisions only; applied to a
     // similarity-aligned pair they would reject the small genuine matches it exists to find.
+    //
+    // A segment whose kind-only pairs are all under the size floor (a run of comments or small
+    // statements) gets the similarity alignments as if Myers had found nothing: those pairs are
+    // all untrusted and must not stand in for similarity evidence. Not when a large pair was
+    // rejected as ambiguous, where similarity would be pairing whole subtrees.
+    let size_of =
+        |meta: &ASTMetadata, id: usize| meta.node_to_subtree_size.get(&id).copied().unwrap_or(0);
     let mut pairs = myers_lcs(&before_hashes, &after_hashes, FALLBACK_MAX_EDIT).unwrap_or_default();
-    let from_hash = !pairs.is_empty();
-    if pairs.is_empty() {
+    let consider_similarity = pairs.iter().all(|&(bi, ai)| {
+        size_of(before_meta, before_seg[bi]) < KIND_ONLY_ANCHOR_MIN_SIZE
+            || size_of(after_meta, after_seg[ai]) < KIND_ONLY_ANCHOR_MIN_SIZE
+    });
+    pairs.retain(|&(bi, ai)| {
+        let ambiguous = before_hash_counts
+            .get(&before_hashes[bi])
+            .copied()
+            .unwrap_or(0)
+            > 1
+            || after_hash_counts
+                .get(&after_hashes[ai])
+                .copied()
+                .unwrap_or(0)
+                > 1;
+        size_of(before_meta, before_seg[bi]) >= KIND_ONLY_ANCHOR_MIN_SIZE
+            && size_of(after_meta, after_seg[ai]) >= KIND_ONLY_ANCHOR_MIN_SIZE
+            && !ambiguous
+    });
+    if pairs.is_empty() && consider_similarity {
         pairs = align_segment_by_similarity(before_seg, after_seg, before_meta, after_meta);
     }
-    if pairs.is_empty() {
+    if pairs.is_empty() && consider_similarity {
         pairs = align_segment_by_mutual_similarity(before_seg, after_seg, before_meta, after_meta);
     }
 
@@ -361,34 +386,6 @@ pub(crate) fn resolve_unequal_segment_via_kind_only_anchors(
     let mut matched_after = vec![false; after_seg.len()];
     let cost_model = UnitCostModel::new(before_meta.language);
     for (bi, ai) in &pairs {
-        if from_hash {
-            let before_size = before_meta
-                .node_to_subtree_size
-                .get(&before_seg[*bi])
-                .copied()
-                .unwrap_or(0);
-            let after_size = after_meta
-                .node_to_subtree_size
-                .get(&after_seg[*ai])
-                .copied()
-                .unwrap_or(0);
-            if before_size < KIND_ONLY_ANCHOR_MIN_SIZE || after_size < KIND_ONLY_ANCHOR_MIN_SIZE {
-                continue;
-            }
-            let ambiguous = before_hash_counts
-                .get(&before_hashes[*bi])
-                .copied()
-                .unwrap_or(0)
-                > 1
-                || after_hash_counts
-                    .get(&after_hashes[*ai])
-                    .copied()
-                    .unwrap_or(0)
-                    > 1;
-            if ambiguous {
-                continue;
-            }
-        }
         matched_before[*bi] = true;
         matched_after[*ai] = true;
         resolve_forest(
@@ -429,6 +426,122 @@ pub(crate) const SEGMENT_SIMILARITY_MAX_CELLS: usize = 4096;
 /// `x.addEventListener('click', f);`) sits just above it.
 pub(crate) const SEGMENT_MUTUAL_SIMILARITY_MIN: f32 = 0.3;
 
+/// How alike two residual entries are, in `0.0..=1.0`: the Jaccard of their
+/// [`crate::code::similarity::SimilaritySketch`]es, except between two childless entries with
+/// visible text. A leaf sketches as the single hash of its whole text, so two comments that
+/// differ by one character would score 0; for those the Jaccard of their word and punctuation
+/// tokens is used instead (`// 3 INSTANCEOF java/lang/String` against `// 2 INSTANCEOF ...`
+/// shares 5 of 7 distinct tokens).
+pub(crate) fn entry_similarity(
+    before_meta: &ASTMetadata,
+    before_id: usize,
+    after_meta: &ASTMetadata,
+    after_id: usize,
+) -> f32 {
+    let childless = |meta: &ASTMetadata, id: usize| {
+        meta.node_info
+            .get(&id)
+            .is_some_and(|info| info.children.is_empty() && !info.text.trim().is_empty())
+    };
+    if childless(before_meta, before_id) && childless(after_meta, after_id) {
+        let (Some(b), Some(a)) = (
+            before_meta.node_info.get(&before_id),
+            after_meta.node_info.get(&after_id),
+        ) else {
+            return 0.0;
+        };
+        return text_token_jaccard(&b.text, &a.text);
+    }
+    match (
+        before_meta.node_to_similarity_sketch.get(&before_id),
+        after_meta.node_to_similarity_sketch.get(&after_id),
+    ) {
+        (Some(b), Some(a)) => b.jaccard(a),
+        _ => 0.0,
+    }
+}
+
+/// An entry's name: the text of its first direct child that is an identifier or a `*_name` node
+/// (`tag_name`, `property_name`), if any.
+pub(crate) fn entry_name(meta: &ASTMetadata, id: usize) -> Option<&str> {
+    meta.node_info.get(&id)?.children.iter().find_map(|child| {
+        let info = meta.node_info.get(child)?;
+        (nodes::is_identifier_kind(&info.kind) || info.kind.ends_with("_name"))
+            .then_some(info.text.as_str())
+    })
+}
+
+/// A similarity alignment's name guard: two named entries with different names are not paired
+/// when either name also names an entry on the other side. A tag is its name: `<table
+/// class=a>` scores closer to `<div class=b>` than to `<table>` on tokens alone
+/// (`html-gohugoio-hugo-enclose-table-with-div-and-add-thead-tbody`).
+pub(crate) struct NameGuard<'m> {
+    before: Vec<Option<&'m str>>,
+    after: Vec<Option<&'m str>>,
+}
+
+impl<'m> NameGuard<'m> {
+    pub(crate) fn new(
+        before_seg: &[usize],
+        after_seg: &[usize],
+        before_meta: &'m ASTMetadata,
+        after_meta: &'m ASTMetadata,
+    ) -> Self {
+        Self {
+            before: before_seg
+                .iter()
+                .map(|&id| entry_name(before_meta, id))
+                .collect(),
+            after: after_seg
+                .iter()
+                .map(|&id| entry_name(after_meta, id))
+                .collect(),
+        }
+    }
+
+    pub(crate) fn forbids(&self, bi: usize, ai: usize) -> bool {
+        match (self.before[bi], self.after[ai]) {
+            (Some(b), Some(a)) if b != a => {
+                self.after.contains(&Some(b)) || self.before.contains(&Some(a))
+            }
+            _ => false,
+        }
+    }
+}
+
+/// Jaccard of the sets of tokens - runs of alphanumerics or `_`, and single other non-blank
+/// characters - in two texts; 1.0 when both have none.
+pub(crate) fn text_token_jaccard(before: &str, after: &str) -> f32 {
+    fn tokens(text: &str) -> rustc_hash::FxHashSet<&str> {
+        let mut out = rustc_hash::FxHashSet::default();
+        let mut start: Option<usize> = None;
+        for (i, ch) in text.char_indices() {
+            let word = ch.is_alphanumeric() || ch == '_';
+            match (word, start) {
+                (true, None) => start = Some(i),
+                (false, Some(s)) => {
+                    out.insert(&text[s..i]);
+                    start = None;
+                }
+                _ => {}
+            }
+            if !word && !ch.is_whitespace() {
+                out.insert(&text[i..i + ch.len_utf8()]);
+            }
+        }
+        if let Some(s) = start {
+            out.insert(&text[s..]);
+        }
+        out
+    }
+    let (b, a) = (tokens(before), tokens(after));
+    let union = b.union(&a).count();
+    if union == 0 {
+        return 1.0;
+    }
+    b.intersection(&a).count() as f32 / union as f32
+}
+
 /// The unequal-count gap's last resort before atomic delete/insert, for a rewrite plus plain
 /// inserts (or deletes) that [`SEGMENT_SIMILARITY_MIN`] is too strict to admit.
 ///
@@ -458,6 +571,7 @@ pub(crate) fn align_segment_by_mutual_similarity(
         })
     }
     let language = before_meta.language;
+    let names = NameGuard::new(before_seg, after_seg, before_meta, after_meta);
     let sim: Vec<Vec<f32>> = (0..n)
         .map(|bi| {
             (0..m)
@@ -477,13 +591,10 @@ pub(crate) fn align_segment_by_mutual_similarity(
                     {
                         return 0.0;
                     }
-                    match (
-                        before_meta.node_to_similarity_sketch.get(&before_seg[bi]),
-                        after_meta.node_to_similarity_sketch.get(&after_seg[ai]),
-                    ) {
-                        (Some(b), Some(a)) => b.jaccard(a),
-                        _ => 0.0,
+                    if names.forbids(bi, ai) {
+                        return 0.0;
                     }
+                    entry_similarity(before_meta, before_seg[bi], after_meta, after_seg[ai])
                 })
                 .collect()
         })
@@ -542,17 +653,13 @@ pub(crate) fn align_segment_by_similarity(
         return Vec::new();
     }
 
+    let names = NameGuard::new(before_seg, after_seg, before_meta, after_meta);
     let similarity = |bi: usize, ai: usize| -> f32 {
-        match (
-            before_meta.node_to_similarity_sketch.get(&before_seg[bi]),
-            after_meta.node_to_similarity_sketch.get(&after_seg[ai]),
-        ) {
-            (Some(b), Some(a)) => {
-                let j = b.jaccard(a);
-                if j >= SEGMENT_SIMILARITY_MIN { j } else { 0.0 }
-            }
-            _ => 0.0,
+        if names.forbids(bi, ai) {
+            return 0.0;
         }
+        let j = entry_similarity(before_meta, before_seg[bi], after_meta, after_seg[ai]);
+        if j >= SEGMENT_SIMILARITY_MIN { j } else { 0.0 }
     };
 
     // score[i][j] = best total similarity aligning before_seg[..i] with after_seg[..j].
