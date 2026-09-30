@@ -59,8 +59,9 @@
 //! 19. [`tokens_are_painted_whole`] - every byte of an operator such as `<=`, a boolean, or an
 //!     access modifier such as `private` carries the same highlighting.
 //! 20. [`wrapped_tokens_are_paired`] - a node that is nothing but one unnamed token, such as C's
-//!     `null` around `NULL` or `nullptr`, in a position a matched pair pins, is paired: `NULL` ->
-//!     `nullptr` is one element changing its text, never a delete beside an insert.
+//!     `null` around `NULL` or `nullptr`, in a position a matched pair pins, is paired with one of
+//!     its own kind there: `NULL` -> `nullptr` is one element changing its text, never a delete
+//!     beside an insert.
 //!
 //! 4 and 5 read only the paintings `FULL` answers to (see [`paintings_with_labels`]); `MINIMAL`
 //! is free to leave whitespace alone. 9 is the only rule comparing the two ground truths'
@@ -2052,7 +2053,7 @@ pub(crate) fn pinned_removed_lexemes<'tree>(
 ///
 /// Wrappers count since 2026-09-30: C's `nullptr` is a `null` node around the token, so `0` ->
 /// `nullptr` escaped a leaf-only test, as did Java's `?` (a `wildcard`). Two wrappers against each
-/// other are invariant 20's.
+/// other are not this rule's: see invariant 20.
 fn single_valued_fields_hold_a_pair(
     context: &TreeContext,
     before: &Code,
@@ -2063,7 +2064,8 @@ fn single_valued_fields_hold_a_pair(
         if !before_leaf.is_named() || !after_leaf.is_named() {
             continue;
         }
-        // Two wrappers are invariant 20's, which holds for equal kinds too.
+        // Two wrappers are left out: of one kind they are invariant 20's, and of two kinds they are
+        // two roles, not one element (`static` -> `const`, see `wrapped_tokens_are_paired`).
         if wraps_one_token(before_leaf) && wraps_one_token(after_leaf) {
             continue;
         }
@@ -2127,6 +2129,11 @@ fn single_valued_fields_hold_a_pair(
 /// its position. Nodes of that shape: C/C++ `null`, Rust `boolean_literal`, C++
 /// `access_specifier`. The corpus had none of either break when this was added (2026-09-30,
 /// `pinned_lexeme_census`); a leaf against a wrapped token (`0` -> `nullptr`) is invariant 18's.
+///
+/// **Same kind only.** Two wrappers of different kinds are two different roles, not one element:
+/// `static auto width{...}` -> `const auto w = ...` removes a storage class and adds a type
+/// qualifier in the one position of a declaration's specifiers that elimination pins
+/// (`cpp-microsoft-terminal-funny-code-comment`). Neither this rule nor 18 checks that pair.
 fn wrapped_tokens_are_paired(
     context: &TreeContext,
     before: &Code,
@@ -2143,6 +2150,18 @@ fn wrapped_tokens_are_paired(
         };
         let inside = token_of_matched(before_node) && token_of_matched(after_node);
         if !whole && !inside {
+            continue;
+        }
+        // The wrappers' kinds: the nodes themselves, or the matched parents of the two tokens.
+        let wrapper_kinds = if whole {
+            (Some(before_node.kind()), Some(after_node.kind()))
+        } else {
+            (
+                before_node.parent().map(|parent| parent.kind()),
+                after_node.parent().map(|parent| parent.kind()),
+            )
+        };
+        if wrapper_kinds.0 != wrapper_kinds.1 {
             continue;
         }
         let before_token = lexeme_token(before_node).unwrap_or(before_node);
@@ -3992,6 +4011,47 @@ mod tests {
         let found = wrapped_token_violations(&mapping, &before, &after);
         assert_eq!(found.len(), 1, "{found:?}");
         assert!(found[0].contains("inserts the other whole"), "{found:?}");
+    }
+
+    /// `static` -> `const` is a storage class removed beside a type qualifier added: two wrappers
+    /// of different kinds are two roles, so neither invariant 20 nor 18 pairs them
+    /// (`cpp-microsoft-terminal-funny-code-comment`).
+    #[test]
+    fn wrappers_of_different_kinds_are_not_one_element() {
+        let (before, after) = (c("static int x = 1;\n"), c("const int x = 1;\n"));
+        let before_static = first_of_kind(
+            before.ast.as_ref().unwrap().root_node(),
+            "storage_class_specifier",
+        )
+        .unwrap();
+        let after_const =
+            first_of_kind(after.ast.as_ref().unwrap().root_node(), "type_qualifier").unwrap();
+        assert_eq!(
+            (before_static.child_count(), after_const.child_count()),
+            (1, 1),
+            "the premise: both are wrappers around one token"
+        );
+        let mapping = replacing(
+            mapping_by_text(&before, &after),
+            before_static,
+            after_const,
+            vec![
+                entry(
+                    HumanOperation::DeleteWithChildren,
+                    Some(before_static),
+                    None,
+                ),
+                entry(HumanOperation::InsertWithChildren, None, Some(after_const)),
+            ],
+        );
+        let reported: Vec<String> =
+            ground_truth_invariant_violations_for(&mapping, &before, &after)
+                .expect("checks run")
+                .into_iter()
+                .filter(|violation| matches!(violation.invariant, 18 | 20))
+                .map(|violation| violation.message)
+                .collect();
+        assert!(reported.is_empty(), "{reported:?}");
     }
 
     /// A Rust `line_comment`'s only child is its `//`, but the comment reads more than that token,

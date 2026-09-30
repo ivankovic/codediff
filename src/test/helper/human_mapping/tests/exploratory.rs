@@ -2046,7 +2046,7 @@ fn node_map_disagreement_census() -> Result<()> {
 ///   `==`, or a named leaf).
 ///
 /// `inv18` marks what invariant 18 reports (named, one token each, different kinds);
-/// `token-in-matched-wrapper` and `wrapper/wrapper` are what invariant 20 reports.
+/// `token-in-matched-wrapper` and `wrapper/wrapper` of one kind are what invariant 20 reports.
 ///
 /// `cargo test --release --lib --features test-fixtures pinned_lexeme_census -- --ignored
 /// --nocapture`
