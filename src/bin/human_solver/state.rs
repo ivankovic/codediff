@@ -690,7 +690,7 @@ pub(crate) fn action_focus_violation(
 ///
 /// Columns are **byte** offsets, as in `HumanTextSpan`, but the cursor steps by *characters*
 /// ([`TextPaintState::step_column`]): a mid-character column gives a span `span_text` refuses.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct TextPaintState {
     /// 0 = before, 1 = after, as in `TextDiff::all`.
     pub(crate) side: usize,
@@ -710,9 +710,9 @@ pub(crate) struct TextPaintState {
     pub(crate) pending: [Vec<HumanTextSpan>; 2],
     /// Top visible row per side. Independent: a move's two places are often far apart.
     pub(crate) scroll: [usize; 2],
-    /// Multi-row selection shape, toggled with `V`. `true` (default): one span per row over the
-    /// same columns. `false`: one full-line sweep, which a moved block needs because `m` requires
-    /// every span on a side to read identical text.
+    /// Multi-row selection shape, toggled with `V`. `false` (default): one full-line sweep from
+    /// the anchor to the cursor, which a moved block needs because `m` requires every span on a
+    /// side to read identical text. `true`: one span per row over the same columns.
     pub(crate) vertical: bool,
 }
 
@@ -732,21 +732,6 @@ pub(crate) fn word_class(ch: char, big: bool) -> WordClass {
         WordClass::Keyword
     } else {
         WordClass::Punctuation
-    }
-}
-
-impl Default for TextPaintState {
-    fn default() -> Self {
-        Self {
-            side: 0,
-            cursor: [(0, 0); 2],
-            anchor: [None; 2],
-            line_prompt: None,
-            search_prompt: None,
-            pending: [Vec::new(), Vec::new()],
-            scroll: [0; 2],
-            vertical: true,
-        }
     }
 }
 
