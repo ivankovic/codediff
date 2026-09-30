@@ -93352,5 +93352,23 @@
         "comment_content:1"
       ]
     }
+  ],
+  "text_mappings": [
+    {
+      "name": "Only one solution",
+      "entries": [
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 3,
+              "start_column": 79,
+              "end_row": 3,
+              "end_column": 80
+            }
+          ]
+        }
+      ]
+    }
   ]
 }

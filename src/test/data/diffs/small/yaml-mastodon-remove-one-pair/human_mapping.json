@@ -257079,5 +257079,39 @@
         "string_scalar:1"
       ]
     }
+  ],
+  "text_mappings": [
+    {
+      "name": "Minimal",
+      "entries": [
+        {
+          "operation": "Delete",
+          "before": [
+            {
+              "start_row": 12,
+              "start_column": 4,
+              "end_row": 13,
+              "end_column": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Full",
+      "entries": [
+        {
+          "operation": "Delete",
+          "before": [
+            {
+              "start_row": 12,
+              "start_column": 0,
+              "end_row": 13,
+              "end_column": 0
+            }
+          ]
+        }
+      ]
+    }
   ]
 }

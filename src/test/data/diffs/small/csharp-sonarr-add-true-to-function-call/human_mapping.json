@@ -30779,5 +30779,23 @@
         "}:1"
       ]
     }
+  ],
+  "text_mappings": [
+    {
+      "name": "Only one solution",
+      "entries": [
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 41,
+              "start_column": 87,
+              "end_row": 41,
+              "end_column": 93
+            }
+          ]
+        }
+      ]
+    }
   ]
 }

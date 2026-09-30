@@ -16,6 +16,7 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 use crate::test;
+use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
 use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
 use anyhow::Result;
 
@@ -27,4 +28,9 @@ fn mapping() -> Result<()> {
 #[test]
 fn invariants() -> Result<()> {
     assert_ground_truth_invariants("rust-rustdesk-add-one-slice-element")
+}
+
+#[test]
+fn painting() -> Result<()> {
+    assert_matches_human_painting_within_limit("rust-rustdesk-add-one-slice-element", 0.0)
 }
