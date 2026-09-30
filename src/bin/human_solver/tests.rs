@@ -2604,6 +2604,7 @@ fn a_vertical_selection_is_never_reshaped() {
     let state = TextPaintState {
         anchor: [Some((1, 2)), None],
         cursor: [(3, 6), (0, 0)],
+        vertical: true,
         ..Default::default()
     };
     let (app, _) = press_in_text_view(source, source, state, KeyCode::Char('d'));
@@ -3065,13 +3066,14 @@ fn a_selection_past_a_multibyte_character_lands_on_the_right_text() {
     );
 }
 
-/// A multi-row selection is vertical: one span per row over the same columns, so `d`/`i` do not
+/// A vertical multi-row selection is one span per row over the same columns, so `d`/`i` do not
 /// swallow the untouched characters between them on middle rows.
 #[test]
-fn a_multi_row_selection_is_a_stack_of_per_row_spans_not_a_line_sweep() {
+fn a_vertical_multi_row_selection_is_a_stack_of_per_row_spans_not_a_line_sweep() {
     let source = "aaaXaaa\nbbbYbbb\ncccZccc\n";
     // Column 3 on row 0 through column 4 on row 2 - a one-column-wide block.
-    let state = paint_state_at(0, (2, 4), Some((0, 3)));
+    let mut state = paint_state_at(0, (2, 4), Some((0, 3)));
+    state.vertical = true;
 
     let spans = state.selection(0, source);
 
@@ -3100,11 +3102,12 @@ fn a_multi_row_selection_is_a_stack_of_per_row_spans_not_a_line_sweep() {
     );
 }
 
-/// A row too short to reach the selected columns contributes no span.
+/// In a vertical selection, a row too short to reach the selected columns contributes no span.
 #[test]
-fn a_multi_row_selection_skips_a_row_shorter_than_the_selected_columns() {
+fn a_vertical_selection_skips_a_row_shorter_than_the_selected_columns() {
     let source = "aaaaaa\nbb\ncccccc\n";
-    let state = paint_state_at(0, (2, 4), Some((0, 4)));
+    let mut state = paint_state_at(0, (2, 4), Some((0, 4)));
+    state.vertical = true;
 
     let spans = state.selection(0, source);
 
@@ -3115,13 +3118,12 @@ fn a_multi_row_selection_skips_a_row_shorter_than_the_selected_columns() {
     );
 }
 
-/// `V` makes one span sweeping full rows, for a contiguous block where `m`'s identical-text check
-/// would fail on a per-row split.
+/// By default a multi-row selection is one span sweeping full rows, for a contiguous block where
+/// `m`'s identical-text check would fail on a per-row split.
 #[test]
-fn toggling_off_vertical_restores_the_full_line_sweep() {
+fn a_multi_row_selection_is_a_full_line_sweep_by_default() {
     let source = "aaaXaaa\nbbbYbbb\ncccZccc\n";
-    let mut state = paint_state_at(0, (2, 4), Some((0, 3)));
-    state.vertical = false;
+    let state = paint_state_at(0, (2, 4), Some((0, 3)));
 
     let spans = state.selection(0, source);
 
@@ -3135,6 +3137,24 @@ fn toggling_off_vertical_restores_the_full_line_sweep() {
         }],
         "one span end to end, not a per-row stack"
     );
+}
+
+/// `V` turns the default full-line sweep into a vertical selection, and back.
+#[test]
+fn v_toggles_from_the_full_line_default_to_vertical_and_back() {
+    let source = "aaa\nbbb\n";
+    let (app, state) = press_in_text_view(
+        source,
+        source,
+        TextPaintState::default(),
+        KeyCode::Char('V'),
+    );
+    assert!(state.vertical);
+    assert_eq!(app.status.as_deref(), Some("Selections are now vertical"));
+
+    let (app, state) = press_in_text_view(source, source, state, KeyCode::Char('V'));
+    assert!(!state.vertical);
+    assert_eq!(app.status.as_deref(), Some("Selections are now full-line"));
 }
 
 /// Reads back the style painted at one character position of one rendered row, skipping the
@@ -3158,6 +3178,7 @@ fn style_at(lines: &[Line<'static>], row: usize, column: usize) -> Style {
 fn vertical_selection_leaves_a_middle_rows_tail_unstyled_but_full_line_does_not() {
     let source = "aaaXaaaaaaaa\nbbbYbbbbbbbb\ncccZcccccccc\n";
     let mut state = paint_state_at(0, (2, 4), Some((0, 3)));
+    state.vertical = true;
     let selected_bg = Some(OverlayTheme::default().palette().cross_highlight_bg);
     let tail_column = 10;
 
