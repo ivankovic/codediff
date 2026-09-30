@@ -27,8 +27,8 @@ fn mapping() -> Result<()> {
     // carries the old right-hand side's leaves into it (`qualified_name`, `MovedSubtree`).
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "java-defects4j-cli-15-writeablecommandlineimpl",
-        37,
-        27,
+        35,
+        25,
     )
 }
 

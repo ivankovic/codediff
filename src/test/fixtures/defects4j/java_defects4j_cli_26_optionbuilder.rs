@@ -27,14 +27,14 @@ fn mapping() -> Result<()> {
     // for the new, and pairs a `line_comment` across (`APTED("large_flat_subtree")`).
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "java-defects4j-cli-26-optionbuilder",
-        7,
-        7,
+        6,
+        6,
     )
 }
 
 #[test]
 fn painting() -> Result<()> {
-    assert_matches_human_painting_within_limit("java-defects4j-cli-26-optionbuilder", 0.86)
+    assert_matches_human_painting_within_limit("java-defects4j-cli-26-optionbuilder", 0.48)
 }
 
 #[test]

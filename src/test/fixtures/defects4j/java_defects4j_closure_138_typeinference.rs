@@ -26,14 +26,14 @@ fn mapping() -> Result<()> {
     // Recorded as found, not examined.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "java-defects4j-closure-138-typeinference",
-        35,
-        26,
+        29,
+        20,
     )
 }
 
 #[test]
 fn painting() -> Result<()> {
-    assert_matches_human_painting_within_limit("java-defects4j-closure-138-typeinference", 1.02)
+    assert_matches_human_painting_within_limit("java-defects4j-closure-138-typeinference", 0.18)
 }
 
 #[test]
