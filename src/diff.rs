@@ -62,6 +62,7 @@ pub(crate) mod solve_large_flat_subtrees;
 pub(crate) mod solve_leading_siblings;
 pub(crate) mod solve_leaf_neighbour_agreement;
 pub(crate) mod solve_moved_subtrees;
+pub(crate) mod solve_multi_maps;
 pub(crate) mod solve_mutual_ancestors;
 pub(crate) mod solve_nested_condition_collapse;
 pub(crate) mod solve_orphaned_leaves;
@@ -381,6 +382,10 @@ impl<'code> PendingDiff<'code> {
         // resolved by the fallback (`rust-add-if`, `typescript-add-error-handling`); any earlier
         // and it finds no ancestor to climb to and silently does nothing.
         solve_wrap_growth::solve(&ctx, &mut ast_diff);
+
+        // Phase 9c: after every matching pass, so "unpaired" means gone and a twin's parent that
+        // a late pass pairs (an `if` that grew an `else`) is not mistaken for a displaced one.
+        solve_multi_maps::solve(&ctx, &mut ast_diff);
 
         // Phase 10 must be last: it records a delete/insert for every undecided node, so a pass
         // after it would find every node claimed.
@@ -821,6 +826,8 @@ pub enum ASTMappingReason {
     /// A deleted and an inserted leaf with the same text under a matched parent pair, re-paired.
     /// See `solve_orphaned_leaves`.
     OrphanedLeafUnderMatchedParent,
+    /// A member of an N:M group of identical copies. See `solve_multi_maps`.
+    MultiMap,
 }
 
 impl ASTMappingReason {
@@ -848,6 +855,7 @@ impl ASTMappingReason {
             ASTMappingReason::WrapGrowth => "WrapGrowth",
             ASTMappingReason::OrphanedLeafUnderMatchedParent => "OrphanLeaf",
             ASTMappingReason::LeafBetweenMatchedNeighbours => "NeighbourLeaf",
+            ASTMappingReason::MultiMap => "MultiMap",
         }
     }
 }
