@@ -54,7 +54,8 @@
 //! 17. [`boolean_flips_are_one_edit`] - a boolean the mapping pairs is not painted `Delete` on one
 //!     side and `Insert` on the other.
 //! 18. [`single_valued_fields_hold_a_pair`] - a matched pair's single-valued named field holds a
-//!     matched pair, never a delete beside an insert.
+//!     matched pair, never a delete beside an insert, when the two read as one token each and
+//!     differ in kind (`0` -> `nullptr`).
 //! 19. [`tokens_are_painted_whole`] - every byte of an operator such as `<=`, a boolean, or an
 //!     access modifier such as `private` carries the same highlighting.
 //! 20. [`wrapped_tokens_are_paired`] - a node that is nothing but one unnamed token, such as C's
@@ -2043,42 +2044,32 @@ pub(crate) fn pinned_removed_lexemes<'tree>(
 /// Invariant 18: an unambiguous position of a matched pair holds a matched pair, never a
 /// delete beside an insert: the parent match already says the role persists.
 ///
-/// Each condition prevents a real false positive: *childless* nodes (an empty container has no
-/// named children either), a *named* field (two adjacent comments share no role), and arity *one*
-/// (a removed flag beside an added subcommand in one argument list is not a pair).
-/// `LeafStatus::Undecided` is not a violation.
+/// Each condition prevents a real false positive: nodes that *read as one token*
+/// ([`lexeme_token`]: a leaf, or a node around one unnamed token spanning all of it - an empty
+/// container has no named children either, but `()` is two tokens), a *named* field (two adjacent
+/// comments share no role), and arity *one* (a removed flag beside an added subcommand in one
+/// argument list is not a pair). `LeafStatus::Undecided` is not a violation.
+///
+/// Wrappers count since 2026-09-30: C's `nullptr` is a `null` node around the token, so `0` ->
+/// `nullptr` escaped a leaf-only test, as did Java's `?` (a `wildcard`). Two wrappers against each
+/// other are invariant 20's.
 fn single_valued_fields_hold_a_pair(
     context: &TreeContext,
     before: &Code,
     after: &Code,
 ) -> Vec<GroundTruthViolation> {
     let mut violations = Vec::new();
-    for before_leaf in &context.leaves[0] {
-        if !before_leaf.is_named() || context.status(*before_leaf, 0) != LeafStatus::Removed {
+    for (before_leaf, after_leaf) in pinned_removed_lexemes(context, before, after) {
+        if !before_leaf.is_named() || !after_leaf.is_named() {
+            continue;
+        }
+        // Two wrappers are invariant 20's, which holds for equal kinds too.
+        if wraps_one_token(before_leaf) && wraps_one_token(after_leaf) {
             continue;
         }
         let Some(before_parent) = before_leaf.parent() else {
             continue;
         };
-        let Some(after_parent) = context
-            .caches
-            .before_match
-            .get(&before_parent.id())
-            .and_then(|id| context.ids[1].get(id))
-        else {
-            continue;
-        };
-        let Some(after_leaf) =
-            pinned_counterpart(context, *before_leaf, before_parent, *after_parent)
-        else {
-            continue;
-        };
-        if !after_leaf.is_named()
-            || after_leaf.child_count() != 0
-            || context.status(after_leaf, 1) != LeafStatus::Removed
-        {
-            continue;
-        }
         // Cross-kind pairs only: `Update` requires equal kinds, so a cross-kind pair has no
         // schema representation, while a same-kind delete+insert is a decision the author was
         // entitled to make.
@@ -2092,7 +2083,7 @@ fn single_valued_fields_hold_a_pair(
                 "{} holds {} `{}` on before row {} and {} `{}` on after row {}, but the mapping \
                  deletes one and inserts the other - the parents are matched and nothing else can \
                  occupy that position, so the two are the same element",
-                field_of(before_parent, *before_leaf).map_or_else(
+                field_of(before_parent, before_leaf).map_or_else(
                     || before_parent.kind().to_string(),
                     |field| format!("{}.{field}", before_parent.kind()),
                 ),
@@ -2110,7 +2101,7 @@ fn single_valued_fields_hold_a_pair(
             vec![
                 ViolationSite {
                     side: 0,
-                    span: span_of_node(*before_leaf),
+                    span: span_of_node(before_leaf),
                 },
                 ViolationSite {
                     side: 1,
@@ -2135,8 +2126,7 @@ fn single_valued_fields_hold_a_pair(
 /// the author may call unrelated; a node that is only a keyword-like token has no identity beside
 /// its position. Nodes of that shape: C/C++ `null`, Rust `boolean_literal`, C++
 /// `access_specifier`. The corpus had none of either break when this was added (2026-09-30,
-/// `pinned_lexeme_census`); a leaf against a wrapped token (`0` -> `nullptr`) is invariant 18's
-/// shape, not this one's.
+/// `pinned_lexeme_census`); a leaf against a wrapped token (`0` -> `nullptr`) is invariant 18's.
 fn wrapped_tokens_are_paired(
     context: &TreeContext,
     before: &Code,
@@ -4036,7 +4026,7 @@ mod tests {
 
     /// `0` -> `nullptr` is a leaf against a wrapped token: invariant 18's shape, not this one's.
     #[test]
-    fn a_leaf_against_a_wrapped_token_is_left_to_invariant_18() {
+    fn a_leaf_against_a_wrapped_token_is_invariant_18s() {
         let (before, after) = (c("int *p = 0;\n"), c("int *p = nullptr;\n"));
         let before_zero =
             first_of_kind(before.ast.as_ref().unwrap().root_node(), "number_literal").unwrap();
@@ -4051,5 +4041,16 @@ mod tests {
             ],
         );
         assert!(wrapped_token_violations(&mapping, &before, &after).is_empty());
+        let found: Vec<String> = ground_truth_invariant_violations_for(&mapping, &before, &after)
+            .expect("checks run")
+            .into_iter()
+            .filter(|violation| violation.invariant == 18)
+            .map(|violation| violation.message)
+            .collect();
+        assert_eq!(found.len(), 1, "{found:?}");
+        assert!(
+            found[0].contains("holds number_literal `0` on before row 1 and null `nullptr`"),
+            "{found:?}"
+        );
     }
 }

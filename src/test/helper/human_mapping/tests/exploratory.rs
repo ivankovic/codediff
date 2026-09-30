@@ -2045,7 +2045,7 @@ fn node_map_disagreement_census() -> Result<()> {
 ///   on each side: a node around one token deleted or inserted whole, or a leaf (`!=` against
 ///   `==`, or a named leaf).
 ///
-/// `inv18` marks what invariant 18 already reports (named, childless, different kinds);
+/// `inv18` marks what invariant 18 reports (named, one token each, different kinds);
 /// `token-in-matched-wrapper` and `wrapper/wrapper` are what invariant 20 reports.
 ///
 /// `cargo test --release --lib --features test-fixtures pinned_lexeme_census -- --ignored
@@ -2099,11 +2099,8 @@ fn pinned_lexeme_census() -> Result<()> {
             } else {
                 "cross-kind"
             };
-            let inv18 = b.child_count() == 0
-                && a.child_count() == 0
-                && b.is_named()
-                && a.is_named()
-                && b.kind() != a.kind();
+            let inv18 =
+                b.is_named() && a.is_named() && b.kind() != a.kind() && !(wraps(b) && wraps(a));
             let pinned = match field_of(before_parent, b) {
                 Some(field) if field_arity(before_parent, &field) == 1 => format!("field:{field}"),
                 _ => "elimination".to_string(),

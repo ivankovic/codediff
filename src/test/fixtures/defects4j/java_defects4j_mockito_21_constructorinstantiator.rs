@@ -44,8 +44,10 @@ fn painting() -> Result<()> {
 fn invariants() -> Result<()> {
     // Invariant 16, twice: `c` renamed `constructor` on before rows 24 and 25. `Minimal` marks the
     // whole `c`, where the rule treats `c` as the shared prefix and marks only `onstructor`.
+    // Invariant 18: `type_arguments` holds `T` on before row 24 and the wildcard `?` on after row
+    // 24. The parents are matched, yet the mapping deletes one and inserts the other.
     assert_ground_truth_invariants_with_known_violations(
         "java-defects4j-mockito-21-constructorinstantiator",
-        2,
+        3,
     )
 }

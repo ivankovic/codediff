@@ -16,7 +16,7 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 use crate::test;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants_with_known_violations;
 use anyhow::Result;
 
 #[test]
@@ -32,5 +32,8 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn invariants() -> Result<()> {
-    assert_ground_truth_invariants("ruby-homebrew-brew-real-small-change")
+    // Invariant 18: `call.method` holds `match` on before row 152 and `[]` on after row 146
+    // (`&.match(regex)` -> `&.[](regex, 1)`). The calls are matched, yet the mapping deletes one
+    // method and inserts the other.
+    assert_ground_truth_invariants_with_known_violations("ruby-homebrew-brew-real-small-change", 1)
 }
