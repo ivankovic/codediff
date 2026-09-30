@@ -167,10 +167,10 @@ t              text view: read the source, and paint the human text-range ground
                  blank-separated word as in vim, 0/^/$ to a line's start/first
                  code character/end, v select. On a terminal narrower than
                  220 columns only the focused side is drawn; Tab shows the other. By default a selection spanning
-                 several rows is vertical -- the same columns on each row, like
-                 a stack of squares, not every full line swept in between; V
-                 toggles that to a full-line sweep, for a single contiguous
-                 multi-line block. d/i paint the
+                 several rows sweeps full lines from the anchor to the cursor, one
+                 contiguous multi-line block; V toggles that to vertical -- the same
+                 columns on each row, like a stack of squares, not every full line
+                 swept in between. d/i paint the
                  Before/After selection deleted/inserted, m pairs BOTH sides'
                  selections as a match (move vs update derived from whether the
                  spans' text is identical), u removes the range under the cursor,
