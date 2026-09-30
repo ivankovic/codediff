@@ -25,8 +25,8 @@ fn mapping() -> Result<()> {
     // originals. All visible.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "vimscript-fholgado-minibufexpl-massive-comment-reduction",
-        18,
-        18,
+        6,
+        6,
     )
 }
 

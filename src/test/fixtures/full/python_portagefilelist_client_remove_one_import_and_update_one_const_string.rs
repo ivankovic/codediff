@@ -23,8 +23,8 @@ use anyhow::Result;
 fn mapping() -> Result<()> {
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "python-portagefilelist-client-remove-one-import-and-update-one-const-string",
-        16,
-        9,
+        8,
+        4,
     )
 }
 

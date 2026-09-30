@@ -2106,3 +2106,120 @@ fn for_roots_and_the_fallback_are_no_ops_without_an_ast() {
     crate::diff::apted::for_roots_fallback(&before, &after, "test", &mut diff);
     assert!(diff.mapping.is_empty());
 }
+
+#[test]
+fn text_token_jaccard_counts_words_and_single_punctuation() {
+    // {3|2, INSTANCEOF, java, /, lang, String} on each side: 5 shared of 7.
+    let score = text_token_jaccard(
+        "// 3 INSTANCEOF java/lang/String",
+        "// 2 INSTANCEOF java/lang/String",
+    );
+    assert!((score - 5.0 / 7.0).abs() < 1e-6, "got {score}");
+    assert_eq!(text_token_jaccard("", ""), 1.0);
+    assert_eq!(text_token_jaccard("foo", "bar"), 0.0);
+}
+
+/// Two comments that differ by one character sketch as two unrelated single hashes; their words
+/// are what make them the same line (`kotlin-jetbrains-kotlin-remove-one-comment-line`).
+#[test]
+fn mutual_similarity_pairs_a_near_identical_comment_by_its_words() {
+    let mut before = ASTMetadata::default();
+    leaf_with_kind(
+        2,
+        20,
+        "line_comment",
+        "// * one in the bridge 'I2.contains' -- this one is unnecessary",
+        &mut before,
+    );
+    leaf_with_kind(
+        3,
+        30,
+        "line_comment",
+        "// 3 INSTANCEOF java/lang/String",
+        &mut before,
+    );
+    let mut after = ASTMetadata::default();
+    leaf_with_kind(
+        12,
+        120,
+        "line_comment",
+        "// 2 INSTANCEOF java/lang/String",
+        &mut after,
+    );
+
+    assert_eq!(
+        align_segment_by_mutual_similarity(&[2, 3], &[12], &before, &after),
+        vec![(1, 0)]
+    );
+}
+
+/// A run of comments always has kind-only pairs, all under the size floor; they are rejected,
+/// and the similarity alignment decides instead of an atomic replace.
+#[test]
+fn a_run_of_small_entries_is_aligned_by_similarity_when_every_kind_pair_is_untrusted() {
+    let mut before = ASTMetadata::default();
+    leaf_with_kind(
+        2,
+        20,
+        "line_comment",
+        "// * one in the bridge 'I2.contains'",
+        &mut before,
+    );
+    leaf_with_kind(
+        3,
+        30,
+        "line_comment",
+        "// 3 INSTANCEOF java/lang/String",
+        &mut before,
+    );
+    let mut after = ASTMetadata::default();
+    leaf_with_kind(
+        12,
+        120,
+        "line_comment",
+        "// 2 INSTANCEOF java/lang/String",
+        &mut after,
+    );
+    for (meta, ids) in [
+        (&mut before, [2, 3].as_slice()),
+        (&mut after, [12].as_slice()),
+    ] {
+        for &id in ids {
+            meta.node_to_kind_only_hash.insert(id, 7);
+            meta.node_to_subtree_size.insert(id, 1);
+        }
+    }
+    let mut diff = ASTDiff::default();
+
+    resolve_unequal_segment_via_kind_only_anchors(&[2, 3], &[12], &before, &after, "t", &mut diff);
+
+    assert_eq!(diff.before_node_map.get(&3).copied(), Some(12));
+    assert_eq!(
+        diff.before_node_map.get(&2).copied(),
+        Some(0),
+        "the other comment is deleted"
+    );
+}
+
+/// A tag is its name: `<table class=a>` is not paired with `<div class=b>` while a `<table>` is
+/// on offer (`html-gohugoio-hugo-enclose-table-with-div-and-add-thead-tbody`), but a lone
+/// candidate of another name is not forbidden.
+#[test]
+fn the_name_guard_keeps_a_named_entry_with_its_own_name_when_one_is_on_offer() {
+    let before = synthetic_meta(&[(1, "start_tag", "", &[2]), (2, "tag_name", "table", &[])]);
+    let after = synthetic_meta(&[
+        (10, "start_tag", "", &[11]),
+        (11, "tag_name", "div", &[]),
+        (20, "start_tag", "", &[21]),
+        (21, "tag_name", "table", &[]),
+    ]);
+    let guard = NameGuard::new(&[1], &[10, 20], &before, &after);
+    assert!(guard.forbids(0, 0));
+    assert!(!guard.forbids(0, 1));
+
+    let lone = NameGuard::new(&[1], &[10], &before, &after);
+    assert!(
+        !lone.forbids(0, 0),
+        "a rename with no same-named alternative stays open"
+    );
+}

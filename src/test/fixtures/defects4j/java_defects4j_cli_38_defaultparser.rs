@@ -27,14 +27,14 @@ fn mapping() -> Result<()> {
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "java-defects4j-cli-38-defaultparser",
         // Includes the N:M floor: 11 all-to-all group members a one-to-one output cannot reach.
-        12,
-        9,
+        11,
+        8,
     )
 }
 
 #[test]
 fn painting() -> Result<()> {
-    assert_matches_human_painting_within_limit("java-defects4j-cli-38-defaultparser", 0.46)
+    assert_matches_human_painting_within_limit("java-defects4j-cli-38-defaultparser", 0.19)
 }
 
 #[test]

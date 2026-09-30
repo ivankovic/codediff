@@ -31,6 +31,9 @@
 //! - Largest first, claiming whole subtrees, so a moved function moves as one piece.
 //! - Several identical targets for a small subtree is a coin flip, so it is refused unless
 //!   `disambiguate_by_context` finds one clearly better surrounding.
+//! - Below the size floor only a comment of a few words moves, and only inside a construct that
+//!   survived around both places: its text is the content, but out of a deleted function into a
+//!   kept one it reads as new text.
 //! - The outermost unmapped reference-node ancestors on both sides must have the same kind: a
 //!   move into a renamed `impl` is the same construct reshaped (rust-turbopack-module-rule), but
 //!   an expression resurfacing inside a new construct of another kind reads as new code
@@ -46,6 +49,29 @@ use crate::diff::{ASTDiff, ASTMapping, ASTMappingReason};
 /// Minimum subtree size (node count, incl. the root) for a move. Below this, identical subtrees
 /// are commodity code (`return None`, `i += 1`) whose pairing is coincidence more often than intent.
 const MIN_MOVE_SUBTREE_SIZE: usize = 4;
+
+/// Words (alphanumeric runs) a comment needs to be a move candidate below
+/// [`MIN_MOVE_SUBTREE_SIZE`]. A comment is one node however long, and its text is the content:
+/// a byte-identical sentence on both sides is not the coincidence a `return None` is
+/// (`java-defects4j-closure-121-inlinevariables`: three comment lines move from a block into the
+/// condition above it).
+const MIN_MOVE_COMMENT_WORDS: usize = 3;
+
+/// Whether `id` is a comment of at least [`MIN_MOVE_COMMENT_WORDS`] words. Such a comment moves
+/// only inside a construct that survived around both places ([`moves_within_a_survivor`]): out of
+/// a deleted function into a kept one it reads as new text
+/// (`lua-luakit-luakit-actual-test-change-merging-two-tests-into-one`).
+fn is_wordy_comment(id: usize, meta: &ASTMetadata) -> bool {
+    meta.node_info.get(&id).is_some_and(|info| {
+        info.kind.contains("comment")
+            && info
+                .text
+                .split(|ch: char| !ch.is_alphanumeric())
+                .filter(|word| !word.is_empty())
+                .count()
+                >= MIN_MOVE_COMMENT_WORDS
+    })
+}
 
 /// Size at or above which an *ambiguous* move (several identical targets) is trusted anyway.
 /// Below it an identical subtree is a `self.foo` or a bare string; above it, several copies moving
@@ -68,7 +94,8 @@ pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
         .filter_map(|(&b, _)| {
             let size = before_metadata.node_to_subtree_size.get(&b).copied()?;
             let start_byte = before_metadata.node_info.get(&b)?.start_byte;
-            (size >= MIN_MOVE_SUBTREE_SIZE).then_some((size, start_byte, b))
+            (size >= MIN_MOVE_SUBTREE_SIZE || is_wordy_comment(b, before_metadata))
+                .then_some((size, start_byte, b))
         })
         .collect();
     deleted.sort_unstable_by(|x, y| y.0.cmp(&x.0).then(x.1.cmp(&y.1)));
@@ -131,6 +158,12 @@ pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
             &diff.before_node_map,
             &language,
         );
+        let small = before_metadata
+            .node_to_subtree_size
+            .get(&b)
+            .copied()
+            .unwrap_or(0)
+            < MIN_MOVE_SUBTREE_SIZE;
         let Some(&a) = candidates.iter().find(|&&a| {
             let target_container = outermost_unmapped_reference_kind(
                 a,
@@ -140,6 +173,7 @@ pub fn solve(ctx: &PassCtx, diff: &mut ASTDiff) {
                 &language,
             );
             source_container == target_container
+                && (!small || moves_within_a_survivor(b, a, before_parents, after_parents, diff))
         }) else {
             continue;
         };
@@ -189,6 +223,39 @@ fn disambiguate_by_context(
 
     scored.sort_by(|x, y| y.0.total_cmp(&x.0));
     (scored[0].0 - scored[1].0 >= CONTEXT_TIEBREAK_MARGIN).then_some(scored[0].1)
+}
+
+/// Whether the lowest matched ancestor of `before` whose partner is an ancestor of `after` lies
+/// below the root: the move stays inside a construct both places belong to (the `if` whose block a
+/// comment leaves for its condition), rather than only inside the file.
+fn moves_within_a_survivor(
+    before: usize,
+    after: usize,
+    before_parents: &rustc_hash::FxHashMap<usize, usize>,
+    after_parents: &rustc_hash::FxHashMap<usize, usize>,
+    diff: &ASTDiff,
+) -> bool {
+    let is_after_ancestor = |candidate: usize| {
+        let mut cur = after;
+        while let Some(&parent) = after_parents.get(&cur) {
+            if parent == candidate {
+                return true;
+            }
+            cur = parent;
+        }
+        false
+    };
+    let mut cur = before;
+    while let Some(&parent) = before_parents.get(&cur) {
+        if let Some(&partner) = diff.before_node_map.get(&parent)
+            && partner != 0
+            && is_after_ancestor(partner)
+        {
+            return before_parents.contains_key(&parent);
+        }
+        cur = parent;
+    }
+    false
 }
 
 /// The kind of the outermost reference node (see `is_reference`) on `node`'s unmapped ancestor
@@ -275,7 +342,7 @@ fn remap_moved_subtree(
 
 #[cfg(test)]
 mod tests {
-    use super::{MAX_AMBIGUOUS_CANDIDATES, disambiguate_by_context};
+    use super::{MAX_AMBIGUOUS_CANDIDATES, disambiguate_by_context, moves_within_a_survivor};
     use crate::code::similarity::SimilaritySketch;
     use crate::code::{ASTMetadata, Code, Language};
     use crate::diff::diff_code;
@@ -313,6 +380,74 @@ mod tests {
             deleted.len(),
             inserted.len()
         );
+    }
+
+    /// The id of the first node of `kind` in `code`.
+    fn first_of_kind(code: &Code, kind: &str) -> usize {
+        let mut stack = vec![code.ast.as_ref().unwrap().root_node()];
+        while let Some(node) = stack.pop() {
+            if node.kind() == kind {
+                return node.id();
+            }
+            let mut cursor = node.walk();
+            let children: Vec<_> = node.children(&mut cursor).collect();
+            stack.extend(children.into_iter().rev());
+        }
+        panic!("no {kind} in the source");
+    }
+
+    /// A comment is one node, below the size floor, but a sentence identical on both sides is not
+    /// a coincidence: it moves when it stays inside a construct that survived around both places
+    /// (`java-defects4j-closure-121-inlinevariables`: from an `if`'s block into its condition).
+    #[test]
+    fn a_wordy_comment_moves_within_the_construct_it_stays_in() {
+        let before = Code::from_string(
+            "class A { void f() {\n  if (ready()) {\n    // inline only when declared constant\n    run();\n  }\n} }\n",
+            &Language::Java,
+        );
+        let after = Code::from_string(
+            "class A { void f() {\n  if (ready() &&\n      // inline only when declared constant\n      constant()) {\n    run();\n  }\n} }\n",
+            &Language::Java,
+        );
+
+        let ast = diff_code(&before, &after).ast.unwrap();
+
+        let (b, a) = (
+            first_of_kind(&before, "line_comment"),
+            first_of_kind(&after, "line_comment"),
+        );
+        assert_eq!(ast.before_node_map.get(&b).copied(), Some(a));
+    }
+
+    /// Out of a deleted function into a kept one, the same sentence reads as new text: the only
+    /// construct around both places is the file
+    /// (`lua-luakit-luakit-actual-test-change-merging-two-tests-into-one`). Within the kept
+    /// function it is a move.
+    #[test]
+    fn a_move_counts_as_within_a_survivor_only_below_the_root() {
+        // before: file 1 -> (fn 2 [deleted] -> comment 3, fn 4 -> comment 5)
+        // after:  file 11 -> fn 14 -> comment 13
+        let before_parents: rustc_hash::FxHashMap<usize, usize> =
+            [(2, 1), (3, 2), (4, 1), (5, 4)].into_iter().collect();
+        let after_parents: rustc_hash::FxHashMap<usize, usize> =
+            [(14, 11), (13, 14)].into_iter().collect();
+        let mut diff = crate::diff::ASTDiff::default();
+        diff.before_node_map.extend([(1, 11), (4, 14), (2, 0)]);
+
+        assert!(!moves_within_a_survivor(
+            3,
+            13,
+            &before_parents,
+            &after_parents,
+            &diff
+        ));
+        assert!(moves_within_a_survivor(
+            5,
+            13,
+            &before_parents,
+            &after_parents,
+            &diff
+        ));
     }
 
     /// Two tiny identical statements in unrelated functions must NOT be "moved" onto each other -

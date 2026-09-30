@@ -193,7 +193,7 @@ mod tests {
         );
         assert_eq!(
             limits.get("c-sched-ext-scx-many-many-moves-some-deletes-some-adds"),
-            Some(&(10, 10)),
+            Some(&(3, 3)),
             "the clamped call shape reads its two numbers"
         );
         assert_eq!(

@@ -2034,3 +2034,115 @@ fn node_map_disagreement_census() -> Result<()> {
     }
     Ok(())
 }
+
+/// EXPLORATORY: every position a matched pair pins whose occupant reads as one token and is
+/// deleted beside an inserted one ([`invariants::pinned_removed_lexemes`]), classified by shape so
+/// a rule over them can be scoped before it becomes an invariant. The shapes:
+///
+/// * `token-in-matched-wrapper` - the mapping pairs a node like C's `null` and deletes and
+///   inserts its only token, `NULL` against `nullptr`.
+/// * `wrapper/wrapper`, `leaf/wrapper`, `wrapper/leaf`, `leaf/leaf` - what occupies the position
+///   on each side: a node around one token deleted or inserted whole, or a leaf (`!=` against
+///   `==`, or a named leaf).
+///
+/// `inv18` marks what invariant 18 reports (named, one token each, different kinds);
+/// `token-in-matched-wrapper` and `wrapper/wrapper` of one kind are what invariant 20 reports.
+///
+/// `cargo test --release --lib --features test-fixtures pinned_lexeme_census -- --ignored
+/// --nocapture`
+#[test]
+#[ignore]
+fn pinned_lexeme_census() -> Result<()> {
+    use crate::test::helper::human_mapping::invariants::{
+        TreeContext, field_arity, field_of, lexeme_token, pinned_removed_lexemes,
+    };
+    use std::collections::BTreeMap;
+
+    let mut by_class: BTreeMap<String, (usize, std::collections::BTreeSet<String>)> =
+        BTreeMap::new();
+    let mut by_kinds: BTreeMap<String, usize> = BTreeMap::new();
+    let (mut total, mut fixtures) = (0usize, 0usize);
+    for (name, dir) in crate::test::helper::handmade_test_case_dirs()? {
+        let Some((before, after)) = crate::test::helper::code_pair_from_dir(&dir)? else {
+            continue;
+        };
+        let Ok(mapping) = load(&name) else { continue };
+        let (Some(before_tree), Some(after_tree)) = (before.ast.as_ref(), after.ast.as_ref())
+        else {
+            continue;
+        };
+        let context = TreeContext::build(&mapping, before_tree.root_node(), after_tree.root_node());
+        let found = pinned_removed_lexemes(&context, &before, &after);
+        if found.is_empty() {
+            continue;
+        }
+        fixtures += 1;
+        for (b, a) in found {
+            total += 1;
+            let before_parent = b.parent().expect("a pinned occupant has a parent");
+            let wraps =
+                |node: Node| lexeme_token(node).is_some_and(|token| token.id() != node.id());
+            let in_matched_wrapper = |node: Node| {
+                node.parent()
+                    .and_then(lexeme_token)
+                    .is_some_and(|token| token.id() == node.id())
+            };
+            let shape = if in_matched_wrapper(b) && in_matched_wrapper(a) {
+                "token-in-matched-wrapper".to_string()
+            } else {
+                let side = |node: Node| if wraps(node) { "wrapper" } else { "leaf" };
+                format!("{}/{}", side(b), side(a))
+            };
+            let named = |node: Node| if node.is_named() { "named" } else { "unnamed" };
+            let kinds = if b.kind() == a.kind() {
+                "same-kind"
+            } else {
+                "cross-kind"
+            };
+            let inv18 =
+                b.is_named() && a.is_named() && b.kind() != a.kind() && !(wraps(b) && wraps(a));
+            let pinned = match field_of(before_parent, b) {
+                Some(field) if field_arity(before_parent, &field) == 1 => format!("field:{field}"),
+                _ => "elimination".to_string(),
+            };
+            let text = |node: Node, contents: &str| {
+                let token = lexeme_token(node).unwrap_or(node);
+                contents[token.byte_range()]
+                    .chars()
+                    .take(30)
+                    .collect::<String>()
+            };
+            let class = format!(
+                "{shape:<26} {:<7}/{:<7} {kinds:<10}{}",
+                named(b),
+                named(a),
+                if inv18 { " inv18" } else { "" }
+            );
+            let entry = by_class.entry(class.clone()).or_default();
+            entry.0 += 1;
+            entry.1.insert(name.clone());
+            *by_kinds
+                .entry(format!("{} -> {}", b.kind(), a.kind()))
+                .or_default() += 1;
+            println!(
+                "{name}\t{class}\t{}.{pinned}\tbefore {} {:?}\tafter {} {:?}",
+                before_parent.kind(),
+                b.start_position().row + 1,
+                text(b, &before.contents),
+                a.start_position().row + 1,
+                text(a, &after.contents),
+            );
+        }
+    }
+    println!("\n{total} pinned deleted+inserted lexemes in {fixtures} fixtures\n");
+    for (class, (count, names)) in &by_class {
+        println!("{count:>6}  {:>4} fixtures  {class}", names.len());
+    }
+    println!();
+    let mut kinds: Vec<_> = by_kinds.into_iter().collect();
+    kinds.sort_by_key(|(_, count)| std::cmp::Reverse(*count));
+    for (pair, count) in kinds.iter().take(60) {
+        println!("{count:>6}  {pair}");
+    }
+    Ok(())
+}

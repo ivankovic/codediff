@@ -21,12 +21,8 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // A <table> is wrapped in a new <div>. codediff's match for its `start_tag`/`tag_name` chain
-    // differs from the human's, and one attribute's subtree is deleted rather than followed.
-    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
+    test::helper::human_mapping::assert_matches_human_mapping(
         "html-gohugoio-hugo-enclose-table-with-div-and-add-thead-tbody",
-        4,
-        3,
     )
 }
 

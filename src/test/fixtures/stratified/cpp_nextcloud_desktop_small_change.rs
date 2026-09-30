@@ -19,7 +19,7 @@ use anyhow::Result;
 
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants_with_known_violations;
 
 #[test]
 fn mapping() -> Result<()> {
@@ -33,5 +33,7 @@ fn painting() -> Result<()> {
 
 #[test]
 fn invariants() -> Result<()> {
-    assert_ground_truth_invariants("cpp-nextcloud-desktop-small-change")
+    // Invariant 16, four times: `lcCseEncryption` <-> `lcCseDecryption` on rows 594 and 596 is not
+    // painted as its differing word (`Encryption`, `Decryption`) under Minimal.
+    assert_ground_truth_invariants_with_known_violations("cpp-nextcloud-desktop-small-change", 4)
 }

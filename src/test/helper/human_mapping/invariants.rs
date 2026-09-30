@@ -54,9 +54,14 @@
 //! 17. [`boolean_flips_are_one_edit`] - a boolean the mapping pairs is not painted `Delete` on one
 //!     side and `Insert` on the other.
 //! 18. [`single_valued_fields_hold_a_pair`] - a matched pair's single-valued named field holds a
-//!     matched pair, never a delete beside an insert.
+//!     matched pair, never a delete beside an insert, when the two read as one token each and
+//!     differ in kind (`0` -> `nullptr`).
 //! 19. [`tokens_are_painted_whole`] - every byte of an operator such as `<=`, a boolean, or an
 //!     access modifier such as `private` carries the same highlighting.
+//! 20. [`wrapped_tokens_are_paired`] - a node that is nothing but one unnamed token, such as C's
+//!     `null` around `NULL` or `nullptr`, in a position a matched pair pins, is paired with one of
+//!     its own kind there: `NULL` -> `nullptr` is one element changing its text, never a delete
+//!     beside an insert.
 //!
 //! 4 and 5 read only the paintings `FULL` answers to (see [`paintings_with_labels`]); `MINIMAL`
 //! is free to leave whitespace alone. 9 is the only rule comparing the two ground truths'
@@ -70,7 +75,7 @@
 //! while its `{` stays) and "a matched pair lands in one painting entry" (a rename is ordinarily
 //! painted as a `Delete` plus an `Insert`).
 //!
-//! **All nineteen are intra-fixture**; `cross_fixture_convention_census`
+//! **All twenty are intra-fixture**; `cross_fixture_convention_census`
 //! (`tests/exploratory.rs`) covers the cross-fixture axis. They run as each fixture stub's
 //! `invariants()` test, so a fixture records its own known violations beside its other clamps
 //! rather than in a corpus-wide exemption list.
@@ -103,7 +108,7 @@ pub struct ViolationSite {
 /// look. The sites let a tool (`human_solver`'s `V` popup) jump to each location.
 #[derive(Debug, Clone)]
 pub struct GroundTruthViolation {
-    /// Which of the nineteen rules, numbered as the module doc lists them.
+    /// Which of the twenty rules, numbered as the module doc lists them.
     pub invariant: u8,
     /// The painting this is about, or `None` for the three rules that read only the tree mapping.
     pub painting: Option<String>,
@@ -299,6 +304,7 @@ pub fn ground_truth_invariant_violations_for(
             &context, before, after,
         ));
         violations.extend(single_valued_fields_hold_a_pair(&context, before, after));
+        violations.extend(wrapped_tokens_are_paired(&context, before, after));
     }
     // Invariants 4 and 5 read only the paintings `FULL` answers to.
     let (leading, interior, minimal_indentation) =
@@ -1478,6 +1484,20 @@ impl<'tree> TreeContext<'tree> {
             }
         }
     }
+
+    /// The node `node` is matched with on the other side, or `None` when the mapping pairs it with
+    /// nothing.
+    pub(crate) fn partner(&self, node: Node<'tree>, side: usize) -> Option<Node<'tree>> {
+        let matches = if side == 0 {
+            &self.caches.before_match
+        } else {
+            &self.caches.after_match
+        };
+        matches
+            .get(&node.id())
+            .and_then(|id| self.ids[1 - side].get(id))
+            .copied()
+    }
 }
 
 fn index_tree<'tree>(
@@ -1884,7 +1904,7 @@ fn identical_entries_are_token_identical(
 }
 
 /// Which field of `parent` holds `node`, or `None` when the grammar gives it no field.
-fn field_of<'tree>(parent: Node<'tree>, node: Node<'tree>) -> Option<String> {
+pub(crate) fn field_of<'tree>(parent: Node<'tree>, node: Node<'tree>) -> Option<String> {
     let mut cursor = parent.walk();
     let children: Vec<Node<'tree>> = parent.children(&mut cursor).collect();
     children
@@ -1896,7 +1916,7 @@ fn field_of<'tree>(parent: Node<'tree>, node: Node<'tree>) -> Option<String> {
 
 /// How many of `parent`'s children carry `field`. More than one makes it a list, and a position
 /// in a list is not an identity.
-fn field_arity(parent: Node, field: &str) -> usize {
+pub(crate) fn field_arity(parent: Node, field: &str) -> usize {
     let mut cursor = parent.walk();
     let count = parent.children(&mut cursor).count();
     (0..count)
@@ -1909,7 +1929,7 @@ fn field_arity(parent: Node, field: &str) -> usize {
 /// * **By name** - a *named* field holding exactly one child on both sides.
 /// * **By elimination** - equal child counts with every *other* position paired. Needed because
 ///   some grammars name no fields where position is obvious (tree-sitter-java's `argument_list`).
-fn pinned_counterpart<'tree>(
+pub(crate) fn pinned_counterpart<'tree>(
     context: &TreeContext<'tree>,
     before_leaf: Node<'tree>,
     before_parent: Node<'tree>,
@@ -1949,45 +1969,109 @@ fn pinned_counterpart<'tree>(
     Some(after_children[index])
 }
 
+/// The token a node reads as: the node itself when it is a leaf, or its only child when that is
+/// an unnamed leaf spanning all of it, as in the C grammar's `null` around `NULL` or `nullptr`.
+/// `None` for anything larger - a Rust `line_comment` whose only child is its `//` reads as more
+/// than that token.
+pub(crate) fn lexeme_token(node: Node) -> Option<Node> {
+    match node.child_count() {
+        0 => Some(node),
+        1 => node.child(0).filter(|child| {
+            !child.is_named() && child.child_count() == 0 && child.byte_range() == node.byte_range()
+        }),
+        _ => None,
+    }
+}
+
+/// A node that is nothing but one unnamed token ([`lexeme_token`]): C's `null`, not `NULL`.
+fn wraps_one_token(node: Node) -> bool {
+    lexeme_token(node).is_some_and(|token| token.id() != node.id())
+}
+
+/// Every position a matched pair pins ([`pinned_counterpart`]) whose occupant reads as one token
+/// ([`lexeme_token`]) and is deleted on the before side while the after side's is inserted, as
+/// `(before, after)` occupants. An occupant is the token itself, or the node wrapping it when that
+/// node is unmatched too; a wrapper the mapping pairs puts its token in its own pinned position.
+/// Visible tokens only.
+pub(crate) fn pinned_removed_lexemes<'tree>(
+    context: &TreeContext<'tree>,
+    before: &Code,
+    after: &Code,
+) -> Vec<(Node<'tree>, Node<'tree>)> {
+    let mut found = Vec::new();
+    for &token in &context.leaves[0] {
+        if !is_visible_leaf(token, &before.contents)
+            || context.status(token, 0) != LeafStatus::Removed
+        {
+            continue;
+        }
+        let mut occupants = vec![token];
+        if let Some(wrapper) = token.parent()
+            && lexeme_token(wrapper).is_some_and(|inner| inner.id() == token.id())
+            && context.partner(wrapper, 0).is_none()
+        {
+            occupants.push(wrapper);
+        }
+        for occupant in occupants {
+            let Some(parent) = occupant.parent() else {
+                continue;
+            };
+            let Some(after_parent) = context.partner(parent, 0) else {
+                continue;
+            };
+            let Some(after_occupant) = pinned_counterpart(context, occupant, parent, after_parent)
+            else {
+                continue;
+            };
+            let Some(after_token) = lexeme_token(after_occupant) else {
+                continue;
+            };
+            if after_occupant.id() != after_token.id()
+                && context.partner(after_occupant, 1).is_some()
+            {
+                continue;
+            }
+            if !is_visible_leaf(after_token, &after.contents)
+                || context.status(after_token, 1) != LeafStatus::Removed
+            {
+                continue;
+            }
+            found.push((occupant, after_occupant));
+        }
+    }
+    found
+}
+
 /// Invariant 18: an unambiguous position of a matched pair holds a matched pair, never a
 /// delete beside an insert: the parent match already says the role persists.
 ///
-/// Each condition prevents a real false positive: *childless* nodes (an empty container has no
-/// named children either), a *named* field (two adjacent comments share no role), and arity *one*
-/// (a removed flag beside an added subcommand in one argument list is not a pair).
-/// `LeafStatus::Undecided` is not a violation.
+/// Each condition prevents a real false positive: nodes that *read as one token*
+/// ([`lexeme_token`]: a leaf, or a node around one unnamed token spanning all of it - an empty
+/// container has no named children either, but `()` is two tokens), a *named* field (two adjacent
+/// comments share no role), and arity *one* (a removed flag beside an added subcommand in one
+/// argument list is not a pair). `LeafStatus::Undecided` is not a violation.
+///
+/// Wrappers count since 2026-09-30: C's `nullptr` is a `null` node around the token, so `0` ->
+/// `nullptr` escaped a leaf-only test, as did Java's `?` (a `wildcard`). Two wrappers against each
+/// other are not this rule's: see invariant 20.
 fn single_valued_fields_hold_a_pair(
     context: &TreeContext,
     before: &Code,
     after: &Code,
 ) -> Vec<GroundTruthViolation> {
     let mut violations = Vec::new();
-    for before_leaf in &context.leaves[0] {
-        if !before_leaf.is_named() || context.status(*before_leaf, 0) != LeafStatus::Removed {
+    for (before_leaf, after_leaf) in pinned_removed_lexemes(context, before, after) {
+        if !before_leaf.is_named() || !after_leaf.is_named() {
+            continue;
+        }
+        // Two wrappers are left out: of one kind they are invariant 20's, and of two kinds they are
+        // two roles, not one element (`static` -> `const`, see `wrapped_tokens_are_paired`).
+        if wraps_one_token(before_leaf) && wraps_one_token(after_leaf) {
             continue;
         }
         let Some(before_parent) = before_leaf.parent() else {
             continue;
         };
-        let Some(after_parent) = context
-            .caches
-            .before_match
-            .get(&before_parent.id())
-            .and_then(|id| context.ids[1].get(id))
-        else {
-            continue;
-        };
-        let Some(after_leaf) =
-            pinned_counterpart(context, *before_leaf, before_parent, *after_parent)
-        else {
-            continue;
-        };
-        if !after_leaf.is_named()
-            || after_leaf.child_count() != 0
-            || context.status(after_leaf, 1) != LeafStatus::Removed
-        {
-            continue;
-        }
         // Cross-kind pairs only: `Update` requires equal kinds, so a cross-kind pair has no
         // schema representation, while a same-kind delete+insert is a decision the author was
         // entitled to make.
@@ -2001,7 +2085,7 @@ fn single_valued_fields_hold_a_pair(
                 "{} holds {} `{}` on before row {} and {} `{}` on after row {}, but the mapping \
                  deletes one and inserts the other - the parents are matched and nothing else can \
                  occupy that position, so the two are the same element",
-                field_of(before_parent, *before_leaf).map_or_else(
+                field_of(before_parent, before_leaf).map_or_else(
                     || before_parent.kind().to_string(),
                     |field| format!("{}.{field}", before_parent.kind()),
                 ),
@@ -2019,11 +2103,107 @@ fn single_valued_fields_hold_a_pair(
             vec![
                 ViolationSite {
                     side: 0,
-                    span: span_of_node(*before_leaf),
+                    span: span_of_node(before_leaf),
                 },
                 ViolationSite {
                     side: 1,
                     span: span_of_node(after_leaf),
+                },
+            ],
+        ));
+    }
+    violations
+}
+
+/// Invariant 20: a node that is nothing but one unnamed token, in a position a matched pair pins
+/// ([`pinned_counterpart`]), is paired. The mapping can break that two ways, both reported:
+///
+/// * **The node is matched and its token deleted and inserted.** Matching `null` with `null`
+///   already says the element persists, and the token is all of it.
+/// * **The node is deleted and inserted whole.** Its parents are matched and nothing else can
+///   occupy the position, so `NULL` -> `nullptr` is one element changing its text.
+///
+/// Unlike invariant 18 this holds for equal kinds too: `null` against `null` is the case it exists
+/// for. What makes a same-kind delete+insert a judgment there (a renamed field of `a.b`) is a name
+/// the author may call unrelated; a node that is only a keyword-like token has no identity beside
+/// its position. Nodes of that shape: C/C++ `null`, Rust `boolean_literal`, C++
+/// `access_specifier`. The corpus had none of either break when this was added (2026-09-30,
+/// `pinned_lexeme_census`); a leaf against a wrapped token (`0` -> `nullptr`) is invariant 18's.
+///
+/// **Same kind only.** Two wrappers of different kinds are two different roles, not one element:
+/// `static auto width{...}` -> `const auto w = ...` removes a storage class and adds a type
+/// qualifier in the one position of a declaration's specifiers that elimination pins
+/// (`cpp-microsoft-terminal-funny-code-comment`). Neither this rule nor 18 checks that pair.
+fn wrapped_tokens_are_paired(
+    context: &TreeContext,
+    before: &Code,
+    after: &Code,
+) -> Vec<GroundTruthViolation> {
+    let mut violations = Vec::new();
+    for (before_node, after_node) in pinned_removed_lexemes(context, before, after) {
+        let whole = wraps_one_token(before_node) && wraps_one_token(after_node);
+        let token_of_matched = |token: Node| {
+            !token.is_named()
+                && token.parent().is_some_and(|parent| {
+                    lexeme_token(parent).is_some_and(|t| t.id() == token.id())
+                })
+        };
+        let inside = token_of_matched(before_node) && token_of_matched(after_node);
+        if !whole && !inside {
+            continue;
+        }
+        // The wrappers' kinds: the nodes themselves, or the matched parents of the two tokens.
+        let wrapper_kinds = if whole {
+            (Some(before_node.kind()), Some(after_node.kind()))
+        } else {
+            (
+                before_node.parent().map(|parent| parent.kind()),
+                after_node.parent().map(|parent| parent.kind()),
+            )
+        };
+        if wrapper_kinds.0 != wrapper_kinds.1 {
+            continue;
+        }
+        let before_token = lexeme_token(before_node).unwrap_or(before_node);
+        let after_token = lexeme_token(after_node).unwrap_or(after_node);
+        let text = |node: Node, contents: &str| {
+            node.utf8_text(contents.as_bytes())
+                .unwrap_or("<unreadable>")
+                .to_string()
+        };
+        let wrapper_kind = if whole {
+            before_node.kind()
+        } else {
+            before_token.parent().map_or("?", |parent| parent.kind())
+        };
+        let how = if whole {
+            "deletes the one and inserts the other whole - their parents are matched and nothing \
+             else can occupy that position"
+        } else {
+            "pairs the two but deletes one token and inserts the other - the node is nothing but \
+             its token"
+        };
+        violations.push(GroundTruthViolation::new(
+            20,
+            None,
+            format!(
+                "`{wrapper_kind}` reads `{}` on before row {} and `{}` on after row {}, and the \
+                 mapping {how}, so `{}` -> `{}` is one element changing its text",
+                text(before_token, &before.contents),
+                row_of(&before.contents, before_token.start_byte()),
+                text(after_token, &after.contents),
+                row_of(&after.contents, after_token.start_byte()),
+                text(before_token, &before.contents),
+                text(after_token, &after.contents),
+            ),
+            vec![
+                ViolationSite {
+                    side: 0,
+                    span: span_of_node(before_token),
+                },
+                ViolationSite {
+                    side: 1,
+                    span: span_of_node(after_token),
                 },
             ],
         ));
@@ -3715,6 +3895,222 @@ mod tests {
         let mapping = mapping_by_text(&before, &after);
         assert!(
             violations_mentioning(&mapping, &before, &after, "read byte-identically").is_empty()
+        );
+    }
+
+    // ── Invariant 20 ────────────────────────────────────────────────────────────────────────
+
+    fn c(source: &str) -> Code {
+        Code::from_string(source, &Language::C)
+    }
+
+    fn first_of_kind<'tree>(node: Node<'tree>, kind: &str) -> Option<Node<'tree>> {
+        if node.kind() == kind {
+            return Some(node);
+        }
+        let mut cursor = node.walk();
+        let children: Vec<Node<'tree>> = node.children(&mut cursor).collect();
+        children
+            .into_iter()
+            .find_map(|child| first_of_kind(child, kind))
+    }
+
+    fn wrapped_token_violations(
+        mapping: &HumanMapping,
+        before: &Code,
+        after: &Code,
+    ) -> Vec<String> {
+        ground_truth_invariant_violations_for(mapping, before, after)
+            .expect("checks run")
+            .into_iter()
+            .filter(|violation| violation.invariant == 20)
+            .map(|violation| violation.message)
+            .collect()
+    }
+
+    /// `mapping` without the entries on `before` or `after` or any node under them, plus `added`.
+    fn replacing(
+        mut mapping: HumanMapping,
+        before: Node,
+        after: Node,
+        added: Vec<HumanMappingEntry>,
+    ) -> HumanMapping {
+        let (before_path, after_path) = (path_for_node(before), path_for_node(after));
+        mapping.entries.retain(|entry| {
+            !entry
+                .before_path
+                .as_ref()
+                .is_some_and(|path| path.starts_with(&before_path))
+                && !entry
+                    .after_path
+                    .as_ref()
+                    .is_some_and(|path| path.starts_with(&after_path))
+        });
+        mapping.entries.extend(added);
+        mapping
+    }
+
+    fn entry(
+        operation: HumanOperation,
+        before: Option<Node>,
+        after: Option<Node>,
+    ) -> HumanMappingEntry {
+        HumanMappingEntry {
+            operation,
+            before_path: before.map(path_for_node),
+            after_path: after.map(path_for_node),
+        }
+    }
+
+    #[test]
+    fn null_to_nullptr_paired_by_text_is_the_expected_shape() {
+        let (before, after) = (c("int *p = NULL;\n"), c("int *p = nullptr;\n"));
+        let mapping = mapping_by_text(&before, &after);
+        assert!(wrapped_token_violations(&mapping, &before, &after).is_empty());
+    }
+
+    #[test]
+    fn a_matched_null_whose_token_is_deleted_and_inserted_is_reported() {
+        let (before, after) = (c("int *p = NULL;\n"), c("int *p = nullptr;\n"));
+        let before_null = first_of_kind(before.ast.as_ref().unwrap().root_node(), "null").unwrap();
+        let after_null = first_of_kind(after.ast.as_ref().unwrap().root_node(), "null").unwrap();
+        let (before_token, after_token) =
+            (before_null.child(0).unwrap(), after_null.child(0).unwrap());
+        let mapping = replacing(
+            mapping_by_text(&before, &after),
+            before_token,
+            after_token,
+            vec![
+                entry(HumanOperation::Delete, Some(before_token), None),
+                entry(HumanOperation::Insert, None, Some(after_token)),
+            ],
+        );
+        let found = wrapped_token_violations(&mapping, &before, &after);
+        assert_eq!(found.len(), 1, "{found:?}");
+        assert!(
+            found[0].contains("`null` reads `NULL` on before row 1 and `nullptr` on after row 1"),
+            "{found:?}"
+        );
+        assert!(found[0].contains("nothing but its token"), "{found:?}");
+    }
+
+    #[test]
+    fn a_null_deleted_and_inserted_whole_in_a_pinned_position_is_reported() {
+        let (before, after) = (c("int *p = NULL;\n"), c("int *p = nullptr;\n"));
+        let before_null = first_of_kind(before.ast.as_ref().unwrap().root_node(), "null").unwrap();
+        let after_null = first_of_kind(after.ast.as_ref().unwrap().root_node(), "null").unwrap();
+        let mapping = replacing(
+            mapping_by_text(&before, &after),
+            before_null,
+            after_null,
+            vec![
+                entry(HumanOperation::DeleteWithChildren, Some(before_null), None),
+                entry(HumanOperation::InsertWithChildren, None, Some(after_null)),
+            ],
+        );
+        let found = wrapped_token_violations(&mapping, &before, &after);
+        assert_eq!(found.len(), 1, "{found:?}");
+        assert!(found[0].contains("inserts the other whole"), "{found:?}");
+    }
+
+    /// `static` -> `const` is a storage class removed beside a type qualifier added: two wrappers
+    /// of different kinds are two roles, so neither invariant 20 nor 18 pairs them
+    /// (`cpp-microsoft-terminal-funny-code-comment`).
+    #[test]
+    fn wrappers_of_different_kinds_are_not_one_element() {
+        let (before, after) = (c("static int x = 1;\n"), c("const int x = 1;\n"));
+        let before_static = first_of_kind(
+            before.ast.as_ref().unwrap().root_node(),
+            "storage_class_specifier",
+        )
+        .unwrap();
+        let after_const =
+            first_of_kind(after.ast.as_ref().unwrap().root_node(), "type_qualifier").unwrap();
+        assert_eq!(
+            (before_static.child_count(), after_const.child_count()),
+            (1, 1),
+            "the premise: both are wrappers around one token"
+        );
+        let mapping = replacing(
+            mapping_by_text(&before, &after),
+            before_static,
+            after_const,
+            vec![
+                entry(
+                    HumanOperation::DeleteWithChildren,
+                    Some(before_static),
+                    None,
+                ),
+                entry(HumanOperation::InsertWithChildren, None, Some(after_const)),
+            ],
+        );
+        let reported: Vec<String> =
+            ground_truth_invariant_violations_for(&mapping, &before, &after)
+                .expect("checks run")
+                .into_iter()
+                .filter(|violation| matches!(violation.invariant, 18 | 20))
+                .map(|violation| violation.message)
+                .collect();
+        assert!(reported.is_empty(), "{reported:?}");
+    }
+
+    /// A Rust `line_comment`'s only child is its `//`, but the comment reads more than that token,
+    /// so pairing the comment says nothing about the `//` (`rust-algorithm-change`).
+    #[test]
+    fn a_node_reading_more_than_its_only_token_is_not_a_wrapper() {
+        let (before, after) = (rust("// a\nfn f() {}\n"), rust("// b\nfn f() {}\n"));
+        let before_comment =
+            first_of_kind(before.ast.as_ref().unwrap().root_node(), "line_comment").unwrap();
+        let after_comment =
+            first_of_kind(after.ast.as_ref().unwrap().root_node(), "line_comment").unwrap();
+        assert_eq!(
+            before_comment.child_count(),
+            1,
+            "the premise: `//` is its only child"
+        );
+        let (before_token, after_token) = (
+            before_comment.child(0).unwrap(),
+            after_comment.child(0).unwrap(),
+        );
+        let mapping = replacing(
+            mapping_by_text(&before, &after),
+            before_token,
+            after_token,
+            vec![
+                entry(HumanOperation::Delete, Some(before_token), None),
+                entry(HumanOperation::Insert, None, Some(after_token)),
+            ],
+        );
+        assert!(wrapped_token_violations(&mapping, &before, &after).is_empty());
+    }
+
+    /// `0` -> `nullptr` is a leaf against a wrapped token: invariant 18's shape, not this one's.
+    #[test]
+    fn a_leaf_against_a_wrapped_token_is_invariant_18s() {
+        let (before, after) = (c("int *p = 0;\n"), c("int *p = nullptr;\n"));
+        let before_zero =
+            first_of_kind(before.ast.as_ref().unwrap().root_node(), "number_literal").unwrap();
+        let after_null = first_of_kind(after.ast.as_ref().unwrap().root_node(), "null").unwrap();
+        let mapping = replacing(
+            mapping_by_text(&before, &after),
+            before_zero,
+            after_null,
+            vec![
+                entry(HumanOperation::Delete, Some(before_zero), None),
+                entry(HumanOperation::InsertWithChildren, None, Some(after_null)),
+            ],
+        );
+        assert!(wrapped_token_violations(&mapping, &before, &after).is_empty());
+        let found: Vec<String> = ground_truth_invariant_violations_for(&mapping, &before, &after)
+            .expect("checks run")
+            .into_iter()
+            .filter(|violation| violation.invariant == 18)
+            .map(|violation| violation.message)
+            .collect();
+        assert_eq!(found.len(), 1, "{found:?}");
+        assert!(
+            found[0].contains("holds number_literal `0` on before row 1 and null `nullptr`"),
+            "{found:?}"
         );
     }
 }

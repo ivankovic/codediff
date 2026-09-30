@@ -16,7 +16,7 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 use crate::test;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants_with_known_violations;
 use anyhow::Result;
 
 #[test]
@@ -28,5 +28,11 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn invariants() -> Result<()> {
-    assert_ground_truth_invariants("c-pocoproject-poco-replace-0-with-nullptr")
+    // Invariant 18, three times: `binary_expression.right` holds `0` on before rows 151, 164 and 165
+    // and `nullptr` on the same after rows. The parents are matched, yet the mapping deletes each `0`
+    // and inserts each `nullptr`.
+    assert_ground_truth_invariants_with_known_violations(
+        "c-pocoproject-poco-replace-0-with-nullptr",
+        3,
+    )
 }

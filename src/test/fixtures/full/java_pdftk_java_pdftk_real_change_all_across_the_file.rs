@@ -26,8 +26,8 @@ fn mapping() -> Result<()> {
     // `class_body`'s constructors with every descendant.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "java-pdftk-java-pdftk-real-change-all-across-the-file",
-        354,
-        243,
+        351,
+        240,
     )
 }
 

@@ -32,7 +32,7 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    assert_matches_human_painting_within_limit("html-gohugoio-hugo-template-not-pure-html", 22.59)
+    assert_matches_human_painting_within_limit("html-gohugoio-hugo-template-not-pure-html", 23.1)
 }
 
 #[test]

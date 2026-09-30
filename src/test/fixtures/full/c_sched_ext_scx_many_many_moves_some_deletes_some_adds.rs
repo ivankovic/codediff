@@ -25,8 +25,8 @@ fn mapping() -> Result<()> {
     // human-`Identical` content across the many moves, not misclassified changes.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "c-sched-ext-scx-many-many-moves-some-deletes-some-adds",
-        10,
-        10,
+        3,
+        3,
     )
 }
 
