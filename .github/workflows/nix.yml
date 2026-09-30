@@ -51,7 +51,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: DeterminateSystems/nix-installer-action@v16
+      - uses: DeterminateSystems/nix-installer-action@v23
 
       # Evaluates every output for every default system (packages, app, devShell), which is where
       # a typo in the flake surfaces, without building any of them.
