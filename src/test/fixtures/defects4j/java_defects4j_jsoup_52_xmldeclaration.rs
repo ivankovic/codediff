@@ -26,6 +26,7 @@ fn mapping() -> Result<()> {
     // Recorded as found, not examined.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "java-defects4j-jsoup-52-xmldeclaration",
+        // Includes the N:M floor: 20 all-to-all group members a one-to-one output cannot reach.
         23,
         16,
     )

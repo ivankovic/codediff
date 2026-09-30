@@ -38,6 +38,16 @@
 //! | 10 | `solve_unresolved_nodes`: delete/insert for every undecided node | closing step |
 //!
 //! [`text`] turns the finished node mapping into the byte ranges the viewers paint.
+//!
+//! **N:M groups.** An [`ASTDiff`] can also say that several nodes correspond to several others as
+//! a whole - one statement became two, three copies became one - which no one-to-one mapping can.
+//! [`ASTDiff::add_group`] records one, and the node maps stay one partner per node: each member
+//! holds a *representative* partner inside its group, so every pass that reads "has a key" as
+//! "decided", and every caller of [`ASTDiff::mapping_for_node`], keeps working. Whoever needs all
+//! of a node's partners asks [`ASTDiff::before_partners`] / [`ASTDiff::after_partners`]. The pipeline
+//! does not produce groups yet: the ground truth does not yet tell a copy from identical new code
+//! in a way a pass could detect (AGENT_LOG, N:M Phase 0), so today only a human mapping's
+//! all-to-all groups arrive here, through `test::helper::human_mapping`.
 pub mod apted;
 pub mod cost;
 pub(crate) mod grouped_greedy_matcher;
@@ -422,6 +432,20 @@ pub struct ASTDiff {
     pub before_node_map: rustc_hash::FxHashMap<usize, usize>,
     /// After node to its before partner, or 0 for an insert.
     pub after_node_map: rustc_hash::FxHashMap<usize, usize>,
+    /// N:M correspondences, each member also in the node maps with a representative partner; see
+    /// the module docs.
+    pub groups: Vec<NodeGroup>,
+    /// Member id to its index in `groups`, per side.
+    before_group: rustc_hash::FxHashMap<usize, usize>,
+    after_group: rustc_hash::FxHashMap<usize, usize>,
+}
+
+/// Nodes on each side that correspond as a whole: every before member to every after member,
+/// none deleted or inserted, whatever the two counts are. Members are in document order.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct NodeGroup {
+    pub before: Vec<usize>,
+    pub after: Vec<usize>,
 }
 
 impl ASTDiff {
@@ -456,8 +480,9 @@ impl ASTDiff {
     }
 
     /// Whether every real pair joins two nodes that exist and are of the same kind, or of a
-    /// cross-kind pair `nodes::kinds_update_allowed` permits. Null mappings always pass. `before`
-    /// gives the language; `node_cache` holds both sides' nodes.
+    /// cross-kind pair `nodes::kinds_update_allowed` permits; every group member's partner lies in
+    /// its group; and the node maps agree outside groups ([`Self::node_map_disagreements`]). Null
+    /// mappings always pass. `before` gives the language; `node_cache` holds both sides' nodes.
     pub fn is_valid(&self, before: &Code, node_cache: &NodeCache) -> bool {
         let language = before.metadata.language.unwrap_or_default();
 
@@ -486,7 +511,50 @@ impl ASTDiff {
             }
         }
 
-        true
+        let partner_in_group = |group: &NodeGroup, member: usize, before_side: bool| {
+            let (map, other) = if before_side {
+                (&self.before_node_map, &group.after)
+            } else {
+                (&self.after_node_map, &group.before)
+            };
+            map.get(&member)
+                .is_some_and(|partner| other.contains(partner))
+        };
+        self.groups.iter().all(|group| {
+            group
+                .before
+                .iter()
+                .all(|&b| partner_in_group(group, b, true))
+                && group
+                    .after
+                    .iter()
+                    .all(|&a| partner_in_group(group, a, false))
+        }) && self.node_map_disagreements().is_empty()
+    }
+
+    /// Pairs the two node maps disagree on outside any group: `before_node_map[b] = a` with
+    /// `after_node_map[a] != b`, or the other way round. A pair here means a node was given a
+    /// second partner and the first was silently overwritten (`add_mapping` never evicts one). As
+    /// `(before_id, after_id)`, sorted.
+    pub fn node_map_disagreements(&self) -> Vec<(usize, usize)> {
+        let mut found = std::collections::BTreeSet::new();
+        for (&b, &a) in &self.before_node_map {
+            if b != 0 && a != 0 && self.after_node_map.get(&a) != Some(&b) {
+                if self.before_group.contains_key(&b) {
+                    continue;
+                }
+                found.insert((b, a));
+            }
+        }
+        for (&a, &b) in &self.after_node_map {
+            if a != 0 && b != 0 && self.before_node_map.get(&b) != Some(&a) {
+                if self.after_group.contains_key(&a) {
+                    continue;
+                }
+                found.insert((b, a));
+            }
+        }
+        found.into_iter().collect()
     }
 
     /// Whether every node of both trees except the roots has a mapping.
@@ -508,7 +576,84 @@ impl ASTDiff {
         true
     }
 
-    /// The partner id and mapping of a node from either side.
+    /// Records an N:M group. `before` and `after` are in document order and must not be empty.
+    ///
+    /// Members are paired in order, and the longer side's surplus each with the last member of the
+    /// shorter side - the representative pairing, written to `mapping` and to the surplus
+    /// members' own node-map entries. A representative keeps the partner it was zipped with, so
+    /// the maps disagree only on surplus members. `mapping` is the pairs' entry, typically
+    /// `Identical` or `MatchButNotIdentical`.
+    pub fn add_group(&mut self, before: &[usize], after: &[usize], mapping: ASTMapping) {
+        assert!(
+            !before.is_empty() && !after.is_empty(),
+            "a group needs members on both sides"
+        );
+        let index = self.groups.len();
+        let zipped = before.len().min(after.len());
+        for i in 0..zipped {
+            self.add_mapping(before[i], after[i], mapping.clone());
+        }
+        for &b in &before[zipped..] {
+            let a = after[zipped - 1];
+            self.mapping.insert((b, a), mapping.clone());
+            self.before_node_map.insert(b, a);
+        }
+        for &a in &after[zipped..] {
+            let b = before[zipped - 1];
+            self.mapping.insert((b, a), mapping.clone());
+            self.after_node_map.insert(a, b);
+        }
+        for &b in before {
+            self.before_group.insert(b, index);
+        }
+        for &a in after {
+            self.after_group.insert(a, index);
+        }
+        self.groups.push(NodeGroup {
+            before: before.to_vec(),
+            after: after.to_vec(),
+        });
+    }
+
+    /// The group a before node is a member of.
+    pub fn before_group(&self, before_id: usize) -> Option<&NodeGroup> {
+        self.before_group
+            .get(&before_id)
+            .map(|&index| &self.groups[index])
+    }
+
+    /// The group an after node is a member of.
+    pub fn after_group(&self, after_id: usize) -> Option<&NodeGroup> {
+        self.after_group
+            .get(&after_id)
+            .map(|&index| &self.groups[index])
+    }
+
+    /// Every after node a before node corresponds to: its group's after side, else its one
+    /// partner. Empty for a delete or an undecided node.
+    pub fn before_partners(&self, before_id: usize) -> &[usize] {
+        if let Some(group) = self.before_group(before_id) {
+            return &group.after;
+        }
+        match self.before_node_map.get(&before_id) {
+            Some(partner) if *partner != 0 => std::slice::from_ref(partner),
+            _ => &[],
+        }
+    }
+
+    /// Every before node an after node corresponds to - see [`Self::before_partners`].
+    pub fn after_partners(&self, after_id: usize) -> &[usize] {
+        if let Some(group) = self.after_group(after_id) {
+            return &group.before;
+        }
+        match self.after_node_map.get(&after_id) {
+            Some(partner) if *partner != 0 => std::slice::from_ref(partner),
+            _ => &[],
+        }
+    }
+
+    /// The partner id and mapping of a node from either side. For a group member, its
+    /// representative partner; [`Self::before_partners`] has them all.
     pub fn mapping_for_node(&self, node_id: &usize) -> Option<(usize, ASTMapping)> {
         if let Some(mapped_id) = self.before_node_map.get(node_id)
             && let Some(mapping) = self.mapping.get(&(*node_id, *mapped_id))
@@ -1182,6 +1327,92 @@ mod tests {
         );
 
         Ok(())
+    }
+
+    /// The statement ids of the body of `code`'s first item, in order.
+    fn body_statements(code: &Code) -> Vec<usize> {
+        let root = code.ast.as_ref().unwrap().root_node();
+        let body = root.child(0).unwrap().child_by_field_name("body").unwrap();
+        let mut cursor = body.walk();
+        body.named_children(&mut cursor)
+            .map(|node| node.id())
+            .collect()
+    }
+
+    #[test]
+    fn a_group_zips_its_members_and_pairs_the_surplus_with_the_last_representative() {
+        let mut diff = ASTDiff::default();
+        diff.add_group(
+            &[1, 2, 3],
+            &[10, 20],
+            ASTMapping::identical(ASTMappingReason::IdenticalHash),
+        );
+        assert_eq!(diff.before_node_map[&1], 10);
+        assert_eq!(diff.before_node_map[&2], 20);
+        assert_eq!(diff.before_node_map[&3], 20);
+        // The representative keeps the partner it was zipped with.
+        assert_eq!(diff.after_node_map[&20], 2);
+        assert_eq!(diff.mapping.len(), 3);
+        assert!(diff.mapping.contains_key(&(3, 20)));
+        assert!(diff.node_map_disagreements().is_empty());
+    }
+
+    #[test]
+    fn a_group_member_has_the_whole_other_side_as_partners() {
+        let mut diff = ASTDiff::default();
+        let identical = ASTMapping::identical(ASTMappingReason::IdenticalHash);
+        diff.add_group(&[1], &[10, 20, 30], identical.clone());
+        diff.add_mapping(2, 40, identical);
+        diff.add_mapping(3, 0, ASTMapping::deleted(ASTMappingReason::UnresolvedNode));
+
+        assert_eq!(diff.before_partners(1), &[10, 20, 30]);
+        assert_eq!(diff.after_partners(30), &[1]);
+        assert_eq!(diff.before_partners(2), &[40]);
+        assert_eq!(diff.after_partners(40), &[2]);
+        assert!(diff.before_partners(3).is_empty());
+        assert!(diff.before_partners(99).is_empty());
+        assert_eq!(
+            diff.after_group(20),
+            Some(&NodeGroup {
+                before: vec![1],
+                after: vec![10, 20, 30],
+            })
+        );
+        assert_eq!(diff.before_group(2), None);
+        // One-partner callers see the representative.
+        assert_eq!(
+            diff.mapping_for_node(&30).map(|(partner, _)| partner),
+            Some(1)
+        );
+    }
+
+    #[test]
+    fn an_overwritten_partner_is_a_disagreement() {
+        let mut diff = ASTDiff::default();
+        let identical = ASTMapping::identical(ASTMappingReason::IdenticalHash);
+        diff.add_mapping(1, 10, identical.clone());
+        diff.add_mapping(2, 10, identical);
+        assert_eq!(diff.node_map_disagreements(), vec![(1, 10)]);
+    }
+
+    #[test]
+    fn a_group_member_whose_partner_leaves_the_group_is_invalid() {
+        let before = Code::from_string("fn f() { foo(); foo(); }", &crate::code::Language::Rust);
+        let after = Code::from_string("fn f() { foo(); }", &crate::code::Language::Rust);
+        let node_cache = NodeCache::build(&before, &after);
+        let (copies, merged) = (body_statements(&before), body_statements(&after));
+        assert_eq!((copies.len(), merged.len()), (2, 1));
+
+        let mut diff = ASTDiff::default();
+        diff.add_group(
+            &copies,
+            &merged,
+            ASTMapping::identical(ASTMappingReason::IdenticalHash),
+        );
+        assert!(diff.is_valid(&before, &node_cache));
+
+        diff.before_node_map.insert(copies[1], 0);
+        assert!(!diff.is_valid(&before, &node_cache));
     }
 
     #[test]

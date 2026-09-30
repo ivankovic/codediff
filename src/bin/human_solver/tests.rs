@@ -324,6 +324,7 @@ fn render_panel_only_scans_the_visible_window_not_the_whole_flat_list() {
                 None,
                 false,
                 424242,
+                None,
                 &std::collections::BTreeSet::new(),
                 &[],
             )
@@ -793,7 +794,6 @@ fn render_modal_prompt_search_shows_the_prefilled_query_and_instructions() {
                 "Minimal",
                 TextOverlay::Human,
                 None,
-                None,
                 DiffPickerData::default(),
                 None,
             )
@@ -832,7 +832,6 @@ fn render_modal_prompt_promote_name_shows_the_actual_target_dataset_not_a_fixed_
                 &HumanMapping::default(),
                 "Minimal",
                 TextOverlay::Human,
-                None,
                 None,
                 DiffPickerData::default(),
                 None,
@@ -1376,7 +1375,7 @@ fn painting_names(app: &App) -> Vec<String> {
         .collect()
 }
 
-/// There is no undo for a painting, so `D` needs two presses.
+/// Deleting a painting is the one bulk removal in the text view, so `D` needs two presses.
 #[test]
 fn deleting_a_painting_takes_two_presses_of_d() {
     let armed = press_in_solution_picker(&["Full", "Minimal"], &[KeyCode::Char('D')]);
@@ -1781,15 +1780,11 @@ fn ranges_painted_under_one_name_stay_out_of_another() {
 }
 
 #[test]
-fn the_text_overlay_cycles_human_codediff_disagreements_tree_disagreement() {
+fn the_text_overlay_cycles_human_codediff_disagreements() {
     assert_eq!(TextOverlay::default(), TextOverlay::Human);
     assert_eq!(TextOverlay::Human.next(), TextOverlay::CodeDiff);
     assert_eq!(TextOverlay::CodeDiff.next(), TextOverlay::Disagreements);
-    assert_eq!(
-        TextOverlay::Disagreements.next(),
-        TextOverlay::TreeDisagreement
-    );
-    assert_eq!(TextOverlay::TreeDisagreement.next(), TextOverlay::Human);
+    assert_eq!(TextOverlay::Disagreements.next(), TextOverlay::Human);
 }
 
 /// codediff's side comes from `TextDiff`, the projection the TUI draws, not a second reading of
@@ -1799,7 +1794,7 @@ fn codediff_text_spans_reports_the_changed_regions_of_a_real_diff() {
     let before = Code::from_string("fn main() {\n    foo();\n}\n", &Language::Rust);
     let after = Code::from_string("fn main() {\n    bar();\n}\n", &Language::Rust);
 
-    let [before_spans, after_spans] = codediff_text_spans(&before, &after);
+    let [before_spans, after_spans] = codediff_text_spans(&before, &after, None);
 
     assert!(
         !before_spans.is_empty(),
@@ -3351,9 +3346,11 @@ fn z_refuses_to_touch_a_fixture_that_already_has_painted_ranges() {
 
 #[test]
 fn the_text_view_renders_painted_ranges() {
-    let backend = ratatui::backend::TestBackend::new(100, 24);
+    // Two columns need `SINGLE_PANEL_WIDTH_THRESHOLD`; narrower draws the focused side only.
+    let width = SINGLE_PANEL_WIDTH_THRESHOLD + 20;
+    let backend = ratatui::backend::TestBackend::new(width, 24);
     let mut terminal = Terminal::new(backend).unwrap();
-    let area = Rect::new(0, 0, 100, 24);
+    let area = Rect::new(0, 0, width, 24);
     let mapping = HumanMapping {
         entries: vec![],
         groups: vec![],
@@ -3384,7 +3381,6 @@ fn the_text_view_renders_painted_ranges() {
                 &mapping,
                 "Minimal",
                 TextOverlay::Human,
-                None,
                 None,
                 &TextPaintState::default(),
             );
@@ -3448,7 +3444,6 @@ fn render_open_diff_picker_shows_the_unmarked_column_and_the_sort_and_filter_mar
                 "Minimal",
                 TextOverlay::Human,
                 None,
-                None,
                 DiffPickerData {
                     unmarked: Some(&unmarked),
                     ..DiffPickerData::default()
@@ -3500,7 +3495,6 @@ fn the_diff_picker_title_keeps_its_filter_list_when_the_terminal_truncates_it() 
                 "Minimal",
                 TextOverlay::Human,
                 None,
-                None,
                 DiffPickerData::default(),
                 None,
             )
@@ -3516,9 +3510,12 @@ fn the_diff_picker_title_keeps_its_filter_list_when_the_terminal_truncates_it() 
 
 #[test]
 fn text_view_modal_renders_both_sides_content() {
-    let backend = ratatui::backend::TestBackend::new(80, 24);
+    // Wide enough for two columns; below `SINGLE_PANEL_WIDTH_THRESHOLD` only the focused side
+    // draws (`the_text_view_draws_only_the_focused_side_on_a_narrow_terminal`).
+    let width = SINGLE_PANEL_WIDTH_THRESHOLD + 20;
+    let backend = ratatui::backend::TestBackend::new(width, 24);
     let mut terminal = Terminal::new(backend).unwrap();
-    let area = Rect::new(0, 0, 80, 24);
+    let area = Rect::new(0, 0, width, 24);
 
     terminal
         .draw(|f| {
@@ -3530,7 +3527,6 @@ fn text_view_modal_renders_both_sides_content() {
                 &HumanMapping::default(),
                 "Minimal",
                 TextOverlay::Human,
-                None,
                 None,
                 &TextPaintState::default(),
             );
@@ -4872,6 +4868,8 @@ fn draw_ui_shows_only_the_focused_panel_below_the_single_panel_width_threshold()
                 after_source.as_bytes(),
                 before_unmarked,
                 after_unmarked,
+                None,
+                None,
                 "test",
                 false,
             )
@@ -4901,6 +4899,8 @@ fn draw_ui_shows_only_the_focused_panel_below_the_single_panel_width_threshold()
                 after_source.as_bytes(),
                 before_unmarked,
                 after_unmarked,
+                None,
+                None,
                 "test",
                 false,
             )
@@ -5465,10 +5465,15 @@ fn action_match_to_end_stops_at_a_kind_mismatch_but_keeps_prior_matches() {
                 before_kind,
                 after_kind,
                 recursive,
+                resume_match_to_end,
             } => {
                 assert!(
                     !recursive,
                     "f should raise a single-pair mismatch, not a recursive one"
+                );
+                assert!(
+                    resume_match_to_end,
+                    "an f stop offers to mark the node and carry on"
                 );
                 (before_id, after_id, before_kind, after_kind)
             }
@@ -7635,6 +7640,7 @@ fn render_panel_marks_an_all_to_all_member_with_a_capital_g() {
                 None,
                 false,
                 0,
+                None,
                 &std::collections::BTreeSet::new(),
                 &app.mapping.groups,
             );
@@ -7718,6 +7724,7 @@ fn render_panel_marks_a_group_matched_node_and_a_pending_selection_distinctly() 
                 None,
                 false,
                 0,
+                None,
                 &pending,
                 &mapping.groups,
             );
@@ -7915,7 +7922,7 @@ fn codediff_text_entries_keeps_the_pairing_that_the_span_view_drops() {
     let before = Code::from_string("fn main() {\n    foo();\n}\n", &Language::Rust);
     let after = Code::from_string("fn main() {\n    bar();\n}\n", &Language::Rust);
 
-    let entries = codediff_text_entries(&before, &after).expect("this pair pairs up cleanly");
+    let entries = codediff_text_entries(&before, &after, None).expect("this pair pairs up cleanly");
     assert!(!entries.is_empty(), "an edited pair should produce entries");
 
     for entry in &entries {
@@ -7956,7 +7963,7 @@ fn seeding_a_painting_reproduces_codediffs_own_spans_on_both_sides() {
     action_paint_seed_from_codediff(&mut app, &before, &after);
     assert!(app.dirty, "seeding is an unsaved change to the mapping");
 
-    let algo = codediff_text_spans(&before, &after);
+    let algo = codediff_text_spans(&before, &after, None);
     for side in [0usize, 1usize] {
         let mut painted: Vec<_> = painted_spans(
             &app.mapping,
@@ -8022,7 +8029,7 @@ fn seeding_refuses_a_pair_whose_codediff_ranges_overlap() {
         .expect("fixture should exist");
     let (before, after) = &*pair;
 
-    let overlapping = codediff_text_spans(before, after)
+    let overlapping = codediff_text_spans(before, after, None)
         .iter()
         .any(|side| spans_overlap(side));
     assert!(
@@ -8030,7 +8037,7 @@ fn seeding_refuses_a_pair_whose_codediff_ranges_overlap() {
         "this test is pointless unless the fixture still has overlapping codediff ranges"
     );
 
-    let error = codediff_text_entries(before, after)
+    let error = codediff_text_entries(before, after, None)
         .expect_err("an overlapping pair must not produce a painting");
     assert!(
         error.contains("overlap"),
@@ -8362,10 +8369,6 @@ fn resetting_a_case_clears_the_mapping_the_groups_and_every_painting() {
         "every painting should be gone"
     );
     assert!(app.dirty, "a reset is an unsaved change");
-    assert!(
-        app.tree_text_spans.is_none(),
-        "spans derived from the discarded mapping must not survive it"
-    );
     assert!(status.contains("Reset"), "status should say so: {status}");
 }
 
@@ -8483,6 +8486,8 @@ fn draw_ui_names_the_missing_grammar_instead_of_drawing_an_empty_tree() {
                 after.contents.as_bytes(),
                 0,
                 0,
+                None,
+                None,
                 "bazel-not-actually-supported-by-treesitter",
                 true,
             )
@@ -8569,7 +8574,7 @@ fn the_same_key_is_not_explained_away_when_there_is_a_tree() {
 #[test]
 fn codediff_text_spans_falls_back_to_the_plain_text_diff() {
     let (before, after) = unparseable_pair();
-    let [before_spans, after_spans] = codediff_text_spans(&before, &after);
+    let [before_spans, after_spans] = codediff_text_spans(&before, &after, None);
 
     assert!(
         !before_spans.is_empty() && !after_spans.is_empty(),
@@ -9272,4 +9277,1899 @@ fn first_leaf_from_skips_whitespace_to_the_next_leaf_and_is_none_past_the_last_o
     assert_eq!(&source[leaf.byte_range()], "a");
 
     assert!(first_leaf_from(root, source.len() - 2).is_none());
+}
+
+// ---------------------------------------------------------------------------------------------
+// Undo and redo
+// ---------------------------------------------------------------------------------------------
+
+/// `m` on the roots through `EditWatch`, as `run_case_session` does it. Returns the app and the
+/// case's source so the caller can press more keys.
+fn app_after_m_with_watch() -> App {
+    let source = "fn main() {}\n";
+    let tree = parse_rust(source);
+    let root = tree.root_node();
+    let mut app = App::new(
+        "test".to_string(),
+        CaseOrigin::Diffs,
+        root.id(),
+        root.id(),
+        HumanMapping::default(),
+    );
+    press_with_watch(&mut app, root, source, KeyCode::Char('m'));
+    app
+}
+
+fn press_with_watch(app: &mut App, root: Node, source: &str, code: KeyCode) {
+    let flat = FlatIndex::new(flatten_visible(root, &app.before.collapsed, None));
+    let caches = rebuild_caches(&app.mapping.entries, root, root);
+    let hashes = rustc_hash::FxHashMap::default();
+    let watch = EditWatch::start(app, code);
+    handle_key(
+        app,
+        code,
+        &flat,
+        &flat,
+        root,
+        root,
+        &caches,
+        source.as_bytes(),
+        source.as_bytes(),
+        &hashes,
+        &hashes,
+        &Code::from_string(source, &Language::Rust),
+        &Code::from_string(source, &Language::Rust),
+    );
+    watch.finish(app);
+}
+
+#[test]
+fn m_pushes_an_undo_step_that_u_restores_and_ctrl_r_reapplies() {
+    let mut app = app_after_m_with_watch();
+    assert_eq!(app.mapping.entries.len(), 1, "m matched the roots");
+    assert_eq!(app.undo_stack.len(), 1);
+    assert!(app.redo_stack.is_empty());
+
+    let message = app.undo().unwrap();
+    assert!(app.mapping.entries.is_empty(), "undo takes the match back");
+    assert!(app.undo_stack.is_empty());
+    assert_eq!(app.redo_stack.len(), 1);
+    assert!(app.dirty, "an undo is itself an unsaved change");
+    assert!(message.contains("0 more to undo"), "{message}");
+
+    app.redo().unwrap();
+    assert_eq!(app.mapping.entries.len(), 1, "redo puts the match back");
+    assert_eq!(app.undo_stack.len(), 1);
+    assert!(app.redo_stack.is_empty());
+}
+
+#[test]
+fn undo_and_redo_report_when_there_is_nothing_to_do() {
+    let mut app = test_app();
+    assert!(app.undo().is_err());
+    assert!(app.redo().is_err());
+    assert!(!app.dirty, "a refused undo is not a change");
+}
+
+#[test]
+fn a_key_that_changes_nothing_pushes_no_undo_step() {
+    let source = "fn main() {}\n";
+    let tree = parse_rust(source);
+    let root = tree.root_node();
+    let mut app = App::new(
+        "test".to_string(),
+        CaseOrigin::Diffs,
+        root.id(),
+        root.id(),
+        HumanMapping::default(),
+    );
+    // `u` on an unmarked node: listed as an editing key, but nothing to unmark.
+    press_with_watch(&mut app, root, source, KeyCode::Char('u'));
+    assert!(app.mapping.entries.is_empty());
+    assert!(
+        app.undo_stack.is_empty(),
+        "a no-op must not become an undo step"
+    );
+}
+
+#[test]
+fn an_edit_after_an_undo_forgets_the_redo_history() {
+    let source = "fn main() {}\n";
+    let tree = parse_rust(source);
+    let root = tree.root_node();
+    let mut app = App::new(
+        "test".to_string(),
+        CaseOrigin::Diffs,
+        root.id(),
+        root.id(),
+        HumanMapping::default(),
+    );
+    press_with_watch(&mut app, root, source, KeyCode::Char('m'));
+    app.undo().unwrap();
+    assert_eq!(app.redo_stack.len(), 1);
+
+    press_with_watch(&mut app, root, source, KeyCode::Char('m'));
+    assert!(
+        app.redo_stack.is_empty(),
+        "the undone match no longer applies"
+    );
+    assert_eq!(app.undo_stack.len(), 1);
+}
+
+#[test]
+fn an_edit_on_a_key_may_edit_mapping_does_not_list_is_flagged_not_undoable() {
+    let mut app = test_app();
+    app.status = Some("Did something".to_string());
+    let watch = EditWatch::start(&app, KeyCode::Char('k'));
+    app.mark_dirty();
+    watch.finish(&mut app);
+
+    assert!(app.undo_stack.is_empty());
+    assert_eq!(app.status.as_deref(), Some("Did something [not undoable]"));
+}
+
+#[test]
+fn push_undo_within_drops_the_oldest_steps_past_the_budget_but_keeps_the_newest() {
+    let mapping_with = |entries: usize| HumanMapping {
+        entries: (0..entries)
+            .map(|_| HumanMappingEntry {
+                operation: HumanOperation::Delete,
+                before_path: Some(vec!["source_file:1".to_string()]),
+                after_path: None,
+            })
+            .collect(),
+        ..HumanMapping::default()
+    };
+    let mut app = test_app();
+    app.push_undo_within(mapping_with(2), 5);
+    app.push_undo_within(mapping_with(2), 5);
+    assert_eq!(app.undo_stack.len(), 2, "4 entries fit a budget of 5");
+
+    app.push_undo_within(mapping_with(4), 5);
+    assert_eq!(
+        app.undo_stack.len(),
+        1,
+        "8 entries do not; the oldest go first"
+    );
+    assert_eq!(
+        app.undo_stack[0].entries.len(),
+        4,
+        "the step just pushed stays"
+    );
+
+    app.push_undo_within(mapping_with(9), 5);
+    assert_eq!(
+        app.undo_stack.len(),
+        1,
+        "a step over the whole budget is still kept, so one undo is always possible"
+    );
+    assert_eq!(app.undo_stack[0].entries.len(), 9);
+}
+
+#[test]
+fn undo_restores_a_case_after_a_confirmed_reset() {
+    let source = "fn main() {}\n";
+    let tree = parse_rust(source);
+    let root = tree.root_node();
+    let flat = FlatIndex::new(flatten_visible(
+        root,
+        &std::collections::HashSet::new(),
+        None,
+    ));
+    let mut mapping = HumanMapping::default();
+    mapping.entries.push(HumanMappingEntry {
+        operation: HumanOperation::Delete,
+        before_path: Some(vec!["source_file:1".to_string()]),
+        after_path: None,
+    });
+    let mut app = App::new(
+        "test".to_string(),
+        CaseOrigin::Diffs,
+        root.id(),
+        root.id(),
+        mapping,
+    );
+    app.modal = Some(Modal::ConfirmResetCase {
+        entries: 1,
+        groups: 0,
+        paintings: 0,
+    });
+    let caches = rebuild_caches(&app.mapping.entries, root, root);
+
+    let watch = EditWatch::start(&app, KeyCode::Char('y'));
+    handle_modal_key(
+        &mut app,
+        KeyCode::Char('y'),
+        &flat,
+        &flat,
+        Some(root),
+        Some(root),
+        &caches,
+        source.as_bytes(),
+        source.as_bytes(),
+        &Code::from_string(source, &Language::Rust),
+        &Code::from_string(source, &Language::Rust),
+    );
+    watch.finish(&mut app);
+    assert!(app.mapping.entries.is_empty(), "the reset went through");
+
+    app.undo().unwrap();
+    assert_eq!(app.mapping.entries.len(), 1, "and U brings the case back");
+}
+
+#[test]
+fn undo_in_the_text_view_takes_back_z_and_drops_the_painting_name_it_created() {
+    let mut app = test_app();
+    app.modal = Some(Modal::TextView {
+        state: TextPaintState::default(),
+    });
+    let watch = EditWatch::start(&app, KeyCode::Char('Z'));
+    action_paint_mark_empty(&mut app);
+    watch.finish(&mut app);
+    assert_eq!(app.mapping.text_mappings.len(), 1);
+    let created = app.text_solution.clone();
+    assert_eq!(app.mapping.text_mappings[0].name, created);
+
+    app.undo().unwrap();
+    assert!(app.mapping.text_mappings.is_empty());
+    assert_eq!(
+        app.text_solution,
+        starting_solution(&app.mapping),
+        "the edited painting's name falls back to what a fresh case would use"
+    );
+}
+
+#[test]
+fn history_key_is_u_and_ctrl_r_only_in_the_tree_panels_and_the_text_view() {
+    use crossterm::event::{KeyEvent, KeyModifiers};
+    let u = KeyEvent::new(KeyCode::Char('U'), KeyModifiers::NONE);
+    let ctrl_r = KeyEvent::new(KeyCode::Char('r'), KeyModifiers::CONTROL);
+    let text_view = Modal::TextView {
+        state: TextPaintState::default(),
+    };
+    let prompt = Modal::PromptSearch {
+        input: String::new(),
+    };
+
+    assert!(matches!(history_key(None, u), Some(HistoryStep::Undo)));
+    assert!(matches!(history_key(None, ctrl_r), Some(HistoryStep::Redo)));
+    assert!(matches!(
+        history_key(Some(&text_view), u),
+        Some(HistoryStep::Undo)
+    ));
+    assert!(matches!(
+        history_key(Some(&text_view), ctrl_r),
+        Some(HistoryStep::Redo)
+    ));
+    // A prompt types its `U`.
+    assert!(history_key(Some(&prompt), u).is_none());
+    // Plain `r` is the reason toggle; Ctrl-U is nothing.
+    assert!(history_key(None, KeyEvent::new(KeyCode::Char('r'), KeyModifiers::NONE)).is_none());
+    assert!(
+        history_key(
+            None,
+            KeyEvent::new(KeyCode::Char('U'), KeyModifiers::CONTROL)
+        )
+        .is_none()
+    );
+}
+
+#[test]
+fn may_edit_mapping_covers_the_marking_keys_and_not_navigation() {
+    for code in [
+        KeyCode::Char('m'),
+        KeyCode::Char('M'),
+        KeyCode::Char('f'),
+        KeyCode::Char('d'),
+        KeyCode::Char('D'),
+        KeyCode::Char('i'),
+        KeyCode::Char('I'),
+        KeyCode::Char('u'),
+    ] {
+        assert!(may_edit_mapping(None, code), "{code:?}");
+    }
+    for code in [
+        KeyCode::Char('j'),
+        KeyCode::Char('x'),
+        KeyCode::Char('p'),
+        KeyCode::Tab,
+    ] {
+        assert!(!may_edit_mapping(None, code), "{code:?}");
+    }
+    let text_view = Modal::TextView {
+        state: TextPaintState::default(),
+    };
+    for code in [
+        KeyCode::Char('d'),
+        KeyCode::Char('i'),
+        KeyCode::Char('m'),
+        KeyCode::Char('u'),
+        KeyCode::Char('Z'),
+        KeyCode::Char('P'),
+    ] {
+        assert!(may_edit_mapping(Some(&text_view), code), "{code:?}");
+    }
+    assert!(!may_edit_mapping(Some(&text_view), KeyCode::Char('v')));
+    assert!(!may_edit_mapping(Some(&text_view), KeyCode::Char('o')));
+}
+
+// ---------------------------------------------------------------------------------------------
+// codediff in the background
+// ---------------------------------------------------------------------------------------------
+
+/// Polls until the background run lands, or gives up after a few seconds so a broken thread
+/// fails the test instead of hanging it.
+fn wait_for_algo_diff(app: &mut App) -> bool {
+    for _ in 0..200 {
+        if poll_algo_diff(app) {
+            return true;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(25));
+    }
+    false
+}
+
+#[test]
+fn start_algo_diff_lands_through_poll_algo_diff_keyed_by_the_panels_own_node_ids() {
+    let before = Arc::new(Code::from_string("fn main() { a(); }\n", &Language::Rust));
+    let after = Arc::new(Code::from_string("fn main() { b(); }\n", &Language::Rust));
+    let root_id = before.ast.as_ref().unwrap().root_node().id();
+    let mut app = test_app();
+
+    assert!(!poll_algo_diff(&mut app), "nothing in flight yet");
+    start_algo_diff(&mut app, &before, &after);
+    assert!(app.algo_diff_pending.is_some());
+
+    assert!(wait_for_algo_diff(&mut app), "the run never reported");
+    assert!(app.algo_diff_pending.is_none(), "the channel is spent");
+    let diff = app
+        .algo_diff
+        .as_ref()
+        .expect("the run produced an AST diff");
+    assert!(
+        diff.before_node_map.contains_key(&root_id),
+        "the diff must be of the very tree the panels show, not a re-parse"
+    );
+    assert!(
+        app.status
+            .as_deref()
+            .unwrap_or("")
+            .starts_with("codediff ran"),
+        "{:?}",
+        app.status
+    );
+    assert!(
+        !poll_algo_diff(&mut app),
+        "a landed run is not delivered twice"
+    );
+}
+
+#[test]
+fn compute_frame_state_counts_mismatches_only_once_codediff_has_run() -> Result<()> {
+    let source = "fn main() {}\n";
+    let before = Code::from_string(source, &Language::Rust);
+    let after = Code::from_string(source, &Language::Rust);
+    let root_id = before.ast.as_ref().unwrap().root_node().id();
+    let mut app = App::new(
+        "test".to_string(),
+        CaseOrigin::Diffs,
+        root_id,
+        root_id,
+        HumanMapping::default(),
+    );
+    // The human says the whole file was deleted (`D` on the root); codediff will say it is
+    // identical.
+    let root = before.ast.as_ref().unwrap().root_node();
+    press_with_watch(&mut app, root, source, KeyCode::Char('D'));
+    assert!(!app.mapping.entries.is_empty(), "D marked the root");
+
+    let state = compute_frame_state(&before, &after, &app)?;
+    assert_eq!(
+        (state.before_mismatches, state.after_mismatches),
+        (None, None),
+        "no verdicts to disagree with yet"
+    );
+
+    app.algo_diff = diff_code(&before, &after).ast;
+    let state = compute_frame_state(&before, &after, &app)?;
+    assert_eq!(
+        state.before_mismatches,
+        Some(state.before_flat.len()),
+        "every marked-deleted node is one codediff mapped"
+    );
+    assert_eq!(
+        state.after_mismatches,
+        Some(0),
+        "nothing on the after side is marked, so nothing there can disagree"
+    );
+    Ok(())
+}
+
+#[test]
+fn the_panel_header_shows_the_mismatch_count_only_once_there_is_one() {
+    let source = "fn main() {}\n";
+    let tree = parse_rust(source);
+    let root = tree.root_node();
+    let flat = FlatIndex::new(flatten_visible(
+        root,
+        &std::collections::HashSet::new(),
+        None,
+    ));
+    let caches = Caches::default();
+    let mut panel = PanelState::new(root.id());
+    let area = Rect::new(0, 0, 60, 6);
+
+    for (mismatches, expected) in [(None, "2 unmarked─"), (Some(3), "2 unmarked, 3 mismatches")] {
+        let backend = ratatui::backend::TestBackend::new(60, 6);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal
+            .draw(|f| {
+                render_panel(
+                    f,
+                    area,
+                    "Before",
+                    &flat,
+                    &mut panel,
+                    &caches,
+                    Side::Before,
+                    source.as_bytes(),
+                    true,
+                    None,
+                    false,
+                    2,
+                    mismatches,
+                    &std::collections::BTreeSet::new(),
+                    &[],
+                )
+            })
+            .unwrap();
+        let text = rendered_text(&terminal);
+        assert!(
+            text.contains(expected),
+            "for {mismatches:?} expected {expected:?} in the header: {text}"
+        );
+    }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Resume, } / {, and ] / [
+// ---------------------------------------------------------------------------------------------
+
+#[test]
+fn session_memory_round_trips_through_its_file_including_the_dataset_filter() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("nested").join("human_solver.json");
+    let memory = SessionMemory {
+        last_case: Some("rust-add-if".to_string()),
+        diff_view: DiffPickerView {
+            column: DiffColumn::Unmarked,
+            sort: DiffSort {
+                column: DiffColumn::Size,
+                descending: true,
+            },
+            filters: DiffFilters {
+                name: Some("rust".to_string()),
+                dataset: Some(DIFF_DATASETS[2]),
+                unmarked: FlagFilter::Yes,
+                ..DiffFilters::default()
+            },
+        },
+    };
+
+    save_session_memory(&path, &memory).unwrap();
+    assert_eq!(load_session_memory(&path), memory);
+}
+
+#[test]
+fn session_memory_is_the_default_for_a_missing_corrupt_or_stale_file() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("human_solver.json");
+    assert_eq!(load_session_memory(&path), SessionMemory::default());
+
+    std::fs::write(&path, "{ not json").unwrap();
+    assert_eq!(load_session_memory(&path), SessionMemory::default());
+
+    // A dataset that no longer exists reads as "all"; unknown keys and missing ones are fine.
+    std::fs::write(
+        &path,
+        r#"{"last_case":"x","diff_view":{"filters":{"dataset":"gone"}},"future":1}"#,
+    )
+    .unwrap();
+    let memory = load_session_memory(&path);
+    assert_eq!(memory.last_case.as_deref(), Some("x"));
+    assert_eq!(memory.diff_view.filters.dataset, None);
+}
+
+#[test]
+fn starting_case_prefers_the_remembered_case_only_while_it_exists() -> Result<()> {
+    let first = list_available_cases()?[0].0.clone();
+    let second = list_available_cases()?[1].0.clone();
+    assert_eq!(starting_case(None)?, first);
+    assert_eq!(starting_case(Some("no-such-case-anywhere"))?, first);
+    assert_eq!(starting_case(Some(&second))?, second);
+    Ok(())
+}
+
+#[test]
+fn remember_session_keeps_the_last_diffs_case_and_the_picker_view() {
+    let dir = tempfile::tempdir().unwrap();
+    // `remember_session` reads the path from the environment; point it at the temp dir.
+    // SAFETY: tests in this binary that read XDG_STATE_HOME all set it to their own directory,
+    // and this one is the only reader at the moment.
+    unsafe { std::env::set_var("XDG_STATE_HOME", dir.path()) };
+    let mut app = App::new(
+        "rust-add-if".to_string(),
+        CaseOrigin::Diffs,
+        0,
+        0,
+        HumanMapping::default(),
+    );
+    app.diff_view.sort = DiffSort {
+        column: DiffColumn::Unmarked,
+        descending: false,
+    };
+    remember_session(&mut app);
+
+    let path = dir.path().join("codediff").join("human_solver.json");
+    let memory = load_session_memory(&path);
+    assert_eq!(memory.last_case.as_deref(), Some("rust-add-if"));
+    assert_eq!(memory.diff_view.sort.column, DiffColumn::Unmarked);
+
+    // A case that is not a diffs case keeps the last one as it was, but still saves the view.
+    app.origin = CaseOrigin::GitCommitFile {
+        path: "src/x.rs".to_string(),
+    };
+    app.name = "src/x.rs@abcdef01".to_string();
+    app.diff_view.sort.descending = true;
+    remember_session(&mut app);
+    let memory = load_session_memory(&path);
+    assert_eq!(memory.last_case.as_deref(), Some("rust-add-if"));
+    assert!(memory.diff_view.sort.descending);
+    unsafe { std::env::remove_var("XDG_STATE_HOME") };
+}
+
+/// `}` or `{` on a real case through `handle_key`, with the default picker view (name order, no
+/// filters, so no corpus scan runs).
+fn press_brace_on(name: &str, code: KeyCode, dirty: bool) -> (App, Option<OpenTarget>) {
+    let source = "fn main() {}\n";
+    let tree = parse_rust(source);
+    let root = tree.root_node();
+    let mut app = App::new(
+        name.to_string(),
+        CaseOrigin::Diffs,
+        root.id(),
+        root.id(),
+        HumanMapping::default(),
+    );
+    app.dirty = dirty;
+    let flat = FlatIndex::new(flatten_visible(root, &app.before.collapsed, None));
+    let caches = rebuild_caches(&app.mapping.entries, root, root);
+    let hashes = rustc_hash::FxHashMap::default();
+    let target = handle_key(
+        &mut app,
+        code,
+        &flat,
+        &flat,
+        root,
+        root,
+        &caches,
+        source.as_bytes(),
+        source.as_bytes(),
+        &hashes,
+        &hashes,
+        &Code::from_string(source, &Language::Rust),
+        &Code::from_string(source, &Language::Rust),
+    );
+    (app, target)
+}
+
+#[test]
+fn close_brace_opens_the_next_case_in_the_pickers_listing_and_wraps() -> Result<()> {
+    let names: Vec<String> = list_available_cases()?
+        .into_iter()
+        .map(|(name, _)| name)
+        .collect();
+    let (first, second, last) = (&names[0], &names[1], &names[names.len() - 1]);
+
+    let (_, target) = press_brace_on(first, KeyCode::Char('}'), false);
+    assert!(
+        matches!(target, Some(OpenTarget::Diffs(ref n)) if n == second),
+        "{target:?}"
+    );
+
+    let (_, target) = press_brace_on(first, KeyCode::Char('{'), false);
+    assert!(
+        matches!(target, Some(OpenTarget::Diffs(ref n)) if n == last),
+        "{target:?}"
+    );
+
+    let (_, target) = press_brace_on(last, KeyCode::Char('}'), false);
+    assert!(
+        matches!(target, Some(OpenTarget::Diffs(ref n)) if n == first),
+        "{target:?}"
+    );
+    Ok(())
+}
+
+#[test]
+fn close_brace_with_unsaved_changes_asks_before_switching() -> Result<()> {
+    let names = list_available_cases()?;
+    let (app, target) = press_brace_on(&names[0].0, KeyCode::Char('}'), true);
+    assert!(target.is_none());
+    assert!(
+        matches!(
+            app.modal,
+            Some(Modal::ConfirmDiscardUnsaved {
+                target: OpenTarget::Diffs(ref n),
+                can_save: true
+            }) if *n == names[1].0
+        ),
+        "{:?}",
+        app.modal
+    );
+    Ok(())
+}
+
+#[test]
+fn close_brace_from_a_case_outside_the_listing_starts_at_its_edge() -> Result<()> {
+    let names = list_available_cases()?;
+    let (_, target) = press_brace_on("not-a-case", KeyCode::Char('}'), false);
+    assert!(matches!(target, Some(OpenTarget::Diffs(ref n)) if *n == names[0].0));
+    let (_, target) = press_brace_on("not-a-case", KeyCode::Char('{'), false);
+    assert!(matches!(target, Some(OpenTarget::Diffs(ref n)) if *n == names[names.len() - 1].0));
+    Ok(())
+}
+
+#[test]
+fn bracket_keys_walk_the_unmarked_nodes_of_the_focused_panel_and_wrap() {
+    let source = "fn main() {\n    a();\n}\n";
+    let tree = parse_rust(source);
+    let root = tree.root_node();
+    let mut app = App::new(
+        "test".to_string(),
+        CaseOrigin::Diffs,
+        root.id(),
+        root.id(),
+        HumanMapping::default(),
+    );
+    let flat = FlatIndex::new(flatten_visible(root, &app.before.collapsed, None));
+    let last = flat[flat.len() - 1].0;
+
+    // `d` marks the root alone deleted; every other node stays unmarked.
+    press_with_watch(&mut app, root, source, KeyCode::Char('d'));
+    app.before.cursor_id = root.id();
+    let caches = rebuild_caches(&app.mapping.entries, root, root);
+    assert_eq!(
+        count_unmarked(&flat, &caches, status_before),
+        flat.len() - 1
+    );
+
+    action_next_unmarked(&mut app, Focus::Before, &flat, &flat, &caches, true).unwrap();
+    assert_eq!(
+        app.before.cursor_id,
+        flat[1].0.id(),
+        "] lands on the first unmarked node"
+    );
+    app.before.cursor_id = root.id();
+    action_next_unmarked(&mut app, Focus::Before, &flat, &flat, &caches, false).unwrap();
+    assert_eq!(app.before.cursor_id, last.id(), "[ wraps to the last");
+    action_next_unmarked(&mut app, Focus::Before, &flat, &flat, &caches, true).unwrap();
+    assert_eq!(
+        app.before.cursor_id,
+        flat[1].0.id(),
+        "] from the last skips the marked root and wraps"
+    );
+
+    // `D` on the root marks its whole subtree: nowhere left to go.
+    app.before.cursor_id = root.id();
+    app.mapping = HumanMapping::default();
+    press_with_watch(&mut app, root, source, KeyCode::Char('D'));
+    let caches = rebuild_caches(&app.mapping.entries, root, root);
+    assert!(action_next_unmarked(&mut app, Focus::Before, &flat, &flat, &caches, true).is_err());
+}
+
+#[test]
+fn is_state_preserving_key_is_true_for_the_bracket_jumps() {
+    assert!(is_state_preserving_key(None, KeyCode::Char(']')));
+    assert!(is_state_preserving_key(None, KeyCode::Char('[')));
+}
+
+// ---------------------------------------------------------------------------------------------
+// Word motions in the t view
+// ---------------------------------------------------------------------------------------------
+
+/// Presses `key` in the text view on `source` from `cursor`, returning where the cursor lands.
+fn word_motion(source: &str, cursor: (usize, usize), key: char) -> (usize, usize) {
+    let mut state = TextPaintState::default();
+    state.cursor[0] = cursor;
+    match key {
+        'w' => state.word_forward(false, source),
+        'W' => state.word_forward(true, source),
+        'b' => state.word_backward(false, source),
+        'B' => state.word_backward(true, source),
+        'e' => state.word_end(false, source),
+        'E' => state.word_end(true, source),
+        other => panic!("not a word motion: {other}"),
+    }
+    state.cursor[0]
+}
+
+#[test]
+fn w_stops_at_each_word_and_punctuation_run_as_vim_does() {
+    //             0123456789012345678
+    let source = "let x_1 = foo(bar);\n    next();\n";
+    let mut at = (0, 0);
+    let mut stops = Vec::new();
+    for _ in 0..12 {
+        at = word_motion(source, at, 'w');
+        stops.push(at);
+    }
+    assert_eq!(
+        stops,
+        vec![
+            (0, 4),  // x_1: `_` and digits are keyword characters
+            (0, 8),  // =
+            (0, 10), // foo
+            (0, 13), // (
+            (0, 14), // bar
+            (0, 17), // );
+            (1, 4),  // next, on the next row past its indentation
+            (1, 8),  // ();
+            (2, 0),  // the end of the text - the empty row after the last newline, as G
+            (2, 0),  // counts rows - and it stays there
+            (2, 0),
+            (2, 0),
+        ]
+    );
+}
+
+#[test]
+fn big_w_treats_any_non_blank_run_as_one_word() {
+    let source = "foo(bar); baz\n";
+    assert_eq!(word_motion(source, (0, 0), 'W'), (0, 10));
+    assert_eq!(
+        word_motion(source, (0, 10), 'W'),
+        (1, 0),
+        "past the last word: the end"
+    );
+}
+
+#[test]
+fn e_goes_to_the_end_of_this_word_then_the_next() {
+    let source = "foo(bar); baz\n";
+    assert_eq!(
+        word_motion(source, (0, 0), 'e'),
+        (0, 2),
+        "foo's last character"
+    );
+    assert_eq!(
+        word_motion(source, (0, 1), 'e'),
+        (0, 2),
+        "from inside the word too"
+    );
+    assert_eq!(word_motion(source, (0, 2), 'e'), (0, 3), "then the ( run");
+    assert_eq!(word_motion(source, (0, 3), 'e'), (0, 6), "bar");
+    assert_eq!(
+        word_motion(source, (0, 6), 'E'),
+        (0, 8),
+        "E: the whole `);` run"
+    );
+    assert_eq!(
+        word_motion(source, (0, 8), 'e'),
+        (0, 12),
+        "baz, across the blank"
+    );
+    assert_eq!(
+        word_motion(source, (0, 12), 'e'),
+        (1, 0),
+        "past the last word: the end"
+    );
+}
+
+#[test]
+fn b_goes_to_the_start_of_this_word_then_the_previous_across_rows() {
+    let source = "foo(bar);\n    baz\n";
+    assert_eq!(
+        word_motion(source, (1, 6), 'b'),
+        (1, 4),
+        "from inside baz to its start"
+    );
+    assert_eq!(
+        word_motion(source, (1, 4), 'b'),
+        (0, 7),
+        "the `);` run on the row above"
+    );
+    assert_eq!(word_motion(source, (0, 7), 'b'), (0, 4), "bar");
+    assert_eq!(
+        word_motion(source, (0, 4), 'B'),
+        (0, 0),
+        "B: the whole first run"
+    );
+    assert_eq!(
+        word_motion(source, (0, 0), 'b'),
+        (0, 0),
+        "nothing before the start"
+    );
+}
+
+#[test]
+fn word_motions_step_by_character_not_byte_in_non_ascii_text() {
+    // `é` is two bytes; a landing column must be a character boundary.
+    let source = "café au_lait\n";
+    assert_eq!(word_motion(source, (0, 0), 'e'), (0, 3), "on the é itself");
+    assert_eq!(
+        word_motion(source, (0, 0), 'w'),
+        (0, 6),
+        "past the two-byte é and the blank"
+    );
+    assert_eq!(word_motion(source, (0, 8), 'b'), (0, 6));
+    assert_eq!(word_motion(source, (0, 6), 'b'), (0, 0));
+}
+
+#[test]
+fn the_text_view_draws_only_the_focused_side_on_a_narrow_terminal() {
+    for (width, side, expect_before, expect_after) in [
+        (SINGLE_PANEL_WIDTH_THRESHOLD, 0, true, true),
+        (SINGLE_PANEL_WIDTH_THRESHOLD - 1, 0, true, false),
+        (SINGLE_PANEL_WIDTH_THRESHOLD - 1, 1, false, true),
+        (60, 1, false, true),
+    ] {
+        let backend = ratatui::backend::TestBackend::new(width, 12);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let state = TextPaintState {
+            side,
+            ..Default::default()
+        };
+        terminal
+            .draw(|f| {
+                render_text_view_modal(
+                    f,
+                    Rect::new(0, 0, width, 12),
+                    "fn old_name() {}",
+                    "fn new_name() {}",
+                    &HumanMapping::default(),
+                    "Minimal",
+                    TextOverlay::Human,
+                    None,
+                    &state,
+                )
+            })
+            .unwrap();
+        let text = rendered_text(&terminal);
+        assert_eq!(
+            text.contains("old_name"),
+            expect_before,
+            "width {width}, side {side}: {text}"
+        );
+        assert_eq!(
+            text.contains("new_name"),
+            expect_after,
+            "width {width}, side {side}: {text}"
+        );
+    }
+}
+
+// ---------------------------------------------------------------------------------------------
+// A save records what it measures
+// ---------------------------------------------------------------------------------------------
+
+const EXACT_STUB: &str = "use anyhow::Result;
+
+use crate::test;
+use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
+
+#[test]
+fn mapping() -> Result<()> {
+    test::helper::human_mapping::assert_matches_human_mapping(\"rust-x\")
+}
+
+#[test]
+fn painting() -> Result<()> {
+    // Not measured yet: 100.0 passes unconditionally. Run this test and record the
+    // limit it reports instead.
+    assert_matches_human_painting_within_limit(\"rust-x\", 100.0)
+}
+";
+
+fn measured(mismatches: Option<(usize, usize)>, painting_percent: Option<f64>) -> SaveMeasurement {
+    SaveMeasurement {
+        mismatches,
+        painting_percent,
+        invariant_violations: 0,
+    }
+}
+
+#[test]
+fn round_up_percent_goes_to_the_next_hundredth_without_drifting_on_exact_ones() {
+    assert_eq!(round_up_percent(0.0), 0.0);
+    assert_eq!(round_up_percent(18.0 / 10_000.0 * 100.0), 0.18);
+    assert_eq!(round_up_percent(0.18001), 0.19);
+    assert_eq!(round_up_percent(26.275), 26.28);
+    assert_eq!(format_percent(0.0), "0.0");
+    assert_eq!(format_percent(1.5), "1.5");
+    assert_eq!(format_percent(26.28), "26.28");
+}
+
+#[test]
+fn a_saved_painting_replaces_the_placeholder_with_the_measured_limit() {
+    let (out, notes) =
+        rewrite_stub_source(EXACT_STUB, "rust-x", &measured(Some((0, 0)), Some(3.85)));
+    assert!(!out.contains("Not measured yet"), "{out}");
+    assert!(
+        out.contains("assert_matches_human_painting_within_limit(\"rust-x\", 3.85)"),
+        "{out}"
+    );
+    assert!(
+        out.contains("assert_matches_human_mapping(\"rust-x\")"),
+        "exact stays exact: {out}"
+    );
+    assert_eq!(notes, vec!["painting limit recorded: 3.85%"]);
+
+    // Saying the same thing again changes nothing and reports nothing.
+    let (again, notes) = rewrite_stub_source(&out, "rust-x", &measured(Some((0, 0)), Some(3.85)));
+    assert_eq!(again, out);
+    assert!(notes.is_empty());
+
+    // A limit follows the measurement in both directions: it records a distance.
+    let (down, notes) = rewrite_stub_source(&out, "rust-x", &measured(Some((0, 0)), Some(0.0)));
+    assert!(down.contains("within_limit(\"rust-x\", 0.0)"), "{down}");
+    assert_eq!(notes, vec!["painting limit 3.85% -> 0.0%"]);
+}
+
+#[test]
+fn an_exact_mapping_with_mismatches_becomes_an_unexamined_clamp() {
+    let (out, notes) = rewrite_stub_source(EXACT_STUB, "rust-x", &measured(Some((4, 3)), None));
+    assert!(
+        out.contains(
+            "    // Recorded as found, not examined.\n    \
+             test::helper::human_mapping::assert_matches_human_mapping_within_limit(\"rust-x\", 4, 3)"
+        ),
+        "{out}"
+    );
+    assert!(
+        out.contains("100.0"),
+        "an unpainted save leaves the painting placeholder: {out}"
+    );
+    assert_eq!(
+        notes,
+        vec!["mapping clamped at 4 mismatches (3 visible), not examined"]
+    );
+
+    // A test that already explains itself keeps its own comment and gets no second one.
+    let explained = EXACT_STUB.replace(
+        "fn mapping() -> Result<()> {\n",
+        "fn mapping() -> Result<()> {\n    // The rename is not recovered.\n",
+    );
+    let (out, _) = rewrite_stub_source(&explained, "rust-x", &measured(Some((4, 3)), None));
+    assert!(!out.contains("Recorded as found"), "{out}");
+    assert!(out.contains("// The rename is not recovered.\n"), "{out}");
+}
+
+#[test]
+fn a_clamp_tightens_in_place_keeps_its_prose_and_never_loosens() {
+    let clamped = "#[test]
+fn mapping() -> Result<()> {
+    // The rename is not recovered.
+    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
+        \"rust-x\",
+        // Includes the N:M floor: 2 members a one-to-one output cannot reach.
+        6,
+        4,
+    )
+}
+";
+    let (out, notes) = rewrite_stub_source(clamped, "rust-x", &measured(Some((5, 4)), None));
+    assert!(out.contains("        5,\n        4,\n"), "{out}");
+    assert!(
+        out.contains("Includes the N:M floor"),
+        "inner prose stays: {out}"
+    );
+    assert!(out.contains("// The rename is not recovered."), "{out}");
+    assert_eq!(notes, vec!["mapping clamp tightened 6/4 -> 5/4"]);
+
+    let (same, notes) = rewrite_stub_source(clamped, "rust-x", &measured(Some((6, 4)), None));
+    assert_eq!(same, clamped);
+    assert!(notes.is_empty());
+
+    let (untouched, notes) = rewrite_stub_source(clamped, "rust-x", &measured(Some((7, 4)), None));
+    assert_eq!(untouched, clamped, "loosening is a decision, not a save");
+    assert_eq!(
+        notes,
+        vec![
+            "7 mismatches (4 visible) exceed the clamp of 6/4: mapping() will fail until the stub \
+             is examined and edited"
+        ]
+    );
+}
+
+#[test]
+fn a_clamp_measured_at_zero_becomes_exact_and_drops_only_the_unexamined_note() {
+    let (clamped, _) = rewrite_stub_source(EXACT_STUB, "rust-x", &measured(Some((4, 3)), None));
+    let (out, notes) = rewrite_stub_source(&clamped, "rust-x", &measured(Some((0, 0)), None));
+    assert!(
+        out.contains("assert_matches_human_mapping(\"rust-x\")"),
+        "{out}"
+    );
+    assert!(!out.contains("Recorded as found"), "{out}");
+    assert_eq!(notes, vec!["mapping is exact now (was clamped at 4/3)"]);
+
+    let explained = clamped.replace(
+        "    // Recorded as found, not examined.\n",
+        "    // A note a human wrote.\n",
+    );
+    let (out, _) = rewrite_stub_source(&explained, "rust-x", &measured(Some((0, 0)), None));
+    assert!(
+        out.contains("// A note a human wrote."),
+        "human prose survives: {out}"
+    );
+}
+
+#[test]
+fn a_text_only_or_hand_written_stub_is_left_alone() {
+    let (out, notes) = rewrite_stub_source(EXACT_STUB, "rust-x", &measured(None, None));
+    assert_eq!(out, EXACT_STUB);
+    assert!(notes.is_empty());
+
+    let other_name = EXACT_STUB.replace("rust-x", "rust-y");
+    let (out, notes) =
+        rewrite_stub_source(&other_name, "rust-x", &measured(Some((3, 3)), Some(1.0)));
+    assert_eq!(
+        out, other_name,
+        "another fixture's calls are not this fixture's"
+    );
+    assert!(notes.is_empty());
+}
+
+#[test]
+fn measure_saved_case_reads_a_real_fixture_as_its_tests_do() -> Result<()> {
+    // Its stub records an exact mapping and a 0.0 painting limit, so that is what measuring finds.
+    let measurement = measure_saved_case("java-add-logging", false)?;
+    assert_eq!(measurement.mismatches, Some((0, 0)));
+    assert_eq!(measurement.painting_percent, Some(0.0));
+    assert_eq!(measurement.invariant_violations, 0);
+    assert_eq!(
+        describe_measurement(&measurement),
+        "codediff: 0 mismatch(es), 0 visible, painting 0.0%, invariants hold"
+    );
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------------------------
+// v ranges in the tree panels
+// ---------------------------------------------------------------------------------------------
+
+/// The `expression_statement`s directly in `fn main`'s body, in order.
+fn body_statements(root: Node) -> Vec<Node> {
+    let block = find_first(root, "block").unwrap();
+    let mut cursor = block.walk();
+    block
+        .children(&mut cursor)
+        .filter(|n| n.kind() == "expression_statement")
+        .collect()
+}
+
+#[test]
+fn range_node_ids_runs_from_anchor_to_cursor_either_way_and_falls_back_to_the_cursor() {
+    let source = "fn main() {\n    a();\n    b();\n    c();\n}\n";
+    let tree = parse_rust(source);
+    let root = tree.root_node();
+    let flat = FlatIndex::new(flatten_visible(
+        root,
+        &std::collections::HashSet::new(),
+        None,
+    ));
+    let statements = body_statements(root);
+    let (a, c) = (statements[0], statements[2]);
+
+    let forward = range_node_ids(&flat, a.id(), c.id());
+    let backward = range_node_ids(&flat, c.id(), a.id());
+    assert_eq!(forward, backward);
+    assert_eq!(forward[0], a.id());
+    assert_eq!(*forward.last().unwrap(), c.id());
+    assert!(
+        forward.contains(&statements[1].id()),
+        "the middle statement and every node under a and b are in between"
+    );
+
+    // An anchor hidden by a collapse is no range at all.
+    let mut collapsed = std::collections::HashSet::new();
+    collapsed.insert(a.parent().unwrap().id());
+    let flat_collapsed = FlatIndex::new(flatten_visible(root, &collapsed, None));
+    assert_eq!(
+        range_node_ids(&flat_collapsed, a.id(), root.id()),
+        vec![root.id()]
+    );
+}
+
+/// `v` at `anchor`, cursor on `cursor`, then `key`, in the After panel, through `handle_key`.
+fn press_after_range(source: &str, key: KeyCode, pick: fn(&[Node]) -> (usize, usize)) -> App {
+    let tree = parse_rust(source);
+    let root = tree.root_node();
+    let statements = body_statements(root);
+    let (anchor, cursor) = pick(&statements);
+    let mut app = App::new(
+        "test".to_string(),
+        CaseOrigin::Diffs,
+        root.id(),
+        root.id(),
+        HumanMapping::default(),
+    );
+    app.focus = Focus::After;
+    app.after.anchor = Some(anchor);
+    app.after.cursor_id = cursor;
+    let flat = FlatIndex::new(flatten_visible(root, &app.after.collapsed, None));
+    let caches = rebuild_caches(&app.mapping.entries, root, root);
+    let hashes = rustc_hash::FxHashMap::default();
+    handle_key(
+        &mut app,
+        key,
+        &flat,
+        &flat,
+        root,
+        root,
+        &caches,
+        source.as_bytes(),
+        source.as_bytes(),
+        &hashes,
+        &hashes,
+        &Code::from_string(source, &Language::Rust),
+        &Code::from_string(source, &Language::Rust),
+    );
+    app
+}
+
+#[test]
+fn capital_i_over_a_v_range_marks_each_statement_with_its_subtree_once() {
+    let source = "fn main() {\n    a();\n    b();\n    c();\n}\n";
+    let app = press_after_range(source, KeyCode::Char('I'), |s| (s[0].id(), s[2].id()));
+    let inserted: Vec<_> = app
+        .mapping
+        .entries
+        .iter()
+        .filter(|e| e.operation == HumanOperation::InsertWithChildren)
+        .collect();
+    assert_eq!(
+        inserted.len(),
+        3,
+        "one subtree mark per statement, nothing under them: {:?}",
+        app.mapping.entries
+    );
+    assert_eq!(app.mapping.entries.len(), 3);
+    assert!(app.after.anchor.is_none(), "the mark consumes the range");
+    assert!(app.dirty);
+    assert_eq!(app.status.as_deref(), Some("Marked 3 node(s) inserted"));
+}
+
+#[test]
+fn a_v_range_skips_nodes_already_marked_and_says_so() {
+    let source = "fn main() {\n    a();\n    b();\n    c();\n}\n";
+    let tree = parse_rust(source);
+    let root = tree.root_node();
+    let statements = body_statements(root);
+    let mut app = App::new(
+        "test".to_string(),
+        CaseOrigin::Diffs,
+        root.id(),
+        root.id(),
+        HumanMapping::default(),
+    );
+    app.focus = Focus::After;
+    // `b();` is already an insert; the range then covers a and c.
+    app.mapping.entries.push(HumanMappingEntry {
+        operation: HumanOperation::InsertWithChildren,
+        before_path: None,
+        after_path: Some(path_for_node(statements[1])),
+    });
+    app.after.anchor = Some(statements[0].id());
+    app.after.cursor_id = statements[2].id();
+    let flat = FlatIndex::new(flatten_visible(root, &app.after.collapsed, None));
+    let caches = rebuild_caches(&app.mapping.entries, root, root);
+    let hashes = rustc_hash::FxHashMap::default();
+    handle_key(
+        &mut app,
+        KeyCode::Char('I'),
+        &flat,
+        &flat,
+        root,
+        root,
+        &caches,
+        source.as_bytes(),
+        source.as_bytes(),
+        &hashes,
+        &hashes,
+        &Code::from_string(source, &Language::Rust),
+        &Code::from_string(source, &Language::Rust),
+    );
+    assert_eq!(app.mapping.entries.len(), 3);
+    let status = app.status.clone().unwrap_or_default();
+    assert!(
+        status.starts_with("Marked 2 node(s) inserted;") && status.contains("already marked"),
+        "{status}"
+    );
+}
+
+#[test]
+fn u_over_a_v_range_unmarks_everything_in_it() {
+    let source = "fn main() {\n    a();\n    b();\n    c();\n}\n";
+    let mut app = press_after_range(source, KeyCode::Char('I'), |s| (s[0].id(), s[2].id()));
+    assert_eq!(app.mapping.entries.len(), 3);
+    let tree = parse_rust(source);
+    let root = tree.root_node();
+    let statements = body_statements(root);
+    // Ids are per parse; re-derive the range on this tree.
+    app.after.anchor = Some(statements[0].id());
+    app.after.cursor_id = statements[2].id();
+    app.before.cursor_id = root.id();
+    let flat = FlatIndex::new(flatten_visible(root, &app.after.collapsed, None));
+    let caches = rebuild_caches(&app.mapping.entries, root, root);
+    let hashes = rustc_hash::FxHashMap::default();
+    handle_key(
+        &mut app,
+        KeyCode::Char('u'),
+        &flat,
+        &flat,
+        root,
+        root,
+        &caches,
+        source.as_bytes(),
+        source.as_bytes(),
+        &hashes,
+        &hashes,
+        &Code::from_string(source, &Language::Rust),
+        &Code::from_string(source, &Language::Rust),
+    );
+    assert!(app.mapping.entries.is_empty(), "{:?}", app.mapping.entries);
+    assert_eq!(app.status.as_deref(), Some("Unmarked 3 node(s)"));
+    assert!(app.after.anchor.is_none());
+}
+
+#[test]
+fn v_toggles_the_focused_panels_anchor_and_preserves_the_frame_state() {
+    let app = press_on_case(CaseOrigin::Diffs, "test", KeyCode::Char('v'));
+    assert_eq!(app.before.anchor, Some(app.before.cursor_id));
+    assert!(app.after.anchor.is_none());
+    assert!(is_state_preserving_key(None, KeyCode::Char('v')));
+}
+
+// ---------------------------------------------------------------------------------------------
+// The f stop marks and carries on; scans are cached; the overlay reuses the diff
+// ---------------------------------------------------------------------------------------------
+
+/// `key` on a kind-mismatch modal whose Before node is `fn main`'s first statement and whose
+/// After node is `b();` in a two-statement after file.
+fn press_on_kind_mismatch(key: KeyCode, resume: bool) -> App {
+    let before_src = "fn main() {\n    a();\n}\n";
+    let after_src = "fn main() {\n    b();\n    a();\n}\n";
+    let before = Code::from_string(before_src, &Language::Rust);
+    let after = Code::from_string(after_src, &Language::Rust);
+    let before_root = before.ast.as_ref().unwrap().root_node();
+    let after_root = after.ast.as_ref().unwrap().root_node();
+    let before_statement = body_statements(before_root)[0];
+    let after_statement = body_statements(after_root)[0];
+    let mut app = App::new(
+        "test".to_string(),
+        CaseOrigin::Diffs,
+        before_root.id(),
+        after_root.id(),
+        HumanMapping::default(),
+    );
+    // As `f` leaves them when it stops: both cursors on the pair that did not match.
+    app.before.cursor_id = before_statement.id();
+    app.after.cursor_id = after_statement.id();
+    app.modal = Some(Modal::ConfirmKindMismatch {
+        before_id: before_statement.id(),
+        after_id: after_statement.id(),
+        before_kind: before_statement.kind().to_string(),
+        after_kind: after_statement.kind().to_string(),
+        recursive: false,
+        resume_match_to_end: resume,
+    });
+    let before_flat = FlatIndex::new(flatten_visible(before_root, &app.before.collapsed, None));
+    let after_flat = FlatIndex::new(flatten_visible(after_root, &app.after.collapsed, None));
+    let caches = rebuild_caches(&app.mapping.entries, before_root, after_root);
+    handle_modal_key(
+        &mut app,
+        key,
+        &before_flat,
+        &after_flat,
+        Some(before_root),
+        Some(after_root),
+        &caches,
+        before_src.as_bytes(),
+        after_src.as_bytes(),
+        &before,
+        &after,
+    );
+    app
+}
+
+#[test]
+fn capital_i_on_an_f_stop_marks_the_insert_and_f_carries_on() {
+    let app = press_on_kind_mismatch(KeyCode::Char('I'), true);
+    assert!(app.modal.is_none(), "the stop is answered: {:?}", app.modal);
+    assert!(app.dirty);
+    let inserts = app
+        .mapping
+        .entries
+        .iter()
+        .filter(|e| e.operation == HumanOperation::InsertWithChildren)
+        .count();
+    assert_eq!(inserts, 1, "{:?}", app.mapping.entries);
+    assert!(
+        app.mapping.entries.len() > 1,
+        "f carried on and matched the rest: {:?}",
+        app.mapping.entries
+    );
+    let status = app.status.clone().unwrap_or_default();
+    assert!(
+        status.contains("; Matched") || status.contains("; Nothing matched"),
+        "{status}"
+    );
+}
+
+#[test]
+fn d_on_a_kind_mismatch_raised_by_m_marks_and_stops_there() {
+    let app = press_on_kind_mismatch(KeyCode::Char('d'), false);
+    assert_eq!(app.mapping.entries.len(), 1, "{:?}", app.mapping.entries);
+    assert_eq!(app.mapping.entries[0].operation, HumanOperation::Delete);
+    assert!(
+        app.status.as_deref().unwrap_or("").starts_with("Marked"),
+        "{:?}",
+        app.status
+    );
+    let kind_mismatch = Modal::ConfirmKindMismatch {
+        before_id: 0,
+        after_id: 0,
+        before_kind: String::new(),
+        after_kind: String::new(),
+        recursive: false,
+        resume_match_to_end: true,
+    };
+    for code in [KeyCode::Char('d'), KeyCode::Char('I'), KeyCode::Char('y')] {
+        assert!(may_edit_mapping(Some(&kind_mismatch), code), "{code:?}");
+    }
+    assert!(!may_edit_mapping(Some(&kind_mismatch), KeyCode::Char('n')));
+}
+
+#[test]
+fn scan_corpus_cached_with_rescans_only_cases_whose_stamp_moved() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("scans").join("kind.json");
+    let names: Vec<String> = ["a", "b", "c"].iter().map(|n| n.to_string()).collect();
+    let scans = AtomicUsize::new(0);
+    // `c` has no answer; `b`'s stamp is unknown (its directory is gone).
+    let scan = |name: &str| {
+        scans.fetch_add(1, Ordering::SeqCst);
+        match name {
+            "a" => Some(1usize),
+            "b" => Some(2),
+            _ => None,
+        }
+    };
+    let stamps = |name: &str| match name {
+        "a" => Some(10),
+        "c" => Some(30),
+        _ => None,
+    };
+
+    let first = scan_corpus_cached_with(Some(&path), &names, stamps, scan);
+    assert_eq!(first.get("a"), Some(&1));
+    assert_eq!(first.get("b"), Some(&2));
+    assert_eq!(first.get("c"), None);
+    assert_eq!(
+        scans.swap(0, Ordering::SeqCst),
+        3,
+        "everything scanned once"
+    );
+    assert!(path.exists());
+
+    let second = scan_corpus_cached_with(Some(&path), &names, stamps, scan);
+    assert_eq!(second, first);
+    assert_eq!(
+        scans.swap(0, Ordering::SeqCst),
+        1,
+        "only the unstamped case is rescanned; a remembered `None` is not"
+    );
+
+    let moved = |name: &str| match name {
+        "a" => Some(11),
+        "c" => Some(30),
+        _ => None,
+    };
+    let third = scan_corpus_cached_with(Some(&path), &names, moved, scan);
+    assert_eq!(third, first);
+    assert_eq!(
+        scans.swap(0, Ordering::SeqCst),
+        2,
+        "a moved, b has no stamp"
+    );
+
+    // No cache file: every call scans everything.
+    scan_corpus_cached_with(None, &names, stamps, scan);
+    assert_eq!(scans.swap(0, Ordering::SeqCst), 3);
+}
+
+#[test]
+fn the_codediff_overlay_from_a_known_diff_matches_a_fresh_run() {
+    let before = Code::from_string("fn main() {\n    a();\n}\n", &Language::Rust);
+    let after = Code::from_string("fn main() {\n    b();\n    a();\n}\n", &Language::Rust);
+    let known = diff_code(&before, &after).ast.expect("an AST diff");
+    let fresh = codediff_text_spans(&before, &after, None);
+    let reused = codediff_text_spans(&before, &after, Some(&known));
+    assert_eq!(reused, fresh);
+    assert!(!reused[1].is_empty(), "the insert shows on the after side");
+}
+
+/// Not a test of anything: prints how long the per-key work takes on the largest fixture, for
+/// deciding whether the caches need to update incrementally. `--run-ignored` to see it.
+#[test]
+#[ignore]
+fn timing_of_the_per_key_work_on_the_largest_fixture() -> Result<()> {
+    for name in [
+        "json-ipfs-ipfs-desktop-only-update-version-strings",
+        "cpp-godotengine-godot-add-one-include",
+    ] {
+        let (before, after) = load_case(name)?;
+        let mapping = human_mapping::load(name)?;
+        let root_id = starting_cursor_id(&before);
+        let app = App::new(
+            name.to_string(),
+            CaseOrigin::Diffs,
+            root_id,
+            starting_cursor_id(&after),
+            mapping,
+        );
+        let started = std::time::Instant::now();
+        let state = compute_frame_state(&before, &after, &app)?;
+        let frame = started.elapsed();
+        let started = std::time::Instant::now();
+        let _clone = app.mapping.clone();
+        let clone = started.elapsed();
+        eprintln!(
+            "{name}: {} entries, compute_frame_state {frame:?}, mapping clone {clone:?}, {} flat rows",
+            app.mapping.entries.len(),
+            state.before_flat.len()
+        );
+    }
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------------------------
+// The keystroke log
+// ---------------------------------------------------------------------------------------------
+
+#[test]
+fn key_name_hides_typed_characters_and_spells_out_modifiers_and_special_keys() {
+    use crossterm::event::{KeyEvent, KeyModifiers};
+    let plain = |code| KeyEvent::new(code, KeyModifiers::NONE);
+    assert_eq!(key_name(plain(KeyCode::Char('m')), "tree"), "m");
+    assert_eq!(
+        key_name(plain(KeyCode::Char('m')), "prompt-typing"),
+        "typed"
+    );
+    assert_eq!(key_name(plain(KeyCode::Char(' ')), "tree"), "Space");
+    assert_eq!(key_name(plain(KeyCode::Enter), "prompt-typing"), "Enter");
+    assert_eq!(key_name(plain(KeyCode::Up), "tree"), "Up");
+    assert_eq!(
+        key_name(
+            KeyEvent::new(KeyCode::Char('r'), KeyModifiers::CONTROL),
+            "text"
+        ),
+        "Ctrl-r"
+    );
+}
+
+#[test]
+fn mode_name_tells_a_typing_state_from_its_view() {
+    assert_eq!(mode_name(None), "tree");
+    let mut state = TextPaintState::default();
+    assert_eq!(
+        mode_name(Some(&Modal::TextView {
+            state: state.clone()
+        })),
+        "text"
+    );
+    state.line_prompt = Some(String::new());
+    assert_eq!(mode_name(Some(&Modal::TextView { state })), "text-typing");
+    assert_eq!(
+        mode_name(Some(&Modal::PromptSearch {
+            input: String::new()
+        })),
+        "prompt-typing"
+    );
+    assert_eq!(
+        mode_name(Some(&Modal::OpenDiffPicker {
+            options: vec![],
+            selected: 0,
+            view: DiffPickerView::default(),
+            name_input: Some("ru".to_string()),
+        })),
+        "picker-typing"
+    );
+}
+
+#[test]
+fn the_key_log_appends_one_line_per_key_that_parses_back() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("deeper").join("keys.tsv");
+    let mut log = KeyLog::open(&path).unwrap();
+    log.record("rust-add-if", "tree", "m", true);
+    log.record("rust-add-if", "prompt-typing", "typed", false);
+    drop(log);
+    let mut again = KeyLog::open(&path).unwrap();
+    again.record("other", "text", "d", true);
+
+    let records = parse_key_log(&std::fs::read_to_string(&path).unwrap());
+    assert_eq!(records.len(), 3, "appended across opens");
+    assert_eq!(records[0].case, "rust-add-if");
+    assert_eq!(records[0].key, "m");
+    assert!(records[0].edited);
+    assert_eq!(records[1].mode, "prompt-typing");
+    assert!(!records[1].edited);
+    assert!(records[0].at_ms <= records[2].at_ms);
+}
+
+#[test]
+fn parse_key_log_skips_a_torn_line() {
+    let records = parse_key_log("1000\ta\ttree\tm\t1\n2000\ta\ttree\n3000\ta\ttext\td\t0");
+    assert_eq!(records.len(), 2);
+    assert_eq!(records[1].key, "d");
+}
+
+#[test]
+fn summarize_key_log_charges_the_pause_before_a_key_to_it_and_drops_breaks() {
+    let log = "\
+1000\tcase-a\ttree\tj\t0
+3000\tcase-a\ttree\tm\t1
+4000\tcase-a\tkind-mismatch\ti\t1
+104000\tcase-b\ttext\td\t1
+105500\tcase-b\ttext\td\t1
+";
+    let summary = summarize_key_log(&parse_key_log(log));
+    // 2s before m, 1s before i, the 100s gap is a break, 1.5s before the last d: 4.5s active.
+    assert!(
+        summary.starts_with("5 keys, 4 of them edits, 4.5s active"),
+        "{summary}"
+    );
+    assert!(
+        summary.contains("tree                           2 keys       2.0s"),
+        "{summary}"
+    );
+    assert!(
+        summary.contains("kind-mismatch                  1 keys       1.0s"),
+        "{summary}"
+    );
+    assert!(
+        summary.contains("text                           2 keys       1.5s"),
+        "{summary}"
+    );
+    assert!(
+        summary.contains("tree m                         1 keys       2.0s"),
+        "{summary}"
+    );
+    assert!(
+        summary.contains("3.0s       3 keys       2 edits  case-a"),
+        "{summary}"
+    );
+    assert_eq!(summarize_key_log(&[]), "No keys logged yet.\n");
+}
+
+// ---------------------------------------------------------------------------------------------
+// Search in the t view, and m over a Minimal sweep
+// ---------------------------------------------------------------------------------------------
+
+#[test]
+fn find_next_looks_past_the_cursor_wraps_and_finds_the_occurrence_under_it_again() {
+    let source = "let café = 1;\nfoo(café);\n";
+    let mut state = TextPaintState::default();
+    state.cursor[0] = (0, 0);
+    assert_eq!(state.find_next(0, source, "café"), Some((0, 4)));
+    state.cursor[0] = (0, 4);
+    assert_eq!(
+        state.find_next(0, source, "café"),
+        Some((1, 4)),
+        "past the cursor first"
+    );
+    state.cursor[0] = (1, 4);
+    assert_eq!(
+        state.find_next(0, source, "café"),
+        Some((0, 4)),
+        "then wraps"
+    );
+    state.cursor[0] = (0, 4);
+    assert_eq!(
+        state.find_next(0, source, "let"),
+        Some((0, 0)),
+        "a lone occurrence before the cursor is reached on the wrap-around pass"
+    );
+    assert_eq!(state.find_next(0, source, "nothing"), None);
+    assert_eq!(state.find_next(0, source, ""), None);
+    // Starting one byte into `é` must not slice mid-character.
+    state.cursor[0] = (0, 7);
+    assert_eq!(state.find_next(0, source, ";"), Some((0, 13)));
+}
+
+/// One key on the text view `app` already has open, keeping `app` (and so `last_search`).
+fn press_text_view_again(app: &mut App, source: &str, code: KeyCode) -> TextPaintState {
+    let tree = parse_rust(source);
+    let root = tree.root_node();
+    let flat = FlatIndex::new(flatten_visible(root, &app.before.collapsed, None));
+    let caches = rebuild_caches(&app.mapping.entries, root, root);
+    handle_modal_key(
+        app,
+        code,
+        &flat,
+        &flat,
+        Some(root),
+        Some(root),
+        &caches,
+        source.as_bytes(),
+        source.as_bytes(),
+        &Code::from_string(source, &Language::Rust),
+        &Code::from_string(source, &Language::Rust),
+    );
+    let Some(Modal::TextView { state }) = &app.modal else {
+        panic!("the text view should still be open, got {:?}", app.modal);
+    };
+    state.clone()
+}
+
+#[test]
+fn slash_in_the_text_view_prompts_jumps_and_remembers_the_query() {
+    let source = "fn main() {\n    alpha();\n    beta();\n}\n";
+    let (mut app, state) = press_in_text_view(
+        source,
+        source,
+        TextPaintState::default(),
+        KeyCode::Char('/'),
+    );
+    assert_eq!(
+        state.search_prompt.as_deref(),
+        Some(""),
+        "empty: nothing searched yet"
+    );
+
+    for code in "beta".chars().map(KeyCode::Char) {
+        press_text_view_again(&mut app, source, code);
+    }
+    let state = press_text_view_again(&mut app, source, KeyCode::Enter);
+    assert_eq!(state.cursor[0], (2, 4), "on `beta`");
+    assert!(state.search_prompt.is_none());
+    assert_eq!(app.last_search.as_deref(), Some("beta"));
+    assert_eq!(
+        app.status.as_deref(),
+        Some("Found \"beta\" on line 3 - / Enter finds the next")
+    );
+
+    // `/` again offers the last query; Esc leaves everything as it was.
+    let state = press_text_view_again(&mut app, source, KeyCode::Char('/'));
+    assert_eq!(state.search_prompt.as_deref(), Some("beta"));
+    let state = press_text_view_again(&mut app, source, KeyCode::Esc);
+    assert!(state.search_prompt.is_none());
+    assert_eq!(state.cursor[0], (2, 4));
+    assert_eq!(app.status.as_deref(), Some("Search cancelled"));
+
+    // Enter on the offered query finds the next occurrence, wrapping to the only one.
+    press_text_view_again(&mut app, source, KeyCode::Char('/'));
+    let state = press_text_view_again(&mut app, source, KeyCode::Enter);
+    assert_eq!(state.cursor[0], (2, 4));
+}
+
+#[test]
+fn the_text_view_title_shows_the_search_prompt_on_the_focused_side() {
+    let width = SINGLE_PANEL_WIDTH_THRESHOLD + 20;
+    let backend = ratatui::backend::TestBackend::new(width, 12);
+    let mut terminal = Terminal::new(backend).unwrap();
+    let state = TextPaintState {
+        side: 1,
+        search_prompt: Some("bet".to_string()),
+        ..Default::default()
+    };
+    terminal
+        .draw(|f| {
+            render_text_view_modal(
+                f,
+                Rect::new(0, 0, width, 12),
+                "fn old_name() {}",
+                "fn new_name() {}",
+                &HumanMapping::default(),
+                "Minimal",
+                TextOverlay::Human,
+                None,
+                &state,
+            )
+        })
+        .unwrap();
+    let text = rendered_text(&terminal);
+    assert!(text.contains("After — search: bet_"), "{text}");
+}
+
+/// Before: an indented block; after: the same block moved down past a new line and re-indented.
+fn moved_block() -> (&'static str, &'static str) {
+    (
+        "fn main() {\n    let a = 1;\n    let b = 2;\n    println!();\n}\n",
+        "fn main() {\n    println!();\n        let a = 1;\n        let b = 2;\n}\n",
+    )
+}
+
+/// Full-line sweeps over rows 1-2 before and rows 2-3 after.
+fn sweeps_over_the_moved_block() -> TextPaintState {
+    let (before, after) = moved_block();
+    TextPaintState {
+        vertical: false,
+        anchor: [Some((1, 0)), Some((2, 0))],
+        cursor: [
+            (2, TextPaintState::row_text(before, 2).len()),
+            (3, TextPaintState::row_text(after, 3).len()),
+        ],
+        ..Default::default()
+    }
+}
+
+#[test]
+fn m_over_minimal_sweeps_pairs_the_rows_one_to_one_without_indentation() {
+    let (before, after) = moved_block();
+    let (app, _) = press_in_text_view_painting(
+        "Minimal",
+        before,
+        after,
+        sweeps_over_the_moved_block(),
+        KeyCode::Char('m'),
+    );
+    let entries = solution_entries(&app.mapping, &app.text_solution);
+    assert_eq!(entries.len(), 2, "one match per row: {:?}", app.status);
+    for (entry, (before_row, after_row)) in entries.iter().zip([(1, 2), (2, 3)]) {
+        assert_eq!(entry.operation, HumanTextOperation::Match);
+        assert_eq!(entry.before.len(), 1);
+        assert_eq!(entry.after.len(), 1);
+        assert_eq!(
+            (entry.before[0].start_row, entry.before[0].start_column),
+            (before_row, 4),
+            "starts at the first code character"
+        );
+        assert_eq!(
+            (entry.after[0].start_row, entry.after[0].start_column),
+            (after_row, 8)
+        );
+        assert_eq!(
+            entry.verdict(before, after).unwrap(),
+            HumanTextVerdict::Move
+        );
+    }
+    assert_eq!(
+        app.status.as_deref(),
+        Some(
+            "Matched 2 line(s) one to one: 2 move(s), 0 update(s) - indentation left unpainted (Minimal)"
+        )
+    );
+    assert!(app.dirty);
+}
+
+#[test]
+fn m_over_full_sweeps_is_one_match_as_drawn() {
+    let (before, after) = moved_block();
+    let (app, _) = press_in_text_view_painting(
+        "Full",
+        before,
+        after,
+        sweeps_over_the_moved_block(),
+        KeyCode::Char('m'),
+    );
+    let entries = solution_entries(&app.mapping, &app.text_solution);
+    assert_eq!(entries.len(), 1, "{:?}", app.status);
+    assert_eq!(
+        entries[0].before[0].start_column, 0,
+        "Full keeps the indentation as drawn"
+    );
+    assert_eq!(entries[0].before[0].end_row, 2);
+}
+
+#[test]
+fn m_over_minimal_sweeps_of_unequal_length_is_refused() {
+    let (before, after) = moved_block();
+    let mut state = sweeps_over_the_moved_block();
+    // Three rows before, two after.
+    state.cursor[0] = (3, TextPaintState::row_text(before, 3).len());
+    let (app, _) = press_in_text_view_painting("Minimal", before, after, state, KeyCode::Char('m'));
+    assert!(solution_entries(&app.mapping, &app.text_solution).is_empty());
+    assert!(
+        app.status
+            .as_deref()
+            .unwrap_or("")
+            .starts_with("Not matched: 3 line(s) against 2"),
+        "{:?}",
+        app.status
+    );
+}
+
+#[test]
+fn m_over_a_minimal_vertical_selection_is_untouched() {
+    let (before, after) = moved_block();
+    let mut state = sweeps_over_the_moved_block();
+    state.vertical = true;
+    state.anchor = [Some((1, 4)), Some((2, 8))];
+    state.cursor = [(2, 9), (3, 13)];
+    let (app, _) = press_in_text_view_painting("Minimal", before, after, state, KeyCode::Char('m'));
+    // The old path: a vertical selection is one entry with a span per row, and a Match's spans
+    // on a side must read the same, which `let a` and `let b` do not.
+    assert!(solution_entries(&app.mapping, &app.text_solution).is_empty());
+    assert!(
+        app.status
+            .as_deref()
+            .unwrap_or("")
+            .starts_with("Not matched:"),
+        "{:?}",
+        app.status
+    );
+}
+
+// ---------------------------------------------------------------------------------------------
+// t opens on the panels' nodes
+// ---------------------------------------------------------------------------------------------
+
+#[test]
+fn at_nodes_puts_each_cursor_on_its_node_and_scrolls_it_into_view() {
+    let mut source = String::from("fn main() {\n");
+    for i in 0..40 {
+        source.push_str(&format!("    stmt_{i}();\n"));
+    }
+    source.push_str("}\n");
+    let tree = parse_rust(&source);
+    let root = tree.root_node();
+    let statements = body_statements(root);
+    let (early, late) = (statements[2], statements[30]);
+
+    let state = TextPaintState::at_nodes(Some(early), Some(late), 1, 20);
+    assert_eq!(state.side, 1);
+    assert_eq!(state.cursor[0], (3, 4), "row 3, past the indentation");
+    assert_eq!(state.cursor[1], (31, 4));
+    assert_eq!(state.scroll[0], 0);
+    assert_eq!(
+        state.scroll[1], 12,
+        "row 31 is the last of a 20-row viewport"
+    );
+
+    let state = TextPaintState::at_nodes(None, None, 0, 20);
+    assert_eq!(state, TextPaintState::default());
+}
+
+#[test]
+fn t_opens_the_text_view_on_the_selected_nodes_with_the_focused_side_first() {
+    let source = "fn main() {\n    alpha();\n    beta();\n}\n";
+    let tree = parse_rust(source);
+    let root = tree.root_node();
+    let statements = body_statements(root);
+    let mut app = App::new(
+        "test".to_string(),
+        CaseOrigin::Diffs,
+        statements[0].id(),
+        statements[1].id(),
+        HumanMapping::default(),
+    );
+    app.focus = Focus::After;
+    let flat = FlatIndex::new(flatten_visible(root, &app.before.collapsed, None));
+    let caches = rebuild_caches(&app.mapping.entries, root, root);
+    let hashes = rustc_hash::FxHashMap::default();
+    handle_key(
+        &mut app,
+        KeyCode::Char('t'),
+        &flat,
+        &flat,
+        root,
+        root,
+        &caches,
+        source.as_bytes(),
+        source.as_bytes(),
+        &hashes,
+        &hashes,
+        &Code::from_string(source, &Language::Rust),
+        &Code::from_string(source, &Language::Rust),
+    );
+    let Some(Modal::TextView { state }) = app.modal else {
+        panic!("t opens the text view, got {:?}", app.modal);
+    };
+    assert_eq!(state.side, 1, "the After panel had the focus");
+    assert_eq!(state.cursor[0], (1, 4), "alpha");
+    assert_eq!(state.cursor[1], (2, 4), "beta");
 }

@@ -28,6 +28,7 @@ fn mapping() -> Result<()> {
     // of `rust-algorithm-change`: the call chain is deleted and the nested `if`/`return` inserted.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "java-defects4j-cli-3-typehandler",
+        // Includes the N:M floor: 8 all-to-all group members a one-to-one output cannot reach.
         14,
         11,
     )

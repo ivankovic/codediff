@@ -1560,6 +1560,9 @@ pub fn human_mapping_cost_for(
 /// A synthetic `ASTDiff` from `name`'s human mapping, so machinery that consumes an `ASTDiff`
 /// (e.g. `diff::text::TextDiff`) treats the human mapping like codediff's output.
 ///
+/// All-to-all groups become [`ASTDiff::add_group`] groups, members in document order; any-one-to-one
+/// groups are flattened by [`representative_entries`].
+///
 /// `cost`/`reason` are placeholders; the human format records neither. `reason` is not inert:
 /// `diff::text`'s `identical_or_move` reads it, so `painting_failure_census` borrows codediff's
 /// reason for shared pairs before rendering.
@@ -1586,9 +1589,51 @@ pub fn as_ast_diff_for_mapping(
     let mut before_cache = PathCache::new();
     let mut after_cache = PathCache::new();
 
-    let entries = representative_entries(mapping, before_root, after_root)?;
+    // All-to-all groups become real groups below; flattening them would give a surplus member's
+    // partner a second partner that overwrites its first.
+    let (all_to_all, other_groups): (Vec<MultiMapGroup>, Vec<MultiMapGroup>) = mapping
+        .groups
+        .iter()
+        .cloned()
+        .partition(|group| group.pairing == GroupPairing::AllToAll);
+    let flattened = HumanMapping {
+        groups: other_groups,
+        ..mapping.clone()
+    };
+    let entries = representative_entries(&flattened, before_root, after_root)?;
 
     let mut diff = ASTDiff::default();
+    for group in &all_to_all {
+        let mut members = [Vec::new(), Vec::new()];
+        for (side, paths, root, cache) in [
+            (0, &group.before_paths, before_root, &mut before_cache),
+            (1, &group.after_paths, after_root, &mut after_cache),
+        ] {
+            let mut nodes = paths
+                .iter()
+                .map(|path| {
+                    cache
+                        .resolve(root, &path_refs(path))
+                        .with_context(|| format!("resolving multi-map path {:?}", path))
+                })
+                .collect::<Result<Vec<_>>>()?;
+            nodes.sort_by_key(|node| node.start_byte());
+            members[side] = nodes.iter().map(|node| node.id()).collect();
+        }
+        let operation = match group.operation {
+            HumanOperation::Identical => ASTMappingOperation::Identical,
+            _ => ASTMappingOperation::MatchButNotIdentical,
+        };
+        diff.add_group(
+            &members[0],
+            &members[1],
+            ASTMapping {
+                cost: 0,
+                operation,
+                reason: ASTMappingReason::default(),
+            },
+        );
+    }
     for entry in &entries {
         let before_id = match &entry.before_path {
             Some(path) => before_cache
@@ -1757,12 +1802,18 @@ fn check_entry<'b, 'a>(
                 .resolve(after_root, &path_refs(after_path))
                 .with_context(|| format!("resolving after_path {:?}", after_path))?;
 
+            // All of its partners, not just one: a node grouped with the right partner *and* others
+            // claims more than the ground truth does.
             let actual_partner = diff_ast.before_node_map.get(&before_node.id()).copied();
-            if actual_partner != Some(after_node.id()) {
-                let mapped_kind = match actual_partner {
+            let partners = diff_ast.before_partners(before_node.id());
+            if partners != [after_node.id()] {
+                let mut mapped_kind = match actual_partner {
                     Some(mapped_id) => node_kind_for_id(after_root, mapped_id),
                     None => "None".to_string(),
                 };
+                if partners.len() > 1 {
+                    mapped_kind = format!("{mapped_kind} and {} more", partners.len() - 1);
+                }
                 mismatches.push(Mismatch {
                     message: format!(
                         "{:?} {:?} <-> {:?}: expected before node '{}' to map to after node '{}', but it mapped to {}{}",
@@ -1899,7 +1950,11 @@ fn check_entry<'b, 'a>(
 ///
 /// For `AllToAll`, deleted and inserted are not valid fates in steps 1-2, step 3 does not apply,
 /// and step 5's closure is over the union of the members (no leftovers exist). A one-to-one diff
-/// therefore always reports at least `|N - M|` mismatches for such a group.
+/// therefore always reports at least `|N - M|` mismatches for such a group; a diff that groups the
+/// members itself ([`ASTDiff::add_group`]) can report none, since an after member whose own partner
+/// is in the group passes in step 2.
+///
+/// A member passes only if *all* its partners ([`ASTDiff::before_partners`]) are in the group.
 fn check_group_entry<'b, 'a>(
     group: &MultiMapGroup,
     before_root: Node<'b>,
@@ -1988,13 +2043,19 @@ fn check_group_entry<'b, 'a>(
         }
     };
 
+    let before_ids: std::collections::HashSet<usize> = before_nodes.iter().map(Node::id).collect();
+
     let mut matched_pairs: Vec<(Node<'b>, Node<'a>)> = Vec::new();
     let mut leftover_before: Vec<Node<'b>> = Vec::new();
     for &b in &before_nodes {
         let actual = diff_ast.before_node_map.get(&b.id()).copied();
+        let partners_in_group = diff_ast
+            .before_partners(b.id())
+            .iter()
+            .all(|partner| after_ids.contains(partner));
         match actual {
             Some(0) if !all_to_all => leftover_before.push(b),
-            Some(a_id) if after_ids.contains(&a_id) => {
+            Some(a_id) if after_ids.contains(&a_id) && partners_in_group => {
                 let a = *after_nodes
                     .iter()
                     .find(|n| n.id() == a_id)
@@ -2029,8 +2090,20 @@ fn check_group_entry<'b, 'a>(
             continue;
         }
         let actual = diff_ast.after_node_map.get(&a.id()).copied();
+        let partners_in_group = diff_ast
+            .after_partners(a.id())
+            .iter()
+            .all(|partner| before_ids.contains(partner));
         match actual {
             Some(0) if !all_to_all => leftover_after.push(a),
+            // Reached from its own side: a surplus member of a group the diff made itself.
+            Some(b_id) if all_to_all && before_ids.contains(&b_id) && partners_in_group => {
+                let b = *before_nodes
+                    .iter()
+                    .find(|n| n.id() == b_id)
+                    .expect("b_id came from before_ids, which is built from before_nodes");
+                matched_pairs.push((b, a));
+            }
             other => {
                 let mapped_kind = match other {
                     Some(mapped_id) => node_kind_for_id(before_root, mapped_id),
@@ -2366,6 +2439,80 @@ pub fn graded_node_count_for(
         &before_metadata,
         &after_metadata,
     )
+}
+
+/// The fewest mismatches a one-to-one output can score on a mapping's all-to-all groups: the
+/// larger side's surplus, `|N - M|` per group (see [`MultiMapGroup`]). `visible` is the same floor
+/// counted as the visible mismatches are: a one-to-one output does best by pairing the visible
+/// members, so only visible surplus beyond `min(N, M)` is forced.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct NmFloor {
+    pub total: usize,
+    pub visible: usize,
+}
+
+pub fn nm_floor(
+    mapping: &HumanMapping,
+    before: &crate::code::Code,
+    after: &crate::code::Code,
+) -> Result<NmFloor> {
+    use crate::diff::nodes::is_structurally_visible;
+
+    let before_root = before
+        .ast
+        .as_ref()
+        .context("Before code has no AST")?
+        .root_node();
+    let after_root = after
+        .ast
+        .as_ref()
+        .context("After code has no AST")?
+        .root_node();
+    let mut before_cache = PathCache::new();
+    let mut after_cache = PathCache::new();
+    let mut floor = NmFloor::default();
+    for group in &mapping.groups {
+        if group.pairing != GroupPairing::AllToAll {
+            continue;
+        }
+        let (n, m) = (group.before_paths.len(), group.after_paths.len());
+        let surplus = n.abs_diff(m);
+        if surplus == 0 {
+            continue;
+        }
+        let visible_on_larger_side = if n > m {
+            let source = before.contents.as_bytes();
+            group
+                .before_paths
+                .iter()
+                .map(|path| before_cache.resolve(before_root, &path_refs(path)))
+                .collect::<Result<Vec<_>>>()?
+                .into_iter()
+                .filter(|node| is_structurally_visible(*node, source))
+                .count()
+        } else {
+            let source = after.contents.as_bytes();
+            group
+                .after_paths
+                .iter()
+                .map(|path| after_cache.resolve(after_root, &path_refs(path)))
+                .collect::<Result<Vec<_>>>()?
+                .into_iter()
+                .filter(|node| is_structurally_visible(*node, source))
+                .count()
+        };
+        floor.total += surplus;
+        floor.visible += visible_on_larger_side.saturating_sub(n.min(m));
+    }
+    Ok(floor)
+}
+
+pub fn nm_floor_for(
+    name: &str,
+    before: &crate::code::Code,
+    after: &crate::code::Code,
+) -> Result<NmFloor> {
+    nm_floor(&load(name)?, before, after)
 }
 
 /// Reduces one side's `TextOperation`s to "touched or not", the only signal a line-only tool
@@ -4584,6 +4731,59 @@ mod tests {
             unmarked_node_count(root, &caches, status_before),
             every_node
         );
+    }
+
+    #[test]
+    fn an_all_to_all_group_scores_its_floor_one_to_one_and_nothing_as_a_group() -> Result<()> {
+        let before_source = "fn main() {\n    foo();\n    foo();\n    foo();\n}\n";
+        let after_source = "fn main() {\n    foo();\n    foo();\n}\n";
+        let before = crate::code::Code::from_string(before_source, &Language::Rust);
+        let after = crate::code::Code::from_string(after_source, &Language::Rust);
+        let before_root = before.ast.as_ref().unwrap().root_node();
+        let after_root = after.ast.as_ref().unwrap().root_node();
+        let before_foos = function_body_statements(before_root);
+        let after_foos = function_body_statements(after_root);
+
+        let mapping = HumanMapping {
+            entries: vec![],
+            groups: vec![MultiMapGroup {
+                before_paths: before_foos.iter().map(|n| path_for_node(*n)).collect(),
+                after_paths: after_foos.iter().map(|n| path_for_node(*n)).collect(),
+                operation: HumanOperation::Identical,
+                with_children: false,
+                pairing: GroupPairing::AllToAll,
+            }],
+            text_mappings: vec![],
+        };
+        let grade = |diff: &ASTDiff| -> Result<usize> {
+            let mut mismatches = Vec::new();
+            check_group_entry(
+                &mapping.groups[0],
+                before_root,
+                after_root,
+                diff,
+                &mut mismatches,
+                &mut PathCache::new(),
+                &mut PathCache::new(),
+            )?;
+            Ok(mismatches.len())
+        };
+
+        let grouped = as_ast_diff_for_mapping(&mapping, &before, &after)?;
+        assert_eq!(grouped.groups.len(), 1);
+        assert_eq!(grade(&grouped)?, 0);
+
+        let mut one_to_one = ASTDiff::default();
+        let identical = ASTMapping::identical(ASTMappingReason::IdenticalHash);
+        one_to_one.add_mapping(before_foos[0].id(), after_foos[0].id(), identical.clone());
+        one_to_one.add_mapping(before_foos[1].id(), after_foos[1].id(), identical);
+        one_to_one.add_mapping(
+            before_foos[2].id(),
+            0,
+            ASTMapping::deleted(ASTMappingReason::UnresolvedNode),
+        );
+        assert_eq!(grade(&one_to_one)?, 1, "the floor, |3 - 2|");
+        Ok(())
     }
 
     #[test]

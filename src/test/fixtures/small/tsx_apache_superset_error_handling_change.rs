@@ -26,7 +26,7 @@ fn mapping() -> Result<()> {
     // scores wrong: this comes down only with N:M support.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "tsx-apache-superset-error-handling-change",
-        // Includes all-to-all group members a one-to-one output cannot reach: the N:M floor.
+        // Includes the N:M floor: 1 all-to-all group member a one-to-one output cannot reach.
         7,
         5,
     )

@@ -229,6 +229,9 @@ struct Row {
     /// divides by every node while only graded ones can mismatch, so a thinly annotated fixture
     /// looks better than it is without this.
     graded_nodes: Option<usize>,
+    /// The mismatches no one-to-one output can avoid on the fixture's all-to-all groups
+    /// (`human_mapping::nm_floor`): a fixture at its floor is as good as a 1:1 diff gets.
+    nm_floor: Option<human_mapping::NmFloor>,
 }
 
 /// Prints every mapping codediff produces for one fixture, with human-readable paths, sorted by
@@ -351,6 +354,7 @@ fn main() -> Result<()> {
                 elapsed_ms,
                 visible_mismatches: None,
                 graded_nodes: None,
+                nm_floor: None,
                 text_only: true,
             });
             continue;
@@ -366,6 +370,7 @@ fn main() -> Result<()> {
                 elapsed_ms,
                 visible_mismatches: None,
                 graded_nodes: None,
+                nm_floor: None,
                 text_only: false,
             });
             continue;
@@ -377,6 +382,7 @@ fn main() -> Result<()> {
         let total_nodes = human_mapping::total_node_count_for(before, after);
         let human_cost = human_mapping::human_mapping_cost_for(name, before, after)?;
         let graded_nodes = human_mapping::graded_node_count_for(name, before, after)?;
+        let nm_floor = human_mapping::nm_floor_for(name, before, after)?;
         rows.push(Row {
             name: name.clone(),
             mismatches: Some((mismatch_count, total_nodes)),
@@ -389,6 +395,7 @@ fn main() -> Result<()> {
                 visible.before_visible_node_count + visible.after_visible_node_count,
             )),
             graded_nodes: Some(graded_nodes),
+            nm_floor: Some(nm_floor),
             text_only: false,
         });
     }
@@ -498,6 +505,33 @@ fn print_goal_progress(rows: &[Row]) {
             "  note: {thin} fixture(s) grade under {:.0}% of their nodes - they clear the rate bar \
              largely by not being annotated, not by being diffed well (see the graded_nodes column)",
             THIN_ANNOTATION_COVERAGE * 100.0
+        );
+    }
+
+    // What N:M support can at most give back. A fixture "held back by the floor" has no visible
+    // mismatch beyond its visible floor, so a 1:1 output cannot reach zero there however good.
+    let floored: Vec<(human_mapping::NmFloor, usize, usize)> = rows
+        .iter()
+        .filter_map(|r| match (r.nm_floor, r.mismatches, r.visible_mismatches) {
+            (Some(floor), Some((count, _)), Some((visible, _))) if floor.total > 0 => {
+                Some((floor, count, visible))
+            }
+            _ => None,
+        })
+        .collect();
+    if !floored.is_empty() {
+        let total: usize = floored.iter().map(|(f, _, _)| f.total).sum();
+        let visible: usize = floored.iter().map(|(f, _, _)| f.visible).sum();
+        let at_floor = floored.iter().filter(|(f, c, _)| *c == f.total).count();
+        let held_back = floored
+            .iter()
+            .filter(|(f, _, v)| f.visible > 0 && *v == f.visible)
+            .count();
+        println!(
+            "  N:M floor: {total} mismatches ({visible} visible) in {} fixtures no one-to-one \
+             output can avoid; {at_floor} are at their floor, {held_back} miss zero visible \
+             mismatches only by it",
+            floored.len()
         );
     }
 }
@@ -1047,6 +1081,8 @@ fn write_csv(rows: &[Row], path: &std::path::Path) -> Result<()> {
         "cost_diff",
         "elapsed_ms",
         "graded_nodes",
+        "nm_floor",
+        "visible_nm_floor",
     ];
     header.extend(columns.iter().map(String::as_str));
     wtr.write_record(&header)?;
@@ -1091,6 +1127,10 @@ fn write_csv(rows: &[Row], path: &std::path::Path) -> Result<()> {
                     format!("{:.3}", row.elapsed_ms),
                     row.graded_nodes
                         .map_or_else(|| "-".to_string(), |g| g.to_string()),
+                    row.nm_floor
+                        .map_or_else(|| "-".to_string(), |f| f.total.to_string()),
+                    row.nm_floor
+                        .map_or_else(|| "-".to_string(), |f| f.visible.to_string()),
                 ];
                 record.extend(reason_fields);
                 wtr.write_record(&record)?;
@@ -1116,6 +1156,10 @@ fn write_csv(rows: &[Row], path: &std::path::Path) -> Result<()> {
                     format!("{:.3}", row.elapsed_ms),
                     row.graded_nodes
                         .map_or_else(|| "-".to_string(), |g| g.to_string()),
+                    row.nm_floor
+                        .map_or_else(|| "-".to_string(), |f| f.total.to_string()),
+                    row.nm_floor
+                        .map_or_else(|| "-".to_string(), |f| f.visible.to_string()),
                 ];
                 record.extend(reason_fields);
                 wtr.write_record(&record)?;
@@ -1178,6 +1222,7 @@ mod tests {
             mismatches: Some((mismatches, 1000)),
             visible_mismatches: Some((visible, 700)),
             graded_nodes: Some(700),
+            nm_floor: Some(human_mapping::NmFloor::default()),
             reason_counts: HashMap::new(),
             algorithm_cost: 0,
             human_cost: Some(0),
@@ -1192,6 +1237,7 @@ mod tests {
             mismatches: None,
             visible_mismatches: None,
             graded_nodes: None,
+            nm_floor: None,
             reason_counts: HashMap::new(),
             algorithm_cost: 0,
             human_cost: None,

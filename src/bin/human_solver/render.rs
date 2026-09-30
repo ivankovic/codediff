@@ -118,6 +118,8 @@ pub(crate) fn render_panel(
     algo_diff: Option<&ASTDiff>,
     show_reason: bool,
     total_unmarked: usize,
+    // `None` until codediff's diff is in; see `FrameState::before_mismatches`.
+    mismatches: Option<usize>,
     multi_selected: &std::collections::BTreeSet<usize>,
     groups: &[MultiMapGroup],
 ) {
@@ -125,6 +127,11 @@ pub(crate) fn render_panel(
     panel.viewport_height = inner_height;
     let cursor_idx = flat.index_of(panel.cursor_id).unwrap_or(0);
     ensure_visible(&mut panel.scroll, cursor_idx, inner_height);
+    // The `v` range, as rows: the anchor's row to the cursor's, either way round.
+    let range_rows = panel
+        .anchor
+        .and_then(|anchor| flat.index_of(anchor))
+        .map(|anchor_idx| anchor_idx.min(cursor_idx)..=anchor_idx.max(cursor_idx));
 
     // Only on-screen rows are built; `total_unmarked` comes from `FrameState`, not from `flat`.
     let visible_end = (panel.scroll + inner_height.max(1)).min(flat.len());
@@ -180,6 +187,10 @@ pub(crate) fn render_panel(
         if multi_selected.contains(&node.id()) {
             style = style.fg(Color::Magenta).add_modifier(Modifier::BOLD);
         }
+        // A `v` range awaiting its mark.
+        if range_rows.as_ref().is_some_and(|rows| rows.contains(&idx)) {
+            style = style.bg(Color::Blue);
+        }
 
         if idx == cursor_idx {
             style = style
@@ -201,12 +212,21 @@ pub(crate) fn render_panel(
     };
     let block = Block::default()
         .borders(Borders::ALL)
-        .title(format!(
-            "{} — {} nodes, {} unmarked",
-            title,
-            flat.len(),
-            total_unmarked
-        ))
+        .title(match mismatches {
+            Some(mismatches) => format!(
+                "{} — {} nodes, {} unmarked, {} mismatches",
+                title,
+                flat.len(),
+                total_unmarked,
+                mismatches
+            ),
+            None => format!(
+                "{} — {} nodes, {} unmarked",
+                title,
+                flat.len(),
+                total_unmarked
+            ),
+        })
         .border_style(border_style);
 
     frame.render_widget(List::new(items).block(block), area);
@@ -281,6 +301,8 @@ pub(crate) fn draw_ui(
     after_src: &[u8],
     before_unmarked: usize,
     after_unmarked: usize,
+    before_mismatches: Option<usize>,
+    after_mismatches: Option<usize>,
     name: &str,
     // No grammar, so no nodes (see `FrameState::before_root`).
     text_only: bool,
@@ -313,26 +335,29 @@ pub(crate) fn draw_ui(
         render_unsupported_language_panels(frame, chunks[1], single_panel, app.focus);
     } else if single_panel {
         let panel_area = chunks[1];
-        let (title, flat, panel, side, src, total_unmarked, multi_selected) = match app.focus {
-            Focus::Before => (
-                "Before",
-                before_flat,
-                &mut app.before,
-                Side::Before,
-                before_src,
-                before_unmarked,
-                &app.before_multi_select,
-            ),
-            Focus::After => (
-                "After",
-                after_flat,
-                &mut app.after,
-                Side::After,
-                after_src,
-                after_unmarked,
-                &app.after_multi_select,
-            ),
-        };
+        let (title, flat, panel, side, src, total_unmarked, mismatches, multi_selected) =
+            match app.focus {
+                Focus::Before => (
+                    "Before",
+                    before_flat,
+                    &mut app.before,
+                    Side::Before,
+                    before_src,
+                    before_unmarked,
+                    before_mismatches,
+                    &app.before_multi_select,
+                ),
+                Focus::After => (
+                    "After",
+                    after_flat,
+                    &mut app.after,
+                    Side::After,
+                    after_src,
+                    after_unmarked,
+                    after_mismatches,
+                    &app.after_multi_select,
+                ),
+            };
         render_panel(
             frame,
             panel_area,
@@ -346,6 +371,7 @@ pub(crate) fn draw_ui(
             app.algo_diff.as_ref(),
             app.show_reason,
             total_unmarked,
+            mismatches,
             multi_selected,
             &app.mapping.groups,
         );
@@ -368,6 +394,7 @@ pub(crate) fn draw_ui(
             app.algo_diff.as_ref(),
             app.show_reason,
             before_unmarked,
+            before_mismatches,
             &app.before_multi_select,
             &app.mapping.groups,
         );
@@ -384,6 +411,7 @@ pub(crate) fn draw_ui(
             app.algo_diff.as_ref(),
             app.show_reason,
             after_unmarked,
+            after_mismatches,
             &app.after_multi_select,
             &app.mapping.groups,
         );
@@ -417,7 +445,6 @@ pub(crate) fn draw_ui(
             &app.text_solution,
             app.text_overlay,
             app.algo_text_spans.as_ref(),
-            app.tree_text_spans.as_ref(),
             DiffPickerData::from_app(app),
             app.diff_comments.as_ref(),
         );
@@ -476,7 +503,6 @@ pub(crate) fn render_modal(
     text_solution: &str,
     text_overlay: TextOverlay,
     algo_text_spans: Option<&[Vec<(HumanTextSpan, HumanTextVerdict)>; 2]>,
-    tree_text_spans: Option<&[Vec<(HumanTextSpan, HumanTextVerdict)>; 2]>,
     diff_data: DiffPickerData<'_>,
     diff_comments: Option<&std::collections::HashMap<String, String>>,
 ) {
@@ -490,20 +516,29 @@ pub(crate) fn render_modal(
             area,
             "Start this case from scratch?",
             &format!(
-                "This throws away everything recorded for this case:\n\n  {entries} mapping entries\n  {groups} multi-map groups\n  {paintings} named paintings\n\nThere is no undo. Nothing is written until you press s, so reopening\nthe case without saving still gets it back.\n\n[y] clear it   [any other key] cancel"
+                "This throws away everything recorded for this case:\n\n  {entries} mapping entries\n  {groups} multi-map groups\n  {paintings} named paintings\n\nU undoes it, and nothing is written until you press s.\n\n[y] clear it   [any other key] cancel"
             ),
         ),
         Modal::ConfirmKindMismatch {
             before_kind,
             after_kind,
+            resume_match_to_end,
             ..
         } => render_text_modal(
             frame,
             area,
             "Node kinds do not match!",
             &format!(
-                "Before: {}\nAfter:  {}\n\nAre you sure you want to add this mapping? (y/n)",
-                before_kind, after_kind
+                "Before: {}\nAfter:  {}\n\n[y] match them anyway\n[d] / [D] mark the Before node \
+                 deleted / with its subtree\n[i] / [I] mark the After node inserted / with its \
+                 subtree{}\n[n] cancel",
+                before_kind,
+                after_kind,
+                if *resume_match_to_end {
+                    ", and f carries on"
+                } else {
+                    ""
+                }
             ),
         ),
         Modal::ConfirmMultiMapGroup {
@@ -629,7 +664,6 @@ pub(crate) fn render_modal(
                 text_solution,
                 text_overlay,
                 algo_text_spans,
-                tree_text_spans,
                 state,
             );
         }
@@ -991,16 +1025,23 @@ pub(crate) fn render_text_view_modal(
     solution: &str,
     overlay: TextOverlay,
     algo_spans: Option<&[Vec<(HumanTextSpan, HumanTextVerdict)>; 2]>,
-    tree_spans: Option<&[Vec<(HumanTextSpan, HumanTextVerdict)>; 2]>,
     state: &TextPaintState,
 ) {
     let popup_area = centered_rect(96, 92, area);
     frame.render_widget(Clear, popup_area);
 
-    let columns = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
-        .split(popup_area);
+    // As `draw_ui`: on a narrow terminal (a phone, say) two half-width columns wrap almost every
+    // line, so only the focused side is drawn, and Tab is how to see the other.
+    let single_panel = area.width < SINGLE_PANEL_WIDTH_THRESHOLD;
+    let columns: Vec<Rect> = if single_panel {
+        vec![popup_area, popup_area]
+    } else {
+        Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+            .split(popup_area)
+            .to_vec()
+    };
 
     let height = popup_area.height.saturating_sub(2) as usize;
 
@@ -1014,15 +1055,11 @@ pub(crate) fn render_text_view_modal(
     ];
     let empty = [Vec::new(), Vec::new()];
     let algo = algo_spans.unwrap_or(&empty);
-    let tree = tree_spans.unwrap_or(&empty);
     let shown = match overlay {
         TextOverlay::Human => human_spans,
         TextOverlay::CodeDiff => algo.clone(),
         TextOverlay::Disagreements => {
             overlay_disagreement_spans(&human_spans, algo, before_src, after_src)
-        }
-        TextOverlay::TreeDisagreement => {
-            overlay_disagreement_spans(&human_spans, tree, before_src, after_src)
         }
     };
 
@@ -1039,24 +1076,33 @@ pub(crate) fn render_text_view_modal(
             } else {
                 String::new()
             };
-            format!(
-                "Before [{solution}] {painted} painted{banked} — showing {} (o cycles)",
-                overlay.label()
-            )
+            match (&state.search_prompt, &state.line_prompt, state.side) {
+                (Some(typed), _, 0) => format!("Before — search: {typed}_"),
+                (_, Some(typed), 0) => format!("Before — jump to line: {typed}_"),
+                _ => format!(
+                    "Before [{solution}] {painted} painted{banked} — showing {} (o cycles)",
+                    overlay.label()
+                ),
+            }
         }),
         (
             1usize,
             after_src,
-            match (&state.line_prompt, state.side) {
-                (Some(typed), 1) => format!("After — jump to line: {typed}_"),
+            match (&state.search_prompt, &state.line_prompt, state.side) {
+                (Some(typed), _, 1) => format!("After — search: {typed}_"),
+                (_, Some(typed), 1) => format!("After — jump to line: {typed}_"),
                 _ if others > 0 => {
                     format!("After — s save-as, L load ({others} other) — u/Tab/Esc")
                 }
-                _ => "After — v sel/i ins/u unmark, n/p diff, a align, s save-as, : jump, Tab, Esc"
+                _ => "After — v sel/i ins/u unmark, n/p diff, a align, s save-as, : jump, / find, \
+                      Tab, Esc"
                     .to_string(),
             },
         ),
     ] {
+        if single_panel && side != state.side {
+            continue;
+        }
         let inner_width = columns[side].width.saturating_sub(2) as usize;
         let lines = render_paint_side(source, &shown[side], state, side, height, inner_width);
         let border_style = if state.side == side {

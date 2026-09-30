@@ -28,7 +28,7 @@ use crate::diff::{ASTDiff, ASTMapping, ASTMappingReason};
 
 /// Maps every descendant of a matched pair of identical subtrees, position by position, as
 /// `Identical`/`IdenticalHashOfAncestor`. Precondition: the subtrees are identical. It skips
-/// (and does not descend into) a child pair whose kinds differ or whose before node is
+/// (and does not descend into) a child pair whose kinds differ or either of whose nodes is
 /// already mapped.
 pub fn map_identical_descendants<'a>(
     before_node: Node<'a>,
@@ -46,7 +46,9 @@ pub fn map_identical_descendants<'a>(
             if before_child.kind() != after_child.kind() {
                 continue;
             }
-            if diff.before_node_map.contains_key(&before_child.id()) {
+            if diff.before_node_map.contains_key(&before_child.id())
+                || diff.after_node_map.contains_key(&after_child.id())
+            {
                 continue;
             }
             diff.add_mapping(

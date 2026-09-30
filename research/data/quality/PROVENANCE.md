@@ -56,11 +56,14 @@ annotation has reached, not a draw - do not read a Defects4J figure as an estima
   reason and node kind, written by the `mismatch_census` test.
 - `convention_census.csv` - leaves whose text survived but whose painting differs between
   fixtures, written by the `cross_fixture_convention_census` test.
+- `nm_candidates.csv` - every subtree codediff deletes or inserts whole while an identical twin on
+  its side is matched: what a pass attaching leftovers to N:M groups could add, labelled with the
+  human's verdict on each. Written by the `nm_candidate_census` test.
 - `kind_mismatches.csv` - every ground-truth pair whose two nodes differ in kind, written by
   `analyze_human_mappings --kind-mismatches`.
 - `kind_invariant_candidates.csv` - the delete+insert leaf pairs the kind invariants would force
   to match, written by `analyze_human_mappings --kind-invariant-cost`.
 
-The three census tests live in `src/test/helper/human_mapping/tests/exploratory.rs`, are
+The four census tests live in `src/test/helper/human_mapping/tests/exploratory.rs`, are
 `#[ignore]`d, and run with `cargo test --release --lib --features test-fixtures <name> --
 --ignored`.

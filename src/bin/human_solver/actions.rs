@@ -573,6 +573,7 @@ pub(crate) fn kind_mismatch_modal(
     before_node: Node,
     after_node: Node,
     recursive: bool,
+    resume_match_to_end: bool,
 ) -> ActionOutcome {
     ActionOutcome::NeedsModal(Box::new(Modal::ConfirmKindMismatch {
         before_id: before_node.id(),
@@ -580,6 +581,7 @@ pub(crate) fn kind_mismatch_modal(
         before_kind: before_node.kind().to_string(),
         after_kind: after_node.kind().to_string(),
         recursive,
+        resume_match_to_end,
     }))
 }
 
@@ -638,7 +640,7 @@ pub(crate) fn action_match(
     }
 
     if before_node.kind() != after_node.kind() {
-        return Ok(kind_mismatch_modal(before_node, after_node, false));
+        return Ok(kind_mismatch_modal(before_node, after_node, false, false));
     }
 
     let operation = classify_match_operation(
@@ -740,7 +742,7 @@ pub(crate) fn action_match_to_end(
                     after_node.kind(),
                 )));
             }
-            return Ok(kind_mismatch_modal(before_node, after_node, false));
+            return Ok(kind_mismatch_modal(before_node, after_node, false, true));
         }
 
         let operation = classify_match_operation(
@@ -760,7 +762,7 @@ pub(crate) fn action_match_to_end(
             .before_match
             .insert(before_node.id(), after_node.id());
         caches.after_match.insert(after_node.id(), before_node.id());
-        app.dirty = true;
+        app.mark_dirty();
         matched += 1;
 
         let next_before = next_unmarked_index(before_idx + 1, before_flat, &caches, status_before);
@@ -832,7 +834,7 @@ pub(crate) fn action_match_subtree(
     }
 
     if before_node.kind() != after_node.kind() {
-        return Ok(kind_mismatch_modal(before_node, after_node, true));
+        return Ok(kind_mismatch_modal(before_node, after_node, true, false));
     }
 
     if before_node.child_count() == 0 && after_node.child_count() == 0 {
@@ -1124,6 +1126,73 @@ pub(crate) fn apply_modal_choice(
     }
 }
 
+/// The visible nodes from `anchor` to `cursor` in `flat`'s order, either way round, both ends
+/// included. An anchor no longer visible (its subtree collapsed) leaves just the cursor.
+pub(crate) fn range_node_ids(flat: &FlatIndex, anchor: usize, cursor: usize) -> Vec<usize> {
+    let (Some(a), Some(c)) = (flat.index_of(anchor), flat.index_of(cursor)) else {
+        return vec![cursor];
+    };
+    let (from, to) = if a <= c { (a, c) } else { (c, a) };
+    flat[from..=to].iter().map(|(node, _)| node.id()).collect()
+}
+
+/// `d`/`D`/`i`/`I` over a `v` range: `mark` on every node of `ids` that is still `Unmarked`,
+/// skipping the ones already marked and, with children, the ones an earlier node of the range
+/// covers, so a run of siblings and the subtree under each is one keystroke. `mark` is
+/// [`action_delete`] or [`action_insert`] for the side.
+pub(crate) fn action_mark_range(
+    flat: &FlatIndex,
+    ids: &[usize],
+    caches: &Caches,
+    status_fn: fn(Node, &Caches) -> NodeStatus,
+    with_children: bool,
+    what: &str,
+    mut mark: impl FnMut(usize) -> Result<String>,
+) -> Result<String> {
+    let mut marked = 0usize;
+    let mut skipped = 0usize;
+    let mut covered: Vec<Node> = Vec::new();
+    for &id in ids {
+        let Some(node) = flat.node_for_id(id) else {
+            continue;
+        };
+        if status_fn(node, caches) != NodeStatus::Unmarked {
+            skipped += 1;
+            continue;
+        }
+        if with_children
+            && covered
+                .iter()
+                .any(|ancestor| is_descendant_of(node, *ancestor))
+        {
+            continue;
+        }
+        mark(id)?;
+        marked += 1;
+        if with_children {
+            covered.push(node);
+        }
+    }
+    if marked == 0 {
+        bail!("Nothing in the range was unmarked");
+    }
+    Ok(match skipped {
+        0 => format!("Marked {marked} node(s) {what}"),
+        _ => format!("Marked {marked} node(s) {what}; {skipped} already marked"),
+    })
+}
+
+fn is_descendant_of(node: Node, ancestor: Node) -> bool {
+    let mut current = node.parent();
+    while let Some(parent) = current {
+        if parent.id() == ancestor.id() {
+            return true;
+        }
+        current = parent.parent();
+    }
+    false
+}
+
 pub(crate) fn action_delete(
     mapping: &mut HumanMapping,
     before_flat: &FlatIndex,
@@ -1299,5 +1368,7 @@ pub(crate) fn action_unmark(
         );
     }
 
-    Ok(format!("'{}' was not marked", node.kind()))
+    // A refusal, not a report: nothing changed, so the case is neither dirty nor one undo step
+    // longer.
+    bail!("'{}' was not marked", node.kind())
 }

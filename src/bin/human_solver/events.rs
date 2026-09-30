@@ -41,6 +41,23 @@ pub(crate) struct FrameState<'a> {
     /// header. Kept here because counting walks every node, not just the visible ones.
     pub(crate) before_unmarked: usize,
     pub(crate) after_unmarked: usize,
+    /// How many nodes in `before_flat`/`after_flat` codediff disagrees with the human on
+    /// (`algo_disagrees`, the `*` rows `n`/`N` visit), for the same header; `None` until
+    /// codediff's diff has arrived. Here for the same reason as the unmarked counts.
+    pub(crate) before_mismatches: Option<usize>,
+    pub(crate) after_mismatches: Option<usize>,
+}
+
+/// How many nodes of `flat` draw a `*`: the human has marked them and codediff says otherwise.
+pub(crate) fn count_mismatches(
+    flat: &[(Node, usize)],
+    caches: &Caches,
+    diff_ast: &ASTDiff,
+    side: Side,
+) -> usize {
+    flat.iter()
+        .filter(|(node, _)| algo_disagrees(side, *node, caches, diff_ast))
+        .count()
 }
 
 pub(crate) fn count_unmarked(
@@ -72,6 +89,8 @@ pub(crate) fn compute_frame_state<'a>(
             after_flat: FlatIndex::new(Vec::new()),
             before_unmarked: 0,
             after_unmarked: 0,
+            before_mismatches: None,
+            after_mismatches: None,
         });
     };
     let before_root = before_tree.root_node();
@@ -99,6 +118,14 @@ pub(crate) fn compute_frame_state<'a>(
 
     let before_unmarked = count_unmarked(&before_flat, &caches, status_before);
     let after_unmarked = count_unmarked(&after_flat, &caches, status_after);
+    let before_mismatches = app
+        .algo_diff
+        .as_ref()
+        .map(|diff| count_mismatches(&before_flat, &caches, diff, Side::Before));
+    let after_mismatches = app
+        .algo_diff
+        .as_ref()
+        .map(|diff| count_mismatches(&after_flat, &caches, diff, Side::After));
 
     Ok(FrameState {
         before_root: Some(before_root),
@@ -110,6 +137,8 @@ pub(crate) fn compute_frame_state<'a>(
         after_flat,
         before_unmarked,
         after_unmarked,
+        before_mismatches,
+        after_mismatches,
     })
 }
 
@@ -129,20 +158,27 @@ pub(crate) enum SessionEnd {
 pub(crate) fn run_event_loop(
     terminal: &mut Terminal<CrosstermBackend<Stdout>>,
     app: &mut App,
-    mut before: Code,
-    mut after: Code,
+    before: Code,
+    after: Code,
 ) -> Result<()> {
+    // `Arc`, not owned: the background codediff run (`start_algo_diff`) must diff these very
+    // trees, since `ASTDiff` is keyed by node id and a re-parse would number the nodes afresh.
+    let mut before = Arc::new(before);
+    let mut after = Arc::new(after);
     loop {
         // The session borrows `before`/`after` immutably, so its cached `FrameState` can live for
         // the whole session; only this loop reassigns them, between sessions.
-        match run_case_session(terminal, app, &before, &after)? {
+        let end = run_case_session(terminal, app, &before, &after)?;
+        // Before the switch, so the memory names the case being left; on quit it is the last.
+        remember_session(app);
+        match end {
             SessionEnd::Quit => break,
             SessionEnd::Open(OpenTarget::Diffs(name)) => match load_case(&name) {
                 Ok((new_before, new_after)) => {
                     let before_root_id = starting_cursor_id(&new_before);
                     let after_root_id = starting_cursor_id(&new_after);
-                    before = new_before;
-                    after = new_after;
+                    before = Arc::new(new_before);
+                    after = Arc::new(new_after);
                     app.mapping = human_mapping::load(&name).unwrap_or_default();
                     app.name = name;
                     app.origin = CaseOrigin::Diffs;
@@ -151,8 +187,8 @@ pub(crate) fn run_event_loop(
                     app.focus = Focus::Before;
                     app.dirty = false;
                     app.algo_diff = None;
+                    app.algo_diff_pending = None;
                     app.algo_text_spans = None;
-                    app.tree_text_spans = None;
                     app.text_overlay = TextOverlay::default();
                     // The previous case's solution name would start a near-duplicate painting here.
                     app.text_solution = starting_solution(&app.mapping);
@@ -167,8 +203,8 @@ pub(crate) fn run_event_loop(
                 Ok((new_before, new_after, source)) => {
                     let before_root_id = starting_cursor_id(&new_before);
                     let after_root_id = starting_cursor_id(&new_after);
-                    before = new_before;
-                    after = new_after;
+                    before = Arc::new(new_before);
+                    after = Arc::new(new_after);
                     app.mapping = HumanMapping::default();
                     app.name = name;
                     app.origin = CaseOrigin::Sample(source);
@@ -177,8 +213,8 @@ pub(crate) fn run_event_loop(
                     app.focus = Focus::Before;
                     app.dirty = false;
                     app.algo_diff = None;
+                    app.algo_diff_pending = None;
                     app.algo_text_spans = None;
-                    app.tree_text_spans = None;
                     app.text_overlay = TextOverlay::default();
                     app.text_solution = starting_solution(&app.mapping);
                     app.clear_multi_select();
@@ -199,8 +235,8 @@ pub(crate) fn run_event_loop(
                 Ok((new_before, new_after)) => {
                     let before_root_id = starting_cursor_id(&new_before);
                     let after_root_id = starting_cursor_id(&new_after);
-                    before = new_before;
-                    after = new_after;
+                    before = Arc::new(new_before);
+                    after = Arc::new(new_after);
                     app.mapping = HumanMapping::default();
                     app.name = format!("{path}@{}", short_hash(&hash));
                     app.status = Some(format!(
@@ -216,8 +252,8 @@ pub(crate) fn run_event_loop(
                     app.focus = Focus::Before;
                     app.dirty = false;
                     app.algo_diff = None;
+                    app.algo_diff_pending = None;
                     app.algo_text_spans = None;
-                    app.tree_text_spans = None;
                     app.text_overlay = TextOverlay::default();
                     app.text_solution = starting_solution(&app.mapping);
                     app.clear_multi_select();
@@ -273,6 +309,9 @@ pub(crate) fn is_navigation_or_display_key(code: KeyCode) -> bool {
             | KeyCode::Char('p')
             | KeyCode::Char('n')
             | KeyCode::Char('N')
+            | KeyCode::Char(']')
+            | KeyCode::Char('[')
+            | KeyCode::Char('v')
             | KeyCode::Char('/')
             | KeyCode::Char('t')
             | KeyCode::Char('T')
@@ -303,15 +342,177 @@ pub(crate) fn is_state_preserving_key(modal: Option<&Modal>, code: KeyCode) -> b
     }
 }
 
+/// Whether `code`, delivered in the current `modal` state, can change `App::mapping`: the keys
+/// `run_case_session` snapshots the mapping before. A key listed here that ends up changing
+/// nothing costs one clone; a key missing here that does change something is reported on the
+/// status line as not undoable, so an omission is visible rather than silent.
+pub(crate) fn may_edit_mapping(modal: Option<&Modal>, code: KeyCode) -> bool {
+    match modal {
+        None => matches!(
+            code,
+            KeyCode::Char('m')
+                | KeyCode::Char('M')
+                | KeyCode::Char('f')
+                | KeyCode::Char('d')
+                | KeyCode::Char('D')
+                | KeyCode::Char('i')
+                | KeyCode::Char('I')
+                | KeyCode::Char('u')
+        ),
+        Some(Modal::ConfirmKindMismatch { .. }) => matches!(
+            code,
+            KeyCode::Char('y')
+                | KeyCode::Char('Y')
+                | KeyCode::Char('d')
+                | KeyCode::Char('D')
+                | KeyCode::Char('i')
+                | KeyCode::Char('I')
+        ),
+        Some(Modal::ConfirmMultiMapGroup { .. }) | Some(Modal::ConfirmResetCase { .. }) => {
+            matches!(code, KeyCode::Char('y') | KeyCode::Char('Y'))
+        }
+        Some(Modal::TextView { .. }) => matches!(
+            code,
+            KeyCode::Char('d')
+                | KeyCode::Char('i')
+                | KeyCode::Char('m')
+                | KeyCode::Char('u')
+                | KeyCode::Char('Z')
+                | KeyCode::Char('P')
+        ),
+        // Enter saves or loads a painting (a typed free-form name included), `e` starts one
+        // empty, and the second `D` deletes one.
+        Some(Modal::SolutionPicker { .. }) => {
+            matches!(
+                code,
+                KeyCode::Enter | KeyCode::Char('e') | KeyCode::Char('D')
+            )
+        }
+        Some(_) => false,
+    }
+}
+
+/// The undo bookkeeping around one key: `start` before its handler runs, `finish` after. Two
+/// halves rather than a wrapper around the dispatch, so a test can drive `handle_key` between
+/// them exactly as `run_case_session` does.
+pub(crate) struct EditWatch {
+    /// The mapping before the key, taken only for keys that can edit: a clone of a large
+    /// fixture's mapping is not free, and most keys navigate.
+    snapshot: Option<HumanMapping>,
+    edits_before: u64,
+}
+
+impl EditWatch {
+    pub(crate) fn start(app: &App, code: KeyCode) -> Self {
+        EditWatch {
+            snapshot: may_edit_mapping(app.modal.as_ref(), code).then(|| app.mapping.clone()),
+            edits_before: app.edits,
+        }
+    }
+
+    pub(crate) fn finish(self, app: &mut App) {
+        if app.edits == self.edits_before {
+            return;
+        }
+        match self.snapshot {
+            Some(snapshot) => app.push_undo(snapshot),
+            // An edit path `may_edit_mapping` does not list: the change stands, but `U` cannot
+            // take it back, and the status line says so rather than hide it.
+            None => {
+                let status = app.status.take().unwrap_or_default();
+                app.status = Some(format!("{status} [not undoable]"));
+            }
+        }
+    }
+}
+
+pub(crate) enum HistoryStep {
+    Undo,
+    Redo,
+}
+
+/// `U` undoes and Ctrl-r redoes, in the tree panels and in the `t` view, where the painting keys
+/// edit the same mapping. In every other modal the keys are the modal's own, or type text.
+pub(crate) fn history_key(
+    modal: Option<&Modal>,
+    key: crossterm::event::KeyEvent,
+) -> Option<HistoryStep> {
+    if !matches!(modal, None | Some(Modal::TextView { .. })) {
+        return None;
+    }
+    let control = key
+        .modifiers
+        .contains(crossterm::event::KeyModifiers::CONTROL);
+    match key.code {
+        KeyCode::Char('U') if !control => Some(HistoryStep::Undo),
+        KeyCode::Char('r') if control => Some(HistoryStep::Redo),
+        _ => None,
+    }
+}
+
+/// Runs codediff on `before`/`after` on a background thread; `poll_algo_diff` collects the
+/// result. The `Arc`s keep the trees alive for the thread, and the thread diffs the same trees
+/// the panels show, so the node ids in its `ASTDiff` are the panels' ids.
+pub(crate) fn start_algo_diff(app: &mut App, before: &Arc<Code>, after: &Arc<Code>) {
+    let (sender, receiver) = std::sync::mpsc::channel();
+    let before = Arc::clone(before);
+    let after = Arc::clone(after);
+    std::thread::spawn(move || {
+        // A failed send means the case was switched meanwhile; the result is simply dropped.
+        let _ = sender.send(diff_code(&before, &after).ast);
+    });
+    app.algo_diff_pending = Some(receiver);
+}
+
+/// Takes a finished background run into `App::algo_diff`. `true` when one arrived this call, so
+/// the caller redraws and recomputes what reads the diff. A run that never reports (the thread
+/// panicked) is forgotten rather than waited on forever.
+pub(crate) fn poll_algo_diff(app: &mut App) -> bool {
+    let Some(receiver) = app.algo_diff_pending.as_ref() else {
+        return false;
+    };
+    match receiver.try_recv() {
+        Ok(ast_diff) => {
+            app.algo_diff_pending = None;
+            app.status = Some(match &ast_diff {
+                Some(ast_diff) => format!(
+                    "codediff ran: {} before-node(s), {} after-node(s) mapped; n/N jump to \
+                     where you disagree",
+                    ast_diff.before_node_map.len(),
+                    ast_diff.after_node_map.len()
+                ),
+                None => "codediff produced no AST diff".to_string(),
+            });
+            app.algo_diff = ast_diff;
+            true
+        }
+        Err(std::sync::mpsc::TryRecvError::Empty) => false,
+        Err(std::sync::mpsc::TryRecvError::Disconnected) => {
+            app.algo_diff_pending = None;
+            app.status = Some("codediff's background run failed; p re-runs it".to_string());
+            false
+        }
+    }
+}
+
 /// Runs the event loop for a single case until the user quits or asks to switch to a different
 /// one. Separate from `run_event_loop` so the cached `FrameState`, which borrows `before`/`after`,
 /// never coexists with their reassignment; a case switch is returned as `SessionEnd::Open`.
 pub(crate) fn run_case_session(
     terminal: &mut Terminal<CrosstermBackend<Stdout>>,
     app: &mut App,
-    before: &Code,
-    after: &Code,
+    before: &Arc<Code>,
+    after: &Arc<Code>,
 ) -> Result<SessionEnd> {
+    // codediff's verdicts (`*`, `n`/`N`, the header count) are wanted from the first frame, and
+    // the run takes up to a second on a large fixture, so it starts now and lands via
+    // `poll_algo_diff` while the human reads.
+    if app.algo_diff.is_none() && app.algo_diff_pending.is_none() {
+        start_algo_diff(app, before, after);
+    }
+    let before: &Code = before;
+    let after: &Code = after;
+
     // An idle poll timeout redraws nothing.
     let mut needs_redraw = true;
 
@@ -338,6 +539,8 @@ pub(crate) fn run_case_session(
                     frame_state.after_src,
                     frame_state.before_unmarked,
                     frame_state.after_unmarked,
+                    frame_state.before_mismatches,
+                    frame_state.after_mismatches,
                     &current_name,
                     frame_state.roots().is_none(),
                 )
@@ -346,6 +549,11 @@ pub(crate) fn run_case_session(
         }
 
         if !event::poll(Duration::from_millis(250))? {
+            if poll_algo_diff(app) {
+                // The mismatch counts read the diff, so the frame state goes with it.
+                needs_redraw = true;
+                state = None;
+            }
             continue;
         }
 
@@ -358,12 +566,32 @@ pub(crate) fn run_case_session(
             continue;
         }
 
+        // For the log: which view takes the key, read before the key can change it.
+        let mode = mode_name(app.modal.as_ref());
+        let key_text = key_name(key, mode);
+        let edits_before = app.edits;
+
+        // Undo and redo live here rather than in a handler: the same two keys serve the tree
+        // panels and the `t` view, and Ctrl-r needs the modifier the handlers never see.
+        if let Some(step) = history_key(app.modal.as_ref(), key) {
+            let result = match step {
+                HistoryStep::Undo => app.undo(),
+                HistoryStep::Redo => app.redo(),
+            };
+            app.status = Some(result.unwrap_or_else(|err| format!("{err:#}")));
+            if let Some(log) = app.key_log.as_mut() {
+                log.record(&app.name, mode, &key_text, app.edits != edits_before);
+            }
+            needs_redraw = true;
+            state = None;
+            continue;
+        }
+
         let state_preserving = is_state_preserving_key(app.modal.as_ref(), key.code);
+        let watch = EditWatch::start(app, key.code);
 
-        let mut open_request: Option<OpenTarget> = None;
-
-        if app.modal.is_some() {
-            open_request = handle_modal_key(
+        let open_request = if app.modal.is_some() {
+            handle_modal_key(
                 app,
                 key.code,
                 &frame_state.before_flat,
@@ -375,7 +603,7 @@ pub(crate) fn run_case_session(
                 frame_state.after_src,
                 before,
                 after,
-            );
+            )
         } else if let Some((before_root, after_root)) = frame_state.roots() {
             // Every loader runs `ensure_parsed` when there is a tree, so the hashes exist here.
             let before_hash = &before
@@ -405,7 +633,7 @@ pub(crate) fn run_case_session(
                 after_hash,
                 before,
                 after,
-            );
+            )
         } else {
             // Text-only mode (see `FrameState::before_root`).
             handle_tree_independent_key(
@@ -416,7 +644,16 @@ pub(crate) fn run_case_session(
                 before,
                 after,
                 false,
-            );
+            )
+        };
+
+        watch.finish(app);
+        if let Some(log) = app.key_log.as_mut() {
+            log.record(&app.name, mode, &key_text, app.edits != edits_before);
+        }
+        // Also here, so a run that landed while keys were streaming in shows without an idle tick.
+        if poll_algo_diff(app) {
+            state = None;
         }
 
         needs_redraw = true;
@@ -449,7 +686,7 @@ pub(crate) fn handle_key(
     after_hash: &rustc_hash::FxHashMap<usize, u64>,
     before: &Code,
     after: &Code,
-) {
+) -> Option<OpenTarget> {
     let focus = app.focus;
 
     let result: Option<Result<String>> = match code {
@@ -534,7 +771,7 @@ pub(crate) fn handle_key(
             };
             match outcome {
                 Ok(ActionOutcome::Done(msg)) => {
-                    app.dirty = true;
+                    app.mark_dirty();
                     app.status = Some(msg);
                     app.clear_multi_select();
                     advance_both_to_next_unmarked(
@@ -619,7 +856,7 @@ pub(crate) fn handle_key(
             };
             match outcome {
                 Ok(ActionOutcome::Done(msg)) => {
-                    app.dirty = true;
+                    app.mark_dirty();
                     app.status = Some(msg);
                     app.clear_multi_select();
                     advance_both_to_next_unmarked(
@@ -635,23 +872,66 @@ pub(crate) fn handle_key(
             }
             None
         }
+        KeyCode::Char('v') => {
+            let panel = match focus {
+                Focus::Before => &mut app.before,
+                Focus::After => &mut app.after,
+            };
+            panel.anchor = match panel.anchor {
+                Some(_) => None,
+                None => Some(panel.cursor_id),
+            };
+            app.status = Some(match panel.anchor {
+                Some(_) => {
+                    "Selecting a range - move, then d/D/i/I/u act on every node in it".to_string()
+                }
+                None => "Range selection cleared".to_string(),
+            });
+            None
+        }
         KeyCode::Char('d') | KeyCode::Char('D') => {
             if focus != Focus::Before {
                 Some(Err(anyhow!(
                     "d/D only apply to the Before panel; press Tab to switch"
                 )))
             } else {
-                let res = action_delete(
-                    &mut app.mapping,
-                    before_flat,
-                    app.before.cursor_id,
-                    before_root,
-                    after_root,
-                    code == KeyCode::Char('D'),
-                    caches,
-                );
+                let with_children = code == KeyCode::Char('D');
+                let res = match app.before.anchor.take() {
+                    Some(anchor) => {
+                        let ids = range_node_ids(before_flat, anchor, app.before.cursor_id);
+                        let mapping = &mut app.mapping;
+                        action_mark_range(
+                            before_flat,
+                            &ids,
+                            caches,
+                            status_before,
+                            with_children,
+                            "deleted",
+                            |id| {
+                                action_delete(
+                                    mapping,
+                                    before_flat,
+                                    id,
+                                    before_root,
+                                    after_root,
+                                    with_children,
+                                    caches,
+                                )
+                            },
+                        )
+                    }
+                    None => action_delete(
+                        &mut app.mapping,
+                        before_flat,
+                        app.before.cursor_id,
+                        before_root,
+                        after_root,
+                        with_children,
+                        caches,
+                    ),
+                };
                 if res.is_ok() {
-                    app.dirty = true;
+                    app.mark_dirty();
                     advance_side_to_next_unmarked(
                         app,
                         Side::Before,
@@ -669,17 +949,43 @@ pub(crate) fn handle_key(
                     "i/I only apply to the After panel; press Tab to switch"
                 )))
             } else {
-                let res = action_insert(
-                    &mut app.mapping,
-                    after_flat,
-                    app.after.cursor_id,
-                    before_root,
-                    after_root,
-                    code == KeyCode::Char('I'),
-                    caches,
-                );
+                let with_children = code == KeyCode::Char('I');
+                let res = match app.after.anchor.take() {
+                    Some(anchor) => {
+                        let ids = range_node_ids(after_flat, anchor, app.after.cursor_id);
+                        let mapping = &mut app.mapping;
+                        action_mark_range(
+                            after_flat,
+                            &ids,
+                            caches,
+                            status_after,
+                            with_children,
+                            "inserted",
+                            |id| {
+                                action_insert(
+                                    mapping,
+                                    after_flat,
+                                    id,
+                                    before_root,
+                                    after_root,
+                                    with_children,
+                                    caches,
+                                )
+                            },
+                        )
+                    }
+                    None => action_insert(
+                        &mut app.mapping,
+                        after_flat,
+                        app.after.cursor_id,
+                        before_root,
+                        after_root,
+                        with_children,
+                        caches,
+                    ),
+                };
                 if res.is_ok() {
-                    app.dirty = true;
+                    app.mark_dirty();
                     advance_side_to_next_unmarked(
                         app,
                         Side::After,
@@ -694,19 +1000,57 @@ pub(crate) fn handle_key(
         KeyCode::Char('a') => Some(action_align(app, focus, before_root, after_root, caches)),
         KeyCode::Char('A') => Some(action_align_algo(app, focus, before_root, after_root)),
         KeyCode::Char('u') => {
-            let res = action_unmark(
-                &mut app.mapping,
-                focus,
-                before_flat,
-                after_flat,
-                app.before.cursor_id,
-                app.after.cursor_id,
-                before_root,
-                after_root,
-                caches,
-            );
+            let (panel, flat) = match focus {
+                Focus::Before => (&mut app.before, before_flat),
+                Focus::After => (&mut app.after, after_flat),
+            };
+            let res = match panel.anchor.take() {
+                // Every node of the range, one `u` each; a node with nothing to unmark is not an
+                // error here, as the point is the ones that have.
+                Some(anchor) => {
+                    let ids = range_node_ids(flat, anchor, panel.cursor_id);
+                    let mut unmarked = 0usize;
+                    for id in ids {
+                        let (before_id, after_id) = match focus {
+                            Focus::Before => (id, app.after.cursor_id),
+                            Focus::After => (app.before.cursor_id, id),
+                        };
+                        if action_unmark(
+                            &mut app.mapping,
+                            focus,
+                            before_flat,
+                            after_flat,
+                            before_id,
+                            after_id,
+                            before_root,
+                            after_root,
+                            caches,
+                        )
+                        .is_ok()
+                        {
+                            unmarked += 1;
+                        }
+                    }
+                    if unmarked == 0 {
+                        Err(anyhow!("Nothing in the range was marked"))
+                    } else {
+                        Ok(format!("Unmarked {unmarked} node(s)"))
+                    }
+                }
+                None => action_unmark(
+                    &mut app.mapping,
+                    focus,
+                    before_flat,
+                    after_flat,
+                    app.before.cursor_id,
+                    app.after.cursor_id,
+                    before_root,
+                    after_root,
+                    caches,
+                ),
+            };
             if res.is_ok() {
-                app.dirty = true;
+                app.mark_dirty();
             }
             Some(res)
         }
@@ -750,6 +1094,21 @@ pub(crate) fn handle_key(
             caches,
             false,
         )),
+        // The text on the nodes the panels are on, not the top of the file.
+        KeyCode::Char('t') => {
+            app.modal = Some(Modal::TextView {
+                state: text_view_at_cursors(app, before_flat, after_flat),
+            });
+            None
+        }
+        KeyCode::Char(']') | KeyCode::Char('[') => Some(action_next_unmarked(
+            app,
+            focus,
+            before_flat,
+            after_flat,
+            caches,
+            code == KeyCode::Char(']'),
+        )),
         KeyCode::Char('/') => {
             app.modal = Some(Modal::PromptSearch {
                 input: app.last_search.clone().unwrap_or_default(),
@@ -775,12 +1134,34 @@ pub(crate) fn handle_key(
             None
         }
         _ => {
-            handle_tree_independent_key(app, code, before_src, after_src, before, after, true);
-            return;
+            return handle_tree_independent_key(
+                app, code, before_src, after_src, before, after, true,
+            );
         }
     };
 
     apply_key_result(app, result);
+    None
+}
+
+/// The rows the text view opens on: `TextPaintState::at_nodes` over the panels' cursor nodes.
+/// Empty flats (text-only mode) give the default view.
+pub(crate) fn text_view_at_cursors(
+    app: &App,
+    before_flat: &FlatIndex,
+    after_flat: &FlatIndex,
+) -> TextPaintState {
+    // The same stand-in for the popup height `handle_text_view` uses.
+    const VIEWPORT_ROWS: usize = 20;
+    TextPaintState::at_nodes(
+        before_flat.node_for_id(app.before.cursor_id),
+        after_flat.node_for_id(app.after.cursor_id),
+        match app.focus {
+            Focus::Before => 0,
+            Focus::After => 1,
+        },
+        VIEWPORT_ROWS,
+    )
 }
 
 /// The keys that read no tree. [`handle_key`] falls through to this, and text-only mode calls it
@@ -796,14 +1177,14 @@ pub(crate) fn handle_tree_independent_key(
     before: &Code,
     after: &Code,
     tree_available: bool,
-) {
+) -> Option<OpenTarget> {
     let result: Option<Result<String>> = match code {
         KeyCode::Char('q') | KeyCode::Esc => {
             app.should_quit = true;
             None
         }
-        // Shift-1 rather than a letter: this is the one action that cannot be undone, so it
-        // should not be one slip away from a harmless key.
+        // Shift-1 rather than a letter: this throws away the whole case, so it should not be one
+        // slip away from a harmless key, even though `U` can bring it back.
         KeyCode::Char('!') => {
             app.modal = Some(Modal::ConfirmResetCase {
                 entries: app.mapping.entries.len(),
@@ -1013,6 +1394,13 @@ pub(crate) fn handle_tree_independent_key(
             }
             None
         }
+        KeyCode::Char('}') | KeyCode::Char('{') => {
+            match neighbouring_case(app, code == KeyCode::Char('}')) {
+                Ok(Some(target)) => return Some(target),
+                Ok(None) => None,
+                Err(err) => Some(Err(err)),
+            }
+        }
         _ if !tree_available => Some(Ok(
             "No tree-sitter grammar for this file: the tree keys do nothing here, but t (paint) \
              and T (unix diff) work"
@@ -1022,6 +1410,7 @@ pub(crate) fn handle_tree_independent_key(
     };
 
     apply_key_result(app, result);
+    None
 }
 
 fn apply_key_result(app: &mut App, result: Option<Result<String>>) {
@@ -1074,13 +1463,89 @@ pub(crate) fn handle_modal_key(
             before_kind,
             after_kind,
             recursive,
+            resume_match_to_end,
         } => match code {
+            // The stop is a delete or an insert: mark it here and, when `f` raised the modal,
+            // carry on matching from the next unmarked pair.
+            KeyCode::Char('d') | KeyCode::Char('D') | KeyCode::Char('i') | KeyCode::Char('I') => {
+                let Some((before_root, after_root)) = roots else {
+                    app.status = Some(NO_TREE_TO_MAP.to_string());
+                    return None;
+                };
+                let with_children = matches!(code, KeyCode::Char('D') | KeyCode::Char('I'));
+                let deleting = matches!(code, KeyCode::Char('d') | KeyCode::Char('D'));
+                let marked = if deleting {
+                    action_delete(
+                        &mut app.mapping,
+                        before_flat,
+                        before_id,
+                        before_root,
+                        after_root,
+                        with_children,
+                        caches,
+                    )
+                } else {
+                    action_insert(
+                        &mut app.mapping,
+                        after_flat,
+                        after_id,
+                        before_root,
+                        after_root,
+                        with_children,
+                        caches,
+                    )
+                };
+                let marked = match marked {
+                    Ok(marked) => marked,
+                    Err(err) => {
+                        app.status = Some(format!("Error: {err:#}"));
+                        return None;
+                    }
+                };
+                app.mark_dirty();
+                let (side, flat) = if deleting {
+                    (Side::Before, before_flat)
+                } else {
+                    (Side::After, after_flat)
+                };
+                advance_side_to_next_unmarked(app, side, flat, before_root, after_root);
+                if !resume_match_to_end {
+                    app.status = Some(marked);
+                    return None;
+                }
+                let hashes = (
+                    before.metadata.ast_metadata.as_ref(),
+                    after.metadata.ast_metadata.as_ref(),
+                );
+                let (Some(before_meta), Some(after_meta)) = hashes else {
+                    app.status = Some(marked);
+                    return None;
+                };
+                match action_match_to_end(
+                    app,
+                    before_flat,
+                    after_flat,
+                    before_root,
+                    after_root,
+                    before_src,
+                    after_src,
+                    &before_meta.node_to_full_hash,
+                    &after_meta.node_to_full_hash,
+                ) {
+                    Ok(ActionOutcome::Done(msg)) => app.status = Some(format!("{marked}; {msg}")),
+                    Ok(ActionOutcome::NeedsModal(modal)) => {
+                        app.status = Some(marked);
+                        app.modal = Some(*modal);
+                    }
+                    Err(err) => app.status = Some(format!("{marked}; then: {err:#}")),
+                }
+            }
             KeyCode::Char('y') | KeyCode::Char('Y') => {
                 let Some((before_root, after_root)) = roots else {
                     app.status = Some(NO_TREE_TO_MAP.to_string());
                     return None;
                 };
-                app.dirty = true;
+                app.mark_dirty();
                 app.status = Some(apply_modal_choice(
                     &mut app.mapping,
                     before_flat,
@@ -1115,6 +1580,7 @@ pub(crate) fn handle_modal_key(
                     before_kind,
                     after_kind,
                     recursive,
+                    resume_match_to_end,
                 });
             }
         },
@@ -1147,7 +1613,7 @@ pub(crate) fn handle_modal_key(
                         pairing,
                     ) {
                         Ok(msg) => {
-                            app.dirty = true;
+                            app.mark_dirty();
                             msg
                         }
                         Err(err) => format!("Error: {:#}", err),
@@ -1516,7 +1982,7 @@ pub(crate) fn handle_modal_key(
             }
             KeyCode::Char('t') => {
                 app.modal = Some(Modal::TextView {
-                    state: TextPaintState::default(),
+                    state: text_view_at_cursors(app, before_flat, after_flat),
                 });
             }
             KeyCode::Esc => {
@@ -1610,14 +2076,43 @@ pub(crate) fn action_save(
     // The invariants also cover the tree mapping, which every saved fixture has.
     ensure_invariants_stub_test(name)?;
     *dirty = false;
-    Ok(if created {
+    let mut status = if created {
         format!(
             "Saved human_mapping.json and created fixtures/{}.rs",
             module_name(name)
         )
     } else {
         "Saved human_mapping.json".to_string()
-    })
+    };
+    // The save stands whatever measuring does; a failure there is reported, not raised.
+    match measure_saved_case(name, text_only) {
+        Ok(measurement) => {
+            status.push_str(&format!(". {}", describe_measurement(&measurement)));
+            match record_measurement_in_stub(name, &measurement) {
+                Ok(notes) if notes.is_empty() => {}
+                Ok(notes) => status.push_str(&format!("; stub: {}", notes.join("; "))),
+                Err(err) => status.push_str(&format!("; stub not updated ({err:#})")),
+            }
+        }
+        Err(err) => status.push_str(&format!(". Not measured ({err:#})")),
+    }
+    Ok(status)
+}
+
+/// The status line's summary of a `SaveMeasurement`.
+pub(crate) fn describe_measurement(measurement: &SaveMeasurement) -> String {
+    let mut parts = Vec::new();
+    if let Some((total, visible)) = measurement.mismatches {
+        parts.push(format!("codediff: {total} mismatch(es), {visible} visible"));
+    }
+    if let Some(percent) = measurement.painting_percent {
+        parts.push(format!("painting {}%", format_percent(percent)));
+    }
+    parts.push(match measurement.invariant_violations {
+        0 => "invariants hold".to_string(),
+        n => format!("{n} invariant violation(s), V lists them"),
+    });
+    parts.join(", ")
 }
 
 /// Rust keywords (2015 through 2024 edition, strict and reserved). A case name becomes a module
@@ -2126,8 +2621,8 @@ fn handle_solution_picker(
             action_save_solution_as(app, &chosen, false, before_text, after_text);
             app.modal = Some(Modal::TextView { state });
         }
-        // Twice, because there is no undo. The second press acts on the name the first one
-        // armed, not on whatever row the cursor reached in between.
+        // Twice, as a guard on the one painting key that removes work in bulk. The second press
+        // acts on the name the first one armed, not on whatever row the cursor reached in between.
         (None, KeyCode::Char('D')) if selected < free_form_index => {
             let chosen = names[selected].clone();
             let exists = app
@@ -2183,6 +2678,43 @@ fn handle_text_view(
     };
     let mut close = false;
 
+    // The `/` prompt takes every keystroke; Enter jumps this side's cursor to the next match.
+    if let Some(mut typed) = state.search_prompt.take() {
+        match code {
+            KeyCode::Char(c) => {
+                typed.push(c);
+                state.search_prompt = Some(typed);
+            }
+            KeyCode::Backspace => {
+                typed.pop();
+                state.search_prompt = Some(typed);
+            }
+            KeyCode::Enter => {
+                let query = typed.trim().to_string();
+                if query.is_empty() {
+                    app.status = Some("Search cancelled (empty)".to_string());
+                } else {
+                    app.status = Some(match state.find_next(state.side, focused_source, &query) {
+                        Some(found) => {
+                            state.cursor[state.side] = found;
+                            format!(
+                                "Found {query:?} on line {} - / Enter finds the next",
+                                found.0 + 1
+                            )
+                        }
+                        None => format!("No {query:?} on this side"),
+                    });
+                    app.last_search = Some(query);
+                }
+            }
+            KeyCode::Esc => app.status = Some("Search cancelled".to_string()),
+            _ => state.search_prompt = Some(typed),
+        }
+        state.scroll_into_view(VIEWPORT_ROWS);
+        app.modal = Some(Modal::TextView { state });
+        return None;
+    }
+
     // The `:` prompt takes every keystroke, so a digit is not a movement command.
     if let Some(mut typed) = state.line_prompt.take() {
         match code {
@@ -2219,12 +2751,30 @@ fn handle_text_view(
             app.status =
                 Some("Jump to line: type a number, Enter to go, Esc to cancel".to_string());
         }
+        // The same search as the tree's `/`, over this side's text; the last query is offered
+        // again so `/` Enter repeats it.
+        KeyCode::Char('/') => {
+            state.search_prompt = Some(app.last_search.clone().unwrap_or_default());
+            app.status = Some(
+                "Search this side: type text, Enter jumps to the next match (wrapping), Esc \
+                 cancels"
+                    .to_string(),
+            );
+        }
         KeyCode::Up | KeyCode::Char('k') => state.step_row(-1, focused_source),
         KeyCode::Down | KeyCode::Char('j') => state.step_row(1, focused_source),
         KeyCode::Left | KeyCode::Char('h') => state.step_column(false, focused_source),
         KeyCode::Right | KeyCode::Char('l') => state.step_column(true, focused_source),
         KeyCode::PageUp => state.step_row(-(VIEWPORT_ROWS as isize), focused_source),
         KeyCode::PageDown => state.step_row(VIEWPORT_ROWS as isize, focused_source),
+        // As in vim: by word, a lowercase key for keyword/punctuation runs, uppercase for any
+        // run of non-blanks.
+        KeyCode::Char('w') => state.word_forward(false, focused_source),
+        KeyCode::Char('W') => state.word_forward(true, focused_source),
+        KeyCode::Char('b') => state.word_backward(false, focused_source),
+        KeyCode::Char('B') => state.word_backward(true, focused_source),
+        KeyCode::Char('e') => state.word_end(false, focused_source),
+        KeyCode::Char('E') => state.word_end(true, focused_source),
         KeyCode::Char('0') | KeyCode::Home => state.cursor[state.side].1 = 0,
         // As in vi. Where a painted range wants to start: `0` would sweep in the indentation.
         KeyCode::Char('^') => {
@@ -2330,10 +2880,8 @@ fn handle_text_view(
             let next = app.text_overlay.next();
             // Lazy, and kept for the case: running codediff is slow on a large fixture.
             if next != TextOverlay::Human && app.algo_text_spans.is_none() {
-                app.algo_text_spans = Some(codediff_text_spans(before, after));
-            }
-            if next == TextOverlay::TreeDisagreement && app.tree_text_spans.is_none() {
-                app.tree_text_spans = Some(tree_mapping_text_spans(&app.mapping, before, after));
+                app.algo_text_spans =
+                    Some(codediff_text_spans(before, after, app.algo_diff.as_ref()));
             }
             app.text_overlay = next;
             let human_spans_for_status = || {
@@ -2365,30 +2913,6 @@ fn handle_text_view(
                         "You and codediff agree everywhere".to_string()
                     } else {
                         format!("Showing {differing} disagreeing range(s)")
-                    }
-                }
-                TextOverlay::TreeDisagreement => {
-                    let differing: usize = app
-                        .tree_text_spans
-                        .as_ref()
-                        .map(|tree| {
-                            overlay_disagreement_spans(
-                                &human_spans_for_status(),
-                                tree,
-                                before_text,
-                                after_text,
-                            )
-                            .iter()
-                            .map(Vec::len)
-                            .sum()
-                        })
-                        .unwrap_or(0);
-                    if differing == 0 {
-                        "Your painting and your tree mapping agree everywhere".to_string()
-                    } else {
-                        format!(
-                            "Showing {differing} disagreeing range(s) between your painting and your tree mapping"
-                        )
                     }
                 }
             });

@@ -202,7 +202,12 @@ pub(crate) fn solve_with_hash_map(
             }
 
             for (before_child, after_child) in pairs {
-                if diff.before_node_map.contains_key(&before_child.id()) {
+                // Either side may already be decided: the kind-only run descends through subtrees
+                // the kind-and-value run already matched inside, and `add_mapping` would silently
+                // overwrite the earlier partner.
+                if diff.before_node_map.contains_key(&before_child.id())
+                    || diff.after_node_map.contains_key(&after_child.id())
+                {
                     continue;
                 }
                 let (operation, cost) = classify(before_child.id(), after_child.id());

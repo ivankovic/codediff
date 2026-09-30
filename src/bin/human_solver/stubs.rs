@@ -297,3 +297,247 @@ pub(crate) fn insert_mod_declaration(dataset: &str, module: &str) -> Result<()> 
     fs::write(&mod_file, out).with_context(|| format!("writing {:?}", mod_file))?;
     Ok(())
 }
+
+// ---------------------------------------------------------------------------------------------
+// Recording what a save measures
+// ---------------------------------------------------------------------------------------------
+
+/// What `s` measures about the saved fixture, for the stub and the status line. Measuring is the
+/// checker direction - codediff against the human's decisions - so nothing here feeds back into
+/// the ground truth.
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct SaveMeasurement {
+    /// `(total, visible)` mismatches between the human mapping and codediff's diff; `None` for a
+    /// text-only fixture, which has no `mapping()` test.
+    pub(crate) mismatches: Option<(usize, usize)>,
+    /// The limit `painting()` needs: the larger disagreement of the two presets, as a percentage
+    /// rounded up to two decimals. `None` when the fixture is unpainted.
+    pub(crate) painting_percent: Option<f64>,
+    pub(crate) invariant_violations: usize,
+}
+
+/// Measures `name` as its fixture tests would, from what is on disk, so a save is followed by the
+/// numbers the stub needs instead of a `cargo test` round trip to find them out.
+pub(crate) fn measure_saved_case(name: &str, text_only: bool) -> Result<SaveMeasurement> {
+    use codediff::diff::text::RenderOptions;
+    use codediff::test::helper::human_mapping::{
+        codediff_diff_for_painting, compare_painting_with_diff,
+        compute_visible_mismatches_with_config, invariants::ground_truth_invariant_violations,
+        load,
+    };
+
+    let mismatches = if text_only {
+        None
+    } else {
+        let visible = compute_visible_mismatches_with_config(
+            name,
+            &codediff::diff::HeuristicConfig::default(),
+        )?;
+        Some((
+            visible.visible.len() + visible.invisible.len(),
+            visible.visible.len(),
+        ))
+    };
+
+    let painting_percent = if load(name)?.text_mappings.is_empty() {
+        None
+    } else {
+        let (before, after) = &*codediff::test::helper::handmade_test_code_pair(name)?;
+        let diff = codediff_diff_for_painting(before, after)?;
+        let mut worst: f64 = 0.0;
+        for options in [RenderOptions::MINIMAL, RenderOptions::FULL] {
+            let comparison = compare_painting_with_diff(name, options, before, after, &diff)?;
+            worst = worst.max(comparison.percent());
+        }
+        Some(round_up_percent(worst))
+    };
+
+    let invariant_violations = ground_truth_invariant_violations(name)?.len();
+
+    Ok(SaveMeasurement {
+        mismatches,
+        painting_percent,
+        invariant_violations,
+    })
+}
+
+/// Up to the next hundredth, so the recorded limit is never below the measurement the test
+/// compares against. The epsilon keeps an exact hundredth (`0.18`, which is `18.000000000000004`
+/// times a hundred) from rounding to the one above.
+pub(crate) fn round_up_percent(percent: f64) -> f64 {
+    let hundredths = (percent * 100.0 - 1e-9).ceil();
+    // `ceil` of a tiny negative is `-0.0`, which would print as such.
+    if hundredths <= 0.0 {
+        0.0
+    } else {
+        hundredths / 100.0
+    }
+}
+
+/// How a limit reads in a stub: two decimals, trailing zeros trimmed to one, as the recorded
+/// limits already are (`0.0`, `3.85`, `26.28`).
+pub(crate) fn format_percent(percent: f64) -> String {
+    let mut text = format!("{percent:.2}");
+    while text.ends_with('0') && !text.ends_with(".0") {
+        text.pop();
+    }
+    text
+}
+
+/// The comment `rewrite_stub_source` writes on a clamp it creates: the number is measured, the
+/// residual is not yet understood. Also what it removes again once the clamp goes.
+pub(crate) const UNEXAMINED_CLAMP_NOTE: &str = "    // Recorded as found, not examined.\n";
+
+/// Writes `measurement` into `name`'s stub, then runs rustfmt on it. Returns what changed, one
+/// line each, for the status line; empty when the stub already said this.
+pub(crate) fn record_measurement_in_stub(
+    name: &str,
+    measurement: &SaveMeasurement,
+) -> Result<Vec<String>> {
+    let dataset = case_dataset(name).unwrap_or_else(legacy_dataset);
+    let path = fixtures_dir(&dataset).join(format!("{}.rs", module_name(name)));
+    let source = fs::read_to_string(&path).with_context(|| format!("reading {:?}", path))?;
+    let (rewritten, notes) = rewrite_stub_source(&source, name, measurement);
+    if rewritten != source {
+        fs::write(&path, rewritten).with_context(|| format!("writing {:?}", path))?;
+        // Best effort: the rewrite is valid Rust either way, rustfmt only makes it canonical.
+        let _ = std::process::Command::new("rustfmt")
+            .args(["--edition", "2024"])
+            .arg(&path)
+            .status();
+    }
+    Ok(notes)
+}
+
+/// `record_measurement_in_stub` on the stub's text. The rules, each a note when it fires:
+///
+/// - `painting()`: the recorded limit becomes the measured one, whichever way it moved, and the
+///   "Not measured yet" placeholder goes. The limit records a distance, so it follows the
+///   measurement.
+/// - `mapping()` exact, with mismatches: becomes a clamp at the measured numbers, with
+///   [`UNEXAMINED_CLAMP_NOTE`] so `the_clamped_stubs_explain_their_limits` stays green and a
+///   reader knows nobody has looked yet.
+/// - `mapping()` clamped, measured at or under it: the numbers tighten in place, prose kept.
+///   Measured at zero: back to the exact call, and the unexamined note (only that one) goes.
+/// - `mapping()` clamped, measured above it: untouched. A clamp is a reviewed number; loosening
+///   it is a decision, so the note says the test will fail and why.
+///
+/// A stub whose calls match neither shape (hand-written) is left alone.
+pub(crate) fn rewrite_stub_source(
+    source: &str,
+    name: &str,
+    measurement: &SaveMeasurement,
+) -> (String, Vec<String>) {
+    let mut out = source.to_string();
+    let mut notes = Vec::new();
+    let quoted = regex::escape(name);
+
+    if let Some(percent) = measurement.painting_percent {
+        let call = regex::Regex::new(&format!(
+            r#"assert_matches_human_painting_within_limit\(\s*"{quoted}"\s*,\s*([0-9.]+)\s*,?\s*\)"#
+        ))
+        .expect("valid regex");
+        let found = call
+            .captures(&out)
+            .map(|found| (found[1].to_string(), found.get(1).expect("group 1").range()));
+        if let Some((recorded, range)) = found {
+            let wanted = format_percent(percent);
+            let placeholder = "    // Not measured yet: 100.0 passes unconditionally. Run this test and record \
+                               the\n    // limit it reports instead.\n";
+            let had_placeholder = out.contains(placeholder);
+            if recorded != wanted {
+                // The number first: the placeholder sits above it, so removing that would shift
+                // the range.
+                out.replace_range(range, &wanted);
+                notes.push(if had_placeholder {
+                    format!("painting limit recorded: {wanted}%")
+                } else {
+                    format!("painting limit {recorded}% -> {wanted}%")
+                });
+            }
+            if had_placeholder {
+                out = out.replace(placeholder, "");
+            }
+        }
+    }
+
+    if let Some((total, visible)) = measurement.mismatches {
+        let exact = regex::Regex::new(&format!(
+            r#"assert_matches_human_mapping\(\s*"{quoted}"\s*,?\s*\)"#
+        ))
+        .expect("valid regex");
+        // Comment lines may sit between the arguments (a note on the N:M floor, say); they stay.
+        let clamped = regex::Regex::new(&format!(
+            r#"assert_matches_human_mapping_within_limit\(\s*"{quoted}"\s*,((?:\s*//[^\n]*)*)\s*(\d+)\s*,((?:\s*//[^\n]*)*)\s*(\d+)\s*,?\s*\)"#
+        ))
+        .expect("valid regex");
+
+        let exact_range = exact.find(&out).map(|found| found.range());
+        let clamp = clamped.captures(&out).map(|found| {
+            (
+                found.get(0).expect("group 0").range(),
+                found.get(2).expect("group 2").range(),
+                found.get(4).expect("group 4").range(),
+                found[2].parse::<usize>().unwrap_or(0),
+                found[4].parse::<usize>().unwrap_or(0),
+            )
+        });
+        if let Some(found) = exact_range {
+            if total > 0 {
+                let call = format!(
+                    "assert_matches_human_mapping_within_limit(\"{name}\", {total}, {visible})"
+                );
+                let start = found.start;
+                out.replace_range(found, &call);
+                // The note goes right above the call's line, unless that test already explains
+                // itself.
+                let line_start = out[..start].rfind('\n').map_or(0, |at| at + 1);
+                let test_at = out[..line_start].rfind("#[test]").unwrap_or(0);
+                let explained = out[test_at..line_start]
+                    .lines()
+                    .any(|line| line.starts_with("    //"));
+                if !explained {
+                    out.insert_str(line_start, UNEXAMINED_CLAMP_NOTE);
+                }
+                notes.push(format!(
+                    "mapping clamped at {total} mismatches ({visible} visible), not examined"
+                ));
+            }
+        } else if let Some((whole, total_range, visible_range, recorded_total, recorded_visible)) =
+            clamp
+        {
+            if (total, visible) == (recorded_total, recorded_visible) {
+                // Already right.
+            } else if total == 0 && visible == 0 {
+                out.replace_range(
+                    whole.clone(),
+                    &format!("assert_matches_human_mapping(\"{name}\")"),
+                );
+                let line_start = out[..whole.start].rfind('\n').map_or(0, |at| at + 1);
+                let test_at = out[..line_start].rfind("#[test]").unwrap_or(0);
+                if let Some(at) = out[test_at..line_start].find(UNEXAMINED_CLAMP_NOTE) {
+                    let at = test_at + at;
+                    out.replace_range(at..at + UNEXAMINED_CLAMP_NOTE.len(), "");
+                }
+                notes.push(format!(
+                    "mapping is exact now (was clamped at {recorded_total}/{recorded_visible})"
+                ));
+            } else if total <= recorded_total && visible <= recorded_visible {
+                // Right to left, so the first range's edit does not shift the second.
+                out.replace_range(visible_range, &visible.to_string());
+                out.replace_range(total_range, &total.to_string());
+                notes.push(format!(
+                    "mapping clamp tightened {recorded_total}/{recorded_visible} -> {total}/{visible}"
+                ));
+            } else {
+                notes.push(format!(
+                    "{total} mismatches ({visible} visible) exceed the clamp of \
+                     {recorded_total}/{recorded_visible}: mapping() will fail until the stub is \
+                     examined and edited"
+                ));
+            }
+        }
+    }
+
+    (out, notes)
+}

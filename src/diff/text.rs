@@ -517,6 +517,9 @@ impl RangeWalk<'_> {
             self.destination.contents.as_bytes(),
         );
         let (new_ranges, descend) = match change {
+            NodeChange::Identical(Some(destination_node)) if self.in_group(node) => {
+                (vec![self.group_member_move(node, destination_node)], false)
+            }
             NodeChange::Identical(Some(destination_node)) => (
                 vec![self.identical_or_move(node, destination_node, mapping.reason)],
                 false,
@@ -539,6 +542,30 @@ impl RangeWalk<'_> {
         };
         self.push(new_ranges);
         descend
+    }
+
+    /// Whether `node` is a member of an N:M group ([`ASTDiff::add_group`]) on its own side.
+    fn in_group(&self, node: Node) -> bool {
+        if self.source_is_before {
+            self.diff.before_group(node.id()).is_some()
+        } else {
+            self.diff.after_group(node.id()).is_some()
+        }
+    }
+
+    /// An identical group member is a `Move` wherever it sits: the group records that verbatim
+    /// code became several copies or several became one, and the ground truth paints every member
+    /// that way, the one still in place too. Its destination is its representative partner; like
+    /// any `Move`, it is out of sequence and never becomes the anchor.
+    fn group_member_move(&self, node: Node, destination_node: Node) -> RangeMatch {
+        RangeMatch {
+            source: TextRange::from_treesitter_range(node.range(), &self.source_columns),
+            destination: TextRange::from_treesitter_range(
+                destination_node.range(),
+                &self.destination_columns,
+            ),
+            operation: TextOperation::Move,
+        }
     }
 
     /// The range for a node with no destination counterpart; see [`advance_and_build_range`].

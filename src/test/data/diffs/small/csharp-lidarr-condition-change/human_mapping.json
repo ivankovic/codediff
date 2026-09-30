@@ -18678,5 +18678,113 @@
       "operation": "match_but_not_identical",
       "with_children": false
     }
+  ],
+  "text_mappings": [
+    {
+      "name": "Minimal",
+      "entries": [
+        {
+          "operation": "Delete",
+          "before": [
+            {
+              "start_row": 41,
+              "start_column": 17,
+              "end_row": 41,
+              "end_column": 36
+            }
+          ]
+        },
+        {
+          "operation": "Delete",
+          "before": [
+            {
+              "start_row": 41,
+              "start_column": 16,
+              "end_row": 41,
+              "end_column": 17
+            }
+          ]
+        },
+        {
+          "operation": "Delete",
+          "before": [
+            {
+              "start_row": 41,
+              "start_column": 76,
+              "end_row": 41,
+              "end_column": 77
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Full",
+      "entries": [
+        {
+          "operation": "Delete",
+          "before": [
+            {
+              "start_row": 41,
+              "start_column": 17,
+              "end_row": 41,
+              "end_column": 36
+            }
+          ]
+        },
+        {
+          "operation": "Delete",
+          "before": [
+            {
+              "start_row": 41,
+              "start_column": 16,
+              "end_row": 41,
+              "end_column": 17
+            }
+          ]
+        },
+        {
+          "operation": "Delete",
+          "before": [
+            {
+              "start_row": 41,
+              "start_column": 76,
+              "end_row": 41,
+              "end_column": 77
+            }
+          ]
+        },
+        {
+          "operation": "Delete",
+          "before": [
+            {
+              "start_row": 41,
+              "start_column": 36,
+              "end_row": 41,
+              "end_column": 37
+            }
+          ]
+        },
+        {
+          "operation": "Match",
+          "before": [
+            {
+              "start_row": 41,
+              "start_column": 37,
+              "end_row": 41,
+              "end_column": 76
+            }
+          ],
+          "after": [
+            {
+              "start_row": 41,
+              "start_column": 16,
+              "end_row": 41,
+              "end_column": 55
+            }
+          ]
+        }
+      ]
+    }
   ]
 }

@@ -73762,5 +73762,39 @@
         "}:1"
       ]
     }
+  ],
+  "text_mappings": [
+    {
+      "name": "Minimal",
+      "entries": [
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 61,
+              "start_column": 63,
+              "end_row": 61,
+              "end_column": 127
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Full",
+      "entries": [
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 61,
+              "start_column": 0,
+              "end_row": 61,
+              "end_column": 127
+            }
+          ]
+        }
+      ]
+    }
   ]
 }

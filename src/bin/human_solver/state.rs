@@ -40,6 +40,10 @@ impl Focus {
 
 pub(crate) struct PanelState {
     pub(crate) cursor_id: usize,
+    /// `v`: the node a range selection started on. While set, `d`/`D`/`i`/`I`/`u` act on every
+    /// visible node from it to the cursor, as vim's visual mode would; cleared by the mark, or by
+    /// `v` again. An id rather than a row: the rows shift when a subtree collapses.
+    pub(crate) anchor: Option<usize>,
     pub(crate) collapsed: std::collections::HashSet<usize>,
     pub(crate) scroll: usize,
     /// List rows available as of the last render; 0 before the first frame. `reveal_node` reads
@@ -51,6 +55,7 @@ impl PanelState {
     pub(crate) fn new(root_id: usize) -> Self {
         Self {
             cursor_id: root_id,
+            anchor: None,
             collapsed: std::collections::HashSet::new(),
             scroll: 0,
             viewport_height: 0,
@@ -141,7 +146,7 @@ pub(crate) fn solution_entries_mut<'a>(
 /// `s`: stores the current painting under another name, **keeping the source**: a fixture with
 /// more than one defensible rendering needs both on disk. `copy` decides whether a *new* name
 /// starts from the current ranges or from nothing. An existing name is only switched to, as `L`
-/// would: merging would duplicate ranges and replacing would discard work, with no undo.
+/// would: merging would duplicate ranges and replacing would discard work.
 pub(crate) fn action_save_solution_as(
     app: &mut App,
     target: &str,
@@ -193,7 +198,7 @@ pub(crate) fn action_save_solution_as(
         mapping: HumanTextMapping { entries },
     });
     app.text_solution = target.to_string();
-    app.dirty = true;
+    app.mark_dirty();
     app.status = Some(if copy {
         let widened = match extended {
             0 => String::new(),
@@ -224,7 +229,7 @@ pub(crate) fn action_delete_solution(app: &mut App, target: &str) {
         app.status = Some(format!("No painting called '{target}'"));
         return;
     }
-    app.dirty = true;
+    app.mark_dirty();
 
     // Only deleting the painting being edited moves the reader; switching them silently would
     // invite painting into the wrong one.
@@ -267,9 +272,6 @@ pub(crate) enum TextOverlay {
     /// Only bytes where human and codediff disagree, coloured by the human's label. Empty means
     /// they agree.
     Disagreements,
-    /// Only bytes where the human's painting and their own tree mapping disagree (the
-    /// human-vs-human comparison `text_mapping_disagreements` makes; `diff_code` is not involved).
-    TreeDisagreement,
 }
 
 impl TextOverlay {
@@ -277,8 +279,7 @@ impl TextOverlay {
         match self {
             TextOverlay::Human => TextOverlay::CodeDiff,
             TextOverlay::CodeDiff => TextOverlay::Disagreements,
-            TextOverlay::Disagreements => TextOverlay::TreeDisagreement,
-            TextOverlay::TreeDisagreement => TextOverlay::Human,
+            TextOverlay::Disagreements => TextOverlay::Human,
         }
     }
 
@@ -287,7 +288,6 @@ impl TextOverlay {
             TextOverlay::Human => "human",
             TextOverlay::CodeDiff => "codediff",
             TextOverlay::Disagreements => "disagreements",
-            TextOverlay::TreeDisagreement => "tree vs painting",
         }
     }
 }
@@ -305,6 +305,7 @@ pub(crate) fn is_text_only(before: &Code, after: &Code) -> bool {
 pub(crate) fn codediff_text_spans(
     before: &Code,
     after: &Code,
+    known: Option<&ASTDiff>,
 ) -> [Vec<(HumanTextSpan, HumanTextVerdict)>; 2] {
     // Keyed on the code, as the product is: `diff_code` returns `Some(ASTDiff)` even with no
     // trees, which would show an empty projection instead of the fallback.
@@ -313,14 +314,19 @@ pub(crate) fn codediff_text_spans(
             codediff::diff::text::plain_text_line_diff(&before.contents, &after.contents);
         [before_ranges, after_ranges]
     } else {
-        let diff = diff_code(before, after);
-        match diff.ast.as_ref() {
-            Some(ast_diff) => {
-                let node_cache = NodeCache::build(before, after);
-                let text_diff = TextDiff::from(before, after, ast_diff, &node_cache);
-                [text_diff.all(0), text_diff.all(1)]
-            }
-            None => [Vec::new(), Vec::new()],
+        let project = |ast_diff: &ASTDiff| {
+            let node_cache = NodeCache::build(before, after);
+            let text_diff = TextDiff::from(before, after, ast_diff, &node_cache);
+            [text_diff.all(0), text_diff.all(1)]
+        };
+        // `known` is the background run's diff of these same trees (`App::algo_diff`), so the
+        // projection needs no second run.
+        match known {
+            Some(ast_diff) => project(ast_diff),
+            None => match diff_code(before, after).ast.as_ref() {
+                Some(ast_diff) => project(ast_diff),
+                None => [Vec::new(), Vec::new()],
+            },
         }
     };
 
@@ -359,8 +365,9 @@ pub(crate) fn codediff_text_spans(
 pub(crate) fn codediff_text_entries(
     before: &Code,
     after: &Code,
+    known: Option<&ASTDiff>,
 ) -> Result<Vec<HumanTextEntry>, &'static str> {
-    let [before_spans, after_spans] = codediff_text_spans(before, after);
+    let [before_spans, after_spans] = codediff_text_spans(before, after, known);
 
     // Overlapping ranges are refused: the renderer resolves an overlap by highest verdict but
     // `label_bytes` (what grading reads) by last entry, so it would render as one thing and score
@@ -437,7 +444,8 @@ pub(crate) fn spans_overlap(spans: &[(HumanTextSpan, HumanTextVerdict)]) -> bool
 
 /// `P` in the text view: seeds the current painting with codediff's rendering, so a fixture is
 /// corrected rather than painted from scratch. Refuses a painting that already has ranges, as
-/// `action_paint_mark_empty` does: there is no undo. `s` branches to seed a second reading.
+/// `action_paint_mark_empty` does: a seed is a starting point, never a replacement. `s` branches
+/// to seed a second reading.
 pub(crate) fn action_paint_seed_from_codediff(app: &mut App, before: &Code, after: &Code) {
     let solution = app.text_solution.clone();
     if !solution_entries(&app.mapping, &solution).is_empty() {
@@ -448,7 +456,7 @@ pub(crate) fn action_paint_seed_from_codediff(app: &mut App, before: &Code, afte
         return;
     }
 
-    let entries = match codediff_text_entries(before, after) {
+    let entries = match codediff_text_entries(before, after, app.algo_diff.as_ref()) {
         Ok(entries) if entries.is_empty() => {
             app.status = Some("codediff paints nothing on this pair - nothing to copy".to_string());
             return;
@@ -464,55 +472,14 @@ pub(crate) fn action_paint_seed_from_codediff(app: &mut App, before: &Code, afte
 
     let count = entries.len();
     *solution_entries_mut(&mut app.mapping, &solution) = entries;
-    app.dirty = true;
+    app.mark_dirty();
     app.status = Some(format!(
         "Copied codediff's {count} range(s) into '{solution}' - correct them from here (u removes one)"
     ));
 }
 
-/// The human's own tree mapping (`HumanMapping::entries`, never `diff_code`) as painting spans,
-/// through the pipeline `text_mapping_disagreements` uses; backs `TextOverlay::TreeDisagreement`.
-/// A mapping that fails to load gives empty spans.
-pub(crate) fn tree_mapping_text_spans(
-    mapping: &HumanMapping,
-    before: &Code,
-    after: &Code,
-) -> [Vec<(HumanTextSpan, HumanTextVerdict)>; 2] {
-    let Ok(ast_diff) = human_mapping::as_ast_diff_for_mapping(mapping, before, after) else {
-        return [Vec::new(), Vec::new()];
-    };
-    let node_cache = NodeCache::build(before, after);
-    let text_diff = TextDiff::from(before, after, &ast_diff, &node_cache);
-
-    let convert = |ranges: Vec<codediff::diff::text::RangeMatch>| {
-        ranges
-            .into_iter()
-            .filter(|range_match| !range_match.source.is_empty())
-            .filter_map(|range_match| {
-                let verdict = match range_match.operation {
-                    codediff::diff::text::TextOperation::Move => HumanTextVerdict::Move,
-                    codediff::diff::text::TextOperation::Update => HumanTextVerdict::Update,
-                    codediff::diff::text::TextOperation::Delete => HumanTextVerdict::Delete,
-                    codediff::diff::text::TextOperation::Insert => HumanTextVerdict::Insert,
-                    _ => return None,
-                };
-                Some((
-                    HumanTextSpan {
-                        start_row: range_match.source.start_row,
-                        start_column: range_match.source.start_column,
-                        end_row: range_match.source.end_row,
-                        end_column: range_match.source.end_column,
-                    },
-                    verdict,
-                ))
-            })
-            .collect()
-    };
-    [convert(text_diff.all(0)), convert(text_diff.all(1))]
-}
-
-/// Spans where the human's painting and `other` disagree, labelled with the human's verdict.
-/// `other` is codediff's spans for `Disagreements` and the tree mapping's for `TreeDisagreement`.
+/// Spans where the human's painting and `other` (codediff's spans) disagree, labelled with the
+/// human's verdict.
 pub(crate) fn overlay_disagreement_spans(
     painted: &[Vec<(HumanTextSpan, HumanTextVerdict)>; 2],
     other: &[Vec<(HumanTextSpan, HumanTextVerdict)>; 2],
@@ -734,6 +701,10 @@ pub(crate) struct TextPaintState {
     /// The digits typed so far at the `:` line prompt, if open. Kept here rather than as a nested
     /// modal, which would have to carry this whole state through and back.
     pub(crate) line_prompt: Option<String>,
+    /// The text typed so far at the `/` search prompt, if open; same arrangement as `line_prompt`.
+    /// Pre-filled from `App::last_search`, so `/` Enter repeats a search, as `n` would in vim
+    /// (`n`/`p` here step through diff hunks).
+    pub(crate) search_prompt: Option<String>,
     /// Ranges banked with `x`, per side, for `d`/`i`/`m` to commit together: what makes an N:M
     /// match possible with one live selection.
     pub(crate) pending: [Vec<HumanTextSpan>; 2],
@@ -745,6 +716,25 @@ pub(crate) struct TextPaintState {
     pub(crate) vertical: bool,
 }
 
+/// vim's word classes: a small word (`w`) is a run of keyword characters or a run of other
+/// non-blanks; a big word (`W`) is any run of non-blanks.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum WordClass {
+    Blank,
+    Keyword,
+    Punctuation,
+}
+
+pub(crate) fn word_class(ch: char, big: bool) -> WordClass {
+    if ch.is_whitespace() {
+        WordClass::Blank
+    } else if big || ch.is_alphanumeric() || ch == '_' {
+        WordClass::Keyword
+    } else {
+        WordClass::Punctuation
+    }
+}
+
 impl Default for TextPaintState {
     fn default() -> Self {
         Self {
@@ -752,6 +742,7 @@ impl Default for TextPaintState {
             cursor: [(0, 0); 2],
             anchor: [None; 2],
             line_prompt: None,
+            search_prompt: None,
             pending: [Vec::new(), Vec::new()],
             scroll: [0; 2],
             vertical: true,
@@ -760,6 +751,29 @@ impl Default for TextPaintState {
 }
 
 impl TextPaintState {
+    /// The view as `t` opens it from the tree panels: each side's cursor on its panel's node, the
+    /// focused side first, both scrolled into a viewport of `height` rows. A side with no node
+    /// (text-only mode) starts at the top.
+    pub(crate) fn at_nodes(
+        before: Option<Node>,
+        after: Option<Node>,
+        side: usize,
+        height: usize,
+    ) -> Self {
+        let mut state = TextPaintState {
+            side,
+            ..Default::default()
+        };
+        for (index, node) in [before, after].into_iter().enumerate() {
+            if let Some(node) = node {
+                let start = node.start_position();
+                state.cursor[index] = (start.row, start.column);
+            }
+            state.scroll_side_into_view(index, height);
+        }
+        state
+    }
+
     /// The row's text without a trailing CRLF `\r`, or `""` past the end. The `\r` is part of the
     /// terminator: kept, it would be a phantom column the cursor, `$` and spans could reach. It is
     /// the row's last byte, so stored columns are unaffected.
@@ -815,6 +829,179 @@ impl TextPaintState {
             let previous_row = row - 1;
             self.cursor[self.side] = (previous_row, Self::row_text(source, previous_row).len());
         }
+    }
+
+    /// The next occurrence of `query` on `side`, strictly after that side's cursor and wrapping
+    /// to the top, as `(row, byte column)`. Plain substring, case-sensitive, like the tree
+    /// search. `None` when the side has no occurrence at all.
+    pub(crate) fn find_next(
+        &self,
+        side: usize,
+        source: &str,
+        query: &str,
+    ) -> Option<(usize, usize)> {
+        if query.is_empty() {
+            return None;
+        }
+        let (cursor_row, cursor_column) = self.cursor[side];
+        let rows: Vec<&str> = source
+            .split('\n')
+            .map(|line| line.strip_suffix('\r').unwrap_or(line))
+            .collect();
+        let count = rows.len();
+        for step in 0..=count {
+            let row = (cursor_row + step) % count;
+            // On the cursor's row the first pass looks past the cursor, the wrap-around pass
+            // (step == count) looks before it - so a lone occurrence under the cursor is found
+            // again, not skipped.
+            let line = rows[row];
+            let from = if step == 0 {
+                (cursor_column + 1).min(line.len())
+            } else {
+                0
+            };
+            let from = (from..=line.len())
+                .find(|&at| line.is_char_boundary(at))
+                .unwrap_or(line.len());
+            if let Some(at) = line[from..].find(query) {
+                return Some((row, from + at));
+            }
+        }
+        None
+    }
+
+    /// `w`/`W`: the start of the next word, across rows. A word is a run of one character class
+    /// ([`word_class`]); with `big`, any run of non-blanks. Past the last word the cursor goes to
+    /// the end of the text. Unlike vim, an empty row is not a stop.
+    pub(crate) fn word_forward(&mut self, big: bool, source: &str) {
+        let mut ahead = Self::positions_from(source, self.cursor[self.side]);
+        let Some((_, _, first)) = ahead.next() else {
+            return;
+        };
+        let class = word_class(first, big);
+        let mut landing = None;
+        for (row, column, ch) in ahead {
+            let this = word_class(ch, big);
+            // Leave the run under the cursor, then the blanks after it.
+            if this != WordClass::Blank && (class == WordClass::Blank || this != class) {
+                landing = Some((row, column));
+                break;
+            }
+            if class != WordClass::Blank && this == WordClass::Blank {
+                // The run is over; from here only blanks are skipped, whatever came before.
+                return self.word_forward_from_blank(big, source, (row, column));
+            }
+        }
+        self.cursor[self.side] = landing.unwrap_or_else(|| Self::end_of_text(source));
+    }
+
+    /// The `word_forward` tail once a blank is reached: the next non-blank, or the text's end.
+    fn word_forward_from_blank(&mut self, big: bool, source: &str, from: (usize, usize)) {
+        let landing = Self::positions_from(source, from)
+            .find(|(_, _, ch)| word_class(*ch, big) != WordClass::Blank)
+            .map(|(row, column, _)| (row, column));
+        self.cursor[self.side] = landing.unwrap_or_else(|| Self::end_of_text(source));
+    }
+
+    /// `e`/`E`: the last character of the word the cursor is in, or of the next word when it is
+    /// already there or on a blank.
+    pub(crate) fn word_end(&mut self, big: bool, source: &str) {
+        let mut ahead = Self::positions_from(source, self.cursor[self.side]).skip(1);
+        let Some((row, column, ch)) =
+            ahead.find(|(_, _, ch)| word_class(*ch, big) != WordClass::Blank)
+        else {
+            self.cursor[self.side] = Self::end_of_text(source);
+            return;
+        };
+        let class = word_class(ch, big);
+        let mut last = (row, column);
+        for (row, column, ch) in ahead {
+            if word_class(ch, big) != class {
+                break;
+            }
+            last = (row, column);
+        }
+        self.cursor[self.side] = last;
+    }
+
+    /// `b`/`B`: the start of the word before the cursor (of this word, when the cursor is inside
+    /// it).
+    pub(crate) fn word_backward(&mut self, big: bool, source: &str) {
+        let mut behind = Self::positions_before(source, self.cursor[self.side]);
+        let Some((row, column, ch)) =
+            behind.find(|(_, _, ch)| word_class(*ch, big) != WordClass::Blank)
+        else {
+            self.cursor[self.side] = (0, 0);
+            return;
+        };
+        let class = word_class(ch, big);
+        let mut first = (row, column);
+        for (row, column, ch) in behind {
+            if word_class(ch, big) != class {
+                break;
+            }
+            first = (row, column);
+        }
+        self.cursor[self.side] = first;
+    }
+
+    /// Every character from `from` on, as `(row, byte column, char)`, rows joined by a newline
+    /// so a row end reads as a blank.
+    fn positions_from(
+        source: &str,
+        from: (usize, usize),
+    ) -> impl Iterator<Item = (usize, usize, char)> + '_ {
+        source
+            .split('\n')
+            .enumerate()
+            .skip(from.0)
+            .flat_map(move |(row, line)| {
+                let line = line.strip_suffix('\r').unwrap_or(line);
+                let start = if row == from.0 {
+                    from.1.min(line.len())
+                } else {
+                    0
+                };
+                line[start..]
+                    .char_indices()
+                    .map(move |(offset, ch)| (row, start + offset, ch))
+                    .chain(std::iter::once((row, line.len(), '\n')))
+            })
+    }
+
+    /// Every character before `from`, nearest first, as `positions_from` gives them.
+    fn positions_before(
+        source: &str,
+        from: (usize, usize),
+    ) -> impl Iterator<Item = (usize, usize, char)> + '_ {
+        let rows: Vec<&str> = source
+            .split('\n')
+            .take(from.0 + 1)
+            .map(|line| line.strip_suffix('\r').unwrap_or(line))
+            .collect();
+        rows.into_iter()
+            .enumerate()
+            .rev()
+            .flat_map(move |(row, line)| {
+                let end = if row == from.0 {
+                    from.1.min(line.len())
+                } else {
+                    line.len()
+                };
+                let terminator = (row != from.0).then_some((row, line.len(), '\n'));
+                terminator.into_iter().chain(
+                    line[..end]
+                        .char_indices()
+                        .rev()
+                        .map(move |(offset, ch)| (row, offset, ch)),
+                )
+            })
+    }
+
+    /// The end of the last row: where a forward motion stops when no word is left.
+    fn end_of_text(source: &str) -> (usize, usize) {
+        let last = Self::row_count(source).saturating_sub(1);
+        (last, Self::row_text(source, last).len())
     }
 
     /// The live selection on `side`: one span per row, or one sweep (see `vertical`); empty if
@@ -1286,6 +1473,11 @@ fn spans_share_a_byte(a: HumanTextSpan, b: HumanTextSpan, source: &str) -> bool 
 
 /// `m`: pairs everything selected on the before side with everything on the after side as one
 /// `Match`; banked ranges make it N:M. Needs ranges on both sides, like the tree's `m`.
+///
+/// In a `Minimal` painting a full-line sweep on each side (one live range per side, several rows)
+/// is committed as `d`/`i` would commit it: without indentation, one range per row (invariant 6).
+/// Since a `Match` needs its spans on a side to read the same, the rows are paired one to one as
+/// separate matches, each a move or an update by itself. Unequal row counts are refused.
 pub(crate) fn action_paint_match(
     app: &mut App,
     state: &mut TextPaintState,
@@ -1297,6 +1489,16 @@ pub(crate) fn action_paint_match(
     if before.is_empty() || after.is_empty() {
         app.status =
             Some("Match needs a selection on both sides - press v on each, then m".to_string());
+        return;
+    }
+
+    let minimal_mode =
+        human_mapping::invariants::designates_minimal(&app.text_solution) && !state.vertical;
+    let one_sweep_each = before.len() == 1
+        && after.len() == 1
+        && (before[0].end_row > before[0].start_row || after[0].end_row > after[0].start_row);
+    if minimal_mode && one_sweep_each {
+        action_paint_match_rows(app, state, before[0], after[0], before_src, after_src);
         return;
     }
 
@@ -1323,7 +1525,7 @@ pub(crate) fn action_paint_match(
         return;
     }
     solution_entries_mut(&mut app.mapping, &solution).push(entry);
-    app.dirty = true;
+    app.mark_dirty();
     state.anchor = [None; 2];
     state.pending = [Vec::new(), Vec::new()];
     app.status = Some(match verdict {
@@ -1335,6 +1537,75 @@ pub(crate) fn action_paint_match(
         }
         other => format!("Matched {shape} ({other:?})"),
     });
+}
+
+/// The `Minimal` multi-row branch of [`action_paint_match`]: `before` and `after` are the two
+/// sweeps. All or nothing: every row pair is checked before any is painted.
+fn action_paint_match_rows(
+    app: &mut App,
+    state: &mut TextPaintState,
+    before: HumanTextSpan,
+    after: HumanTextSpan,
+    before_src: &str,
+    after_src: &str,
+) {
+    let before_rows = skip_leading_whitespace(before, before_src);
+    let after_rows = skip_leading_whitespace(after, after_src);
+    if before_rows.len() != after_rows.len() {
+        app.status = Some(format!(
+            "Not matched: {} line(s) against {} after dropping blank lines and indentation - \
+             Minimal pairs the rows one to one, so sweep the same number of lines on each side, \
+             or use a vertical selection (V)",
+            before_rows.len(),
+            after_rows.len()
+        ));
+        return;
+    }
+    if before_rows.is_empty() {
+        app.status = Some(
+            "Only blank lines selected - Minimal claims no indentation, so nothing to match"
+                .to_string(),
+        );
+        return;
+    }
+
+    let solution = app.text_solution.clone();
+    let mut entries = Vec::with_capacity(before_rows.len());
+    let mut moves = 0usize;
+    for (before_row, after_row) in before_rows.into_iter().zip(after_rows) {
+        let entry = HumanTextEntry {
+            operation: HumanTextOperation::Match,
+            before: vec![before_row],
+            after: vec![after_row],
+        };
+        match entry.verdict(before_src, after_src) {
+            Ok(HumanTextVerdict::Move) => moves += 1,
+            Ok(_) => {}
+            Err(err) => {
+                app.status = Some(format!("Not matched: {err:#}"));
+                return;
+            }
+        }
+        if let Some(clash) =
+            overlapping_painted_range(&app.mapping, &solution, &entry, before_src, after_src)
+        {
+            app.status = Some(format!("Not matched: {clash} - u removes it first"));
+            return;
+        }
+        entries.push(entry);
+    }
+    // The rows of one sweep cannot overlap each other, so checking each against the painting
+    // as it was is enough.
+    let count = entries.len();
+    solution_entries_mut(&mut app.mapping, &solution).extend(entries);
+    app.mark_dirty();
+    state.anchor = [None; 2];
+    state.pending = [Vec::new(), Vec::new()];
+    let updates = count - moves;
+    app.status = Some(format!(
+        "Matched {count} line(s) one to one: {moves} move(s), {updates} update(s) - indentation \
+         left unpainted (Minimal)"
+    ));
 }
 
 /// `d` / `i`: paints everything selected on the focused side as one removal or addition. Unlike a
@@ -1421,7 +1692,7 @@ pub(crate) fn action_paint_one_sided(
         return;
     }
     solution_entries_mut(&mut app.mapping, &solution).push(entry);
-    app.dirty = true;
+    app.mark_dirty();
     state.anchor[side] = None;
     state.pending[side].clear();
     let note = if split_any {
@@ -1495,7 +1766,7 @@ pub(crate) fn action_paint_unmark(
         app.status = Some("Nothing painted here".to_string());
         return;
     }
-    app.dirty = true;
+    app.mark_dirty();
     app.status = Some(format!("Removed {removed} painted range(s)"));
 }
 
@@ -1510,12 +1781,10 @@ pub(crate) fn action_reset_case(app: &mut App) -> String {
     app.mapping.groups.clear();
     app.mapping.text_mappings.clear();
 
-    // A stale `tree_text_spans` would draw the discarded mapping, and `text_solution` would name
-    // a painting that no longer exists.
-    app.tree_text_spans = None;
+    // `text_solution` would name a painting that no longer exists.
     app.text_solution = starting_solution(&app.mapping);
     app.clear_multi_select();
-    app.dirty = true;
+    app.mark_dirty();
 
     format!(
         "Reset: cleared {entries} mapping entries, {groups} groups and {paintings} paintings - \
@@ -1534,7 +1803,7 @@ pub(crate) fn action_paint_mark_empty(app: &mut App) {
         return;
     }
     solution_entries_mut(&mut app.mapping, &solution);
-    app.dirty = true;
+    app.mark_dirty();
     app.status = Some(format!("Marked '{solution}' as painted with no changes"));
 }
 
@@ -1550,6 +1819,9 @@ pub(crate) enum Modal {
         after_kind: String,
         /// From `M`: confirming also auto-matches the rest of the subtree.
         recursive: bool,
+        /// From `f`: `d`/`D`/`i`/`I` mark the node that stopped it and `f` carries on from
+        /// there, so a stop costs one key instead of four.
+        resume_match_to_end: bool,
     },
     /// Raised by `m`/`M` when the multi-map selection mixes AST kinds; the set form of
     /// `ConfirmKindMismatch`.
@@ -1584,8 +1856,8 @@ pub(crate) enum Modal {
         /// Same contract as `OpenDiffPicker::name_input`.
         name_input: Option<String>,
     },
-    /// Raised by `!`: confirms throwing away everything recorded for this case. There is no
-    /// undo.
+    /// Raised by `!`: confirms throwing away everything recorded for this case (`U` restores
+    /// it).
     ConfirmResetCase {
         entries: usize,
         groups: usize,
@@ -1704,11 +1976,27 @@ pub(crate) struct App {
     pub(crate) after: PanelState,
     pub(crate) mapping: HumanMapping,
     pub(crate) dirty: bool,
+    /// Bumped by every `mark_dirty`: how the event loop tells an edit from a key that only opened
+    /// a modal or was refused, so an undo step is pushed only when `mapping` actually changed.
+    pub(crate) edits: u64,
+    /// `mapping` as it was before each edit, oldest first; `U` pops one. Whole snapshots rather
+    /// than inverse operations: a fixture's mapping is small next to its trees, and every edit
+    /// path (tree marks, groups, paintings, `!`) is covered without each knowing how to reverse
+    /// itself. Bounded by `UNDO_ENTRY_BUDGET`.
+    pub(crate) undo_stack: Vec<HumanMapping>,
+    /// What `U` undid, for Ctrl-r; cleared by the next edit.
+    pub(crate) redo_stack: Vec<HumanMapping>,
+    /// The keystroke log (`keylog`), `None` when it could not be opened.
+    pub(crate) key_log: Option<KeyLog>,
     pub(crate) status: Option<String>,
     pub(crate) modal: Option<Modal>,
     pub(crate) should_quit: bool,
-    /// codediff's own diff, from `p`. `None` until `p` runs for this case.
+    /// codediff's own diff of the open case. `None` until the background run
+    /// (`start_algo_diff`, begun when the case opens) lands, or `p` runs it in the foreground.
     pub(crate) algo_diff: Option<ASTDiff>,
+    /// The background run's result channel while it is in flight; `poll_algo_diff` drains it.
+    /// Dropped with the case it was started for.
+    pub(crate) algo_diff_pending: Option<std::sync::mpsc::Receiver<Option<ASTDiff>>>,
     /// `H`: hides fully marked subtrees in both panels, recomputed every frame.
     pub(crate) hide_solved: bool,
     /// `r`: shows each node's `ASTMappingReason` label after its codediff glyph (needs `p`).
@@ -1739,9 +2027,6 @@ pub(crate) struct App {
     pub(crate) text_overlay: TextOverlay,
     /// codediff's text ranges per side, computed on first use and dropped on case change.
     pub(crate) algo_text_spans: Option<[Vec<(HumanTextSpan, HumanTextVerdict)>; 2]>,
-    /// The human's tree mapping as text ranges (`tree_mapping_text_spans`), for
-    /// `TextOverlay::TreeDisagreement`; cached like `algo_text_spans`.
-    pub(crate) tree_text_spans: Option<[Vec<(HumanTextSpan, HumanTextVerdict)>; 2]>,
     /// The painting the `t` view edits; see `starting_solution`. Changed by `s`/`L`.
     pub(crate) text_solution: String,
     /// `NodeStatus::Unmarked` count per case across both trees (`diff_case_unmarked_count`), for
@@ -1779,6 +2064,10 @@ impl App {
             after: PanelState::new(after_root_id),
             mapping,
             dirty: false,
+            edits: 0,
+            undo_stack: Vec::new(),
+            redo_stack: Vec::new(),
+            key_log: None,
             status: Some(
                 "Loaded. m match, d/D delete, i/I insert, u unmark, s save, q quit, o open."
                     .to_string(),
@@ -1786,6 +2075,7 @@ impl App {
             modal: None,
             should_quit: false,
             algo_diff: None,
+            algo_diff_pending: None,
             hide_solved: false,
             show_reason: false,
             sample_view: SamplePickerView::default(),
@@ -1799,7 +2089,6 @@ impl App {
             text_solution,
             text_overlay: TextOverlay::default(),
             algo_text_spans: None,
-            tree_text_spans: None,
             diff_unmarked: None,
             last_search: None,
             before_multi_select: std::collections::BTreeSet::new(),
@@ -1815,4 +2104,75 @@ impl App {
         self.after_multi_select.clear();
         self.multi_select_pairing = GroupPairing::default();
     }
+
+    /// Records that `mapping` changed and is not on disk. Every edit path calls this, so `edits`
+    /// is the one counter the undo bookkeeping in `run_case_session` has to watch.
+    pub(crate) fn mark_dirty(&mut self) {
+        self.dirty = true;
+        self.edits += 1;
+    }
+
+    /// Pushes the pre-edit `snapshot` as the next thing `U` restores, and forgets any redo
+    /// history: after a fresh edit, what was undone before no longer applies.
+    pub(crate) fn push_undo(&mut self, snapshot: HumanMapping) {
+        self.push_undo_within(snapshot, UNDO_ENTRY_BUDGET);
+    }
+
+    /// `push_undo` with the budget as a parameter, so a test can hit it without two million
+    /// entries.
+    pub(crate) fn push_undo_within(&mut self, snapshot: HumanMapping, budget: usize) {
+        self.undo_stack.push(snapshot);
+        self.redo_stack.clear();
+        let mut held: usize = self.undo_stack.iter().map(|m| m.entries.len()).sum();
+        // Oldest first, and never the step just pushed: one undo must always be possible.
+        while held > budget && self.undo_stack.len() > 1 {
+            held -= self.undo_stack.remove(0).entries.len();
+        }
+    }
+
+    /// `U`: restores the mapping from before the last edit. `Err` with nothing to restore.
+    pub(crate) fn undo(&mut self) -> Result<String> {
+        let previous = self.undo_stack.pop().context("Nothing to undo")?;
+        let current = std::mem::replace(&mut self.mapping, previous);
+        self.redo_stack.push(current);
+        self.after_history_step();
+        Ok(format!(
+            "Undid the last change ({} more to undo, Ctrl-r redoes)",
+            self.undo_stack.len()
+        ))
+    }
+
+    /// Ctrl-r: re-applies what `U` undid. `Err` with nothing to redo.
+    pub(crate) fn redo(&mut self) -> Result<String> {
+        let next = self.redo_stack.pop().context("Nothing to redo")?;
+        let current = std::mem::replace(&mut self.mapping, next);
+        self.undo_stack.push(current);
+        self.after_history_step();
+        Ok(format!(
+            "Redid the last undone change ({} more to redo)",
+            self.redo_stack.len()
+        ))
+    }
+
+    /// The bookkeeping both `undo` and `redo` need once `mapping` is swapped: the case is
+    /// unsaved, whatever derived from the old mapping is stale, and a pending selection or a
+    /// painting name may refer to something the restored mapping does not have.
+    fn after_history_step(&mut self) {
+        self.dirty = true;
+        self.edits += 1;
+        self.clear_multi_select();
+        let names_current = self
+            .mapping
+            .text_mappings
+            .iter()
+            .any(|painting| painting.name == self.text_solution);
+        if !names_current {
+            self.text_solution = starting_solution(&self.mapping);
+        }
+    }
 }
+
+/// How many mapping entries the undo stack may hold in total before its oldest snapshots are
+/// dropped. A median fixture has under a thousand entries, so this is hundreds of steps there; on
+/// the largest fixture (about 200k entries) it is a handful, which is still every recent slip.
+pub(crate) const UNDO_ENTRY_BUDGET: usize = 2_000_000;

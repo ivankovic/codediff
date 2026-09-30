@@ -24,7 +24,7 @@ fn mapping() -> Result<()> {
     // Residual not yet root-caused.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "rust-tiffany352-rink-rs-real-change",
-        // Includes all-to-all group members a one-to-one output cannot reach: the N:M floor.
+        // Includes the N:M floor: 5 all-to-all group members a one-to-one output cannot reach.
         35,
         28,
     )

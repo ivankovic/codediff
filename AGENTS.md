@@ -7,6 +7,12 @@ that directory.
 - `make benchmark-quality` (the `benchmark_optimal_solutions` binary) shows a change's effect on
 accuracy and speed.
 
+## Branches
+
+- Do not commit to `main`. Since v0.1, work happens on a branch named for it (e.g.
+`multi-map-support`); check `git branch --show-current` before the first commit of a task.
+- Merging a branch into `main` is Marko's call. Releases (`make deploy`) are cut from `main`.
+
 ## Markdown files
 
 - Do NOT update the README.md files unless explicitly asked to do so.

@@ -23,7 +23,7 @@ use anyhow::Result;
 fn mapping() -> Result<()> {
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "csharp-jellyfin-add-function",
-        // Includes all-to-all group members a one-to-one output cannot reach: the N:M floor.
+        // Includes the N:M floor: 4 all-to-all group members a one-to-one output cannot reach.
         55,
         36,
     )
