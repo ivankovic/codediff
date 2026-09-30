@@ -135,8 +135,11 @@ def translate_uses(step: dict[str, Any]) -> list[str] | None:
 
     if name == "taiki-e/install-action":
         tool = str(inputs.get("tool", "")) or str(step["uses"]).split("@", 1)[1]
-        check_tool(["cargo", tool, "--version"], f"the {tool} step")
-        raise StepSkipped(f"using the local cargo-{tool}")
+        # CI names a tool either way - `@nextest`, `tool: cargo-about` - and cargo runs both as a
+        # subcommand without the prefix.
+        subcommand = tool.removeprefix("cargo-")
+        check_tool(["cargo", subcommand, "--version"], f"the {tool} step")
+        raise StepSkipped(f"using the local cargo-{subcommand}")
 
     if name == "astral-sh/ruff-action":
         check_tool(["ruff", "--version"], "the Python lint")
