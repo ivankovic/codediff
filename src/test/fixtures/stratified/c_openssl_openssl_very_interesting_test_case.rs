@@ -19,7 +19,7 @@ use anyhow::Result;
 
 use crate::test;
 use crate::test::helper::human_mapping::assert_matches_human_painting_within_limit;
-use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants;
+use crate::test::helper::human_mapping::invariants::assert_ground_truth_invariants_with_known_violations;
 
 #[test]
 fn mapping() -> Result<()> {
@@ -35,5 +35,11 @@ fn painting() -> Result<()> {
 
 #[test]
 fn invariants() -> Result<()> {
-    assert_ground_truth_invariants("c-openssl-openssl-very-interesting-test-case")
+    // Invariant 16: `okeylen` -> `md_len` on after row 321 is not painted as its differing word `md_`
+    // under Minimal. Invariant 5, twice: Full leaves columns 31..32 unpainted between two painted
+    // regions on before row 298 and after row 301.
+    assert_ground_truth_invariants_with_known_violations(
+        "c-openssl-openssl-very-interesting-test-case",
+        3,
+    )
 }

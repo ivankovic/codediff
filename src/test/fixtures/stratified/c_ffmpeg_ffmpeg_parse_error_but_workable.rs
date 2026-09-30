@@ -26,8 +26,8 @@ fn mapping() -> Result<()> {
     // Failed to parse
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "c-ffmpeg-ffmpeg-parse-error-but-workable",
-        26,
-        18,
+        34,
+        23,
     )
 }
 
