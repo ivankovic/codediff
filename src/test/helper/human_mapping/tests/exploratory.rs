@@ -1004,7 +1004,7 @@ fn painting_failure_census() -> Result<()> {
             continue;
         };
         let (before, after) = &*pair;
-        let Ok(mapping) = load(name) else {
+        let Ok(mapping) = load_with(name, before, after) else {
             continue;
         };
         if mapping.text_mappings.is_empty() {
