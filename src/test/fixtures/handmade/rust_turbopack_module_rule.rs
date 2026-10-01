@@ -442,7 +442,9 @@ fn invariants() -> Result<()> {
     // Invariant 3 on three delimiter pairs the mapping splits (after rows 201, 203, 204 open
     // inserted, closers matched), invariant 11 on removed leaves `Minimal` leaves unpainted (2 on
     // before row 217, 81 from after row 202), invariant 12 on one edited leaf neither side paints.
-    assert_ground_truth_invariants_with_known_violations("rust-turbopack-module-rule", 6)
+    // Invariant 21: `Minimal` paints `ConfiguredModuleType` on after row 201 as an update of its
+    // own, while the mapping inserts it.
+    assert_ground_truth_invariants_with_known_violations("rust-turbopack-module-rule", 7)
 }
 
 #[test]

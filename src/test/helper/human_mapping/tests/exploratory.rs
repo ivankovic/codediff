@@ -2146,3 +2146,200 @@ fn pinned_lexeme_census() -> Result<()> {
     }
     Ok(())
 }
+
+/// EXPLORATORY: candidate invariants between the tree mapping and the paintings, counted over the
+/// corpus before any becomes a rule. Developed on `cpp-ladybird-refactor-variables-if-changes`,
+/// painted after its mapping was written.
+///
+/// - `21` a leaf painted `Update` that the tree mapping deletes or inserts;
+/// - `22` a leaf the tree mapping pairs, painted wholly `Delete` (before) or `Insert` (after);
+/// - `23` a leaf inside a painted `Match` whose mapping partner lies outside that entry's spans on
+///   the other side.
+///
+/// Each is split by `named` (text is not its own kind) against punctuation, and by partner `same`
+/// (identical) against `paired` (edited). `FIXTURES=a,b` limits the run and prints every hit.
+///
+/// `cargo test --release --lib --features test-fixtures mapping_painting_census -- --ignored
+/// --nocapture`
+#[test]
+#[ignore]
+fn mapping_painting_census() -> Result<()> {
+    use crate::test::helper::human_mapping::invariants::{LeafStatus, TreeContext, painted_labels};
+    use std::collections::BTreeMap;
+
+    let wanted = std::env::var("FIXTURES").unwrap_or_default();
+    let wanted: Vec<&str> = wanted
+        .split(',')
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .collect();
+    let verbose = !wanted.is_empty();
+    let mut totals: BTreeMap<String, (usize, std::collections::BTreeSet<String>)> = BTreeMap::new();
+    let mut samples: BTreeMap<String, Vec<String>> = BTreeMap::new();
+
+    for (name, dir) in crate::test::helper::handmade_test_case_dirs()? {
+        if !wanted.is_empty() && !wanted.contains(&name.as_str()) {
+            continue;
+        }
+        let Some((before, after)) = crate::test::helper::code_pair_from_dir(&dir)? else {
+            continue;
+        };
+        let Ok(mapping) = load(&name) else { continue };
+        if mapping.text_mappings.is_empty() {
+            continue;
+        }
+        let (Some(bt), Some(at)) = (before.ast.as_ref(), after.ast.as_ref()) else {
+            continue;
+        };
+        let context = TreeContext::build(&mapping, bt.root_node(), at.root_node());
+        let codes = [&before, &after];
+        for named in &mapping.text_mappings {
+            let labels = painted_labels(named, &before, &after)?;
+            let whole = |side: usize, leaf: Node| -> Option<Option<TextLabel>> {
+                let slice = labels[side].get(leaf.byte_range())?;
+                let first = *slice.first()?;
+                slice.iter().all(|l| *l == first).then_some(first)
+            };
+            let mut hit = |rule: &str, side: usize, leaf: Node, detail: String| {
+                let named_leaf = codes[side].contents.get(leaf.byte_range()) != Some(leaf.kind());
+                let key = format!("{rule} {}", if named_leaf { "named" } else { "punct" });
+                let entry = totals.entry(key.clone()).or_default();
+                entry.0 += 1;
+                entry.1.insert(name.clone());
+                let line = format!(
+                    "{name} [{}] {} row {} `{}` {detail}",
+                    named.name,
+                    if side == 0 { "before" } else { "after" },
+                    leaf.start_position().row + 1,
+                    codes[side].contents[leaf.byte_range()]
+                        .chars()
+                        .take(30)
+                        .collect::<String>()
+                );
+                let list = samples.entry(key).or_default();
+                if verbose || list.len() < 12 {
+                    list.push(line);
+                }
+            };
+            let mut exact_update_spans: [std::collections::HashSet<(usize, usize)>; 2] =
+                Default::default();
+            for entry in &named.mapping.entries {
+                if entry.operation != HumanTextOperation::Match {
+                    continue;
+                }
+                for (side, spans) in [(0, &entry.before), (1, &entry.after)] {
+                    for span in spans {
+                        if let (Some(s), Some(e)) = (
+                            byte_offset(&codes[side].contents, span.start_row, span.start_column),
+                            byte_offset(&codes[side].contents, span.end_row, span.end_column),
+                        ) {
+                            exact_update_spans[side].insert((s, e));
+                        }
+                    }
+                }
+            }
+            for side in 0..2 {
+                for &leaf in &context.leaves[side] {
+                    if codes[side].contents[leaf.byte_range()].trim().is_empty() {
+                        continue;
+                    }
+                    let status = context.status(leaf, side);
+                    let label = whole(side, leaf);
+                    // 21: only where an update span is exactly this token, not a byte of a larger
+                    // edited span (`width: Double` -> `val width: Double`).
+                    if status == LeafStatus::Removed
+                        && label == Some(Some(TextLabel::Update))
+                        && exact_update_spans[side].contains(&(leaf.start_byte(), leaf.end_byte()))
+                    {
+                        hit("21 update-on-removed", side, leaf, String::new());
+                    }
+                    // 22
+                    let removed_label = if side == 0 {
+                        TextLabel::Delete
+                    } else {
+                        TextLabel::Insert
+                    };
+                    if label == Some(Some(removed_label)) {
+                        match status {
+                            LeafStatus::Same(p) => hit(
+                                "22 paired-painted-removed same",
+                                side,
+                                leaf,
+                                format!("partner row {}", p.start_position().row + 1),
+                            ),
+                            LeafStatus::Paired(p) => hit(
+                                "22 paired-painted-removed paired",
+                                side,
+                                leaf,
+                                format!(
+                                    "partner row {} `{}`",
+                                    p.start_position().row + 1,
+                                    codes[1 - side].contents[p.byte_range()]
+                                        .chars()
+                                        .take(30)
+                                        .collect::<String>()
+                                ),
+                            ),
+                            _ => {}
+                        }
+                    }
+                }
+            }
+            // 23
+            let to_bytes = |side: usize, span: &HumanTextSpan| -> Option<(usize, usize)> {
+                Some((
+                    byte_offset(&codes[side].contents, span.start_row, span.start_column)?,
+                    byte_offset(&codes[side].contents, span.end_row, span.end_column)?,
+                ))
+            };
+            for entry in &named.mapping.entries {
+                if entry.operation != HumanTextOperation::Match {
+                    continue;
+                }
+                let sides: [Vec<(usize, usize)>; 2] = [
+                    entry.before.iter().filter_map(|s| to_bytes(0, s)).collect(),
+                    entry.after.iter().filter_map(|s| to_bytes(1, s)).collect(),
+                ];
+                for side in 0..2 {
+                    for &leaf in &context.leaves[side] {
+                        let r = leaf.byte_range();
+                        if codes[side].contents[r.clone()].trim().is_empty()
+                            || !sides[side].iter().any(|&(s, e)| s <= r.start && r.end <= e)
+                        {
+                            continue;
+                        }
+                        let partner = match context.status(leaf, side) {
+                            LeafStatus::Same(p) | LeafStatus::Paired(p) => p,
+                            _ => continue,
+                        };
+                        // Overlap, not containment: Minimal paints part of a token (`Linked` inserted,
+                        // `HashMap` matched).
+                        let pr = partner.byte_range();
+                        if !sides[1 - side]
+                            .iter()
+                            .any(|&(s, e)| s < pr.end && pr.start < e)
+                        {
+                            hit(
+                                "23 match-partner-outside",
+                                side,
+                                leaf,
+                                format!("partner row {}", partner.start_position().row + 1),
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+    println!();
+    for (key, (count, fixtures)) in &totals {
+        println!("{key:45} {count:6} hits in {:4} fixtures", fixtures.len());
+    }
+    for (key, list) in &samples {
+        println!("\n== {key}");
+        for line in list {
+            println!("  {line}");
+        }
+    }
+    Ok(())
+}
