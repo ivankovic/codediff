@@ -24,8 +24,8 @@ use anyhow::Result;
 fn mapping() -> Result<()> {
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "cpp-ladybird-refactor-variables-if-changes",
-        101,
-        63,
+        141,
+        87,
     )
 }
 

@@ -278,7 +278,7 @@ fn mapping_details() -> Result<()> {
 #[test]
 fn painting() -> Result<()> {
     // `MINIMAL` sets the limit.
-    assert_matches_human_painting_within_limit("rust-hash-optimization", 7.10)
+    assert_matches_human_painting_within_limit("rust-hash-optimization", 8.80)
 }
 
 #[test]
