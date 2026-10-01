@@ -60,6 +60,7 @@ const NON_APTED_REASON_LABELS: &[&str] = &[
     "CondCollapse",
     "HeritageGrowth",
     "WrapGrowth",
+    "MultiMap",
 ];
 
 /// Column label for one `ASTMappingReason`: `bucket_label`, except that `APTED` gets one column
@@ -1197,6 +1198,7 @@ mod tests {
             ASTMappingReason::NestedConditionCollapse,
             ASTMappingReason::HeritageClauseGrowth,
             ASTMappingReason::WrapGrowth,
+            ASTMappingReason::MultiMap,
         ];
 
         for reason in every_variant {

@@ -2471,3 +2471,158 @@ fn unnamed_slot_census() -> Result<()> {
     }
     Ok(())
 }
+
+/// EXPLORATORY: every all-to-all copy in the ground truth, one line per *copy* - the solver writes
+/// one group per node of a copied subtree, so groups nested under another group's member are
+/// folded into it. For each member: its row, whether the human pairs its parent with the parent of
+/// a member on the other side ("in place"), and what codediff does with it today.
+///
+/// `cargo test --release --lib --features test-fixtures nm_copy_census -- --ignored --nocapture`
+#[test]
+#[ignore]
+fn nm_copy_census() -> Result<()> {
+    use crate::test::helper::node_for_path;
+
+    let mut copies = 0usize;
+    for (name, dir) in crate::test::helper::handmade_test_case_dirs()? {
+        let Ok(mapping) = load(&name) else { continue };
+        let groups: Vec<&MultiMapGroup> = mapping
+            .groups
+            .iter()
+            .filter(|g| g.pairing == GroupPairing::AllToAll)
+            .collect();
+        if groups.is_empty() {
+            continue;
+        }
+        let Some((before, after)) = crate::test::helper::code_pair_from_dir(&dir)? else {
+            continue;
+        };
+        let (Some(bt), Some(at)) = (before.ast.as_ref(), after.ast.as_ref()) else {
+            continue;
+        };
+        let (broot, aroot) = (bt.root_node(), at.root_node());
+        let resolve = |root: Node<'_>, paths: &[Vec<String>]| -> Vec<Option<usize>> {
+            paths
+                .iter()
+                .map(|p| node_for_path(root, &path_refs(p)).ok().map(|n| n.id()))
+                .collect()
+        };
+        // Every member id per side, to fold nested groups.
+        let mut all_before = std::collections::HashSet::new();
+        let mut all_after = std::collections::HashSet::new();
+        for g in &groups {
+            all_before.extend(resolve(broot, &g.before_paths).into_iter().flatten());
+            all_after.extend(resolve(aroot, &g.after_paths).into_iter().flatten());
+        }
+        let human: std::collections::HashMap<Vec<String>, Vec<String>> = mapping
+            .entries
+            .iter()
+            .filter_map(|e| Some((e.before_path.clone()?, e.after_path.clone()?)))
+            .collect();
+        let diff = crate::diff::diff_code(&before, &after);
+        let ast = diff.ast.as_ref();
+
+        for g in &groups {
+            let bnodes: Vec<Node> = g
+                .before_paths
+                .iter()
+                .filter_map(|p| node_for_path(broot, &path_refs(p)).ok())
+                .collect();
+            let anodes: Vec<Node> = g
+                .after_paths
+                .iter()
+                .filter_map(|p| node_for_path(aroot, &path_refs(p)).ok())
+                .collect();
+            let nested = |n: &Node, set: &std::collections::HashSet<usize>| {
+                let mut cur = n.parent();
+                while let Some(p) = cur {
+                    if set.contains(&p.id()) {
+                        return true;
+                    }
+                    cur = p.parent();
+                }
+                false
+            };
+            if bnodes.iter().any(|n| nested(n, &all_before))
+                || anodes.iter().any(|n| nested(n, &all_after))
+            {
+                continue;
+            }
+            copies += 1;
+            let text = |n: &Node, code: &crate::code::Code| {
+                code.contents[n.byte_range()]
+                    .lines()
+                    .next()
+                    .unwrap_or("")
+                    .trim()
+                    .chars()
+                    .take(50)
+                    .collect::<String>()
+            };
+            let parent_path = |p: &Vec<String>| p[..p.len().saturating_sub(1)].to_vec();
+            let in_place_before = |p: &Vec<String>| {
+                human
+                    .get(&parent_path(p))
+                    .is_some_and(|ap| g.after_paths.iter().any(|q| &parent_path(q) == ap))
+            };
+            let in_place_after = |q: &Vec<String>| {
+                g.before_paths
+                    .iter()
+                    .any(|p| human.get(&parent_path(p)) == Some(&parent_path(q)))
+            };
+            let ours = |id: usize, before_side: bool| -> String {
+                let Some(ast) = ast else { return "-".into() };
+                let partner = if before_side {
+                    ast.before_node_map.get(&id)
+                } else {
+                    ast.after_node_map.get(&id)
+                };
+                match partner {
+                    Some(0) | None => "gone".into(),
+                    Some(p)
+                        if (before_side && anodes.iter().any(|a| a.id() == *p))
+                            || (!before_side && bnodes.iter().any(|b| b.id() == *p)) =>
+                    {
+                        "in-group".into()
+                    }
+                    Some(_) => "elsewhere".into(),
+                }
+            };
+            let members = |nodes: &[Node], paths: &[Vec<String>], before_side: bool| {
+                nodes
+                    .iter()
+                    .zip(paths)
+                    .map(|(n, p)| {
+                        let place = if before_side {
+                            in_place_before(p)
+                        } else {
+                            in_place_after(p)
+                        };
+                        format!(
+                            "r{}{}:{}",
+                            n.start_position().row + 1,
+                            if place { "=" } else { "*" },
+                            ours(n.id(), before_side)
+                        )
+                    })
+                    .collect::<Vec<_>>()
+                    .join(",")
+            };
+            let (kind, sample) = match (bnodes.first(), anodes.first()) {
+                (Some(n), _) => (n.kind(), text(n, &before)),
+                (None, Some(n)) => (n.kind(), text(n, &after)),
+                _ => ("?", String::new()),
+            };
+            println!(
+                "{name}\t{}:{}\t{:?}\t{kind}\t{sample:?}\tbefore[{}]\tafter[{}]",
+                bnodes.len(),
+                anodes.len(),
+                g.operation,
+                members(&bnodes, &g.before_paths, true),
+                members(&anodes, &g.after_paths, false),
+            );
+        }
+    }
+    println!("\n{copies} copies (all-to-all groups not nested in another)");
+    Ok(())
+}
