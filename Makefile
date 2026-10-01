@@ -241,7 +241,8 @@ update-quality-baseline:
 	{ \
 		echo "# Runtime baseline for \`make check-quality\` - see Makefile."; \
 		echo "#"; \
-		echo "# MS_PER_FIXTURE: benchmark_optimal_solutions' own \"Runtime: ... ms/fixture\" line."; \
+		echo "# MS_PER_FIXTURE: benchmark_optimal_solutions' own \"Runtime: ... ms/fixture\" line: the diffs"; \
+		echo "# alone, timed one at a time after the parallel grading pass."; \
 		echo "# Informational only: a >2x jump warns, it never fails a deploy, because wall-clock"; \
 		echo "# time varies by machine far more than any real regression would."; \
 		echo "#"; \

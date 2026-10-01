@@ -73,24 +73,6 @@ fn reason_column_label(reason: &ASTMappingReason) -> String {
     }
 }
 
-/// Tallies every mapping entry, including lone deletes/inserts, by `reason_column_label`.
-fn reason_counts_for(
-    before: &Code,
-    after: &Code,
-    config: &omnidiff::diff::HeuristicConfig,
-) -> HashMap<String, usize> {
-    let diff = omnidiff::diff::diff_code_with_config(before, after, config);
-    let mut counts = HashMap::new();
-    if let Some(diff_ast) = diff.ast {
-        for mapping in diff_ast.mapping.values() {
-            *counts
-                .entry(reason_column_label(&mapping.reason))
-                .or_insert(0) += 1;
-        }
-    }
-    counts
-}
-
 /// CSV columns: all of `NON_APTED_REASON_LABELS`, even when zero everywhere, so downstream tools
 /// see a stable shape, then every observed `"APTED:<source>"` sorted by name. APTED columns go
 /// last because their set depends on the data.
@@ -120,23 +102,138 @@ fn active_reason_columns(rows: &[Row]) -> Vec<String> {
         .collect()
 }
 
-/// Total unit-cost (`diff_cost`) of omnidiff's own mapping.
-fn algorithm_cost_for(
-    before: &Code,
-    after: &Code,
+/// Every fixture's [`Row`] but its timing, `threads` fixtures at a time, in `cases` order. Each
+/// worker diffs a fixture once and loads its mapping once, and reads every column off those two.
+fn grade_in_parallel(
+    cases: &[(String, std::path::PathBuf)],
     config: &omnidiff::diff::HeuristicConfig,
-) -> u64 {
-    let diff = omnidiff::diff::diff_code_with_config(before, after, config);
-    let Some(diff_ast) = diff.ast else {
-        return 0;
-    };
-    let before_metadata = omnidiff::code::metadata::metadata_of(before);
-    let after_metadata = omnidiff::code::metadata::metadata_of(after);
-    diff_cost(&diff_ast, &before_metadata, &after_metadata)
+    threads: usize,
+) -> Result<Vec<Row>> {
+    let next = std::sync::atomic::AtomicUsize::new(0);
+    let results: Vec<std::sync::Mutex<Option<Result<Option<Row>>>>> =
+        cases.iter().map(|_| std::sync::Mutex::new(None)).collect();
+    std::thread::scope(|scope| {
+        for _ in 0..threads {
+            std::thread::Builder::new()
+                // The diff recurses as deep as the tree; the TUI's diff thread has the same need.
+                .stack_size(omnidiff::tui::app::DIFF_COMPUTE_STACK_SIZE)
+                .spawn_scoped(scope, || {
+                    loop {
+                        let i = next.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                        let Some((name, dir)) = cases.get(i) else {
+                            break;
+                        };
+                        let row = grade(name, dir, config);
+                        *results[i].lock().expect("no worker panics holding it") = Some(row);
+                    }
+                })
+                .expect("spawn grading worker");
+        }
+    });
+    let mut rows = Vec::with_capacity(cases.len());
+    for result in results {
+        if let Some(row) = result
+            .into_inner()
+            .expect("no worker panics holding it")
+            .transpose()?
+        {
+            rows.extend(row);
+        }
+    }
+    Ok(rows)
 }
 
-/// Wall-clock milliseconds for one diff, single-shot. Each of this file's measurements runs its
-/// own diff; a benchmark run once by hand does not warrant sharing one.
+/// One fixture's [`Row`], `elapsed_ms` left at zero for the timing pass; `None` when the fixture
+/// has no before/after pair.
+fn grade(
+    name: &str,
+    dir: &std::path::Path,
+    config: &omnidiff::diff::HeuristicConfig,
+) -> Result<Option<Row>> {
+    let Some((before, after)) = helper::code_pair_from_dir(dir)? else {
+        return Ok(None);
+    };
+    let (before, after) = (&before, &after);
+    let diff = omnidiff::diff::diff_code_with_config(before, after, config);
+    let mut reason_counts = HashMap::new();
+    let mut algorithm_cost = 0;
+    if let Some(diff_ast) = &diff.ast {
+        for mapping in diff_ast.mapping.values() {
+            *reason_counts
+                .entry(reason_column_label(&mapping.reason))
+                .or_insert(0) += 1;
+        }
+        let before_metadata = omnidiff::code::metadata::metadata_of(before);
+        let after_metadata = omnidiff::code::metadata::metadata_of(after);
+        algorithm_cost = diff_cost(diff_ast, &before_metadata, &after_metadata);
+    }
+    let mut row = Row {
+        name: name.to_string(),
+        mismatches: None,
+        reason_counts,
+        algorithm_cost,
+        human_cost: None,
+        elapsed_ms: 0.0,
+        visible_mismatches: None,
+        graded_nodes: None,
+        nm_floor: None,
+        text_only: false,
+    };
+    // Keyed off `Code::ast`, not `diff.ast`, which is `Some` even when neither side parsed.
+    // The human-mapping calls below bail on an AST-less pair and would fail the whole gate.
+    if before.ast.is_none() || after.ast.is_none() {
+        row.text_only = true;
+        return Ok(Some(row));
+    }
+    if !human_mapping::mapping_path(name).exists() {
+        return Ok(Some(row));
+    }
+    let diff_ast = diff.ast.as_ref().context("Diff has no AST")?;
+    let node_cache = omnidiff::diff::NodeCache::build(before, after);
+    let mapping = human_mapping::load_with(name, before, after)?;
+    let visible = human_mapping::visible_mismatches_with(
+        name,
+        before,
+        after,
+        diff_ast,
+        &node_cache,
+        config,
+        &mapping,
+    )?;
+    let (before_root, after_root) = (
+        before.ast.as_ref().expect("checked").root_node(),
+        after.ast.as_ref().expect("checked").root_node(),
+    );
+    let before_metadata = omnidiff::code::metadata::metadata_of(before);
+    let after_metadata = omnidiff::code::metadata::metadata_of(after);
+    row.mismatches = Some((
+        visible.visible.len() + visible.invisible.len(),
+        node_cache.before.len() + node_cache.after.len(),
+    ));
+    row.visible_mismatches = Some((
+        visible.visible.len(),
+        visible.before_visible_node_count + visible.after_visible_node_count,
+    ));
+    row.human_cost = Some(human_mapping::human_mapping_cost(
+        &mapping,
+        before_root,
+        after_root,
+        &before_metadata,
+        &after_metadata,
+    )?);
+    row.graded_nodes = Some(human_mapping::graded_node_count(
+        &mapping,
+        before_root,
+        after_root,
+        &before_metadata,
+        &after_metadata,
+    )?);
+    row.nm_floor = Some(human_mapping::nm_floor(&mapping, before, after)?);
+    Ok(Some(row))
+}
+
+/// Wall-clock milliseconds for one diff, single-shot, kept apart from the graded diff so grading
+/// can run in parallel without touching the figure.
 fn elapsed_ms_for(before: &Code, after: &Code, config: &omnidiff::diff::HeuristicConfig) -> f64 {
     let started = std::time::Instant::now();
     let _diff = omnidiff::diff::diff_code_with_config(before, after, config);
@@ -327,78 +424,22 @@ fn main() -> Result<()> {
     // recompute it on every lookup.
     let cases = helper::handmade_test_case_dirs()?;
 
-    let started = std::time::Instant::now();
-    // Load+parse time is subtracted so the reported runtime covers scoring only.
-    let mut load_time = std::time::Duration::ZERO;
-    let mut rows = Vec::with_capacity(cases.len());
-    for (name, dir) in &cases {
-        let load_started = std::time::Instant::now();
-        let pair = helper::code_pair_from_dir(dir)?;
-        load_time += load_started.elapsed();
-        let Some((before, after)) = pair else {
+    let threads = std::thread::available_parallelism().map_or(1, |n| n.get());
+    let mut rows = grade_in_parallel(&cases, &config, threads)?;
+    // Timed afterwards, one diff at a time on this thread, so the latency figures are not shared
+    // with seven other diffs competing for the cores. Loading and parsing are not timed.
+    let dirs: HashMap<&str, &std::path::PathBuf> = cases
+        .iter()
+        .map(|(name, dir)| (name.as_str(), dir))
+        .collect();
+    let mut timed_ms = 0.0f64;
+    for row in &mut rows {
+        let dir = dirs[row.name.as_str()];
+        let Some((before, after)) = helper::code_pair_from_dir(dir)? else {
             continue;
         };
-        let (before, after) = (&before, &after);
-        let reason_counts = reason_counts_for(before, after, &config);
-        let algorithm_cost = algorithm_cost_for(before, after, &config);
-        let elapsed_ms = elapsed_ms_for(before, after, &config);
-
-        // Keyed off `Code::ast`, not `diff.ast`, which is `Some` even when neither side parsed.
-        // The human-mapping calls below bail on an AST-less pair and would fail the whole gate.
-        if before.ast.is_none() || after.ast.is_none() {
-            rows.push(Row {
-                name: name.clone(),
-                mismatches: None,
-                reason_counts,
-                algorithm_cost,
-                human_cost: None,
-                elapsed_ms,
-                visible_mismatches: None,
-                graded_nodes: None,
-                nm_floor: None,
-                text_only: true,
-            });
-            continue;
-        }
-
-        if !human_mapping::mapping_path(name).exists() {
-            rows.push(Row {
-                name: name.clone(),
-                mismatches: None,
-                reason_counts,
-                algorithm_cost,
-                human_cost: None,
-                elapsed_ms,
-                visible_mismatches: None,
-                graded_nodes: None,
-                nm_floor: None,
-                text_only: false,
-            });
-            continue;
-        }
-        let visible = human_mapping::compute_visible_mismatches_for_with_config(
-            name, before, after, &config,
-        )?;
-        let mismatch_count = visible.visible.len() + visible.invisible.len();
-        let total_nodes = human_mapping::total_node_count_for(before, after);
-        let human_cost = human_mapping::human_mapping_cost_for(name, before, after)?;
-        let graded_nodes = human_mapping::graded_node_count_for(name, before, after)?;
-        let nm_floor = human_mapping::nm_floor_for(name, before, after)?;
-        rows.push(Row {
-            name: name.clone(),
-            mismatches: Some((mismatch_count, total_nodes)),
-            reason_counts,
-            algorithm_cost,
-            human_cost: Some(human_cost),
-            elapsed_ms,
-            visible_mismatches: Some((
-                visible.visible.len(),
-                visible.before_visible_node_count + visible.after_visible_node_count,
-            )),
-            graded_nodes: Some(graded_nodes),
-            nm_floor: Some(nm_floor),
-            text_only: false,
-        });
+        row.elapsed_ms = elapsed_ms_for(&before, &after, &config);
+        timed_ms += row.elapsed_ms;
     }
 
     // Worst first; unsolved last.
@@ -408,8 +449,6 @@ fn main() -> Result<()> {
         (None, Some(_)) => std::cmp::Ordering::Greater,
         (None, None) => a.name.cmp(&b.name),
     });
-
-    let elapsed = started.elapsed().saturating_sub(load_time);
 
     if let Some(csv_path) = args.csv {
         let path = csv_path.unwrap_or_else(|| {
@@ -426,10 +465,11 @@ fn main() -> Result<()> {
     print_table(&rows);
     print_reason_table(&rows);
     print_goal_progress(&rows);
+    // The diffs alone: grading runs on every core and is not part of the figure.
     println!(
         "\nRuntime: {:.3}s total, {:.1}ms/fixture ({} fixtures)",
-        elapsed.as_secs_f64(),
-        elapsed.as_secs_f64() * 1000.0 / rows.len() as f64,
+        timed_ms / 1000.0,
+        timed_ms / rows.len() as f64,
         rows.len()
     );
 

@@ -3149,7 +3149,16 @@ pub fn compute_mismatches_detailed_for_with_config(
     let diff = crate::diff::diff_code_with_config(before, after, config);
     let diff_ast = diff.ast.context("Diff has no AST")?;
     let node_cache = NodeCache::build(before, after);
-    compute_mismatches_detailed_with_diff(name, before, after, &diff_ast, &node_cache, config)
+    let mapping = load_with(name, before, after)?;
+    compute_mismatches_detailed_with_diff(
+        name,
+        before,
+        after,
+        &diff_ast,
+        &node_cache,
+        config,
+        &mapping,
+    )
 }
 
 /// [`compute_mismatches_detailed_for_with_config`]'s body over an already computed diff, so
@@ -3161,8 +3170,8 @@ fn compute_mismatches_detailed_with_diff(
     diff_ast: &ASTDiff,
     node_cache: &NodeCache,
     config: &crate::diff::HeuristicConfig,
+    mapping: &HumanMapping,
 ) -> Result<Vec<Mismatch>> {
-    let mapping = load_with(name, before, after)?;
     let language = before.metadata.language.unwrap_or_default();
     // Determinism check sampled - see `compute_mismatches`. Neither check is about one node, so
     // both use the `(0, Side::Before)` sentinel.
@@ -3243,9 +3252,32 @@ pub fn compute_visible_mismatches_for_with_config(
     let diff = crate::diff::diff_code_with_config(before, after, config);
     let diff_ast = diff.ast.context("Diff has no AST")?;
     let node_cache = NodeCache::build(before, after);
+    let mapping = load_with(name, before, after)?;
+    visible_mismatches_with(
+        name,
+        before,
+        after,
+        &diff_ast,
+        &node_cache,
+        config,
+        &mapping,
+    )
+}
 
-    let mismatches =
-        compute_mismatches_detailed_with_diff(name, before, after, &diff_ast, &node_cache, config)?;
+/// [`compute_visible_mismatches_for_with_config`] over an already computed diff and loaded mapping,
+/// for a caller that needs both for more than this (the benchmark).
+pub fn visible_mismatches_with(
+    name: &str,
+    before: &crate::code::Code,
+    after: &crate::code::Code,
+    diff_ast: &ASTDiff,
+    node_cache: &NodeCache,
+    config: &crate::diff::HeuristicConfig,
+    mapping: &HumanMapping,
+) -> Result<VisibleMismatches> {
+    let mismatches = compute_mismatches_detailed_with_diff(
+        name, before, after, diff_ast, node_cache, config, mapping,
+    )?;
     let before_visible = crate::diff::nodes::structurally_visible_node_ids(before);
     let after_visible = crate::diff::nodes::structurally_visible_node_ids(after);
 
