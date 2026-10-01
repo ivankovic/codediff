@@ -24,8 +24,8 @@ fn mapping() -> Result<()> {
     // Residual not yet examined.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "cpp-laydbird-change-function-signature",
-        58,
-        37,
+        54,
+        33,
     )
 }
 

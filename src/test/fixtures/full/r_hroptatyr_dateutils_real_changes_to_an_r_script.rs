@@ -21,11 +21,8 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // Two nodes, both in the `qualified_name` bucket.
-    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
+    test::helper::human_mapping::assert_matches_human_mapping(
         "r-hroptatyr-dateutils-real-changes-to-an-r-script",
-        2,
-        2,
     )
 }
 

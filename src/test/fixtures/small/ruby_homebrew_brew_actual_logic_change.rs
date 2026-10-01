@@ -25,8 +25,8 @@ fn mapping() -> Result<()> {
     // does not realize two multi-map group pairings.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "ruby-homebrew-brew-actual-logic-change",
-        15,
-        8,
+        13,
+        6,
     )
 }
 

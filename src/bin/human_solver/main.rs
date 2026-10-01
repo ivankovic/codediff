@@ -172,8 +172,11 @@ t              text view: read the source, and paint the human text-range ground
                  columns on each row, like a stack of squares, not every full line
                  swept in between. d/i paint the
                  Before/After selection deleted/inserted, m pairs BOTH sides'
-                 selections as a match (move vs update derived from whether the
-                 spans' text is identical), u removes the range under the cursor,
+                 selections as a match: a move when every span on both sides reads
+                 the same, otherwise an update as a whole - so banked spans of
+                 different text, several spellings extracted into one helper, are
+                 one match (paint an unchanged span as its own match if you want it
+                 shown as a move), u removes the range under the cursor,
                  Z marks a nothing-to-paint fixture, : jumps to a line number,
                  / searches this side's text (plain substring; Enter jumps to the
                  next match, wrapping; the last query is offered again, so / Enter

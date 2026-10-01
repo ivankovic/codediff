@@ -25,8 +25,8 @@ fn mapping() -> Result<()> {
     // punctuation and keyword leaves to leaves of surviving functions.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "go-henri-gasc-cliphist-auto-generated-file",
-        158,
-        104,
+        156,
+        102,
     )
 }
 

@@ -35,8 +35,8 @@ fn mapping() -> Result<()> {
     //    each leaving one before member unavoidably unmatched.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "rust-algorithm-change",
-        47,
-        33,
+        44,
+        30,
     )
 }
 

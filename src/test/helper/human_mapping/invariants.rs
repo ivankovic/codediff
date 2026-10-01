@@ -62,6 +62,13 @@
 //!     `null` around `NULL` or `nullptr`, in a position a matched pair pins, is paired with one of
 //!     its own kind there: `NULL` -> `nullptr` is one element changing its text, never a delete
 //!     beside an insert.
+//! 21. [`painted_updates_are_not_removed`] - a token painted as one `Update` span of its own is
+//!     not deleted or inserted by the tree mapping.
+//! 22. [`identical_pairs_are_not_painted_removed`] - a named leaf the tree mapping pairs with an
+//!     identical leaf is not painted wholly `Delete` (before) or `Insert` (after), whatever its
+//!     partner's painting (10 needs both).
+//! 23. [`painted_matches_hold_the_mapping_partner`] - a named leaf inside a painted `Match` has its
+//!     tree-mapping partner inside, or overlapping, that `Match`'s spans on the other side.
 //!
 //! 4 and 5 read only the paintings `FULL` answers to (see [`paintings_with_labels`]); `MINIMAL`
 //! is free to leave whitespace alone. 9 is the only rule comparing the two ground truths'
@@ -75,7 +82,7 @@
 //! while its `{` stays) and "a matched pair lands in one painting entry" (a rename is ordinarily
 //! painted as a `Delete` plus an `Insert`).
 //!
-//! **All twenty are intra-fixture**; `cross_fixture_convention_census`
+//! **All twenty-three are intra-fixture**; `cross_fixture_convention_census`
 //! (`tests/exploratory.rs`) covers the cross-fixture axis. They run as each fixture stub's
 //! `invariants()` test, so a fixture records its own known violations beside its other clamps
 //! rather than in a corpus-wide exemption list.
@@ -108,7 +115,7 @@ pub struct ViolationSite {
 /// look. The sites let a tool (`human_solver`'s `V` popup) jump to each location.
 #[derive(Debug, Clone)]
 pub struct GroundTruthViolation {
-    /// Which of the twenty rules, numbered as the module doc lists them.
+    /// Which of the twenty-three rules, numbered as the module doc lists them.
     pub invariant: u8,
     /// The painting this is about, or `None` for the three rules that read only the tree mapping.
     pub painting: Option<String>,
@@ -284,6 +291,26 @@ pub fn ground_truth_invariant_violations_for(
         for named in &mapping.text_mappings {
             violations.extend(painting_implies_mapping_edits(
                 mapping, named, before, after,
+            ));
+        }
+        for named in &mapping.text_mappings {
+            let labels = &paintings
+                .iter()
+                .find(|(name, _)| *name == named.name.as_str())
+                .expect("one labelling per painting")
+                .1;
+            violations.extend(painted_updates_are_not_removed(
+                named, labels, &context, before, after,
+            ));
+            violations.extend(identical_pairs_are_not_painted_removed(
+                &named.name,
+                labels,
+                &context,
+                before,
+                after,
+            ));
+            violations.extend(painted_matches_hold_the_mapping_partner(
+                named, &context, before, after,
             ));
         }
         for (name, labels) in &paintings {
@@ -2211,6 +2238,237 @@ fn wrapped_tokens_are_paired(
     violations
 }
 
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+// Invariants 21-23: what a painting says about a token against what the tree mapping says
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+
+/// Every span of `named`'s `Match` entries as byte ranges, per side.
+fn match_spans(named: &NamedTextMapping, codes: [&Code; 2]) -> Vec<[Vec<(usize, usize)>; 2]> {
+    named
+        .mapping
+        .entries
+        .iter()
+        .filter(|entry| entry.operation == super::HumanTextOperation::Match)
+        .map(|entry| {
+            let bytes = |side: usize, spans: &[HumanTextSpan]| {
+                spans
+                    .iter()
+                    .filter_map(|span| {
+                        let contents = &codes[side].contents;
+                        Some((
+                            super::byte_offset(contents, span.start_row, span.start_column)?,
+                            super::byte_offset(contents, span.end_row, span.end_column)?,
+                        ))
+                    })
+                    .collect()
+            };
+            [bytes(0, &entry.before), bytes(1, &entry.after)]
+        })
+        .collect()
+}
+
+/// Collects one violation per painting and rule: a count, the first token, the rows, and sites.
+struct Tally {
+    count: usize,
+    first: String,
+    rows: [Vec<usize>; 2],
+    sites: Vec<ViolationSite>,
+}
+
+impl Tally {
+    fn new() -> Self {
+        Self {
+            count: 0,
+            first: String::new(),
+            rows: [Vec::new(), Vec::new()],
+            sites: Vec::new(),
+        }
+    }
+
+    fn add(&mut self, side: usize, leaf: Node, contents: &str) {
+        if self.count == 0 {
+            self.first = leaf_text(leaf, contents);
+        }
+        self.count += 1;
+        self.rows[side].push(row_of(contents, leaf.start_byte()));
+        if self.sites.len() < MAX_SITES {
+            self.sites.push(ViolationSite {
+                side,
+                span: span_of_node(leaf),
+            });
+        }
+    }
+}
+
+/// Invariant 21: a token painted as one `Update` span of its own is not deleted or inserted by the
+/// tree mapping. The painting says the token became the other side's; the mapping says it is gone
+/// (`&` -> `*`, `as` -> `as_if`, `cpp-ladybird-refactor-variables-if-changes`).
+///
+/// Only a span that is exactly the token: a byte of a larger edited span may well be new - `val` in
+/// `width: Double` -> `val width: Double` (`kotlin-refactor-function`). Punctuation included; the
+/// corpus had no false hit when this was added (2026-10-01, `mapping_painting_census`).
+fn painted_updates_are_not_removed(
+    named: &NamedTextMapping,
+    labels: &PaintedLabels,
+    context: &TreeContext,
+    before: &Code,
+    after: &Code,
+) -> Vec<GroundTruthViolation> {
+    let codes = [before, after];
+    let mut exact: [std::collections::HashSet<(usize, usize)>; 2] = Default::default();
+    for spans in match_spans(named, codes) {
+        for side in 0..2 {
+            exact[side].extend(spans[side].iter().copied());
+        }
+    }
+    let mut tally = Tally::new();
+    for side in 0..2 {
+        for leaf in &context.leaves[side] {
+            if !is_visible_leaf(*leaf, &codes[side].contents)
+                || !exact[side].contains(&(leaf.start_byte(), leaf.end_byte()))
+                || whole_leaf_label(&labels[side], *leaf) != Some(Some(TextLabel::Update))
+                || context.status(*leaf, side) != LeafStatus::Removed
+            {
+                continue;
+            }
+            tally.add(side, *leaf, &codes[side].contents);
+        }
+    }
+    if tally.count == 0 {
+        return Vec::new();
+    }
+    vec![GroundTruthViolation::new(
+        21,
+        Some(&named.name),
+        format!(
+            "painting '{}' paints {} token(s) as an update of their own that the tree mapping \
+             deletes or inserts, on {} - the first is `{}`; an update says the token became the \
+             other side's, an unmatched node says it is gone",
+            named.name,
+            tally.count,
+            site_rows(&tally.rows),
+            tally.first,
+        ),
+        tally.sites,
+    )]
+}
+
+/// Invariant 22: a named leaf the tree mapping pairs with an identical leaf is not painted wholly
+/// `Delete` (before) or `Insert` (after), whatever its partner's painting - invariant 10 asks for
+/// both. `active_view_box` is painted new on after row 206 of
+/// `cpp-ladybird-refactor-variables-if-changes` while the mapping moves it there.
+///
+/// Named leaves only: which of two identical delimiters survives is each ground truth's choice. A
+/// partner that reads differently is not this rule's: whether a paired replacement (`nextLineTabStop`
+/// -> `0`) may be painted gone and new is an open convention.
+fn identical_pairs_are_not_painted_removed(
+    painting: &str,
+    labels: &PaintedLabels,
+    context: &TreeContext,
+    before: &Code,
+    after: &Code,
+) -> Vec<GroundTruthViolation> {
+    let codes = [before, after];
+    let mut tally = Tally::new();
+    for side in 0..2 {
+        let removed = if side == 0 {
+            TextLabel::Delete
+        } else {
+            TextLabel::Insert
+        };
+        for leaf in &context.leaves[side] {
+            let contents = &codes[side].contents;
+            if !is_visible_leaf(*leaf, contents)
+                || !is_named_leaf(*leaf, contents)
+                || whole_leaf_label(&labels[side], *leaf) != Some(Some(removed))
+                || !matches!(context.status(*leaf, side), LeafStatus::Same(_))
+            {
+                continue;
+            }
+            tally.add(side, *leaf, contents);
+        }
+    }
+    if tally.count == 0 {
+        return Vec::new();
+    }
+    vec![GroundTruthViolation::new(
+        22,
+        Some(painting),
+        format!(
+            "painting '{painting}' paints {} leaf/leaves wholly deleted or inserted that the tree \
+             mapping pairs with an identical leaf, on {} - the first is `{}`",
+            tally.count,
+            site_rows(&tally.rows),
+            tally.first,
+        ),
+        tally.sites,
+    )]
+}
+
+/// Invariant 23: a named leaf inside a painted `Match` has its tree-mapping partner inside, or
+/// overlapping, that `Match`'s spans on the other side: the painting pairs the two places, and the
+/// mapping may not pair the leaf with a third. `parent` on after row 550 of
+/// `cpp-ladybird-refactor-variables-if-changes` is painted moved from there while the mapping
+/// renames it from `parent_node` on before row 527.
+///
+/// Overlap, not containment: Minimal paints part of a token (`Linked` inserted and `HashMap`
+/// matched in `HashMap` -> `LinkedHashMap`). Named leaves only, as for 22; it also keeps out the
+/// alternative paintings of an ambiguous parenthesis ("Full (outer)", "Full (inner)"), of which
+/// the mapping can agree with one.
+fn painted_matches_hold_the_mapping_partner(
+    named: &NamedTextMapping,
+    context: &TreeContext,
+    before: &Code,
+    after: &Code,
+) -> Vec<GroundTruthViolation> {
+    let codes = [before, after];
+    let mut tally = Tally::new();
+    for spans in match_spans(named, codes) {
+        for side in 0..2 {
+            for leaf in &context.leaves[side] {
+                let contents = &codes[side].contents;
+                let range = leaf.byte_range();
+                if !is_visible_leaf(*leaf, contents)
+                    || !is_named_leaf(*leaf, contents)
+                    || !spans[side]
+                        .iter()
+                        .any(|&(start, end)| start <= range.start && range.end <= end)
+                {
+                    continue;
+                }
+                let partner = match context.status(*leaf, side) {
+                    LeafStatus::Same(partner) | LeafStatus::Paired(partner) => partner,
+                    _ => continue,
+                };
+                let theirs = partner.byte_range();
+                if spans[1 - side]
+                    .iter()
+                    .any(|&(start, end)| start < theirs.end && theirs.start < end)
+                {
+                    continue;
+                }
+                tally.add(side, *leaf, contents);
+            }
+        }
+    }
+    if tally.count == 0 {
+        return Vec::new();
+    }
+    vec![GroundTruthViolation::new(
+        23,
+        Some(&named.name),
+        format!(
+            "painting '{}' matches {} leaf/leaves to a place the tree mapping does not pair them \
+             with, on {} - the first is `{}`",
+            named.name,
+            tally.count,
+            site_rows(&tally.rows),
+            tally.first,
+        ),
+        tally.sites,
+    )]
+}
+
 /// Invariant 15: a `MatchButNotIdentical` entry's two subtrees do not read byte-identically with
 /// every descendant paired inside. Such an entry could only be satisfied by codediff calling an
 /// identical subtree not identical, since `check_entry` is strict about the operation. Group
@@ -4112,5 +4370,90 @@ mod tests {
             found[0].contains("holds number_literal `0` on before row 1 and null `nullptr`"),
             "{found:?}"
         );
+    }
+
+    // ── Invariants 21-23 ────────────────────────────────────────────────────────────────────
+
+    fn numbered(mapping: &HumanMapping, before: &Code, after: &Code, rule: u8) -> Vec<String> {
+        ground_truth_invariant_violations_for(mapping, before, after)
+            .expect("checks run")
+            .into_iter()
+            .filter(|violation| violation.invariant == rule)
+            .map(|violation| violation.message)
+            .collect()
+    }
+
+    /// `let v = a + b;` -> `let v = a - b;`, the operator at column 10 on both sides.
+    fn operator_swap() -> (Code, Code) {
+        (rust("let v = a + b;\n"), rust("let v = a - b;\n"))
+    }
+
+    #[test]
+    fn a_token_painted_as_its_own_update_but_deleted_and_inserted_is_reported() {
+        let (before, after) = operator_swap();
+        let plus = first_of_kind(before.ast.as_ref().unwrap().root_node(), "+").unwrap();
+        let minus = first_of_kind(after.ast.as_ref().unwrap().root_node(), "-").unwrap();
+        let mapping = replacing(
+            mapping_by_text(&before, &after),
+            plus,
+            minus,
+            vec![
+                entry(HumanOperation::Delete, Some(plus), None),
+                entry(HumanOperation::Insert, None, Some(minus)),
+            ],
+        );
+        let mapping = with_painting(mapping, "Minimal", vec![matched((10, 11), (10, 11))]);
+        let found = numbered(&mapping, &before, &after, 21);
+        assert_eq!(found.len(), 1, "{found:?}");
+        assert!(found[0].contains("the first is `+`"), "{found:?}");
+    }
+
+    #[test]
+    fn a_token_painted_as_its_own_update_and_paired_is_the_expected_shape() {
+        let (before, after) = operator_swap();
+        let mapping = with_painting(
+            mapping_by_text(&before, &after),
+            "Minimal",
+            vec![matched((10, 11), (10, 11))],
+        );
+        assert!(numbered(&mapping, &before, &after, 21).is_empty());
+    }
+
+    #[test]
+    fn an_identical_pair_painted_new_on_one_side_is_reported_and_punctuation_is_not() {
+        let source = rust("let v = a + b;\n");
+        let mapping = with_painting(
+            mapping_by_text(&source, &source),
+            "Minimal",
+            vec![inserted(8, 1), inserted(13, 1)],
+        );
+        let found = numbered(&mapping, &source, &source, 22);
+        assert_eq!(found.len(), 1, "{found:?}");
+        assert!(
+            found[0].contains("1 leaf/leaves"),
+            "only `a`, not `;`: {found:?}"
+        );
+        assert!(found[0].contains("the first is `a`"), "{found:?}");
+    }
+
+    #[test]
+    fn a_painted_match_pairing_a_leaf_elsewhere_than_the_mapping_is_reported() {
+        let source = rust("let v = a + b;\n");
+        // The painting says `a` became `b`; the mapping keeps `a` as `a`.
+        let mapping = with_painting(
+            mapping_by_text(&source, &source),
+            "Minimal",
+            vec![matched((8, 9), (12, 13))],
+        );
+        let found = numbered(&mapping, &source, &source, 23);
+        assert_eq!(found.len(), 1, "{found:?}");
+        assert!(found[0].contains("the first is `a`"), "{found:?}");
+
+        let agreeing = with_painting(
+            mapping_by_text(&source, &source),
+            "Minimal",
+            vec![matched((8, 9), (8, 9))],
+        );
+        assert!(numbered(&agreeing, &source, &source, 23).is_empty());
     }
 }

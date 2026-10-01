@@ -2805,8 +2805,9 @@ fn handle_text_view(
                 None => "Selection cleared".to_string(),
             });
         }
-        // Vertical selects the same columns on each row; full-line sweeps rows end to end, which
-        // a contiguous multi-line block needs because `m` requires identical text on both sides.
+        // Vertical selects the same columns on each row; full-line sweeps rows end to end, which a
+        // block painted as a move needs: one `m` over a per-row stack is a move only if every row
+        // reads the same as every other, else an update as a whole.
         KeyCode::Char('V') => {
             state.vertical = !state.vertical;
             let mode = if state.vertical {

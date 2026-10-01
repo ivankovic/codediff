@@ -27,8 +27,8 @@ fn mapping() -> Result<()> {
     // `assignment_expression.right`, which codediff still deletes (`APTED("qualified_name")`).
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "c-genymobile-scrcpy-big-change",
-        103,
-        70,
+        101,
+        68,
     )
 }
 

@@ -26,8 +26,8 @@ fn mapping() -> Result<()> {
     // side.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "java-jakartaee-rest-real-logic-change-of-a-significant-chunck",
-        78,
-        52,
+        76,
+        50,
     )
 }
 
