@@ -2146,3 +2146,328 @@ fn pinned_lexeme_census() -> Result<()> {
     }
     Ok(())
 }
+
+/// EXPLORATORY: candidate invariants between the tree mapping and the paintings, counted over the
+/// corpus before any becomes a rule. Developed on `cpp-ladybird-refactor-variables-if-changes`,
+/// painted after its mapping was written.
+///
+/// - `21` a leaf painted `Update` that the tree mapping deletes or inserts;
+/// - `22` a leaf the tree mapping pairs, painted wholly `Delete` (before) or `Insert` (after);
+/// - `23` a leaf inside a painted `Match` whose mapping partner lies outside that entry's spans on
+///   the other side.
+///
+/// Each is split by `named` (text is not its own kind) against punctuation, and by partner `same`
+/// (identical) against `paired` (edited). `FIXTURES=a,b` limits the run and prints every hit.
+///
+/// `cargo test --release --lib --features test-fixtures mapping_painting_census -- --ignored
+/// --nocapture`
+#[test]
+#[ignore]
+fn mapping_painting_census() -> Result<()> {
+    use crate::test::helper::human_mapping::invariants::{LeafStatus, TreeContext, painted_labels};
+    use std::collections::BTreeMap;
+
+    let wanted = std::env::var("FIXTURES").unwrap_or_default();
+    let wanted: Vec<&str> = wanted
+        .split(',')
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .collect();
+    let verbose = !wanted.is_empty();
+    let mut totals: BTreeMap<String, (usize, std::collections::BTreeSet<String>)> = BTreeMap::new();
+    let mut samples: BTreeMap<String, Vec<String>> = BTreeMap::new();
+
+    for (name, dir) in crate::test::helper::handmade_test_case_dirs()? {
+        if !wanted.is_empty() && !wanted.contains(&name.as_str()) {
+            continue;
+        }
+        let Some((before, after)) = crate::test::helper::code_pair_from_dir(&dir)? else {
+            continue;
+        };
+        let Ok(mapping) = load(&name) else { continue };
+        if mapping.text_mappings.is_empty() {
+            continue;
+        }
+        let (Some(bt), Some(at)) = (before.ast.as_ref(), after.ast.as_ref()) else {
+            continue;
+        };
+        let context = TreeContext::build(&mapping, bt.root_node(), at.root_node());
+        let codes = [&before, &after];
+        for named in &mapping.text_mappings {
+            let labels = painted_labels(named, &before, &after)?;
+            let whole = |side: usize, leaf: Node| -> Option<Option<TextLabel>> {
+                let slice = labels[side].get(leaf.byte_range())?;
+                let first = *slice.first()?;
+                slice.iter().all(|l| *l == first).then_some(first)
+            };
+            let mut hit = |rule: &str, side: usize, leaf: Node, detail: String| {
+                let named_leaf = codes[side].contents.get(leaf.byte_range()) != Some(leaf.kind());
+                let key = format!("{rule} {}", if named_leaf { "named" } else { "punct" });
+                let entry = totals.entry(key.clone()).or_default();
+                entry.0 += 1;
+                entry.1.insert(name.clone());
+                let line = format!(
+                    "{name} [{}] {} row {} `{}` {detail}",
+                    named.name,
+                    if side == 0 { "before" } else { "after" },
+                    leaf.start_position().row + 1,
+                    codes[side].contents[leaf.byte_range()]
+                        .chars()
+                        .take(30)
+                        .collect::<String>()
+                );
+                let list = samples.entry(key).or_default();
+                if verbose || list.len() < 12 {
+                    list.push(line);
+                }
+            };
+            let mut exact_update_spans: [std::collections::HashSet<(usize, usize)>; 2] =
+                Default::default();
+            for entry in &named.mapping.entries {
+                if entry.operation != HumanTextOperation::Match {
+                    continue;
+                }
+                for (side, spans) in [(0, &entry.before), (1, &entry.after)] {
+                    for span in spans {
+                        if let (Some(s), Some(e)) = (
+                            byte_offset(&codes[side].contents, span.start_row, span.start_column),
+                            byte_offset(&codes[side].contents, span.end_row, span.end_column),
+                        ) {
+                            exact_update_spans[side].insert((s, e));
+                        }
+                    }
+                }
+            }
+            for side in 0..2 {
+                for &leaf in &context.leaves[side] {
+                    if codes[side].contents[leaf.byte_range()].trim().is_empty() {
+                        continue;
+                    }
+                    let status = context.status(leaf, side);
+                    let label = whole(side, leaf);
+                    // 21: only where an update span is exactly this token, not a byte of a larger
+                    // edited span (`width: Double` -> `val width: Double`).
+                    if status == LeafStatus::Removed
+                        && label == Some(Some(TextLabel::Update))
+                        && exact_update_spans[side].contains(&(leaf.start_byte(), leaf.end_byte()))
+                    {
+                        hit("21 update-on-removed", side, leaf, String::new());
+                    }
+                    // 22
+                    let removed_label = if side == 0 {
+                        TextLabel::Delete
+                    } else {
+                        TextLabel::Insert
+                    };
+                    if label == Some(Some(removed_label)) {
+                        match status {
+                            LeafStatus::Same(p) => hit(
+                                "22 paired-painted-removed same",
+                                side,
+                                leaf,
+                                format!("partner row {}", p.start_position().row + 1),
+                            ),
+                            LeafStatus::Paired(p) => hit(
+                                "22 paired-painted-removed paired",
+                                side,
+                                leaf,
+                                format!(
+                                    "partner row {} `{}`",
+                                    p.start_position().row + 1,
+                                    codes[1 - side].contents[p.byte_range()]
+                                        .chars()
+                                        .take(30)
+                                        .collect::<String>()
+                                ),
+                            ),
+                            _ => {}
+                        }
+                    }
+                }
+            }
+            // 23
+            let to_bytes = |side: usize, span: &HumanTextSpan| -> Option<(usize, usize)> {
+                Some((
+                    byte_offset(&codes[side].contents, span.start_row, span.start_column)?,
+                    byte_offset(&codes[side].contents, span.end_row, span.end_column)?,
+                ))
+            };
+            for entry in &named.mapping.entries {
+                if entry.operation != HumanTextOperation::Match {
+                    continue;
+                }
+                let sides: [Vec<(usize, usize)>; 2] = [
+                    entry.before.iter().filter_map(|s| to_bytes(0, s)).collect(),
+                    entry.after.iter().filter_map(|s| to_bytes(1, s)).collect(),
+                ];
+                for side in 0..2 {
+                    for &leaf in &context.leaves[side] {
+                        let r = leaf.byte_range();
+                        if codes[side].contents[r.clone()].trim().is_empty()
+                            || !sides[side].iter().any(|&(s, e)| s <= r.start && r.end <= e)
+                        {
+                            continue;
+                        }
+                        let partner = match context.status(leaf, side) {
+                            LeafStatus::Same(p) | LeafStatus::Paired(p) => p,
+                            _ => continue,
+                        };
+                        // Overlap, not containment: Minimal paints part of a token (`Linked` inserted,
+                        // `HashMap` matched).
+                        let pr = partner.byte_range();
+                        if !sides[1 - side]
+                            .iter()
+                            .any(|&(s, e)| s < pr.end && pr.start < e)
+                        {
+                            hit(
+                                "23 match-partner-outside",
+                                side,
+                                leaf,
+                                format!("partner row {}", partner.start_position().row + 1),
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+    println!();
+    for (key, (count, fixtures)) in &totals {
+        println!("{key:45} {count:6} hits in {:4} fixtures", fixtures.len());
+    }
+    for (key, list) in &samples {
+        println!("\n== {key}");
+        for line in list {
+            println!("  {line}");
+        }
+    }
+    Ok(())
+}
+
+/// EXPLORATORY: every unnamed token in a position a matched pair pins ([`invariants::
+/// pinned_counterpart`]) whose counterpart reads differently - `!=` against `==`, `&` against `*` -
+/// and what the ground truth does with the two: pairs them, deletes one and inserts the other, or
+/// something else. Measures whether "an unnamed token in a pinned slot is paired" could be an
+/// invariant, and how consistent the ground truth already is about it.
+///
+/// `FIXTURES=a,b` prints every case; otherwise a summary and samples.
+/// `cargo test --release --lib --features test-fixtures unnamed_slot_census -- --ignored
+/// --nocapture`
+#[test]
+#[ignore]
+fn unnamed_slot_census() -> Result<()> {
+    use crate::test::helper::human_mapping::invariants::{
+        LeafStatus, TreeContext, field_arity, field_of, pinned_counterpart,
+    };
+    use std::collections::BTreeMap;
+
+    let wanted = std::env::var("FIXTURES").unwrap_or_default();
+    let wanted: Vec<&str> = wanted
+        .split(',')
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .collect();
+    let mut by_verdict: BTreeMap<String, (usize, std::collections::BTreeSet<String>)> =
+        BTreeMap::new();
+    let mut by_pair: BTreeMap<(String, String), BTreeMap<String, usize>> = BTreeMap::new();
+    let mut samples: BTreeMap<String, Vec<String>> = BTreeMap::new();
+
+    for (name, dir) in crate::test::helper::handmade_test_case_dirs()? {
+        if !wanted.is_empty() && !wanted.contains(&name.as_str()) {
+            continue;
+        }
+        let Some((before, after)) = crate::test::helper::code_pair_from_dir(&dir)? else {
+            continue;
+        };
+        let Ok(mapping) = load(&name) else { continue };
+        let (Some(bt), Some(at)) = (before.ast.as_ref(), after.ast.as_ref()) else {
+            continue;
+        };
+        let context = TreeContext::build(&mapping, bt.root_node(), at.root_node());
+        for &leaf in &context.leaves[0] {
+            let text = &before.contents[leaf.byte_range()];
+            if leaf.is_named() || text.trim().is_empty() {
+                continue;
+            }
+            let Some(parent) = leaf.parent() else {
+                continue;
+            };
+            let Some(after_parent) = context.partner(parent, 0) else {
+                continue;
+            };
+            let Some(counterpart) = pinned_counterpart(&context, leaf, parent, after_parent) else {
+                continue;
+            };
+            let other = &after.contents[counterpart.byte_range()];
+            if counterpart.is_named() || counterpart.child_count() != 0 || other == text {
+                continue;
+            }
+            let in_error = {
+                let mut current = Some(parent);
+                let mut found = false;
+                while let Some(node) = current {
+                    if node.is_error() {
+                        found = true;
+                        break;
+                    }
+                    current = node.parent();
+                }
+                found
+            };
+            let verdict = match (context.status(leaf, 0), context.status(counterpart, 1)) {
+                (LeafStatus::Paired(p), _) if p.id() == counterpart.id() => "paired",
+                (LeafStatus::Removed, LeafStatus::Removed) => "deleted+inserted",
+                (LeafStatus::Undecided, _) | (_, LeafStatus::Undecided) => "undecided",
+                _ => "other",
+            };
+            let pinned = match field_of(parent, leaf) {
+                Some(field) if field_arity(parent, &field) == 1 => format!("field:{field}"),
+                _ => "elimination".to_string(),
+            };
+            let parents = if parent.kind() == after_parent.kind() {
+                "same-parent-kind"
+            } else {
+                "cross-parent-kind"
+            };
+            let key = format!(
+                "{verdict:<17} {parents:<17}{}",
+                if in_error { " in-ERROR" } else { "" }
+            );
+            let entry = by_verdict.entry(key.clone()).or_default();
+            entry.0 += 1;
+            entry.1.insert(name.clone());
+            *by_pair
+                .entry((text.to_string(), other.to_string()))
+                .or_default()
+                .entry(verdict.to_string())
+                .or_default() += 1;
+            let line = format!(
+                "{name}  row {} `{text}` -> `{other}`  in {}->{} ({pinned})",
+                leaf.start_position().row + 1,
+                parent.kind(),
+                after_parent.kind()
+            );
+            let list = samples.entry(key).or_default();
+            if !wanted.is_empty() || list.len() < 25 {
+                list.push(line);
+            }
+        }
+    }
+    println!();
+    for (key, (count, fixtures)) in &by_verdict {
+        println!("{count:6} in {:4} fixtures  {key}", fixtures.len());
+    }
+    println!("\nby token pair (verdict counts):");
+    let mut pairs: Vec<_> = by_pair.into_iter().collect();
+    pairs.sort_by_key(|(_, v)| std::cmp::Reverse(v.values().sum::<usize>()));
+    for ((b, a), verdicts) in pairs.iter().take(40) {
+        println!("  `{b}` -> `{a}`  {verdicts:?}");
+    }
+    for (key, list) in &samples {
+        println!("\n== {key}");
+        for line in list {
+            println!("  {line}");
+        }
+    }
+    Ok(())
+}

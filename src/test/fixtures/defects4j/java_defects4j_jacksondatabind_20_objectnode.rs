@@ -43,8 +43,11 @@ fn invariants() -> Result<()> {
     //    `com....JsonAutoDetect` import unpainted on row 3, while the mapping says they are gone.
     //  - [16] x3: the `JsonAutoDetect` <-> `JsonIgnore` rename is painted whole under Minimal on
     //    both sides, where only the differing words should be, and not whole under Full before.
+    //  - [22] x2: both paintings paint `com.fasterxml.jackson.annotation` of the new `JsonIgnore`
+    //    import on after row 4 as inserted, while the mapping pairs those four identifiers with
+    //    the `JsonAutoDetect` import's on before row 3.
     assert_ground_truth_invariants_with_known_violations(
         "java-defects4j-jacksondatabind-20-objectnode",
-        5,
+        7,
     )
 }
