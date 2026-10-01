@@ -711,8 +711,9 @@ pub(crate) struct TextPaintState {
     /// Top visible row per side. Independent: a move's two places are often far apart.
     pub(crate) scroll: [usize; 2],
     /// Multi-row selection shape, toggled with `V`. `false` (default): one full-line sweep from
-    /// the anchor to the cursor, which a moved block needs because `m` requires every span on a
-    /// side to read identical text. `true`: one span per row over the same columns.
+    /// the anchor to the cursor, which a block painted as a move needs - a match is a move only
+    /// when every span reads the same, so a per-row stack of different rows is an update. `true`:
+    /// one span per row over the same columns.
     pub(crate) vertical: bool,
 }
 
@@ -1461,8 +1462,9 @@ fn spans_share_a_byte(a: HumanTextSpan, b: HumanTextSpan, source: &str) -> bool 
 ///
 /// In a `Minimal` painting a full-line sweep on each side (one live range per side, several rows)
 /// is committed as `d`/`i` would commit it: without indentation, one range per row (invariant 6).
-/// Since a `Match` needs its spans on a side to read the same, the rows are paired one to one as
-/// separate matches, each a move or an update by itself. Unequal row counts are refused.
+/// The rows are paired one to one as separate matches, each a move or an update by itself - one
+/// match over every row would be an update as a whole as soon as any row differs. Unequal row
+/// counts are refused.
 pub(crate) fn action_paint_match(
     app: &mut App,
     state: &mut TextPaintState,

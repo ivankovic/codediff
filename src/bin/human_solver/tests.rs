@@ -2006,9 +2006,10 @@ fn the_live_selection_commits_together_with_banked_ranges() {
     assert_eq!(state.committable(0, source).len(), 2);
 }
 
-/// Refused at the keystroke, while the selection is still on screen, not at save time.
+/// Spans that read differently on one side (an extraction: several spellings, one helper) are
+/// one match, recorded as an update as a whole.
 #[test]
-fn m_refuses_a_group_whose_spans_differ_within_a_side() {
+fn m_records_a_group_whose_spans_differ_within_a_side_as_an_update() {
     let (before_src, after_src) = ("foo\nqux\n", "bar\n");
     let mut app = test_app();
     let mut state = TextPaintState::default();
@@ -2025,24 +2026,15 @@ fn m_refuses_a_group_whose_spans_differ_within_a_side() {
 
     action_paint_match(&mut app, &mut state, before_src, after_src);
 
-    assert!(
-        app.mapping.text_mappings.is_empty(),
-        "nothing should have been stored"
-    );
-    assert!(!app.dirty);
-    assert!(
-        app.status
-            .as_deref()
-            .unwrap_or("")
-            .contains("identical text"),
-        "the reason has to reach the human: {:?}",
-        app.status
-    );
+    let entries = solution_entries(&app.mapping, &app.text_solution);
+    assert_eq!(entries.len(), 1, "{:?}", app.status);
+    assert_eq!((entries[0].before.len(), entries[0].after.len()), (2, 1));
+    assert!(app.dirty);
     assert_eq!(
-        state.pending[0].len(),
-        1,
-        "the selection must survive so it can be corrected"
+        app.status.as_deref(),
+        Some("Matched 2:1: text differs, recorded as an update")
     );
+    assert!(state.pending[0].is_empty(), "the bank is spent");
 }
 
 #[test]
@@ -11112,16 +11104,16 @@ fn m_over_a_minimal_vertical_selection_is_untouched() {
     state.anchor = [Some((1, 4)), Some((2, 8))];
     state.cursor = [(2, 9), (3, 13)];
     let (app, _) = press_in_text_view_painting("Minimal", before, after, state, KeyCode::Char('m'));
-    // The old path: a vertical selection is one entry with a span per row, and a Match's spans
-    // on a side must read the same, which `let a` and `let b` do not.
-    assert!(solution_entries(&app.mapping, &app.text_solution).is_empty());
-    assert!(
-        app.status
-            .as_deref()
-            .unwrap_or("")
-            .starts_with("Not matched:"),
-        "{:?}",
-        app.status
+    // The old path: a vertical selection is one entry with a span per row, kept as drawn. `let a`
+    // and `let b` read differently, so the match is an update as a whole.
+    let entries = solution_entries(&app.mapping, &app.text_solution);
+    assert_eq!(entries.len(), 1, "{:?}", app.status);
+    assert_eq!((entries[0].before.len(), entries[0].after.len()), (2, 2));
+    assert_eq!(entries[0].before[0].start_column, 4, "drawn columns kept");
+    assert_eq!(entries[0].after[0].start_column, 8, "drawn columns kept");
+    assert_eq!(
+        app.status.as_deref(),
+        Some("Matched 2:2: text differs, recorded as an update")
     );
 }
 

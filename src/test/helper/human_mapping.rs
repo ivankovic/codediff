@@ -191,8 +191,10 @@ pub enum HumanTextOperation {
 /// `Insert` only `after`.
 ///
 /// Both sides are lists, so a `Match` can be N:M: which occurrence pairs with which is left
-/// unspecified, which is only sound because every span on one side of a `Match` must cover
-/// identical text ([`HumanTextEntry::verdict`] enforces it).
+/// unspecified. The spans on one side may read differently - three spellings of one condition
+/// extracted into a single helper (`rust-rustdesk-rustdesk-large-file-40k-normal-feature-work`) -
+/// and then the whole entry is an update ([`HumanTextEntry::verdict`]). A span that is unchanged
+/// within such an entry is painted as its own `Match` by hand, if wanted.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HumanTextEntry {
     pub operation: HumanTextOperation,
@@ -235,9 +237,11 @@ where
 /// What a [`HumanTextEntry`] asserts once its spans have been read.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum HumanTextVerdict {
-    /// A `Match` whose two spans hold byte-identical text: the same code, somewhere else.
+    /// A `Match` whose spans all hold byte-identical text, on both sides: the same code, somewhere
+    /// else.
     Move,
-    /// A `Match` whose two spans differ: the same code, edited in place.
+    /// A `Match` with any span that reads differently from another, on either side: the same code,
+    /// edited. Every span of the entry is the update, the identical ones included.
     Update,
     Delete,
     Insert,
@@ -278,11 +282,11 @@ impl HumanTextEntry {
                     "a Match entry has no `before` span"
                 );
                 ensure!(!self.after.is_empty(), "a Match entry has no `after` span");
-                let before_text = self.side_text(before, &self.before, "Match", "before")?;
-                let after_text = self.side_text(after, &self.after, "Match", "after")?;
-                // Byte-identical means relocated, anything else means edited. Sound for N:M
-                // because `side_text` checked every span on a side reads the same.
-                Ok(if before_text == after_text {
+                let mut texts = Self::side_texts(before, &self.before, "Match", "before")?;
+                texts.extend(Self::side_texts(after, &self.after, "Match", "after")?);
+                // Byte-identical everywhere means relocated; any difference, on either side,
+                // makes the whole entry an edit.
+                Ok(if texts.windows(2).all(|pair| pair[0] == pair[1]) {
                     HumanTextVerdict::Move
                 } else {
                     HumanTextVerdict::Update
@@ -307,29 +311,22 @@ impl HumanTextEntry {
         Ok(())
     }
 
-    /// The text one side's spans cover, checking they all cover the *same* text.
-    fn side_text<'a>(
-        &self,
+    /// The text each of one side's spans covers, in order.
+    fn side_texts<'a>(
         source: &'a str,
         spans: &[HumanTextSpan],
         operation: &str,
         side: &str,
-    ) -> Result<&'a str> {
-        let mut text: Option<&str> = None;
-        for (index, span) in spans.iter().enumerate() {
-            let this = span_text(source, *span).with_context(|| {
-                format!("a {operation} entry's {side} span {index} is outside the {side} file")
-            })?;
-            match text {
-                None => text = Some(this),
-                Some(first) => ensure!(
-                    first == this,
-                    "a {operation} entry's {side} spans must all cover identical text, but span 0 \
-                     reads {first:?} and span {index} reads {this:?}"
-                ),
-            }
-        }
-        text.context("no spans")
+    ) -> Result<Vec<&'a str>> {
+        spans
+            .iter()
+            .enumerate()
+            .map(|(index, span)| {
+                span_text(source, *span).with_context(|| {
+                    format!("a {operation} entry's {side} span {index} is outside the {side} file")
+                })
+            })
+            .collect()
     }
 }
 
@@ -3166,12 +3163,12 @@ mod tests {
         );
     }
 
-    /// The invariant that makes an unspecified pairing sound: an error, not a silently picked
-    /// first span.
+    /// Spans that read differently within one side are an extraction (three spellings of one
+    /// condition become one helper): the whole entry is an update.
     #[test]
-    fn a_match_whose_spans_disagree_within_one_side_is_rejected() {
+    fn a_match_whose_spans_differ_within_one_side_is_an_update() {
         let before = "foo\nqux\n";
-        let after = "bar\n";
+        let after = "foo\n";
 
         let group = HumanTextEntry {
             operation: HumanTextOperation::Match,
@@ -3179,12 +3176,42 @@ mod tests {
             after: vec![span(0, 0, 0, 3)],
         };
 
-        let err = group.verdict(before, after).unwrap_err().to_string();
-        assert!(
-            err.contains("identical text"),
-            "the error must say why, got: {err}"
+        assert_eq!(
+            group.verdict(before, after).unwrap(),
+            HumanTextVerdict::Update,
+            "`foo` is unchanged, but `qux` is not: any difference makes the entry an update"
         );
-        assert!(err.contains("foo") && err.contains("qux"), "got: {err}");
+    }
+
+    /// Only identical text on every span of both sides is a move.
+    #[test]
+    fn a_match_is_a_move_only_when_every_span_reads_the_same() {
+        let before = "foo\nfoo\n";
+        let after = "foo\nfoo!\n";
+
+        let group = HumanTextEntry {
+            operation: HumanTextOperation::Match,
+            before: vec![span(0, 0, 0, 3), span(1, 0, 1, 3)],
+            after: vec![span(0, 0, 0, 3), span(1, 0, 1, 4)],
+        };
+
+        assert_eq!(
+            group.verdict(before, after).unwrap(),
+            HumanTextVerdict::Update
+        );
+    }
+
+    /// A span outside its file is still an error.
+    #[test]
+    fn a_match_span_outside_its_file_is_rejected() {
+        let group = HumanTextEntry {
+            operation: HumanTextOperation::Match,
+            before: vec![span(0, 0, 0, 3), span(5, 0, 5, 3)],
+            after: vec![span(0, 0, 0, 3)],
+        };
+
+        let err = group.verdict("foo\n", "foo\n").unwrap_err().to_string();
+        assert!(err.contains("span 1 is outside"), "got: {err}");
     }
 
     #[test]
