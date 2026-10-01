@@ -1,12 +1,12 @@
 # research/external
 
-Third-party datasets we score CodeDiff against, and the scripts that fetch them. Nothing here is
+Third-party datasets we score OmniDiff against, and the scripts that fetch them. Nothing here is
 part of the product, and nothing here is vendored: every script downloads into
 `/var/tmp/research/external/<name>/` (the same convention as the corpus checkouts under
 `/var/tmp/research/<mode>/`), pins what it fetched, and refuses to re-download an existing copy.
 
 Why external data at all: our own ground truth (`src/test/data/diffs/`) was annotated by the
-people who built CodeDiff. The introductory paper's threats-to-validity section names that risk.
+people who built OmniDiff. The introductory paper's threats-to-validity section names that risk.
 An oracle built by someone else, for a different tool, on a different AST, is the answer to it.
 
 ## What is here
@@ -51,7 +51,7 @@ drop every mapping nested under an unchanged program element (type, method, fiel
 `defects4j/cases.json` lists 698 cases and `cases-problematic.json` a further 102; the scorer
 runs both and carries the flag through to its CSV so the two populations can be reported apart.
 
-## Scoring CodeDiff against it
+## Scoring OmniDiff against it
 
 ```
 cd research
@@ -62,7 +62,7 @@ make measure-astdiff-oracle    # -> data/comparison/astdiff_oracle_defects4j.csv
 The scorer is `src/bin/benchmark_astdiff_oracle.rs` (feature `test-fixtures`, like every other
 dev tool). What it does, and where the seams are, is documented at the top of that file; the short
 version: a JDT node and a tree-sitter node are "the same node" when their byte spans are equal,
-mappings are compared as sets of span pairs, and a CodeDiff mapping is only judged at all when the
+mappings are compared as sets of span pairs, and an OmniDiff mapping is only judged at all when the
 oracle could have an opinion about it. The published reference numbers to land next to are
 Table 12 of the paper (statement + sub-expression level, Defects4J):
 

@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -171,7 +171,7 @@ fn mapping_details() -> Result<()> {
 #[test]
 fn mapping() -> Result<()> {
     // One pair inside a 2<->1 multi-map group where the human recorded `MatchButNotIdentical` and
-    // codediff chose `Identical`. The pairing is accepted; only the operation differs, and nothing
+    // omnidiff chose `Identical`. The pairing is accepted; only the operation differs, and nothing
     // renders differently (0 visible).
     test::helper::human_mapping::assert_matches_human_mapping("rust-add-to-existing-use")
 }

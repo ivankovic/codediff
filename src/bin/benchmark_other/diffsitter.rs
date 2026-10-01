@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -17,14 +17,14 @@
  */
 
 use anyhow::{Context, Result, bail};
-use codediff::code::{Code, Language};
-use codediff::diff::text_range::TextRange;
+use omnidiff::code::{Code, Language};
+use omnidiff::diff::text_range::TextRange;
 use std::process::Command;
 
 use super::{external_tool_bin, merge_spans, write_temp_pair};
 
 /// Path to the `diffsitter` binary, from `DIFFSITTER_BIN`. Install with
-/// `cargo install --root /var/tmp/codediff-tools diffsitter`.
+/// `cargo install --root /var/tmp/omnidiff-tools diffsitter`.
 pub(crate) fn diffsitter_bin() -> Result<std::path::PathBuf> {
     external_tool_bin("DIFFSITTER_BIN", "point it at a built `diffsitter` binary")
 }

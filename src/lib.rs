@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -23,7 +23,7 @@
 //!
 //! # Stability
 //!
-//! This crate is published for the `codediff` binary. Its stable contracts are the command line
+//! This crate is published for the `omnidiff` binary. Its stable contracts are the command line
 //! and the `--mode json` output, which the editor integrations consume. The library API - the
 //! `diff` module's submodules (`apted`, `cost`, `nodes`, `text`, `text_range`), the `tui` module,
 //! and the `tree_sitter` and `ratatui` types in their signatures - is the binary's internals made

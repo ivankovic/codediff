@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -285,7 +285,7 @@ pub(crate) fn commit_multi_map_group(
         after_root,
     );
     if with_children {
-        // A with-children member's descendants must stay free for codediff to pair however it pairs
+        // A with-children member's descendants must stay free for omnidiff to pair however it pairs
         // them (see `check_subtree_maps_within`), so leftover entries on them go, as for `d`/`i`.
         for &node in &before_nodes {
             clear_before_descendants(&mut mapping.entries, node, before_root);

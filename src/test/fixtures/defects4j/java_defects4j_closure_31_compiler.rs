@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -24,7 +24,7 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 #[test]
 fn mapping() -> Result<()> {
     // A condition grows a conjunct, and the two disagree about which `&&` of the chain is new: the
-    // human keeps the outer, codediff (`APTED("large_flat_subtree")`) the inner. The ambiguity a
+    // human keeps the outer, omnidiff (`APTED("large_flat_subtree")`) the inner. The ambiguity a
     // flat chain of equal tokens always carries.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "java-defects4j-closure-31-compiler",

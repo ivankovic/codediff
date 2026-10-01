@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -107,7 +107,7 @@ mod tests {
         }
         assert!(
             undocumented.is_empty(),
-            "these clamped limits have no comment saying why codediff cannot do better. Write one, \
+            "these clamped limits have no comment saying why omnidiff cannot do better. Write one, \
              or tighten the limit until none is needed:\n    {}",
             undocumented.join("\n    ")
         );

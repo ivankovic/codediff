@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -17,8 +17,8 @@
  */
 
 use anyhow::{Context, Result, bail};
-use codediff::code::{Code, Language};
-use codediff::diff::text_range::TextRange;
+use omnidiff::code::{Code, Language};
+use omnidiff::diff::text_range::TextRange;
 use std::collections::HashMap;
 use std::io::Write;
 use std::process::Command;
@@ -31,7 +31,7 @@ use super::{char_offset_table, external_tool_bin, span_from_char_offsets, write_
 ///
 /// Passed explicitly via `-g` because GumTree's auto-detect regex for C# (`\.[cs]$`) never matches
 /// `.cs`. `*-treesitter-ng` is preferred over `*-srcml`: no extra binary, and the same parser family
-/// codediff uses.
+/// omnidiff uses.
 pub(crate) fn gumtree_generator(language: Language) -> Option<(&'static str, &'static str)> {
     match language {
         Language::Java => Some(("java-jdt", "java")), // Stable

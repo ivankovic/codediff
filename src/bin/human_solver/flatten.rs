@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -124,8 +124,8 @@ pub(crate) fn mark_fully_solved(
     is_solved
 }
 
-/// codediff's own per-node verdict (from `p`). Unlike `NodeStatus` it has no inherited variants:
-/// codediff's node maps carry an entry for every descendant directly.
+/// omnidiff's own per-node verdict (from `p`). Unlike `NodeStatus` it has no inherited variants:
+/// omnidiff's node maps carry an entry for every descendant directly.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum AlgoStatus {
     /// Mapped to a node on the other side (whatever the specific `ASTMappingOperation`).
@@ -195,7 +195,7 @@ pub(crate) fn reason_detail(reason: ASTMappingReason) -> String {
     }
 }
 
-/// True if codediff's verdict for `node` differs from the human's, including matching it to a
+/// True if omnidiff's verdict for `node` differs from the human's, including matching it to a
 /// different partner (the same comparison `check_entry` makes). An unmarked node never disagrees.
 pub(crate) fn algo_disagrees(side: Side, node: Node, caches: &Caches, diff_ast: &ASTDiff) -> bool {
     let (human_match, human_removed) = match side {

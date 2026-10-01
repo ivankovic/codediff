@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -16,7 +16,7 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-//! Scores codediff's node mapping against an oracle nobody on this project wrote: the
+//! Scores omnidiff's node mapping against an oracle nobody on this project wrote: the
 //! Alikhanifard & Tsantalis AST node-mapping benchmark (TOSEM 2025, arXiv 2403.05939), Defects4J
 //! half. `research/external/README.md` says what the data is and how to fetch it; this doc says
 //! how a JDT mapping and a tree-sitter mapping are compared.
@@ -28,11 +28,11 @@
 //! nodes, Javadoc internals) are dropped and counted per JDT type under `--details`; **quote that
 //! resolution rate next to any precision or recall**.
 //!
-//! **Which codediff pairs are judged.** Codediff maps tree-sitter-only structure (`;`, `modifiers`)
+//! **Which omnidiff pairs are judged.** Omnidiff maps tree-sitter-only structure (`;`, `modifiers`)
 //! the oracle has no record of; counting that as false positives would measure the grammar. A pair
 //! is judged when its left span is one the oracle maps on the left, or its right span one it maps
 //! on the right, or its kind is whitelisted: a kind that resolves against the oracle nearly every
-//! time it appears (`KindStats`). The whitelist catches codediff pairing a deleted node with an
+//! time it appears (`KindStats`). The whitelist catches omnidiff pairing a deleted node with an
 //! inserted one where the oracle maps neither; it is data-driven so that a kind like `modifiers`,
 //! which resolves only with a single modifier, stays out.
 //!
@@ -41,15 +41,15 @@
 //! no enclosing element is kept, as the paper does.
 //!
 //! **Two granularities**, as in the paper's Tables 11 and 12: `statement` (`is_statement_level`,
-//! and the statement-level whitelist on codediff's side) and `all`.
+//! and the statement-level whitelist on omnidiff's side) and `all`.
 //!
 //! Pass 1 learns the whitelist, pass 2 scores; the oracle JSON (gigabytes) is read twice rather
 //! than held in memory.
 
 use anyhow::{Context, Result, bail};
 use clap::Parser;
-use codediff::code::{Code, Language};
-use codediff::diff;
+use omnidiff::code::{Code, Language};
+use omnidiff::diff;
 use serde::Deserialize;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::{Path, PathBuf};
@@ -57,7 +57,7 @@ use std::time::Instant;
 
 #[derive(Parser, Debug)]
 #[command(
-    about = "Score codediff against the Alikhanifard & Tsantalis AST node-mapping oracle (Defects4J half)"
+    about = "Score omnidiff against the Alikhanifard & Tsantalis AST node-mapping oracle (Defects4J half)"
 )]
 struct Args {
     /// RefactoringMiner sparse checkout holding src/test/resources/astDiff/ - written by
@@ -95,7 +95,7 @@ struct Args {
     /// ... and only when at least this many occurrences were seen.
     #[arg(long, default_value_t = 50)]
     whitelist_min: usize,
-    /// Score our own hand-authored mappings against the oracle instead of codediff's output, over
+    /// Score our own hand-authored mappings against the oracle instead of omnidiff's output, over
     /// the compilation units this fixture directory holds a solved fixture for. Their mapping stays
     /// the reference, so precision and recall measure agreement, not a verdict.
     ///
@@ -395,7 +395,7 @@ fn under_unchanged_element(before: &Side, after: &Side, before_id: usize, after_
     }
 }
 
-/// Per-kind evidence for the whitelist: of the codediff-paired nodes of this kind under changed
+/// Per-kind evidence for the whitelist: of the omnidiff-paired nodes of this kind under changed
 /// program elements, how many have their span in the oracle's universe. A high ratio means JDT
 /// models the kind one-to-one.
 #[derive(Default, Debug, Clone)]
@@ -410,7 +410,7 @@ struct FileResolution {
     oracle: Vec<(SpanPair, String, usize, usize)>,
     records: usize,
     unresolved: BTreeMap<String, usize>,
-    /// Every span the oracle maps on each side, resolved or not: the universe a codediff pair is
+    /// Every span the oracle maps on each side, resolved or not: the universe an omnidiff pair is
     /// judged against. `[0]` for all records, `[1]` for statement-level ones.
     left_universe: [HashSet<Span>; 2],
     right_universe: [HashSet<Span>; 2],
@@ -483,9 +483,9 @@ fn resolve_oracle(json_path: &Path, before: &Side, after: &Side) -> Result<FileR
     Ok(resolution)
 }
 
-/// Codediff's mapping as span pairs with the node ids and kinds behind them. Inserts and deletes
+/// Omnidiff's mapping as span pairs with the node ids and kinds behind them. Inserts and deletes
 /// are not pairs.
-fn codediff_pairs(
+fn omnidiff_pairs(
     before: &Side,
     after: &Side,
     ast: &diff::ASTDiff,
@@ -545,7 +545,7 @@ struct FileScore {
     resolved: usize,
     all: Counts,
     statement: Counts,
-    codediff_ms: f64,
+    omnidiff_ms: f64,
 }
 
 /// One compilation unit, scored at both granularities.
@@ -560,12 +560,12 @@ fn score_file(
     whitelist_all: &HashSet<&'static str>,
     whitelist_statement: &HashSet<&'static str>,
     details: bool,
-    human: Option<(&str, &codediff::test::helper::human_mapping::HumanMapping)>,
+    human: Option<(&str, &omnidiff::test::helper::human_mapping::HumanMapping)>,
 ) -> Result<FileScore> {
     let started = Instant::now();
     let human_ast = match human {
         Some((_, mapping)) => Some(
-            codediff::test::helper::human_mapping::as_ast_diff_for_mapping(
+            omnidiff::test::helper::human_mapping::as_ast_diff_for_mapping(
                 mapping,
                 &before.code,
                 &after.code,
@@ -578,12 +578,12 @@ fn score_file(
         Some(_) => None,
         None => Some(diff::diff_code(&before.code, &after.code)),
     };
-    let codediff_ms = started.elapsed().as_secs_f64() * 1000.0;
+    let omnidiff_ms = started.elapsed().as_secs_f64() * 1000.0;
     let ast = human_ast
         .as_ref()
         .or_else(|| diff.as_ref().and_then(|diff| diff.ast.as_ref()));
     let pairs = ast
-        .map(|ast| codediff_pairs(before, after, ast))
+        .map(|ast| omnidiff_pairs(before, after, ast))
         .unwrap_or_default();
 
     let mut score = FileScore {
@@ -594,7 +594,7 @@ fn score_file(
         resolved: resolution.oracle.len(),
         all: Counts::default(),
         statement: Counts::default(),
-        codediff_ms,
+        omnidiff_ms,
     };
 
     for statement_level in [false, true] {
@@ -622,7 +622,7 @@ fn score_file(
                 }
                 // A whitelisted kind the oracle maps on neither side. Unmoved and unchanged, the
                 // oracle simply did not list it (it records comments selectively): nothing to
-                // judge. Otherwise its silence is its verdict, and codediff's pair is an error.
+                // judge. Otherwise its silence is its verdict, and omnidiff's pair is an error.
                 whitelist.contains(kind)
                     && (pair.0 != pair.1 || before.text(pair.0) != after.text(pair.1))
             })
@@ -773,7 +773,7 @@ fn main() -> Result<()> {
         total_files
     );
 
-    // Pass 1: learn the kind whitelist. It counts only nodes codediff pairs, so this pass runs
+    // Pass 1: learn the kind whitelist. It counts only nodes omnidiff pairs, so this pass runs
     // the diff too.
     let mut kind_all: HashMap<&'static str, KindStats> = HashMap::new();
     let mut kind_statement: HashMap<&'static str, KindStats> = HashMap::new();
@@ -801,7 +801,7 @@ fn main() -> Result<()> {
             let Some(ast) = diff.ast.as_ref() else {
                 continue;
             };
-            for (pair, b, a, kind) in codediff_pairs(&before, &after, ast) {
+            for (pair, b, a, kind) in omnidiff_pairs(&before, &after, ast) {
                 if under_unchanged_element(&before, &after, b, a) {
                     continue;
                 }
@@ -895,7 +895,7 @@ fn main() -> Result<()> {
             let mapping = match &human_index {
                 Some(index) => match human_fixture_for(index, &before, &after) {
                     Some(name) => {
-                        let mapping = codediff::test::helper::human_mapping::load(&name)
+                        let mapping = omnidiff::test::helper::human_mapping::load(&name)
                             .with_context(|| format!("loading the human mapping for {name}"))?;
                         Some((name, mapping))
                     }
@@ -939,7 +939,7 @@ fn main() -> Result<()> {
         "statement_tp",
         "statement_fp",
         "statement_fn",
-        "codediff_ms",
+        "omnidiff_ms",
     ])?;
     for s in &scores {
         writer.write_record([
@@ -956,7 +956,7 @@ fn main() -> Result<()> {
             s.statement.tp.to_string(),
             s.statement.fp.to_string(),
             s.statement.fn_.to_string(),
-            format!("{:.3}", s.codediff_ms),
+            format!("{:.3}", s.omnidiff_ms),
         ])?;
     }
     writer.flush()?;

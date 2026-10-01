@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -25,7 +25,7 @@ fn mapping() -> Result<()> {
     // Several subjective quality decisions:
     //
     // 1. The lowest-cost solution reuses parts of `..nums.len()` for `HashSet::new()`, which no
-    //    human would do. The cost is tied, so it is a `MultiMapGroup` and codediff's choice is
+    //    human would do. The cost is tied, so it is a `MultiMapGroup` and omnidiff's choice is
     //    accepted.
     // 2. `return Some(nums[i])` / `return Some(num)` should match, which requires bridging a
     //    removed loop-nesting level; the structural matchers do not. Every mismatch on the

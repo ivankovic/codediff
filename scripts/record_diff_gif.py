@@ -1,4 +1,4 @@
-# This file is part of the CodeDiff code diffing tool.
+# This file is part of the OmniDiff code diffing tool.
 #
 # Copyright (C) 2026 Marko Ivankovic
 #
@@ -15,10 +15,10 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-"""Record the GIF that contrasts GNU diff with codediff on one change.
+"""Record the GIF that contrasts GNU diff with omnidiff on one change.
 
 Both halves are the *same* two files in the *same* viewer: only the ranges differ, because
-`generate_showcase` bakes every case twice - once as codediff maps it, once as the real GNU `diff`
+`generate_showcase` bakes every case twice - once as omnidiff maps it, once as the real GNU `diff`
 marks it (whole touched lines). That is what makes a wipe the right transition here: the code does
 not move, so a bar sweeping across it swaps one reading for the other in place and the reader's eye
 stays on the line it was already looking at.
@@ -58,7 +58,7 @@ GUTTER_COLS = 4
 PANEL_GAP = 2
 HEADER_H = 30
 # The band above the panels carrying the tool's name. It is drawn at *both* ends of every frame so
-# that a bar anywhere in the middle leaves one copy on each side: the reader sees "codediff" over
+# that a bar anywhere in the middle leaves one copy on each side: the reader sees "omnidiff" over
 # the revealed half and "GNU diff" over the half still to be swept, which is the whole point of the
 # transition. A single centred label would sit exactly under the bar at the halfway frame.
 LABEL_H = 34
@@ -194,18 +194,18 @@ def main() -> int:
 
     state = args.showcase / "state.json"
     cases = args.showcase / "cases"
-    codediff = segments_for(cases / f"{args.case}.codediff.json", state)
+    omnidiff = segments_for(cases / f"{args.case}.omnidiff.json", state)
     unix = segments_for(cases / f"{args.case}.diff.json", state)
 
-    if canvas_size(codediff) != canvas_size(unix):
+    if canvas_size(omnidiff) != canvas_size(unix):
         # Both bakes are the same two files, so this cannot differ unless the payloads are not a
         # pair - and a wipe between differently-sized images would silently misalign the code.
         print("error: the two bakes disagree about canvas size", file=sys.stderr)
         return 1
 
-    palette = codediff["palette"]
+    palette = omnidiff["palette"]
     images, durations = frames(
-        render(codediff, "codediff", palette["insert_bg"]),
+        render(omnidiff, "omnidiff", palette["insert_bg"]),
         render(unix, "GNU diff", palette["delete_bg"]),
     )
     # One palette for the whole animation - see PALETTE_COLORS. `paste` stacks every frame into a

@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -22,7 +22,7 @@ use anyhow::Result;
 #[test]
 fn mapping() -> Result<()> {
     // A new `elseif` branch whose `..` chain tokens coincidentally match earlier occurrences.
-    // codediff treats the branch as new; the human correlates a few of those tokens.
+    // omnidiff treats the branch as new; the human correlates a few of those tokens.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "lua-neovim-neovim-add-new-logic",
         10,

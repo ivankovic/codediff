@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-#  This file is part of the CodeDiff code diffing tool.
+#  This file is part of the OmniDiff code diffing tool.
 #
 #  Copyright (C) 2026 Marko Ivankovic
 #
@@ -34,7 +34,7 @@
 #
 # Usage (from research/), as its own systemd unit rather than a child of the shell:
 #
-#   systemd-run --user --unit codediff-overnight --collect --same-dir \
+#   systemd-run --user --unit omnidiff-overnight --collect --same-dir \
 #     ./measure/overnight_benchmarks.sh [log-file]
 #
 # Why a unit: when an R48 shard hits a pair that needs more memory than the machine has, the
@@ -43,12 +43,12 @@
 # A unit of its own is stopped alone. For the same reason every shard runs in its own transient
 # scope with a hard memory cap (SHARD_MEMORY_MAX) below, so a pathological pair kills that shard's
 # process and nothing else, and a killed shard resumes from its own output with the offending
-# pair recorded as `killed` and skipped. `journalctl --user -u codediff-overnight` has the log.
+# pair recorded as `killed` and skipped. `journalctl --user -u omnidiff-overnight` has the log.
 #
 # The shard scopes are not children of the unit (a scope cannot be), so they sit in a slice of
-# their own, `codediff-r48.slice`, capped as a whole at SLICE_MEMORY_MAX. To stop everything:
+# their own, `omnidiff-r48.slice`, capped as a whole at SLICE_MEMORY_MAX. To stop everything:
 #
-#   systemctl --user stop codediff-overnight codediff-r48.slice
+#   systemctl --user stop omnidiff-overnight omnidiff-r48.slice
 #
 #   MODE=full        which corpus root under /var/tmp/research/ (both stages read the same one).
 #   COUNT=1000       R22's pairs per language.
@@ -197,7 +197,7 @@ PY
     # counting at 1 again and would otherwise overwrite an earlier launch's parts.
     local part="$OUT/robustness_shard_$i.part${LAUNCH}_$(printf '%04d' "$attempt").csv"
     echo "shard $i: attempt $attempt, $left pairs left"
-    systemd-run --user --scope --quiet --collect --slice=codediff-r48.slice \
+    systemd-run --user --scope --quiet --collect --slice=omnidiff-r48.slice \
       -p MemoryMax="$SHARD_MEMORY_MAX" -p MemorySwapMax=0 \
       ../target/release/benchmark_diff_pairs \
         --csv "$remaining" --repo-root "$REPOS" --output "$part" \
@@ -230,8 +230,8 @@ PY
   done
 }
 
-systemctl --user set-property codediff-r48.slice MemoryMax="$SLICE_MEMORY_MAX" MemorySwapMax=0 \
-  || echo "WARNING: could not cap codediff-r48.slice; shards are still capped individually"
+systemctl --user set-property omnidiff-r48.slice MemoryMax="$SLICE_MEMORY_MAX" MemorySwapMax=0 \
+  || echo "WARNING: could not cap omnidiff-r48.slice; shards are still capped individually"
 pids=()
 for i in $(seq 0 $((SHARDS - 1))); do
   run_shard "$i" &

@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -27,7 +27,7 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // A rewritten for-loop header: codediff paints isolated leaf tokens as Move, the human the whole
+    // A rewritten for-loop header: omnidiff paints isolated leaf tokens as Move, the human the whole
     // skeleton as one Move. A match-granularity gap.
     assert_matches_human_painting_within_limit("python-bugfix-loop", 1.71)
 }

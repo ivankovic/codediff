@@ -1,4 +1,4 @@
-# This file is part of the CodeDiff code diffing tool.
+# This file is part of the OmniDiff code diffing tool.
 #
 # Copyright (C) 2026 Marko Ivankovic
 #
@@ -17,10 +17,10 @@
 
 # Product-side targets: build, test, install, benchmarks, the quality gate, and release.
 #
-#   benchmark-   measures codediff alone, against src/test/data/ (accuracy and speed in one run).
+#   benchmark-   measures omnidiff alone, against src/test/data/ (accuracy and speed in one run).
 #   check-       gates that fail CI, each on exactly what a benchmark- target measures. Not in
 #                .githooks/pre-push: a slow hook is worse than none.
-#   measure-     anything beyond codediff alone (other diff tools, the upstream corpus): lives in
+#   measure-     anything beyond omnidiff alone (other diff tools, the upstream corpus): lives in
 #                research/Makefile, never here.
 #
 # Corpus fetching, sampling, analysis and paper builds are research/'s too
@@ -90,7 +90,7 @@ test-showcase-js:
 build:
 	cargo build --release --features $(FEATURES)
 
-# Installs this working tree, uncommitted changes included, over whatever `codediff` is on PATH.
+# Installs this working tree, uncommitted changes included, over whatever `omnidiff` is on PATH.
 install:
 	cargo install --path . --force
 
@@ -113,11 +113,11 @@ benchmark-quality:
 diff-inventory:
 	cargo run --release --features $(FEATURES) --bin diff_inventory
 
-# Records the README's assets/diff-vs-codediff.gif from the showcase bake, painted by the viewer's
+# Records the README's assets/diff-vs-omnidiff.gif from the showcase bake, painted by the viewer's
 # own model.js, so it cannot drift from the product. Committed, so it resolves on crates.io; re-run
 # after painting changes. Needs Node and research/'s uv environment.
 DIFF_GIF_CASE ?= python-refactoring
-DIFF_GIF_OUT ?= assets/diff-vs-codediff.gif
+DIFF_GIF_OUT ?= assets/diff-vs-omnidiff.gif
 diff-gif:
 	@tmp=$$(mktemp -d) && trap 'rm -rf "$$tmp"' EXIT; \
 	cargo run --release --features test-fixtures --bin generate_showcase -- --out "$$tmp" >/dev/null && \

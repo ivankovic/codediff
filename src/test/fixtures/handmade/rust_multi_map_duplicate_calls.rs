@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -24,7 +24,7 @@ use anyhow::Result;
 fn mapping() -> Result<()> {
     // Three identical `foo();` become two: all-to-all 3:2 groups over the statement and its six
     // descendants. A one-to-one output leaves one before member of each unmatched, so seven is the
-    // floor, and codediff reaches it.
+    // floor, and omnidiff reaches it.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "rust-multi-map-duplicate-calls",
         7,

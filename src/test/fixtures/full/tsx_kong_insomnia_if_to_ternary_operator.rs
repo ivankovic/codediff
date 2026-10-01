@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -22,7 +22,7 @@ use anyhow::Result;
 #[test]
 fn mapping() -> Result<()> {
     // The if-to-ternary rewrite turns `identifier` into `member_expression`/`property_identifier`;
-    // codediff's `qualified_name` pass keeps the old identifier pairing instead.
+    // omnidiff's `qualified_name` pass keeps the old identifier pairing instead.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "tsx-kong-insomnia-if-to-ternary-operator",
         5,

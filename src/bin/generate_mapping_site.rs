@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -20,7 +20,7 @@
 //! read-only HTML page with before/after trees and code panels, driven by
 //! `assets/mapping_site/viewer.js`. Published to GitHub Pages by `.github/workflows/pages.yml`.
 //!
-//! This is for humans to review the ground truth itself; it never runs codediff's own diff. The
+//! This is for humans to review the ground truth itself; it never runs omnidiff's own diff. The
 //! one thing a reviewer can record is "I looked at this and had nothing to file": a per-fixture
 //! mark that `assets/mapping_site/reviewed.js` keeps in the browser's own storage (the site has
 //! no server), tied to the page's [`fixture_revision`] so a later remapping shows up as
@@ -36,14 +36,14 @@ use anyhow::{Context, Result};
 use clap::Parser;
 use tree_sitter::Node;
 
-use codediff::code::{Code, Language};
-use codediff::diff::NodeCache;
-use codediff::diff::text::{RangeMatch, TextDiff, TextOperation};
-use codediff::diff::text_range::TextRange;
-use codediff::test::helper;
+use omnidiff::code::{Code, Language};
+use omnidiff::diff::NodeCache;
+use omnidiff::diff::text::{RangeMatch, TextDiff, TextOperation};
+use omnidiff::diff::text_range::TextRange;
+use omnidiff::test::helper;
 #[cfg(test)]
-use codediff::test::helper::human_mapping::rebuild_caches;
-use codediff::test::helper::human_mapping::{
+use omnidiff::test::helper::human_mapping::rebuild_caches;
+use omnidiff::test::helper::human_mapping::{
     self, Caches, GroupPairing, HumanMapping, HumanOperation, HumanTextVerdict, MarkKind,
     NodeStatus, is_identical_after, is_identical_before, is_moved_after, is_moved_before,
     match_operation_after, match_operation_before, rebuild_caches_for_mapping, status_after,
@@ -51,7 +51,7 @@ use codediff::test::helper::human_mapping::{
 };
 
 /// `owner/repo` for the "file an issue" and "view source" links.
-const REPO: &str = "ivankovic/codediff";
+const REPO: &str = "ivankovic/omnidiff";
 
 #[derive(Parser)]
 struct Args {
@@ -147,13 +147,13 @@ fn main() -> Result<()> {
 
         let language = before.metadata.language.unwrap_or_default();
         // Line-level rather than node-level: it is the only granularity Unix `diff` can be scored
-        // at, so the codediff and diff columns mean the same thing.
+        // at, so the omnidiff and diff columns mean the same thing.
         let mismatches = human_mapping::line_mismatches_for_mapping(&mapping, before, after)
             .with_context(|| format!("computing line mismatches for '{name}'"))?;
         index_entries.push(IndexEntry {
             name: name.clone(),
             language,
-            codediff_mismatches: mismatches.codediff,
+            omnidiff_mismatches: mismatches.omnidiff,
             unix_diff_mismatches: mismatches.unix_diff,
             total_lines: mismatches.total_lines,
             // Names, not a count: only "nobody painted this" has no names, which differs from a
@@ -294,7 +294,7 @@ fn render_fixture_page(
         true,
     );
 
-    // The code view goes through the same `ASTDiff` -> `TextDiff` path codediff's own output uses,
+    // The code view goes through the same `ASTDiff` -> `TextDiff` path omnidiff's own output uses,
     // so it cannot drift from how the TUI would render the human's answer.
     let human_diff = human_mapping::as_ast_diff_for_mapping(mapping, before, after)
         .with_context(|| format!("building a synthetic ASTDiff for '{name}'"))?;
@@ -984,7 +984,7 @@ fn code_counterparts(
     to_side: &str,
     to_ids: &[String],
 ) -> HashMap<usize, String> {
-    let key = |r: &codediff::diff::text_range::TextRange| {
+    let key = |r: &omnidiff::diff::text_range::TextRange| {
         (r.start_row, r.start_column, r.end_row, r.end_column)
     };
     let mut by_source: HashMap<(usize, usize, usize, usize), usize> = HashMap::new();
@@ -1103,7 +1103,7 @@ impl PanelRanges {
         PanelRanges {
             counterparts,
             markers: code_markers(other, row_count, side, &other_ids),
-            ops: codediff::diff::text::line_operations(&ranges, row_count),
+            ops: omnidiff::diff::text::line_operations(&ranges, row_count),
             side: side.to_string(),
             ids,
             ranges,
@@ -1170,7 +1170,7 @@ fn painting_panels(
                 let index = ranges[side].len();
                 ranges[side].push(RangeMatch {
                     source: span.to_text_range(),
-                    destination: codediff::diff::text_range::TextRange::zero(),
+                    destination: omnidiff::diff::text_range::TextRange::zero(),
                     operation: operation.clone(),
                 });
                 ids[side].push(entry_ids[side].clone());
@@ -1186,7 +1186,7 @@ fn painting_panels(
     let [before_counterparts, after_counterparts] = counterparts;
     Ok([
         PanelRanges {
-            ops: codediff::diff::text::line_operations(&before_ranges, row_counts[0]),
+            ops: omnidiff::diff::text::line_operations(&before_ranges, row_counts[0]),
             side: sides[0].clone(),
             ranges: before_ranges,
             ids: before_ids,
@@ -1194,7 +1194,7 @@ fn painting_panels(
             markers: Vec::new(),
         },
         PanelRanges {
-            ops: codediff::diff::text::line_operations(&after_ranges, row_counts[1]),
+            ops: omnidiff::diff::text::line_operations(&after_ranges, row_counts[1]),
             side: sides[1].clone(),
             ranges: after_ranges,
             ids: after_ids,
@@ -1291,7 +1291,7 @@ fn render_code_row(
     let row_len = line.len();
     // A row a range spans wholly is painted only to its last real character, but `row_len` stays
     // untrimmed so the unpainted trailing whitespace is still emitted.
-    let paint_row_len = codediff::diff::text_range::paint_row_len(line);
+    let paint_row_len = omnidiff::diff::text_range::paint_row_len(line);
     let side = &panel.side;
 
     // Byte-column spans for this row: painted ranges, plus carets as zero-width spans.
@@ -1317,7 +1317,7 @@ fn render_code_row(
         })
         .collect();
     segments.extend(markers.iter().map(|marker| {
-        let column = codediff::diff::text_range::floor_char_boundary(line, marker.column);
+        let column = omnidiff::diff::text_range::floor_char_boundary(line, marker.column);
         (
             column,
             column,
@@ -1334,8 +1334,8 @@ fn render_code_row(
     let mut cursor = 0usize;
     let mut has_marker = false;
     for (start, end, operation, id, counterpart) in segments {
-        let start = codediff::diff::text_range::floor_char_boundary(line, start).max(cursor);
-        let end = codediff::diff::text_range::floor_char_boundary(line, end).max(start);
+        let start = omnidiff::diff::text_range::floor_char_boundary(line, start).max(cursor);
+        let end = omnidiff::diff::text_range::floor_char_boundary(line, end).max(start);
         if start > cursor {
             text.push_str(&escape_html_text(&line[cursor..start]));
         }
@@ -1383,7 +1383,7 @@ struct IndexEntry {
     name: String,
     language: Language,
     /// Line-level mismatches against the human mapping - see `human_mapping::LineMismatches`.
-    codediff_mismatches: usize,
+    omnidiff_mismatches: usize,
     unix_diff_mismatches: usize,
     total_lines: usize,
     /// The fixture's `description.md`, if it has one.
@@ -1412,7 +1412,7 @@ fn render_fixtures_script(entries: &[IndexEntry]) -> String {
         })
         .collect();
     format!(
-        "// Generated by generate_mapping_site.rs; read by reviewed.js.\nwindow.CODEDIFF_FIXTURES = [\n{}\n];\n",
+        "// Generated by generate_mapping_site.rs; read by reviewed.js.\nwindow.OMNIDIFF_FIXTURES = [\n{}\n];\n",
         items.join(",\n")
     )
 }
@@ -1423,10 +1423,10 @@ fn render_index_page(entries: &[IndexEntry]) -> String {
         let name_attr = escape_html_attr(&entry.name);
         let name_escaped = escape_html_text(&entry.name);
         rows.push_str(&format!(
-            r#"<tr data-name="{name_attr}" data-language="{language}" data-codediff="{codediff}" data-unix_diff="{unix_diff}" data-total_lines="{total_lines}" data-paintings="{painting_count}" data-unmarked="{unmarked}" data-revision="{revision}" data-reviewed="0">
+            r#"<tr data-name="{name_attr}" data-language="{language}" data-omnidiff="{omnidiff}" data-unix_diff="{unix_diff}" data-total_lines="{total_lines}" data-paintings="{painting_count}" data-unmarked="{unmarked}" data-revision="{revision}" data-reviewed="0">
 <td><a href="fixtures/{name_attr}.html">{name_escaped}</a>{note}</td>
 <td><span class="language-badge">{language}</span></td>
-<td>{codediff}</td>
+<td>{omnidiff}</td>
 <td>{unix_diff}</td>
 <td>{total_lines}</td>
 <td class="paintings">{painting_names}</td>
@@ -1436,7 +1436,7 @@ fn render_index_page(entries: &[IndexEntry]) -> String {
 "#,
             language = entry.language,
             revision = entry.revision,
-            codediff = entry.codediff_mismatches,
+            omnidiff = entry.omnidiff_mismatches,
             unix_diff = entry.unix_diff_mismatches,
             total_lines = entry.total_lines,
             painting_count = entry.paintings.len(),
@@ -1469,21 +1469,21 @@ fn render_index_page(entries: &[IndexEntry]) -> String {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>codediff human mappings</title>
+<title>omnidiff human mappings</title>
 <link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
 <header class="page-header">
 <h1>Human-authored ground-truth mappings</h1>
 <p class="notice">Looking for the tool rather than its ground truth? <a href="showcase/index.html">Twenty
-of these changes in codediff's own viewer</a>, each shown as Unix <code>diff</code> marks it and as
-codediff maps it.</p>
+of these changes in omnidiff's own viewer</a>, each shown as Unix <code>diff</code> marks it and as
+omnidiff maps it.</p>
 <p>Each page below shows one fixture's before/after AST, annotated with what a human decided
 should match, get deleted, or get inserted. Disagree with one? Open the fixture, select the node,
 and use the "file an issue" button.</p>
-<p>"codediff mismatches"/"unix diff mismatches" are line-level disagreements against the human
+<p>"omnidiff mismatches"/"unix diff mismatches" are line-level disagreements against the human
 mapping (see the introductory paper for why line granularity, not AST-node granularity, is the only
-fair way to compare codediff against a line-only tool like Unix <code>diff</code>) - click a column
+fair way to compare omnidiff against a line-only tool like Unix <code>diff</code>) - click a column
 header to sort by it.</p>
 <p>"Paintings" lists the hand-recorded accounts of each diff <em>as text</em>, kept independently of
 the node mapping because a rendering often has several equally correct answers where the mapping has
@@ -1505,7 +1505,7 @@ half-ticked so you know to look again. Sort by it to see what is left.</p>
 <tr>
 <th data-sort="name" data-type="string" tabindex="0" aria-sort="ascending">Fixture</th>
 <th data-sort="language" data-type="string" tabindex="0" aria-sort="none">Language</th>
-<th data-sort="codediff" data-type="number" tabindex="0" aria-sort="none">codediff mismatches</th>
+<th data-sort="omnidiff" data-type="number" tabindex="0" aria-sort="none">omnidiff mismatches</th>
 <th data-sort="unix_diff" data-type="number" tabindex="0" aria-sort="none">Unix diff mismatches</th>
 <th data-sort="total_lines" data-type="number" tabindex="0" aria-sort="none">Total lines</th>
 <th data-sort="paintings" data-type="number" tabindex="0" aria-sort="none">Paintings</th>
@@ -1537,7 +1537,7 @@ fn escape_html_attr(s: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use codediff::test::helper::human_mapping::{
+    use omnidiff::test::helper::human_mapping::{
         HumanMapping, HumanMappingEntry, HumanOperation, HumanTextEntry, HumanTextOperation,
         HumanTextSpan,
     };
@@ -1583,7 +1583,7 @@ mod tests {
     fn render_code_panel_reproduces_the_source_text_exactly() {
         let mut checked = 0usize;
         let mut painted = 0usize;
-        for name in codediff::test::helper::UNIT_TEST_FIXTURES {
+        for name in omnidiff::test::helper::UNIT_TEST_FIXTURES {
             let Ok(pair) = helper::handmade_test_code_pair(name) else {
                 continue;
             };
@@ -1678,13 +1678,13 @@ mod tests {
     fn render_code_row_paints_only_the_changed_columns() {
         let ranges = vec![
             RangeMatch {
-                source: codediff::diff::text_range::TextRange::new(0, 4, 0, 7),
-                destination: codediff::diff::text_range::TextRange::new(0, 4, 0, 7),
+                source: omnidiff::diff::text_range::TextRange::new(0, 4, 0, 7),
+                destination: omnidiff::diff::text_range::TextRange::new(0, 4, 0, 7),
                 operation: TextOperation::Update,
             },
             RangeMatch {
-                source: codediff::diff::text_range::TextRange::new(0, 0, 0, 4),
-                destination: codediff::diff::text_range::TextRange::new(0, 0, 0, 4),
+                source: omnidiff::diff::text_range::TextRange::new(0, 0, 0, 4),
+                destination: omnidiff::diff::text_range::TextRange::new(0, 0, 0, 4),
                 operation: TextOperation::Identical,
             },
         ];
@@ -1703,8 +1703,8 @@ mod tests {
     #[test]
     fn render_code_row_does_not_wrap_a_middle_rows_trailing_whitespace() {
         let ranges = vec![RangeMatch {
-            source: codediff::diff::text_range::TextRange::new(0, 0, 1, 3),
-            destination: codediff::diff::text_range::TextRange::new(0, 0, 1, 3),
+            source: omnidiff::diff::text_range::TextRange::new(0, 0, 1, 3),
+            destination: omnidiff::diff::text_range::TextRange::new(0, 0, 1, 3),
             operation: TextOperation::Move,
         }];
         let panel = PanelRanges::from_tree("b", "a", ranges, &[], 1, &[], 0);
@@ -1721,7 +1721,7 @@ mod tests {
     /// before side's `destination`.
     #[test]
     fn render_code_row_draws_a_caret_for_the_other_sides_deletion() {
-        use codediff::diff::text_range::TextRange;
+        use omnidiff::diff::text_range::TextRange;
 
         let before = vec![RangeMatch {
             source: TextRange::new(7, 0, 9, 0),
@@ -1763,7 +1763,7 @@ mod tests {
 
     #[test]
     fn code_markers_clamps_an_end_of_file_caret_onto_the_last_row() {
-        use codediff::diff::text_range::TextRange;
+        use omnidiff::diff::text_range::TextRange;
 
         let before = vec![RangeMatch {
             source: TextRange::new(3, 0, 4, 0),
@@ -1820,7 +1820,7 @@ mod tests {
     /// `line_operations` alone would fold the whole panel away.
     #[test]
     fn anchor_rows_anchors_on_a_caret_with_no_changed_row() {
-        use codediff::diff::text_range::TextRange;
+        use omnidiff::diff::text_range::TextRange;
 
         let panel = PanelRanges::from_tree(
             "a",
@@ -1857,7 +1857,7 @@ mod tests {
     /// unfold the whole file unless it shares the tree panel's anchors.
     #[test]
     fn a_paintings_anchors_are_unioned_with_the_tree_panels_own() {
-        use codediff::diff::text_range::TextRange;
+        use omnidiff::diff::text_range::TextRange;
 
         let tree = PanelRanges::from_tree(
             "a",
@@ -1898,7 +1898,7 @@ mod tests {
 
     #[test]
     fn code_counterparts_links_real_text_directly_and_a_deletion_to_its_caret() {
-        use codediff::diff::text_range::TextRange;
+        use omnidiff::diff::text_range::TextRange;
 
         let before = vec![
             RangeMatch {
@@ -2177,7 +2177,7 @@ mod tests {
 
         assert!(
             html.contains(
-                r#"href="https://github.com/ivankovic/codediff/tree/main/src/test/data/diffs/handmade/rust-add-if""#
+                r#"href="https://github.com/ivankovic/omnidiff/tree/main/src/test/data/diffs/handmade/rust-add-if""#
             ),
             "expected a link straight to this fixture's own before/after files: {html}"
         );
@@ -2281,7 +2281,7 @@ mod tests {
 
     fn parse_rust(source: &str) -> tree_sitter::Tree {
         let language =
-            codediff::code::language::to_treesitter(&codediff::code::Language::Rust).unwrap();
+            omnidiff::code::language::to_treesitter(&omnidiff::code::Language::Rust).unwrap();
         let mut parser = tree_sitter::Parser::new();
         parser.set_language(&language).unwrap();
         parser.parse(source, None).unwrap()
@@ -3061,8 +3061,8 @@ mod tests {
         let mapping = HumanMapping {
             entries: vec![HumanMappingEntry {
                 operation: HumanOperation::MatchButNotIdentical,
-                before_path: Some(codediff::test::helper::path_for_node(block)),
-                after_path: Some(codediff::test::helper::path_for_node(block)),
+                before_path: Some(omnidiff::test::helper::path_for_node(block)),
+                after_path: Some(omnidiff::test::helper::path_for_node(block)),
             }],
             ..Default::default()
         };
@@ -3104,7 +3104,7 @@ mod tests {
             IndexEntry {
                 name: "rust-add-if".to_string(),
                 language: Language::Rust,
-                codediff_mismatches: 0,
+                omnidiff_mismatches: 0,
                 unix_diff_mismatches: 3,
                 total_lines: 40,
                 paintings: vec!["Minimal".to_string(), "Full".to_string()],
@@ -3115,7 +3115,7 @@ mod tests {
             IndexEntry {
                 name: "c-linux-small-bugfix".to_string(),
                 language: Language::C,
-                codediff_mismatches: 1,
+                omnidiff_mismatches: 1,
                 unix_diff_mismatches: 5,
                 total_lines: 12,
                 paintings: Vec::new(),
@@ -3157,7 +3157,7 @@ mod tests {
         let entries = vec![IndexEntry {
             name: "rust-add-if".to_string(),
             language: Language::Rust,
-            codediff_mismatches: 2,
+            omnidiff_mismatches: 2,
             unix_diff_mismatches: 9,
             total_lines: 40,
             paintings: vec!["Only one solution".to_string()],
@@ -3169,8 +3169,8 @@ mod tests {
         let html = render_index_page(&entries);
 
         assert!(
-            html.contains(r#"data-codediff="2""#),
-            "expected the row to carry codediff's mismatch count as a data attribute for the \
+            html.contains(r#"data-omnidiff="2""#),
+            "expected the row to carry omnidiff's mismatch count as a data attribute for the \
              sort script to read: {html}"
         );
         assert!(
@@ -3183,7 +3183,7 @@ mod tests {
         );
         assert!(
             html.contains(">2</td>"),
-            "codediff's count should render as a cell: {html}"
+            "omnidiff's count should render as a cell: {html}"
         );
         assert!(
             html.contains(">9</td>"),
@@ -3200,7 +3200,7 @@ mod tests {
         for sort_key in [
             "name",
             "language",
-            "codediff",
+            "omnidiff",
             "unix_diff",
             "total_lines",
             "paintings",
@@ -3219,7 +3219,7 @@ mod tests {
         let entries = vec![IndexEntry {
             name: "a&b".to_string(),
             language: Language::Unknown,
-            codediff_mismatches: 0,
+            omnidiff_mismatches: 0,
             unix_diff_mismatches: 0,
             total_lines: 0,
             paintings: Vec::new(),
@@ -3237,7 +3237,7 @@ mod tests {
         let entries = vec![IndexEntry {
             name: "rust-add-if".to_string(),
             language: Language::Rust,
-            codediff_mismatches: 0,
+            omnidiff_mismatches: 0,
             unix_diff_mismatches: 0,
             total_lines: 0,
             paintings: Vec::new(),
@@ -3266,7 +3266,7 @@ mod tests {
         let entry = |name: &str, revision: &str| IndexEntry {
             name: name.to_string(),
             language: Language::Rust,
-            codediff_mismatches: 0,
+            omnidiff_mismatches: 0,
             unix_diff_mismatches: 0,
             total_lines: 0,
             paintings: Vec::new(),
@@ -3282,7 +3282,7 @@ mod tests {
         ]);
 
         assert!(script.starts_with("// Generated by generate_mapping_site.rs"));
-        assert!(script.contains("window.CODEDIFF_FIXTURES = ["));
+        assert!(script.contains("window.OMNIDIFF_FIXTURES = ["));
         assert!(script.contains(r#"{name:"rust-add-if",revision:"0000000000000001"}"#));
         assert!(script.contains(r#"{name:"odd\"name",revision:"0000000000000002"}"#));
     }
@@ -3355,7 +3355,7 @@ mod tests {
         );
         assert!(
             page.html.contains(&format!(
-                r#"<body data-fixture="rust-add-if" data-repo="ivankovic/codediff" data-revision="{}">"#,
+                r#"<body data-fixture="rust-add-if" data-repo="ivankovic/omnidiff" data-revision="{}">"#,
                 page.revision
             )),
             "the page must carry the same revision the index row does: {}",

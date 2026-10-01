@@ -1,0 +1,50 @@
+theme = "Custom"
+layout = "Auto"
+recent_pairs = [
+    [
+    "src/test/data/diffs/handmade/python-api-change/before.py.test",
+    "src/test/data/diffs/handmade/python-api-change/after.py.test",
+],
+    [
+    "src/test/data/diffs/handmade/rust-cost-optimization/before.rs.test",
+    "src/test/data/diffs/handmade/rust-cost-optimization/after.rs.test",
+],
+    [
+    "src/test/data/diffs/full/csharp-glibsharp-gtksharp-whitespace-only-change/before.cs.test",
+    "src/test/data/diffs/full/csharp-glibsharp-gtksharp-whitespace-only-change/after.cs.test",
+],
+    [
+    "src/test/data/diffs/handmade/rust-completely-unrelated-main-files/before.rs.test",
+    "src/test/data/diffs/handmade/rust-completely-unrelated-main-files/after.rs.test",
+],
+    [
+    "src/test/data/diffs/handmade/python-refactoring/before.py.test",
+    "src/test/data/diffs/handmade/rust-completely-unrelated-main-files/after.rs.test",
+],
+    [
+    "src/test/data/diffs/handmade/python-refactoring/before.py.test",
+    "src/test/data/diffs/handmade/python-refactoring/after.py.test",
+],
+]
+syntax_theme = "base16-ocean.dark"
+node_highlight = false
+
+[custom_palette]
+insert_bg = "#387d52"
+delete_bg = "#7e3b42"
+move_bg = "#5c5d64"
+update_bg = "#787d58"
+overlay_fg = "#f8f8f2"
+cross_highlight_bg = "#639dad"
+search_bg = "#a97f56"
+before_title_fg = "#cd0000"
+after_title_fg = "#00cd00"
+
+[render_options]
+leading_whitespace = true
+structural_punctuation = true
+whole_pair_updates = true
+paint_reindent_only_moves = true
+paint_displaced_moves = true
+paint_resized_moves = true
+whole_identifier_updates = true

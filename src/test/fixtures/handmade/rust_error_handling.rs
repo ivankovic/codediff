@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -25,7 +25,7 @@ fn mapping() -> Result<()> {
     // Two interesting choices:
     // 1. `.unwrap()` to `?`: the after `call_expression`/`field_expression` can match either
     //    before candidate at equal cost. The mapping resolves the tie as a multi-map group of
-    //    `MatchButNotIdentical`, and codediff chooses `Identical`: cost-tied is not don't-care.
+    //    `MatchButNotIdentical`, and omnidiff chooses `Identical`: cost-tied is not don't-care.
     // 2. `contents` becoming `Ok(contents)` is a deep change a human obviously matches. APTED
     //    reaches both nodes but its ordering constraint (LCA consistency with the block's other
     //    matches) excludes the pair - an objective wall, not a heuristic cutoff.

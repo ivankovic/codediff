@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -25,7 +25,7 @@
 use super::*;
 
 /// EXPLORATORY: every disagreement run between the *tree mapping* and the painting for the fixture
-/// in `FIXTURE` (`painting_disagreement_detail` checks codediff's *rendering* instead).
+/// in `FIXTURE` (`painting_disagreement_detail` checks omnidiff's *rendering* instead).
 /// `FIXTURE=name cargo test --lib --features test-fixtures
 /// mapping_vs_painting_disagreement_detail_for_fixture -- --ignored --nocapture`.
 #[test]
@@ -84,12 +84,12 @@ fn measure_stub_fixtures() -> Result<()> {
     Ok(())
 }
 
-/// EXPLORATORY: every run of bytes where codediff's rendering disagrees with the closest human
+/// EXPLORATORY: every run of bytes where omnidiff's rendering disagrees with the closest human
 /// painting for one fixture (`compare_painting`'s byte projection): `FIXTURE=<name>
 /// MODE=<minimal|full> cargo test --lib --features test-fixtures painting_disagreement_detail --
 /// --ignored --nocapture`.
 ///
-/// `MAPPING=human` renders the human tree mapping instead, with codediff's reasons borrowed as
+/// `MAPPING=human` renders the human tree mapping instead, with omnidiff's reasons borrowed as
 /// `painting_failure_census` does - the runs only a rendering change can fix.
 #[test]
 #[ignore]
@@ -112,7 +112,7 @@ fn painting_disagreement_detail() -> Result<()> {
     let real = diff
         .ast
         .as_ref()
-        .with_context(|| format!("codediff produced no AST diff for '{name}'"))?;
+        .with_context(|| format!("omnidiff produced no AST diff for '{name}'"))?;
     let ast = if human {
         let mut human_ast = as_ast_diff_for_mapping(&mapping, before, after)?;
         for (key, pair) in human_ast.mapping.iter_mut() {
@@ -143,7 +143,7 @@ fn painting_disagreement_detail() -> Result<()> {
             .collect()
     };
     let ours = render(&ast);
-    // The candidate is chosen against codediff's own rendering even under `MAPPING=human`, as
+    // The candidate is chosen against omnidiff's own rendering even under `MAPPING=human`, as
     // the census chooses it, so the two report runs against the same painting.
     let chooser = if human { render(real) } else { ours.clone() };
 
@@ -185,7 +185,7 @@ fn painting_disagreement_detail() -> Result<()> {
 
     eprintln!(
         "fixture={name} mode={mode} mapping={} (painting solution='{}')",
-        if human { "human" } else { "codediff" },
+        if human { "human" } else { "omnidiff" },
         painting.name
     );
     for (side, contents) in [(0usize, &before.contents), (1usize, &after.contents)] {
@@ -322,7 +322,7 @@ fn mismatch_detail_for_fixture() -> Result<()> {
                 .map(|&partner_id| locate(partner_code, partner_id))
                 .unwrap_or_else(|| "0 (unmapped)".to_string());
             eprintln!(
-                "{side} {}  -> codediff chose {partner}",
+                "{side} {}  -> omnidiff chose {partner}",
                 locate(code, mismatch.node_id)
             );
             eprintln!("    {}", mismatch.message);
@@ -824,7 +824,7 @@ fn cross_fixture_convention_census() -> Result<()> {
     Ok(())
 }
 
-/// EXPLORATORY: every run of bytes where codediff's rendering disagrees with the painting,
+/// EXPLORATORY: every run of bytes where omnidiff's rendering disagrees with the painting,
 /// classified and **attributed** to the node matcher or the renderer, per preset:
 ///
 /// * `real` - `diff_code`'s mapping, rendered. What a reader sees.
@@ -1029,7 +1029,7 @@ fn painting_failure_census() -> Result<()> {
         };
         // The human format records no `ASTMappingReason`, but `identical_or_move` reads one to
         // keep a verified pure reindent or relocation unpainted. Pairs both mappings make borrow
-        // codediff's reason, or `ideal` would blame the renderer for `Move`s it never paints.
+        // omnidiff's reason, or `ideal` would blame the renderer for `Move`s it never paints.
         for (key, human) in human_ast.mapping.iter_mut() {
             if let Some(real) = real_ast.mapping.get(key) {
                 human.reason = real.reason;
@@ -1347,7 +1347,7 @@ fn painting_failure_census() -> Result<()> {
         );
     }
     eprintln!(
-        "  real = codediff's mapping vs the painting; renderer = the human mapping rendered vs \
+        "  real = omnidiff's mapping vs the painting; renderer = the human mapping rendered vs \
          the painting\n  (what no matcher fix can remove); matcher = the two renderings of the two \
          mappings against each other."
     );
@@ -1407,7 +1407,7 @@ fn painting_failure_census() -> Result<()> {
         let title = if stream == "ideal" {
             "renderer's own errors (human mapping rendered vs painting): ours -> theirs"
         } else {
-            "everything a reader sees (codediff's mapping rendered vs painting): ours -> theirs"
+            "everything a reader sees (omnidiff's mapping rendered vs painting): ours -> theirs"
         };
         print(
             title,
@@ -1578,8 +1578,8 @@ fn painting_failure_census() -> Result<()> {
 /// **Which identical leftovers the ground truth calls a copy.** Measures, before any engine code
 /// exists, what a pass that attaches leftovers to N:M groups would gain and break.
 ///
-/// A *candidate* is a node codediff deletes or inserts together with its whole subtree, whose
-/// full hash equals a node on the same side that codediff pairs with an identical node (its
+/// A *candidate* is a node omnidiff deletes or inserts together with its whole subtree, whose
+/// full hash equals a node on the same side that omnidiff pairs with an identical node (its
 /// *twin*): the leftover a copy-attaching pass could add to its twin's pair as a group. Only
 /// maximal candidates are rows; their descendants ride along and are counted in `size`.
 ///
@@ -1591,7 +1591,7 @@ fn painting_failure_census() -> Result<()> {
 /// * `matched` - the human pairs it one-to-one elsewhere: a mismatch either way.
 /// * `ungraded`.
 ///
-/// Then recall: every all-to-all member whose codediff partner is outside its group, and whether
+/// Then recall: every all-to-all member whose omnidiff partner is outside its group, and whether
 /// a candidate covers it (is it, or an ancestor of it). Writes
 /// `research/data/quality/nm_candidates.csv`.
 ///
@@ -1747,7 +1747,7 @@ fn nm_candidate_census() -> Result<()> {
                 fully_unmatched.insert(node.id(), own && children);
             }
 
-            // Hash -> the nodes on this side codediff pairs with an identical node.
+            // Hash -> the nodes on this side omnidiff pairs with an identical node.
             let mut twins: FxHashMap<u64, Vec<Node>> = FxHashMap::default();
             for node in &nodes {
                 let Some(&partner) = node_map.get(&node.id()) else {
@@ -1772,7 +1772,7 @@ fn nm_candidate_census() -> Result<()> {
                     && hash_of(node.id()).is_some_and(|hash| twins.contains_key(&hash))
             };
             for node in &nodes {
-                if !is_candidate(*node) || node.parent().is_some_and(&is_candidate) {
+                if !is_candidate(*node) || node.parent().is_some_and(is_candidate) {
                     continue;
                 }
                 candidate_roots[side].insert(node.id());
@@ -1879,7 +1879,7 @@ fn nm_candidate_census() -> Result<()> {
             }
         }
 
-        // Recall over the all-to-all members codediff leaves outside their group.
+        // Recall over the all-to-all members omnidiff leaves outside their group.
         let mut before_cache = PathCache::new();
         let mut after_cache = PathCache::new();
         for group in &mapping.groups {
@@ -1954,13 +1954,13 @@ fn nm_candidate_census() -> Result<()> {
         println!("  {label:<15} {}", line.join("  "));
     }
     println!(
-        "\nall-to-all members codediff leaves outside their group: {missed_members}, \
+        "\nall-to-all members omnidiff leaves outside their group: {missed_members}, \
          covered by a candidate: {covered_members}"
     );
     Ok(())
 }
 
-/// **Where codediff gives a node a second partner and silently drops the first**
+/// **Where omnidiff gives a node a second partner and silently drops the first**
 /// ([`ASTDiff::node_map_disagreements`]), per fixture, with the passes that wrote each side of the
 /// disagreement. Every fixture, solved or not.
 ///
@@ -2475,7 +2475,7 @@ fn unnamed_slot_census() -> Result<()> {
 /// EXPLORATORY: every all-to-all copy in the ground truth, one line per *copy* - the solver writes
 /// one group per node of a copied subtree, so groups nested under another group's member are
 /// folded into it. For each member: its row, whether the human pairs its parent with the parent of
-/// a member on the other side ("in place"), and what codediff does with it today.
+/// a member on the other side ("in place"), and what omnidiff does with it today.
 ///
 /// `cargo test --release --lib --features test-fixtures nm_copy_census -- --ignored --nocapture`
 #[test]

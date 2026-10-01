@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -32,7 +32,7 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // codediff splits into Insert+Delete what the painting calls one Update.
+    // omnidiff splits into Insert+Delete what the painting calls one Update.
     assert_matches_human_painting_within_limit("vimscript-neovim-neovim-small-change-2", 5.62)
 }
 

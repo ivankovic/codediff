@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -18,7 +18,7 @@
 
 // The showcase's half of the page: a `fetch` shim that answers the viewer's `/api/*` calls from
 // the JSON `generate_showcase` baked, and the strip of chrome above the viewer that picks a case
-// and flips between `diff`'s view and codediff's. app.js and model.js are the viewer under
+// and flips between `diff`'s view and omnidiff's. app.js and model.js are the viewer under
 // assets/viewer/, loaded unchanged; nothing here reaches into them. Switching a case or a view
 // rewrites what the shim will answer and then presses the viewer's own `r` (reload), which makes
 // it ask again.
@@ -31,18 +31,18 @@
 // showcase.test.js, run by `make test-showcase-js`; the DOM wiring is not.
 "use strict";
 
-const CodeDiffShowcase = (() => {
+const OmniDiffShowcase = (() => {
   const GROUPS = [
-    { id: "diff_wrong", label: "Where diff gets it wrong and CodeDiff is exact" },
+    { id: "diff_wrong", label: "Where diff gets it wrong and OmniDiff is exact" },
     { id: "both_right", label: "Where both are right" },
   ];
-  const VIEWS = ["diff", "codediff"];
-  const VIEW_LABEL = { diff: "Unix diff", codediff: "CodeDiff" };
+  const VIEWS = ["diff", "omnidiff"];
+  const VIEW_LABEL = { diff: "Unix diff", omnidiff: "OmniDiff" };
 
   // ----- URL <-> selection ------------------------------------------------------------------
 
   // The case a visitor lands on without a `?case=` (the README's link): two loops replaced by
-  // built-ins, where `diff` marks whole blocks and CodeDiff shows what each line became.
+  // built-ins, where `diff` marks whole blocks and OmniDiff shows what each line became.
   const LANDING_CASE = "python-refactoring";
 
   // LANDING_CASE, or the first case if the site has no such case.
@@ -51,8 +51,8 @@ const CodeDiffShowcase = (() => {
     return cases.length ? cases[0].name : null;
   }
 
-  // `?case=<name>&view=diff|codediff`. Anything missing or unknown falls back to the landing case
-  // and to `diff` - the view a newcomer already knows, so the flip to CodeDiff is the reveal.
+  // `?case=<name>&view=diff|omnidiff`. Anything missing or unknown falls back to the landing case
+  // and to `diff` - the view a newcomer already knows, so the flip to OmniDiff is the reveal.
   function parseQuery(search, cases) {
     const params = new URLSearchParams(search || "");
     const wanted = params.get("case");
@@ -74,7 +74,7 @@ const CodeDiffShowcase = (() => {
   // ----- the API the page thinks it is talking to ------------------------------------------
 
   // Which baked payload answers for a (view, render options) pair. `diff`'s view has one
-  // rendering; codediff's has the default and the two presets the `M` panel can pick, and any
+  // rendering; omnidiff's has the default and the two presets the `M` panel can pick, and any
   // other combination of options gets the default rather than a recomputation nobody can run.
   function payloadFor(view, payloads, presets, options) {
     if (view === "diff") return payloads.diff;
@@ -82,7 +82,7 @@ const CodeDiffShowcase = (() => {
       if (sameOptions(options, presets.minimal)) return payloads.minimal;
       if (sameOptions(options, presets.full)) return payloads.full;
     }
-    return payloads.codediff;
+    return payloads.omnidiff;
   }
 
   function sameOptions(a, b) {
@@ -129,7 +129,7 @@ const CodeDiffShowcase = (() => {
       case "/api/ls":
       case "/api/review":
       case "/api/review/open":
-        return refuse("Only the changes listed above can be opened here. Install codediff to diff your own.");
+        return refuse("Only the changes listed above can be opened here. Install omnidiff to diff your own.");
       default:
         return { status: 404, json: { error: `no such endpoint: ${path}` } };
     }
@@ -164,7 +164,7 @@ const CodeDiffShowcase = (() => {
     const summary = entry.summary ? ` (${entry.summary})` : "";
     return (
       `Unix diff marks ${plural(entry.diff_marked, "line")} · ` +
-      `CodeDiff marks ${formatCounts(entry.codediff)}${summary}`
+      `OmniDiff marks ${formatCounts(entry.omnidiff)}${summary}`
     );
   }
 
@@ -185,10 +185,10 @@ const CodeDiffShowcase = (() => {
 })();
 
 if (typeof module !== "undefined") {
-  module.exports = CodeDiffShowcase;
+  module.exports = OmniDiffShowcase;
 } else {
   (() => {
-    const S = CodeDiffShowcase;
+    const S = OmniDiffShowcase;
     const $ = (selector) => document.querySelector(selector);
     // Rows visible without scrolling on a typical window, roughly; a first change past this many
     // rows is one the reader would otherwise not see on load.
@@ -223,8 +223,8 @@ if (typeof module !== "undefined") {
         const load = (suffix) => realFetch(`cases/${name}.${suffix}.json`).then((r) => r.json());
         cache.set(
           name,
-          Promise.all([load("diff"), load("codediff"), load("minimal"), load("full")]).then(
-            ([diff, codediff, minimal, full]) => ({ diff, codediff, minimal, full }),
+          Promise.all([load("diff"), load("omnidiff"), load("minimal"), load("full")]).then(
+            ([diff, omnidiff, minimal, full]) => ({ diff, omnidiff, minimal, full }),
           ),
         );
       }
@@ -277,7 +277,7 @@ if (typeof module !== "undefined") {
       }
       select.addEventListener("change", () => select_(select.value, ctx.view));
       $("#view-diff").addEventListener("click", () => select_(selected, "diff"));
-      $("#view-codediff").addEventListener("click", () => select_(selected, "codediff"));
+      $("#view-omnidiff").addEventListener("click", () => select_(selected, "omnidiff"));
       // The viewer's own `M`, for a touch screen with no keyboard to press it on.
       $("#diff-options").addEventListener("click", () =>
         document.dispatchEvent(new KeyboardEvent("keydown", { key: "M", bubbles: true }))
@@ -345,7 +345,7 @@ if (typeof module !== "undefined") {
 
     function updateTitle() {
       const entry = cases.find((c) => c.name === selected);
-      if (entry) document.title = `${entry.title} · ${S.VIEW_LABEL[ctx.view]} · CodeDiff examples`;
+      if (entry) document.title = `${entry.title} · ${S.VIEW_LABEL[ctx.view]} · OmniDiff examples`;
     }
   })();
 }

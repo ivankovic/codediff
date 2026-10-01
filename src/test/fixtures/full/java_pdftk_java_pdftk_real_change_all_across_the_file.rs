@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -21,7 +21,7 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // Not an objective wall: codediff's cost exceeds the human's, so the search misses a better
+    // Not an objective wall: omnidiff's cost exceeds the human's, so the search misses a better
     // mapping. Mostly `APTED("large_flat_subtree")` and `MovedSubtree` deleting and reinserting the
     // `class_body`'s constructors with every descendant.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(

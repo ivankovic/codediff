@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -26,12 +26,12 @@ use std::io::{self, Write};
 use anyhow::{Context, Result};
 
 /// The absolute path to the running binary, so the written config points at *this* build rather
-/// than whatever `codediff` resolves to on PATH. Falls back to the bare name if it can't be resolved.
-pub fn resolve_codediff_path() -> String {
+/// than whatever `omnidiff` resolves to on PATH. Falls back to the bare name if it can't be resolved.
+pub fn resolve_omnidiff_path() -> String {
     std::env::current_exe()
         .ok()
         .and_then(|path| path.to_str().map(str::to_string))
-        .unwrap_or_else(|| "codediff".to_string())
+        .unwrap_or_else(|| "omnidiff".to_string())
 }
 
 /// Parses a yes/no answer; an empty line is `default`, anything unrecognized is `None` (reprompt).
@@ -90,37 +90,37 @@ mod tests {
     #[test]
     fn shell_quote_leaves_a_plain_path_alone() {
         assert_eq!(
-            shell_quote("/usr/local/bin/codediff"),
-            "/usr/local/bin/codediff"
+            shell_quote("/usr/local/bin/omnidiff"),
+            "/usr/local/bin/omnidiff"
         );
-        assert_eq!(shell_quote("codediff"), "codediff");
+        assert_eq!(shell_quote("omnidiff"), "omnidiff");
     }
 
     #[test]
     fn shell_quote_single_quotes_a_path_with_spaces_or_shell_syntax() {
         assert_eq!(
-            shell_quote("/Applications/My Tools/codediff"),
-            "'/Applications/My Tools/codediff'"
+            shell_quote("/Applications/My Tools/omnidiff"),
+            "'/Applications/My Tools/omnidiff'"
         );
         assert_eq!(
-            shell_quote(r"C:\Program Files\codediff\codediff.exe"),
-            r"'C:\Program Files\codediff\codediff.exe'"
+            shell_quote(r"C:\Program Files\omnidiff\omnidiff.exe"),
+            r"'C:\Program Files\omnidiff\omnidiff.exe'"
         );
-        assert_eq!(shell_quote("$HOME/bin/codediff"), "'$HOME/bin/codediff'");
+        assert_eq!(shell_quote("$HOME/bin/omnidiff"), "'$HOME/bin/omnidiff'");
         assert_eq!(shell_quote(""), "''");
     }
 
     #[test]
     fn shell_quote_escapes_an_embedded_single_quote() {
         assert_eq!(
-            shell_quote("/home/o'brien/codediff"),
-            r"'/home/o'\''brien/codediff'"
+            shell_quote("/home/o'brien/omnidiff"),
+            r"'/home/o'\''brien/omnidiff'"
         );
     }
 
     #[test]
-    fn resolve_codediff_path_never_returns_an_empty_string() {
-        assert!(!resolve_codediff_path().is_empty());
+    fn resolve_omnidiff_path_never_returns_an_empty_string() {
+        assert!(!resolve_omnidiff_path().is_empty());
     }
 
     #[test]

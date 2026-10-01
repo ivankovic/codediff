@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 #
-#  This file is part of the CodeDiff code diffing tool.
+#  This file is part of the OmniDiff code diffing tool.
 #
 #  Copyright (C) 2026 Marko Ivankovic
 #
@@ -23,7 +23,7 @@ tags `v<that>`, and `release.yml` builds whatever the tag names. Three recipes u
 repeat the number by hand, and nothing else compares them:
 
 * `packaging/aur/PKGBUILD` - `pkgver=`
-* `packaging/gentoo/dev-util/codediff/codediff-<version>.ebuild` - the file name
+* `packaging/gentoo/dev-util/omnidiff/omnidiff-<version>.ebuild` - the file name
 * `packaging/nix/package.nix` - the `version ?` fallback
 
 A recipe left on the previous version fetches the previous tag's tarball and builds the previous
@@ -40,7 +40,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 CARGO_TOML = REPO_ROOT / "Cargo.toml"
 PKGBUILD = REPO_ROOT / "packaging" / "aur" / "PKGBUILD"
-EBUILD_DIR = REPO_ROOT / "packaging" / "gentoo" / "dev-util" / "codediff"
+EBUILD_DIR = REPO_ROOT / "packaging" / "gentoo" / "dev-util" / "omnidiff"
 PACKAGE_NIX = REPO_ROOT / "packaging" / "nix" / "package.nix"
 
 
@@ -58,7 +58,7 @@ def cargo_version() -> str:
 
 def recipe_versions() -> dict[str, str]:
     """Each recipe's version, keyed by a path relative to the repository root."""
-    ebuilds = sorted(EBUILD_DIR.glob("codediff-*.ebuild"))
+    ebuilds = sorted(EBUILD_DIR.glob("omnidiff-*.ebuild"))
     if len(ebuilds) != 1:
         sys.exit(
             f"check_version_sync: expected exactly one ebuild in {EBUILD_DIR.relative_to(REPO_ROOT)},"
@@ -69,7 +69,7 @@ def recipe_versions() -> dict[str, str]:
         str(PKGBUILD.relative_to(REPO_ROOT)): first_match(
             r"^pkgver=(\S+)", PKGBUILD.read_text(), "pkgver in PKGBUILD"
         ),
-        str(ebuild.relative_to(REPO_ROOT)): ebuild.name.removeprefix("codediff-").removesuffix(
+        str(ebuild.relative_to(REPO_ROOT)): ebuild.name.removeprefix("omnidiff-").removesuffix(
             ".ebuild"
         ),
         str(PACKAGE_NIX.relative_to(REPO_ROOT)): first_match(

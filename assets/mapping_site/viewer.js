@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -20,7 +20,7 @@
 // verbatim into every generated site by generate_mapping_site.rs. Ported from a subset of
 // human_solver's own keybindings (see that binary's top-of-file doc comment): only the read-only
 // cursor-navigation ones (j/k/h/l/g/G/Tab/a/i//?) - nothing that mutates a mapping, and nothing
-// that compares against codediff's own diff, since this viewer never runs codediff at all.
+// that compares against omnidiff's own diff, since this viewer never runs omnidiff at all.
 (function () {
   "use strict";
 
@@ -187,7 +187,7 @@
 
   // The generator deliberately doesn't bake a `data-path` string into every node (it measurably
   // added to page size across ~thousands of nodes) - computed here instead, lazily, only for the
-  // one node a click actually needs it for. Mirrors codediff's own `path_for_node` (Rust):
+  // one node a click actually needs it for. Mirrors omnidiff's own `path_for_node` (Rust):
   // "kind:occurrence" per level, walking up to the tree root, where occurrence is the 1-indexed
   // count of same-kind `.node` elements at that level appearing at or before this one.
   function updateIssueLink(side, el) {
@@ -430,7 +430,7 @@
   // same mapping - all this does is switch between them and wire up cross-panel highlighting.
 
   const VIEWS = ["split", "code", "tree"];
-  const VIEW_STORAGE_KEY = "codediff-mapping-view";
+  const VIEW_STORAGE_KEY = "omnidiff-mapping-view";
   const viewButtons = Array.from(
     document.querySelectorAll(".view-switch button")
   );
@@ -533,7 +533,7 @@
   const renderingButtons = Array.from(
     document.querySelectorAll(".painting-switch button")
   );
-  const RENDERING_STORAGE_KEY = "codediff-mapping-rendering";
+  const RENDERING_STORAGE_KEY = "omnidiff-mapping-rendering";
 
   function renderingName(el) {
     return el.dataset.paintingName || "";

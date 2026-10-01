@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -21,7 +21,7 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // A new ternary whose string/quote leaves coincidentally match tokens elsewhere, so codediff
+    // A new ternary whose string/quote leaves coincidentally match tokens elsewhere, so omnidiff
     // pairs them. The ground truth is 1:2 (see `description.md`), so any one-to-one pairing
     // scores wrong: this comes down only with N:M support.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(

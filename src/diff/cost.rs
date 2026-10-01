@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -17,7 +17,7 @@
  */
 
 //! Total edit cost of a finished mapping, root to every leaf (not APTED's internal DP). `diff_cost`
-//! and `human_mapping::human_mapping_cost` both sum `operation_cost`, so codediff's cost and the
+//! and `human_mapping::human_mapping_cost` both sum `operation_cost`, so omnidiff's cost and the
 //! human's are comparable.
 use crate::code::ASTMetadata;
 use crate::diff::{ASTDiff, ASTMappingOperation, COST_DELETE, COST_INSERT, COST_UPDATE};

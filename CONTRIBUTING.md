@@ -7,7 +7,7 @@
 The product is written in Rust. The showcase's browser viewer (`assets/viewer/`) is plain
 JavaScript, and the research and analysis scripts are Python.
 
-CodeDiff stores user configuration, for example the active theme, on disk with `confy`. The
+OmniDiff stores user configuration, for example the active theme, on disk with `confy`. The
 dataset-analysis tools in `src/bin/` use a separate SQLite database to store the stats that they
 collect.
 
@@ -146,7 +146,7 @@ The README's "Accurate" principle states the painting targets, compared byte by 
 `make update-painting-attribution` measures them, one row per fixture and preset in
 `research/data/quality/painting_attribution.csv`, and `make check-painting-attribution` fails CI if
 any fixture gets worse. Each row carries two numbers that answer different questions:
-`real_bytes` renders codediff's own mapping, which is what a reader sees, and `renderer_bytes`
+`real_bytes` renders omnidiff's own mapping, which is what a reader sees, and `renderer_bytes`
 renders the *human* tree mapping, so it holds no matcher error at all - what is left there only a
 change to `diff::text` can fix. Steer painting work by the second. `painting_disagreement_detail`
 (`src/test/helper/human_mapping/tests/exploratory.rs`, `MAPPING=human` for the second column)
@@ -158,7 +158,7 @@ The tree mapping behind the painting has targets of its own:
 * **99% of test cases with at most 1% of visible nodes mismatched.**
 
 Both are stated in *visible* nodes - the ones carrying text of their own, per
-`codediff::diff::nodes::is_structurally_visible` - not all AST nodes. A wrongly-matched `block` or
+`omnidiff::diff::nodes::is_structurally_visible` - not all AST nodes. A wrongly-matched `block` or
 `argument_list`, whose every readable byte belongs to a child, is not the same defect as a
 wrongly-matched identifier. About 68% of nodes are visible corpus-wide, so the two counts differ.
 The benchmark prints both (`Mismatches` / `Vis Mism`), and every clamped `fixtures` test
@@ -241,7 +241,7 @@ documented there.
   (`uv tool install ruff@0.16.4`, one-time - see "Code quality" above).
 * `build` - `cargo build --release --features stats` (the `stats` feature builds the
   dataset-analysis binaries in `src/bin/`). It does not run the tests.
-* `install` - `cargo install --path . --force`, so `codediff` on `PATH` matches this checkout.
+* `install` - `cargo install --path . --force`, so `omnidiff` on `PATH` matches this checkout.
 * `install-hooks` - one-time setup that points git at `.githooks/`. `pre-commit` formats the Rust
   and Python a commit stages (`cargo fmt`, `ruff format`) and regenerates `src/test/data/diffs.csv`
   when a commit touches the fixture corpus. `pre-push` runs the fast subset of what CI checks
@@ -258,12 +258,12 @@ documented there.
 
 Three verbs, and which file a target lives in follows from them:
 
-* **`benchmark-`** measures **codediff**, and lives in the root Makefile. `benchmark-quality`
+* **`benchmark-`** measures **omnidiff**, and lives in the root Makefile. `benchmark-quality`
   answers both questions a change raises - is it right, and is it fast - in one run over the
   fixture corpus. Production QA, and it needs nothing a bare checkout lacks.
 * **`check-`** gates. Runs in CI on every push and fails the build. `check-quality` gates on
   precisely what `benchmark-quality` measures - the pairing is the point.
-* **`measure-`** measures anything that is not codediff alone: other people's tools, or the cloned
+* **`measure-`** measures anything that is not omnidiff alone: other people's tools, or the cloned
   upstream corpus at `REPOSITORIES_DIR`. Lives in `research/Makefile`, never the root one. A number
   that moves when someone else ships a GumTree release is a study of the field, not product QA.
 
@@ -297,7 +297,7 @@ Three verbs, and which file a target lives in follows from them:
 * `deploy-github` - tags the current commit `v<Cargo.toml version>` and pushes the tag. This push
   triggers `.github/workflows/release.yml`, which creates a draft GitHub Release whose notes are
   the version's section of `CHANGELOG.md` (it fails if that section is missing or still says
-  `unreleased`), attaches the cross-platform `codediff` binaries, the `.deb`s, completions and
+  `unreleased`), attaches the cross-platform `omnidiff` binaries, the `.deb`s, completions and
   checksums, and publishes the release once every asset is there.
 
 ## CI

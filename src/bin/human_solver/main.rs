@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -16,7 +16,7 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-//! Builds the ground-truth AST mappings the fixture tests grade codediff against.
+//! Builds the ground-truth AST mappings the fixture tests grade omnidiff against.
 //!
 //! Run as `cargo run --bin human_solver -- <name>`, where `<name>` is a fixture directory under
 //! `src/test/data/diffs/<dataset>/` (e.g. "rust-add-if"); without it the first case alphabetically
@@ -69,23 +69,23 @@ use std::path::{Path, PathBuf};
 use stubs::*;
 use tree_sitter::Node;
 
-use codediff::code::language::{language_for_path, to_treesitter};
-use codediff::code::{Code, Language};
-use codediff::diff::text::TextDiff;
-use codediff::diff::{ASTDiff, ASTMappingReason, NodeCache, diff_code};
+use omnidiff::code::language::{language_for_path, to_treesitter};
+use omnidiff::code::{Code, Language};
+use omnidiff::diff::text::TextDiff;
+use omnidiff::diff::{ASTDiff, ASTMappingReason, NodeCache, diff_code};
 #[cfg(test)]
-use codediff::test::helper::human_mapping::rebuild_caches;
-use codediff::test::helper::human_mapping::{
+use omnidiff::test::helper::human_mapping::rebuild_caches;
+use omnidiff::test::helper::human_mapping::{
     self, Caches, GroupPairing, HumanMapping, HumanMappingEntry, HumanOperation, HumanTextEntry,
     HumanTextMapping, HumanTextOperation, HumanTextSpan, HumanTextVerdict, MarkKind, MultiMapGroup,
     NamedTextMapping, NodeStatus, disagreement_is_move_only, is_inherited_removed, path_refs,
     rebuild_caches_for_mapping, status_after, status_before, text_mapping_disagreements,
 };
-use codediff::test::helper::{
+use omnidiff::test::helper::{
     DIFF_DATASETS, code_pair_from_dir, code_pair_from_dir_without_metadata, diffs_case_dir,
     node_for_path, path_for_node, precompute_paths, read_note, write_note,
 };
-use codediff::tui::theme::{self, OverlayPalette, OverlayTheme};
+use omnidiff::tui::theme::{self, OverlayPalette, OverlayTheme};
 
 #[derive(Parser, Debug)]
 #[command(
@@ -145,14 +145,14 @@ X              flip the pending selection to all-to-all and back: every
                  left over (a statement split in two, two merged into one, a
                  body duplicated). Shown as G instead of g once committed
 c              clear the pending multi-map selection
-a / A          align other panel to the human mapping / to codediff's mapping
-p              re-run codediff's own diff in the foreground; it runs by itself in
+a / A          align other panel to the human mapping / to omnidiff's mapping
+p              re-run omnidiff's own diff in the foreground; it runs by itself in
                  the background when a case opens, and its verdict then shows
                  next to each node (`*` where it disagrees with you) with the
                  count of those in each panel's header
 r              toggle showing the ASTMappingReason (which pass matched it) next
                  to each node's algo verdict
-n / N          jump to next / previous mismatch (`*`) vs. codediff's verdict
+n / N          jump to next / previous mismatch (`*`) vs. omnidiff's verdict
 ] / [          jump to the next / previous unmarked node in this panel (wraps)
 } / {          open the next / previous case as the o picker lists it - its
                  sort and filters apply, so with Unmarked filtered to yes this
@@ -225,13 +225,13 @@ t              text view: read the source, and paint the human text-range ground
                  without closing this view -- so a row an invariant names becomes
                  the node whose entry has to change. A cursor in the whitespace
                  between two tokens lands on the next leaf, and says so
-                 o cycles what is drawn: your painting, codediff's own rendering
+                 o cycles what is drawn: your painting, omnidiff's own rendering
                  of the same pair, or only the bytes where the two disagree
-                 P copies codediff's rendering into the current painting as a
+                 P copies omnidiff's rendering into the current painting as a
                  starting point, so a fixture is corrected rather than painted
                  from a blank page -- only into an empty painting, so it can
                  never overwrite work (s branches this one to a new name first),
-                 and it declines outright on a pair whose codediff ranges
+                 and it declines outright on a pair whose omnidiff ranges
                  overlap or fail to pair up, rather than seeding a painting that
                  would render and score differently
 T              view the output of unix `diff -u`, with before/after line numbers
@@ -266,11 +266,11 @@ o              open a different test case (src/test/data/diffs/) as a table:
                  The scans behind Cmpl/Unmarked, Paint, Disagree, Invariant and
                  Size run on the first s or f on that column (Cmpl/Unmarked blocks
                  for ~12s and Disagree ~7s on the full corpus the first time; their
-                 results are cached under ~/.local/state/codediff/scans/ and only
+                 results are cached under ~/.local/state/omnidiff/scans/ and only
                  cases changed since are rescanned); until then those columns read
                  ?, and a ? row survives either filter direction.
                  Cursor, sort and filters persist across o, and with the case
-                 last open across runs (~/.local/state/codediff/human_solver.json):
+                 last open across runs (~/.local/state/omnidiff/human_solver.json):
                  started with no name, the tool reopens where it left off.
                  Every key is appended to human_solver_keys.tsv beside it (which
                  view took it, the key, whether it edited; typed text is not
@@ -605,14 +605,14 @@ struct SessionMemory {
     diff_view: DiffPickerView,
 }
 
-/// `$XDG_STATE_HOME/codediff/human_solver.json`, or `~/.local/state/...` without the variable;
+/// `$XDG_STATE_HOME/omnidiff/human_solver.json`, or `~/.local/state/...` without the variable;
 /// `None` with neither set.
 fn session_memory_path() -> Option<PathBuf> {
     let state_home = match std::env::var_os("XDG_STATE_HOME") {
         Some(dir) if !dir.is_empty() => PathBuf::from(dir),
         _ => PathBuf::from(std::env::var_os("HOME")?).join(".local/state"),
     };
-    Some(state_home.join("codediff").join("human_solver.json"))
+    Some(state_home.join("omnidiff").join("human_solver.json"))
 }
 
 /// The memory at `path`, or the default when the file is missing or unreadable: a corrupt file
@@ -1056,7 +1056,7 @@ fn compute_diff_text_painted() -> std::collections::HashMap<String, bool> {
     })
 }
 
-/// How many bytes `name`'s human tree mapping and human text painting disagree about (codediff's
+/// How many bytes `name`'s human tree mapping and human text painting disagree about (omnidiff's
 /// own matching plays no part), excluding `disagreement_is_move_only` runs. `None` when the case
 /// can't be loaded or has no painting yet, as distinct from agreeing exactly (`Some(0)`).
 fn diff_case_disagreement_bytes(name: &str) -> Option<usize> {
@@ -2146,7 +2146,7 @@ fn main() -> Result<()> {
         return Ok(());
     }
 
-    // The same theme as the `codediff` binary. `set_custom_palette` must come first:
+    // The same theme as the `omnidiff` binary. `set_custom_palette` must come first:
     // `OverlayTheme::Custom` resolves its colours from that process-global.
     theme::set_custom_palette(theme::load_custom_palette());
     let _ = OVERLAY_THEME.set(theme::load_overlay_theme());

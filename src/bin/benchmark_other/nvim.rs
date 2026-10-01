@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -17,8 +17,8 @@
  */
 
 use anyhow::{Context, Result, bail};
-use codediff::code::Code;
-use codediff::diff::text_range::TextRange;
+use omnidiff::code::Code;
+use omnidiff::diff::text_range::TextRange;
 use std::collections::HashMap;
 use std::process::Command;
 

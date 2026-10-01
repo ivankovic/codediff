@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -449,7 +449,7 @@ pub fn run(
         ranges_for_options(&data.after_ranges, &data.after_contents, render_options);
     if large_residual {
         eprintln!(
-            "codediff: this diff left an unusually large unmatched residual after the \
+            "omnidiff: this diff left an unusually large unmatched residual after the \
              heuristic passes; the structural matching for that portion may be coarser than \
              usual."
         );
@@ -461,7 +461,7 @@ pub fn run(
 }
 
 /// Writes non-interactive output to stdout as an `io::Result`, where `print!` would panic. The
-/// reader closing the pipe early (`codediff a b | head`, quitting the pager) is the ordinary end of
+/// reader closing the pipe early (`omnidiff a b | head`, quitting the pager) is the ordinary end of
 /// a run, not a crash: it surfaces as `ErrorKind::BrokenPipe`, which `main` exits quietly on.
 pub fn write_stdout(text: &str) -> std::io::Result<()> {
     use std::io::Write;

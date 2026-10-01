@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -27,7 +27,7 @@ use crate::{case_dataset, legacy_dataset};
 
 // ---------------------------------------------------------------------------------------------
 
-pub(crate) const LICENSE_HEADER: &str = "/*  This file is part of the CodeDiff code diffing tool.
+pub(crate) const LICENSE_HEADER: &str = "/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -109,7 +109,7 @@ pub(crate) fn stub_test_contents(name: &str, comment: Option<&str>, text_only: b
         // lands inside the string. The name is left out so a long one cannot overflow the width.
         let module_doc = [
             "//! This fixture's language has no tree-sitter grammar, so there is no tree to map",
-            "//! and no `mapping()` test here. codediff renders the pair with its plain-text",
+            "//! and no `mapping()` test here. omnidiff renders the pair with its plain-text",
             "//! fallback diff (`plain_text_line_diff`), and that is what the `painting()` test",
             "//! below is graded against - see `PaintingDiff::PlainText`.",
         ]
@@ -303,11 +303,11 @@ pub(crate) fn insert_mod_declaration(dataset: &str, module: &str) -> Result<()> 
 // ---------------------------------------------------------------------------------------------
 
 /// What `s` measures about the saved fixture, for the stub and the status line. Measuring is the
-/// checker direction - codediff against the human's decisions - so nothing here feeds back into
+/// checker direction - omnidiff against the human's decisions - so nothing here feeds back into
 /// the ground truth.
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct SaveMeasurement {
-    /// `(total, visible)` mismatches between the human mapping and codediff's diff; `None` for a
+    /// `(total, visible)` mismatches between the human mapping and omnidiff's diff; `None` for a
     /// text-only fixture, which has no `mapping()` test.
     pub(crate) mismatches: Option<(usize, usize)>,
     /// The limit `painting()` needs: the larger disagreement of the two presets, as a percentage
@@ -319,11 +319,10 @@ pub(crate) struct SaveMeasurement {
 /// Measures `name` as its fixture tests would, from what is on disk, so a save is followed by the
 /// numbers the stub needs instead of a `cargo test` round trip to find them out.
 pub(crate) fn measure_saved_case(name: &str, text_only: bool) -> Result<SaveMeasurement> {
-    use codediff::diff::text::RenderOptions;
-    use codediff::test::helper::human_mapping::{
-        codediff_diff_for_painting, compare_painting_with_diff,
-        compute_visible_mismatches_with_config, invariants::ground_truth_invariant_violations,
-        load,
+    use omnidiff::diff::text::RenderOptions;
+    use omnidiff::test::helper::human_mapping::{
+        compare_painting_with_diff, compute_visible_mismatches_with_config,
+        invariants::ground_truth_invariant_violations, load, omnidiff_diff_for_painting,
     };
 
     let mismatches = if text_only {
@@ -331,7 +330,7 @@ pub(crate) fn measure_saved_case(name: &str, text_only: bool) -> Result<SaveMeas
     } else {
         let visible = compute_visible_mismatches_with_config(
             name,
-            &codediff::diff::HeuristicConfig::default(),
+            &omnidiff::diff::HeuristicConfig::default(),
         )?;
         Some((
             visible.visible.len() + visible.invisible.len(),
@@ -342,8 +341,8 @@ pub(crate) fn measure_saved_case(name: &str, text_only: bool) -> Result<SaveMeas
     let painting_percent = if load(name)?.text_mappings.is_empty() {
         None
     } else {
-        let (before, after) = &*codediff::test::helper::handmade_test_code_pair(name)?;
-        let diff = codediff_diff_for_painting(before, after)?;
+        let (before, after) = &*omnidiff::test::helper::handmade_test_code_pair(name)?;
+        let diff = omnidiff_diff_for_painting(before, after)?;
         let mut worst: f64 = 0.0;
         for options in [RenderOptions::MINIMAL, RenderOptions::FULL] {
             let comparison = compare_painting_with_diff(name, options, before, after, &diff)?;

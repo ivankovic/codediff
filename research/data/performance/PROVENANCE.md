@@ -31,7 +31,7 @@ thread heap 56.6 MB.
 The paper's Robust target exercised on the whole Full corpus: every modified code file in the
 corpus's recent history - the population `../corpus_stats/edit_shape.csv` summarises - pushed
 through `diff_code` with no node cap. The 2026-09-18 review of the introductory paper asked for it:
-can codediff run on every diff in the Full corpus?
+can omnidiff run on every diff in the Full corpus?
 
 | | |
 |---|---|
@@ -50,7 +50,7 @@ which is where the finding is.
 
 ### What did not complete
 
-* **Unreadable (1,669).** Files with an extension the lister maps to a language but codediff has no
+* **Unreadable (1,669).** Files with an extension the lister maps to a language but omnidiff has no
   grammar for (`.zsh`, 60 in the first 50k), files that are not valid UTF-8, and a few blobs git
   could not serve. Never reached the diff; excluded from the rate.
 * **Past the 120 s budget (96).** Median combined size 1.3 M AST nodes. The budget was applied with
@@ -83,8 +83,8 @@ The first launch (05:21) ran the eight shards unconfined. Four minutes in, one s
 more memory than the machine has, the kernel OOM-killed it, and systemd stopped the whole scope
 the launching shell lived in - the other shards, the orchestrator and the interactive session
 that had started them (`setsid` leaves the cgroup alone). Since then the chain runs as its own unit
-(`systemd-run --user --unit codediff-overnight`), every shard in its own capped scope inside
-`codediff-r48.slice`, and a killed shard resumes from its own output with the offending pair
+(`systemd-run --user --unit omnidiff-overnight`), every shard in its own capped scope inside
+`omnidiff-r48.slice`, and a killed shard resumes from its own output with the offending pair
 recorded with the exit status it died with.
 
 The restarts then surfaced three harness bugs, each fixed before the run that counts:

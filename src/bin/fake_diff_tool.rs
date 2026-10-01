@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -170,7 +170,7 @@ fn mix(mut hash: u64) -> u64 {
 
 /// `index` moved back to the nearest character boundary.
 fn snap_down(line: &str, index: usize) -> usize {
-    codediff::diff::text_range::floor_char_boundary(line, index)
+    omnidiff::diff::text_range::floor_char_boundary(line, index)
 }
 
 fn snap_up(line: &str, mut index: usize) -> usize {

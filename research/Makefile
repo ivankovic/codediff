@@ -1,4 +1,4 @@
-# This file is part of the CodeDiff code diffing tool.
+# This file is part of the OmniDiff code diffing tool.
 #
 # Copyright (C) 2026 Marko Ivankovic
 #
@@ -237,10 +237,10 @@ measure-robustness-fixtures: build
 # this target only starts it. See measure/overnight_benchmarks.sh's header for the
 # knobs, measure/r48_retry_killed.sh for the pass that follows, and data/performance/PROVENANCE.md.
 measure-robustness-full:
-	systemd-run --user --unit codediff-overnight --collect -p WorkingDirectory=$(CURDIR) \
+	systemd-run --user --unit omnidiff-overnight --collect -p WorkingDirectory=$(CURDIR) \
 		--setenv=PATH="$$PATH" --setenv=HOME="$$HOME" --setenv=SKIP_R22=1 \
 		./measure/overnight_benchmarks.sh
-	@echo "started as codediff-overnight; follow with: journalctl --user -u codediff-overnight -f"
+	@echo "started as omnidiff-overnight; follow with: journalctl --user -u omnidiff-overnight -f"
 
 measure-code-pair-diffs:
 	uv run ./analysis/code_pair_diff_stats.py data/samples/sampled_code_pairs_$(LANGUAGE).csv \
@@ -287,11 +287,11 @@ matching-reasons-report:
 	uv run ./analysis/matching_reasons_report.py
 
 # Change-shape census over the human-authored mappings: which shapes (reparent, sibling reorder,
-# human-confirmed ambiguity) occur, how often, and how well codediff maps a fixture containing each.
+# human-confirmed ambiguity) occur, how often, and how well omnidiff maps a fixture containing each.
 # This is the "which shapes occur" half of the paper's RQ3, which the ablation study alone cannot
 # answer. Reads data/quality/human_mapping_analysis.csv, so re-run `analyze_human_mappings --csv`
 # first if fixtures were added - that file and data/quality/optimal_solutions_benchmark.csv must
-# describe the same corpus state, since this report joins prevalence against codediff's own result.
+# describe the same corpus state, since this report joins prevalence against omnidiff's own result.
 shapes-report:
 	uv run ./analysis/human_mapping_shapes_report.py
 
@@ -317,7 +317,7 @@ measure-edit-shape:
 # Ground-truth ambiguity over the human-authored mappings: how often a real-world change admits no
 # unique correct AST mapping, i.e. how often the annotator recorded a multi-map group. This is the
 # paper's RQ3, and it mentions no diffing tool at all - unlike shapes-report above, nothing here
-# joins against codediff's own result. Reads the mapping JSON files directly, scoped to the fixture
+# joins against omnidiff's own result. Reads the mapping JSON files directly, scoped to the fixture
 # set in data/quality/human_mapping_analysis.csv, so re-run `analyze_human_mappings --csv` first if
 # fixtures were added. One rate over every in-scope fixture, see the script's own doc comment.
 ambiguity-report:
@@ -340,8 +340,8 @@ rendering-report:
 # build's artifacts are touched - then starts measure/per_test_coverage.py as a systemd unit, each
 # test in its own memory-capped scope; see that script for why. About ten minutes on eight cores.
 #
-#   journalctl --user -fu codediff-per-test-coverage     follow it
-#   systemctl --user stop codediff-per-test-coverage codediff-per-test-coverage.slice
+#   journalctl --user -fu omnidiff-per-test-coverage     follow it
+#   systemctl --user stop omnidiff-per-test-coverage omnidiff-per-test-coverage.slice
 #
 # Resumable: run it again to continue. To re-measure from scratch - after the engine changes, say -
 # delete data/coverage/per_test/ first, since the bits only mean anything against the binary that
@@ -354,7 +354,7 @@ measure-per-test-coverage:
 		| python3 -c 'import sys, json; print(next(m["executable"] for m in map(json.loads, sys.stdin) if m.get("reason") == "compiler-artifact" and m.get("profile", {}).get("test") and m.get("executable")))' \
 		> $(PER_TEST_COVERAGE_TARGET)/test-binary.txt
 	mkdir -p data/coverage/per_test
-	systemd-run --user --unit codediff-per-test-coverage --collect --same-dir \
+	systemd-run --user --unit omnidiff-per-test-coverage --collect --same-dir \
 		--setenv=PATH="$$PATH" ./measure/per_test_coverage.py \
 		--binary "$$(cat $(PER_TEST_COVERAGE_TARGET)/test-binary.txt)" --out data/coverage/per_test
 
@@ -365,13 +365,13 @@ measure-per-test-coverage:
 # itself. Split out from measure-tools-timing below so a paper rebuild (introductory-paper) can
 # re-render from existing data without paying for a fresh (slow - GumTree's JVM cold-starts per
 # fixture) benchmark run.
-# Codediff against the other diff tools (Unix `diff`, GumTree, difftastic, diffsitter) over this
+# Omnidiff against the other diff tools (Unix `diff`, GumTree, difftastic, diffsitter) over this
 # repository's own fixture corpus - timing, and agreement with the human ground truth.
 #
 # In research/ because they measure other people's tools (see the root Makefile's header).
 #
 # A tool that is not installed is skipped with a note, not an error, so both targets still produce
-# a codediff column on a machine with none of them. See data/comparison/PROVENANCE.md for which
+# an omnidiff column on a machine with none of them. See data/comparison/PROVENANCE.md for which
 # builds are installed and which of their numbers are safe to quote.
 #
 # Timing is the only reason to pay for `measure-tools-timing`'s slow, machine-load-sensitive run.
@@ -468,7 +468,7 @@ fetch-external:
 	./external/fetch_gumtree_simple_package.sh
 	./external/fetch_defects4j_metadata.sh
 
-# Score codediff's node mapping against the Alikhanifard & Tsantalis oracle (Defects4J half, 800
+# Score omnidiff's node mapping against the Alikhanifard & Tsantalis oracle (Defects4J half, 800
 # cases). Writes data/comparison/astdiff_oracle_defects4j.csv and prints precision/recall at the
 # paper's two granularities next to its published numbers. Reads ~2.2 GB of oracle JSON twice;
 # takes a few minutes. `--details` adds the unresolved-JDT-type census, the kind whitelist and
@@ -477,10 +477,10 @@ measure-astdiff-oracle: fetch-external
 	cd .. && cargo run --release --features test-fixtures --bin benchmark_astdiff_oracle -- \
 		--csv research/data/comparison/astdiff_oracle_defects4j.csv $(ASTDIFF_ORACLE_ARGS)
 
-# The same oracle, with our own hand-authored mappings scored against it instead of codediff's
+# The same oracle, with our own hand-authored mappings scored against it instead of omnidiff's
 # output, over the Defects4J compilation units solved so far. Writes
 # data/comparison/astdiff_oracle_defects4j_human.csv; the paper reads both CSVs together, and
-# codediff's own rows over the same units are the control that makes the figure readable.
+# omnidiff's own rows over the same units are the control that makes the figure readable.
 measure-astdiff-oracle-human: fetch-external
 	cd .. && cargo run --release --features test-fixtures --bin benchmark_astdiff_oracle -- \
 		--human-mappings src/test/data/diffs/defects4j \

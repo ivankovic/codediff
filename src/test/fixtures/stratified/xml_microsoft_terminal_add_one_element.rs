@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -24,7 +24,7 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 #[test]
 fn mapping() -> Result<()> {
     // One `<test/>` appended, so the closing whitespace `CharData` now separates two elements and
-    // carries a new indent. The pairing agrees; the human calls that pair `Update`, codediff
+    // carries a new indent. The pairing agrees; the human calls that pair `Update`, omnidiff
     // `Identical`.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "xml-microsoft-terminal-add-one-element",

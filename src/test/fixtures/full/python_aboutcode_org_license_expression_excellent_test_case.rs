@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -23,7 +23,7 @@ use anyhow::Result;
 fn mapping() -> Result<()> {
     // Two strings should map to one (N:M), and a version list changes in ways that need logical
     // analysis. Fewer decisions than the count suggests: the human deletes 28 whole string
-    // literals codediff keeps matched (identical bytes, same order), each counting its subtree.
+    // literals omnidiff keeps matched (identical bytes, same order), each counting its subtree.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "python-aboutcode-org-license-expression-excellent-test-case",
         251,

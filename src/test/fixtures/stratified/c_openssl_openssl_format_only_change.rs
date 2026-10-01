@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -32,7 +32,7 @@ fn mapping() -> Result<()> {
 #[test]
 fn painting() -> Result<()> {
     // A whitespace reflow: interior whitespace lives between AST nodes where no painting can reach,
-    // so codediff paints the reflowed statements while Minimal paints nothing.
+    // so omnidiff paints the reflowed statements while Minimal paints nothing.
     assert_matches_human_painting_within_limit("c-openssl-openssl-format-only-change", 11.20)
 }
 

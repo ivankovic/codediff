@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -25,10 +25,10 @@ use std::path::PathBuf;
 use anyhow::{Context, Result, bail};
 use clap::Parser;
 
-use codediff::tui::color_depth::ColorDepth;
-use codediff::tui::screenshot::{overlay_theme_named, render};
-use codediff::tui::theme;
-use codediff::tui::widgets::code_viewer::syntax_theme_names;
+use omnidiff::tui::color_depth::ColorDepth;
+use omnidiff::tui::screenshot::{overlay_theme_named, render};
+use omnidiff::tui::theme;
+use omnidiff::tui::widgets::code_viewer::syntax_theme_names;
 
 #[derive(Parser)]
 #[command(about = "Render the viewer offscreen and print its styled cells as JSON")]
@@ -71,7 +71,7 @@ fn main() -> Result<()> {
     // Opening a pair records it in the config, like the live viewer. Keep that out of the
     // caller's real config unless they pointed at one themselves.
     let scratch_config =
-        std::env::temp_dir().join(format!("codediff-screenshot-{}.toml", std::process::id()));
+        std::env::temp_dir().join(format!("omnidiff-screenshot-{}.toml", std::process::id()));
     if std::env::var_os(theme::CONFIG_ENV).is_none() {
         // SAFETY: before any other thread exists.
         unsafe { std::env::set_var(theme::CONFIG_ENV, &scratch_config) };

@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -24,7 +24,7 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 #[test]
 fn mapping() -> Result<()> {
     // The human deletes an `expression_statement` in a nested `if` and inserts its replacement;
-    // codediff reuses the deleted leaves inside the inserted one. The scaffolding-reuse family.
+    // omnidiff reuses the deleted leaves inside the inserted one. The scaffolding-reuse family.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "java-defects4j-cli-18-posixparser",
         16,

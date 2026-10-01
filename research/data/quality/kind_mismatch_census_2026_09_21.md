@@ -25,7 +25,7 @@ schema for a cross-kind match to hide.
 **Two things this number is not.** It is not a measure of how often cross-kind matching is
 *needed*: the human solver raised a `y`/`n` modal on every cross-kind match until 2026-09-21, and
 a painter who hits friction records delete+insert instead, invisibly. 110 is a floor. And it is
-not a measure of how often codediff gets these wrong - nothing here reads codediff's output at
+not a measure of how often omnidiff gets these wrong - nothing here reads omnidiff's output at
 all. This is strictly the shape of the ground truth.
 
 ## The rule set

@@ -1,4 +1,4 @@
-#  This file is part of the CodeDiff code diffing tool.
+#  This file is part of the OmniDiff code diffing tool.
 #
 #  Copyright (C) 2026 Marko Ivankovic
 #
@@ -14,7 +14,7 @@
 #
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
-"""Compare codediff against other diff tools - Unix `diff`, GumTree, difftastic, diffsitter today
+"""Compare omnidiff against other diff tools - Unix `diff`, GumTree, difftastic, diffsitter today
 (`benchmark_other.rs`'s `ExternalTool` can grow more) - on line-level agreement with the
 human-authored mapping, and on runtime.
 
@@ -22,7 +22,7 @@ Reads benchmark_other.csv (produced by
 `cargo run --release --bin benchmark_other -- --csv --repeats N`), one row per fixture with
 `<tool>_mismatches` (a single count - deterministic, only ever computed once) and `<tool>_ms`
 (every one of the `--repeats` timing measurements for that fixture, `;`-joined into one field -
-see `ms_values`) columns for codediff and every `ExternalTool`. See that binary's own doc comment
+see `ms_values`) columns for omnidiff and every `ExternalTool`. See that binary's own doc comment
 for what "mismatch" means (a line where the tool's touched/untouched call disagrees with the human
 mapping projected down to lines - the only signal a line-based tool like Unix diff can produce at
 all, so it's the fairest common ground, not node-level accuracy). A CSV from a pre-`--repeats`
@@ -36,7 +36,7 @@ Writes three plots:
     so the two distributions sit side by side within each bucket.
   - benchmark_other_runtime.png: full runtime distribution (every individual repeat, not a
     per-fixture mean), one violin per tool plus a `treesitter_parse_ms` reference violin (log-scale
-    y-axis, KDE computed in log10-space - codediff's per-fixture times span ~3 orders of magnitude,
+    y-axis, KDE computed in log10-space - omnidiff's per-fixture times span ~3 orders of magnitude,
     so a single mean bar hides exactly the shape that matters here). The reference violin is
     tree-sitter parsing alone, with no diffing on top - the lower bound every other series must pay
     before its own work even starts.
@@ -108,9 +108,9 @@ BASELINE = "#c3c2b7"
 #
 # `treesitter_parse` (black, INK_PRIMARY) and `unix_diff` (grey, INK_MUTED) reuse this file's own
 # chart-chrome tokens rather than a categorical color - a deliberate choice: neither
-# is "a tool being compared" the way codediff/gumtree/difftastic/diffsitter are, one's a reference
+# is "a tool being compared" the way omnidiff/gumtree/difftastic/diffsitter are, one's a reference
 # lower bound, the other the long-standing line-level baseline every other series is measured
-# against. codediff/gumtree/gumtree_warm's colors (blue/violet/red) are from the dataviz skill's
+# against. omnidiff/gumtree/gumtree_warm's colors (blue/violet/red) are from the dataviz skill's
 # reference palette, originally validated colorblind-safe via validate_palette.js as part of a
 # larger fivesome that also included unix_diff/treesitter_parse's old categorical slots, before
 # those two moved to grey/black above. difftastic/diffsitter (gold/teal) were added after that
@@ -136,7 +136,7 @@ DISPLAY_NAMES = {
     "bdiff": "BDiff (per process)",
     "nvim_diff": "nvim -d",
     "bdiff_warm": "BDiff (warm interpreter)",
-    "codediff": "CodeDiff",
+    "omnidiff": "OmniDiff",
     "gumtree": "GumTree (binary)",
     "gumtree_warm": "GumTree (warm JVM)",
     "diffsitter": "diffsitter",
@@ -160,7 +160,7 @@ LATEX_NAMES = {
     "bdiff": r"BDiff (cold, per-invocation)",
     "nvim_diff": r"\texttt{nvim -d}",
     "bdiff_warm": r"BDiff (warm interpreter)",
-    "codediff": r"\textsc{CodeDiff}",
+    "omnidiff": r"\textsc{OmniDiff}",
     "gumtree": r"GumTree (cold, per-invocation)",
     "gumtree_warm": r"GumTree (warm JVM)",
     "diffsitter": r"diffsitter",
@@ -184,7 +184,7 @@ COLORS = {
     "bdiff": "#3f8f4f",
     "nvim_diff": "#57a773",
     "bdiff_warm": "#7fbf8f",
-    "codediff": "#2a78d6",
+    "omnidiff": "#2a78d6",
     "gumtree": "#4a3aa7",
     "gumtree_warm": "#e34948",
     "difftastic": "#c9a227",
@@ -214,14 +214,14 @@ def ordered(ids: list[str]) -> list[str]:
 
 
 def rows_for(id_: str, rows: list[dict]) -> list[dict]:
-    """Which of `rows` series `id_` draws from. `treesitter_parse`/`codediff` always draw from the
-    full corpus (every language parses, and codediff has no scope gaps of its own). `gumtree_warm`
+    """Which of `rows` series `id_` draws from. `treesitter_parse`/`omnidiff` always draw from the
+    full corpus (every language parses, and omnidiff has no scope gaps of its own). `gumtree_warm`
     draws from whichever rows the batch driver actually covered that run - its own opt-in
     availability check, not a per-fixture language scope (see `plot_runtime`'s doc comment). Every
     other id is `applicable_rows` - `ExternalTool::supports`'s per-fixture language scope."""
-    if id_ in ("treesitter_parse", "codediff") or id_ in TEXT_TOOLS:
+    if id_ in ("treesitter_parse", "omnidiff") or id_ in TEXT_TOOLS:
         # Every text-based tool is language-agnostic (`ExternalTool::supports` returns true for
-        # all of them), so like codediff they always draw from the full corpus.
+        # all of them), so like omnidiff they always draw from the full corpus.
         return rows
     if id_ in ("gumtree_warm", "bdiff_warm"):
         return [r for r in rows if r.get(f"{id_}_ms", "") != ""]
@@ -243,7 +243,7 @@ def tool_names(fieldnames: list[str]) -> list[str]:
     return [
         c[: -len("_mismatches")]
         for c in fieldnames
-        if c.endswith("_mismatches") and c != "codediff_mismatches"
+        if c.endswith("_mismatches") and c != "omnidiff_mismatches"
     ]
 
 
@@ -276,7 +276,7 @@ def applicable_rows(rows: list[dict], tool: str) -> list[dict]:
 def agreement(rows: list[dict], tool: str) -> np.ndarray:
     """Per-fixture agreement % for `tool`, filtered to `applicable_rows` internally - callers
     don't need to pre-filter `rows` per label themselves, since different labels in the same call
-    (e.g. `plot_accuracy`'s "codediff" alongside "gumtree") can have different applicable subsets."""
+    (e.g. `plot_accuracy`'s "omnidiff" alongside "gumtree") can have different applicable subsets."""
     scoped = applicable_rows(rows, tool)
     total = np.array([int(r["total_lines"]) for r in scoped], dtype=float)
     mismatches = np.array([int(r[f"{tool}_mismatches"]) for r in scoped], dtype=float)
@@ -354,7 +354,7 @@ def _plot_agreement_histogram(
 # emit hunk headers and whole lines, and nothing finer exists to extract. Sub-line means the tool
 # reports character or column ranges inside a line: difftastic's per-change `start`/`end` columns,
 # GumTree's, diffsitter's and srcDiff's character offsets (through `span_from_char_offsets` in
-# benchmark_other.rs), BDiff's `str_diff` ranges, and codediff's own `TextRange` columns.
+# benchmark_other.rs), BDiff's `str_diff` ranges, and omnidiff's own `TextRange` columns.
 #
 # `nvim -d` is in the sub-line group: its line pass is libxdiff, the same engine as the four git
 # rows, but it adds a second pass that highlights changed characters *within* those lines, which
@@ -365,7 +365,7 @@ def _plot_agreement_histogram(
 # the tool. It is measured, and the corpus decides.
 GRANULARITY = {
     "line": ["unix_diff", "git_myers", "git_minimal", "git_patience", "git_histogram"],
-    "subline": ["bdiff", "nvim_diff", "diffsitter", "difftastic", "gumtree", "srcdiff", "codediff"],
+    "subline": ["bdiff", "nvim_diff", "diffsitter", "difftastic", "gumtree", "srcdiff", "omnidiff"],
 }
 
 # Agreement buckets, most-accurate first. Checked in order and first match wins, so a fixture at
@@ -426,14 +426,14 @@ def bucket_counts(accuracy_rows, tool, metric="line"):
     return len(scored), counts
 
 
-def write_bucket_table(accuracy_rows, output_path, include_codediff):
+def write_bucket_table(accuracy_rows, output_path, include_omnidiff):
     r"""Per-fixture agreement buckets as a generated LaTeX table, ``\input`` directly.
 
     A bucketed-agreement histogram could not show the result this exists to show: with 10-point
     buckets every tool put the large majority of its fixtures into
     the single 90--100% bar, so the chart's whole dynamic range sat inside one column. These
     buckets zoom in where the data actually is, and what they expose is not a small difference -
-    CodeDiff maps 418 of 486 fixtures with zero mismatched lines against Unix diff's 244, where the
+    OmniDiff maps 418 of 486 fixtures with zero mismatched lines against Unix diff's 244, where the
     pooled line rates (0.80% against 1.13%) look nearly tied. Both readings are true: the pooled
     rate is dominated by a handful of very large fixtures, and this one weights every change
     equally.
@@ -472,7 +472,7 @@ def write_bucket_table(accuracy_rows, output_path, include_codediff):
     for group, members in GRANULARITY.items():
         lines.append(group_titles[group])
         for tool in members:
-            if tool == "codediff" and not include_codediff:
+            if tool == "omnidiff" and not include_omnidiff:
                 continue
             result = bucket_counts(accuracy_rows, tool)
             if result is None:
@@ -531,19 +531,19 @@ def write_node_bucket_table(accuracy_rows, output_path):
         f"    Tool & $n$ & {header_labels} {row_end}",
         r"    \midrule",
     ]
-    lines += _bucket_rows(accuracy_rows, GRANULARITY["subline"], "node", include_codediff=True)
+    lines += _bucket_rows(accuracy_rows, GRANULARITY["subline"], "node", include_omnidiff=True)
     lines += [r"    \bottomrule", r"  \end{tabular}", r"\end{table*}"]
     output_path.write_text("\n".join(lines) + "\n")
     print(f"Table written to {output_path}")
 
 
-def _bucket_rows(accuracy_rows, tools, metric, include_codediff):
+def _bucket_rows(accuracy_rows, tools, metric, include_omnidiff):
     """The `Tool & n & <bucket cells>` body rows for one granularity, as LaTeX source lines."""
     backslash = "\\"
     row_end = backslash * 2
     rows = []
     for tool in tools:
-        if tool == "codediff" and not include_codediff:
+        if tool == "omnidiff" and not include_omnidiff:
             continue
         result = bucket_counts(accuracy_rows, tool, metric=metric)
         if result is None:
@@ -557,7 +557,7 @@ def _bucket_rows(accuracy_rows, tools, metric, include_codediff):
     return rows
 
 
-def write_combined_bucket_table(accuracy_rows, output_path, include_codediff):
+def write_combined_bucket_table(accuracy_rows, output_path, include_omnidiff):
     r"""The line and node readings as **one** table, which is what the paper \input{}s.
 
     As two separate floats with byte-identical column headers (``Tool``, ``n``, and the four
@@ -568,14 +568,14 @@ def write_combined_bucket_table(accuracy_rows, output_path, include_codediff):
     than in two captions a reader has to hold side by side.
 
     The asymmetry between the halves is deliberate. The line half omits
-    \textsc{CodeDiff} (`include_codediff`), because Section 7 answers RQ4 over other people's
+    \textsc{OmniDiff} (`include_omnidiff`), because Section 7 answers RQ4 over other people's
     tools and the paper's own tool is reported in its own section; the node half includes it,
-    because the node reading is where a reader asking "and where does CodeDiff land" is actually
-    looking. Passing `include_codediff=True` puts it in both.
+    because the node reading is where a reader asking "and where does OmniDiff land" is actually
+    looking. Passing `include_omnidiff=True` puts it in both.
 
     **No node block.** Node-granularity rows would be a second reading of the same tools under a
     metric only half of them can be scored on. Line granularity is the single common
-    ground all eleven configurations share, and it is the basis Section 8 scores \textsc{CodeDiff}
+    ground all eleven configurations share, and it is the basis Section 8 scores \textsc{OmniDiff}
     on too, so the table now carries the two line-level blocks only. The node numbers stay
     available in `write_node_bucket_table`'s own file for anything that wants them.
     """
@@ -604,13 +604,13 @@ def write_combined_bucket_table(accuracy_rows, output_path, include_codediff):
         r"    \midrule",
         r"    \multicolumn{6}{l}{\emph{Line granularity: line-only tools}} " + row_end,
     ]
-    lines += _bucket_rows(accuracy_rows, GRANULARITY["line"], "line", include_codediff)
+    lines += _bucket_rows(accuracy_rows, GRANULARITY["line"], "line", include_omnidiff)
     lines.append(r"    \addlinespace")
     lines.append(
         r"    \multicolumn{6}{l}{\emph{Line granularity: tools reporting sub-line detail}} "
         + row_end
     )
-    lines += _bucket_rows(accuracy_rows, GRANULARITY["subline"], "line", include_codediff)
+    lines += _bucket_rows(accuracy_rows, GRANULARITY["subline"], "line", include_omnidiff)
     lines += [r"    \bottomrule", r"  \end{tabular}", r"\end{table*}"]
     output_path.write_text("\n".join(lines) + "\n")
     print(f"Table written to {output_path}")
@@ -629,8 +629,8 @@ DATASET_LABELS = [
 ALL_DATASETS = "All"
 
 # The LaTeX macro-name stem for each dataset label. A control sequence is letters only, so
-# `Defects4J` cannot be spelled into one: `\CodeDiffPerfectPctDefects4J` is not a macro name, it
-# is `\CodeDiffPerfectPctDefects` followed by the characters `4J`, which `main.tex` would typeset
+# `Defects4J` cannot be spelled into one: `\OmniDiffPerfectPctDefects4J` is not a macro name, it
+# is `\OmniDiffPerfectPctDefects` followed by the characters `4J`, which `main.tex` would typeset
 # as an undefined-control-sequence error rather than a number. Every other label happens to be
 # letters already and maps to itself, so this dict is the one place the two spellings differ.
 DATASET_MACRO_STEMS = {"Defects4J": "DefectsFourJ"}
@@ -683,9 +683,9 @@ def plot_dataset_buckets(accuracy_rows, datasets, output_path):
     Perfect share over the whole corpus, so the panels share one y axis and a row means the same
     tool everywhere.
 
-    \textsc{CodeDiff} is deliberately absent: Section 7 answers RQ4 over other people's tools and
-    the paper's own tool is reported in Section 8 (`write_codediff_dataset_table`)."""
-    tools = [t for t in GRANULARITY["line"] + GRANULARITY["subline"] if t != "codediff"]
+    \textsc{OmniDiff} is deliberately absent: Section 7 answers RQ4 over other people's tools and
+    the paper's own tool is reported in Section 8 (`write_omnidiff_dataset_table`)."""
+    tools = [t for t in GRANULARITY["line"] + GRANULARITY["subline"] if t != "omnidiff"]
     overall = {t: dataset_bucket_shares(accuracy_rows, datasets, t) for t in tools}
     tools = [t for t in tools if ALL_DATASETS in overall[t]]
     # Best at the top: matplotlib draws y upward, so the sort is ascending by Perfect share.
@@ -802,8 +802,8 @@ def read_quality_rows(csv_path: Path) -> dict[str, dict] | None:
 
     This is the source of the paper's node-accuracy figures (the CORPUS block in
     paper_variables.py totals its `mismatches`/`total_nodes` and `visible_mismatches`/
-    `visible_nodes` columns), which is why the per-dataset CodeDiff table reads its node columns
-    from here rather than from benchmark_accuracy.csv: the latter's `codediff_node_mismatches` is
+    `visible_nodes` columns), which is why the per-dataset OmniDiff table reads its node columns
+    from here rather than from benchmark_accuracy.csv: the latter's `omnidiff_node_mismatches` is
     the per-node "did you consider this changed" projection every sub-line tool is scored on,
     not mapping fidelity, and over the same 775 fixtures it totals 16,656 mismatches where the
     mapping-fidelity figure is 7,012. Two numbers both called "node
@@ -814,10 +814,10 @@ def read_quality_rows(csv_path: Path) -> dict[str, dict] | None:
         return {r["solution"]: r for r in csv.DictReader(f)}
 
 
-def write_codediff_dataset_table(accuracy_rows, datasets, output_path):
-    r"""\textsc{CodeDiff}'s per-dataset agreement as a single-column LaTeX table for Section 8 -
+def write_omnidiff_dataset_table(accuracy_rows, datasets, output_path):
+    r"""\textsc{OmniDiff}'s per-dataset agreement as a single-column LaTeX table for Section 8 -
     the tool's own per-dataset reading, kept apart from `plot_dataset_buckets` because Section 8
-    reports \textsc{CodeDiff} on its own rather than against the other tools.
+    reports \textsc{OmniDiff} on its own rather than against the other tools.
 
     The columns are the four buckets of `write_bucket_table`, on the same rows and the same
     line-level basis, so a row here can be read directly against a row of that table. A pooled
@@ -832,12 +832,12 @@ def write_codediff_dataset_table(accuracy_rows, datasets, output_path):
         "% regenerate: make timing-report (from research/).",
         r"\begin{table}",
         (
-            r"  \caption{\textsc{CodeDiff} against the human mapping, in the four agreement"
+            r"  \caption{\textsc{OmniDiff} against the human mapping, in the four agreement"
             r" buckets of Table~\ref{tab:agreement-buckets} and on the same line-level basis, so"
             r" that a row here can be read directly against a row there. \emph{Perfect} means"
             r" literally zero mismatched lines.}"
         ),
-        r"  \label{tab:codediff-by-dataset}",
+        r"  \label{tab:omnidiff-by-dataset}",
         r"  \small",
         r"  \begin{tabular}{l" + "r" * (1 + len(BUCKETS)) + "}",
         r"    \toprule",
@@ -846,7 +846,7 @@ def write_codediff_dataset_table(accuracy_rows, datasets, output_path):
     ]
     for key, label in DATASET_LABELS + [(ALL_DATASETS, ALL_DATASETS)]:
         rows = rows_in_dataset(accuracy_rows, datasets, key)
-        buckets = bucket_counts(rows, "codediff")
+        buckets = bucket_counts(rows, "omnidiff")
         if buckets is None:
             continue
         scored, counts = buckets
@@ -901,7 +901,7 @@ def plot_summary(rows, tools, output_path):
     the same flag - do not). That is an artifact of run order, not of the algorithms.
     """
     ids = ordered(
-        ["codediff"] + tools + [w for w in ("gumtree_warm", "bdiff_warm") if has_warm(rows, w)]
+        ["omnidiff"] + tools + [w for w in ("gumtree_warm", "bdiff_warm") if has_warm(rows, w)]
     )
     fig, ax = plt.subplots(figsize=(11, 5.5), facecolor=SURFACE)
 
@@ -968,7 +968,7 @@ def median_ms(rows, id_):
 def plot_runtime(rows: list[dict], tools: list[str], output_path: Path) -> None:
     """One violin per tool, plus a `treesitter_parse` reference violin and (when present in the
     CSV) a `gumtree_warm` reference violin, full per-fixture distribution rather than just the mean
-    - codediff's 93 per-fixture times span ~3 orders of magnitude (3ms to 3.9s, dominated by file
+    - omnidiff's 93 per-fixture times span ~3 orders of magnitude (3ms to 3.9s, dominated by file
     size), so a single bar hides exactly the shape that matters here. `violinplot` runs its KDE in
     log10-space (matplotlib's own kernel bandwidth assumes a linear axis, so feeding it raw ms on a
     log-scaled axis would misshape the KDE) - the y-axis ticks are then relabeled back to real ms.
@@ -976,7 +976,7 @@ def plot_runtime(rows: list[dict], tools: list[str], output_path: Path) -> None:
     Series order and display names both come from `DISPLAY_ORDER`/`DISPLAY_NAMES` (see `ordered`),
     not from `tools`' own CSV-column order, so this plot, `plot_accuracy`, and
     `variance_table_rows` all read in the same fixed sequence regardless of which columns happen
-    to appear first in the CSV: TreeSitter parse, UNIX diff, CodeDiff, GumTree (binary), GumTree
+    to appear first in the CSV: TreeSitter parse, UNIX diff, OmniDiff, GumTree (binary), GumTree
     (warm JVM), diffsitter, difftastic. `treesitter_parse` goes first: it's not a competing tool
     (no accuracy
     to score, see `plot_accuracy`'s doc comment for why it's absent there), it's the reference
@@ -993,10 +993,10 @@ def plot_runtime(rows: list[dict], tools: list[str], output_path: Path) -> None:
     for it separately.
 
     Each tool's violin is built from its own `applicable_rows` (see that function's doc comment) -
-    a language-scoped tool like GumTree has far fewer points than codediff/unix_diff, so its violin
+    a language-scoped tool like GumTree has far fewer points than omnidiff/unix_diff, so its violin
     is necessarily noisier and its x-tick carries an explicit "(n=...)" rather than implying the
     same sample size as everything else on the axis. `treesitter_parse_ms` has no scope gaps (every
-    corpus language parses), so it's always full sample size, same as codediff.
+    corpus language parses), so it's always full sample size, same as omnidiff.
 
     Every point plotted is one individual `--repeats` measurement, not a per-fixture mean/median -
     `ms_values` splits `benchmark_other.rs`'s `;`-joined column back into its full sample, so a
@@ -1019,7 +1019,7 @@ def plot_runtime(rows: list[dict], tools: list[str], output_path: Path) -> None:
     ids = [
         i
         for i in ordered(
-            ["codediff"] + tools + [w for w in ("gumtree_warm", "bdiff_warm") if has_warm(rows, w)]
+            ["omnidiff"] + tools + [w for w in ("gumtree_warm", "bdiff_warm") if has_warm(rows, w)]
         )
         if i not in FIGURE_OMITS
     ]
@@ -1164,7 +1164,7 @@ def variance_table_rows(rows: list[dict], tools: list[str]) -> list[tuple[str, i
     points, same spirit as `applicable_rows` dropping out-of-scope rows entirely instead of
     coercing them to a misleading value."""
     ids = ordered(
-        ["treesitter_parse", "codediff"]
+        ["treesitter_parse", "omnidiff"]
         + tools
         + [w for w in ("gumtree_warm", "bdiff_warm") if has_warm(rows, w)]
     )
@@ -1234,7 +1234,7 @@ def write_variance_table(rows: list[dict], tools: list[str], output_path: Path) 
 # harmless (see the `Shape*` block for the established precedent). Every tool
 # covers the full corpus, so `common_subset` below is unchanged by their presence.
 PAPER_MACRO_STEMS = {
-    "codediff": "CodeDiff",
+    "omnidiff": "OmniDiff",
     "unix_diff": "UnixDiff",
     "git_myers": "GitMyers",
     "git_minimal": "GitMinimal",
@@ -1304,25 +1304,25 @@ def speed_percentiles(rows: list[dict], id_: str) -> tuple[float, float, float] 
     became adaptive (as they are in `benchmark_diff_pairs`, which skips repeats for already-slow
     pairs). Returns None for a series with no measurements.
 
-    For `codediff` the parse is added back in. `benchmark_other` calls `ensure_parsed()` on every
-    fixture *before* timing starts, so `codediff_ms` covers `diff_code` alone - no parse, no
+    For `omnidiff` the parse is added back in. `benchmark_other` calls `ensure_parsed()` on every
+    fixture *before* timing starts, so `omnidiff_ms` covers `diff_code` alone - no parse, no
     process spawn, no IO - while every external tool's timed region is its whole subprocess:
     temp-file write, spawn, that tool's own parse and diff, and parsing its output back. Reporting
-    the two side by side compared different things and flattered codediff by its entire parse cost
+    the two side by side compared different things and flattered omnidiff by its entire parse cost
     (p50 7.09 ms against diffsitter's 8.62, which became 10.07 once the parse it had
     already measured was included - reversing the ordering the paper stated).
 
     `treesitter_parse_ms` is measured per repeat by the same harness, so this needs no re-run: it
     is a reporting fix, not new data. The remaining asymmetry runs the *other* way and is stated in
-    the paper rather than silently carried - codediff still pays no process-startup cost, which
+    the paper rather than silently carried - omnidiff still pays no process-startup cost, which
     every external tool pays in full."""
     values = [v for r in rows_for(id_, rows) for v in ms_values(r, f"{id_}_ms")]
-    if id_ == "codediff":
+    if id_ == "omnidiff":
         # Paired per repeat, not pooled separately, so a fixture's parse is added to that same
         # fixture's diff rather than to some other fixture's.
         values = []
         for r in rows_for(id_, rows):
-            diff_ms = ms_values(r, "codediff_ms")
+            diff_ms = ms_values(r, "omnidiff_ms")
             parse_ms = ms_values(r, "treesitter_parse_ms")
             if not diff_ms:
                 continue
@@ -1340,14 +1340,14 @@ def speed_percentiles(rows: list[dict], id_: str) -> tuple[float, float, float] 
 
 def speed_sample(rows: list[dict], id_: str) -> list[float]:
     """Every individual wall-clock measurement for `id_`, in milliseconds, on the same population
-    and with the same codediff parse handling as `speed_percentiles` - which is the point: the max
+    and with the same omnidiff parse handling as `speed_percentiles` - which is the point: the max
     the paper quotes has to come from the sample its percentiles come from, or the two describe
     different runs."""
-    if id_ != "codediff":
+    if id_ != "omnidiff":
         return [v for r in rows_for(id_, rows) for v in ms_values(r, f"{id_}_ms")]
     values: list[float] = []
     for r in rows_for(id_, rows):
-        diff_ms = ms_values(r, "codediff_ms")
+        diff_ms = ms_values(r, "omnidiff_ms")
         parse_ms = ms_values(r, "treesitter_parse_ms")
         if not diff_ms:
             continue
@@ -1422,8 +1422,8 @@ def write_paper_fragment(
                 )
 
         # Per-dataset readings: the Perfect share of every configuration
-        # and CodeDiff's pooled line rate, split by the four datasets of Section 3. Same
-        # sources as `plot_dataset_buckets` and `write_codediff_dataset_table`.
+        # and OmniDiff's pooled line rate, split by the four datasets of Section 3. Same
+        # sources as `plot_dataset_buckets` and `write_omnidiff_dataset_table`.
         datasets = fixture_datasets()
         lines.append(
             "% Per-dataset: Curated = small/, Full = full/, Stratified = stratified/, "
@@ -1440,7 +1440,7 @@ def write_paper_fragment(
                         f"\\newcommand{{\\{stem}PerfectPct{macro_stem(label)}}}"
                         f"{{{100.0 * counts[0] / scored:.0f}}}"
                     )
-                if id_ == "codediff":
+                if id_ == "omnidiff":
                     totals = accuracy_totals(subset, id_)
                     if totals is not None:
                         _, mismatches, total = totals
@@ -1448,7 +1448,7 @@ def write_paper_fragment(
                             f"\\newcommand{{\\{stem}LineRate{macro_stem(label)}}}"
                             f"{{{100.0 * mismatches / total:.3f}}}"
                         )
-                    # Node and visible-node accuracy per dataset. `write_codediff_dataset_table`
+                    # Node and visible-node accuracy per dataset. `write_omnidiff_dataset_table`
                     # carries the agreement buckets (see its doc comment), and the prose that reads
                     # the four datasets in the same order on all three metrics needs these numbers
                     # to stay checkable.
@@ -1471,14 +1471,14 @@ def write_paper_fragment(
                                         f"{{{100.0 * (total_n - miss_n) / total_n:.2f}}}"
                                     )
 
-        # srcDiff parses five languages, so its Perfect share and CodeDiff's are over different
+        # srcDiff parses five languages, so its Perfect share and OmniDiff's are over different
         # fixtures. The paper sets them side by side on srcDiff's own subset, and only there.
         srcdiff_scored = [r for r in accuracy_rows if r.get("srcdiff_line_mismatches", "") != ""]
-        buckets = bucket_counts(srcdiff_scored, "codediff")
+        buckets = bucket_counts(srcdiff_scored, "omnidiff")
         if buckets is not None:
             scored, counts = buckets
             lines.append(
-                f"\\newcommand{{\\SrcDiffSubsetCodeDiffPerfectPct}}{{{100.0 * counts[0] / scored:.0f}}}"
+                f"\\newcommand{{\\SrcDiffSubsetOmniDiffPerfectPct}}{{{100.0 * counts[0] / scored:.0f}}}"
             )
 
         # main.tex names the best established tools in prose (the abstract, RA4.1, the findings
@@ -1488,7 +1488,7 @@ def write_paper_fragment(
         perfect = {}
         for id_ in PAPER_MACRO_STEMS:
             buckets = bucket_counts(accuracy_rows, id_)
-            if id_ != "codediff" and buckets is not None:
+            if id_ != "omnidiff" and buckets is not None:
                 perfect[id_] = 100.0 * buckets[1][0] / buckets[0]
         ranked = sorted(perfect, key=perfect.get, reverse=True)
         if ranked[:2] != ["srcdiff", "difftastic"]:
@@ -1511,7 +1511,7 @@ def write_paper_fragment(
 
     lines.append("% Speed: pooled per-repeat wall-clock, milliseconds.")
     speed_ids = ordered(
-        ["codediff"] + tools + [w for w in ("gumtree_warm", "bdiff_warm") if has_warm(rows, w)]
+        ["omnidiff"] + tools + [w for w in ("gumtree_warm", "bdiff_warm") if has_warm(rows, w)]
     )
     for id_ in speed_ids:
         percentiles = speed_percentiles(rows, id_)
@@ -1538,7 +1538,7 @@ def write_paper_fragment(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Compare codediff against other diff tools from benchmark_other.csv."
+        description="Compare omnidiff against other diff tools from benchmark_other.csv."
     )
     parser.add_argument(
         "--csv",
@@ -1553,7 +1553,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--quality-csv",
         default="data/quality/optimal_solutions_benchmark.csv",
-        help="Path to codediff's own quality benchmark CSV, the source of its node accuracy"
+        help="Path to omnidiff's own quality benchmark CSV, the source of its node accuracy"
         " (default: data/quality/optimal_solutions_benchmark.csv)",
     )
     parser.add_argument(
@@ -1586,33 +1586,33 @@ if __name__ == "__main__":
     write_variance_table(rows, tools, plots_dir / "benchmark_other_variance.tex")
     accuracy_rows = read_accuracy_rows(Path(args.accuracy_csv))
     if accuracy_rows:
-        # Two fragments, same reason `plot_accuracy`/`plot_accuracy_with_codediff` were two files:
-        # the paper answers RQ2 without codediff, and a reader asking where codediff lands wants
+        # Two fragments, same reason `plot_accuracy`/`plot_accuracy_with_omnidiff` were two files:
+        # the paper answers RQ2 without omnidiff, and a reader asking where omnidiff lands wants
         # it in. Neither audience can be handed the other's table by accident.
         write_bucket_table(
-            accuracy_rows, plots_dir / "benchmark_other_buckets.tex", include_codediff=False
+            accuracy_rows, plots_dir / "benchmark_other_buckets.tex", include_omnidiff=False
         )
         write_bucket_table(
             accuracy_rows,
-            plots_dir / "benchmark_other_buckets_with_codediff.tex",
-            include_codediff=True,
+            plots_dir / "benchmark_other_buckets_with_omnidiff.tex",
+            include_omnidiff=True,
         )
         write_node_bucket_table(accuracy_rows, plots_dir / "benchmark_other_buckets_node.tex")
         # What the paper actually \input{}s - see write_combined_bucket_table.
         write_combined_bucket_table(
             accuracy_rows,
             plots_dir / "benchmark_other_buckets_combined.tex",
-            include_codediff=False,
+            include_omnidiff=False,
         )
         # Per-dataset readings - see plot_dataset_buckets.
         datasets = fixture_datasets()
         plot_dataset_buckets(
             accuracy_rows, datasets, plots_dir / "benchmark_other_buckets_by_dataset.png"
         )
-        write_codediff_dataset_table(
+        write_omnidiff_dataset_table(
             accuracy_rows,
             datasets,
-            plots_dir / "benchmark_codediff_by_dataset.tex",
+            plots_dir / "benchmark_omnidiff_by_dataset.tex",
         )
         print_bucket_table(accuracy_rows)
 

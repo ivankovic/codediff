@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -29,10 +29,10 @@ use std::sync::Arc;
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
 
-use codediff::code::Code;
-use codediff::code::language::language_for_path;
-use codediff::diff::diff_code;
-use codediff::stats::count_nodes;
+use omnidiff::code::Code;
+use omnidiff::code::language::language_for_path;
+use omnidiff::diff::diff_code;
+use omnidiff::stats::count_nodes;
 
 /// Counts heap allocation per thread, not per process, so a timed-out thread left running cannot
 /// pollute the next pair's numbers.
@@ -176,7 +176,7 @@ fn open_repo<'a>(
 
 fn blob_content(repo: &Repository, treeish: &str, path: &str) -> Result<Vec<u8>> {
     let tree = repo.revparse_single(treeish)?.peel_to_tree()?;
-    codediff::stats::git::blob_bytes(repo, &tree, Path::new(path))
+    omnidiff::stats::git::blob_bytes(repo, &tree, Path::new(path))
 }
 
 /// The settings every measurement runs under, in both modes.
@@ -301,7 +301,7 @@ fn measure_codes(mut row: Row, before_code: Code, after_code: Code, budget: Budg
         // The product's stack size, not the 2MB default: an overflow aborts the process past
         // `catch_unwind`, and would blame the diff for a harness limit.
         std::thread::Builder::new()
-            .stack_size(codediff::tui::app::DIFF_COMPUTE_STACK_SIZE)
+            .stack_size(omnidiff::tui::app::DIFF_COMPUTE_STACK_SIZE)
             .spawn(move || {
                 let start = Instant::now();
                 let result =
@@ -385,7 +385,7 @@ const FIXTURE_DATASETS: &[&str] = &["small", "full", "stratified", "defects4j"];
 /// `handmade_test_case_dirs`' deterministic order.
 fn paper_fixture_dirs() -> Result<Vec<(String, String, PathBuf)>> {
     let mut out = Vec::new();
-    for (name, dir) in codediff::test::helper::handmade_test_case_dirs()? {
+    for (name, dir) in omnidiff::test::helper::handmade_test_case_dirs()? {
         let dataset = dir
             .parent()
             .and_then(|p| p.file_name())
@@ -456,7 +456,7 @@ fn main() -> Result<()> {
         println!("Loaded {} fixture directories", total);
 
         for (i, (dataset, name, dir)) in fixtures.iter().enumerate() {
-            match codediff::test::helper::code_pair_from_dir(dir) {
+            match omnidiff::test::helper::code_pair_from_dir(dir) {
                 Ok(Some((before, after))) => {
                     let row = measure_fixture(dataset, name, before, after, budget);
                     *status_counts.entry(row.status).or_insert(0) += 1;
@@ -568,7 +568,7 @@ fn main() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use codediff::test::helper;
+    use omnidiff::test::helper;
     use std::collections::HashMap as StdHashMap;
 
     fn budget(iterations: usize, max_combined_nodes: usize) -> Budget {

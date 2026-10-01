@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -30,7 +30,7 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // Minified CSS expanded to multiple lines: codediff calls every displaced rule a Move, while
+    // Minified CSS expanded to multiple lines: omnidiff calls every displaced rule a Move, while
     // the painting says a rule shifted by an edit beside it has not moved. The Move-vs-nothing
     // family, amplified by a tiny file. Recorded to stop it growing, not endorsed.
     assert_matches_human_painting_within_limit(

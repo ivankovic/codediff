@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -411,23 +411,34 @@ where
 }
 
 /// The environment variable that overrides every other config layer.
-pub const CONFIG_ENV: &str = "CODEDIFF_CONFIG";
+pub const CONFIG_ENV: &str = "OMNIDIFF_CONFIG";
 
 /// The project-level config file's name, looked for at or above the current directory.
-const PROJECT_CONFIG: &str = ".codediff.toml";
+const PROJECT_CONFIG: &str = ".omnidiff.toml";
+
+/// The names from before the rename to OmniDiff (v0.2.0), still read for one release so an
+/// upgrade keeps its settings: the variable and the project file as fallbacks, the user config
+/// moved to the new directory the first time it is needed. Remove in v0.3.
+const LEGACY_CONFIG_ENV: &str = "CODEDIFF_CONFIG";
+const LEGACY_PROJECT_CONFIG: &str = ".codediff.toml";
+const LEGACY_CONFIG_DIR: &str = "codediff";
 
 /// The config file to read and write, resolved in this order:
 ///
-/// 1. `$CODEDIFF_CONFIG`, if set and non-empty. Authoritative: no walk-up, no fallback.
-/// 2. The nearest `.codediff.toml` at or above the current directory, **if one already exists**.
-///    It is never created, so codediff does not litter the directories it runs in. The walk-up
+/// 1. `$OMNIDIFF_CONFIG`, if set and non-empty. Authoritative: no walk-up, no fallback.
+/// 2. The nearest `.omnidiff.toml` at or above the current directory, **if one already exists**.
+///    It is never created, so omnidiff does not litter the directories it runs in. The walk-up
 ///    matters because git runs difftools from the repository root.
-/// 3. `$XDG_CONFIG_HOME/codediff/config.toml`, else `$HOME/.config/codediff/config.toml`.
+/// 3. `$XDG_CONFIG_HOME/omnidiff/config.toml`, else `$HOME/.config/omnidiff/config.toml`.
+///
+/// Each layer also accepts its pre-rename name (see [`LEGACY_CONFIG_ENV`]).
 pub(crate) fn config_path() -> PathBuf {
-    if let Ok(explicit) = std::env::var(CONFIG_ENV)
-        && !explicit.is_empty()
-    {
-        return PathBuf::from(explicit);
+    for variable in [CONFIG_ENV, LEGACY_CONFIG_ENV] {
+        if let Ok(explicit) = std::env::var(variable)
+            && !explicit.is_empty()
+        {
+            return PathBuf::from(explicit);
+        }
     }
     #[cfg(test)]
     {
@@ -435,7 +446,32 @@ pub(crate) fn config_path() -> PathBuf {
     }
     #[cfg(not(test))]
     {
-        nearest_project_config().unwrap_or_else(user_config_path)
+        nearest_project_config().unwrap_or_else(|| {
+            let path = user_config_path();
+            adopt_legacy_user_config(&path);
+            path
+        })
+    }
+}
+
+/// Moves a pre-rename `.../codediff/config.toml` to `path`, when `path` is `.../omnidiff/config.toml`
+/// and does not exist yet. Best effort: a failure leaves the defaults, as a fresh machine has.
+fn adopt_legacy_user_config(path: &Path) {
+    if path.exists() {
+        return;
+    }
+    let Some(directory) = path.parent() else {
+        return;
+    };
+    let Some(config_home) = directory.parent() else {
+        return;
+    };
+    if directory.file_name() != Some("omnidiff".as_ref()) {
+        return;
+    }
+    let legacy = config_home.join(LEGACY_CONFIG_DIR).join("config.toml");
+    if legacy.is_file() && std::fs::create_dir_all(directory).is_ok() {
+        let _ = std::fs::rename(&legacy, path);
     }
 }
 
@@ -445,10 +481,10 @@ pub(crate) fn config_path() -> PathBuf {
 /// keyed by process id so threaded `cargo test` runs do not share a file.
 #[cfg(test)]
 fn test_config_path() -> PathBuf {
-    std::env::temp_dir().join(format!("codediff-test-config-{}.toml", std::process::id()))
+    std::env::temp_dir().join(format!("omnidiff-test-config-{}.toml", std::process::id()))
 }
 
-/// The nearest existing `.codediff.toml` at or above the current directory. Unreachable in the
+/// The nearest existing `.omnidiff.toml` at or above the current directory. Unreachable in the
 /// test build; the walk is tested through `nearest_project_config_from`.
 #[cfg_attr(test, allow(dead_code))]
 fn nearest_project_config() -> Option<PathBuf> {
@@ -457,14 +493,16 @@ fn nearest_project_config() -> Option<PathBuf> {
 
 fn nearest_project_config_from(start: &Path) -> Option<PathBuf> {
     start.ancestors().find_map(|directory| {
-        let candidate = directory.join(PROJECT_CONFIG);
-        candidate.is_file().then_some(candidate)
+        [PROJECT_CONFIG, LEGACY_PROJECT_CONFIG]
+            .into_iter()
+            .map(|name| directory.join(name))
+            .find(|candidate| candidate.is_file())
     })
 }
 
 /// Resolved from the environment rather than a `dirs` crate: a new dependency costs every Gentoo
 /// ebuild bump a regenerated `CRATES=` block. With neither variable set it falls back to
-/// `./.codediff.toml` rather than a path under the filesystem root.
+/// `./.omnidiff.toml` rather than a path under the filesystem root.
 #[cfg_attr(test, allow(dead_code))]
 fn user_config_path() -> PathBuf {
     user_config_path_from(
@@ -475,12 +513,12 @@ fn user_config_path() -> PathBuf {
 
 fn user_config_path_from(xdg_config_home: Option<String>, home: Option<String>) -> PathBuf {
     if let Some(xdg) = xdg_config_home.filter(|value| !value.is_empty()) {
-        return PathBuf::from(xdg).join("codediff").join("config.toml");
+        return PathBuf::from(xdg).join("omnidiff").join("config.toml");
     }
     if let Some(home) = home.filter(|value| !value.is_empty()) {
         return PathBuf::from(home)
             .join(".config")
-            .join("codediff")
+            .join("omnidiff")
             .join("config.toml");
     }
     PathBuf::from(PROJECT_CONFIG)
@@ -764,7 +802,7 @@ mod tests {
         assert!(!nested.join(PROJECT_CONFIG).exists());
     }
 
-    /// `~/.config/codediff/` does not exist on a fresh machine, and the user config is the
+    /// `~/.config/omnidiff/` does not exist on a fresh machine, and the user config is the
     /// default destination.
     #[test]
     fn saving_creates_the_directories_the_user_config_lives_in() {
@@ -772,7 +810,7 @@ mod tests {
         let path = home
             .path()
             .join(".config")
-            .join("codediff")
+            .join("omnidiff")
             .join("config.toml");
         assert!(!path.exists());
 
@@ -793,20 +831,54 @@ mod tests {
     }
 
     #[test]
+    fn a_pre_rename_project_config_is_still_found_but_the_new_name_wins() {
+        let root = tempfile::tempdir().expect("temp dir");
+        let nested = root.path().join("a").join("b");
+        std::fs::create_dir_all(&nested).expect("mkdir");
+        let legacy = root.path().join(LEGACY_PROJECT_CONFIG);
+        std::fs::write(&legacy, "").expect("write");
+        assert_eq!(nearest_project_config_from(&nested), Some(legacy));
+
+        let current = root.path().join(PROJECT_CONFIG);
+        std::fs::write(&current, "").expect("write");
+        assert_eq!(nearest_project_config_from(&nested), Some(current));
+    }
+
+    #[test]
+    fn a_pre_rename_user_config_moves_to_the_new_directory_once() {
+        let home = tempfile::tempdir().expect("temp dir");
+        let legacy = home.path().join(LEGACY_CONFIG_DIR).join("config.toml");
+        std::fs::create_dir_all(legacy.parent().unwrap()).expect("mkdir");
+        std::fs::write(&legacy, "node_highlight = true\n").expect("write");
+        let path = home.path().join("omnidiff").join("config.toml");
+
+        adopt_legacy_user_config(&path);
+        assert!(!legacy.exists(), "the old file was moved, not copied");
+        assert!(load_from(path.clone()).node_highlight);
+
+        // Once the new file exists, a stray old one is left alone.
+        std::fs::create_dir_all(legacy.parent().unwrap()).expect("mkdir");
+        std::fs::write(&legacy, "").expect("write");
+        adopt_legacy_user_config(&path);
+        assert!(legacy.exists());
+        assert!(load_from(path).node_highlight);
+    }
+
+    #[test]
     fn the_user_config_path_follows_xdg_then_home() {
         assert_eq!(
             user_config_path_from(Some("/x/config".into()), Some("/home/me".into())),
-            PathBuf::from("/x/config/codediff/config.toml"),
+            PathBuf::from("/x/config/omnidiff/config.toml"),
             "XDG_CONFIG_HOME wins when it is set"
         );
         assert_eq!(
             user_config_path_from(None, Some("/home/me".into())),
-            PathBuf::from("/home/me/.config/codediff/config.toml")
+            PathBuf::from("/home/me/.config/omnidiff/config.toml")
         );
         // An empty variable is not a choice.
         assert_eq!(
             user_config_path_from(Some(String::new()), Some("/home/me".into())),
-            PathBuf::from("/home/me/.config/codediff/config.toml")
+            PathBuf::from("/home/me/.config/omnidiff/config.toml")
         );
         // No HOME at all: a relative path rather than one under `/`.
         assert_eq!(

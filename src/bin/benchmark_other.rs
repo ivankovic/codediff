@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -16,12 +16,12 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-//! Compares codediff against other diff tools (`ExternalTool`) at line granularity, against the
+//! Compares omnidiff against other diff tools (`ExternalTool`) at line granularity, against the
 //! human mappings in `src/test/data/diffs/*/*/human_mapping.json`.
 //!
 //! Lines, because that is the only signal a line-based tool can produce: the human mapping and
-//! codediff's `ASTDiff` are both projected down to per-line "touched or not" labels. That throws
-//! away moves, so a fixture codediff gets node-perfect can still show line mismatches here.
+//! omnidiff's `ASTDiff` are both projected down to per-line "touched or not" labels. That throws
+//! away moves, so a fixture omnidiff gets node-perfect can still show line mismatches here.
 //!
 //! GumTree, difftastic, diffsitter and srcDiff are not bundled: point `GUMTREE_BIN`, `DIFFT_BIN`,
 //! `DIFFSITTER_BIN` and `SRCDIFF_BIN` at built binaries. `treesitter_parse_ms` is timed as a reference lower bound,
@@ -30,13 +30,13 @@
 
 use anyhow::{Context, Result, bail};
 use clap::Parser;
-use codediff::code::{Code, Language};
-use codediff::diff;
-use codediff::diff::text_range::TextRange;
-use codediff::test::helper;
-use codediff::test::helper::SampleProvenance;
-use codediff::test::helper::human_mapping;
 use csv::Writer;
+use omnidiff::code::{Code, Language};
+use omnidiff::diff;
+use omnidiff::diff::text_range::TextRange;
+use omnidiff::test::helper;
+use omnidiff::test::helper::SampleProvenance;
+use omnidiff::test::helper::human_mapping;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
@@ -65,7 +65,7 @@ use srcdiff::*;
 
 #[derive(Parser)]
 struct Args {
-    /// Print every before/after line where codediff or an external tool disagrees with the human
+    /// Print every before/after line where omnidiff or an external tool disagrees with the human
     /// mapping's touched/untouched call, for this one fixture, instead of the summary table.
     #[arg(long)]
     details: Option<String>,
@@ -80,7 +80,7 @@ struct Args {
     ///
     /// Node columns are a "did this node's text change" projection, not the node-to-node mapping
     /// fidelity `benchmark_optimal_solutions` reports: external tools parse their own trees, so
-    /// codediff is scored through the same projection and is not comparable to its own
+    /// omnidiff is scored through the same projection and is not comparable to its own
     /// optimal-solutions number. `*_visible_node_mismatches` restricts it to nodes that carry
     /// text of their own (`diff::nodes::is_structurally_visible`).
     // GumTree can emit a real node mapping, but its trees match tree-sitter's node for node only in
@@ -100,7 +100,7 @@ struct Args {
     #[arg(long, value_name = "NAMES", value_delimiter = ',')]
     fixtures: Vec<String>,
 
-    /// Only score these tools, comma-separated: any `ExternalTool` name plus `codediff`. Default:
+    /// Only score these tools, comma-separated: any `ExternalTool` name plus `omnidiff`. Default:
     /// all of them. Requires `--accuracy-csv`; an unknown name is an error.
     // Not offered for timing runs, whose tables and CSV header are built from `ExternalTool::ALL`.
     #[arg(long, value_name = "NAMES", value_delimiter = ',')]
@@ -108,7 +108,7 @@ struct Args {
 }
 
 /// Which tools an accuracy run scores. `None` means all of them. Names rather than
-/// `ExternalTool`s because `codediff` is selectable too.
+/// `ExternalTool`s because `omnidiff` is selectable too.
 struct ToolSelection(Option<std::collections::HashSet<String>>);
 
 impl ToolSelection {
@@ -117,7 +117,7 @@ impl ToolSelection {
         if names.is_empty() {
             return Ok(ToolSelection(None));
         }
-        let known: Vec<&str> = std::iter::once("codediff")
+        let known: Vec<&str> = std::iter::once("omnidiff")
             .chain(ExternalTool::ALL.iter().map(|tool| tool.name()))
             .collect();
         for name in names {
@@ -293,16 +293,16 @@ fn treesitter_parse_ms(source: &Code, parser: &mut tree_sitter::Parser) -> f64 {
 struct Row {
     name: String,
     /// (mismatched lines, total lines across both sides) against the human line labels.
-    codediff: (usize, usize),
+    omnidiff: (usize, usize),
     /// One entry per `ExternalTool::ALL`; `None` when the tool does not support the language or
     /// failed on this fixture.
     tools: Vec<Option<(usize, usize)>>,
-    /// Milliseconds from parsed `Code` to codediff's line labels, one per repeat.
+    /// Milliseconds from parsed `Code` to omnidiff's line labels, one per repeat.
     ///
     /// Excludes parsing (`main` parses every fixture first), while a tool's timing is its whole
     /// subprocess, so it is not comparable to `tool_ms` alone: add `treesitter_ms` for end to end.
     /// The two stay separate so both "algorithm only" and "end to end" are answerable.
-    codediff_ms: Vec<f64>,
+    omnidiff_ms: Vec<f64>,
     /// Milliseconds inside `ExternalTool::line_labels`, one per repeat; `None` exactly where
     /// `tools` is.
     tool_ms: Vec<Option<Vec<f64>>>,
@@ -331,21 +331,21 @@ fn score_fixture(
     let total_lines = human_before.len() + human_after.len();
 
     // Accuracy is deterministic, so it is scored on the first repeat only.
-    let mut codediff_mismatches = 0usize;
-    let mut codediff_ms = Vec::with_capacity(repeats);
+    let mut omnidiff_mismatches = 0usize;
+    let mut omnidiff_ms = Vec::with_capacity(repeats);
     for i in 0..repeats {
         let started = std::time::Instant::now();
-        let codediff_diff = diff::diff_code(before, after);
-        let codediff_ast = codediff_diff
+        let omnidiff_diff = diff::diff_code(before, after);
+        let omnidiff_ast = omnidiff_diff
             .ast
-            .context("codediff produced no AST mapping")?;
-        let (codediff_before, codediff_after) =
-            human_mapping::touched_lines(before, after, &codediff_ast, &node_cache);
-        codediff_ms.push(started.elapsed().as_secs_f64() * 1000.0);
+            .context("omnidiff produced no AST mapping")?;
+        let (omnidiff_before, omnidiff_after) =
+            human_mapping::touched_lines(before, after, &omnidiff_ast, &node_cache);
+        omnidiff_ms.push(started.elapsed().as_secs_f64() * 1000.0);
         if i == 0 {
-            codediff_mismatches =
-                human_mapping::line_disagreement_count(&human_before, &codediff_before)
-                    + human_mapping::line_disagreement_count(&human_after, &codediff_after);
+            omnidiff_mismatches =
+                human_mapping::line_disagreement_count(&human_before, &omnidiff_before)
+                    + human_mapping::line_disagreement_count(&human_after, &omnidiff_after);
         }
     }
 
@@ -396,9 +396,9 @@ fn score_fixture(
 
     Ok(Row {
         name: name.to_string(),
-        codediff: (codediff_mismatches, total_lines),
+        omnidiff: (omnidiff_mismatches, total_lines),
         tools,
-        codediff_ms,
+        omnidiff_ms,
         tool_ms,
         treesitter_ms,
         gumtree_warm_ms,
@@ -406,21 +406,21 @@ fn score_fixture(
     })
 }
 
-/// `--details`: prints every line where codediff or a tool disagrees with the human mapping.
+/// `--details`: prints every line where omnidiff or a tool disagrees with the human mapping.
 fn print_details(name: &str, before: &Code, after: &Code) -> Result<()> {
     let language = before.metadata.language.unwrap_or_default();
     let (human_before, human_after, node_cache) =
         human_mapping::human_touched_lines_for(name, before, after)?;
 
-    let codediff_diff = diff::diff_code(before, after);
-    let codediff_ast = codediff_diff
+    let omnidiff_diff = diff::diff_code(before, after);
+    let omnidiff_ast = omnidiff_diff
         .ast
-        .context("codediff produced no AST mapping")?;
-    let (codediff_before, codediff_after) =
-        human_mapping::touched_lines(before, after, &codediff_ast, &node_cache);
+        .context("omnidiff produced no AST mapping")?;
+    let (omnidiff_before, omnidiff_after) =
+        human_mapping::touched_lines(before, after, &omnidiff_ast, &node_cache);
 
     let mut sources: Vec<(&str, Vec<bool>, Vec<bool>)> =
-        vec![("codediff", codediff_before, codediff_after)];
+        vec![("omnidiff", omnidiff_before, omnidiff_after)];
     for tool in ExternalTool::ALL {
         if !tool.supports(language) {
             println!("{}: does not support {:?}, skipped", tool.name(), language);
@@ -574,9 +574,9 @@ fn main() -> Result<()> {
     let elapsed = started.elapsed();
 
     rows.sort_by(|a, b| {
-        b.codediff
+        b.omnidiff
             .0
-            .cmp(&a.codediff.0)
+            .cmp(&a.omnidiff.0)
             .then_with(|| a.name.cmp(&b.name))
     });
 
@@ -610,7 +610,7 @@ fn print_table(rows: &[Row]) {
     print!(
         "{:<name_width$}  {:>9}  {:>7}",
         "Solution",
-        "codediff",
+        "omnidiff",
         "cd %",
         name_width = name_width
     );
@@ -621,7 +621,7 @@ fn print_table(rows: &[Row]) {
     let rule_width = name_width + (2 + 9 + 2 + 7) * (1 + tool_names.len());
     println!("{}", "-".repeat(rule_width));
 
-    let mut codediff_total = (0usize, 0usize);
+    let mut omnidiff_total = (0usize, 0usize);
     // (mismatches, total lines, fixtures scored): the count tells "0 mismatches everywhere" apart
     // from "out of scope almost everywhere".
     let mut tool_totals = vec![(0usize, 0usize, 0usize); tool_names.len()];
@@ -629,12 +629,12 @@ fn print_table(rows: &[Row]) {
         print!(
             "{:<name_width$}  {:>9}  {:>6.2}%",
             row.name,
-            row.codediff.0,
-            pct(row.codediff.0, row.codediff.1),
+            row.omnidiff.0,
+            pct(row.omnidiff.0, row.omnidiff.1),
             name_width = name_width
         );
-        codediff_total.0 += row.codediff.0;
-        codediff_total.1 += row.codediff.1;
+        omnidiff_total.0 += row.omnidiff.0;
+        omnidiff_total.1 += row.omnidiff.1;
         for (i, cell) in row.tools.iter().enumerate() {
             match *cell {
                 Some((mismatches, total)) => {
@@ -653,8 +653,8 @@ fn print_table(rows: &[Row]) {
     print!(
         "{:<name_width$}  {:>9}  {:>6.2}%",
         "TOTAL",
-        codediff_total.0,
-        pct(codediff_total.0, codediff_total.1),
+        omnidiff_total.0,
+        pct(omnidiff_total.0, omnidiff_total.1),
         name_width = name_width
     );
     for &(mismatches, total, _) in &tool_totals {
@@ -703,7 +703,7 @@ fn mean_coefficient_of_variation<'a>(samples: impl Iterator<Item = &'a [f64]>) -
 
 fn print_runtime_table(rows: &[Row]) {
     let tool_names: Vec<&str> = ExternalTool::ALL.iter().map(|t| t.name()).collect();
-    let label_width = ["codediff", "treesitter_parse", "gumtree_warm", "bdiff_warm"]
+    let label_width = ["omnidiff", "treesitter_parse", "gumtree_warm", "bdiff_warm"]
         .iter()
         .chain(&tool_names)
         .map(|s| s.len())
@@ -713,7 +713,7 @@ fn print_runtime_table(rows: &[Row]) {
     println!();
     println!(
         "Per-tool runtime (time to produce line-level touched/untouched labels, {} repeat(s)/fixture):",
-        rows.first().map(|r| r.codediff_ms.len()).unwrap_or(0)
+        rows.first().map(|r| r.omnidiff_ms.len()).unwrap_or(0)
     );
     println!(
         "{:<label_width$}  {:>10}  {:>10}  {:>8}",
@@ -743,20 +743,20 @@ fn print_runtime_table(rows: &[Row]) {
         label_width = label_width
     );
 
-    let codediff_flat: Vec<f64> = rows
+    let omnidiff_flat: Vec<f64> = rows
         .iter()
-        .flat_map(|r| r.codediff_ms.iter().copied())
+        .flat_map(|r| r.omnidiff_ms.iter().copied())
         .collect();
-    let codediff_total: f64 = codediff_flat.iter().sum();
+    let omnidiff_total: f64 = omnidiff_flat.iter().sum();
     println!(
         "{:<label_width$}  {:>10.1}  {:>10.3}  {:>7}  (n={})",
-        "codediff",
-        codediff_total,
-        codediff_total / codediff_flat.len().max(1) as f64,
-        mean_coefficient_of_variation(rows.iter().map(|r| r.codediff_ms.as_slice()))
+        "omnidiff",
+        omnidiff_total,
+        omnidiff_total / omnidiff_flat.len().max(1) as f64,
+        mean_coefficient_of_variation(rows.iter().map(|r| r.omnidiff_ms.as_slice()))
             .map(|cv| format!("{cv:.1}"))
             .unwrap_or_else(|| "-".to_string()),
-        codediff_flat.len(),
+        omnidiff_flat.len(),
         label_width = label_width
     );
     for (i, tool_name) in tool_names.iter().enumerate() {
@@ -961,7 +961,7 @@ struct AccuracyRow {
     total_leaf_nodes: usize,
     /// Denominator for the `*_visible_node_mismatches` columns.
     total_visible_nodes: usize,
-    /// codediff first (if selected), then `ExternalTool::ALL` order.
+    /// omnidiff first (if selected), then `ExternalTool::ALL` order.
     scores: Vec<ToolScore>,
 }
 
@@ -986,7 +986,7 @@ fn score_accuracy(
     provenance: &HashMap<String, SampleProvenance>,
     selection: &ToolSelection,
 ) -> Result<AccuracyRow> {
-    let node_cache = codediff::diff::NodeCache::build(before, after);
+    let node_cache = omnidiff::diff::NodeCache::build(before, after);
     let truth_ast = human_mapping::as_ast_diff(name, before, after)?;
 
     let (truth_before_lines, truth_after_lines) =
@@ -1014,10 +1014,10 @@ fn score_accuracy(
 
     // Nodes whose classification reaches the screen. Visibility is structural and judged on the
     // source alone, so every tool is scored against one fixed set; judging each tool by its own
-    // rendering gives each a different denominator, and judging by codediff's privileges codediff.
+    // rendering gives each a different denominator, and judging by omnidiff's privileges omnidiff.
     // Neither a subset nor a superset of the leaf view.
-    let before_visible_ids = codediff::diff::nodes::structurally_visible_node_ids(before);
-    let after_visible_ids = codediff::diff::nodes::structurally_visible_node_ids(after);
+    let before_visible_ids = omnidiff::diff::nodes::structurally_visible_node_ids(before);
+    let after_visible_ids = omnidiff::diff::nodes::structurally_visible_node_ids(after);
     let visible_filter = |labels: &[bool],
                           extents: &[human_mapping::NodeExtent],
                           visible: &std::collections::HashSet<usize>|
@@ -1037,9 +1037,9 @@ fn score_accuracy(
     let disagreement = human_mapping::line_disagreement_count;
     let mut scores = Vec::with_capacity(ExternalTool::ALL.len() + 1);
 
-    if selection.includes("codediff") {
-        let diff = codediff::diff::diff_code(before, after);
-        let ast = diff.ast.as_ref().context("codediff produced no AST")?;
+    if selection.includes("omnidiff") {
+        let diff = omnidiff::diff::diff_code(before, after);
+        let ast = diff.ast.as_ref().context("omnidiff produced no AST")?;
         let (cd_before_lines, cd_after_lines) =
             human_mapping::touched_lines(before, after, ast, &node_cache);
         let (cd_before_spans, cd_after_spans) =
@@ -1047,7 +1047,7 @@ fn score_accuracy(
         let cd_before_nodes = human_mapping::nodes_touched_by(&before_extents, &cd_before_spans);
         let cd_after_nodes = human_mapping::nodes_touched_by(&after_extents, &cd_after_spans);
         scores.push(ToolScore {
-            name: "codediff",
+            name: "omnidiff",
             line_mismatches: Some(
                 disagreement(&truth_before_lines, &cd_before_lines)
                     + disagreement(&truth_after_lines, &cd_after_lines),
@@ -1370,8 +1370,8 @@ fn write_csv(rows: &[Row], path: &std::path::Path) -> Result<()> {
     let mut header = vec![
         "solution".to_string(),
         "total_lines".to_string(),
-        "codediff_mismatches".to_string(),
-        "codediff_ms".to_string(),
+        "omnidiff_mismatches".to_string(),
+        "omnidiff_ms".to_string(),
         "treesitter_parse_ms".to_string(),
     ];
     header.extend(ExternalTool::ALL.iter().flat_map(|t| {
@@ -1387,9 +1387,9 @@ fn write_csv(rows: &[Row], path: &std::path::Path) -> Result<()> {
     for row in rows {
         let mut record = vec![
             row.name.clone(),
-            row.codediff.1.to_string(),
-            row.codediff.0.to_string(),
-            join_ms(&row.codediff_ms),
+            row.omnidiff.1.to_string(),
+            row.omnidiff.0.to_string(),
+            join_ms(&row.omnidiff_ms),
             join_ms(&row.treesitter_ms),
         ];
         // Blank, not 0, for an unscored tool: `benchmark_other_report.py` excludes blanks.

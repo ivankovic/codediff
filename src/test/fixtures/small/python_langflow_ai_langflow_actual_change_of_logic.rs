@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -22,7 +22,7 @@ use anyhow::Result;
 #[test]
 fn mapping() -> Result<()> {
     // Mostly unchanged pairs (same path on both sides) classified `MatchButNotIdentical` rather
-    // than `Identical`; the rest is one multi-map group pairing codediff does not realize.
+    // than `Identical`; the rest is one multi-map group pairing omnidiff does not realize.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "python-langflow-ai-langflow-actual-change-of-logic",
         1,

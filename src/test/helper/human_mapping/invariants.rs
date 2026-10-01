@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -17,7 +17,7 @@
  */
 //! Properties every fixture's *ground truth* should hold, checked against the ground truth alone.
 //!
-//! Nothing here runs `diff_code`. The mapping and painting tests grade codediff against
+//! Nothing here runs `diff_code`. The mapping and painting tests grade omnidiff against
 //! hand-authored data; these check that data against itself, so they fail only when a fixture's
 //! mapping and paintings disagree with each other. The numbers are stable and referenced
 //! elsewhere ("invariant 16"):
@@ -714,7 +714,7 @@ fn no_unpainted_whitespace_between_painted_regions(
 /// **Invariant 6.** A `Minimal` painting never paints a line's leading whitespace.
 ///
 /// The mirror of invariant 4, and the data side of `RenderOptions::leading_whitespace` being off
-/// under `MINIMAL`: a `Minimal` painting that claims indentation grades codediff against a
+/// under `MINIMAL`: a `Minimal` painting that claims indentation grades omnidiff against a
 /// reading `MINIMAL` never produces. Unconditional on the verdict, `Insert` on a new line
 /// included - that is exactly where the presets part company. A line with nothing visible is
 /// skipped, as in invariants 1 and 4.
@@ -1184,7 +1184,7 @@ fn is_closer(kind: &str) -> bool {
 /// between its halves is skipped, since error recovery invents pairs no human saw.
 ///
 /// A half its multi-map group leaves free is not a claim ([`group_leaves_status_open`]): the
-/// question is whether *some* admissible pairing agrees, as `check_group_entry` asks of codediff.
+/// question is whether *some* admissible pairing agrees, as `check_group_entry` asks of omnidiff.
 /// Checked per pair, so two pairs jointly infeasible through one group's count go unreported -
 /// a false negative, never a false positive.
 ///
@@ -1774,7 +1774,7 @@ fn edited_leaves_are_painted(
 
 /// Invariant 13: a painting that records an edit belongs to a mapping that records one too.
 ///
-/// An all-`Identical` mapping with balanced groups says nothing changed, and grades codediff
+/// An all-`Identical` mapping with balanced groups says nothing changed, and grades omnidiff
 /// against nothing. A painting with a visible `Delete`/`Insert`, or a `Match` differing beyond
 /// whitespace, says otherwise. Whitespace is exempt: it lives between nodes, where the tree cannot
 /// record it.
@@ -2470,7 +2470,7 @@ fn painted_matches_hold_the_mapping_partner(
 }
 
 /// Invariant 15: a `MatchButNotIdentical` entry's two subtrees do not read byte-identically with
-/// every descendant paired inside. Such an entry could only be satisfied by codediff calling an
+/// every descendant paired inside. Such an entry could only be satisfied by omnidiff calling an
 /// identical subtree not identical, since `check_entry` is strict about the operation. Group
 /// members are skipped: the operation describes the whole group.
 fn match_but_not_identical_entries_differ(

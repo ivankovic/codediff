@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -21,7 +21,7 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // The `color` attribute's value moves into a new `sx={{...}}` object. codediff pairs the
+    // The `color` attribute's value moves into a new `sx={{...}}` object. omnidiff pairs the
     // surrounding attributes by position, so the value reads as changed rather than moved.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "tsx-mui-material-ui-move-colour-to-a-new-attribute",

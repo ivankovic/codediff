@@ -1,4 +1,4 @@
-# This file is part of the CodeDiff code diffing tool.
+# This file is part of the OmniDiff code diffing tool.
 #
 # Copyright (C) 2026 Marko Ivankovic
 #
@@ -135,12 +135,12 @@ jobs:
           echo "CARGO_TARGET_$(echo ${{ matrix.target }} | tr 'a-z-' 'A-Z_')_LINKER=${{ matrix.cross }}-gcc" >> "$GITHUB_ENV"
           echo "CC_$(echo ${{ matrix.target }} | tr '-' '_')=${{ matrix.cross }}-gcc" >> "$GITHUB_ENV"
 
-      # Default features (`tui`) only - this is the `codediff` product binary, not the
+      # Default features (`tui`) only - this is the `omnidiff` product binary, not the
       # test-fixtures/stats-gated dev tools in src/bin/. `--locked`: the committed Cargo.lock is
       # what CI tested and what `cargo publish --locked` ships.
       - name: Build
         if: "!matrix.zig"
-        run: cargo build --release --locked --target ${{ matrix.target }} --bin codediff
+        run: cargo build --release --locked --target ${{ matrix.target }} --bin omnidiff
 
       # The musl targets: zig is the C compiler and linker for the grammars as well as the Rust,
       # for both architectures, so no per-architecture toolchain package is needed.
@@ -156,15 +156,15 @@ jobs:
 
       - name: Build (zig)
         if: matrix.zig
-        run: cargo zigbuild --release --locked --target ${{ matrix.target }} --bin codediff
+        run: cargo zigbuild --release --locked --target ${{ matrix.target }} --bin omnidiff
 
       # A musl binary is only worth shipping if it is static: a dynamic one would still need a
       # musl loader on the user's machine, which a glibc distribution does not have.
       - name: Verify static linking
         if: matrix.zig
         run: |
-          file target/${{ matrix.target }}/release/codediff
-          file target/${{ matrix.target }}/release/codediff | grep -q 'static' \
+          file target/${{ matrix.target }}/release/omnidiff
+          file target/${{ matrix.target }}/release/omnidiff | grep -q 'static' \
             || { echo "::error::musl binary is not statically linked"; exit 1; }
 
       # A cross-compiled binary cannot be run here to check it, so check what it *is*. A silent
@@ -173,15 +173,15 @@ jobs:
       - name: Verify architecture
         if: matrix.cross
         run: |
-          file target/${{ matrix.target }}/release/codediff
-          file target/${{ matrix.target }}/release/codediff | grep -q 'ARM aarch64' \
+          file target/${{ matrix.target }}/release/omnidiff
+          file target/${{ matrix.target }}/release/omnidiff | grep -q 'ARM aarch64' \
             || { echo "::error::built binary is not aarch64"; exit 1; }
 
       # The binary at the archive root (which is what `[package.metadata.binstall]` in Cargo.toml
       # promises `cargo binstall`), with the license and README beside it: an AGPL binary travels
       # with its license text.
       #
-      # Deliberately not generated per-target here: `codediff util man`/`util completions` need to
+      # Deliberately not generated per-target here: `omnidiff util man`/`util completions` need to
       # *run* the binary, and one of these targets is always cross-compiled (macos-latest is
       # arm64, so x86_64-apple-darwin is the odd one out and would need Rosetta). The output is
       # identical for every platform anyway - it is derived from the clap definition, not from the
@@ -190,27 +190,27 @@ jobs:
         if: runner.os != 'Windows'
         run: |
           mkdir dist
-          cp target/${{ matrix.target }}/release/codediff LICENSE THIRD-PARTY-NOTICES.md README.md dist/
-          tar czf codediff-${{ matrix.target }}.tar.gz -C dist codediff LICENSE THIRD-PARTY-NOTICES.md README.md
+          cp target/${{ matrix.target }}/release/omnidiff LICENSE THIRD-PARTY-NOTICES.md README.md dist/
+          tar czf omnidiff-${{ matrix.target }}.tar.gz -C dist omnidiff LICENSE THIRD-PARTY-NOTICES.md README.md
 
       - name: Package (Windows)
         if: runner.os == 'Windows'
         run: |
           New-Item -ItemType Directory dist
-          Copy-Item target/${{ matrix.target }}/release/codediff.exe, LICENSE, THIRD-PARTY-NOTICES.md, README.md dist/
-          Compress-Archive -Path dist/* -DestinationPath codediff-${{ matrix.target }}.zip
+          Copy-Item target/${{ matrix.target }}/release/omnidiff.exe, LICENSE, THIRD-PARTY-NOTICES.md, README.md dist/
+          Compress-Archive -Path dist/* -DestinationPath omnidiff-${{ matrix.target }}.zip
 
       # Signed provenance (which workflow, commit and runner produced this file), verifiable with
-      # `gh attestation verify codediff-<target>.tar.gz --repo ivankovic/codediff`.
+      # `gh attestation verify omnidiff-<target>.tar.gz --repo ivankovic/omnidiff`.
       - uses: actions/attest-build-provenance@v2
         with:
-          subject-path: codediff-${{ matrix.target }}.*
+          subject-path: omnidiff-${{ matrix.target }}.*
 
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
           draft: true
-          files: codediff-${{ matrix.target }}.*
+          files: omnidiff-${{ matrix.target }}.*
 
   # Shell completions and the man page, generated once on a native Linux runner. Every packaging
   # recipe under packaging/ generates these itself from its own freshly built binary, so this
@@ -228,21 +228,21 @@ jobs:
 
       - name: Build and generate
         run: |
-          cargo build --release --locked --bin codediff
+          cargo build --release --locked --bin omnidiff
           mkdir -p dist/completions
-          ./target/release/codediff util man > dist/codediff.1
-          ./target/release/codediff util completions bash > dist/completions/codediff.bash
-          ./target/release/codediff util completions zsh > dist/completions/_codediff
-          ./target/release/codediff util completions fish > dist/completions/codediff.fish
-          ./target/release/codediff util completions powershell > dist/completions/codediff.ps1
-          ./target/release/codediff util completions elvish > dist/completions/codediff.elv
-          tar czf codediff-completions-and-man.tar.gz -C dist .
+          ./target/release/omnidiff util man > dist/omnidiff.1
+          ./target/release/omnidiff util completions bash > dist/completions/omnidiff.bash
+          ./target/release/omnidiff util completions zsh > dist/completions/_omnidiff
+          ./target/release/omnidiff util completions fish > dist/completions/omnidiff.fish
+          ./target/release/omnidiff util completions powershell > dist/completions/omnidiff.ps1
+          ./target/release/omnidiff util completions elvish > dist/completions/omnidiff.elv
+          tar czf omnidiff-completions-and-man.tar.gz -C dist .
 
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
           draft: true
-          files: codediff-completions-and-man.tar.gz
+          files: omnidiff-completions-and-man.tar.gz
 
   # Unofficial .deb from Cargo.toml's [package.metadata.deb]; see packaging/README.md. The Pages
   # apt repository is built from these.
@@ -285,43 +285,43 @@ jobs:
       # here and passing --no-build below also stops cargo-deb from doing a second release build.
       - name: Build and generate assets
         run: |
-          cargo build --release --locked --bin codediff
+          cargo build --release --locked --bin omnidiff
           mkdir -p target/dist
-          ./target/release/codediff util man > target/dist/codediff.1
-          ./target/release/codediff util completions bash > target/dist/codediff.bash
-          ./target/release/codediff util completions zsh > target/dist/_codediff
-          ./target/release/codediff util completions fish > target/dist/codediff.fish
+          ./target/release/omnidiff util man > target/dist/omnidiff.1
+          ./target/release/omnidiff util completions bash > target/dist/omnidiff.bash
+          ./target/release/omnidiff util completions zsh > target/dist/_omnidiff
+          ./target/release/omnidiff util completions fish > target/dist/omnidiff.fish
 
       - name: Package
-        run: cargo deb --no-build --output codediff_${{ matrix.arch }}.deb
+        run: cargo deb --no-build --output omnidiff_${{ matrix.arch }}.deb
 
       # Catches an asset path in Cargo.toml going stale: `cargo deb` would happily produce a
-      # package missing the man page, and nobody would notice until someone ran `man codediff`.
+      # package missing the man page, and nobody would notice until someone ran `man omnidiff`.
       # The Architecture check is the arm64 counterpart of the `build` job's `file` assertion: a
       # package whose control field disagrees with its contents is one apt will happily offer to
       # the wrong machines.
       - name: Verify contents
         run: |
-          dpkg-deb --contents codediff_${{ matrix.arch }}.deb
-          for path in usr/bin/codediff usr/share/man/man1/codediff.1 \
-                      usr/share/bash-completion/completions/codediff; do
-            dpkg-deb --contents codediff_${{ matrix.arch }}.deb | grep -q " ./$path" \
+          dpkg-deb --contents omnidiff_${{ matrix.arch }}.deb
+          for path in usr/bin/omnidiff usr/share/man/man1/omnidiff.1 \
+                      usr/share/bash-completion/completions/omnidiff; do
+            dpkg-deb --contents omnidiff_${{ matrix.arch }}.deb | grep -q " ./$path" \
               || { echo "::error::missing $path in .deb"; exit 1; }
           done
-          got="$(dpkg-deb -f codediff_${{ matrix.arch }}.deb Architecture)"
+          got="$(dpkg-deb -f omnidiff_${{ matrix.arch }}.deb Architecture)"
           [ "$got" = "${{ matrix.arch }}" ] \
             || { echo "::error::.deb declares Architecture $got, expected ${{ matrix.arch }}"; exit 1; }
-          echo "Depends: $(dpkg-deb -f codediff_${{ matrix.arch }}.deb Depends)"
+          echo "Depends: $(dpkg-deb -f omnidiff_${{ matrix.arch }}.deb Depends)"
 
       - uses: actions/attest-build-provenance@v2
         with:
-          subject-path: codediff_${{ matrix.arch }}.deb
+          subject-path: omnidiff_${{ matrix.arch }}.deb
 
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
           draft: true
-          files: codediff_${{ matrix.arch }}.deb
+          files: omnidiff_${{ matrix.arch }}.deb
 
   # One SHA256SUMS.txt over every artifact, then the draft becomes the release. Runs last, after
   # every other job has uploaded, so the file covers everything and the release appears complete.
@@ -366,9 +366,9 @@ jobs:
           TAG: ${{ github.ref_name }}
         run: gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false
 
-  # The Homebrew tap (github.com/ivankovic/homebrew-codediff) installs the release tarballs by
+  # The Homebrew tap (github.com/ivankovic/homebrew-omnidiff) installs the release tarballs by
   # checksum, so its formula can only be written once SHA256SUMS.txt exists. Rendered from
-  # packaging/homebrew/codediff.rb.in and pushed to the tap; see packaging/README.md, "Homebrew".
+  # packaging/homebrew/omnidiff.rb.in and pushed to the tap; see packaging/README.md, "Homebrew".
   # The push needs the HOMEBREW_TAP_TOKEN secret (a fine-grained token with contents write on the
   # tap repository); without it this warns and the release stands, since the tap is downstream of
   # the release and not part of it.
@@ -387,8 +387,8 @@ jobs:
         run: |
           gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern SHA256SUMS.txt
           python3 scripts/render_homebrew_formula.py \
-            --version "${TAG#v}" --sums SHA256SUMS.txt --out rendered/codediff.rb
-          cat rendered/codediff.rb
+            --version "${TAG#v}" --sums SHA256SUMS.txt --out rendered/omnidiff.rb
+          cat rendered/omnidiff.rb
 
       - name: Push to the tap
         env:
@@ -399,18 +399,18 @@ jobs:
             echo "::warning::HOMEBREW_TAP_TOKEN is not set; the formula was rendered but not pushed"
             exit 0
           fi
-          git clone --depth 1 "https://x-access-token:${TAP_TOKEN}@github.com/ivankovic/homebrew-codediff.git" tap
+          git clone --depth 1 "https://x-access-token:${TAP_TOKEN}@github.com/ivankovic/homebrew-omnidiff.git" tap
           mkdir -p tap/Formula
-          cp rendered/codediff.rb tap/Formula/codediff.rb
+          cp rendered/omnidiff.rb tap/Formula/omnidiff.rb
           cd tap
-          git add Formula/codediff.rb
+          git add Formula/omnidiff.rb
           if git diff --cached --quiet; then
             echo "formula already at $TAG"
             exit 0
           fi
           git -c user.name="github-actions[bot]" \
               -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
-              commit -m "codediff $TAG"
+              commit -m "omnidiff $TAG"
           git push
 
   # Rebuild the apt repository that GitHub Pages serves, now that the release is public: pages.yml

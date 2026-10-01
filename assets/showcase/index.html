@@ -1,5 +1,5 @@
 <!--
-  This file is part of the CodeDiff code diffing tool.
+  This file is part of the OmniDiff code diffing tool.
 
   Copyright (C) 2026 Marko Ivankovic
 
@@ -22,29 +22,29 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>CodeDiff examples</title>
-<meta name="description" content="Twenty real code changes, each shown as Unix diff marks it and as CodeDiff maps it, recorded from the command-line tool and replayed in CodeDiff's own viewer.">
+<title>OmniDiff examples</title>
+<meta name="description" content="Twenty real code changes, each shown as Unix diff marks it and as OmniDiff maps it, recorded from the command-line tool and replayed in OmniDiff's own viewer.">
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="showcase.css">
 </head>
 <body data-token="showcase">
 <header id="showcase">
   <div class="showcase-row showcase-head">
-    <a class="brand" href="https://github.com/ivankovic/codediff">CodeDiff</a>
+    <a class="brand" href="https://github.com/ivankovic/omnidiff">OmniDiff</a>
     <span class="tagline">Fast, robust, syntax-aware code diffing. Twenty real changes, each shown as
-      <code>diff</code> marks it and as CodeDiff maps it, in CodeDiff's own viewer.</span>
-    <a class="install" href="https://github.com/ivankovic/codediff#installation">Install</a>
+      <code>diff</code> marks it and as OmniDiff maps it, in OmniDiff's own viewer.</span>
+    <a class="install" href="https://github.com/ivankovic/omnidiff#installation">Install</a>
   </div>
-  <p class="notice">Each diff here was computed ahead of time by the <code>codediff</code> command-line
+  <p class="notice">Each diff here was computed ahead of time by the <code>omnidiff</code> command-line
     tool and recorded; your browser only replays it. This is not an online service. Please
-    <a href="https://github.com/ivankovic/codediff#installation">install the tool</a>.</p>
+    <a href="https://github.com/ivankovic/omnidiff#installation">install the tool</a>.</p>
   <div class="showcase-row showcase-controls">
     <label class="case-picker">Change
       <select id="case-select" aria-label="Which change to show"></select>
     </label>
     <div class="toggle" role="group" aria-label="Which tool's view is shown">
       <button id="view-diff" type="button" class="view-button">Unix <code>diff</code></button>
-      <button id="view-codediff" type="button" class="view-button">CodeDiff</button>
+      <button id="view-omnidiff" type="button" class="view-button">OmniDiff</button>
     </div>
     <span id="case-stats"></span>
   </div>

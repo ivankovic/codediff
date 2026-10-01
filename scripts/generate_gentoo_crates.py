@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 #
-#  This file is part of the CodeDiff code diffing tool.
+#  This file is part of the OmniDiff code diffing tool.
 #
 #  Copyright (C) 2026 Marko Ivankovic
 #
@@ -27,7 +27,7 @@ has to name all of them. ``pycargoebuild`` is the usual tool for this,
 but it is not always installed, and the job is small enough to not need it: every registry crate in
 Cargo.lock becomes one ``name@version`` line.
 
-Only entries with a ``source`` key are emitted. The ``codediff`` package itself has none (it is the
+Only entries with a ``source`` key are emitted. The ``omnidiff`` package itself has none (it is the
 workspace root, unpacked from the release tarball rather than fetched from crates.io), and neither
 would any git or path dependency - none exist today, and if one is ever added it must be handled
 explicitly in the ebuild rather than silently dropped into ``CRATES``, so this script fails loudly
@@ -61,7 +61,7 @@ import urllib.request
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-EBUILD_DIR = REPO_ROOT / "packaging" / "gentoo" / "dev-util" / "codediff"
+EBUILD_DIR = REPO_ROOT / "packaging" / "gentoo" / "dev-util" / "omnidiff"
 # Deliberately NOT `.*?` with DOTALL: a lazy dot-star still crosses newlines, so it runs past the
 # end of this block to the *next* line consisting of a lone closing quote - SRC_URI's, here - and
 # silently deletes `inherit`, DESCRIPTION, HOMEPAGE and SRC_URI along the way. (It did exactly
@@ -79,7 +79,7 @@ def crates_from_lockfile(lockfile: Path) -> list[str]:
             # The root crate. Anything else without a source is a path/git dependency that
             # cargo.eclass cannot fetch, and quietly omitting it would produce an ebuild that
             # fails to build only once someone runs it.
-            if package["name"] != "codediff":
+            if package["name"] != "omnidiff":
                 raise SystemExit(
                     f"error: {package['name']} {package['version']} has no source - a path or git "
                     f"dependency needs explicit handling in the ebuild, not a silent drop"

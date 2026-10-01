@@ -1,11 +1,11 @@
 # Maintainer: Marko Ivankovic <marko@ivankovic.me>
 
-pkgname=codediff
+pkgname=omnidiff
 pkgver=0.1.1
 pkgrel=1
 pkgdesc="Fast, robust, syntax-aware code diffing using tree-sitter ASTs"
 arch=('x86_64' 'aarch64')
-url="https://github.com/ivankovic/codediff"
+url="https://github.com/ivankovic/omnidiff"
 license=('AGPL-3.0-or-later')
 depends=('gcc-libs' 'glibc')
 makedepends=('cargo')
@@ -38,7 +38,7 @@ build() {
 	#
 	# Note: upstream's release profile sets `lto = "fat"` and `codegen-units = 1`, and every
 	# tree-sitter grammar is compiled from C. This build takes minutes, not seconds.
-	cargo build --frozen --release --bin codediff
+	cargo build --frozen --release --bin omnidiff
 }
 
 check() {

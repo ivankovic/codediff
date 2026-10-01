@@ -1,4 +1,4 @@
-# This file is part of the CodeDiff code diffing tool.
+# This file is part of the OmniDiff code diffing tool.
 #
 # Copyright (C) 2026 Marko Ivankovic
 #
@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-# Lets `nix run github:ivankovic/codediff` and `nix build` work against this repository directly,
+# Lets `nix run github:ivankovic/omnidiff` and `nix build` work against this repository directly,
 # with no tag, no release artifact and no vendor hash - `packaging/nix/package.nix` vendors straight
 # from the committed Cargo.lock. See that file for the derivation itself and for what a nixpkgs
 # submission would change.
@@ -35,24 +35,24 @@
         pkgs = nixpkgs.legacyPackages.${system};
         # Read from Cargo.toml rather than repeated here, so a release bump touches one file.
         version = (builtins.fromTOML (builtins.readFile ./Cargo.toml)).package.version;
-        codediff = pkgs.callPackage ./packaging/nix/package.nix {
+        omnidiff = pkgs.callPackage ./packaging/nix/package.nix {
           src = self;
           inherit version;
         };
       in
       {
         packages = {
-          inherit codediff;
-          default = codediff;
+          inherit omnidiff;
+          default = omnidiff;
         };
 
         apps.default = {
           type = "app";
-          program = "${codediff}/bin/codediff";
-          meta.description = codediff.meta.description;
+          program = "${omnidiff}/bin/omnidiff";
+          meta.description = omnidiff.meta.description;
         };
 
-        # `nix develop` for working on codediff itself: the full toolchain plus the tools the
+        # `nix develop` for working on omnidiff itself: the full toolchain plus the tools the
         # Makefile's own targets reach for. Not needed to merely build or run the package.
         devShells.default = pkgs.mkShell {
           packages = with pkgs; [

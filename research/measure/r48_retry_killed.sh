@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-#  This file is part of the CodeDiff code diffing tool.
+#  This file is part of the OmniDiff code diffing tool.
 #
 #  Copyright (C) 2026 Marko Ivankovic
 #
@@ -79,7 +79,7 @@ for name, rows in (("small", small), ("big", big), ("timeouts", timed)):
 PY
 
 run() {  # run <csv> <output part> <MemoryMax> <timeout-secs>
-  systemd-run --user --scope --quiet --collect --slice=codediff-r48.slice \
+  systemd-run --user --scope --quiet --collect --slice=omnidiff-r48.slice \
     -p MemoryMax="$3" -p MemorySwapMax=0 \
     ../target/release/benchmark_diff_pairs \
       --csv "$1" --repo-root "$REPOS" --output "$2" \

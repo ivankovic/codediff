@@ -1,4 +1,4 @@
-# This file is part of the CodeDiff code diffing tool.
+# This file is part of the OmniDiff code diffing tool.
 #
 # Copyright (C) 2026 Marko Ivankovic
 #
@@ -289,7 +289,7 @@ jobs:
       # nextest: one process per test, so src/test/helper.rs's fixture caches are freed after each
       # (see CONTRIBUTING.md). The src/test/fixtures/ tests touch nothing feature-gated, so each job
       # runs one third of them (--partition, deterministic by name) and the three jobs together run
-      # each once. test() matches names without the crate prefix: ^codediff::test::fixtures::
+      # each once. test() matches names without the crate prefix: ^omnidiff::test::fixtures::
       # matches nothing and CI stays green - check `cargo nextest list -E '<expr>'` before editing.
       - name: Test (what this feature set changes)
         run: cargo nextest run --release --features "${{ matrix.features }}"

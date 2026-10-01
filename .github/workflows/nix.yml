@@ -1,4 +1,4 @@
-# This file is part of the CodeDiff code diffing tool.
+# This file is part of the OmniDiff code diffing tool.
 #
 # Copyright (C) 2026 Marko Ivankovic
 #
@@ -57,13 +57,13 @@ jobs:
       # a typo in the flake surfaces, without building any of them.
       - run: nix flake check -L --no-build
 
-      - run: nix build .#codediff -L
+      - run: nix build .#omnidiff -L
 
       # The derivation's own test phase runs the library tests; this proves the installed binary
       # and the generated man page and completions are there, which is what a packager checks.
       - run: |
-          ./result/bin/codediff --version
-          test -s ./result/share/man/man1/codediff.1.gz
-          test -s ./result/share/bash-completion/completions/codediff.bash
-          test -s ./result/share/zsh/site-functions/_codediff
-          test -s ./result/share/fish/vendor_completions.d/codediff.fish
+          ./result/bin/omnidiff --version
+          test -s ./result/share/man/man1/omnidiff.1.gz
+          test -s ./result/share/bash-completion/completions/omnidiff.bash
+          test -s ./result/share/zsh/site-functions/_omnidiff
+          test -s ./result/share/fish/vendor_completions.d/omnidiff.fish

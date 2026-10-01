@@ -1,6 +1,6 @@
 # Painting, attributed: what is left after a perfect matcher, 2026-09-15
 
-**What this is.** A census of every place codediff's *rendering* disagrees with a hand-painted
+**What this is.** A census of every place omnidiff's *rendering* disagrees with a hand-painted
 ground truth, over all **603 painted fixtures** (2001 diff cases, 1062 with a human tree mapping;
 287 of the paintings are two-preset). It **attributes** each disagreement - separating what a
 better node matcher could fix from what only a rendering rule can - and **counts by runs and
@@ -130,7 +130,7 @@ Nearly all of it is `FULL`-only, and that is by construction: under `MINIMAL`
 
 The widest-spread family in the corpus. Under `FULL` the human paints a run of added alignment
 whitespace `Insert` (`c-freeciv-add-parameter-to-function`, 29 spaces on a continuation line);
-codediff paints nothing. The deletion mirror is 58 runs over 31 fixtures.
+omnidiff paints nothing. The deletion mirror is 58 runs over 31 fixtures.
 
 This is interior whitespace collapse being unpaintable, on sixty-three fixtures. The mechanism is
 in `own_content_span`: `diff::text` derives every range from node spans, and inter-token gap text
@@ -143,7 +143,7 @@ are painted. Largest open item; not attempted here.
 
 ### C. Unpainted updates - 225 runs, 54 fixtures (`FULL`)
 
-`- -> update`: the human paints an identifier `Update` and codediff paints nothing there, having
+`- -> update`: the human paints an identifier `Update` and omnidiff paints nothing there, having
 already narrowed the change to the inserted prefix: rename granularity, a narrowed `Update`
 against a whole-identifier one. The mirror, `update -> insert` (60 runs / 31 fixtures under `MINIMAL`), is the same seam
 from the other side: where the narrowing leaves one side's middle empty, the edit *is* an
@@ -153,7 +153,7 @@ The obvious lever is the wrong one - see R3 below.
 
 ### D. Which node moved - 175 runs, 50 fixtures (`FULL`), plus its relabellings
 
-`- -> move`: the human paints the node that relocated, codediff paints the ones it went past (or
+`- -> move`: the human paints the node that relocated, omnidiff paints the ones it went past (or
 nothing on that side). With `insert -> move` (66/29) and `delete -> move` (62/26) this is the
 decision `move_attribution.md` records: a mapping does not say which of a matched pair moved, and
 the two tree walks answer it differently. `reconcile_moves`/`paint_resized_moves` address part of

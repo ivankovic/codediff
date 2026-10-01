@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -28,7 +28,7 @@ fn mapping() -> Result<()> {
 #[test]
 fn painting() -> Result<()> {
     // `Full` claims the inserted line's indentation, both `(user_id` parameter lists and both URL
-    // literals as Move, none of which codediff paints: all paint codediff does not produce.
+    // literals as Move, none of which omnidiff paints: all paint omnidiff does not produce.
     assert_matches_human_painting_within_limit("python-api-change", 10.09)
 }
 

@@ -61,8 +61,8 @@ text-based ones beyond Unix `diff`:
 **Two traps, both of which produce a silently wrong number rather than an error.**
 
 1. **BDiff shells out to `git diff --no-index`**, so it inherits the user's git configuration.
-   This project's own README recommends setting `diff.external=codediff`; with that set, git emits
-   codediff's output, BDiff finds no `@@` headers, and `bdiff.bdiff()` returns a **0-entry edit
+   This project's own README recommends setting `diff.external=omnidiff`; with that set, git emits
+   omnidiff's output, BDiff finds no `@@` headers, and `bdiff.bdiff()` returns a **0-entry edit
    script with exit status 0** - which scores as "this tool thinks nothing changed", i.e. a
    near-perfect result. `benchmark_other` neutralizes this per invocation by pointing
    GIT_CONFIG_GLOBAL and GIT_CONFIG_SYSTEM at /dev/null (`git_env`), for its own git calls as well
@@ -122,10 +122,10 @@ Join to `src/test/data/sample.csv` on `solution == sample.csv:promoted_to`.
 **What the node columns measure, and what they do not.** Both granularities are a *touched or
 not* projection: for each line (or node), did the tool consider it changed, and does that agree
 with the human mapping? A mismatch is one disagreement. This is deliberately **not** the
-node-mapping fidelity metric `benchmark_optimal_solutions` reports for codediff, and the two
+node-mapping fidelity metric `benchmark_optimal_solutions` reports for omnidiff, and the two
 numbers must never be compared or mixed. An external tool parses its own tree and shares no node
 identities with this codebase's AST, so "which node did this one become" cannot be asked of it at
-all; "did you think this text changed" can be asked of everything. codediff is scored through the
+all; "did you think this text changed" can be asked of everything. omnidiff is scored through the
 identical projection here, which is what makes its column comparable to the tools' - and, by the
 same token, not comparable to its own optimal-solutions figure.
 
@@ -134,13 +134,13 @@ node counts as touched when a change lands anywhere inside it, that includes eve
 every change up to the root, so the count partly reflects how deep a grammar's tree is.
 `_leaf_node_mismatches` counts only childless nodes - non-nesting, and the granularity the
 AST-aware tools actually report at. `_visible_node_mismatches` (added 2026-08-20) counts only
-nodes carrying text of their own, per `codediff::diff::nodes::is_structurally_visible`, with
+nodes carrying text of their own, per `omnidiff::diff::nodes::is_structurally_visible`, with
 `total_visible_nodes` as its denominator. Report whichever you use explicitly; they are not
 interchangeable.
 
 **Visibility is structural: a property of the tree and the source bytes, not of any diff.** A node
 is visible if it carries text of its own - a leaf, or an interior node with non-whitespace content
-its children don't cover (`codediff::diff::nodes::is_structurally_visible`). Every tool is
+its children don't cover (`omnidiff::diff::nodes::is_structurally_visible`). Every tool is
 therefore scored against the identical, fixed set of visible nodes, which is what makes the columns
 comparable at all. An earlier version derived visibility from the renderer, which made the set move
 with whichever diff produced it; that was replaced 2026-08-20 after it turned out a coarse diff
@@ -220,8 +220,8 @@ units enter both files. Every binary verified by running it, not by reading a pa
 | tool | version | path |
 | --- | --- | --- |
 | GumTree | 4.0.0-beta8 | `/var/tmp/gumtree-installed/gumtree-4.0.0-beta8/bin/gumtree` (`GUMTREE_BIN`) |
-| difftastic | 0.69.0 | `/var/tmp/codediff-tools/bin/difft` (`DIFFT_BIN`) |
-| diffsitter | 0.9.0 | `/var/tmp/codediff-tools/bin/diffsitter` (`DIFFSITTER_BIN`) |
+| difftastic | 0.69.0 | `/var/tmp/omnidiff-tools/bin/difft` (`DIFFT_BIN`) |
+| diffsitter | 0.9.0 | `/var/tmp/omnidiff-tools/bin/diffsitter` (`DIFFSITTER_BIN`) |
 | Neovim | 0.11.4 | `/opt/nvim-linux-x86_64/bin/nvim` (`NVIM_BIN`) |
 | BDiff | 0.1.0 | `/var/tmp/bdiff-install/venv/bin/python` (`BDIFF_PYTHON`) |
 
@@ -239,8 +239,8 @@ a real fixture pair (a `textdiff -f JSON` run producing a non-empty `matches` ar
 reading `gumtree list GENERATORS`. Still unsupported by beta8, and correctly absent: HTML, Lua,
 Vimscript, ShellScript, Scala.
 
-**GumTree's tree is not codediff's tree, and how far apart they are is per-language.** Node
-counts on one fixture's before side, GumTree vs codediff: java-jdt 512/997 (1.95x),
+**GumTree's tree is not omnidiff's tree, and how far apart they are is per-language.** Node
+counts on one fixture's before side, GumTree vs omnidiff: java-jdt 512/997 (1.95x),
 java-treesitter-ng 585/997, python 6708/10314 (1.54x), rust 810/1344 (1.66x), kotlin 1330/1792
 (1.35x), go 174/233 (1.34x) - but js 51/51, ruby 1427/1427, cs 2280/2280, c 23971/23969, php
 34779/34771, i.e. **node-for-node identical**. GumTree's tree-sitter-ng bindings reuse the same
@@ -260,7 +260,7 @@ run (`astdiff_oracle_defects4j_human.csv`) covers 274 solved units in 231 cases 
 oracle at 99.65% precision / 99.63% recall, 380 disagreeing pairs in 52,726, and 39 of 8,762 at
 statement level.
 
-codediff's accuracy against ground truth this project did not write. Produced
+omnidiff's accuracy against ground truth this project did not write. Produced
 by `benchmark_astdiff_oracle` (`cd research && make measure-astdiff-oracle`) from two external
 inputs fetched by the scripts in `research/external/` (see its README for the datasets):
 
@@ -272,7 +272,7 @@ inputs fetched by the scripts in `research/external/` (see its README for the da
 
 One row per compilation unit: how many oracle records it held, how many resolved to tree-sitter
 span pairs, and TP/FP/FN at the paper's two granularities (`all` = statement + sub-expression,
-Table 12; `statement` = Table 11), plus codediff's wall-clock. `problematic` carries the oracle's
+Table 12; `statement` = Table 11), plus omnidiff's wall-clock. `problematic` carries the oracle's
 own `cases-problematic.json` flag (102 of the 800) so the two populations can be read apart.
 
 **How a JDT mapping and a tree-sitter mapping are compared is the whole measurement**, and it is
@@ -281,7 +281,7 @@ tree-sitter node are the same node when their byte spans agree (after converting
 offsets; 3 of the 1046 files are non-ASCII), with four span tolerances for systematic boundary
 differences (a JDT body declaration starts at its Javadoc; `;`/`:` on `for` initialisers and
 `case` labels; `METHOD_INVOCATION_ARGUMENTS` without its parentheses). Mappings under unchanged
-program elements are excluded on both sides, as in the paper. A codediff pair is judged only when
+program elements are excluded on both sides, as in the paper. An omnidiff pair is judged only when
 the oracle maps one of its spans, or its node kind is one the oracle models one-to-one (a
 data-driven whitelist: 83 kinds at `all`, 20 at `statement`) *and* the node moved or changed.
 
@@ -306,14 +306,14 @@ precision/recall from this file.
 Against the paper's Table 12/14 (Defects4J, statement + sub-expression): RefactoringMiner 3.0
 99.7 / 99.3, perfect 85.9%; GumTree 3.0 simple 98.4 / 97.8, perfect 63.3%; GumTree 3.0 greedy
 97.5 / 93.1, perfect 18.1%. At statement level (Table 11/13): RM 99.8 / 99.6, perfect 89.4%;
-GumTree simple 99.1 / 98.5, perfect 72.4%. So codediff's precision and recall sit between GumTree
+GumTree simple 99.1 / 98.5, perfect 72.4%. So omnidiff's precision and recall sit between GumTree
 simple and RefactoringMiner at both granularities; its perfect-diff rate beats GumTree simple at
 statement level (80.8 against 72.4) and trails it at sub-expression level (55.4 against 63.3).
 
 **Read those comparisons with two caveats.** (1) The paper's numbers were computed on JDT trees,
 ours on tree-sitter trees through the span equality above; the 12% of non-comment oracle records
 we cannot resolve are excluded from our denominator and not from theirs. (2) Our judged set of
-codediff pairs is conservative by construction - a codediff pairing of a deleted node with an
+omnidiff pairs is conservative by construction - an omnidiff pairing of a deleted node with an
 inserted one is only counted as a false positive when its kind is whitelisted, and `identifier`
 (ratio 0.916) and `binary_expression` (0.942, JDT's flat n-ary `InfixExpression` against
 tree-sitter's nested pairs) fall below the 0.95 threshold. Both caveats push our precision up and

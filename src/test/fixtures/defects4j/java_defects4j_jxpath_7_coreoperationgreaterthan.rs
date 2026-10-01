@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -24,7 +24,7 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 #[test]
 fn mapping() -> Result<()> {
     // Shared by all four `CoreOperation*` fixtures: the human replaces the first
-    // `method_declaration` whole, codediff reuses its scaffolding (`}`, `;`, the `>` leaf) in the
+    // `method_declaration` whole, omnidiff reuses its scaffolding (`}`, `;`, the `>` leaf) in the
     // surviving method. One choice of which near-identical method survives.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "java-defects4j-jxpath-7-coreoperationgreaterthan",

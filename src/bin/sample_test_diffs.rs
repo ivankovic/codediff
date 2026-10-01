@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -20,7 +20,7 @@
 //! `src/test/data/sample.csv` to `--count` per language instead of starting over, so it can be
 //! re-run against different checkout roots.
 //!
-//! `--stratified` samples per (language, [`codediff::stats::sampling::LOC_BUCKETS`] bucket), and
+//! `--stratified` samples per (language, [`omnidiff::stats::sampling::LOC_BUCKETS`] bucket), and
 //! `--count` then means per bucket - unlike `sample_code_pairs --count`, a per-language total.
 use anyhow::{Result, bail};
 use clap::Parser;
@@ -31,12 +31,12 @@ use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use codediff::anomalous_paths;
-use codediff::code::Language;
-use codediff::code::language::{language_for_path, language_for_path_and_content, to_treesitter};
-use codediff::stats::filesystem::{find_git_repositories, for_each_repository};
-use codediff::stats::git::{text_loc_if_in_range, walk_single_parent_commit_diffs};
-use codediff::stats::sampling::{Reservoir, loc_bucket};
+use omnidiff::anomalous_paths;
+use omnidiff::code::Language;
+use omnidiff::code::language::{language_for_path, language_for_path_and_content, to_treesitter};
+use omnidiff::stats::filesystem::{find_git_repositories, for_each_repository};
+use omnidiff::stats::git::{text_loc_if_in_range, walk_single_parent_commit_diffs};
+use omnidiff::stats::sampling::{Reservoir, loc_bucket};
 
 // The upper bound is the size `stats::expand_from_code` refuses to parse.
 const MIN_BYTES: usize = 1;
@@ -79,7 +79,7 @@ struct Args {
     #[arg(long)]
     dataset: Option<String>,
 
-    /// Stratify sampling by [`codediff::stats::sampling::LOC_BUCKETS`] (of the larger side's line
+    /// Stratify sampling by [`omnidiff::stats::sampling::LOC_BUCKETS`] (of the larger side's line
     /// count) as well as language; `--count` becomes a target per (language, bucket).
     #[arg(long, default_value_t = false)]
     stratified: bool,
@@ -419,8 +419,8 @@ fn write_csv(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use codediff::stats::sampling::LOC_BUCKETS;
-    use codediff::test::helper;
+    use omnidiff::stats::sampling::LOC_BUCKETS;
+    use omnidiff::test::helper;
 
     fn sample(
         repo_path: &Path,

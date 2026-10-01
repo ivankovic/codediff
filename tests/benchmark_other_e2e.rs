@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -51,7 +51,7 @@ const GRANULARITIES: [(&str, &str); 4] = [
 /// Runs `benchmark_other --accuracy-csv` over the fixtures with the fake as difftastic.
 ///
 /// `--tools difftastic` keeps expected values a function of the human mapping alone: scoring
-/// codediff too would tie them to the diff algorithm's current output.
+/// omnidiff too would tie them to the diff algorithm's current output.
 fn run(mode: &str, out_dir: &Path) -> (Output, std::path::PathBuf) {
     let csv_path = out_dir.join(format!("{mode}.csv"));
     let mut fixtures = SUPPORTED.join(",");
@@ -271,20 +271,20 @@ fn the_scoping_flags_narrow_the_run() {
         "--fixtures did not narrow the corpus - scored {:?}",
         filtered.rows.keys().collect::<Vec<_>>()
     );
-    let codediff_columns = |csv: &Csv| -> usize {
+    let omnidiff_columns = |csv: &Csv| -> usize {
         csv.header
             .iter()
-            .filter(|column| column.starts_with("codediff_"))
+            .filter(|column| column.starts_with("omnidiff_"))
             .count()
     };
     assert_eq!(
-        codediff_columns(&filtered),
+        omnidiff_columns(&filtered),
         0,
-        "--tools did not gate codediff: {:?}",
+        "--tools did not gate omnidiff: {:?}",
         filtered.header
     );
 
-    // Without the control, "no codediff columns" could mean codediff is never scored at all.
+    // Without the control, "no omnidiff columns" could mean omnidiff is never scored at all.
     let control_path = out_dir.path().join("control.csv");
     let output = Command::new(env!("CARGO_BIN_EXE_benchmark_other"))
         .arg("--accuracy-csv")
@@ -301,8 +301,8 @@ fn the_scoping_flags_narrow_the_run() {
     );
     let control = read_csv(&control_path);
     assert!(
-        codediff_columns(&control) > 0,
-        "codediff should be scored when --tools is absent: {:?}",
+        omnidiff_columns(&control) > 0,
+        "omnidiff should be scored when --tools is absent: {:?}",
         control.header
     );
     assert!(

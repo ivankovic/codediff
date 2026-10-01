@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -63,13 +63,13 @@ impl PanelState {
     }
 }
 
-/// The overlay theme, read once at startup from the `.codediff.toml` the `codediff` binary uses.
+/// The overlay theme, read once at startup from the `.omnidiff.toml` the `omnidiff` binary uses.
 /// Process-global like `tui::theme`'s palette, so `palette()` stays the one resolution point;
 /// human_solver has no theme picker to change it at runtime.
 pub(crate) static OVERLAY_THEME: std::sync::OnceLock<OverlayTheme> = std::sync::OnceLock::new();
 
 /// Falls back to the default theme when `main` installed none, which keeps render tests
-/// independent of the machine's `.codediff.toml`.
+/// independent of the machine's `.omnidiff.toml`.
 pub(crate) fn overlay_palette() -> OverlayPalette {
     OVERLAY_THEME.get().copied().unwrap_or_default().palette()
 }
@@ -267,9 +267,9 @@ pub(crate) enum TextOverlay {
     /// The human's own painting for the current solution.
     #[default]
     Human,
-    /// codediff's diff through the same `TextDiff` projection the TUI renders.
-    CodeDiff,
-    /// Only bytes where human and codediff disagree, coloured by the human's label. Empty means
+    /// omnidiff's diff through the same `TextDiff` projection the TUI renders.
+    OmniDiff,
+    /// Only bytes where human and omnidiff disagree, coloured by the human's label. Empty means
     /// they agree.
     Disagreements,
 }
@@ -277,8 +277,8 @@ pub(crate) enum TextOverlay {
 impl TextOverlay {
     pub(crate) fn next(self) -> Self {
         match self {
-            TextOverlay::Human => TextOverlay::CodeDiff,
-            TextOverlay::CodeDiff => TextOverlay::Disagreements,
+            TextOverlay::Human => TextOverlay::OmniDiff,
+            TextOverlay::OmniDiff => TextOverlay::Disagreements,
             TextOverlay::Disagreements => TextOverlay::Human,
         }
     }
@@ -286,7 +286,7 @@ impl TextOverlay {
     pub(crate) fn label(self) -> &'static str {
         match self {
             TextOverlay::Human => "human",
-            TextOverlay::CodeDiff => "codediff",
+            TextOverlay::OmniDiff => "omnidiff",
             TextOverlay::Disagreements => "disagreements",
         }
     }
@@ -294,15 +294,15 @@ impl TextOverlay {
 
 /// Whether the pair has no tree on some side (no grammar, or unrecognised language). One
 /// predicate so the whole tool agrees on text-only mode: the panels, `handle_key`, the generated
-/// stub and [`codediff_text_spans`] all key on it.
+/// stub and [`omnidiff_text_spans`] all key on it.
 pub(crate) fn is_text_only(before: &Code, after: &Code) -> bool {
     before.ast.is_none() || after.ast.is_none()
 }
 
-/// codediff's own text ranges for this case, one list per side, through `TextDiff::from` (what the
+/// omnidiff's own text ranges for this case, one list per side, through `TextDiff::from` (what the
 /// TUI renders). With no AST this is the `plain_text_line_diff` fallback, not nothing: that is
 /// what the product shows and what a text-only fixture's painting is graded against.
-pub(crate) fn codediff_text_spans(
+pub(crate) fn omnidiff_text_spans(
     before: &Code,
     after: &Code,
     known: Option<&ASTDiff>,
@@ -311,7 +311,7 @@ pub(crate) fn codediff_text_spans(
     // trees, which would show an empty projection instead of the fallback.
     let sides = if is_text_only(before, after) {
         let (before_ranges, after_ranges) =
-            codediff::diff::text::plain_text_line_diff(&before.contents, &after.contents);
+            omnidiff::diff::text::plain_text_line_diff(&before.contents, &after.contents);
         [before_ranges, after_ranges]
     } else {
         let project = |ast_diff: &ASTDiff| {
@@ -330,16 +330,16 @@ pub(crate) fn codediff_text_spans(
         }
     };
 
-    let convert = |ranges: Vec<codediff::diff::text::RangeMatch>| {
+    let convert = |ranges: Vec<omnidiff::diff::text::RangeMatch>| {
         ranges
             .into_iter()
             .filter(|range_match| !range_match.source.is_empty())
             .filter_map(|range_match| {
                 let verdict = match range_match.operation {
-                    codediff::diff::text::TextOperation::Move => HumanTextVerdict::Move,
-                    codediff::diff::text::TextOperation::Update => HumanTextVerdict::Update,
-                    codediff::diff::text::TextOperation::Delete => HumanTextVerdict::Delete,
-                    codediff::diff::text::TextOperation::Insert => HumanTextVerdict::Insert,
+                    omnidiff::diff::text::TextOperation::Move => HumanTextVerdict::Move,
+                    omnidiff::diff::text::TextOperation::Update => HumanTextVerdict::Update,
+                    omnidiff::diff::text::TextOperation::Delete => HumanTextVerdict::Delete,
+                    omnidiff::diff::text::TextOperation::Insert => HumanTextVerdict::Insert,
                     // Identical text is the unpainted background here.
                     _ => return None,
                 };
@@ -359,22 +359,22 @@ pub(crate) fn codediff_text_spans(
     [convert(before_ranges), convert(after_ranges)]
 }
 
-/// codediff's rendering as painting entries, for `P` to seed an empty painting. Built from
-/// `codediff_text_spans`, so seeding then showing codediff's overlay reveals no difference. Move
+/// omnidiff's rendering as painting entries, for `P` to seed an empty painting. Built from
+/// `omnidiff_text_spans`, so seeding then showing omnidiff's overlay reveals no difference. Move
 /// and Update both become `Match`: the verdict is derived from the spans' text, not stored.
-pub(crate) fn codediff_text_entries(
+pub(crate) fn omnidiff_text_entries(
     before: &Code,
     after: &Code,
     known: Option<&ASTDiff>,
 ) -> Result<Vec<HumanTextEntry>, &'static str> {
-    let [before_spans, after_spans] = codediff_text_spans(before, after, known);
+    let [before_spans, after_spans] = omnidiff_text_spans(before, after, known);
 
     // Overlapping ranges are refused: the renderer resolves an overlap by highest verdict but
     // `label_bytes` (what grading reads) by last entry, so it would render as one thing and score
-    // as another. codediff's own rendering does produce overlaps.
+    // as another. omnidiff's own rendering does produce overlaps.
     if spans_overlap(&before_spans) || spans_overlap(&after_spans) {
         return Err(
-            "codediff's own ranges overlap on this pair, which a painting cannot represent",
+            "omnidiff's own ranges overlap on this pair, which a painting cannot represent",
         );
     }
 
@@ -393,7 +393,7 @@ pub(crate) fn codediff_text_entries(
     let before_matched = matched(&before_spans);
     let after_matched = matched(&after_spans);
     if before_matched.len() != after_matched.len() {
-        return Err("codediff's two sides do not pair up here, so a match cannot be derived");
+        return Err("omnidiff's two sides do not pair up here, so a match cannot be derived");
     }
 
     let mut entries: Vec<HumanTextEntry> = before_matched
@@ -442,11 +442,11 @@ pub(crate) fn spans_overlap(spans: &[(HumanTextSpan, HumanTextVerdict)]) -> bool
     })
 }
 
-/// `P` in the text view: seeds the current painting with codediff's rendering, so a fixture is
+/// `P` in the text view: seeds the current painting with omnidiff's rendering, so a fixture is
 /// corrected rather than painted from scratch. Refuses a painting that already has ranges, as
 /// `action_paint_mark_empty` does: a seed is a starting point, never a replacement. `s` branches
 /// to seed a second reading.
-pub(crate) fn action_paint_seed_from_codediff(app: &mut App, before: &Code, after: &Code) {
+pub(crate) fn action_paint_seed_from_omnidiff(app: &mut App, before: &Code, after: &Code) {
     let solution = app.text_solution.clone();
     if !solution_entries(&app.mapping, &solution).is_empty() {
         app.status = Some(format!(
@@ -456,15 +456,15 @@ pub(crate) fn action_paint_seed_from_codediff(app: &mut App, before: &Code, afte
         return;
     }
 
-    let entries = match codediff_text_entries(before, after, app.algo_diff.as_ref()) {
+    let entries = match omnidiff_text_entries(before, after, app.algo_diff.as_ref()) {
         Ok(entries) if entries.is_empty() => {
-            app.status = Some("codediff paints nothing on this pair - nothing to copy".to_string());
+            app.status = Some("omnidiff paints nothing on this pair - nothing to copy".to_string());
             return;
         }
         Ok(entries) => entries,
         Err(reason) => {
             app.status = Some(format!(
-                "Cannot seed from codediff: {reason} - paint by hand"
+                "Cannot seed from omnidiff: {reason} - paint by hand"
             ));
             return;
         }
@@ -474,11 +474,11 @@ pub(crate) fn action_paint_seed_from_codediff(app: &mut App, before: &Code, afte
     *solution_entries_mut(&mut app.mapping, &solution) = entries;
     app.mark_dirty();
     app.status = Some(format!(
-        "Copied codediff's {count} range(s) into '{solution}' - correct them from here (u removes one)"
+        "Copied omnidiff's {count} range(s) into '{solution}' - correct them from here (u removes one)"
     ));
 }
 
-/// Spans where the human's painting and `other` (codediff's spans) disagree, labelled with the
+/// Spans where the human's painting and `other` (omnidiff's spans) disagree, labelled with the
 /// human's verdict.
 pub(crate) fn overlay_disagreement_spans(
     painted: &[Vec<(HumanTextSpan, HumanTextVerdict)>; 2],
@@ -1134,7 +1134,7 @@ const HUNK_MAX_EDIT: usize = 10_000;
 /// `None` means the Myers search gave up past `HUNK_MAX_EDIT`; callers must not read that as "no
 /// differences".
 pub(crate) fn text_diff_hunks(before_src: &str, after_src: &str) -> Option<Vec<(usize, usize)>> {
-    let core = codediff::diff::text::line_diff_core(before_src, after_src, HUNK_MAX_EDIT)?;
+    let core = omnidiff::diff::text::line_diff_core(before_src, after_src, HUNK_MAX_EDIT)?;
     let mut hunks = Vec::new();
     let (mut next_before, mut next_after) = (0usize, 0usize);
     for &(before_row, after_row) in &core.pairs {
@@ -1432,13 +1432,13 @@ fn overlapping_painted_range(
 /// Compared as absolute offsets so `(row + 1, 0)` and `(row, row_len)` are one position. A shared
 /// line terminator does not count: `label_bytes` never labels one.
 fn spans_share_a_byte(a: HumanTextSpan, b: HumanTextSpan, source: &str) -> bool {
-    let text = codediff::diff::text_range::SourceText::new(source);
+    let text = omnidiff::diff::text_range::SourceText::new(source);
     let offset = |row: usize, column: usize| -> Option<usize> {
         text.byte_index(
-            codediff::diff::text_range::SourceRow::from_raw(row),
-            codediff::diff::text_range::SourceColumn::from_raw(column),
+            omnidiff::diff::text_range::SourceRow::from_raw(row),
+            omnidiff::diff::text_range::SourceColumn::from_raw(column),
         )
-        .map(codediff::diff::text_range::SourceOffset::get)
+        .map(omnidiff::diff::text_range::SourceOffset::get)
     };
     let (Some(a_start), Some(a_end)) = (
         offset(a.start_row, a.start_column),
@@ -1797,7 +1797,7 @@ pub(crate) fn action_paint_mark_empty(app: &mut App) {
 /// A blocking prompt. While `App::modal` is `Some`, keys go to `handle_modal_key`.
 #[derive(Debug, Clone)]
 pub(crate) enum Modal {
-    /// The two cursor nodes have different kinds. codediff pairs different kinds only where
+    /// The two cursor nodes have different kinds. omnidiff pairs different kinds only where
     /// `nodes::kinds_update_allowed` permits, so this is usually a mismatch; confirmed explicitly.
     ConfirmKindMismatch {
         before_id: usize,
@@ -1978,7 +1978,7 @@ pub(crate) struct App {
     pub(crate) status: Option<String>,
     pub(crate) modal: Option<Modal>,
     pub(crate) should_quit: bool,
-    /// codediff's own diff of the open case. `None` until the background run
+    /// omnidiff's own diff of the open case. `None` until the background run
     /// (`start_algo_diff`, begun when the case opens) lands, or `p` runs it in the foreground.
     pub(crate) algo_diff: Option<ASTDiff>,
     /// The background run's result channel while it is in flight; `poll_algo_diff` drains it.
@@ -1986,7 +1986,7 @@ pub(crate) struct App {
     pub(crate) algo_diff_pending: Option<std::sync::mpsc::Receiver<Option<ASTDiff>>>,
     /// `H`: hides fully marked subtrees in both panels, recomputed every frame.
     pub(crate) hide_solved: bool,
-    /// `r`: shows each node's `ASTMappingReason` label after its codediff glyph (needs `p`).
+    /// `r`: shows each node's `ASTMappingReason` label after its omnidiff glyph (needs `p`).
     pub(crate) show_reason: bool,
     /// The `O` picker's column, sort and filters, persisted so they stick across reopening.
     pub(crate) sample_view: SamplePickerView,
@@ -2012,7 +2012,7 @@ pub(crate) struct App {
     pub(crate) diff_comments: Option<std::collections::HashMap<String, String>>,
     /// What the `t` view paints (see `TextOverlay`), cycled by `o`.
     pub(crate) text_overlay: TextOverlay,
-    /// codediff's text ranges per side, computed on first use and dropped on case change.
+    /// omnidiff's text ranges per side, computed on first use and dropped on case change.
     pub(crate) algo_text_spans: Option<[Vec<(HumanTextSpan, HumanTextVerdict)>; 2]>,
     /// The painting the `t` view edits; see `starting_solution`. Changed by `s`/`L`.
     pub(crate) text_solution: String,

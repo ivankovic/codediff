@@ -1,6 +1,6 @@
 # Packaging
 
-Recipes for distributing `codediff` through package managers, kept in-repo so they version
+Recipes for distributing `omnidiff` through package managers, kept in-repo so they version
 alongside the code they build. Their status differs per target (table below): the Debian package
 and the Homebrew tap are published by the release workflow; the Arch, Gentoo and Nix recipes are
 not submitted to their distributions, whose submission targets (the AUR, a Gentoo overlay,
@@ -10,11 +10,11 @@ than a recipe here.
 | Target | Files | Status |
 | --- | --- | --- |
 | Arch (AUR) | `aur/PKGBUILD` | the AUR is closed to new submissions; the PKGBUILD builds locally with `makepkg -si` |
-| Gentoo | `gentoo/dev-util/codediff/` | ready for an overlay |
-| Debian/Ubuntu | `[package.metadata.deb]` in `../Cargo.toml` | **published** — signed apt repository at [ivankovic.github.io/codediff/apt](https://ivankovic.github.io/codediff/apt) |
+| Gentoo | `gentoo/dev-util/omnidiff/` | ready for an overlay |
+| Debian/Ubuntu | `[package.metadata.deb]` in `../Cargo.toml` | **published** — signed apt repository at [ivankovic.github.io/omnidiff/apt](https://ivankovic.github.io/omnidiff/apt) |
 | Nix / NixOS | `nix/package.nix`, `../flake.nix`, `../flake.lock` | works today via `nix run`; built by the Nix workflow |
-| Homebrew | `homebrew/codediff.rb.in`, rendered by `../scripts/render_homebrew_formula.py` | tap at `ivankovic/homebrew-codediff`, pushed by the release workflow |
-| VS Code | [codediff-vscode](https://github.com/ivankovic/codediff-vscode) | **published** — on the Marketplace and Open VSX |
+| Homebrew | `homebrew/omnidiff.rb.in`, rendered by `../scripts/render_homebrew_formula.py` | tap at `ivankovic/homebrew-omnidiff`, pushed by the release workflow |
+| VS Code | [omnidiff-vscode](https://github.com/ivankovic/omnidiff-vscode) | **published** — on the Marketplace and Open VSX |
 
 ## The one thing you cannot skip: checksums
 
@@ -23,7 +23,7 @@ be regenerated after the next tag exists, and until then the recipes name the ne
 old hash and do not build. `make check-versions` checks the version strings, not the hashes.
 
 * `aur/PKGBUILD` carries the sha256 of the tag tarball
-* `gentoo/dev-util/codediff/Manifest` carries one `DIST` line for the tag tarball and one for each
+* `gentoo/dev-util/omnidiff/Manifest` carries one `DIST` line for the tag tarball and one for each
   vendored crate, each with its size, BLAKE2B and SHA512
 * Nix needs a `hash =` only if you switch `package.nix` to `fetchFromGitHub`; as long as `src` is
   a parameter and `cargoLock.lockFile` points at the in-tree lock, there is nothing to hash
@@ -43,8 +43,8 @@ tools where you have them:
 
 ```sh
 cd packaging/aur && updpkgsums                      # rewrites sha256sums=() in place
-ebuild gentoo/dev-util/codediff/codediff-<version>.ebuild manifest
-nix-prefetch-url --unpack https://github.com/ivankovic/codediff/archive/refs/tags/v<version>.tar.gz
+ebuild gentoo/dev-util/omnidiff/omnidiff-<version>.ebuild manifest
+nix-prefetch-url --unpack https://github.com/ivankovic/omnidiff/archive/refs/tags/v<version>.tar.gz
 ```
 
 **Not from `SHA256SUMS.txt`.** That asset hashes the *release assets* - the prebuilt binaries, the
@@ -72,7 +72,7 @@ git2 (OpenSSL, libssh2) and a bundled SQLite. They are not part of the shipped p
 recipe exposes them as a build option.
 
 **Completions and the man page are generated, never hand-written.** Each recipe runs
-`codediff util man` and `codediff util completions <shell>` against the binary it just built, so
+`omnidiff util man` and `omnidiff util completions <shell>` against the binary it just built, so
 they track the real flag list. This assumes a **native** build — under cross-compilation the target
 binary cannot be executed, and these would have to come from a host build instead (which is exactly
 what the release workflow's `assets` job does for the prebuilt tarballs).
@@ -108,12 +108,12 @@ To build one locally:
 
 ```sh
 cargo install cargo-deb
-cargo build --release --bin codediff
+cargo build --release --bin omnidiff
 mkdir -p target/dist
-./target/release/codediff util man                > target/dist/codediff.1
-./target/release/codediff util completions bash   > target/dist/codediff.bash
-./target/release/codediff util completions zsh    > target/dist/_codediff
-./target/release/codediff util completions fish   > target/dist/codediff.fish
+./target/release/omnidiff util man                > target/dist/omnidiff.1
+./target/release/omnidiff util completions bash   > target/dist/omnidiff.bash
+./target/release/omnidiff util completions zsh    > target/dist/_omnidiff
+./target/release/omnidiff util completions fish   > target/dist/omnidiff.fish
 cargo deb --no-build
 ```
 
@@ -167,7 +167,7 @@ user on a date nobody is watching, which is what the trailing `never` is for:
 
 ```sh
 gpg --batch --pinentry-mode loopback --passphrase '' \
-    --quick-gen-key 'CodeDiff apt repository <marko@ivankovic.me>' rsa4096 sign never
+    --quick-gen-key 'OmniDiff apt repository <marko@ivankovic.me>' rsa4096 sign never
 gpg --armor --export-secret-keys '<KEYID>' | gh secret set APT_GPG_PRIVATE_KEY
 ```
 
@@ -191,12 +191,12 @@ pages.yml rejects a value that is not an armoured private key block.
 
 The private key exists only in that secret. **Back it up somewhere you control**: losing it means
 generating a new one, and every user who added the old key gets a signature failure on their next
-`apt update` until they re-fetch `codediff-archive-keyring.gpg`. That is also what makes rotation
+`apt update` until they re-fetch `omnidiff-archive-keyring.gpg`. That is also what makes rotation
 expensive, so rotate on evidence, not on a schedule.
 
 ## Nix
 
-`nix run github:ivankovic/codediff` works against the repository directly — no tag, no release
+`nix run github:ivankovic/omnidiff` works against the repository directly — no tag, no release
 artifact, no vendor hash, because `cargoLock.lockFile` vendors straight from the committed
 `Cargo.lock`. `nix develop` gives a shell with the toolchain the `Makefile` targets expect.
 
@@ -204,7 +204,7 @@ A nixpkgs submission would take `nix/package.nix` as-is but swap `src` for a `fe
 and `cargoLock.lockFile` for a `cargoHash`, since nixpkgs does not carry the lock file. The
 `maintainers` list is deliberately empty until somebody agrees to be on it.
 
-`flake.lock` is committed, so `nix run github:ivankovic/codediff` builds against one pinned
+`flake.lock` is committed, so `nix run github:ivankovic/omnidiff` builds against one pinned
 nixpkgs rather than whatever `nixos-unstable` is that day. `nix flake update` moves the pin; do
 it deliberately, in a commit of its own.
 
@@ -218,12 +218,12 @@ do, with `git` as a check-time input: the git review tests spawn `git` and chang
 directory, which is safe in a process of their own and not under plain `cargo test`.
 
 **Building it locally without Nix installed.** The official image works through podman or
-docker; the named volume keeps the store between runs so a retry only rebuilds codediff:
+docker; the named volume keeps the store between runs so a retry only rebuilds omnidiff:
 
 ```
-podman run --rm -it -v "$PWD":/src -w /src -v codediff-nix:/nix docker.io/nixos/nix:latest \
+podman run --rm -it -v "$PWD":/src -w /src -v omnidiff-nix:/nix docker.io/nixos/nix:latest \
   sh -c 'git config --global --add safe.directory /src && \
-         nix --extra-experimental-features "nix-command flakes" build .#codediff -L'
+         nix --extra-experimental-features "nix-command flakes" build .#omnidiff -L'
 ```
 
 Flakes see only git-tracked files, so a new fixture or source file has to be `git add`ed before
@@ -231,19 +231,19 @@ the build sees it. The `result` link it leaves at the root is ignored.
 
 ## Homebrew
 
-A tap, not homebrew-core: `brew install ivankovic/codediff/codediff` taps
-[`ivankovic/homebrew-codediff`](https://github.com/ivankovic/homebrew-codediff) and installs from
+A tap, not homebrew-core: `brew install ivankovic/omnidiff/omnidiff` taps
+[`ivankovic/homebrew-omnidiff`](https://github.com/ivankovic/homebrew-omnidiff) and installs from
 it. The formula installs the release tarballs rather than building from source, so a user gets
 the same attested binary every other route ships in seconds, instead of compiling every grammar
 under fat LTO on their own machine. homebrew-core would not take a binary formula; a personal tap
 routinely does. On macOS it installs the Apple Silicon or Intel build; on Linux the static musl
 build, which runs on any distribution.
 
-`homebrew/codediff.rb.in` is the source of truth, kept here so it versions with the code. It is a
+`homebrew/omnidiff.rb.in` is the source of truth, kept here so it versions with the code. It is a
 template: the version and the four checksums come from the release's `SHA256SUMS.txt`, which
 only exists once the release does. `scripts/render_homebrew_formula.py` fills them in and refuses
 to leave a placeholder behind, and release.yml's `homebrew` job runs it after the checksums job
-and pushes `Formula/codediff.rb` to the tap.
+and pushes `Formula/omnidiff.rb` to the tap.
 
 The push needs a fine-grained personal access token with **Contents: read and write** on the
 tap repository alone, stored as the `HOMEBREW_TAP_TOKEN` secret of this repository. Without it the
@@ -252,11 +252,11 @@ job prints a warning and the release proceeds; render and push by hand then:
 ```sh
 gh release download v<version> --pattern SHA256SUMS.txt
 python3 scripts/render_homebrew_formula.py --version <version> --sums SHA256SUMS.txt \
-  --out ../homebrew-codediff/Formula/codediff.rb
+  --out ../homebrew-omnidiff/Formula/omnidiff.rb
 ```
 
 The man page and completions are generated at install time by the installed binary, as every
-other recipe does; `brew test codediff` runs a real headless diff.
+other recipe does; `brew test omnidiff` runs a real headless diff.
 
 ## Release checklist
 
@@ -278,9 +278,9 @@ other recipe does; `brew test codediff` runs a real headless diff.
    `SHA256SUMS.txt`**: that file covers the release assets, and the source tarball is not one.
 8. Push the updated Gentoo recipe to the overlay. The Homebrew tap updates itself from the
    release workflow (see "Homebrew" above); check that
-   [`Formula/codediff.rb`](https://github.com/ivankovic/homebrew-codediff/blob/main/Formula/codediff.rb)
+   [`Formula/omnidiff.rb`](https://github.com/ivankovic/homebrew-omnidiff/blob/main/Formula/omnidiff.rb)
    names the new version.
 9. Check that the apt repository picked the release up — `curl -s
-   https://ivankovic.github.io/codediff/apt/dists/stable/main/binary-amd64/Packages | grep ^Version`
+   https://ivankovic.github.io/omnidiff/apt/dists/stable/main/binary-amd64/Packages | grep ^Version`
    should name the new version. It refreshes itself (step 2 above), so this is a check, not a task;
    if it is stale, re-run the Pages workflow.

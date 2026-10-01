@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -16,7 +16,7 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 //! Attribution for a sample taken from a third-party repository: it is someone else's code, not
-//! under codediff's AGPL, so its provenance and license travel with it. `render_readme` records a
+//! under omnidiff's AGPL, so its provenance and license travel with it. `render_readme` records a
 //! commit-pinned link to the license file plus a best-effort label, not the license text. See
 //! `README.md`'s "Third-party test fixtures".
 
@@ -212,8 +212,8 @@ pub fn render_readme(
         out,
         "`before.*.test`/`after.*.test` in this directory are an unmodified excerpt of the file \
          above, copied verbatim from the source repository at the commit above (and its single \
-         parent) for use as codediff test-fixture input. This content is **not** part of \
-         codediff's own codebase and is **not** covered by codediff's own AGPL-3.0 license - it \
+         parent) for use as omnidiff test-fixture input. This content is **not** part of \
+         omnidiff's own codebase and is **not** covered by omnidiff's own AGPL-3.0 license - it \
          remains under whatever license the source repository itself applies, linked below \
          exactly as it read in that repository at this commit."
     );
@@ -228,7 +228,7 @@ pub fn render_readme(
              This is very likely a shallow-clone gap (the commit has aged out of the checkout's \
              `--depth` window since this sample was originally promoted), not evidence the \
              repository lacks a license. Check the repository above directly before reusing this \
-             sample outside codediff's own test suite."
+             sample outside omnidiff's own test suite."
         );
         return out;
     }
@@ -238,7 +238,7 @@ pub fn render_readme(
             out,
             "No LICENSE/COPYING/NOTICE file was found at the repository root at this commit. \
              Licensing terms are unknown from this checkout alone - check the repository above \
-             directly before reusing this sample outside codediff's own test suite."
+             directly before reusing this sample outside omnidiff's own test suite."
         );
         return out;
     }

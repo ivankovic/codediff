@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -27,7 +27,7 @@ fn mapping() -> Result<()> {
 
 #[test]
 fn painting() -> Result<()> {
-    // Wrapping existing code in new error-handling structure is the shape codediff renders least
+    // Wrapping existing code in new error-handling structure is the shape omnidiff renders least
     // like a human (as in kotlin-refactor-function and java-add-exception-handling).
     assert_matches_human_painting_within_limit("typescript-add-error-handling", 35.61)
 }

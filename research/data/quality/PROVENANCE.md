@@ -28,7 +28,7 @@ them a Defects4J unit (274 solved, from 113).
 | `defects4j` | 996 | 274 |
 | **total** | **2002** | **1279** |
 
-The paper's scope is **1217** fixtures (1056 before). Over them codediff maps 10,325,792 of
+The paper's scope is **1217** fixtures (1056 before). Over them omnidiff maps 10,325,792 of
 10,333,777 nodes (99.92%), and 7,030,055 of 7,035,541 visible nodes; `paper_variables.py`'s
 authored CORPUS block carries these totals.
 
@@ -56,7 +56,7 @@ annotation has reached, not a draw - do not read a Defects4J figure as an estima
   reason and node kind, written by the `mismatch_census` test.
 - `convention_census.csv` - leaves whose text survived but whose painting differs between
   fixtures, written by the `cross_fixture_convention_census` test.
-- `nm_candidates.csv` - every subtree codediff deletes or inserts whole while an identical twin on
+- `nm_candidates.csv` - every subtree omnidiff deletes or inserts whole while an identical twin on
   its side is matched: what a pass attaching leftovers to N:M groups could add, labelled with the
   human's verdict on each. Written by the `nm_candidate_census` test.
 - `kind_mismatches.csv` - every ground-truth pair whose two nodes differ in kind, written by

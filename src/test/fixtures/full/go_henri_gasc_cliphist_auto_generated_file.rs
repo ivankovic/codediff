@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -21,7 +21,7 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // Auto-generated file. The human deletes whole `function_declaration`s; codediff matches their
+    // Auto-generated file. The human deletes whole `function_declaration`s; omnidiff matches their
     // punctuation and keyword leaves to leaves of surviving functions.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "go-henri-gasc-cliphist-auto-generated-file",
