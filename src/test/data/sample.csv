@@ -46,7 +46,7 @@ C,nginx-nginx.git,02bd43d05b6f7803597d8453d9848b767dc4a323,src/event/ngx_event_o
 C,nginx-nginx.git,7677d5646aeb761b8b9da5af3eb10c008aae3f90,src/event/ngx_event_openssl_cache.c,c-nginx-add-typedef,small,PROMOTED,,
 C,nginx-nginx.git,90f1b5fd08e9aca01d568d6653da772980033e43,src/os/win32/ngx_win32_config.h,c-nginx-nginx-add-preproc-two-lines,stratified,PROMOTED,,100-300
 C,ollama-ollama.git,1a19df1f3a39481dfe686c8f1041f91531a04ada,llama/llama.cpp/common/json-schema-to-grammar.h,c-ollama-ollama-change-imports,stratified,PROMOTED,,10-30
-C,openssl-openssl.git,2ea6e785f526f88f913cc6f49372aae9dc54bc63,crypto/pkcs7/pk7_doit.c,,stratified,SAMPLED,,1000-3000
+C,openssl-openssl.git,2ea6e785f526f88f913cc6f49372aae9dc54bc63,crypto/pkcs7/pk7_doit.c,c-openssl-openssl-big-multi-map-change,stratified,PROMOTED,,1000-3000
 C,openssl-openssl.git,2fab90bb5e1937f1c2125eab144f7f6c39e70087,crypto/pkcs12/p12_key.c,,stratified,SAMPLED,,100-300
 C,openssl-openssl.git,2fab90bb5e1937f1c2125eab144f7f6c39e70087,crypto/ui/ui_null.c,c-openssl-openssl-whitepsace-only,stratified,PROMOTED,,10-30
 C,openssl-openssl.git,2fab90bb5e1937f1c2125eab144f7f6c39e70087,providers/common/der/der_rsa_sig.c,c-openssl-openssl-format-only-change,stratified,PROMOTED,,30-100
@@ -108,7 +108,7 @@ CPP,cgdb-cgdb,a7c00e7096d20944fe3eec9823f333616273f522,cgdb/cgdb.cpp,cpp-cgdb-cg
 CPP,electron-electron.git,3bfe1f236345a7fa6e651ee24782c72a16a58b47,shell/browser/child_web_contents_tracker.cc,cpp-electron-electron-add-imports,stratified,PROMOTED,,10-30
 CPP,godotengine-godot.git,005e0542455ecb50ba2829cb83c40f07e2660adf,editor/scene/3d/gizmos/two_bone_ik_3d_gizmo_plugin.cpp,cpp-godotengine-godot-two-imports-added,stratified,PROMOTED,,100-300
 CPP,godotengine-godot.git,0ea5ece98499bb575fc3ad9002e988f2394f83b2,scene/resources/animation.cpp,cpp-godotengine-godot-add-qualified-name,stratified,PROMOTED,,3000+
-CPP,godotengine-godot.git,106bbaa2e89ff47a43edd86b950873db909870ac,scene/resources/2d/tile_set.cpp,,stratified,SAMPLED,,3000+
+CPP,godotengine-godot.git,106bbaa2e89ff47a43edd86b950873db909870ac,scene/resources/2d/tile_set.cpp,cpp-godotengine-godot-add-function,stratified,PROMOTED,,3000+
 CPP,godotengine-godot.git,6f86914f55a149d2b9578ba42f7f2a671f740557,scene/2d/animated_sprite_2d.cpp,cpp-godot-small-bugfix,small,PROMOTED,,
 CPP,godotengine-godot.git,727b06a79f6cbfab3c01dfb23da343cf1a0d17b5,platform/windows/export/export_plugin.cpp,cpp-godotengine-godot-insert-one-include,stratified,PROMOTED,,1000-3000
 CPP,godotengine-godot.git,765362b033011f44ccac7a68dd28147cf21fa135,servers/rendering/rendering_device.cpp,cpp-godotengine-godot-add-one-include,stratified,PROMOTED,,3000+
@@ -126,7 +126,7 @@ CPP,libreoffice,5505d3bc4dd1e7350f5d935ead1ea5161d276ad9,store/source/lockbyte.c
 CPP,libreoffice,6a0ac36db8c9017bfab8026dec37708924d0cdce,vcl/inc/unx/fc_fontoptions.hxx,cpp-libreoffice-add-imports-and-function-param,stratified,PROMOTED,,30-100
 CPP,libreoffice,900c75afe4b2d7e98e1572aec8d113b9e9d05b36,basctl/source/dlged/dlged.cxx,cpp-libreoffice-remove-two-wrapping-functions,stratified,PROMOTED,,1000-3000
 CPP,libreoffice,942a4d540a408df06f22489398a619ce0b5a75d0,vcl/unx/kf5/KFSalInstance.cxx,cpp-libreoffice-delete-function,stratified,PROMOTED,,30-100
-CPP,libreoffice,b7335df01fa53380e473b197d54f973c1aa5ce19,cui/source/tabpages/transfrm.cxx,,stratified,SAMPLED,,1000-3000
+CPP,libreoffice,b7335df01fa53380e473b197d54f973c1aa5ce19,cui/source/tabpages/transfrm.cxx,cpp-libreoffice-fraction-type-to-double,stratified,PROMOTED,,1000-3000
 CPP,libreoffice,d12f7b60b2c96db507c2a8ed5c75666d970ce5ab,sw/source/core/unocore/unoframe.cxx,cpp-libreoffice-warn-to-info,stratified,PROMOTED,,3000+
 CPP,libreoffice,dc513684282e732c7e8ff71dde431d5632f12824,vcl/source/accessibility/accessiblelistbox.cxx,cpp-libreoffice-remove-return-value,small,PROMOTED,,
 CPP,libreoffice,e086652cd1c007c025a952bf265085a55c6898ad,include/vcl/metaact.hxx,,stratified,SAMPLED,,1000-3000
@@ -149,7 +149,7 @@ CPP,mozilla-firefox-firefox.git,9f363abaef7c7fadb71455508e78b71125aaf0b1,toolkit
 CPP,mozilla-firefox-firefox.git,9f363abaef7c7fadb71455508e78b71125aaf0b1,toolkit/components/url-classifier/tests/gtest/TestURLsAndHashing.cpp,cpp-mozilla-firefox-firefox-delete-leading-comment,stratified,PROMOTED,,30-100
 CPP,mozilla-firefox-firefox.git,9f363abaef7c7fadb71455508e78b71125aaf0b1,toolkit/mozapps/update/updater/progressui_null.cpp,cpp-mozilla-firefox-firefox-update-file-comment-2,stratified,PROMOTED,,10-30
 CPP,mozilla-firefox-firefox.git,e503e0b5bfa3a3cee7a876b9da45a1b2a6dd680a,netwerk/protocol/http/HttpChannelChild.cpp,cpp-mozilla-firefox-firefox-pure-move,stratified,PROMOTED,,3000+
-CPP,mozilla-firefox-firefox.git,f81328e36511088c5110a38a9b1f8041c80457a2,xpfe/appshell/nsAppShellWindowEnumerator.cpp,,stratified,SAMPLED,,300-1000
+CPP,mozilla-firefox-firefox.git,f81328e36511088c5110a38a9b1f8041c80457a2,xpfe/appshell/nsAppShellWindowEnumerator.cpp,cpp-mozilla-firefox-firefox-block-to-default,stratified,PROMOTED,,300-1000
 CPP,nextcloud-desktop.git,585b6ca32dc97c51ede2dad1c002b8a2625e12fc,test/testnextcloudpropagator.cpp,cpp-nextcloud-add-test-case,small,PROMOTED,,
 CPP,nextcloud-desktop.git,e216d97b5952fe98022108386094c4c080fb1dca,src/libsync/clientsideencryption.cpp,cpp-nextcloud-desktop-small-change,stratified,PROMOTED,,3000+
 CPP,nzbgetcom-nzbget.git,2de2c56a8deaa1bdbf86c573c6ae8d97fce4b1b7,daemon/extension/ExtensionManager.cpp,cpp-nzbgetcom-nzbget-update-string-const,stratified,PROMOTED,,300-1000
@@ -164,7 +164,7 @@ CPP,ollama-ollama.git,544b6739dde2a6b156b1673c72d94949c1940be7,llama/build-info.
 CPP,ollama-ollama.git,8dd12c873d7816f76d5488c8ff879a574dad5e01,llama/build-info.cpp,cpp-ollama-ollama-update-commit-hash-5,stratified,PROMOTED,,0-10
 CPP,ollama-ollama.git,afaf7ce8c34bab8de45ca00dbd12da8cd3cc033a,ml/backend/ggml/ggml/src/ggml-metal/ggml-metal.cpp,cpp-ollama-add-function-argument,small,PROMOTED,,
 CPP,ollama-ollama.git,b1fccabb34aad5ca68015cf36ae3352a8e2bf9bf,llama/build-info.cpp,cpp-ollama-ollama-update-commit-hash-6,stratified,PROMOTED,,0-10
-CPP,ollama-ollama.git,b1fccabb34aad5ca68015cf36ae3352a8e2bf9bf,llama/llama.cpp/tools/mtmd/models/whisper-enc.cpp,,stratified,SAMPLED,,100-300
+CPP,ollama-ollama.git,b1fccabb34aad5ca68015cf36ae3352a8e2bf9bf,llama/llama.cpp/tools/mtmd/models/whisper-enc.cpp,cpp-ollama-ollama-delete-if-else-branch,stratified,PROMOTED,,100-300
 CPP,ollama-ollama.git,b95693056c62a3acaa172f555e3bdb2b438684e3,llama/build-info.cpp,cpp-ollama-ollama-update-commit-hash-7,stratified,PROMOTED,,0-10
 CPP,ollama-ollama.git,ef00199fb4e6d045e11e76baaab9049f3234939d,llama/build-info.cpp,cpp-ollama-ollama-update-commit-hash-8,stratified,PROMOTED,,0-10
 CPP,opencv-opencv.git,17a01d687c6557ba5c3cb47805edf816871835f7,modules/core/include/opencv2/core/mat.hpp,cpp-opencv-opencv-fix-dimention-dimension-typo-in-two-comments,stratified,PROMOTED,,3000+

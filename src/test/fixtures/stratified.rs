@@ -93,6 +93,8 @@ mod c_openssl_openssl_add_import;
 #[cfg(test)]
 mod c_openssl_openssl_add_two_clang_comments;
 #[cfg(test)]
+mod c_openssl_openssl_big_multi_map_change;
+#[cfg(test)]
 mod c_openssl_openssl_copyright;
 #[cfg(test)]
 mod c_openssl_openssl_format_only_change;
@@ -149,6 +151,8 @@ mod c_tmux_tmux_delete_one_include;
 #[cfg(test)]
 mod cpp_electron_electron_add_imports;
 #[cfg(test)]
+mod cpp_godotengine_godot_add_function;
+#[cfg(test)]
 mod cpp_godotengine_godot_add_include;
 #[cfg(test)]
 mod cpp_godotengine_godot_add_one_include;
@@ -179,6 +183,8 @@ mod cpp_libreoffice_add_imports_and_function_param;
 #[cfg(test)]
 mod cpp_libreoffice_delete_function;
 #[cfg(test)]
+mod cpp_libreoffice_fraction_type_to_double;
+#[cfg(test)]
 mod cpp_libreoffice_remove_two_wrapping_functions;
 #[cfg(test)]
 mod cpp_libreoffice_warn_to_info;
@@ -203,6 +209,8 @@ mod cpp_mongodb_mongo_add_function_and_2_call_sites;
 #[cfg(test)]
 mod cpp_mongodb_mongo_use_auto;
 #[cfg(test)]
+mod cpp_mozilla_firefox_firefox_block_to_default;
+#[cfg(test)]
 mod cpp_mozilla_firefox_firefox_delete_leading_comment;
 #[cfg(test)]
 mod cpp_mozilla_firefox_firefox_pure_move;
@@ -218,6 +226,8 @@ mod cpp_nzbgetcom_nzbget_add_if;
 mod cpp_nzbgetcom_nzbget_add_include;
 #[cfg(test)]
 mod cpp_nzbgetcom_nzbget_update_string_const;
+#[cfg(test)]
+mod cpp_ollama_ollama_delete_if_else_branch;
 #[cfg(test)]
 mod cpp_ollama_ollama_update_commit_hash;
 #[cfg(test)]
