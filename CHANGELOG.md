@@ -4,17 +4,36 @@ All notable changes to OmniDiff (named CodeDiff up to v0.1.1). The format follow
 and the version numbers follow [Semantic Versioning](https://semver.org/) as far as a 0.x
 release does: a minor bump may change the JSON output or the library API, a patch bump does not.
 
-## [Unreleased]
+## [0.2.0] - 2026-10-01
+
+**CodeDiff is now OmniDiff.** The old name is a registered trademark, so everything was renamed.
 
 ### Changed
 
 - **Renamed from CodeDiff to OmniDiff.** The crate, binary, packages, editor extensions and
   repositories are all `omnidiff` now: install `omnidiff` (`cargo install --locked omnidiff`, the
-  `omnidiff` deb, `brew install ivankovic/omnidiff/omnidiff`), then rerun `omnidiff git configure`
-  and `omnidiff jj configure`, since a configuration that names `codediff` points at a binary that
-  no longer updates. The config moved to `.omnidiff.toml`, `$OMNIDIFF_CONFIG` and
-  `~/.config/omnidiff/config.toml`. For this release the old names are still read, and
-  `~/.config/codediff/config.toml` is moved to the new place the first time it is needed.
+  `omnidiff` deb from `https://ivankovic.github.io/omnidiff/apt`, `brew install
+  ivankovic/omnidiff/omnidiff`, the `ivankovic.omnidiff` VS Code extension, `omnidiff.nvim`),
+  then rerun `omnidiff git configure` and `omnidiff jj configure`, since a configuration that
+  names `codediff` points at a binary that no longer updates. The apt repository moved with the
+  GitHub Pages site: replace `ivankovic.github.io/codediff/apt` and the
+  `codediff-archive-keyring.gpg` key file in your apt sources with the `omnidiff` ones (see the
+  README). The `codediff` crate and the `codediff` packages stay available for now and are
+  retired in a later release.
+- The config moved to `.omnidiff.toml`, `$OMNIDIFF_CONFIG` and `~/.config/omnidiff/config.toml`.
+  For this release the old names are still read, and `~/.config/codediff/config.toml` is moved to
+  the new place the first time it is needed.
+- Code copied to several places is shown as such: when a statement or declaration of some size
+  appears once before and twice after (or the reverse) in two branches of one `if`, every copy
+  paints as a move of the original instead of one being matched and the rest inserted.
+- A comment of three or more words that moves inside a function, class or other construct that
+  survives the change is shown as moved, instead of deleted and re-inserted.
+- A run of comments or small statements that changes length is aligned by similarity, so the
+  entries that stayed are matched instead of the whole run being deleted and re-inserted.
+- A leaf renamed across two different constructs (one identifier of a replaced expression reused
+  in the new one) is shown as deleted and inserted rather than as an in-place update.
+- Library: `ASTDiff` records N:M groups next to its one-partner node maps (`add_group`), and its
+  node maps can no longer disagree about a pair (`is_valid` checks it).
 
 ## [0.1.1] - 2026-09-27
 
