@@ -1772,7 +1772,7 @@ fn nm_candidate_census() -> Result<()> {
                     && hash_of(node.id()).is_some_and(|hash| twins.contains_key(&hash))
             };
             for node in &nodes {
-                if !is_candidate(*node) || node.parent().is_some_and(&is_candidate) {
+                if !is_candidate(*node) || node.parent().is_some_and(is_candidate) {
                     continue;
                 }
                 candidate_roots[side].insert(node.id());
