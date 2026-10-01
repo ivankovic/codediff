@@ -13,12 +13,12 @@ makedepends=('cargo')
 # neither tests/, src/bin/ nor the fixture corpus (see Cargo.toml's `include`), so `check()` would
 # have nothing to run. The tradeoff is that this download also carries research/ and the test corpus.
 source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
-# sha256 of the v0.1.1 tag tarball. Until `updpkgsums` runs after the next tag exists, this is
+# sha256 of the v0.2.0 tag tarball. Until `updpkgsums` runs after the next tag exists, this is
 # the previous tag's hash, and the package does not build. Re-run `updpkgsums` in this
 # directory after every tag; do not guess it, and do not read it from the release's
 # SHA256SUMS.txt - that asset covers the *release assets* (the prebuilt binaries, the .deb, the
 # completions tarball), and GitHub's auto-generated source tarball is not one of them.
-sha256sums=('a59bf5c332abb07f15612f2221c3b7b8f8987920beaea9cf9a825e1002b6b886')
+sha256sums=('5d36ac3ad6e9e47d19ae47b00570efdb74c07d5f84bc1826b4c6308558a193cf')
 
 prepare() {
 	cd "$pkgname-$pkgver"
