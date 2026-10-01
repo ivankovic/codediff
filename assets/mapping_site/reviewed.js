@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -42,7 +42,7 @@
 
   // Prefixed like the viewer's own keys: localStorage is shared by everything on this origin
   // (all of ivankovic.github.io), not just this site.
-  const STORAGE_KEY = "codediff-mapping-reviewed";
+  const STORAGE_KEY = "omnidiff-mapping-reviewed";
 
   // The stored shape is one object of fixture name -> revision string. Anything else (an older
   // format, a hand-edited value, garbage) reads as "no marks" rather than throwing on every page.
@@ -172,7 +172,7 @@
         revision: row.dataset.revision || "",
       }));
     }
-    return Array.isArray(window.CODEDIFF_FIXTURES) ? window.CODEDIFF_FIXTURES : [];
+    return Array.isArray(window.OMNIDIFF_FIXTURES) ? window.OMNIDIFF_FIXTURES : [];
   }
 
   // ─── Random unreviewed fixture ──────────────────────────────────────────────────────────────

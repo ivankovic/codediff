@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -23,7 +23,7 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // The human pairs an `if` body's `block` with the one the edit keeps, codediff with the
+    // The human pairs an `if` body's `block` with the one the edit keeps, omnidiff with the
     // other arm's.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "java-defects4j-closure-44-codeconsumer",

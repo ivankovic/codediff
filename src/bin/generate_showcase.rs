@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -20,7 +20,7 @@
 //!
 //! The viewer (`assets/viewer/`) only paints the JSON it is sent, so this bakes that JSON for the
 //! cases in [`CASES`] and serves the viewer with a `fetch` shim (`assets/showcase/showcase.js`)
-//! answering `/api/*` from files. Each case is baked twice: as codediff maps it and as GNU `diff`
+//! answering `/api/*` from files. Each case is baked twice: as omnidiff maps it and as GNU `diff`
 //! marks it. Published by `.github/workflows/pages.yml` under `showcase/`; nothing is committed.
 
 use std::collections::HashMap;
@@ -31,15 +31,15 @@ use anyhow::{Context, Result, anyhow};
 use clap::Parser;
 use serde::Serialize;
 
-use codediff::diff::text::{RangeMatch, RenderOptions, TextOperation};
-use codediff::diff::text_range::TextRange;
-use codediff::showcase::payload::{DiffPayload, RangePayload, diff_payload};
-use codediff::showcase::state::default_state;
-use codediff::test::helper;
-use codediff::test::helper::human_mapping;
-use codediff::tui::actions::DiffSessionData;
-use codediff::tui::app::compute_diff_with_options;
-use codediff::tui::theme::PanelLayout;
+use omnidiff::diff::text::{RangeMatch, RenderOptions, TextOperation};
+use omnidiff::diff::text_range::TextRange;
+use omnidiff::showcase::payload::{DiffPayload, RangePayload, diff_payload};
+use omnidiff::showcase::state::default_state;
+use omnidiff::test::helper;
+use omnidiff::test::helper::human_mapping;
+use omnidiff::tui::actions::DiffSessionData;
+use omnidiff::tui::app::compute_diff_with_options;
+use omnidiff::tui::theme::PanelLayout;
 
 #[derive(Parser)]
 struct Args {
@@ -51,10 +51,10 @@ struct Args {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 enum Group {
-    /// `diff` marks whole lines a reader has to re-diff by eye; codediff's mapping matches the
+    /// `diff` marks whole lines a reader has to re-diff by eye; omnidiff's mapping matches the
     /// human one line for line.
     DiffWrong,
-    /// A plain line diff is already the right answer, and codediff says the same thing.
+    /// A plain line diff is already the right answer, and omnidiff says the same thing.
     BothRight,
 }
 
@@ -181,11 +181,11 @@ struct CaseIndex {
     lines: usize,
     /// Lines GNU `diff` marks, both sides together.
     diff_marked: usize,
-    /// What codediff paints under the default options, per operation. Counted from the baked
+    /// What omnidiff paints under the default options, per operation. Counted from the baked
     /// ranges, not the payload's `change_counts`, which says "0 updates" for a pure in-line
     /// deletion like `buffer` -> `buf`.
-    codediff: PaintedCounts,
-    /// codediff's one-line reading of the whole change, e.g. "Whitespace changes only".
+    omnidiff: PaintedCounts,
+    /// omnidiff's one-line reading of the whole change, e.g. "Whitespace changes only".
     summary: Option<String>,
     /// The upstream commit the change was taken from, when the fixture is a sampled one.
     upstream: Option<String>,
@@ -238,7 +238,7 @@ fn main() -> Result<()> {
         let baked = bake(case, &provenance, &repository_urls)
             .with_context(|| format!("baking {}", case.name))?;
         for (suffix, payload) in [
-            ("codediff", &baked.codediff),
+            ("omnidiff", &baked.omnidiff),
             ("minimal", &baked.minimal),
             ("full", &baked.full),
             ("diff", &baked.unix),
@@ -257,9 +257,9 @@ fn main() -> Result<()> {
 }
 
 struct Baked {
-    /// codediff's diff under the default render options and under each preset the `M` panel
+    /// omnidiff's diff under the default render options and under each preset the `M` panel
     /// can switch to.
-    codediff: DiffPayload,
+    omnidiff: DiffPayload,
     minimal: DiffPayload,
     full: DiffPayload,
     /// The same two files as GNU `diff` marks them.
@@ -284,7 +284,7 @@ fn bake(
     // The diff `/api/diff` and `/api/render_options` answer with, under each preset.
     let (data, large_residual) =
         compute_diff_with_options(&before_path, &after_path, RenderOptions::default())?;
-    let codediff = diff_payload(&data, large_residual, RenderOptions::default(), None);
+    let omnidiff = diff_payload(&data, large_residual, RenderOptions::default(), None);
     let minimal = diff_payload(&data, large_residual, RenderOptions::MINIMAL, None);
     let full = diff_payload(&data, large_residual, RenderOptions::FULL, None);
 
@@ -312,16 +312,16 @@ fn bake(
         group: case.group,
         title: case.title,
         dataset,
-        language: codediff.after.language.clone(),
-        lines: codediff.after.lines.len(),
+        language: omnidiff.after.language.clone(),
+        lines: omnidiff.after.lines.len(),
         diff_marked,
-        codediff: PaintedCounts::of(&codediff),
-        summary: codediff.summary.as_ref().map(|s| s.label.to_string()),
+        omnidiff: PaintedCounts::of(&omnidiff),
+        summary: omnidiff.summary.as_ref().map(|s| s.label.to_string()),
         upstream,
     };
 
     Ok(Baked {
-        codediff,
+        omnidiff,
         minimal,
         full,
         unix,
@@ -329,7 +329,7 @@ fn bake(
     })
 }
 
-/// codediff's painted ranges by operation. Updates and moves count the larger side, not the sum:
+/// omnidiff's painted ranges by operation. Updates and moves count the larger side, not the sum:
 /// they paint both sides, except a pure in-line deletion (`buffer` -> `buf`), which paints only
 /// the before side.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -516,7 +516,7 @@ mod tests {
             source: [0; 4],
             destination: [0; 4],
         };
-        let side = |ops: &[&'static str], lines: usize| codediff::showcase::payload::SidePayload {
+        let side = |ops: &[&'static str], lines: usize| omnidiff::showcase::payload::SidePayload {
             path: String::new(),
             name: String::new(),
             language: String::new(),
@@ -578,7 +578,7 @@ mod tests {
 
     #[test]
     fn baking_every_case_matches_the_published_scores() {
-        // The list promises codediff matches the human mapping on every case; a matcher
+        // The list promises omnidiff matches the human mapping on every case; a matcher
         // regression must fail here before it is published.
         let provenance = helper::sample_provenance().unwrap();
         let repository_urls = helper::repository_urls().unwrap();
@@ -595,7 +595,7 @@ mod tests {
             assert_eq!(
                 mismatches.len(),
                 0,
-                "{}: codediff disagrees with the human mapping",
+                "{}: omnidiff disagrees with the human mapping",
                 case.name
             );
         }

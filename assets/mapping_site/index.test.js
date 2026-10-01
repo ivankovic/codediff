@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -32,10 +32,10 @@ const { cellValue, compareRows } = require("./index.js");
 // comment on `cellValue`.
 {
   const row = {
-    dataset: { name: "foo", codediff: "3", unix_diff: "7", total_lines: "123" },
+    dataset: { name: "foo", omnidiff: "3", unix_diff: "7", total_lines: "123" },
   };
   assert.strictEqual(cellValue(row, "name", "string"), "foo");
-  assert.strictEqual(cellValue(row, "codediff", "number"), 3);
+  assert.strictEqual(cellValue(row, "omnidiff", "number"), 3);
   assert.strictEqual(cellValue(row, "unix_diff", "number"), 7);
   assert.strictEqual(cellValue(row, "total_lines", "number"), 123);
 }
@@ -48,14 +48,14 @@ const { cellValue, compareRows } = require("./index.js");
 // right numbers, the earlier check above) is what catches that class of failure.
 {
   const rows = [
-    { dataset: { name: "c", codediff: "1", unix_diff: "9", total_lines: "300" } },
-    { dataset: { name: "a", codediff: "3", unix_diff: "1", total_lines: "100" } },
-    { dataset: { name: "b", codediff: "2", unix_diff: "5", total_lines: "200" } },
+    { dataset: { name: "c", omnidiff: "1", unix_diff: "9", total_lines: "300" } },
+    { dataset: { name: "a", omnidiff: "3", unix_diff: "1", total_lines: "100" } },
+    { dataset: { name: "b", omnidiff: "2", unix_diff: "5", total_lines: "200" } },
   ];
 
   const columns = [
     ["name", "string"],
-    ["codediff", "number"],
+    ["omnidiff", "number"],
     ["unix_diff", "number"],
     ["total_lines", "number"],
   ];

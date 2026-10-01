@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -21,7 +21,7 @@ use clap::Parser;
 use std::path::PathBuf;
 use tempfile::tempdir;
 
-use codediff::code::Code;
+use omnidiff::code::Code;
 
 #[derive(Parser, Debug)]
 #[command(

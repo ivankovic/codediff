@@ -15,7 +15,7 @@ data/
   quality/        output  - diff accuracy against human-authored ground truth
   performance/    output  - diff speed/memory over the sampled pairs
     baselines/            - pinned point-in-time snapshots, kept for comparison
-  comparison/     output  - codediff against other diff tools, and against external oracles
+  comparison/     output  - omnidiff against other diff tools, and against external oracles
   rq1/            output  - whole-tree APTED against a 1-second budget (the paper's RQ2, named RQ1
                             in files and macros)
   coverage/       output  - line coverage of the test suite: the README badge and per-test sets

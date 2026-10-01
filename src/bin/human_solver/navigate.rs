@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -161,7 +161,7 @@ pub(crate) fn action_next_mismatch(
     forward: bool,
 ) -> Result<String> {
     let diff_ast = app.algo_diff.as_ref().context(
-        "codediff has not finished yet; it runs in the background when a case opens, p runs it now",
+        "omnidiff has not finished yet; it runs in the background when a case opens, p runs it now",
     )?;
     let found = match focus {
         Focus::Before => advance_to_next_mismatch(
@@ -363,7 +363,7 @@ pub(crate) fn action_align(
     align_cursor_to(app, focus, before_root, after_root, target_id)
 }
 
-/// `A`: like `a`, but uses codediff's mapping from `p`. Errors if `p` has not run or codediff
+/// `A`: like `a`, but uses omnidiff's mapping from `p`. Errors if `p` has not run or omnidiff
 /// deleted/inserted the cursor node.
 pub(crate) fn action_align_algo(
     app: &mut App,
@@ -375,7 +375,7 @@ pub(crate) fn action_align_algo(
         let diff_ast = app
             .algo_diff
             .as_ref()
-            .context("codediff has not finished yet; it runs in the background when a case opens, p runs it now")?;
+            .context("omnidiff has not finished yet; it runs in the background when a case opens, p runs it now")?;
         let own_cursor = match focus {
             Focus::Before => app.before.cursor_id,
             Focus::After => app.after.cursor_id,
@@ -386,11 +386,11 @@ pub(crate) fn action_align_algo(
         };
         *node_map
             .get(&own_cursor)
-            .context("codediff has no verdict for this node")?
+            .context("omnidiff has no verdict for this node")?
     };
 
     if target_id == 0 {
-        bail!("codediff maps this node to nothing (deleted/inserted), not to a matching node");
+        bail!("omnidiff maps this node to nothing (deleted/inserted), not to a matching node");
     }
 
     align_cursor_to(app, focus, before_root, after_root, target_id)

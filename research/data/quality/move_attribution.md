@@ -124,7 +124,7 @@ against its own `destination` and asking what the other side calls that exact ex
 |---|---|---|
 | fixtures with >=1 unpaired move | 24 | **5** |
 | unpaired move ranges | 67 of 1538 (4.4%) | **12 of 1508 (0.8%)** |
-| codediff line mismatches vs the human mappings | 4890 | **3392** |
+| omnidiff line mismatches vs the human mappings | 4890 | **3392** |
 | fixtures with zero line mismatches (of 500) | 427 | **431** |
 
 Concentrated rather than pervasive before the fix: one fixture
@@ -178,7 +178,7 @@ reproducible - recover just this one directory with:
 git checkout 904e5de -- src/test/data/samples/python-x-aboutcode-org-license-expression-af87cfab-utils_thirdparty
 ```
 
-Rendered move hunks, via `codediff --mode json before.py.test after.py.test`:
+Rendered move hunks, via `omnidiff --mode json before.py.test after.py.test`:
 
 ```
 before reconcile_moves:   before: move rows 27..32     after: move rows 33..34

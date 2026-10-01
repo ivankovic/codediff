@@ -24,5 +24,5 @@ ignore-dev-dependencies = true
 
 # The root crate itself: cargo-about resolves it too, and its license is not a third party's.
 # Accepted here so the run succeeds; the template leaves its entry out.
-[codediff]
+[omnidiff]
 accepted = ["AGPL-3.0-or-later"]

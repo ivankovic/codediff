@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -22,7 +22,7 @@ use anyhow::Result;
 #[test]
 fn mapping() -> Result<()> {
     // A call moves from a closure into a new if branch - the cross-boundary move gap - plus two
-    // multi-map group pairings codediff does not realize.
+    // multi-map group pairings omnidiff does not realize.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "swift-swiftlang-swift-actual-logic-change",
         36,

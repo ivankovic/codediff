@@ -1,17 +1,17 @@
-CODEDIFF COMMERCIAL LICENSE AGREEMENT
+OMNIDIFF COMMERCIAL LICENSE AGREEMENT
 Version 1.0, 24 September 2026
 
 Copyright (C) 2026 Marko Ivankovic
 
 This Agreement is an alternative to the GNU Affero General Public License
-(AGPL). codediff is and remains available under the AGPL, version 3 or later,
+(AGPL). omnidiff is and remains available under the AGPL, version 3 or later,
 to everyone, at no cost. This Agreement exists for organisations that cannot
 or do not want to accept the obligations of the AGPL. It grants the same
 software under different terms, in exchange for a recurring fee. Nothing in
 this Agreement limits the rights that anyone has under the AGPL.
 
 If you do not hold a Subscription, this Agreement does not apply to you, and
-your use of codediff is governed by the AGPL alone.
+your use of omnidiff is governed by the AGPL alone.
 
 
 1. PARTIES
@@ -30,9 +30,9 @@ your use of codediff is governed by the AGPL alone.
 
 2. DEFINITIONS
 
-2.1 "Software" means the codediff program, its source code, and its
+2.1 "Software" means the omnidiff program, its source code, and its
     documentation, as published by Licensor at
-    https://github.com/ivankovic/codediff or a successor location.
+    https://github.com/ivankovic/omnidiff or a successor location.
 
 2.2 "Subscription" means an active, paid sponsorship of Licensor at a tier
     that names this Agreement as a benefit, at
@@ -85,9 +85,9 @@ your use of codediff is governed by the AGPL alone.
     (f) remove or alter copyright, license, or attribution notices in the
         Software, including the notices of Third-Party Components;
 
-    (g) use Licensor's name or the name "codediff" to endorse or promote
+    (g) use Licensor's name or the name "omnidiff" to endorse or promote
         Licensee or its products without prior written permission, beyond a
-        factual statement that Licensee uses codediff;
+        factual statement that Licensee uses omnidiff;
 
     (h) transfer or assign this license.
 

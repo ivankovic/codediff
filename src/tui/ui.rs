@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -208,7 +208,7 @@ pub fn install_panic_hook() {
         restore_terminal();
         default_hook(info);
         eprintln!(
-            "\ncodediff {} crashed. Please report this, with the lines above and the two files \
+            "\nomnidiff {} crashed. Please report this, with the lines above and the two files \
              being diffed if you can share them, at {}",
             env!("CARGO_PKG_VERSION"),
             crate::tui::ISSUE_TRACKER_URL

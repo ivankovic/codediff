@@ -1,4 +1,4 @@
-# This file is part of the CodeDiff code diffing tool.
+# This file is part of the OmniDiff code diffing tool.
 #
 # Copyright (C) 2026 Marko Ivankovic
 #
@@ -100,7 +100,7 @@ jobs:
             # export that produced nothing - a mistyped key id, a pinentry that could not prompt -
             # stores a secret that exists, lists fine, and expands to nothing. That is exactly how
             # this failed the first time it ran.
-            if [ "$GITHUB_REPOSITORY" = "ivankovic/codediff" ]; then
+            if [ "$GITHUB_REPOSITORY" = "ivankovic/omnidiff" ]; then
               echo "::error::APT_GPG_PRIVATE_KEY is unset or empty - the apt repository cannot be signed"
               exit 1
             fi

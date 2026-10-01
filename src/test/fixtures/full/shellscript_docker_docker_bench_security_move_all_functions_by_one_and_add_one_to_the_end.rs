@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -21,7 +21,7 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // Every `function_definition` shifts by one: the human pairs each with its neighbour, codediff
+    // Every `function_definition` shifts by one: the human pairs each with its neighbour, omnidiff
     // positionally (`StructurallyIdenticalAncestor`, inherited by descendants). The positional
     // answer costs more than the human's, so this is not a cost tie; something picks it anyway.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(

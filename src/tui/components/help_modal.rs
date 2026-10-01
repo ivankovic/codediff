@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -62,7 +62,7 @@ Files and diffing
   G                Review git changes: a picker of the repository's unstaged files, staged
                    files, and recent commits (Enter unfolds a commit into its files).
                    Enter on a file opens its diff - index vs working tree, HEAD vs index,
-                   or parent vs commit. `codediff --review` starts here.
+                   or parent vs commit. `omnidiff --review` starts here.
   ]/[              Next/previous file of the set the reviewed file came from
   Esc              While a diff is computing: cancel it and keep the previous result
 
@@ -94,12 +94,12 @@ Other
   Ctrl-Z           Suspend to the shell (Unix); `fg` comes back to the same view
 
 About
-  codediff - fast, syntax-aware code diffing using tree-sitter ASTs
+  omnidiff - fast, syntax-aware code diffing using tree-sitter ASTs
   Copyright (C) 2026 Marko Ivankovic
   License: GNU Affero General Public License v3 or later
            https://www.gnu.org/licenses/
-  Repository: https://github.com/ivankovic/codediff
-  Bugs:       https://github.com/ivankovic/codediff/issues
+  Repository: https://github.com/ivankovic/omnidiff
+  Bugs:       https://github.com/ivankovic/omnidiff/issues
 ";
 
 /// The `?` popup: a scrollable keybinding reference plus a color legend rendered from the live

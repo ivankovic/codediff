@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -17,20 +17,20 @@
  */
 
 use anyhow::{Context, Result, bail};
-use codediff::code::{Code, Language};
-use codediff::diff::text_range::TextRange;
+use omnidiff::code::{Code, Language};
+use omnidiff::diff::text_range::TextRange;
 use std::process::Command;
 
 use super::{external_tool_bin, span_on_row, write_temp_pair};
 
 /// Path to the `difft` binary, from `DIFFT_BIN`. Install with
-/// `cargo install --root /var/tmp/codediff-tools difftastic`.
+/// `cargo install --root /var/tmp/omnidiff-tools difftastic`.
 pub(crate) fn difftastic_bin() -> Result<std::path::PathBuf> {
     external_tool_bin("DIFFT_BIN", "point it at a built `difft` binary")
 }
 
 /// File extension that difftastic's auto-detection maps to `language` (`difft --list-languages`);
-/// `None` where difftastic has no grammar. `Lisp` is `.el` because codediff's `Lisp` is Emacs Lisp,
+/// `None` where difftastic has no grammar. `Lisp` is `.el` because omnidiff's `Lisp` is Emacs Lisp,
 /// which difftastic keeps separate from Common Lisp.
 pub(crate) fn difftastic_extension(language: Language) -> Option<&'static str> {
     match language {

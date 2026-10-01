@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -22,7 +22,7 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // The added `if` can map either way (inner or outer), expressed as two multi-map groups; codediff
+    // The added `if` can map either way (inner or outer), expressed as two multi-map groups; omnidiff
     // matches the inner `if` as `Identical` rather than the groups' `MatchButNotIdentical`.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "c-linux-small-bugfix",

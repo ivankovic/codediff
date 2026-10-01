@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -24,7 +24,7 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 #[test]
 fn mapping() -> Result<()> {
     // Several mappings are defensible depending on which node kinds are preferred to match, and
-    // codediff takes a different one than the human did.
+    // omnidiff takes a different one than the human did.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "go-caddyserver-caddy-multiple-solutions-interesting-case",
         3,

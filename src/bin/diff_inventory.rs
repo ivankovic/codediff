@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -27,10 +27,10 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result};
 use clap::Parser;
 
-use codediff::test::helper::human_mapping::{
+use omnidiff::test::helper::human_mapping::{
     rebuild_caches_for_mapping, status_after, status_before,
 };
-use codediff::test::helper::{
+use omnidiff::test::helper::{
     DIFF_DATASETS, code_pair_from_dir_without_metadata, human_mapping, note_as_csv_cell, read_note,
     readme_provenance,
 };
@@ -273,7 +273,7 @@ fn count_error_nodes(root: tree_sitter::Node) -> usize {
     count
 }
 
-/// A subtree's node count, root inclusive. A local copy of `codediff::stats::count_nodes`, which
+/// A subtree's node count, root inclusive. A local copy of `omnidiff::stats::count_nodes`, which
 /// sits behind the `stats` feature this binary otherwise does not need.
 fn count_nodes(root: tree_sitter::Node) -> usize {
     let mut count = 0;
@@ -355,7 +355,7 @@ mod tests {
 
     #[test]
     fn a_handmade_fixture_has_blank_provenance_rather_than_a_missing_row() {
-        let dir = codediff::test::helper::diffs_case_dir("cpp-add-templates")
+        let dir = omnidiff::test::helper::diffs_case_dir("cpp-add-templates")
             .expect("a known handmade fixture");
         let row = row_for("cpp-add-templates", "handmade", &dir)
             .unwrap()
@@ -375,7 +375,7 @@ mod tests {
     #[test]
     fn error_nodes_and_their_percentage_come_from_the_real_parse() {
         let row_of = |name: &str, dataset: &str| {
-            let dir = codediff::test::helper::diffs_case_dir(name).expect("a known fixture");
+            let dir = omnidiff::test::helper::diffs_case_dir(name).expect("a known fixture");
             row_for(name, dataset, &dir).unwrap().expect("a row")
         };
 
@@ -402,9 +402,9 @@ mod tests {
 
     #[test]
     fn missing_nodes_are_not_counted_as_errors() {
-        let code = codediff::code::Code::from_string(
+        let code = omnidiff::code::Code::from_string(
             "fn f() { let x = 1 }\n",
-            &codediff::code::Language::Rust,
+            &omnidiff::code::Language::Rust,
         );
         let root = code.ast.as_ref().expect("a tree").root_node();
         let mut has_missing = false;

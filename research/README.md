@@ -1,6 +1,6 @@
 # research/
 
-Everything that exists to produce CodeDiff's papers and empirical studies: the corpus, the
+Everything that exists to produce OmniDiff's papers and empirical studies: the corpus, the
 measurements over it, the analysis scripts, the generated figures, and the papers themselves. Part
 of the project but not part of the product. The product's code does not read it; its test suite
 and a few dev tools do. `src/test.rs` checks `data/quality/quality_baseline.csv` against the

@@ -1,8 +1,20 @@
 # Changelog
 
-All notable changes to CodeDiff. The format follows [Keep a Changelog](https://keepachangelog.com/),
+All notable changes to OmniDiff (named CodeDiff up to v0.1.1). The format follows [Keep a Changelog](https://keepachangelog.com/),
 and the version numbers follow [Semantic Versioning](https://semver.org/) as far as a 0.x
 release does: a minor bump may change the JSON output or the library API, a patch bump does not.
+
+## [Unreleased]
+
+### Changed
+
+- **Renamed from CodeDiff to OmniDiff.** The crate, binary, packages, editor extensions and
+  repositories are all `omnidiff` now: install `omnidiff` (`cargo install --locked omnidiff`, the
+  `omnidiff` deb, `brew install ivankovic/omnidiff/omnidiff`), then rerun `omnidiff git configure`
+  and `omnidiff jj configure`, since a configuration that names `codediff` points at a binary that
+  no longer updates. The config moved to `.omnidiff.toml`, `$OMNIDIFF_CONFIG` and
+  `~/.config/omnidiff/config.toml`. For this release the old names are still read, and
+  `~/.config/codediff/config.toml` is moved to the new place the first time it is needed.
 
 ## [0.1.1] - 2026-09-27
 

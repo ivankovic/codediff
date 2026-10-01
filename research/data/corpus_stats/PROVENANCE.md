@@ -169,7 +169,7 @@ new), and the median bytes per node is 4.8 either way; the paper reports both an
 
 Note what a zero node count means in this database, since 311,112 code files (8.0%) carry one:
 177,991 are flagged `automatically_generated` from a header comment and never parsed (a rule older
-than this run), 128,288 are in a language the classifier knows but codediff has no grammar for,
+than this run), 128,288 are in a language the classifier knows but omnidiff has no grammar for,
 4,824 are empty, 9 gave up. The largest files in the corpus are generated too, but carry no such
 comment and so are parsed; that is why the corpus-shape figure's nodes curve starts flat and its
 maximum is a data table.
@@ -188,7 +188,7 @@ walked again instead.
 | | |
 |---|---|
 | Date | 2026-09-24, 18:01 to 20:54 for the walk, then the report |
-| Command | `file_stats --path <repository> --db /var/tmp/research/full/stats.sqlite`, one process per repository over `/var/tmp/research/full/repositories/*/`, in alphabetical order, as a systemd user unit capped at 48 GB (`codediff-fullwalk-20260924`) |
+| Command | `file_stats --path <repository> --db /var/tmp/research/full/stats.sqlite`, one process per repository over `/var/tmp/research/full/repositories/*/`, in alphabetical order, as a systemd user unit capped at 48 GB (`omnidiff-fullwalk-20260924`) |
 | Repositories | 7,444, 0 non-zero exits |
 | Wall clock | 2h53m for the walk; `analysis/file_stats.py` about 20 minutes, run twice (once by `make file-stats-report`, once as `make introductory-paper-empirical`'s prerequisite) |
 | Held out | `FasterXML-jackson-dataformats-text/yaml/src/test/resources/data/fuzz-65918.yaml`, renamed for the duration and restored, for the reason under "One file is excluded from the parse" above |

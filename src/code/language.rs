@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -65,7 +65,7 @@ fn looks_like_xml(content: &str) -> bool {
         .starts_with("<?xml")
 }
 
-/// Every file extension CodeDiff recognises, lower-cased, and the language it means. The one
+/// Every file extension OmniDiff recognises, lower-cased, and the language it means. The one
 /// table behind [`language_for_extension`] and the README's language list.
 pub const EXTENSIONS: &[(&[&str], Language)] = &[
     (&["bash", "sh"], Language::ShellScript),

@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -16,22 +16,22 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-//! `codediff jj configure`: the Jujutsu counterpart of `git_configure`.
+//! `omnidiff jj configure`: the Jujutsu counterpart of `git_configure`.
 //!
 //! jj ignores git's `difftool`/`diff.external` settings even in a colocated repo. It writes:
 //!
 //! ```toml
-//! [merge-tools.codediff]
-//! program = "/abs/path/to/codediff"
+//! [merge-tools.omnidiff]
+//! program = "/abs/path/to/omnidiff"
 //! diff-args = ["$left", "$right"]
 //! diff-invocation-mode = "file-by-file"
 //!
 //! [ui]
-//! diff-formatter = "codediff"   # only if the user opts in to making it the default
+//! diff-formatter = "omnidiff"   # only if the user opts in to making it the default
 //! ```
 //!
 //! `diff-invocation-mode = "file-by-file"` is required: jj's default (`"dir"`) passes two directory
-//! trees (literally `left` and `right`), which codediff cannot diff; `file-by-file` passes one file
+//! trees (literally `left` and `right`), which omnidiff cannot diff; `file-by-file` passes one file
 //! pair per change, keeping the repo-relative path and extension (`left/src.rs`), so language
 //! detection works. Both verified against jj 0.44.0.
 //!
@@ -44,10 +44,10 @@ use std::process::Command;
 
 use anyhow::{Context, Result};
 
-use crate::configure_prompt::{ask_yes_no, read_line, resolve_codediff_path};
+use crate::configure_prompt::{ask_yes_no, read_line, resolve_omnidiff_path};
 
-/// The tool name codediff registers itself under in `[merge-tools.<name>]`.
-const TOOL: &str = "codediff";
+/// The tool name omnidiff registers itself under in `[merge-tools.<name>]`.
+const TOOL: &str = "omnidiff";
 
 /// Whether `jj config set` writes `--user` (all repositories) or `--repo` (this one only).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -72,18 +72,18 @@ impl Scope {
     }
 }
 
-/// Entry point for `codediff jj configure`. Without a terminal on stdin it prints the manual
+/// Entry point for `omnidiff jj configure`. Without a terminal on stdin it prints the manual
 /// commands and fails rather than block on a read nobody will answer.
 pub fn run() -> Result<()> {
     if !io::stdin().is_terminal() {
         print_manual_instructions();
-        anyhow::bail!("`codediff jj configure` needs an interactive terminal");
+        anyhow::bail!("`omnidiff jj configure` needs an interactive terminal");
     }
 
     ensure_jj_available()?;
 
-    let codediff_path = resolve_codediff_path();
-    println!("Configuring jj to use {codediff_path} as its diff tool.\n");
+    let omnidiff_path = resolve_omnidiff_path();
+    println!("Configuring jj to use {omnidiff_path} as its diff tool.\n");
 
     let scope = ask_scope()?;
     if scope == Scope::Repo {
@@ -92,7 +92,7 @@ pub fn run() -> Result<()> {
 
     let register = ask_yes_no(
         &format!(
-            "{}Register codediff as a jj diff tool (`merge-tools.{TOOL}`)? You can then run \
+            "{}Register omnidiff as a jj diff tool (`merge-tools.{TOOL}`)? You can then run \
              `jj diff --tool {TOOL}`. [Y/n] ",
             existing_value_note(&format!("merge-tools.{TOOL}.program"), scope)
         ),
@@ -116,7 +116,7 @@ pub fn run() -> Result<()> {
         set_config(
             scope,
             &format!("merge-tools.{TOOL}.program"),
-            &codediff_path,
+            &omnidiff_path,
         )?;
         set_config(
             scope,
@@ -214,13 +214,13 @@ fn ensure_inside_jj_repo() -> Result<()> {
 fn print_manual_instructions() {
     eprintln!(
         "Run these manually instead (see README's \"Jujutsu (jj) integration\" section):\n\n\
-         jj config set --user merge-tools.codediff.program codediff\n\
-         jj config set --user merge-tools.codediff.diff-args '[\"$left\",\"$right\"]'\n\
-         jj config set --user merge-tools.codediff.diff-invocation-mode file-by-file\n\n\
+         jj config set --user merge-tools.omnidiff.program omnidiff\n\
+         jj config set --user merge-tools.omnidiff.diff-args '[\"$left\",\"$right\"]'\n\
+         jj config set --user merge-tools.omnidiff.diff-invocation-mode file-by-file\n\n\
          Use --repo instead of --user to apply them to the current repository only. To make \
-         codediff the default for plain `jj diff` as well:\n\n\
-         jj config set --user ui.diff-formatter codediff\n\n\
-         diff-invocation-mode is required: without it jj passes two directories, which codediff \
+         omnidiff the default for plain `jj diff` as well:\n\n\
+         jj config set --user ui.diff-formatter omnidiff\n\n\
+         diff-invocation-mode is required: without it jj passes two directories, which omnidiff \
          cannot diff."
     );
 }

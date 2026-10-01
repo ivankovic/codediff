@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -24,7 +24,7 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 #[test]
 fn mapping() -> Result<()> {
     // A `return` becomes a `throw` deep in an `if` chain. The mapping replaces the statement
-    // whole; codediff pairs the shared `;` across. Invariant 18 deliberately does not rule on
+    // whole; omnidiff pairs the shared `;` across. Invariant 18 deliberately does not rule on
     // delimiters surviving a construct substitution.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "java-defects4j-cli-40-typehandler",

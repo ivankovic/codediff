@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 #
-#  This file is part of the CodeDiff code diffing tool.
+#  This file is part of the OmniDiff code diffing tool.
 #
 #  Copyright (C) 2026 Marko Ivankovic
 #
@@ -17,7 +17,7 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-"""Renders the Homebrew formula from packaging/homebrew/codediff.rb.in and a release's
+"""Renders the Homebrew formula from packaging/homebrew/omnidiff.rb.in and a release's
 SHA256SUMS.txt.
 
 The template names the release assets it installs; this fills in the version and each asset's
@@ -26,7 +26,7 @@ not carry would fail at `brew install`, on a user's machine, rather than here. r
 it after the checksums job and pushes the result to the tap.
 
 Usage:  python3 scripts/render_homebrew_formula.py --version 0.1.0 --sums SHA256SUMS.txt \\
-            --out Formula/codediff.rb
+            --out Formula/omnidiff.rb
 """
 
 from __future__ import annotations
@@ -37,7 +37,7 @@ import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-TEMPLATE = REPO_ROOT / "packaging" / "homebrew" / "codediff.rb.in"
+TEMPLATE = REPO_ROOT / "packaging" / "homebrew" / "omnidiff.rb.in"
 
 PLACEHOLDER = re.compile(r"\{\{(VERSION|SHA256:([^}]+))\}\}")
 
@@ -82,7 +82,7 @@ def main() -> int:
         sys.exit(f"render_homebrew_formula: {args.sums} has no entry for {missing.args[0]}")
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(formula)
-    print(f"wrote {args.out} for codediff {args.version}", file=sys.stderr)
+    print(f"wrote {args.out} for omnidiff {args.version}", file=sys.stderr)
     return 0
 
 

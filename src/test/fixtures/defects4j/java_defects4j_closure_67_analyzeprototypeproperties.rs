@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -23,7 +23,7 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // A 3:3 any-one-to-one group of `binary_expression`s where codediff realizes two pairs, an
+    // A 3:3 any-one-to-one group of `binary_expression`s where omnidiff realizes two pairs, an
     // under-match rather than an N:M floor; plus an inserted `parenthesized_expression`. Invisible.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "java-defects4j-closure-67-analyzeprototypeproperties",

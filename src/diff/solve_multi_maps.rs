@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -148,7 +148,7 @@ fn is_statement(kind: &str) -> bool {
 /// The kinds of `id`'s ancestors up to its enclosing function, innermost first: where the node sits,
 /// read from its own tree. Two identical nodes whose nesting differs were displaced by the edit
 /// (re-wrapped into a new `else`), whatever the rest of the diff paired; reading it from the node
-/// maps instead would let a parent codediff failed to pair (an `if` that grew an `else`,
+/// maps instead would let a parent omnidiff failed to pair (an `if` that grew an `else`,
 /// `java-defects4j-closure-134-typedscopecreator`) pass for a displacement.
 fn nesting(id: usize, meta: &ASTMetadata) -> Vec<&str> {
     let mut kinds = Vec::new();

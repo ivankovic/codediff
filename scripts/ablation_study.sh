@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-#  This file is part of the CodeDiff code diffing tool.
+#  This file is part of the OmniDiff code diffing tool.
 #
 #  Copyright (C) 2026 Marko Ivankovic
 #
@@ -38,7 +38,7 @@ BIN=./target/release/benchmark_optimal_solutions
 
 # The root Makefile's FEATURES, so this build shares the release binary its other targets link
 # rather than re-linking the fat-LTO build for a different feature set. Any set that implies
-# test-fixtures works: benchmark_optimal_solutions needs codediff::test's fixture loading.
+# test-fixtures works: benchmark_optimal_solutions needs omnidiff::test's fixture loading.
 FEATURES="${FEATURES:-stats}"
 
 echo "Building benchmark_optimal_solutions (release, features: $FEATURES)..."

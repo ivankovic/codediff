@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -37,7 +37,7 @@
 //! orders of magnitude; lower it when a change earns it, and treat a rise as a regression.
 //!
 //! **What a stub comment says.** The fixture's `description.md` says what the fixture *demands*
-//! (a fact about the data). A stub comment says why codediff *falls short* of it (a fact about this
+//! (a fact about the data). A stub comment says why omnidiff *falls short* of it (a fact about this
 //! implementation, false once fixed), and is the only justification a clamp gets.
 //! `the_clamped_stubs_explain_their_limits` enforces that every clamped `mapping()` has one.
 

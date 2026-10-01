@@ -1,9 +1,9 @@
-# CodeDiff
+# OmniDiff
 
-[![CI](https://github.com/ivankovic/codediff/actions/workflows/ci.yml/badge.svg)](https://github.com/ivankovic/codediff/actions/workflows/ci.yml)
-[![Latest release](https://img.shields.io/github/v/release/ivankovic/codediff)](https://github.com/ivankovic/codediff/releases/latest)
-[![docs.rs](https://docs.rs/codediff/badge.svg)](https://docs.rs/codediff)
-[![coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/ivankovic/codediff/main/research/data/coverage/badge.json)](CONTRIBUTING.md#coverage)
+[![CI](https://github.com/ivankovic/omnidiff/actions/workflows/ci.yml/badge.svg)](https://github.com/ivankovic/omnidiff/actions/workflows/ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/ivankovic/omnidiff)](https://github.com/ivankovic/omnidiff/releases/latest)
+[![docs.rs](https://docs.rs/omnidiff/badge.svg)](https://docs.rs/omnidiff)
+[![coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/ivankovic/omnidiff/main/research/data/coverage/badge.json)](CONTRIBUTING.md#coverage)
 [![License: AGPL v3+](https://img.shields.io/badge/license-AGPL--3.0--or--later-blue)](LICENSE)
 
 Fast, robust, accurate, syntax-aware code diffing.
@@ -15,16 +15,16 @@ Fast, robust, accurate, syntax-aware code diffing.
 
 ![An animation of one Python refactoring painted two ways. A vertical bar sweeps left to right and
 back across a two-pane diff. On one side of the bar, GNU diff marks whole lines as deleted and
-inserted; on the other, CodeDiff paints only the parts that changed - `sum(numbers)` and
+inserted; on the other, OmniDiff paints only the parts that changed - `sum(numbers)` and
 `len(numbers)` rather than the whole assignment, and `numbers` shown as moved rather than
-rewritten.](/assets/diff-vs-codediff.gif)
+rewritten.](/assets/diff-vs-omnidiff.gif)
 
-**[See it in the browser](https://ivankovic.github.io/codediff/showcase/)**: twenty real changes,
-recorded from the command-line tool and compared side by side in Unix `diff` and in CodeDiff.
+**[See it in the browser](https://ivankovic.github.io/omnidiff/showcase/)**: twenty real changes,
+recorded from the command-line tool and compared side by side in Unix `diff` and in OmniDiff.
 
 The terminal UI, in its light theme:
 
-![A screenshot of CodeDiff's two-panel terminal UI in a light theme, showing the same Python
+![A screenshot of OmniDiff's two-panel terminal UI in a light theme, showing the same Python
 refactoring, with the changed right-hand sides highlighted rather than whole
 lines](/assets/readme-screenshot.png)
 
@@ -33,10 +33,10 @@ lines](/assets/readme-screenshot.png)
 ## From source
 
 ```
-cargo install --locked codediff
+cargo install --locked omnidiff
 ```
 
-This command builds CodeDiff from source, with the dependency versions it was tested with. You
+This command builds OmniDiff from source, with the dependency versions it was tested with. You
 need a C compiler on `PATH` and a Rust toolchain, rustc 1.88 or later. The build compiles every tree-sitter grammar from C.
 The first `cargo install` takes a few minutes, because of this and the `lto = "fat"` release
 profile.
@@ -44,14 +44,14 @@ profile.
 ## Prebuilt binaries
 
 Prebuilt binaries for Linux, macOS (Intel and Apple Silicon), and Windows are attached to every
-[GitHub release](https://github.com/ivankovic/codediff/releases/latest).
+[GitHub release](https://github.com/ivankovic/omnidiff/releases/latest).
 
 ## Homebrew
 
 macOS and Linux:
 
 ```
-brew install ivankovic/codediff/codediff
+brew install ivankovic/omnidiff/omnidiff
 ```
 
 ## Debian and Ubuntu
@@ -61,12 +61,12 @@ versions like any other package. amd64 and arm64:
 
 ```sh
 sudo install -d -m 0755 /etc/apt/keyrings
-curl -fsSL https://ivankovic.github.io/codediff/apt/codediff-archive-keyring.gpg \
-  | sudo tee /etc/apt/keyrings/codediff-archive-keyring.gpg > /dev/null
-echo "deb [signed-by=/etc/apt/keyrings/codediff-archive-keyring.gpg] \
-https://ivankovic.github.io/codediff/apt stable main" \
-  | sudo tee /etc/apt/sources.list.d/codediff.list > /dev/null
-sudo apt update && sudo apt install codediff
+curl -fsSL https://ivankovic.github.io/omnidiff/apt/omnidiff-archive-keyring.gpg \
+  | sudo tee /etc/apt/keyrings/omnidiff-archive-keyring.gpg > /dev/null
+echo "deb [signed-by=/etc/apt/keyrings/omnidiff-archive-keyring.gpg] \
+https://ivankovic.github.io/omnidiff/apt stable main" \
+  | sudo tee /etc/apt/sources.list.d/omnidiff.list > /dev/null
+sudo apt update && sudo apt install omnidiff
 ```
 
 ## Nix and NixOS
@@ -74,7 +74,7 @@ sudo apt update && sudo apt install codediff
 On NixOS, or anywhere with Nix installed, no installation step is needed at all:
 
 ```
-nix run github:ivankovic/codediff
+nix run github:ivankovic/omnidiff
 ```
 
 If flakes are not enabled in your Nix configuration, add
@@ -90,18 +90,18 @@ Recipes for Arch and Gentoo live in [`packaging/`](packaging/): the PKGBUILD bui
 VS Code does not yet let an extension replace its built-in diff view. The API is implemented
 upstream but unreleased; the extension will adopt it when it ships.
 
-* **VS Code** - [codediff-vscode](https://github.com/ivankovic/codediff-vscode). Search for
-  **CodeDiff** in the Extensions view, or `code --install-extension ivankovic.codediff`. Also on
-  [Open VSX](https://open-vsx.org/extension/ivankovic/codediff) for VSCodium, Cursor and Windsurf.
-* **Neovim** - [codediff.nvim](https://github.com/ivankovic/codediff.nvim).
+* **VS Code** - [omnidiff-vscode](https://github.com/ivankovic/omnidiff-vscode). Search for
+  **OmniDiff** in the Extensions view, or `code --install-extension ivankovic.omnidiff`. Also on
+  [Open VSX](https://open-vsx.org/extension/ivankovic/omnidiff) for VSCodium, Cursor and Windsurf.
+* **Neovim** - [omnidiff.nvim](https://github.com/ivankovic/omnidiff.nvim).
 
-# Using CodeDiff
+# Using OmniDiff
 
 ## The interactive TUI
 
 ```
-codediff                  # open an empty viewer; press o to pick each file
-codediff BEFORE AFTER     # open directly into the diff of two files
+omnidiff                  # open an empty viewer; press o to pick each file
+omnidiff BEFORE AFTER     # open directly into the diff of two files
 ```
 
 Press `?` in the viewer for the full list of keybindings.
@@ -118,16 +118,16 @@ Note: codereview is at v0.0.0; use it at your own risk.
 
 ## Headless / batch mode
 
-`codediff --headless BEFORE AFTER`, or its synonym `--batch`, prints the diff as plain text, with
+`omnidiff --headless BEFORE AFTER`, or its synonym `--batch`, prints the diff as plain text, with
 optional color, instead of opening the TUI. Use this for scripts, CI, or any case where stdout is
 not a real terminal. Headless mode also starts automatically whenever stdout is not a terminal, for
-example when piped into `less` or redirected to a file. Because of this, `codediff BEFORE AFTER |
+example when piped into `less` or redirected to a file. Because of this, `omnidiff BEFORE AFTER |
 less` works without the flag.
 
 Every printed line is prefixed with its line number, so the moved-chunk headers' "Moved to lines
-40-60" cross-references can actually be followed. CodeDiff collapses long runs of unchanged
+40-60" cross-references can actually be followed. OmniDiff collapses long runs of unchanged
 lines. It keeps 3 lines of context on each side of a change (override with `--context N`), the
-same convention as `diff -u`. CodeDiff also prefixes each hunk with the nearest enclosing
+same convention as `diff -u`. OmniDiff also prefixes each hunk with the nearest enclosing
 function, class, or struct line, when that line is not otherwise visible. This shows the location
 of a change deep inside a large file.
 
@@ -135,9 +135,9 @@ Colors are on by default (git's pager renders them); pass `--color never`, or se
 disable ANSI colors, for example when you redirect output to a file - `--color always` forces them
 even under `NO_COLOR`.
 
-CodeDiff exits `0` on success and `2` on error. For scripting, pass `--exit-code` to additionally
+OmniDiff exits `0` on success and `2` on error. For scripting, pass `--exit-code` to additionally
 get `1` when the files differ, the `diff(1)` convention. That is opt-in rather than the default
-for the same reason `git diff` exits `0` even when files differ: CodeDiff's usual non-interactive
+for the same reason `git diff` exits `0` even when files differ: OmniDiff's usual non-interactive
 callers are version control systems driving it as a display tool, and they read a non-zero exit as
 "the tool failed" - `jj` warns on every file, and `git difftool` with `difftool.trustExitCode=true`
 aborts the whole diff. (The 7-argument `GIT_EXTERNAL_DIFF` form stays at `0` even with
@@ -145,7 +145,7 @@ aborts the whole diff. (The 7-argument `GIT_EXTERNAL_DIFF` form stays at `0` eve
 
 ## JSON output
 
-`codediff --mode json BEFORE AFTER` prints the diff as one JSON object, for editors and tools that
+`omnidiff --mode json BEFORE AFTER` prints the diff as one JSON object, for editors and tools that
 place highlights on their own buffers. Each side carries its path, its detected language and its
 hunks, and each hunk is an operation (`delete`, `insert`, `update`, `move`) with a range in that
 side's own file:
@@ -172,47 +172,47 @@ reports them. `reference_line` is the row of the nearest enclosing named declara
 status bar names, such as `comment_only` or `whitespace_only`. A binary file on either side
 answers with `"binary": true` and empty hunks. Unlike headless mode, JSON output is never chosen
 automatically: only `--mode json` selects it, so a pipe never receives it by surprise. The
-[VS Code extension](https://github.com/ivankovic/codediff-vscode) is built on this output; the
+[VS Code extension](https://github.com/ivankovic/omnidiff-vscode) is built on this output; the
 authoritative field list is `src/tui/json_output.rs`.
 
 ## Git integration
 
-CodeDiff is a `git difftool` backend. Run the interactive setup wizard, which asks
+OmniDiff is a `git difftool` backend. Run the interactive setup wizard, which asks
 whether to configure it globally or for the current repository only:
 
 ```
-codediff git configure
+omnidiff git configure
 ```
 
 Or configure it by hand:
 
 ```
-git config difftool.codediff.cmd 'codediff "$LOCAL" "$REMOTE"'
-git difftool --tool=codediff
+git config difftool.omnidiff.cmd 'omnidiff "$LOCAL" "$REMOTE"'
+git difftool --tool=omnidiff
 ```
 
-Run `git config diff.tool codediff` to make plain `git difftool` use CodeDiff by default, without
+Run `git config diff.tool omnidiff` to make plain `git difftool` use OmniDiff by default, without
 needing `--tool`. If you do not want git to ask "view diff ... [Y/n]?" before every file, run `git
 config difftool.prompt false`.
 
 **`git difftool` opens the interactive TUI. `git diff` and `git log -p` never do.** `git diff`
-pipes its output through git's pager, and a full-screen TUI cannot draw onto a pipe, so CodeDiff
+pipes its output through git's pager, and a full-screen TUI cannot draw onto a pipe, so OmniDiff
 always falls back to plain text there regardless of terminal or `GIT_EXTERNAL_DIFF` config (see
 "Headless / batch mode" above). If you want the interactive viewer from git, use `git difftool`,
 not `git diff`. If `git difftool` still doesn't open interactively over SSH, reconnect with
 `ssh -t` — the session needs an allocated pseudo-terminal; tmux panes always have one.
 
-CodeDiff also works directly with `git diff` and `git log -p`, through `GIT_EXTERNAL_DIFF`. This
+OmniDiff also works directly with `git diff` and `git log -p`, through `GIT_EXTERNAL_DIFF`. This
 path needs no `difftool` config:
 
 ```
-GIT_EXTERNAL_DIFF=codediff git diff
+GIT_EXTERNAL_DIFF=omnidiff git diff
 ```
 
-Binary files - anything CodeDiff cannot read as text, a PDF or an image - get a one-line
+Binary files - anything OmniDiff cannot read as text, a PDF or an image - get a one-line
 `Binary file <path> differs` notice instead of a diff, the same stand-in git and `diff(1)` print
 for them. They likewise never block the rest of a `git diff`: an external diff that exits non-zero
-makes git abandon the *entire* run, so CodeDiff reports an unshowable file as a successful diff of
+makes git abandon the *entire* run, so OmniDiff reports an unshowable file as a successful diff of
 nothing rather than as a failure.
 
 ## Jujutsu (jj) integration
@@ -221,35 +221,35 @@ jj does not read git's `difftool`/`diff.external` settings, even in a colocated 
 its own configuration. Run the setup wizard:
 
 ```
-codediff jj configure
+omnidiff jj configure
 ```
 
 Or configure it by hand:
 
 ```
-jj config set --user merge-tools.codediff.program codediff
-jj config set --user merge-tools.codediff.diff-args '["$left","$right"]'
-jj config set --user merge-tools.codediff.diff-invocation-mode file-by-file
+jj config set --user merge-tools.omnidiff.program omnidiff
+jj config set --user merge-tools.omnidiff.diff-args '["$left","$right"]'
+jj config set --user merge-tools.omnidiff.diff-invocation-mode file-by-file
 ```
 
-That registers `jj diff --tool codediff`. To make it the default for plain `jj diff` as well:
+That registers `jj diff --tool omnidiff`. To make it the default for plain `jj diff` as well:
 
 ```
-jj config set --user ui.diff-formatter codediff
+jj config set --user ui.diff-formatter omnidiff
 ```
 
 Use `--repo` in place of `--user` to configure the current repository only.
 
 **`diff-invocation-mode = "file-by-file"` is required.** jj's default hands a diff tool two
-*directory* trees; CodeDiff diffs two files, so without this setting every invocation fails. With
+*directory* trees; OmniDiff diffs two files, so without this setting every invocation fails. With
 it, jj passes one changed file pair at a time, keeping each file's real path and extension, so
 language detection works exactly as it does under git.
 
-`jj diff` runs its formatter under a pager, so CodeDiff renders in its non-interactive text mode
+`jj diff` runs its formatter under a pager, so OmniDiff renders in its non-interactive text mode
 there - the same output `git diff` gets. jj has no equivalent of `git difftool`'s interactive
 per-file viewer (its terminal-attached hook, `ui.diff-editor`, is for `jj diffedit`/`jj split`,
 which edit the right-hand side and read it back - not something a read-only viewer should claim to
-do), so for the full-screen TUI on a jj repo, run `codediff BEFORE AFTER` directly.
+do), so for the full-screen TUI on a jj repo, run `omnidiff BEFORE AFTER` directly.
 
 # Supported languages
 
@@ -303,7 +303,7 @@ See the LICENSE file for the full text of the License.
 ## Cannot use AGPL software?
 
 A commercial license is available as a monthly subscription through
-[GitHub Sponsors](https://github.com/sponsors/ivankovic). It covers internal use of codediff
+[GitHub Sponsors](https://github.com/sponsors/ivankovic). It covers internal use of omnidiff
 by your organisation without the source-disclosure obligations of the AGPL. The terms are in
 [LICENSE-COMMERCIAL](LICENSE-COMMERCIAL). Pick the tier that names the commercial license as a
 benefit. For invoicing or other arrangements, contact me at
@@ -313,7 +313,7 @@ benefit. For invoicing or other arrangements, contact me at
 
 ## Fast
 
-CodeDiff's goal is:
+OmniDiff's goal is:
 
 * **A median diff in 100ms or less.**
 * **A 99th-percentile diff in 1000ms or less.**
@@ -328,7 +328,7 @@ committed baseline on every push, and warns when the runtime is more than twice 
 
 ## Robust
 
-CodeDiff's goal is to process 100% of all commits.
+OmniDiff's goal is to process 100% of all commits.
 
 The full test dataset holds the git commit history of about 7,500 open-source git repositories,
 as available on the main branch. This list of repositories comes from the Gentoo Linux
@@ -345,14 +345,14 @@ bundles, a PNG as a C array - and one commit of a 40,000-line single-header C++ 
 
 ## Accurate
 
-CodeDiff must match a human's own reading of a change, measured against the hand-authored
+OmniDiff must match a human's own reading of a change, measured against the hand-authored
 ground-truth mappings in `src/test/data/diffs/`:
 
 * **90% of test cases with zero mismatched bytes.**
 * **99% of test cases with at most 1% of bytes mismatched.**
 
 Neither is met yet. 818 of about 2,000 fixtures carry a hand-painted ground truth - every byte of
-both files labelled with what a human says happened to it - and CodeDiff's own highlighting is
+both files labelled with what a human says happened to it - and OmniDiff's own highlighting is
 compared against it byte by byte, under each of its two highlighting presets (`--full`, which keeps
 brackets, separators and leading whitespace, and `--minimal`, which drops them):
 

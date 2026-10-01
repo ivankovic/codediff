@@ -15,7 +15,7 @@ to resolve in the upstream repository's history. Original bug report: https://is
 
 Defects4J has since deprecated this bug (in version 3.0.0: JVM11.Not.Repoducible); the AST-diff oracle and the replication package predate that and still carry it.
 
-This content is **not** part of codediff's own codebase and is **not** covered by codediff's own
+This content is **not** part of omnidiff's own codebase and is **not** covered by omnidiff's own
 AGPL-3.0 license - it remains under the license of the project it came from.
 
 ## License

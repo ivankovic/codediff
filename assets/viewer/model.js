@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -34,7 +34,7 @@
 // Rust side.
 "use strict";
 
-const CodeDiffModel = (() => {
+const OmniDiffModel = (() => {
   // src/tui/app.rs FOOTER_HINTS, verbatim - pinned by a Rust test so the two cannot drift.
   const FOOTER_HINTS =
     "?:help  o:open  G:git  r:reload  n/p:next/prev  /:search  M:options  Tab:switch  q:quit";
@@ -1031,5 +1031,5 @@ const CodeDiffModel = (() => {
 // Exposed for model.test.js (plain Node) - a no-op in the browser, where `module` is undefined
 // and the global below is what app.js reads.
 if (typeof module !== "undefined") {
-  module.exports = CodeDiffModel;
+  module.exports = OmniDiffModel;
 }

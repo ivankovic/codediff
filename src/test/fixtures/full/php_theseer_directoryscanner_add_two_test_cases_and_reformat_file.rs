@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -22,7 +22,7 @@ use anyhow::Result;
 #[test]
 fn mapping() -> Result<()> {
     // One decision seen from two sides (`APTED("qualified_name")`): the human pairs the second
-    // before comment with the *fourth* after one, codediff pairs positionally. The costs tie
+    // before comment with the *fourth* after one, omnidiff pairs positionally. The costs tie
     // exactly: the cost function cannot tell the answers apart.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "php-theseer-directoryscanner-add-two-test-cases-and-reformat-file",

@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -19,19 +19,19 @@
 //! Corpus-wide statistics over every `human_mapping.json` under `src/test/data/diffs/`: the shape
 //! of the ground truth itself (sizes, operation mix, groups), plus corpus-wide signals for
 //! pipeline-design questions (wrap/reparent rate, sibling-reorder rate). No diffing happens here;
-//! `benchmark_optimal_solutions` measures codediff against the corpus.
+//! `benchmark_optimal_solutions` measures omnidiff against the corpus.
 
 use anyhow::Result;
 use clap::Parser;
-use codediff::code::Language;
-use codediff::diff::NodeCache;
-use codediff::test::helper;
-use codediff::test::helper::PathCache;
-use codediff::test::helper::human_mapping::{self, GroupPairing, HumanOperation};
+use omnidiff::code::Language;
+use omnidiff::diff::NodeCache;
+use omnidiff::test::helper;
+use omnidiff::test::helper::PathCache;
+use omnidiff::test::helper::human_mapping::{self, GroupPairing, HumanOperation};
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-/// Subtree size, root inclusive. A copy of `codediff::stats::count_nodes`, which sits behind the
+/// Subtree size, root inclusive. A copy of `omnidiff::stats::count_nodes`, which sits behind the
 /// `stats` feature this binary otherwise does not need; keep the two in sync.
 fn count_nodes(root: tree_sitter::Node) -> usize {
     let mut count = 1;
@@ -306,8 +306,8 @@ fn subtree_size<'a>(
 fn analyze_fixture(
     name: &str,
     category: &str,
-    before: &codediff::code::Code,
-    after: &codediff::code::Code,
+    before: &omnidiff::code::Code,
+    after: &omnidiff::code::Code,
     current_mismatches: &HashMap<String, usize>,
 ) -> Result<FixtureStats> {
     let node_cache = NodeCache::build(before, after);
@@ -607,8 +607,8 @@ fn cell_text(node: tree_sitter::Node, src: &str) -> String {
 /// is warned about and skipped.
 fn kind_mismatches_of(
     name: &str,
-    before: &codediff::code::Code,
-    after: &codediff::code::Code,
+    before: &omnidiff::code::Code,
+    after: &omnidiff::code::Code,
 ) -> Vec<KindMismatch> {
     let Ok(mapping) = human_mapping::load(name) else {
         return Vec::new();
@@ -751,8 +751,8 @@ fn field_of(node: tree_sitter::Node) -> Option<String> {
 
 fn kind_invariant_cost_of(
     name: &str,
-    before: &codediff::code::Code,
-    after: &codediff::code::Code,
+    before: &omnidiff::code::Code,
+    after: &omnidiff::code::Code,
 ) -> Option<InvariantCost> {
     let mapping = human_mapping::load(name).ok()?;
     let before_root = before.ast.as_ref()?.root_node();
@@ -914,8 +914,8 @@ struct EliminationHit {
 /// by elimination: equal child counts, and every sibling pairwise matched in order.
 fn elimination_hits_of(
     name: &str,
-    before: &codediff::code::Code,
-    after: &codediff::code::Code,
+    before: &omnidiff::code::Code,
+    after: &omnidiff::code::Code,
 ) -> Vec<EliminationHit> {
     let mut out = Vec::new();
     let Ok(mapping) = human_mapping::load(name) else {
@@ -1508,7 +1508,7 @@ fn main() -> Result<()> {
     print_top_kinds("Top deleted node kinds", &delete_kinds, args.top_kinds);
     print_top_kinds("Top inserted node kinds", &insert_kinds, args.top_kinds);
 
-    // ---- 8. Cross-reference against current codediff results ----
+    // ---- 8. Cross-reference against current omnidiff results ----
     let with_current: Vec<&FixtureStats> = all_stats
         .iter()
         .filter(|s| s.current_mismatches.is_some())

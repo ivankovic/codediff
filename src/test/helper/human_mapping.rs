@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -18,7 +18,7 @@
 
 //! Human-authored ground truth for a fixture, `<fixture dir>/human_mapping.json`, written by the
 //! `human_solver` binary: a node mapping (`entries`, `groups`) and independent text paintings
-//! (`text_mappings`), plus the checks that grade codediff against them.
+//! (`text_mappings`), plus the checks that grade omnidiff against them.
 //!
 //! Nodes are identified by *path* (see [`super::path_for_node`]), not node id: ids are not stable
 //! across the separate parses that write and later check a mapping.
@@ -37,7 +37,7 @@ use crate::test::helper::{PathCache, path_for_node};
 pub mod invariants;
 
 /// What a human decided should happen to a node (or pair of nodes) between before and after. The
-/// three pairing operations also pin *which* [`ASTMappingOperation`] codediff must have chosen.
+/// three pairing operations also pin *which* [`ASTMappingOperation`] omnidiff must have chosen.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum HumanOperation {
@@ -103,7 +103,7 @@ impl GroupPairing {
 /// A set of `before_paths` nodes that correspond to a set of `after_paths` nodes as a whole, in
 /// one of the two senses [`GroupPairing`] names.
 ///
-/// `AnyOneToOne`: any pairing codediff produces counts, as long as it uses `min(N, M)` pairs and
+/// `AnyOneToOne`: any pairing omnidiff produces counts, as long as it uses `min(N, M)` pairs and
 /// leaves the rest deleted/inserted. `AllToAll`: every member must be matched inside the group, so
 /// a one-to-one diff necessarily scores at least `|N - M|` mismatches. That is deliberate: it is
 /// the distance between what the ground truth says and what the algorithm can express.
@@ -444,7 +444,7 @@ pub struct TextMappingDisagreement {
 ///
 /// Line terminators are never labeled: the renderer bounds each row's painted columns to the row's
 /// content, so a multi-row range never visibly paints the seam between rows. Applies to the human's
-/// spans and codediff's ranges alike.
+/// spans and omnidiff's ranges alike.
 fn label_bytes(contents: &str, spans: &[(HumanTextSpan, TextLabel)]) -> Vec<Option<TextLabel>> {
     let mut labels = vec![None; contents.len()];
     for &(span, label) in spans {
@@ -626,7 +626,7 @@ fn disagreements_for(
     Ok(disagreements)
 }
 
-/// How closely codediff's own rendering, under one [`crate::diff::text::RenderOptions`] preset,
+/// How closely omnidiff's own rendering, under one [`crate::diff::text::RenderOptions`] preset,
 /// matches the human painting that preset is answerable to.
 #[derive(Debug, Clone)]
 pub struct PaintingComparison {
@@ -731,7 +731,7 @@ pub(crate) fn designates_preset(name: &str, preset: &str) -> bool {
             .is_some_and(|rest| rest.starts_with(' '))
 }
 
-/// Compares codediff's rendering under `options` against the painting that preset is answerable
+/// Compares omnidiff's rendering under `options` against the painting that preset is answerable
 /// to, byte for byte (ranges chunk one edit too differently to compare directly). The result is a
 /// rate because fixture sizes span three orders of magnitude.
 pub fn compare_painting(
@@ -739,11 +739,11 @@ pub fn compare_painting(
     options: crate::diff::text::RenderOptions,
 ) -> Result<PaintingComparison> {
     let (before, after) = &*super::handmade_test_code_pair(name)?;
-    let diff = codediff_diff_for_painting(before, after)?;
+    let diff = omnidiff_diff_for_painting(before, after)?;
     compare_painting_with_diff(name, options, before, after, &diff)
 }
 
-/// codediff's side of a painting comparison, built once per fixture and projected per preset by
+/// omnidiff's side of a painting comparison, built once per fixture and projected per preset by
 /// [`compare_painting_with_diff`].
 pub enum PaintingDiff<'code> {
     /// The ordinary case: a tree mapping, projected to text by [`crate::diff::text::TextDiff`].
@@ -761,7 +761,7 @@ pub enum PaintingDiff<'code> {
 }
 
 /// See [`PaintingDiff`].
-pub fn codediff_diff_for_painting<'code>(
+pub fn omnidiff_diff_for_painting<'code>(
     before: &'code crate::code::Code,
     after: &'code crate::code::Code,
 ) -> Result<PaintingDiff<'code>> {
@@ -778,15 +778,15 @@ pub fn codediff_diff_for_painting<'code>(
     let diff = crate::diff::diff_code(before, after);
     let ast = diff
         .ast
-        .context("codediff produced no AST diff for a pair that has both trees")?;
+        .context("omnidiff produced no AST diff for a pair that has both trees")?;
     let node_cache = crate::diff::NodeCache::build(before, after);
     Ok(PaintingDiff::Ast { ast, node_cache })
 }
 
-/// codediff's own side of a painting comparison, as per-byte labels, `[before, after]`: the ranges
+/// omnidiff's own side of a painting comparison, as per-byte labels, `[before, after]`: the ranges
 /// the TUI renders under `options`. Built under `options` rather than via `TextDiff::from`
 /// (which builds under `FULL`), because some options change the build itself.
-pub fn codediff_painting_labels(
+pub fn omnidiff_painting_labels(
     diff: &PaintingDiff,
     before: &crate::code::Code,
     after: &crate::code::Code,
@@ -827,7 +827,7 @@ pub fn compare_painting_with_diff(
     let mapping = load(name)?;
     let candidates = paintings_for_mode(&mapping, options)?;
 
-    let ours = codediff_painting_labels(diff, before, after, options);
+    let ours = omnidiff_painting_labels(diff, before, after, options);
     let total_bytes = before.contents.len() + after.contents.len();
 
     // Several paintings under one preset are alternatives: the closest one is the verdict.
@@ -871,13 +871,13 @@ pub fn compare_painting_with_diff(
     best.context("a preset with no candidate paintings should have been rejected above")
 }
 
-/// Asserts codediff's rendering matches the human painting under **both** presets, within
+/// Asserts omnidiff's rendering matches the human painting under **both** presets, within
 /// `max_percent` of the fixture's bytes - a recorded distance, not a target.
 pub fn assert_matches_human_painting_within_limit(name: &str, max_percent: f64) -> Result<()> {
     use crate::diff::text::RenderOptions;
 
     let (before, after) = &*super::handmade_test_code_pair(name)?;
-    let diff = codediff_diff_for_painting(before, after)?;
+    let diff = omnidiff_diff_for_painting(before, after)?;
     let mut failures = Vec::new();
     for options in [RenderOptions::MINIMAL, RenderOptions::FULL] {
         let comparison = compare_painting_with_diff(name, options, before, after, &diff)?;
@@ -897,7 +897,7 @@ pub fn assert_matches_human_painting_within_limit(name: &str, max_percent: f64) 
         return Ok(());
     }
     bail!(
-        "codediff's rendering disagrees with the human painting for '{name}':\n{}",
+        "omnidiff's rendering disagrees with the human painting for '{name}':\n{}",
         failures.join("\n")
     );
 }
@@ -1232,7 +1232,7 @@ pub enum Side {
     After,
 }
 
-/// One disagreement between the human mapping and codediff's output, tagged with the node most
+/// One disagreement between the human mapping and omnidiff's output, tagged with the node most
 /// responsible, so callers can tell a mismatch on a visible node from one on invisible scaffolding
 /// (see [`crate::diff::nodes::structurally_visible_node_ids`]). `node_id` is `0` (never a real
 /// id) for a mismatch about no single node.
@@ -1424,7 +1424,7 @@ fn actual_mapping_info_after(
     }
 }
 
-/// The [`ASTMappingOperation`] codediff is expected to have chosen for a matched pair, given the
+/// The [`ASTMappingOperation`] omnidiff is expected to have chosen for a matched pair, given the
 /// human's [`HumanOperation`] for that pair.
 fn expected_ast_operation(operation: HumanOperation) -> Option<ASTMappingOperation> {
     match operation {
@@ -1555,13 +1555,13 @@ pub fn human_mapping_cost_for(
 }
 
 /// A synthetic `ASTDiff` from `name`'s human mapping, so machinery that consumes an `ASTDiff`
-/// (e.g. `diff::text::TextDiff`) treats the human mapping like codediff's output.
+/// (e.g. `diff::text::TextDiff`) treats the human mapping like omnidiff's output.
 ///
 /// All-to-all groups become [`ASTDiff::add_group`] groups, members in document order; any-one-to-one
 /// groups are flattened by [`representative_entries`].
 ///
 /// `cost`/`reason` are placeholders; the human format records neither. `reason` is not inert:
-/// `diff::text`'s `identical_or_move` reads it, so `painting_failure_census` borrows codediff's
+/// `diff::text`'s `identical_or_move` reads it, so `painting_failure_census` borrows omnidiff's
 /// reason for shared pairs before rendering.
 pub fn as_ast_diff(
     name: &str,
@@ -1835,7 +1835,7 @@ fn check_entry<'b, 'a>(
                 Some(actual_mapping) if actual_mapping.operation == expected_op => {}
                 Some(actual_mapping) => mismatches.push(Mismatch {
                     message: format!(
-                        "{:?} {:?} <-> {:?}: expected codediff operation {:?}, but it chose {:?}",
+                        "{:?} {:?} <-> {:?}: expected omnidiff operation {:?}, but it chose {:?}",
                         entry.operation, before_path, after_path, expected_op, actual_mapping.operation
                     ),
                     node_id: before_node.id(),
@@ -2127,7 +2127,7 @@ fn check_group_entry<'b, 'a>(
     if !all_to_all && matched_pairs.len() != expected_matched {
         mismatches.push(Mismatch {
             message: format!(
-                "{context}: expected exactly {expected_matched} pair(s) matched within the group, but codediff matched {}",
+                "{context}: expected exactly {expected_matched} pair(s) matched within the group, but omnidiff matched {}",
                 matched_pairs.len()
             ),
             node_id: group_node_id,
@@ -2140,7 +2140,7 @@ fn check_group_entry<'b, 'a>(
             Some(actual_mapping) if accepted_ops.contains(&actual_mapping.operation) => {}
             Some(actual_mapping) => mismatches.push(Mismatch {
                 message: format!(
-                    "{context}: pair '{}' <-> '{}' expected codediff operation {accepted_ops:?}, but it chose {:?}",
+                    "{context}: pair '{}' <-> '{}' expected omnidiff operation {accepted_ops:?}, but it chose {:?}",
                     b.kind(),
                     a.kind(),
                     actual_mapping.operation
@@ -2326,7 +2326,7 @@ fn describe_nondeterminism_with_config(
     mismatches
 }
 
-/// Every disagreement between `name`'s human mapping and codediff's diff (empty if they agree).
+/// Every disagreement between `name`'s human mapping and omnidiff's diff (empty if they agree).
 ///
 /// For [`crate::test::helper::UNIT_TEST_FIXTURES`], also diffs two more fresh parses and compares
 /// all three runs by path: `diff_code` must be a pure function of its source, and a difference
@@ -2608,7 +2608,7 @@ pub fn nodes_touched_by(
 }
 
 /// The changed (non-`Identical`) ranges on each side of `ast_diff`, as `(before, after)`, for
-/// [`nodes_touched_by`]. Used for the ground truth and codediff alike, so any asymmetry is in the
+/// [`nodes_touched_by`]. Used for the ground truth and omnidiff alike, so any asymmetry is in the
 /// diff, not the measurement.
 pub fn changed_spans(
     before: &crate::code::Code,
@@ -2719,7 +2719,7 @@ fn touched_line_numbers(
 /// Line-level mismatch counts for one fixture against the human mapping's per-line projection.
 /// Unlike node mismatches, meaningful for a line-only tool like Unix `diff` too.
 pub struct LineMismatches {
-    pub codediff: usize,
+    pub omnidiff: usize,
     pub unix_diff: usize,
     /// `before`'s line count plus `after`'s - the denominator of both counts.
     pub total_lines: usize,
@@ -2748,7 +2748,7 @@ pub fn human_touched_lines_for<'code>(
     human_touched_lines_for_mapping(&mapping, before, after)
 }
 
-/// [`LineMismatches`] for one fixture: codediff and Unix `diff` against the human mapping. Only
+/// [`LineMismatches`] for one fixture: omnidiff and Unix `diff` against the human mapping. Only
 /// Unix `diff`, since other external tools need binaries a caller cannot assume.
 pub fn line_mismatches_for(
     name: &str,
@@ -2769,21 +2769,21 @@ pub fn line_mismatches_for_mapping(
         human_touched_lines_for_mapping(mapping, before, after)?;
     let total_lines = human_before.len() + human_after.len();
 
-    let codediff_diff = crate::diff::diff_code(before, after);
-    let codediff_ast = codediff_diff
+    let omnidiff_diff = crate::diff::diff_code(before, after);
+    let omnidiff_ast = omnidiff_diff
         .ast
-        .context("codediff produced no AST mapping")?;
-    let (codediff_before, codediff_after) =
-        touched_lines(before, after, &codediff_ast, &node_cache);
-    let codediff = line_disagreement_count(&human_before, &codediff_before)
-        + line_disagreement_count(&human_after, &codediff_after);
+        .context("omnidiff produced no AST mapping")?;
+    let (omnidiff_before, omnidiff_after) =
+        touched_lines(before, after, &omnidiff_ast, &node_cache);
+    let omnidiff = line_disagreement_count(&human_before, &omnidiff_before)
+        + line_disagreement_count(&human_after, &omnidiff_after);
 
     let (unix_before, unix_after) = unix_diff_line_labels(before, after)?;
     let unix_diff = line_disagreement_count(&human_before, &unix_before)
         + line_disagreement_count(&human_after, &unix_after);
 
     Ok(LineMismatches {
-        codediff,
+        omnidiff,
         unix_diff,
         total_lines,
     })
@@ -2951,7 +2951,7 @@ pub fn compute_visible_mismatches_for_with_config(
     })
 }
 
-/// Checks that every decision in `name`'s human mapping holds in codediff's diff, reporting every
+/// Checks that every decision in `name`'s human mapping holds in omnidiff's diff, reporting every
 /// mismatch at once.
 pub fn assert_matches_human_mapping(name: &str) -> Result<()> {
     assert_matches_human_mapping_within_limit(name, 0, 0)
@@ -2985,7 +2985,7 @@ pub fn assert_matches_human_mapping_within_limit(
             .chain(visible.invisible.iter().map(|m| m.message.as_str()))
             .collect();
         bail!(
-            "{} mismatch(es) ({} visible) between the human mapping and codediff's diff for '{}' \
+            "{} mismatch(es) ({} visible) between the human mapping and omnidiff's diff for '{}' \
              (allowed up to {} total, {} visible){}{}:\n{}",
             total,
             visible_count,
@@ -3625,13 +3625,13 @@ mod tests {
     // Apple's diff has no `--*-line-format`, so the GNU-only runner cannot work there.
     #[cfg_attr(target_os = "macos", ignore = "needs GNU diff")]
     #[test]
-    fn line_mismatches_for_is_zero_for_a_fixture_codediff_solves_exactly() -> Result<()> {
+    fn line_mismatches_for_is_zero_for_a_fixture_omnidiff_solves_exactly() -> Result<()> {
         // rust-no-change is fully identical, so both agree with the all-untouched human mapping.
         let (before, after) = &*crate::test::helper::handmade_test_code_pair("rust-no-change")?;
 
         let result = line_mismatches_for("rust-no-change", before, after)?;
 
-        assert_eq!(result.codediff, 0);
+        assert_eq!(result.omnidiff, 0);
         assert_eq!(result.unix_diff, 0);
         assert!(result.total_lines > 0);
 
@@ -4046,7 +4046,7 @@ mod tests {
     #[test]
     fn check_group_entry_reports_each_all_to_all_member_a_one_to_one_diff_leaves_out() -> Result<()>
     {
-        // codediff can only pair the one original with one copy; the other two come out inserted,
+        // omnidiff can only pair the one original with one copy; the other two come out inserted,
         // and that is exactly what the group must report - once per copy, nothing else.
         let (before, after) = one_foo_becoming_three();
         let before_root = before.ast.as_ref().unwrap().root_node();
@@ -4275,7 +4275,7 @@ mod tests {
     }
 
     #[test]
-    fn check_group_entry_fails_when_codediff_deletes_and_inserts_instead_of_matching() -> Result<()>
+    fn check_group_entry_fails_when_omnidiff_deletes_and_inserts_instead_of_matching() -> Result<()>
     {
         // Every node's fate is locally valid, but with N == M == 2 the group under-matched.
         let source = "fn main() {\n    foo();\n    foo();\n}\n";
@@ -4995,7 +4995,7 @@ mod tests {
             "the premise of this test is a pair tree-sitter cannot parse"
         );
 
-        let diff = codediff_diff_for_painting(&before, &after)?;
+        let diff = omnidiff_diff_for_painting(&before, &after)?;
         let PaintingDiff::PlainText {
             before: before_ranges,
             after: after_ranges,
@@ -5015,7 +5015,7 @@ mod tests {
             crate::diff::text::RenderOptions::MINIMAL,
             crate::diff::text::RenderOptions::FULL,
         ] {
-            let labels = codediff_painting_labels(&diff, &before, &after, options);
+            let labels = omnidiff_painting_labels(&diff, &before, &after, options);
             for (side, contents) in [(0usize, before_text), (1usize, after_text)] {
                 let painted: String = contents
                     .char_indices()

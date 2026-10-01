@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -1780,21 +1780,21 @@ fn ranges_painted_under_one_name_stay_out_of_another() {
 }
 
 #[test]
-fn the_text_overlay_cycles_human_codediff_disagreements() {
+fn the_text_overlay_cycles_human_omnidiff_disagreements() {
     assert_eq!(TextOverlay::default(), TextOverlay::Human);
-    assert_eq!(TextOverlay::Human.next(), TextOverlay::CodeDiff);
-    assert_eq!(TextOverlay::CodeDiff.next(), TextOverlay::Disagreements);
+    assert_eq!(TextOverlay::Human.next(), TextOverlay::OmniDiff);
+    assert_eq!(TextOverlay::OmniDiff.next(), TextOverlay::Disagreements);
     assert_eq!(TextOverlay::Disagreements.next(), TextOverlay::Human);
 }
 
-/// codediff's side comes from `TextDiff`, the projection the TUI draws, not a second reading of
+/// omnidiff's side comes from `TextDiff`, the projection the TUI draws, not a second reading of
 /// its node mapping.
 #[test]
-fn codediff_text_spans_reports_the_changed_regions_of_a_real_diff() {
+fn omnidiff_text_spans_reports_the_changed_regions_of_a_real_diff() {
     let before = Code::from_string("fn main() {\n    foo();\n}\n", &Language::Rust);
     let after = Code::from_string("fn main() {\n    bar();\n}\n", &Language::Rust);
 
-    let [before_spans, after_spans] = codediff_text_spans(&before, &after, None);
+    let [before_spans, after_spans] = omnidiff_text_spans(&before, &after, None);
 
     assert!(
         !before_spans.is_empty(),
@@ -1845,7 +1845,7 @@ fn the_disagreement_overlay_is_empty_when_the_two_accounts_match() {
     );
 }
 
-/// The shared overlay palette, so a range looks as it does in the `codediff` TUI.
+/// The shared overlay palette, so a range looks as it does in the `omnidiff` TUI.
 #[test]
 fn painted_ranges_use_the_shared_overlay_palette() {
     let palette = OverlayTheme::default().palette();
@@ -1921,7 +1921,7 @@ fn span_covers_uses_the_exact_end_column_on_the_last_row() {
     assert!(!span_covers(span, 0, 3, 5));
 }
 
-/// Unset means Dracula, which keeps render tests independent of the machine's `.codediff.toml`.
+/// Unset means Dracula, which keeps render tests independent of the machine's `.omnidiff.toml`.
 #[test]
 fn the_palette_falls_back_to_the_default_theme_when_none_was_installed() {
     assert_eq!(
@@ -2844,7 +2844,7 @@ fn o_cycles_the_overlay_and_p_no_longer_does() {
         TextPaintState::default(),
         KeyCode::Char('o'),
     );
-    assert_eq!(app.text_overlay, TextOverlay::CodeDiff);
+    assert_eq!(app.text_overlay, TextOverlay::OmniDiff);
 
     // Each press starts a fresh app, so `Human` is the default; the status line (a jump, not an
     // overlay switch) is what rules out `p` cycling.
@@ -3027,7 +3027,7 @@ fn a_selection_includes_the_character_under_the_cursor() {
     let span = spans[0];
 
     assert_eq!(
-        codediff::test::helper::human_mapping::span_text(source, span),
+        omnidiff::test::helper::human_mapping::span_text(source, span),
         Some("foo")
     );
 }
@@ -3053,7 +3053,7 @@ fn a_selection_past_a_multibyte_character_lands_on_the_right_text() {
     let span = state.selection(0, source)[0];
 
     assert_eq!(
-        codediff::test::helper::human_mapping::span_text(source, span),
+        omnidiff::test::helper::human_mapping::span_text(source, span),
         Some("foo")
     );
 }
@@ -3277,12 +3277,12 @@ fn d_and_i_paint_one_sided_ranges_on_their_own_side() {
     let entries = &solution_entries(&app.mapping, &app.text_solution);
     assert_eq!(entries.len(), 2);
     assert_eq!(
-        codediff::test::helper::human_mapping::span_text(before_src, entries[0].before[0]),
+        omnidiff::test::helper::human_mapping::span_text(before_src, entries[0].before[0]),
         Some("gone")
     );
     assert!(entries[0].after.is_empty(), "a delete has no after side");
     assert_eq!(
-        codediff::test::helper::human_mapping::span_text(after_src, entries[1].after[0]),
+        omnidiff::test::helper::human_mapping::span_text(after_src, entries[1].after[0]),
         Some("new")
     );
     assert!(entries[1].before.is_empty(), "an insert has no before side");
@@ -4963,7 +4963,7 @@ fn help_modal_renders_keybindings() {
 
 fn parse_rust(source: &str) -> tree_sitter::Tree {
     let language =
-        codediff::code::language::to_treesitter(&codediff::code::Language::Rust).unwrap();
+        omnidiff::code::language::to_treesitter(&omnidiff::code::Language::Rust).unwrap();
     let mut parser = tree_sitter::Parser::new();
     parser.set_language(&language).unwrap();
     parser.parse(source, None).unwrap()
@@ -6424,8 +6424,8 @@ fn sample_comment_at_is_none_when_comment_is_empty_or_row_is_missing() {
 #[test]
 fn algo_reason_reports_the_pass_that_produced_each_side_of_a_match() {
     let source = "fn f() { a(); }\n";
-    let before = codediff::code::Code::from_string(source, &codediff::code::Language::Rust);
-    let after = codediff::code::Code::from_string(source, &codediff::code::Language::Rust);
+    let before = omnidiff::code::Code::from_string(source, &omnidiff::code::Language::Rust);
+    let after = omnidiff::code::Code::from_string(source, &omnidiff::code::Language::Rust);
     let diff = diff_code(&before, &after);
     let diff_ast = diff.ast.expect("diff has AST");
 
@@ -6445,7 +6445,7 @@ fn algo_reason_reports_the_pass_that_produced_each_side_of_a_match() {
 fn algo_reason_is_none_when_the_diff_has_no_entry_for_the_node() {
     // An empty ASTDiff (before `p`) misses cleanly rather than panicking.
     let source = "fn f() {}\n";
-    let code = codediff::code::Code::from_string(source, &codediff::code::Language::Rust);
+    let code = omnidiff::code::Code::from_string(source, &omnidiff::code::Language::Rust);
     let root = code.ast.as_ref().unwrap().root_node();
     let empty_diff = ASTDiff::default();
 
@@ -7931,11 +7931,11 @@ fn round_tripping_the_real_sample_csv_loses_nothing() {
 }
 
 #[test]
-fn codediff_text_entries_keeps_the_pairing_that_the_span_view_drops() {
+fn omnidiff_text_entries_keeps_the_pairing_that_the_span_view_drops() {
     let before = Code::from_string("fn main() {\n    foo();\n}\n", &Language::Rust);
     let after = Code::from_string("fn main() {\n    bar();\n}\n", &Language::Rust);
 
-    let entries = codediff_text_entries(&before, &after, None).expect("this pair pairs up cleanly");
+    let entries = omnidiff_text_entries(&before, &after, None).expect("this pair pairs up cleanly");
     assert!(!entries.is_empty(), "an edited pair should produce entries");
 
     for entry in &entries {
@@ -7956,9 +7956,9 @@ fn codediff_text_entries_keeps_the_pairing_that_the_span_view_drops() {
     }
 }
 
-/// The seed must *be* codediff's rendering, so it starts at zero disagreement.
+/// The seed must *be* omnidiff's rendering, so it starts at zero disagreement.
 #[test]
-fn seeding_a_painting_reproduces_codediffs_own_spans_on_both_sides() {
+fn seeding_a_painting_reproduces_omnidiffs_own_spans_on_both_sides() {
     let before_src = "fn main() {\n    foo();\n}\n";
     let after_src = "fn main() {\n    bar();\n}\n";
     let before = Code::from_string(before_src, &Language::Rust);
@@ -7973,10 +7973,10 @@ fn seeding_a_painting_reproduces_codediffs_own_spans_on_both_sides() {
         HumanMapping::default(),
     );
 
-    action_paint_seed_from_codediff(&mut app, &before, &after);
+    action_paint_seed_from_omnidiff(&mut app, &before, &after);
     assert!(app.dirty, "seeding is an unsaved change to the mapping");
 
-    let algo = codediff_text_spans(&before, &after, None);
+    let algo = omnidiff_text_spans(&before, &after, None);
     for side in [0usize, 1usize] {
         let mut painted: Vec<_> = painted_spans(
             &app.mapping,
@@ -7990,7 +7990,7 @@ fn seeding_a_painting_reproduces_codediffs_own_spans_on_both_sides() {
         expected.sort_by_key(|(span, _)| (span.start_row, span.start_column));
         assert_eq!(
             painted, expected,
-            "side {side} should read exactly as codediff renders it"
+            "side {side} should read exactly as omnidiff renders it"
         );
     }
 }
@@ -8011,12 +8011,12 @@ fn seeding_refuses_to_overwrite_a_painting_that_already_has_ranges() {
         HumanMapping::default(),
     );
 
-    action_paint_seed_from_codediff(&mut app, &before, &after);
+    action_paint_seed_from_omnidiff(&mut app, &before, &after);
     // `HumanTextEntry` has no `PartialEq`; compare the rendered shape.
     let seeded = format!("{:?}", solution_entries(&app.mapping, &app.text_solution));
     app.dirty = false;
 
-    action_paint_seed_from_codediff(&mut app, &before, &after);
+    action_paint_seed_from_omnidiff(&mut app, &before, &after);
 
     assert_eq!(
         format!("{:?}", solution_entries(&app.mapping, &app.text_solution)),
@@ -8033,24 +8033,24 @@ fn seeding_refuses_to_overwrite_a_painting_that_already_has_ranges() {
     );
 }
 
-/// The overlap guard, against a fixture that trips it: codediff's rendering overlaps on some
+/// The overlap guard, against a fixture that trips it: omnidiff's rendering overlaps on some
 /// corpus fixtures, and a painting cannot represent that (the renderer resolves an overlap by
 /// highest verdict, the scorer by list order).
 #[test]
-fn seeding_refuses_a_pair_whose_codediff_ranges_overlap() {
-    let pair = codediff::test::helper::handmade_test_code_pair("xml-odoo-odoo-add-two-attributes")
+fn seeding_refuses_a_pair_whose_omnidiff_ranges_overlap() {
+    let pair = omnidiff::test::helper::handmade_test_code_pair("xml-odoo-odoo-add-two-attributes")
         .expect("fixture should exist");
     let (before, after) = &*pair;
 
-    let overlapping = codediff_text_spans(before, after, None)
+    let overlapping = omnidiff_text_spans(before, after, None)
         .iter()
         .any(|side| spans_overlap(side));
     assert!(
         overlapping,
-        "this test is pointless unless the fixture still has overlapping codediff ranges"
+        "this test is pointless unless the fixture still has overlapping omnidiff ranges"
     );
 
-    let error = codediff_text_entries(before, after, None)
+    let error = omnidiff_text_entries(before, after, None)
         .expect_err("an overlapping pair must not produce a painting");
     assert!(
         error.contains("overlap"),
@@ -8582,12 +8582,12 @@ fn the_same_key_is_not_explained_away_when_there_is_a_tree() {
     assert_eq!(app.status, before_status);
 }
 
-/// For a pair with no grammar codediff answers with its plain-text fallback, so `p` and `P` have
+/// For a pair with no grammar omnidiff answers with its plain-text fallback, so `p` and `P` have
 /// something to work with.
 #[test]
-fn codediff_text_spans_falls_back_to_the_plain_text_diff() {
+fn omnidiff_text_spans_falls_back_to_the_plain_text_diff() {
     let (before, after) = unparseable_pair();
-    let [before_spans, after_spans] = codediff_text_spans(&before, &after, None);
+    let [before_spans, after_spans] = omnidiff_text_spans(&before, &after, None);
 
     assert!(
         !before_spans.is_empty() && !after_spans.is_empty(),
@@ -9607,7 +9607,7 @@ fn may_edit_mapping_covers_the_marking_keys_and_not_navigation() {
 }
 
 // ---------------------------------------------------------------------------------------------
-// codediff in the background
+// omnidiff in the background
 // ---------------------------------------------------------------------------------------------
 
 /// Polls until the background run lands, or gives up after a few seconds so a broken thread
@@ -9647,7 +9647,7 @@ fn start_algo_diff_lands_through_poll_algo_diff_keyed_by_the_panels_own_node_ids
         app.status
             .as_deref()
             .unwrap_or("")
-            .starts_with("codediff ran"),
+            .starts_with("omnidiff ran"),
         "{:?}",
         app.status
     );
@@ -9658,7 +9658,7 @@ fn start_algo_diff_lands_through_poll_algo_diff_keyed_by_the_panels_own_node_ids
 }
 
 #[test]
-fn compute_frame_state_counts_mismatches_only_once_codediff_has_run() -> Result<()> {
+fn compute_frame_state_counts_mismatches_only_once_omnidiff_has_run() -> Result<()> {
     let source = "fn main() {}\n";
     let before = Code::from_string(source, &Language::Rust);
     let after = Code::from_string(source, &Language::Rust);
@@ -9670,7 +9670,7 @@ fn compute_frame_state_counts_mismatches_only_once_codediff_has_run() -> Result<
         root_id,
         HumanMapping::default(),
     );
-    // The human says the whole file was deleted (`D` on the root); codediff will say it is
+    // The human says the whole file was deleted (`D` on the root); omnidiff will say it is
     // identical.
     let root = before.ast.as_ref().unwrap().root_node();
     press_with_watch(&mut app, root, source, KeyCode::Char('D'));
@@ -9688,7 +9688,7 @@ fn compute_frame_state_counts_mismatches_only_once_codediff_has_run() -> Result<
     assert_eq!(
         state.before_mismatches,
         Some(state.before_flat.len()),
-        "every marked-deleted node is one codediff mapped"
+        "every marked-deleted node is one omnidiff mapped"
     );
     assert_eq!(
         state.after_mismatches,
@@ -9823,7 +9823,7 @@ fn remember_session_keeps_the_last_diffs_case_and_the_picker_view() {
     };
     remember_session(&mut app);
 
-    let path = dir.path().join("codediff").join("human_solver.json");
+    let path = dir.path().join("omnidiff").join("human_solver.json");
     let memory = load_session_memory(&path);
     assert_eq!(memory.last_case.as_deref(), Some("rust-add-if"));
     assert_eq!(memory.diff_view.sort.column, DiffColumn::Unmarked);
@@ -10342,7 +10342,7 @@ fn measure_saved_case_reads_a_real_fixture_as_its_tests_do() -> Result<()> {
     assert_eq!(measurement.invariant_violations, 0);
     assert_eq!(
         describe_measurement(&measurement),
-        "codediff: 0 mismatch(es), 0 visible, painting 0.0%, invariants hold"
+        "omnidiff: 0 mismatch(es), 0 visible, painting 0.0%, invariants hold"
     );
     Ok(())
 }
@@ -10704,12 +10704,12 @@ fn scan_corpus_cached_with_rescans_only_cases_whose_stamp_moved() {
 }
 
 #[test]
-fn the_codediff_overlay_from_a_known_diff_matches_a_fresh_run() {
+fn the_omnidiff_overlay_from_a_known_diff_matches_a_fresh_run() {
     let before = Code::from_string("fn main() {\n    a();\n}\n", &Language::Rust);
     let after = Code::from_string("fn main() {\n    b();\n    a();\n}\n", &Language::Rust);
     let known = diff_code(&before, &after).ast.expect("an AST diff");
-    let fresh = codediff_text_spans(&before, &after, None);
-    let reused = codediff_text_spans(&before, &after, Some(&known));
+    let fresh = omnidiff_text_spans(&before, &after, None);
+    let reused = omnidiff_text_spans(&before, &after, Some(&known));
     assert_eq!(reused, fresh);
     assert!(!reused[1].is_empty(), "the insert shows on the after side");
 }

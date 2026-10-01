@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -19,7 +19,7 @@
 //! and how to turn any one of those changes into the two files on disk the diff engine reads.
 //! The TUI's review picker (`tui::components::review_dialog`) is its caller.
 //!
-//! Talks to the `git` binary, not `git2`, whose OpenSSL/libssh2 build `cargo install codediff`
+//! Talks to the `git` binary, not `git2`, whose OpenSSL/libssh2 build `cargo install omnidiff`
 //! should not pay for; anyone reviewing has `git` on `PATH`.
 //!
 //! A side is materialized at `<workspace>/<revision>/<path>`: the basename picks the grammar, and
@@ -411,7 +411,7 @@ impl Workspace {
         std::os::unix::fs::DirBuilderExt::mode(&mut builder, 0o700);
         for attempt in 0..100 {
             let dir = std::env::temp_dir().join(format!(
-                "codediff-review-{}-{nanos}-{attempt}",
+                "omnidiff-review-{}-{nanos}-{attempt}",
                 std::process::id()
             ));
             match builder.create(&dir) {

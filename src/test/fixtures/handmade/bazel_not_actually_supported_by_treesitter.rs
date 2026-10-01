@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -16,7 +16,7 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 //! This fixture's language has no tree-sitter grammar, so there is no tree to map
-//! and no `mapping()` test here. codediff renders the pair with its plain-text
+//! and no `mapping()` test here. omnidiff renders the pair with its plain-text
 //! fallback diff (`plain_text_line_diff`), and that is what the `painting()` test
 //! below is graded against - see `PaintingDiff::PlainText`.
 

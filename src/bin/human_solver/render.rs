@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -18,13 +18,13 @@
 //! Drawing the two AST panels, the modals and the status line.
 
 use crate::*;
-use codediff::diff::text_range::{ScreenColumn, SourceRow, cell_width_of, row_cells_of};
+use omnidiff::diff::text_range::{ScreenColumn, SourceRow, cell_width_of, row_cells_of};
 
 // ---------------------------------------------------------------------------------------------
 // Rendering
 // ---------------------------------------------------------------------------------------------
 
-pub(crate) use codediff::test::helper::human_mapping::Side;
+pub(crate) use omnidiff::test::helper::human_mapping::Side;
 
 pub(crate) fn node_label(node: Node, src: &[u8]) -> String {
     if node.child_count() == 0 {
@@ -42,7 +42,7 @@ pub(crate) fn node_label(node: Node, src: &[u8]) -> String {
 /// space, not a tab stop, and C0 only (a C1 control is two bytes): a character's screen column
 /// must keep matching its byte offset, because paint cursors and `HumanTextSpan`s are stored in
 /// those coordinates. The product viewer keeps the tab instead and maps byte columns to tab
-/// stops where it draws a row (`codediff::tui::display_columns`).
+/// stops where it draws a row (`omnidiff::tui::display_columns`).
 pub(crate) fn display_safe_char(ch: char) -> char {
     if ch.is_ascii_control() { ' ' } else { ch }
 }
@@ -118,7 +118,7 @@ pub(crate) fn render_panel(
     algo_diff: Option<&ASTDiff>,
     show_reason: bool,
     total_unmarked: usize,
-    // `None` until codediff's diff is in; see `FrameState::before_mismatches`.
+    // `None` until omnidiff's diff is in; see `FrameState::before_mismatches`.
     mismatches: Option<usize>,
     multi_selected: &std::collections::BTreeSet<usize>,
     groups: &[MultiMapGroup],
@@ -235,7 +235,7 @@ pub(crate) fn render_panel(
 /// Below this width `draw_ui` shows only the focused panel: two half-width panels wrap almost every
 /// line. Shared with the main TUI's `DiffViewer`.
 pub(crate) const SINGLE_PANEL_WIDTH_THRESHOLD: u16 =
-    codediff::tui::components::diff_viewer::SINGLE_PANEL_THRESHOLD;
+    omnidiff::tui::components::diff_viewer::SINGLE_PANEL_THRESHOLD;
 
 /// The Before/After panels for a language with no tree-sitter grammar: one row saying why they are
 /// empty. Drawn in the panels, not the status line, because two empty panels otherwise read as
@@ -286,7 +286,7 @@ fn render_unsupported_language_panels(
 
 pub(crate) const NO_GRAMMAR_MESSAGE: &str = "<Language not supported by TreeSitter>\n\nThere is \
     no AST for this file pair, so there is no tree mapping to record. Press t to paint the text \
-    (which is graded against codediff's own plain-text fallback diff), T for a unix diff, s to \
+    (which is graded against omnidiff's own plain-text fallback diff), T for a unix diff, s to \
     save, o to open another case.";
 
 // A params struct would only relocate these fields.
@@ -418,7 +418,7 @@ pub(crate) fn draw_ui(
     }
 
     let footer = format!(
-        "{}{}{}\nm/M match[+children]  x select for multi-map  X flip all-to-all  c clear selection  f match to EOF  d/D delete[+children]  i/I insert[+children]  a/A align (human/codediff)  p run codediff  r toggle reason  n/N next/prev mismatch  t text view  T unix diff  H hide solved  u unmark  h/l ←/→ collapse/expand  j/k ↑/↓ move  g/G top/bottom  Tab switch  s save  ? help  q quit",
+        "{}{}{}\nm/M match[+children]  x select for multi-map  X flip all-to-all  c clear selection  f match to EOF  d/D delete[+children]  i/I insert[+children]  a/A align (human/omnidiff)  p run omnidiff  r toggle reason  n/N next/prev mismatch  t text view  T unix diff  H hide solved  u unmark  h/l ←/→ collapse/expand  j/k ↑/↓ move  g/G top/bottom  Tab switch  s save  ? help  q quit",
         app.status.clone().unwrap_or_default(),
         if app.dirty { "  [UNSAVED]" } else { "" },
         if caches.unresolved > 0 {
@@ -759,7 +759,7 @@ pub(crate) fn painted_spans(
         .collect()
 }
 
-/// From the shared overlay palette, so a painted range looks as it does in the `codediff` TUI.
+/// From the shared overlay palette, so a painted range looks as it does in the `omnidiff` TUI.
 pub(crate) fn verdict_style(verdict: HumanTextVerdict) -> Style {
     let palette = overlay_palette();
     let color = match verdict {
@@ -1057,7 +1057,7 @@ pub(crate) fn render_text_view_modal(
     let algo = algo_spans.unwrap_or(&empty);
     let shown = match overlay {
         TextOverlay::Human => human_spans,
-        TextOverlay::CodeDiff => algo.clone(),
+        TextOverlay::OmniDiff => algo.clone(),
         TextOverlay::Disagreements => {
             overlay_disagreement_spans(&human_spans, algo, before_src, after_src)
         }

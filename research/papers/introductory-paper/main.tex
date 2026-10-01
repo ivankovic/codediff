@@ -72,7 +72,7 @@
 
 \keywords{source code differencing, syntax-aware diffing, empirical software engineering, source code tree edit distance}
 
-\title{CodeDiff: A Fast, Robust, Syntax-Aware Code Diffing Tool}
+\title{OmniDiff: A Fast, Robust, Syntax-Aware Code Diffing Tool}
 
 \author{Marko Ivankovi\'{c}}
 \affiliation{%
@@ -135,9 +135,9 @@ perfectly, and the one that reaches it, srcDiff, parses five of the corpus's lan
 that parse most of it, none renders more than \DifftasticPerfectPct{}\%, and
 \texttt{diff}, the most popular tool, renders only \UnixDiffPerfectPct{}\%.
 
-As a tool contribution, we present \textsc{CodeDiff}, which combines existing state-of-the-art
+As a tool contribution, we present \textsc{OmniDiff}, which combines existing state-of-the-art
 algorithms into one robust tool. It maps \NodeAccuracyPct{}\% of AST nodes correctly and renders
-\CodeDiffPerfectPct{}\% of changes perfectly, at a median of \SpeedCodeDiffPFifty{}\,ms per diff
+\OmniDiffPerfectPct{}\% of changes perfectly, at a median of \SpeedOmniDiffPFifty{}\,ms per diff
 including its parse. We tested it on \RobustnessFullAttempted{} diffs
 in \NumRepos{} repositories, and it completes \RobustnessFullCompletedPct{}\% of them
 successfully.
@@ -278,7 +278,7 @@ This paper makes the following contributions:
   \item \textbf{Evaluation:} An analysis of the real-world code change
     data shape, irrespective of any concrete implementation, and a quantified comparison of several
     state-of-the-art code diffing tools on the human annotated dataset.
-  \item \textbf{Tool:} \textsc{CodeDiff}, a new state-of-the-art tool. Combining all current research
+  \item \textbf{Tool:} \textsc{OmniDiff}, a new state-of-the-art tool. Combining all current research
     with strict engineering principles and carefully implemented to maximise performance, based on
     the collected data.
 \end{itemize}
@@ -491,7 +491,7 @@ The AST node-mapping oracle of Alikhanifard and Tsantalis~\cite{astdiffbenchmark
 \OracleUnits{} Java compilation units, which before-side node each after-side node corresponds to:
 \OracleRecords{} node correspondences in all, built by running six tools, inspecting every diff by
 hand against six stated criteria, and resolving disagreements by vote. It was authored by different people, for a
-different tool, on a different AST, before \textsc{CodeDiff} existed. The file contents its
+different tool, on a different AST, before \textsc{OmniDiff} existed. The file contents its
 character offsets index into come from Falleri and Martinez' replication
 package~\cite{gumtreesimple}.
 
@@ -566,7 +566,7 @@ travel, not as a difference between the datasets.
 \end{resultbox}
 
 This result bears on how tools are scored, because no existing tool can produce these mappings.
-\textsc{CodeDiff}'s node-level accuracy (Section~\ref{sec:codediff}) counts a group as correct
+\textsc{OmniDiff}'s node-level accuracy (Section~\ref{sec:omnidiff}) counts a group as correct
 whenever its mapping is any of the pairings the group allows. The line-level comparison of
 Section~\ref{sec:tools} needs one answer per node, so it projects each group through a single
 representative pairing, members paired in source order; a tool that chose a different, equally
@@ -632,7 +632,7 @@ system runtime limits.
   whose whole-tree APTED computation completes within the time on the axis, per artifact
   category; the height of each curve at the dashed line is RA2, and the pairs the budget killed
   are the gap to 100\%. Right: wall-clock per diff for every tool configuration of
-  Section~\ref{sec:tools}, every repeated run over every fixture, with \textsc{CodeDiff} charged
+  Section~\ref{sec:tools}, every repeated run over every fixture, with \textsc{OmniDiff} charged
   for its parse and drawn dash-dotted; the dotted curve is the tree-sitter parse alone, the floor
   every AST-aware tool pays first. The dashed line is the same one second in both panels.}
   \label{fig:time-budget}
@@ -778,7 +778,7 @@ Section~\ref{sec:dataset}. \texttt{git diff} is measured
 under each of its four algorithms, Myers, minimal, patience and histogram, giving eleven configurations in all. Five configurations report at line granularity only: Unix
 \texttt{diff} and the four \texttt{git} algorithms. Six report sub-line detail: BDiff~\cite{bdiff},
 Neovim's diff mode, and the four AST-aware tools, GumTree (\GumTreeVersion{})~\cite{gumtreediff-2014},
-difftastic~\cite{difftastic}, diffsitter~\cite{diffsitter} and srcDiff~\cite{decker-2020}. Our own tool's figures are reported in Section~\ref{sec:codediff}, on the same basis and against the same ground truth.
+difftastic~\cite{difftastic}, diffsitter~\cite{diffsitter} and srcDiff~\cite{decker-2020}. Our own tool's figures are reported in Section~\ref{sec:omnidiff}, on the same basis and against the same ground truth.
 
 
 
@@ -831,9 +831,9 @@ interpreter, for the same reason.
 
 \begin{table}
   \caption{Wall-clock time percentiles for the eleven tool configurations, milliseconds, sorted
-  fastest to slowest by median, with \textsc{CodeDiff} on the last row. \emph{Max} is the slowest
+  fastest to slowest by median, with \textsc{OmniDiff} on the last row. \emph{Max} is the slowest
   single one of the \TimingRepeats{} runs over any fixture. Every configuration is timed as a whole
-  process except \textsc{CodeDiff}, which is timed in-process and so pays no process startup; see
+  process except \textsc{OmniDiff}, which is timed in-process and so pays no process startup; see
   Section~\ref{sec:threats}.}
   \label{tab:speed-vs-others}
   \small
@@ -855,7 +855,7 @@ interpreter, for the same reason.
     BDiff (cold, per-invocation) & \SpeedBDiffColdPFifty{} & \SpeedBDiffColdPNinety{} & \SpeedBDiffColdPNinetyNine{} & \SpeedBDiffColdMax{} \\
     GumTree (cold, per-invocation) & \SpeedGumTreeColdPFifty{} & \SpeedGumTreeColdPNinety{} & \SpeedGumTreeColdPNinetyNine{} & \SpeedGumTreeColdMax{} \\
     \midrule
-    \textsc{CodeDiff} & \SpeedCodeDiffPFifty{} & \SpeedCodeDiffPNinety{} & \SpeedCodeDiffPNinetyNine{} & \SpeedCodeDiffMax{} \\
+    \textsc{OmniDiff} & \SpeedOmniDiffPFifty{} & \SpeedOmniDiffPNinety{} & \SpeedOmniDiffPNinetyNine{} & \SpeedOmniDiffMax{} \\
     \bottomrule
   \end{tabular}
 \end{table}
@@ -876,16 +876,16 @@ repeat count is uniform, so no fixture is over-weighted.
 
 
 
-\section{\textsc{CodeDiff}}
-\label{sec:codediff}
+\section{\textsc{OmniDiff}}
+\label{sec:omnidiff}
 
 This section is the paper's tool contribution. Table~\ref{tab:findings-to-design} lists what
-each empirical result decided in \textsc{CodeDiff}'s design; the phases that follow are the
+each empirical result decided in \textsc{OmniDiff}'s design; the phases that follow are the
 same list read top to bottom, and the tool is then evaluated against the same ground truth and on
 the same basis as Section~\ref{sec:tools}'s eleven configurations.
 
 \begin{table}
-  \caption{What each empirical result decided in \textsc{CodeDiff}'s design.}
+  \caption{What each empirical result decided in \textsc{OmniDiff}'s design.}
   \label{tab:findings-to-design}
   \small
   \begin{tabular}{@{}>{\raggedright\arraybackslash}p{0.44\linewidth}>{\raggedright\arraybackslash}p{0.52\linewidth}@{}}
@@ -917,22 +917,22 @@ the same basis as Section~\ref{sec:tools}'s eleven configurations.
   \end{tabular}
 \end{table}
 
-\textsc{CodeDiff} has two targets:
+\textsc{OmniDiff} has two targets:
 
 \begin{itemize}
-  \item \textbf{Robust:} \textsc{CodeDiff} must handle every file up to the measured maximum,
+  \item \textbf{Robust:} \textsc{OmniDiff} must handle every file up to the measured maximum,
     \AstMax{} AST nodes, with headroom above that number.
-  \item \textbf{Fast:} \textsc{CodeDiff} must compute a diff in under \SpeedTargetMs{}\,ms for
+  \item \textbf{Fast:} \textsc{OmniDiff} must compute a diff in under \SpeedTargetMs{}\,ms for
     \SpeedTargetPct{}\% of real-world changes, RQ2's one second applied to the population of
     real changes rather than to a corpus of hard cases.
 \end{itemize}
 
-\textsc{CodeDiff} matches two ASTs in \NumPhasesWord{} phases. Each phase either resolves part of the
+\textsc{OmniDiff} matches two ASTs in \NumPhasesWord{} phases. Each phase either resolves part of the
 mapping directly or narrows the residual left for the next phase. Later phases only ever see
 nodes earlier phases left unmatched. A sixth step closes the mapping, recording the deletion or
 insertion implied by whatever every phase above left undecided.
 
-\textbf{Phase 1, hash-based descent.} \textsc{CodeDiff} matches subtrees by two hash variants, in
+\textbf{Phase 1, hash-based descent.} \textsc{OmniDiff} matches subtrees by two hash variants, in
 order: byte-identical subtrees, then same-shape subtrees with any leaf value. This phase is
 motivated directly
 by the commit-size data of Section~\ref{sec:dataset}: since most commits touch a small fraction of
@@ -970,32 +970,32 @@ insert. This phase, adapted directly from GumTree's recovery-mappings
 phase~\cite{gumtreediff-2014}, pairs up whole subtrees left fully deleted on one side and fully
 inserted on the other, when they are byte-identical and large enough to rule out coincidence.
 
-\textbf{Result.} \textsc{CodeDiff} renders \CodeDiffPerfectPct{}\% of the corpus perfectly,
+\textbf{Result.} \textsc{OmniDiff} renders \OmniDiffPerfectPct{}\% of the corpus perfectly,
 against \DifftasticPerfectPct{}\% for the best established tool that parses most of it, at a
-median of \SpeedCodeDiffPFifty{}\,ms including its parse, and it completes every fixture. On the
-\SrcDiffFixtures{} changes srcDiff parses, it renders \SrcDiffSubsetCodeDiffPerfectPct{}\% perfectly
+median of \SpeedOmniDiffPFifty{}\,ms including its parse, and it completes every fixture. On the
+\SrcDiffFixtures{} changes srcDiff parses, it renders \SrcDiffSubsetOmniDiffPerfectPct{}\% perfectly
 against srcDiff's \SrcDiffPerfectPct{}\%.
 
-\textbf{Accuracy.} Against the human mapping, \textsc{CodeDiff} maps \NodeAccuracyPct{}\% of AST
+\textbf{Accuracy.} Against the human mapping, \textsc{OmniDiff} maps \NodeAccuracyPct{}\% of AST
 nodes correctly (\NodeMismatches{} mismatches in \NodesTotal{}), and \VisibleNodeAccuracyPct{}\% of
 the \VisibleNodeShare{}\% of nodes that carry text and can reach the screen
 (\VisibleNodeMismatches{} in \VisibleNodesTotal{}). On the line-level basis of
-Section~\ref{sec:tools} it marks \CodeDiffLineMismatches{} lines differently from the human
-mapping over \CodeDiffFixtures{} fixtures, a rate of \CodeDiffLineRate{}\%, the lowest of any tool
-measured. Table~\ref{tab:codediff-by-dataset} splits the result by dataset.
+Section~\ref{sec:tools} it marks \OmniDiffLineMismatches{} lines differently from the human
+mapping over \OmniDiffFixtures{} fixtures, a rate of \OmniDiffLineRate{}\%, the lowest of any tool
+measured. Table~\ref{tab:omnidiff-by-dataset} splits the result by dataset.
 
-\input{figures/benchmark_codediff_by_dataset.tex}
+\input{figures/benchmark_omnidiff_by_dataset.tex}
 
 \textbf{Robustness.} Run over the \RobustnessFixtures{} fixtures with a
 \RobustnessTimeoutSeconds{}-second budget per fixture and no cap on tree size,
-\textsc{CodeDiff} completes every one. The largest fixture holds \RobustnessMaxNodes{}
+\textsc{OmniDiff} completes every one. The largest fixture holds \RobustnessMaxNodes{}
 AST nodes per side, the slowest takes \RobustnessSlowestMs{}\,ms, and peak heap use is
 \RobustnessPeakMemoryMb{}\,MB. The same measurement over the whole Full corpus reaches the files
 the fixture corpus does not. Every modified code file in the corpus's recent history
 (Section~\ref{sec:edit-shape}), \RobustnessFullAttempted{} pairs across
 \RobustnessFullLanguages{} languages, was diffed with no node cap under a
 \RobustnessFullTimeoutSeconds{}-second budget and a \RobustnessFullMemoryCapGb{}\,GB memory cap
-per process. \textsc{CodeDiff} completes \RobustnessFullCompletedPct{}\% of them with
+per process. \textsc{OmniDiff} completes \RobustnessFullCompletedPct{}\% of them with
 \RobustnessFullPanicked{} panics, at a median of \RobustnessFullPFiftyMs{}\,ms and a 99th
 percentile of \RobustnessFullPNinetyNineMs{}\,ms; the largest completed pair holds
 \RobustnessFullMaxSideNodes{} AST nodes on each side, against the \AstMax{} of the largest file
@@ -1007,9 +1007,9 @@ single-header C++ library. Given \RobustnessFullBigMemoryCapGb{}\,GB and a five-
 commit of each memory-killed file was tried again: \RobustnessFullKilledFilesCompletedUnderBigCap{}
 completed, one needed more memory still, and the rest ran past even that five-minute budget.
 
-\textbf{Speed.} Over the \CodeDiffFixtures{} fixtures, \textsc{CodeDiff}'s median wall-clock time
-is \SpeedCodeDiffPFifty{}\,ms, its 90th percentile \SpeedCodeDiffPNinety{}\,ms and its 99th
-percentile \SpeedCodeDiffPNinetyNine{}\,ms, parse included. The right panel of
+\textbf{Speed.} Over the \OmniDiffFixtures{} fixtures, \textsc{OmniDiff}'s median wall-clock time
+is \SpeedOmniDiffPFifty{}\,ms, its 90th percentile \SpeedOmniDiffPNinety{}\,ms and its 99th
+percentile \SpeedOmniDiffPNinetyNine{}\,ms, parse included. The right panel of
 Figure~\ref{fig:time-budget} places that curve among the eleven configurations of
 Table~\ref{tab:speed-vs-others}: at the median the line-based tools sit to its left and the
 AST-aware tools to its right, and besides diffsitter, over the \DiffsitterFixtures{} fixtures its
@@ -1033,14 +1033,14 @@ AST-aware tools compute and the line-based ones never had, which if anything fav
 line-based tools. It also means the paintings---the only place the corpus records a second correct
 rendering---never enter that comparison, so RA3.2's error term sits in those tables unremoved.
 
-\textbf{Internal validity.} \textsc{CodeDiff} is timed in-process while every external tool is
+\textbf{Internal validity.} \textsc{OmniDiff} is timed in-process while every external tool is
 timed as a whole process, so it pays no process-startup cost that the others pay in full. We state
 this rather than correct for it, and report GumTree and BDiff both cold and warm so that a reader
 can see how large the effect is for the two tools where it dominates. Per-tool mean runtimes are
 additionally distorted by run order, whichever tool runs first per fixture absorbing cold-cache
 cost; to minimise this effect we quote percentiles rather than means throughout, and every timing number is the result of repeated runs.
 
-The ground truth is authored by the same people who built \textsc{CodeDiff}, which is a real risk
+The ground truth is authored by the same people who built \textsc{OmniDiff}, which is a real risk
 of bias in its favour. Three things limit it: the mappings are authored against the change itself in
 a dedicated annotation tool with no tool output shown, the full annotation history is published
 with the corpus so that any individual mapping can be inspected and disputed, and
@@ -1052,7 +1052,7 @@ depend on our own discipline, and it is the reason the corpus was extended with 
 real commits. It concentrates hard, structurally interesting changes, because easy ones exercise
 nothing worth measuring---so every tail figure in this paper is a stress reading rather than an
 estimate of what a developer waits for on a typical commit. Every accuracy result is also reported per dataset (Figure~\ref{fig:agreement-by-dataset},
-Table~\ref{tab:codediff-by-dataset}), so a reader can separate the two random samples, the
+Table~\ref{tab:omnidiff-by-dataset}), so a reader can separate the two random samples, the
 stratified one, and the Defects4J bug fixes from each other. The Defects4J rows carry the
 selection caveat of Section~\ref{sec:diff-shape}: the units solved so far are how far annotation
 has reached, not a draw, and they run shorter than the ones still unsolved.
@@ -1064,7 +1064,7 @@ painting reaches larger changes.
 
 Finally, the fixture corpus's largest file holds \RobustnessMaxNodes{} AST nodes, well short of
 the Robust target's \AstMax{}. The target is exercised only by the whole-corpus run of
-Section~\ref{sec:codediff}, whose budget and memory cap were applied with eight processes
+Section~\ref{sec:omnidiff}, whose budget and memory cap were applied with eight processes
 sharing the machine, so a pair near either limit may have crossed it for want of a core rather
 than of an algorithm. Re-running the timeouts on a quiet machine moved two of them into the
 completed set and no more, and the memory kills recur across every commit of the same files,
@@ -1078,10 +1078,10 @@ Section~\ref{sec:diff-shape} rather than being representative of it by construct
 
 \textbf{Tree-diffing tools.} Section~\ref{sec:background} describes what each of the tools
 compared here does; what matters for positioning this work is where each one's goal differs from
-ours. GumTree~\cite{gumtreediff-2014} remains the reference point, and \textsc{CodeDiff}'s
+ours. GumTree~\cite{gumtreediff-2014} remains the reference point, and \textsc{OmniDiff}'s
 move-recovery phase adapts its recovery-mappings heuristic directly: the difference is that GumTree
 targets research use, with broad language and backend flexibility that stays valuable well beyond
-what RA4.1's single corpus measures, while \textsc{CodeDiff} narrows to a tree-sitter-only frontend
+what RA4.1's single corpus measures, while \textsc{OmniDiff} narrows to a tree-sitter-only frontend
 and spends the saved generality on production targets. difftastic~\cite{difftastic} and
 diffsitter~\cite{diffsitter} share that parsing layer but optimise for a diff a human reads
 comfortably rather than for fidelity of the underlying node mapping, so RA4.1 measures them against
@@ -1106,7 +1106,7 @@ annotators on a measurable minority of changes.
 \textbf{Empirical studies.} Dyer et al.~\cite{ast-api-1} and L\"{a}mmel et al.~\cite{ast-api-2}
 mine AST nodes at scale to study API usage; Arafat and
 Riehle~\cite{commit-size-distribution-paper} measure the commit-size distribution of open-source
-software, the distribution \textsc{CodeDiff}'s Fast target is stated against; and
+software, the distribution \textsc{OmniDiff}'s Fast target is stated against; and
 Defects4J~\cite{defects4j} collects real, reproducible bug fixes from open-source Java projects,
 each a before/after file pair, and has since served as the file-pair corpus behind most
 evaluations of AST differencing on Java. This paper's empirical study differs from these in
@@ -1125,7 +1125,7 @@ best possible correspondence cannot be expressed with the four standard operatio
 (RA1.2), the mapping and its rendering are not unique (RA3.1, RA3.2), and no established tool
 that parses most of the corpus maps much more than three fifths of it perfectly (RA4.1). Closing that gap needs a ground truth
 that records the correspondence itself, a cost model that agrees with readers, and tools that
-are measured against both; the corpus published with this paper and the \textsc{CodeDiff} tool
+are measured against both; the corpus published with this paper and the \textsc{OmniDiff} tool
 are a first step towards all three.
 
 \bibliographystyle{ACM-Reference-Format}

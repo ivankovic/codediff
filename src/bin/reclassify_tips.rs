@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -31,7 +31,7 @@ use rusqlite::{Connection, params};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-use codediff::code::tip::type_from_path;
+use omnidiff::code::tip::type_from_path;
 
 #[derive(Parser)]
 struct Args {

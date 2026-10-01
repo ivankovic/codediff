@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -23,7 +23,7 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // One of two identical `::` tokens is dropped; the human picked the inner, codediff the outer.
+    // One of two identical `::` tokens is dropped; the human picked the inner, omnidiff the outer.
     // The same ambiguity as the painting rule, one level up.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "rust-rust-lang-rust-remove-path-from-using",

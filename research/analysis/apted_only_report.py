@@ -1,4 +1,4 @@
-#  This file is part of the CodeDiff code diffing tool.
+#  This file is part of the OmniDiff code diffing tool.
 #
 #  Copyright (C) 2026 Marko Ivankovic
 #
@@ -29,10 +29,10 @@ ast_nodes_after, status, elapsed_ms), buckets every pair by this project's share
 percentage with status "ok" (finished inside the 1s budget the driver enforced via subprocess
 kill, not this script) per bucket.
 
-The measured algorithm is CodeDiff's own APTED implementation (`apted::for_roots`,
-`Algorithm::Apted`), run directly on the whole before/after trees with none of CodeDiff's 7-phase
+The measured algorithm is OmniDiff's own APTED implementation (`apted::for_roots`,
+`Algorithm::Apted`), run directly on the whole before/after trees with none of OmniDiff's 7-phase
 pipeline's pre-matching heuristics applied first - not a generic/stock APTED implementation. This
-implementation includes CodeDiff's own containment-aware `compute_delta` optimization (~35% faster
+implementation includes OmniDiff's own containment-aware `compute_delta` optimization (~35% faster
 than the naive version on this project's own benchmark suite), so if anything it is
 faster than a textbook implementation would be. The percentages this script reports are therefore
 a lower bound on how often a whole-tree tree-edit-distance computation fails a one-second budget in
@@ -99,7 +99,7 @@ import numpy as np
 from _common import GRIDLINE, INK_MUTED, INK_PRIMARY, INK_SECONDARY, SURFACE, read_rows
 from matplotlib import ticker
 
-BAR_COLOR = "#2a78d6"  # matches benchmark_other_report.py's "codediff" series color
+BAR_COLOR = "#2a78d6"  # matches benchmark_other_report.py's "omnidiff" series color
 
 # This project's LOC buckets, mirroring `LOC_BUCKETS` in src/stats/sampling.rs: (exclusive upper
 # bound, label), keyed by the *larger* of a pair's before/after line count. One definition used

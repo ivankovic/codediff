@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -30,7 +30,7 @@ fn mapping() -> Result<()> {
     // 4. Its surrounding `if` matches both the before `if` around the `ereport` and the one at the
     //    same location: another 2-to-1.
     // The unmarked nodes left are all at that N:M site, which no `MultiMapGroup` can encode; the
-    // limit is high because the mapping is specific, not because codediff is wrong there.
+    // limit is high because the mapping is specific, not because omnidiff is wrong there.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "c-postgres-real-logic-change",
         124,

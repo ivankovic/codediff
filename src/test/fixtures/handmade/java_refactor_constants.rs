@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -23,7 +23,7 @@ use anyhow::Result;
 #[test]
 fn mapping() -> Result<()> {
     // Two literals become one named constant: an all-to-all 2:1 group (see
-    // `MultiMapGroup::pairing`). One before literal is unavoidably unmatched; codediff's
+    // `MultiMapGroup::pairing`). One before literal is unavoidably unmatched; omnidiff's
     // `qualified_name` pass also deletes the other and inserts the after one, an ordinary gap.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "java-refactor-constants",

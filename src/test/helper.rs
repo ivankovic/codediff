@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -539,7 +539,7 @@ pub fn diffs_case_dir(name: &str) -> Option<std::path::PathBuf> {
 }
 
 /// The human note for one fixture, `<fixture dir>/description.md`, or `None` for a name no dataset
-/// holds. It says what the fixture demands, never why codediff falls short (that belongs in the
+/// holds. It says what the fixture demands, never why omnidiff falls short (that belongs in the
 /// fixture's stub, see `test::fixtures`). A separate file because `human_mapping.json` is too
 /// large to parse just to list notes, and `README.md` is generated.
 pub fn note_path(name: &str) -> Option<std::path::PathBuf> {

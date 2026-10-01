@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -23,7 +23,7 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // An `identifier` argument became the literal `0`. The human calls that an update; codediff
+    // An `identifier` argument became the literal `0`. The human calls that an update; omnidiff
     // deletes the identifier, since the two share no text and nothing forces the pair.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "c-openssl-openssl-identifier-to-literal-zero",

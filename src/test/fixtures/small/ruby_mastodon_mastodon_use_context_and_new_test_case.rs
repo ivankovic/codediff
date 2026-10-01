@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -21,7 +21,7 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // A multi-map group declares `MatchButNotIdentical`, but codediff's pair (`do_block` and its
+    // A multi-map group declares `MatchButNotIdentical`, but omnidiff's pair (`do_block` and its
     // `body_statement`) is `Identical`.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "ruby-mastodon-mastodon-use-context-and-new-test-case",

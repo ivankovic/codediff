@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -21,7 +21,7 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // An `if` modifier moves to a later assignment; codediff deletes and inserts most of it, and
+    // An `if` modifier moves to a later assignment; omnidiff deletes and inserts most of it, and
     // does not realize two multi-map group pairings.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "ruby-homebrew-brew-actual-logic-change",

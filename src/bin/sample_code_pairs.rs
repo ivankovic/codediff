@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -23,12 +23,12 @@ use rand::rngs::StdRng;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-use codediff::anomalous_paths;
-use codediff::code::Language;
-use codediff::code::language::{language_for_path, language_for_path_and_content, to_treesitter};
-use codediff::stats::filesystem::{find_git_repositories, for_each_repository};
-use codediff::stats::git::{text_loc_if_in_range, walk_single_parent_commit_diffs};
-use codediff::stats::sampling::{LOC_BUCKETS, Reservoir, loc_bucket};
+use omnidiff::anomalous_paths;
+use omnidiff::code::Language;
+use omnidiff::code::language::{language_for_path, language_for_path_and_content, to_treesitter};
+use omnidiff::stats::filesystem::{find_git_repositories, for_each_repository};
+use omnidiff::stats::git::{text_loc_if_in_range, walk_single_parent_commit_diffs};
+use omnidiff::stats::sampling::{LOC_BUCKETS, Reservoir, loc_bucket};
 
 // The upper bound is the size `stats::expand_from_code` refuses to parse.
 const MIN_BYTES: usize = 1;
@@ -240,7 +240,7 @@ fn write_csv(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use codediff::test::helper;
+    use omnidiff::test::helper;
 
     #[test]
     fn samples_real_pairs_from_handmade_repository() -> Result<()> {

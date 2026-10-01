@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -23,7 +23,7 @@
 //! order below is the code's; the call-site comments in `Diff::pending_with_config` and
 //! [`PendingDiff::finish`] say why each pass sits where it does, and each pass's `solve` doc
 //! explains its mechanism. The right-hand column maps the code's phase numbers to the paper's
-//! ("CodeDiff", `research/papers/introductory-paper`); the code's numbering has gaps (there is no
+//! ("OmniDiff", `research/papers/introductory-paper`); the code's numbering has gaps (there is no
 //! phase 3 or 5).
 //!
 //! | Code phase | Pass | Paper |
@@ -83,8 +83,8 @@ use crate::diff::text::TextDiff;
 /// from, so it cannot outlive them:
 ///
 /// ```compile_fail
-/// use codediff::code::{Code, Language};
-/// use codediff::diff::NodeCache;
+/// use omnidiff::code::{Code, Language};
+/// use omnidiff::diff::NodeCache;
 ///
 /// let cache = {
 ///     let code = Code::from_string("fn main() { let x = 1; }", &Language::Rust);

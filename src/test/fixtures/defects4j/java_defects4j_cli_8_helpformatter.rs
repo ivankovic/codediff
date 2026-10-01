@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -25,7 +25,7 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 fn mapping() -> Result<()> {
     // `findWrapPos(text, width, nextLineTabStop)` becomes `findWrapPos(text, width, 0)`. The human
     // pairs the third argument across the kind change, since `text` and `width` are untouched and
-    // nothing else is left for `0` to be; codediff deletes and inserts
+    // nothing else is left for `0` to be; omnidiff deletes and inserts
     // (`APTED("large_flat_subtree")`). Java's `argument_list` names no fields, so invariant 18
     // reaches this only by elimination.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(

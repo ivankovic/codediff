@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -30,7 +30,7 @@ fn mapping() -> Result<()> {
 #[test]
 fn painting() -> Result<()> {
     // The alignment run between `NULL,` and `/* opener */` collapses to one space; no narrower
-    // painting ends on a visible character, so the rows are painted whole. codediff paints nothing:
+    // painting ends on a visible character, so the rows are painted whole. omnidiff paints nothing:
     // interior whitespace is out of reach (as in c-openssl-openssl-format-only-change).
     assert_matches_human_painting_within_limit("c-openssl-openssl-whitepsace-only", 21.12)
 }

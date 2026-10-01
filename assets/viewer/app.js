@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -24,9 +24,9 @@
 "use strict";
 
 (() => {
-  const M = CodeDiffModel;
+  const M = OmniDiffModel;
   const TOKEN = document.body.dataset.token;
-  const TOKEN_HEADER = "X-Codediff-Token";
+  const TOKEN_HEADER = "X-Omnidiff-Token";
   const $ = (selector) => document.querySelector(selector);
 
   // ----- api ----------------------------------------------------------------------------------
@@ -1258,7 +1258,7 @@
     try {
       state.info = await api("/api/state");
     } catch (error) {
-      document.body.textContent = `codediff: ${error.message}`;
+      document.body.textContent = `omnidiff: ${error.message}`;
       return;
     }
     const settings = state.info.settings;
@@ -1273,7 +1273,7 @@
     state.before = state.info.before;
     state.after = state.info.after;
     if (state.info.config_error) setError(state.info.config_error);
-    document.title = `codediff ${state.info.version}`;
+    document.title = `omnidiff ${state.info.version}`;
 
     state.model.setTabWidth(state.info.tab_width);
     document.documentElement.style.setProperty("--tab-size", state.info.tab_width);

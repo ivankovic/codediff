@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -34,10 +34,10 @@ use std::path::PathBuf;
 use tracing_subscriber::{EnvFilter, Layer, fmt, prelude::*};
 
 /// Where bug reports go; printed by the panic hook and the `?` About text.
-pub const ISSUE_TRACKER_URL: &str = "https://github.com/ivankovic/codediff/issues";
+pub const ISSUE_TRACKER_URL: &str = "https://github.com/ivankovic/omnidiff/issues";
 
 /// The environment variable that turns logging on. Its value is the `tracing` filter directive
-/// (`info`, `codediff=debug`, ...).
+/// (`info`, `omnidiff=debug`, ...).
 pub const LOG_ENV: &str = "RUST_LOG";
 
 /// Logs to a file, since the terminal is used by the TUI, and only when [`LOG_ENV`] is set: a
@@ -76,9 +76,9 @@ pub fn initialize_logging() -> Result<()> {
     Ok(())
 }
 
-/// The log file: `$XDG_STATE_HOME/codediff/log.txt`, else `$HOME/.local/state/codediff/log.txt`
+/// The log file: `$XDG_STATE_HOME/omnidiff/log.txt`, else `$HOME/.local/state/omnidiff/log.txt`
 /// (the XDG state directory, where logs belong), else the system temp directory. Per user, never
-/// a world-shared path: a shared `/tmp/codediff` is another user's to create first, and to point
+/// a world-shared path: a shared `/tmp/omnidiff` is another user's to create first, and to point
 /// a symlink from.
 pub fn log_file_path() -> PathBuf {
     log_file_path_from(
@@ -98,7 +98,7 @@ fn log_file_path_from(
         (_, Some(home)) if !home.as_os_str().is_empty() => home.join(".local").join("state"),
         _ => temp_dir,
     };
-    base.join("codediff").join("log.txt")
+    base.join("omnidiff").join("log.txt")
 }
 
 #[cfg(test)]
@@ -110,15 +110,15 @@ mod tests {
         let temp = PathBuf::from("/tmp");
         assert_eq!(
             log_file_path_from(Some("/xdg".into()), Some("/home/u".into()), temp.clone()),
-            PathBuf::from("/xdg/codediff/log.txt")
+            PathBuf::from("/xdg/omnidiff/log.txt")
         );
         assert_eq!(
             log_file_path_from(None, Some("/home/u".into()), temp.clone()),
-            PathBuf::from("/home/u/.local/state/codediff/log.txt")
+            PathBuf::from("/home/u/.local/state/omnidiff/log.txt")
         );
         assert_eq!(
             log_file_path_from(Some("".into()), Some("".into()), temp),
-            PathBuf::from("/tmp/codediff/log.txt")
+            PathBuf::from("/tmp/omnidiff/log.txt")
         );
     }
 }

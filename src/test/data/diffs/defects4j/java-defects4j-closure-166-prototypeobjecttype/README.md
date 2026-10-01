@@ -13,7 +13,7 @@ which is also the exact text the Alikhanifard & Tsantalis AST-diff oracle's offs
 The revision ids are Defects4J's own, from the repositories it bundles, and are not guaranteed
 to resolve in the upstream repository's history. Original bug report: https://storage.googleapis.com/google-code-archive/v2/code.google.com/closure-compiler/issues/issue-785.json
 
-This content is **not** part of codediff's own codebase and is **not** covered by codediff's own
+This content is **not** part of omnidiff's own codebase and is **not** covered by omnidiff's own
 AGPL-3.0 license - it remains under the license of the project it came from.
 
 ## License

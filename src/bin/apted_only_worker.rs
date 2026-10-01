@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -30,10 +30,10 @@ use clap::Parser;
 use std::path::PathBuf;
 use std::time::Instant;
 
-use codediff::code::Code;
-use codediff::code::language::language_for_path;
-use codediff::diff::ASTDiff;
-use codediff::diff::apted::{Algorithm, for_roots};
+use omnidiff::code::Code;
+use omnidiff::code::language::language_for_path;
+use omnidiff::diff::ASTDiff;
+use omnidiff::diff::apted::{Algorithm, for_roots};
 
 #[derive(Parser)]
 struct Args {

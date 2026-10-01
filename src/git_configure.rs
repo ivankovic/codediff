@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -16,7 +16,7 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-//! `codediff git configure`: an interactive wizard for the `git config` commands README's "Git
+//! `omnidiff git configure`: an interactive wizard for the `git config` commands README's "Git
 //! integration" section otherwise asks the user to run by hand.
 
 use std::io::{self, IsTerminal};
@@ -24,7 +24,7 @@ use std::process::Command;
 
 use anyhow::{Context, Result};
 
-use crate::configure_prompt::{ask_yes_no, read_line, resolve_codediff_path, shell_quote};
+use crate::configure_prompt::{ask_yes_no, read_line, resolve_omnidiff_path, shell_quote};
 
 /// Whether to write `git config` values with `--global` or to the current repository only.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -51,28 +51,28 @@ impl Scope {
     }
 }
 
-/// Entry point for `codediff git configure`. Without a terminal on stdin it prints the manual
+/// Entry point for `omnidiff git configure`. Without a terminal on stdin it prints the manual
 /// commands and fails rather than block on a read nobody will answer.
 pub fn run() -> Result<()> {
     if !io::stdin().is_terminal() {
         print_manual_instructions();
-        anyhow::bail!("`codediff git configure` needs an interactive terminal");
+        anyhow::bail!("`omnidiff git configure` needs an interactive terminal");
     }
 
-    let codediff_path = resolve_codediff_path();
-    println!("Configuring git to use {codediff_path} as its diff tool.\n");
+    let omnidiff_path = resolve_omnidiff_path();
+    println!("Configuring git to use {omnidiff_path} as its diff tool.\n");
 
     let scope = ask_scope()?;
     if scope == Scope::Local {
         ensure_inside_git_repo()?;
     }
 
-    let difftool_cmd = difftool_command(&codediff_path);
+    let difftool_cmd = difftool_command(&omnidiff_path);
     let set_difftool = ask_yes_no(
         &format!(
-            "{}{}Set codediff as the default `git difftool`? [Y/n] (`difftool.codediff.cmd` = \
+            "{}{}Set omnidiff as the default `git difftool`? [Y/n] (`difftool.omnidiff.cmd` = \
              `{difftool_cmd}`) ",
-            existing_value_note("difftool.codediff.cmd", scope),
+            existing_value_note("difftool.omnidiff.cmd", scope),
             // `diff.tool` is overwritten too, so an existing choice (meld, vimdiff) is shown.
             existing_value_note("diff.tool", scope)
         ),
@@ -85,8 +85,8 @@ pub fn run() -> Result<()> {
         )?;
     let set_external = ask_yes_no(
         &format!(
-            "{}Also use codediff for plain `git diff`/`git log -p` (via `diff.external`)? This \
-             makes every git diff go through codediff, always in its non-interactive text mode. \
+            "{}Also use omnidiff for plain `git diff`/`git log -p` (via `diff.external`)? This \
+             makes every git diff go through omnidiff, always in its non-interactive text mode. \
              [y/N] ",
             existing_value_note("diff.external", scope)
         ),
@@ -100,27 +100,27 @@ pub fn run() -> Result<()> {
 
     println!();
     if set_difftool {
-        set_config(scope, "difftool.codediff.cmd", &difftool_cmd)?;
-        set_config(scope, "diff.tool", "codediff")?;
+        set_config(scope, "difftool.omnidiff.cmd", &difftool_cmd)?;
+        set_config(scope, "diff.tool", "omnidiff")?;
         if skip_prompt {
             set_config(scope, "difftool.prompt", "false")?;
         }
     }
     if set_external {
         // The resolved path, like the difftool command, so git runs this build rather than
-        // whatever `codediff` is first on PATH; git runs the value through a shell.
-        set_config(scope, "diff.external", &shell_quote(&codediff_path))?;
+        // whatever `omnidiff` is first on PATH; git runs the value through a shell.
+        set_config(scope, "diff.external", &shell_quote(&omnidiff_path))?;
     }
 
     println!("\nDone - configured {}.", scope.label());
     Ok(())
 }
 
-/// The `difftool.codediff.cmd` value. git runs it through `sh`, so the binary's path is quoted
+/// The `difftool.omnidiff.cmd` value. git runs it through `sh`, so the binary's path is quoted
 /// as a shell word (a path under "Program Files" or "Application Support" has a space in it) and
 /// `$LOCAL`/`$REMOTE` stay as the variables git expands.
-fn difftool_command(codediff_path: &str) -> String {
-    format!("{} \"$LOCAL\" \"$REMOTE\"", shell_quote(codediff_path))
+fn difftool_command(omnidiff_path: &str) -> String {
+    format!("{} \"$LOCAL\" \"$REMOTE\"", shell_quote(omnidiff_path))
 }
 
 /// `key`'s current value under `scope` as a line to show before the prompt that would overwrite it,
@@ -178,12 +178,12 @@ fn ensure_inside_git_repo() -> Result<()> {
 fn print_manual_instructions() {
     eprintln!(
         "Run these manually instead (see README's \"Git integration\" section):\n\n\
-         git config difftool.codediff.cmd 'codediff \"$LOCAL\" \"$REMOTE\"'\n\
-         git config diff.tool codediff\n\
+         git config difftool.omnidiff.cmd 'omnidiff \"$LOCAL\" \"$REMOTE\"'\n\
+         git config diff.tool omnidiff\n\
          git config difftool.prompt false\n\n\
          Add --global to any of these to apply them to every repository instead of just this \
          one. For plain `git diff`/`git log -p` too (always non-interactive):\n\n\
-         git config diff.external codediff"
+         git config diff.external omnidiff"
     );
 }
 
@@ -215,12 +215,12 @@ mod tests {
     #[test]
     fn difftool_command_quotes_a_path_with_spaces_and_keeps_gits_variables_bare() {
         assert_eq!(
-            difftool_command("/usr/local/bin/codediff"),
-            "/usr/local/bin/codediff \"$LOCAL\" \"$REMOTE\""
+            difftool_command("/usr/local/bin/omnidiff"),
+            "/usr/local/bin/omnidiff \"$LOCAL\" \"$REMOTE\""
         );
         assert_eq!(
-            difftool_command("/Applications/My Tools/codediff"),
-            "'/Applications/My Tools/codediff' \"$LOCAL\" \"$REMOTE\""
+            difftool_command("/Applications/My Tools/omnidiff"),
+            "'/Applications/My Tools/omnidiff' \"$LOCAL\" \"$REMOTE\""
         );
     }
 

@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -17,10 +17,10 @@
  */
 use anyhow::Result;
 use clap::Parser;
-use codediff::anomalous_paths;
-use codediff::code::{Code, Language};
-use codediff::stats::DiffStats;
 use crossbeam_channel::{Receiver, Sender, bounded};
+use omnidiff::anomalous_paths;
+use omnidiff::code::{Code, Language};
+use omnidiff::stats::DiffStats;
 use rusqlite::{Connection, params};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -126,7 +126,7 @@ fn main() -> Result<()> {
     let n_threads = args.threads.unwrap_or_else(num_cpus::get);
     let queue_capacity = args.queue_capacity;
 
-    let repo_paths = codediff::stats::filesystem::find_git_repositories(base_path)?;
+    let repo_paths = omnidiff::stats::filesystem::find_git_repositories(base_path)?;
 
     if repo_paths.is_empty() {
         eprintln!("No git repositories found in: {:?}", base_path);
@@ -195,7 +195,7 @@ fn path_from_delta(delta: &git2::DiffDelta) -> String {
 
 fn detect_language_from_path(path: &str) -> Language {
     let path_buf = PathBuf::from(path);
-    codediff::code::language::language_for_path(&path_buf).unwrap_or(Language::Unknown)
+    omnidiff::code::language::language_for_path(&path_buf).unwrap_or(Language::Unknown)
 }
 
 fn process_repository(
@@ -469,7 +469,7 @@ fn export_stats_sqlite(path: &Path, stats: HashMap<(String, String), DiffStats>)
 #[cfg(test)]
 mod tests {
     use super::*;
-    use codediff::test::helper;
+    use omnidiff::test::helper;
     use rusqlite::Connection;
     use std::path::Path;
     use tempfile::NamedTempFile;

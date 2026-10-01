@@ -1,4 +1,4 @@
-# This file is part of the CodeDiff code diffing tool.
+# This file is part of the OmniDiff code diffing tool.
 #
 # Copyright (C) 2026 Marko Ivankovic
 #
@@ -92,7 +92,7 @@ def test_bucket_label_formats_the_open_top_bucket_with_a_plus():
 
 
 def test_tool_names_come_from_the_mismatch_columns_in_order():
-    fields = ["solution", "difft_mismatches", "difft_ms", "gumtree_mismatches", "codediff_ms"]
+    fields = ["solution", "difft_mismatches", "difft_ms", "gumtree_mismatches", "omnidiff_ms"]
     assert benchmark_other_report.tool_names(fields) == ["difft", "gumtree"]
 
 
@@ -509,17 +509,17 @@ def test_the_homebrew_formula_renders_from_the_release_checksums():
     """The tap installs release assets by name and checksum; both come from SHA256SUMS.txt, so
     the rendered formula must carry the version in every URL and the digest of every asset."""
     sums = render_homebrew_formula.checksums(
-        "aaaa  codediff-aarch64-apple-darwin.tar.gz\n"
-        "bbbb *codediff-x86_64-apple-darwin.tar.gz\n"
-        "cccc  codediff-aarch64-unknown-linux-musl.tar.gz\n"
-        "dddd  codediff-x86_64-unknown-linux-musl.tar.gz\n"
+        "aaaa  omnidiff-aarch64-apple-darwin.tar.gz\n"
+        "bbbb *omnidiff-x86_64-apple-darwin.tar.gz\n"
+        "cccc  omnidiff-aarch64-unknown-linux-musl.tar.gz\n"
+        "dddd  omnidiff-x86_64-unknown-linux-musl.tar.gz\n"
         "eeee  SHA256SUMS.txt\n"
     )
     formula = render_homebrew_formula.render(
         render_homebrew_formula.TEMPLATE.read_text(), "0.1.0", sums
     )
     assert 'version "0.1.0"' in formula
-    assert "download/v0.1.0/codediff-aarch64-apple-darwin.tar.gz" in formula
+    assert "download/v0.1.0/omnidiff-aarch64-apple-darwin.tar.gz" in formula
     assert 'sha256 "aaaa"' in formula
     assert 'sha256 "bbbb"' in formula
     assert 'sha256 "dddd"' in formula
@@ -529,6 +529,6 @@ def test_the_homebrew_formula_renders_from_the_release_checksums():
 def test_the_homebrew_formula_refuses_an_asset_the_release_lacks():
     """A placeholder left behind would fail at `brew install` on a user's machine; a missing asset
     fails here, naming it."""
-    sums = render_homebrew_formula.checksums("aaaa  codediff-aarch64-apple-darwin.tar.gz\n")
+    sums = render_homebrew_formula.checksums("aaaa  omnidiff-aarch64-apple-darwin.tar.gz\n")
     with pytest.raises(KeyError, match="x86_64-apple-darwin"):
         render_homebrew_formula.render(render_homebrew_formula.TEMPLATE.read_text(), "0.1.0", sums)

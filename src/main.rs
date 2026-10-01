@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -22,8 +22,8 @@ use anyhow::Context;
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 
-use codediff::tui;
-use codediff::tui::positional::{
+use omnidiff::tui;
+use omnidiff::tui::positional::{
     binary_notice, invoked_as_git_external_diff, resolve_before_after,
 };
 
@@ -63,7 +63,7 @@ enum Command {
 enum UtilAction {
     /// Print a shell completion script for SHELL on stdout.
     ///
-    /// For example: `source <(codediff util completions bash)`.
+    /// For example: `source <(omnidiff util completions bash)`.
     Completions {
         /// The shell to generate for.
         shell: clap_complete::Shell,
@@ -74,13 +74,13 @@ enum UtilAction {
 
 #[derive(Subcommand)]
 enum GitAction {
-    /// Interactively configure codediff as git's diff tool.
+    /// Interactively configure omnidiff as git's diff tool.
     Configure,
 }
 
 #[derive(Subcommand)]
 enum JjAction {
-    /// Interactively configure codediff as jj's diff tool.
+    /// Interactively configure omnidiff as jj's diff tool.
     Configure,
 }
 
@@ -128,12 +128,12 @@ fn parse_positive_rate(value: &str) -> Result<f64, String> {
         With no arguments, opens an interactive two-panel terminal UI. With BEFORE and AFTER \
         file paths, diffs them directly - as the TUI, as plain text (--headless), or as a single \
         JSON object (--mode json) for editor integrations. Also serves as a `git difftool` \
-        backend and a `jj` diff formatter; see `codediff git configure` and `codediff jj \
+        backend and a `jj` diff formatter; see `omnidiff git configure` and `omnidiff jj \
         configure`.",
     version,
     after_help = "Exit codes: 0 on success, 2 on error. Pass --exit-code to additionally get \
     1 when the files differ (the diff(1) convention), which is off by default for the same \
-    reason `git diff` defaults to 0: when a VCS drives codediff as a display tool, a non-zero \
+    reason `git diff` defaults to 0: when a VCS drives omnidiff as a display tool, a non-zero \
     exit means \"the tool failed\", not \"the files differ\"."
 )]
 struct Args {
@@ -264,8 +264,8 @@ fn headless_needs_files_message(args: &Args) -> &'static str {
 /// panel's saved setting applies. A preset flag replaces that setting outright (a script's output
 /// then does not depend on the machine); the single-option flags only ever turn an option on, on
 /// top of whichever applies.
-fn render_option_flags(args: &Args) -> Option<codediff::diff::text::RenderOptions> {
-    use codediff::diff::text::RenderOptions;
+fn render_option_flags(args: &Args) -> Option<omnidiff::diff::text::RenderOptions> {
+    use omnidiff::diff::text::RenderOptions;
     let preset = if args.minimal {
         Some(RenderOptions::MINIMAL)
     } else if args.full {
@@ -276,15 +276,15 @@ fn render_option_flags(args: &Args) -> Option<codediff::diff::text::RenderOption
     if !args.whole_updates && !args.paint_reindent_moves {
         return preset;
     }
-    let mut options = preset.unwrap_or_else(codediff::tui::theme::load_render_options);
+    let mut options = preset.unwrap_or_else(omnidiff::tui::theme::load_render_options);
     options.whole_pair_updates |= args.whole_updates;
     options.paint_reindent_only_moves |= args.paint_reindent_moves;
     Some(options)
 }
 
 /// The render options a headless or JSON run paints with.
-fn render_options(args: &Args) -> codediff::diff::text::RenderOptions {
-    render_option_flags(args).unwrap_or_else(codediff::tui::theme::load_render_options)
+fn render_options(args: &Args) -> omnidiff::diff::text::RenderOptions {
+    render_option_flags(args).unwrap_or_else(omnidiff::tui::theme::load_render_options)
 }
 
 /// Whether headless output should be ANSI-colored. `Auto` deliberately ignores whether stdout is a
@@ -344,7 +344,7 @@ fn run_util(action: &UtilAction) -> Result<()> {
     match action {
         UtilAction::Completions { shell } => {
             // Explicit bin name: clap would otherwise use the crate name, which need not match.
-            clap_complete::generate(*shell, &mut command, "codediff", &mut std::io::stdout());
+            clap_complete::generate(*shell, &mut command, "omnidiff", &mut std::io::stdout());
         }
         UtilAction::Man => {
             clap_mangen::Man::new(command).render(&mut std::io::stdout())?;
@@ -353,7 +353,7 @@ fn run_util(action: &UtilAction) -> Result<()> {
     Ok(())
 }
 
-/// Whether `error` is the reader having closed stdout (`codediff a b | head`, a pager quit early).
+/// Whether `error` is the reader having closed stdout (`omnidiff a b | head`, a pager quit early).
 /// That is the ordinary end of a run, not a failure to report.
 fn is_broken_pipe(error: &anyhow::Error) -> bool {
     error.chain().any(|cause| {
@@ -363,7 +363,7 @@ fn is_broken_pipe(error: &anyhow::Error) -> bool {
     })
 }
 
-/// Every failure exits [`EXIT_FAILURE`] with a `codediff: ...` line, whichever path raised it;
+/// Every failure exits [`EXIT_FAILURE`] with an `omnidiff: ...` line, whichever path raised it;
 /// clap's own usage errors already exit 2 on their own. The one exception is a broken pipe, which
 /// exits 0 without a word.
 #[tokio::main]
@@ -372,7 +372,7 @@ async fn main() {
         Ok(code) => code,
         Err(error) if is_broken_pipe(&error) => 0,
         Err(error) => {
-            eprintln!("codediff: {error:#}");
+            eprintln!("omnidiff: {error:#}");
             EXIT_FAILURE
         }
     };
@@ -406,7 +406,7 @@ async fn run() -> Result<i32> {
 
     if let Some((before, after)) = before_after.as_ref() {
         let either_is_binary =
-            codediff::code::is_binary_file(before)? || codediff::code::is_binary_file(after)?;
+            omnidiff::code::is_binary_file(before)? || omnidiff::code::is_binary_file(after)?;
         if either_is_binary {
             return run_binary(&args, before, after);
         }
@@ -560,13 +560,13 @@ mod tests {
         assert_eq!(render_option_flags(&args_with(Mode::Tui, false)), None);
 
         let config = tempfile::NamedTempFile::new().expect("temp config");
-        unsafe { std::env::set_var(codediff::tui::theme::CONFIG_ENV, config.path()) };
-        codediff::tui::theme::save_render_options(codediff::diff::text::RenderOptions {
+        unsafe { std::env::set_var(omnidiff::tui::theme::CONFIG_ENV, config.path()) };
+        omnidiff::tui::theme::save_render_options(omnidiff::diff::text::RenderOptions {
             whole_pair_updates: true,
-            ..codediff::diff::text::RenderOptions::FULL
+            ..omnidiff::diff::text::RenderOptions::FULL
         });
         let options = render_options(&args_with(Mode::Headless, false));
-        unsafe { std::env::remove_var(codediff::tui::theme::CONFIG_ENV) };
+        unsafe { std::env::remove_var(omnidiff::tui::theme::CONFIG_ENV) };
 
         assert!(options.whole_pair_updates);
     }
@@ -576,14 +576,14 @@ mod tests {
     #[test]
     fn contradictory_mode_flags_are_rejected() {
         for argv in [
-            &["codediff", "--review", "a.rs", "b.rs"][..],
-            &["codediff", "--review", "--mode", "json"],
-            &["codediff", "--headless", "--mode", "json"],
+            &["omnidiff", "--review", "a.rs", "b.rs"][..],
+            &["omnidiff", "--review", "--mode", "json"],
+            &["omnidiff", "--headless", "--mode", "json"],
         ] {
             assert!(Args::try_parse_from(argv).is_err(), "{argv:?} was accepted");
         }
-        assert!(Args::try_parse_from(["codediff", "--headless", "a.rs", "b.rs"]).is_ok());
-        assert!(Args::try_parse_from(["codediff", "--review"]).is_ok());
+        assert!(Args::try_parse_from(["omnidiff", "--headless", "a.rs", "b.rs"]).is_ok());
+        assert!(Args::try_parse_from(["omnidiff", "--review"]).is_ok());
     }
 
     #[test]
@@ -626,10 +626,10 @@ mod tests {
     #[test]
     fn color_flag_parses_all_three_choices_and_defaults_to_auto() {
         for (argv, expected) in [
-            (vec!["codediff"], ColorChoice::Auto),
-            (vec!["codediff", "--color", "always"], ColorChoice::Always),
-            (vec!["codediff", "--color", "never"], ColorChoice::Never),
-            (vec!["codediff", "--color", "auto"], ColorChoice::Auto),
+            (vec!["omnidiff"], ColorChoice::Auto),
+            (vec!["omnidiff", "--color", "always"], ColorChoice::Always),
+            (vec!["omnidiff", "--color", "never"], ColorChoice::Never),
+            (vec!["omnidiff", "--color", "auto"], ColorChoice::Auto),
         ] {
             let args = Args::try_parse_from(argv.clone())
                 .unwrap_or_else(|e| panic!("{argv:?} should parse: {e}"));
@@ -640,11 +640,11 @@ mod tests {
     #[test]
     fn context_flag_defaults_to_the_headless_default_and_accepts_overrides() {
         assert_eq!(
-            Args::try_parse_from(["codediff"]).unwrap().context,
+            Args::try_parse_from(["omnidiff"]).unwrap().context,
             tui::headless::CONTEXT_LINES
         );
         assert_eq!(
-            Args::try_parse_from(["codediff", "--context", "0"])
+            Args::try_parse_from(["omnidiff", "--context", "0"])
                 .unwrap()
                 .context,
             0
@@ -663,11 +663,11 @@ mod tests {
             ("json", Mode::Json),
             ("JSON", Mode::Json),
         ] {
-            let args = Args::try_parse_from(["codediff", "--mode", value]).unwrap();
+            let args = Args::try_parse_from(["omnidiff", "--mode", value]).unwrap();
             assert_eq!(args.mode, expected, "--mode {value}");
         }
-        assert!(Args::try_parse_from(["codediff", "--mode", "bogus"]).is_err());
-        assert!(Args::try_parse_from(["codediff", "--exact"]).is_err());
+        assert!(Args::try_parse_from(["omnidiff", "--mode", "bogus"]).is_err());
+        assert!(Args::try_parse_from(["omnidiff", "--exact"]).is_err());
     }
 
     /// `Duration::from_secs_f64(1.0 / rate)` panics on these; they are argument errors instead.
@@ -675,15 +675,15 @@ mod tests {
     fn tui_rates_reject_zero_negative_and_non_numbers() {
         for value in ["0", "-1", "nan", "inf", "fast"] {
             assert!(
-                Args::try_parse_from(["codediff", "--tui-tick-rate", value]).is_err(),
+                Args::try_parse_from(["omnidiff", "--tui-tick-rate", value]).is_err(),
                 "--tui-tick-rate {value}"
             );
             assert!(
-                Args::try_parse_from(["codediff", "--tui-frame-rate", value]).is_err(),
+                Args::try_parse_from(["omnidiff", "--tui-frame-rate", value]).is_err(),
                 "--tui-frame-rate {value}"
             );
         }
-        let args = Args::try_parse_from(["codediff", "--tui-tick-rate", "2.5"]).unwrap();
+        let args = Args::try_parse_from(["omnidiff", "--tui-tick-rate", "2.5"]).unwrap();
         assert_eq!(args.tui_tick_rate, 2.5);
     }
 
@@ -798,9 +798,9 @@ mod tests {
 
     #[test]
     fn exit_code_flag_defaults_to_off_and_parses() {
-        assert!(!Args::try_parse_from(["codediff"]).unwrap().exit_code);
+        assert!(!Args::try_parse_from(["omnidiff"]).unwrap().exit_code);
         assert!(
-            Args::try_parse_from(["codediff", "--exit-code"])
+            Args::try_parse_from(["omnidiff", "--exit-code"])
                 .unwrap()
                 .exit_code
         );
@@ -808,7 +808,7 @@ mod tests {
 
     #[test]
     fn git_configure_parses_as_a_subcommand() {
-        let args = Args::try_parse_from(["codediff", "git", "configure"]).unwrap();
+        let args = Args::try_parse_from(["omnidiff", "git", "configure"]).unwrap();
         assert!(matches!(
             args.command,
             Some(Command::Git {
@@ -820,7 +820,7 @@ mod tests {
 
     #[test]
     fn two_paths_still_parse_as_paths_not_a_subcommand() {
-        let args = Args::try_parse_from(["codediff", "a.rs", "b.rs"]).unwrap();
+        let args = Args::try_parse_from(["omnidiff", "a.rs", "b.rs"]).unwrap();
         assert!(args.command.is_none());
         assert_eq!(
             args.paths,
@@ -831,7 +831,7 @@ mod tests {
     /// The `packaging/` recipes call these, so a rename breaks them silently.
     #[test]
     fn util_generates_completions_and_a_man_page() {
-        let args = Args::try_parse_from(["codediff", "util", "completions", "bash"]).unwrap();
+        let args = Args::try_parse_from(["omnidiff", "util", "completions", "bash"]).unwrap();
         assert!(matches!(
             args.command,
             Some(Command::Util {
@@ -841,7 +841,7 @@ mod tests {
             })
         ));
 
-        let args = Args::try_parse_from(["codediff", "util", "man"]).unwrap();
+        let args = Args::try_parse_from(["omnidiff", "util", "man"]).unwrap();
         assert!(matches!(
             args.command,
             Some(Command::Util {
@@ -851,7 +851,7 @@ mod tests {
     }
 
     #[test]
-    fn the_help_text_describes_codediff_rather_than_a_doc_comment() {
+    fn the_help_text_describes_omnidiff_rather_than_a_doc_comment() {
         use clap::CommandFactory;
 
         let about = Args::command().get_about().unwrap().to_string();
@@ -867,7 +867,7 @@ mod tests {
 
     #[test]
     fn no_args_still_opens_empty_viewer() {
-        let args = Args::try_parse_from(["codediff"]).unwrap();
+        let args = Args::try_parse_from(["omnidiff"]).unwrap();
         assert!(args.command.is_none());
         assert!(args.paths.is_empty());
     }
@@ -889,7 +889,7 @@ mod tests {
 
     #[test]
     fn batch_flag_is_a_clap_alias_for_headless() {
-        let args = Args::try_parse_from(["codediff", "--batch"]).expect("--batch should parse");
+        let args = Args::try_parse_from(["omnidiff", "--batch"]).expect("--batch should parse");
         assert!(
             args.headless,
             "--batch should set the same field as --headless"

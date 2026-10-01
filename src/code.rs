@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -483,7 +483,7 @@ mod tests {
             .as_ref()
             .expect("Language should be set");
 
-        let ts_language = crate::code::language::to_treesitter(language).expect("Unable to convert CodeDiff language to TreeSitter language in tests. Something is wrong with the test infrastructure.");
+        let ts_language = crate::code::language::to_treesitter(language).expect("Unable to convert OmniDiff language to TreeSitter language in tests. Something is wrong with the test infrastructure.");
 
         let mut parser = tree_sitter::Parser::new();
         parser.set_language(&ts_language)?;

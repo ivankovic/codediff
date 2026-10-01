@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -24,7 +24,7 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 #[test]
 fn mapping() -> Result<()> {
     // Includes the invariant-18 pairing of `0` with `keyboard` across
-    // `assignment_expression.right`, which codediff still deletes (`APTED("qualified_name")`).
+    // `assignment_expression.right`, which omnidiff still deletes (`APTED("qualified_name")`).
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "c-genymobile-scrcpy-big-change",
         101,

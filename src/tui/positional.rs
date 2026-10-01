@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -15,7 +15,7 @@
  *  You should have received a copy of the GNU Affero General Public License
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-//! The positional-argument conventions `codediff` accepts, and the notice it prints for a binary
+//! The positional-argument conventions `omnidiff` accepts, and the notice it prints for a binary
 //! pair. The tests live in `main.rs`, next to the CLI behaviour they also exercise.
 
 use std::path::{Path, PathBuf};

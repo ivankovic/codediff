@@ -1,4 +1,4 @@
-#  This file is part of the CodeDiff code diffing tool.
+#  This file is part of the OmniDiff code diffing tool.
 #
 #  Copyright (C) 2026 Marko Ivankovic
 #
@@ -136,11 +136,11 @@ def write_paper_fragment(rows: list[dict], output_path: Path) -> None:
     A fragment merged into plots/variables.tex by analysis/paper_variables.py, same contract as
     apted_only_report.py and benchmark_other_report.py. Regenerate with `make shapes-report`.
 
-    Per shape: how many fixtures contain it, and what fraction of those CodeDiff maps with zero
+    Per shape: how many fixtures contain it, and what fraction of those OmniDiff maps with zero
     mismatches. The second number is the point - prevalence alone cannot say whether a shape needs
     a dedicated heuristic, and the ablation alone cannot say which shapes are going unserved.
 
-    `current_mismatches` is the CSV's own record of CodeDiff's result on that fixture, so this file
+    `current_mismatches` is the CSV's own record of OmniDiff's result on that fixture, so this file
     and data/quality/optimal_solutions_benchmark.csv must come from the same corpus state. Both are
     written by their producers against src/test/data/diffs/, so re-run both after adding fixtures.
     """

@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -41,14 +41,14 @@ pub(crate) struct FrameState<'a> {
     /// header. Kept here because counting walks every node, not just the visible ones.
     pub(crate) before_unmarked: usize,
     pub(crate) after_unmarked: usize,
-    /// How many nodes in `before_flat`/`after_flat` codediff disagrees with the human on
+    /// How many nodes in `before_flat`/`after_flat` omnidiff disagrees with the human on
     /// (`algo_disagrees`, the `*` rows `n`/`N` visit), for the same header; `None` until
-    /// codediff's diff has arrived. Here for the same reason as the unmarked counts.
+    /// omnidiff's diff has arrived. Here for the same reason as the unmarked counts.
     pub(crate) before_mismatches: Option<usize>,
     pub(crate) after_mismatches: Option<usize>,
 }
 
-/// How many nodes of `flat` draw a `*`: the human has marked them and codediff says otherwise.
+/// How many nodes of `flat` draw a `*`: the human has marked them and omnidiff says otherwise.
 pub(crate) fn count_mismatches(
     flat: &[(Node, usize)],
     caches: &Caches,
@@ -161,7 +161,7 @@ pub(crate) fn run_event_loop(
     before: Code,
     after: Code,
 ) -> Result<()> {
-    // `Arc`, not owned: the background codediff run (`start_algo_diff`) must diff these very
+    // `Arc`, not owned: the background omnidiff run (`start_algo_diff`) must diff these very
     // trees, since `ASTDiff` is keyed by node id and a re-parse would number the nodes afresh.
     let mut before = Arc::new(before);
     let mut after = Arc::new(after);
@@ -450,7 +450,7 @@ pub(crate) fn history_key(
     }
 }
 
-/// Runs codediff on `before`/`after` on a background thread; `poll_algo_diff` collects the
+/// Runs omnidiff on `before`/`after` on a background thread; `poll_algo_diff` collects the
 /// result. The `Arc`s keep the trees alive for the thread, and the thread diffs the same trees
 /// the panels show, so the node ids in its `ASTDiff` are the panels' ids.
 pub(crate) fn start_algo_diff(app: &mut App, before: &Arc<Code>, after: &Arc<Code>) {
@@ -476,12 +476,12 @@ pub(crate) fn poll_algo_diff(app: &mut App) -> bool {
             app.algo_diff_pending = None;
             app.status = Some(match &ast_diff {
                 Some(ast_diff) => format!(
-                    "codediff ran: {} before-node(s), {} after-node(s) mapped; n/N jump to \
+                    "omnidiff ran: {} before-node(s), {} after-node(s) mapped; n/N jump to \
                      where you disagree",
                     ast_diff.before_node_map.len(),
                     ast_diff.after_node_map.len()
                 ),
-                None => "codediff produced no AST diff".to_string(),
+                None => "omnidiff produced no AST diff".to_string(),
             });
             app.algo_diff = ast_diff;
             true
@@ -489,7 +489,7 @@ pub(crate) fn poll_algo_diff(app: &mut App) -> bool {
         Err(std::sync::mpsc::TryRecvError::Empty) => false,
         Err(std::sync::mpsc::TryRecvError::Disconnected) => {
             app.algo_diff_pending = None;
-            app.status = Some("codediff's background run failed; p re-runs it".to_string());
+            app.status = Some("omnidiff's background run failed; p re-runs it".to_string());
             false
         }
     }
@@ -504,7 +504,7 @@ pub(crate) fn run_case_session(
     before: &Arc<Code>,
     after: &Arc<Code>,
 ) -> Result<SessionEnd> {
-    // codediff's verdicts (`*`, `n`/`N`, the header count) are wanted from the first frame, and
+    // omnidiff's verdicts (`*`, `n`/`N`, the header count) are wanted from the first frame, and
     // the run takes up to a second on a large fixture, so it starts now and lands via
     // `poll_algo_diff` while the human reads.
     if app.algo_diff.is_none() && app.algo_diff_pending.is_none() {
@@ -1206,14 +1206,14 @@ pub(crate) fn handle_tree_independent_key(
             app.status = Some(match diff.ast {
                 Some(ast_diff) => {
                     let msg = format!(
-                        "Ran codediff: {} before-node(s), {} after-node(s) mapped",
+                        "Ran omnidiff: {} before-node(s), {} after-node(s) mapped",
                         ast_diff.before_node_map.len(),
                         ast_diff.after_node_map.len()
                     );
                     app.algo_diff = Some(ast_diff);
                     msg
                 }
-                None => "codediff produced no AST diff".to_string(),
+                None => "omnidiff produced no AST diff".to_string(),
             });
             None
         }
@@ -2103,7 +2103,7 @@ pub(crate) fn action_save(
 pub(crate) fn describe_measurement(measurement: &SaveMeasurement) -> String {
     let mut parts = Vec::new();
     if let Some((total, visible)) = measurement.mismatches {
-        parts.push(format!("codediff: {total} mismatch(es), {visible} visible"));
+        parts.push(format!("omnidiff: {total} mismatch(es), {visible} visible"));
     }
     if let Some(percent) = measurement.painting_percent {
         parts.push(format!("painting {}%", format_percent(percent)));
@@ -2875,14 +2875,14 @@ fn handle_text_view(
         }
         // Unlike `a`, aligns this side's *tree* panel with the text cursor.
         KeyCode::Char('A') => action_paint_reveal_node(app, &state, before, after),
-        // Adopts codediff's rendering (what `o` shows) as the draft to correct.
-        KeyCode::Char('P') => action_paint_seed_from_codediff(app, before, after),
+        // Adopts omnidiff's rendering (what `o` shows) as the draft to correct.
+        KeyCode::Char('P') => action_paint_seed_from_omnidiff(app, before, after),
         KeyCode::Char('o') => {
             let next = app.text_overlay.next();
-            // Lazy, and kept for the case: running codediff is slow on a large fixture.
+            // Lazy, and kept for the case: running omnidiff is slow on a large fixture.
             if next != TextOverlay::Human && app.algo_text_spans.is_none() {
                 app.algo_text_spans =
-                    Some(codediff_text_spans(before, after, app.algo_diff.as_ref()));
+                    Some(omnidiff_text_spans(before, after, app.algo_diff.as_ref()));
             }
             app.text_overlay = next;
             let human_spans_for_status = || {
@@ -2893,7 +2893,7 @@ fn handle_text_view(
             };
             app.status = Some(match next {
                 TextOverlay::Human => "Showing your painting".to_string(),
-                TextOverlay::CodeDiff => "Showing codediff's own diff".to_string(),
+                TextOverlay::OmniDiff => "Showing omnidiff's own diff".to_string(),
                 TextOverlay::Disagreements => {
                     let differing: usize = app
                         .algo_text_spans
@@ -2911,7 +2911,7 @@ fn handle_text_view(
                         })
                         .unwrap_or(0);
                     if differing == 0 {
-                        "You and codediff agree everywhere".to_string()
+                        "You and omnidiff agree everywhere".to_string()
                     } else {
                         format!("Showing {differing} disagreeing range(s)")
                     }

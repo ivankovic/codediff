@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -21,8 +21,8 @@
 //! a human promotes it from `human_solver`.
 //!
 //! Each fixture also gets a `source.json` (its `sample.csv` row, which `human_solver` reads back
-//! on promotion) and a `README.md` (see `codediff::stats::license`) recording provenance and the
-//! license the content is actually under: it is someone else's code, not covered by codediff's
+//! on promotion) and a `README.md` (see `omnidiff::stats::license`) recording provenance and the
+//! license the content is actually under: it is someone else's code, not covered by omnidiff's
 //! AGPL-3.0.
 //!
 //! Safe to re-run: byte-identical content is left alone and a missing README.md is backfilled.
@@ -33,7 +33,7 @@ use serde::Serialize;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use codediff::stats::license;
+use omnidiff::stats::license;
 
 const DEFAULT_REPO_ROOTS: &[&str] = &[
     "/var/tmp/research/tiny/repositories",
@@ -205,7 +205,7 @@ fn find_repo_path(roots: &[PathBuf], repository: &str) -> Option<PathBuf> {
 }
 
 fn blob_text(repo: &Repository, tree: &Tree, path: &Path) -> Result<String> {
-    Ok(String::from_utf8(codediff::stats::git::blob_bytes(
+    Ok(String::from_utf8(omnidiff::stats::git::blob_bytes(
         repo, tree, path,
     )?)?)
 }
@@ -380,8 +380,8 @@ fn materialize_row(row: &Row, repo_roots: &[PathBuf], output_dir: &Path) -> Resu
 #[cfg(test)]
 mod tests {
     use super::*;
-    use codediff::test::helper;
     use git2::Sort;
+    use omnidiff::test::helper;
     use tempfile::tempdir;
 
     /// Finds the first single-parent commit in `repo_path` and the path of a file it modified.

@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -21,7 +21,7 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // A 2:3 multi-map group expects two realized pairs; codediff matches one.
+    // A 2:3 multi-map group expects two realized pairs; omnidiff matches one.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "vimscript-junegunn-fzf-condition-canges",
         1,

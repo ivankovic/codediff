@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -16,18 +16,18 @@
  *  along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-//! Scores codediff against every fixture in `src/test/data/diffs/` that has a
+//! Scores omnidiff against every fixture in `src/test/data/diffs/` that has a
 //! `human_mapping.json`, counting mismatched nodes; fixtures without one are reported as
 //! "unsolved". A mismatch count shows partial progress that the `fixtures` tests' pass/fail
 //! cannot.
 
 use anyhow::{Context, Result, bail};
 use clap::Parser;
-use codediff::code::Code;
-use codediff::diff::ASTMappingReason;
-use codediff::diff::cost::diff_cost;
-use codediff::test::helper;
-use codediff::test::helper::human_mapping;
+use omnidiff::code::Code;
+use omnidiff::diff::ASTMappingReason;
+use omnidiff::diff::cost::diff_cost;
+use omnidiff::test::helper;
+use omnidiff::test::helper::human_mapping;
 use std::collections::{BTreeMap, HashMap};
 use std::fs::File;
 
@@ -77,9 +77,9 @@ fn reason_column_label(reason: &ASTMappingReason) -> String {
 fn reason_counts_for(
     before: &Code,
     after: &Code,
-    config: &codediff::diff::HeuristicConfig,
+    config: &omnidiff::diff::HeuristicConfig,
 ) -> HashMap<String, usize> {
-    let diff = codediff::diff::diff_code_with_config(before, after, config);
+    let diff = omnidiff::diff::diff_code_with_config(before, after, config);
     let mut counts = HashMap::new();
     if let Some(diff_ast) = diff.ast {
         for mapping in diff_ast.mapping.values() {
@@ -120,37 +120,37 @@ fn active_reason_columns(rows: &[Row]) -> Vec<String> {
         .collect()
 }
 
-/// Total unit-cost (`diff_cost`) of codediff's own mapping.
+/// Total unit-cost (`diff_cost`) of omnidiff's own mapping.
 fn algorithm_cost_for(
     before: &Code,
     after: &Code,
-    config: &codediff::diff::HeuristicConfig,
+    config: &omnidiff::diff::HeuristicConfig,
 ) -> u64 {
-    let diff = codediff::diff::diff_code_with_config(before, after, config);
+    let diff = omnidiff::diff::diff_code_with_config(before, after, config);
     let Some(diff_ast) = diff.ast else {
         return 0;
     };
-    let before_metadata = codediff::code::metadata::metadata_of(before);
-    let after_metadata = codediff::code::metadata::metadata_of(after);
+    let before_metadata = omnidiff::code::metadata::metadata_of(before);
+    let after_metadata = omnidiff::code::metadata::metadata_of(after);
     diff_cost(&diff_ast, &before_metadata, &after_metadata)
 }
 
 /// Wall-clock milliseconds for one diff, single-shot. Each of this file's measurements runs its
 /// own diff; a benchmark run once by hand does not warrant sharing one.
-fn elapsed_ms_for(before: &Code, after: &Code, config: &codediff::diff::HeuristicConfig) -> f64 {
+fn elapsed_ms_for(before: &Code, after: &Code, config: &omnidiff::diff::HeuristicConfig) -> f64 {
     let started = std::time::Instant::now();
-    let _diff = codediff::diff::diff_code_with_config(before, after, config);
+    let _diff = omnidiff::diff::diff_code_with_config(before, after, config);
     started.elapsed().as_secs_f64() * 1000.0
 }
 
 #[derive(Parser)]
 struct Args {
-    /// Print every mismatch for this fixture, with codediff's operation and reason, instead of the
+    /// Print every mismatch for this fixture, with omnidiff's operation and reason, instead of the
     /// table.
     #[arg(long)]
     details: Option<String>,
 
-    /// Print codediff's complete mapping for this fixture (paths, operation, reason) instead of the
+    /// Print omnidiff's complete mapping for this fixture (paths, operation, reason) instead of the
     /// table.
     #[arg(long)]
     dump: Option<String>,
@@ -198,8 +198,8 @@ struct Args {
 }
 
 /// Resolves the `--solver-X`/`--no-solver-X` pairs; `overrides_with` makes the last flag win.
-fn config_from_args(args: &Args) -> codediff::diff::HeuristicConfig {
-    codediff::diff::HeuristicConfig {
+fn config_from_args(args: &Args) -> omnidiff::diff::HeuristicConfig {
+    omnidiff::diff::HeuristicConfig {
         solver_moved_subtrees: args.solver_moved_subtrees && !args.no_solver_moved_subtrees,
         solver_bottom_up_propagation: args.solver_bottom_up_propagation
             && !args.no_solver_bottom_up_propagation,
@@ -235,17 +235,17 @@ struct Row {
     nm_floor: Option<human_mapping::NmFloor>,
 }
 
-/// Prints every mapping codediff produces for one fixture, with human-readable paths, sorted by
+/// Prints every mapping omnidiff produces for one fixture, with human-readable paths, sorted by
 /// the before path (inserts, having none, sort last).
-fn dump_mapping(name: &str, config: &codediff::diff::HeuristicConfig) -> Result<()> {
-    use codediff::test::helper::path_for_node;
+fn dump_mapping(name: &str, config: &omnidiff::diff::HeuristicConfig) -> Result<()> {
+    use omnidiff::test::helper::path_for_node;
 
     // Borrowed, not cloned: `Code`'s `Clone` drops `ast_metadata`, which makes every
     // `metadata_of` recompute.
     let pair = helper::handmade_test_code_pair(name)?;
     let (before, after) = (&pair.0, &pair.1);
 
-    let diff = codediff::diff::diff_code_with_config(before, after, config);
+    let diff = omnidiff::diff::diff_code_with_config(before, after, config);
     let ast = diff.ast.expect("diff has AST");
 
     let before_ast = before.ast.as_ref().expect("before parsed");

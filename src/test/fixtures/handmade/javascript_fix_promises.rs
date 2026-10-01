@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -22,7 +22,7 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // Three pairs inside multi-map groups where the human says `MatchButNotIdentical` and codediff
+    // Three pairs inside multi-map groups where the human says `MatchButNotIdentical` and omnidiff
     // `Identical`: the pair is byte-identical though the subtrees differ. Nothing visible.
     test::helper::human_mapping::assert_matches_human_mapping("javascript-fix-promises")
 }

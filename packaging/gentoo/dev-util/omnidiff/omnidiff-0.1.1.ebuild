@@ -340,9 +340,9 @@ RUST_MIN_VER="1.88.0"
 inherit bash-completion-r1 cargo
 
 DESCRIPTION="Fast, robust, syntax-aware code diffing using tree-sitter ASTs"
-HOMEPAGE="https://github.com/ivankovic/codediff"
+HOMEPAGE="https://github.com/ivankovic/omnidiff"
 SRC_URI="
-	https://github.com/ivankovic/codediff/archive/refs/tags/v${PV}.tar.gz -> ${P}.tar.gz
+	https://github.com/ivankovic/omnidiff/archive/refs/tags/v${PV}.tar.gz -> ${P}.tar.gz
 	${CARGO_CRATE_URIS}
 "
 
@@ -364,7 +364,7 @@ KEYWORDS="~amd64 ~arm64"
 # they are not part of the shipped product, so there is no USE flag for them.
 
 # `lto = "fat"` plus `codegen-units = 1` in the release profile (see Cargo.toml) makes this a slow
-# single-threaded link. That is deliberate upstream - codediff is CPU-bound at run time - but it is
+# single-threaded link. That is deliberate upstream - omnidiff is CPU-bound at run time - but it is
 # worth knowing before reporting the build as hung.
 
 src_test() {
@@ -384,18 +384,18 @@ src_install() {
 	# Hardcoded rather than $(usex debug ...): that idiom needs a `debug` USE flag in IUSE, and
 	# this package deliberately offers no debug build - the release profile's lto/codegen-units
 	# settings are the point of it (see Cargo.toml).
-	local codediff="${S}/target/release/codediff"
-	"${codediff}" util man > "${T}/${PN}.1" || die "failed to generate man page"
+	local omnidiff="${S}/target/release/omnidiff"
+	"${omnidiff}" util man > "${T}/${PN}.1" || die "failed to generate man page"
 	doman "${T}/${PN}.1"
 
-	"${codediff}" util completions bash > "${T}/${PN}.bash" || die
+	"${omnidiff}" util completions bash > "${T}/${PN}.bash" || die
 	newbashcomp "${T}/${PN}.bash" "${PN}"
 
-	"${codediff}" util completions zsh > "${T}/_${PN}" || die
+	"${omnidiff}" util completions zsh > "${T}/_${PN}" || die
 	insinto /usr/share/zsh/site-functions
 	doins "${T}/_${PN}"
 
-	"${codediff}" util completions fish > "${T}/${PN}.fish" || die
+	"${omnidiff}" util completions fish > "${T}/${PN}.fish" || die
 	insinto /usr/share/fish/vendor_completions.d
 	doins "${T}/${PN}.fish"
 
@@ -403,6 +403,6 @@ src_install() {
 }
 
 pkg_postinst() {
-	elog "Configure codediff as git's diff tool with:  codediff git configure"
-	elog "Configure codediff as jj's diff tool with:   codediff jj configure"
+	elog "Configure omnidiff as git's diff tool with:  omnidiff git configure"
+	elog "Configure omnidiff as jj's diff tool with:   omnidiff jj configure"
 }

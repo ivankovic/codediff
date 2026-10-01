@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 #
-#  This file is part of the CodeDiff code diffing tool.
+#  This file is part of the OmniDiff code diffing tool.
 #
 #  Copyright (C) 2026 Marko Ivankovic
 #
@@ -45,11 +45,11 @@ Run it as its own systemd unit, with every test in its own memory-capped scope -
 `research/measure/overnight_benchmarks.sh` for why (an OOM inside the shell's scope takes down the
 whole session):
 
-  systemd-run --user --unit codediff-per-test-coverage --collect --same-dir \\
+  systemd-run --user --unit omnidiff-per-test-coverage --collect --same-dir \\
     --setenv=PATH="$PATH" ./measure/per_test_coverage.py --binary <instrumented test binary> \\
     --out data/coverage/per_test
 
-  systemctl --user stop codediff-per-test-coverage codediff-per-test-coverage.slice
+  systemctl --user stop omnidiff-per-test-coverage omnidiff-per-test-coverage.slice
 
 The instrumented binary comes from `cargo llvm-cov show-env`; `make measure-per-test-coverage` in
 research/Makefile builds it and starts the unit.
@@ -70,7 +70,7 @@ import time
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
-SLICE = "codediff-per-test-coverage.slice"
+SLICE = "omnidiff-per-test-coverage.slice"
 
 # Everything outside this repository's own source, plus the fixture stubs (see the docstring).
 IGNORE = r"(/\.cargo/|/rustc/|/target/|/src/test/fixtures/)"

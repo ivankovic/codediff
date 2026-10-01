@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-#  This file is part of the CodeDiff code diffing tool.
+#  This file is part of the OmniDiff code diffing tool.
 #
 #  Copyright (C) 2025 Marko Ivankovic
 #

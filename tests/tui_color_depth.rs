@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -42,7 +42,7 @@ const FRAME_DRAWN: &str = "q:quit";
 /// Long enough for a debug build to diff the fixture, short enough that a hang fails the test.
 const TIMEOUT: Duration = Duration::from_secs(60);
 
-/// Everything codediff writes to a pseudo-terminal while showing the README's example diff, with
+/// Everything omnidiff writes to a pseudo-terminal while showing the README's example diff, with
 /// the environment cleared down to `TERM`, `COLORTERM` if given, and what keeps it off the real
 /// config. Quits with `q` once the first frame is out.
 fn run_viewer(term: &str, colorterm: Option<&str>) -> String {
@@ -51,20 +51,20 @@ fn run_viewer(term: &str, colorterm: Option<&str>) -> String {
     let home = tempfile::tempdir().expect("temp dir");
 
     let mut command = Command::new("script");
-    // -q: no "Script started" banner, -f: flush every write, -e: exit with codediff's status,
+    // -q: no "Script started" banner, -f: flush every write, -e: exit with omnidiff's status,
     // -c: the command. The typescript file is not needed; `script` copies the output to stdout.
     command
         .args([
             "-qfec",
-            r#"stty cols 230 rows 30; exec "$CODEDIFF" "$BEFORE" "$AFTER""#,
+            r#"stty cols 230 rows 30; exec "$OMNIDIFF" "$BEFORE" "$AFTER""#,
             "/dev/null",
         ])
         .env_clear()
         .env("PATH", std::env::var_os("PATH").unwrap_or_default())
         .env("HOME", home.path())
-        .env("CODEDIFF_CONFIG", home.path().join("config.toml"))
+        .env("OMNIDIFF_CONFIG", home.path().join("config.toml"))
         .env("TERM", term)
-        .env("CODEDIFF", env!("CARGO_BIN_EXE_codediff"))
+        .env("OMNIDIFF", env!("CARGO_BIN_EXE_omnidiff"))
         .env("BEFORE", fixture.join("before.py.test"))
         .env("AFTER", fixture.join("after.py.test"))
         .stdin(Stdio::piped())
@@ -95,12 +95,12 @@ fn run_viewer(term: &str, colorterm: Option<&str>) -> String {
         let remaining = deadline.saturating_duration_since(Instant::now());
         match chunks.recv_timeout(remaining) {
             Ok(chunk) => output.extend(chunk),
-            // The reader is done: codediff has exited and `script` with it.
+            // The reader is done: omnidiff has exited and `script` with it.
             Err(mpsc::RecvTimeoutError::Disconnected) => break,
             Err(mpsc::RecvTimeoutError::Timeout) => {
                 let _ = child.kill();
                 panic!(
-                    "no {} within {TIMEOUT:?}; codediff wrote:\n{}",
+                    "no {} within {TIMEOUT:?}; omnidiff wrote:\n{}",
                     if quit_sent {
                         "exit after q"
                     } else {
@@ -118,7 +118,7 @@ fn run_viewer(term: &str, colorterm: Option<&str>) -> String {
         }
     }
     let status = child.wait().expect("wait for script");
-    assert!(status.success(), "codediff exited with {status}");
+    assert!(status.success(), "omnidiff exited with {status}");
     String::from_utf8_lossy(&output).into_owned()
 }
 

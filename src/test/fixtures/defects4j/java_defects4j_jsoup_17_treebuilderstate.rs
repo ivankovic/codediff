@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -24,7 +24,7 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 #[test]
 fn mapping() -> Result<()> {
     // An argument changes lexical class in place (`hex_integer_literal` against
-    // `character_literal`); the human pairs it, codediff deletes and inserts. The shape of
+    // `character_literal`); the human pairs it, omnidiff deletes and inserts. The shape of
     // `cli-8-helpformatter`.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "java-defects4j-jsoup-17-treebuilderstate",

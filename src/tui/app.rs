@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -875,7 +875,7 @@ impl App {
         self.select_file_for_panel(Panel::After, after)
     }
 
-    /// Why a file cannot be shown, in the words `codediff a.pdf b.pdf` uses, or `None` when it
+    /// Why a file cannot be shown, in the words `omnidiff a.pdf b.pdf` uses, or `None` when it
     /// can. Checked before loading a panel, whose `read_to_string` UTF-8 error would otherwise
     /// take the whole TUI down.
     fn unshowable(path: &Path) -> Option<String> {
@@ -1300,7 +1300,7 @@ pub(crate) const FOOTER_HINTS: &str =
 
 /// The footer's render-options badge: `None` for `FULL`, `[minimal]`, or the options that differ
 /// from `FULL` by name. An option turned off leaves something unpainted, and the setting persists
-/// across runs, so without a badge missing highlights read as codediff having missed them.
+/// across runs, so without a badge missing highlights read as omnidiff having missed them.
 ///
 /// Compared against `FULL` rather than against "everything on": `FULL` has whole-pair updates
 /// off, so an "is it off" list names that option whenever anything else is off, and has nothing
@@ -1517,7 +1517,7 @@ pub const DIFF_COMPUTE_STACK_SIZE: usize = 256 * 1024 * 1024;
 
 /// The name of that thread, which the TUI's panic hook uses to tell a diff-computation panic
 /// (caught, shown in the error banner) from one that takes the app down.
-pub const DIFF_THREAD_NAME: &str = "codediff-diff";
+pub const DIFF_THREAD_NAME: &str = "omnidiff-diff";
 
 /// Parses, diffs and builds the display ranges, honouring `render_options`' construction-time
 /// options. The `bool` is `PendingDiff::large_residual`, always `false` for the plain-text
@@ -1878,7 +1878,7 @@ mod tests {
         );
         assert!(app.before_path.is_none());
 
-        let missing = std::env::temp_dir().join("codediff-no-such-file-ever.rs");
+        let missing = std::env::temp_dir().join("omnidiff-no-such-file-ever.rs");
         app.select_file_for_panel(Panel::After, missing)?;
         assert!(
             app.last_error
@@ -2344,7 +2344,7 @@ mod tests {
         Ok(())
     }
 
-    /// The saved theme would otherwise land in the developer's own config, so `$CODEDIFF_CONFIG`
+    /// The saved theme would otherwise land in the developer's own config, so `$OMNIDIFF_CONFIG`
     /// points at a temp file. Safe under nextest, which runs each test in its own process.
     #[test]
     fn apply_theme_selection_updates_viewer_and_returns_to_the_viewer_screen() {

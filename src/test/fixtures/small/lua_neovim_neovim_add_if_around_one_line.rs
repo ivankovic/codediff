@@ -1,4 +1,4 @@
-/*  This file is part of the CodeDiff code diffing tool.
+/*  This file is part of the OmniDiff code diffing tool.
  *
  *  Copyright (C) 2026 Marko Ivankovic
  *
@@ -21,7 +21,7 @@ use anyhow::Result;
 
 #[test]
 fn mapping() -> Result<()> {
-    // Cost-model optimal, not a bug. `assert(session):stop()` gets wrapped in a new `if`. codediff
+    // Cost-model optimal, not a bug. `assert(session):stop()` gets wrapped in a new `if`. omnidiff
     // matches the outer function-body `block` to the inner if-block (both holding just that call)
     // and inserts the wrapper: outer-to-outer would need the call's whole subtree deleted and
     // reinserted, since `expression_statement` vs `if_statement` cannot update. Tree edit
