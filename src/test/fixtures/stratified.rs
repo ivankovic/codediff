@@ -107,6 +107,8 @@ mod c_openssl_openssl_whitepsace_only;
 #[cfg(test)]
 mod c_openssl_openssl_whitespace_only;
 #[cfg(test)]
+mod c_openssl_openssl_whitespace_only_2;
+#[cfg(test)]
 mod c_postgres_postgres_change_ctrl_c_behaviour;
 #[cfg(test)]
 mod c_postgres_postgres_copyright;
@@ -283,6 +285,8 @@ mod csharp_lidarr_lidarr_add_import_and_func;
 #[cfg(test)]
 mod csharp_lidarr_lidarr_add_method_to_class;
 #[cfg(test)]
+mod csharp_lidarr_lidarr_add_two_params;
+#[cfg(test)]
 mod csharp_radarr_radarr_add_base_class;
 #[cfg(test)]
 mod csharp_radarr_radarr_add_func;
@@ -300,6 +304,8 @@ mod csharp_radarr_radarr_remove_import_and_func;
 mod csharp_sonarr_sonarr_add_attribute;
 #[cfg(test)]
 mod csharp_sonarr_sonarr_add_attribute_2;
+#[cfg(test)]
+mod csharp_sonarr_sonarr_add_field_definition;
 #[cfg(test)]
 mod csharp_sonarr_sonarr_add_func;
 #[cfg(test)]
@@ -397,9 +403,17 @@ mod go_jesseduffield_lazygit_change_undo_key;
 #[cfg(test)]
 mod go_junegunn_fzf_real_small_change;
 #[cfg(test)]
+mod go_kubernetes_kubernetes_add_element_to_return_slice;
+#[cfg(test)]
 mod go_ollama_ollama_add_go_build_comment;
 #[cfg(test)]
+mod go_ollama_ollama_delete_go_build_comment;
+#[cfg(test)]
 mod go_ollama_ollama_remove_go_build_comment;
+#[cfg(test)]
+mod go_prometheus_prometheus_nil_to_selector_expr;
+#[cfg(test)]
+mod go_prometheus_prometheus_one_update_in_a_huge_file;
 #[cfg(test)]
 mod go_prometheus_prometheus_remove_copyright_year;
 #[cfg(test)]
@@ -923,6 +937,8 @@ mod tsx_microsoft_typescript_libpath_to_lib;
 #[cfg(test)]
 mod tsx_mui_material_ui_add_attribute;
 #[cfg(test)]
+mod tsx_mui_material_ui_add_name_to_pair;
+#[cfg(test)]
 mod tsx_mui_material_ui_add_to_empty_block;
 #[cfg(test)]
 mod tsx_mui_material_ui_delete_only;
@@ -940,6 +956,8 @@ mod tsx_mui_material_ui_remove_import_4;
 mod tsx_mui_material_ui_remove_one_import;
 #[cfg(test)]
 mod tsx_shadcn_ui_ui_order_of_class_names;
+#[cfg(test)]
+mod tsx_shadcn_ui_ui_update_release_announcement;
 #[cfg(test)]
 mod typescript_microsoft_typescript_add_es_target;
 #[cfg(test)]
@@ -1021,6 +1039,8 @@ mod xml_jellyfin_jellyfin_update_attribute_values;
 #[cfg(test)]
 mod xml_libreoffice_add_one_menu_item;
 #[cfg(test)]
+mod xml_libreoffice_non_latin_string_data_update;
+#[cfg(test)]
 mod xml_libreoffice_unicode;
 #[cfg(test)]
 mod xml_microsoft_terminal_add_one_element;
@@ -1061,6 +1081,8 @@ mod yaml_ansible_ansible_rename_string_scalar;
 #[cfg(test)]
 mod yaml_ansible_ansible_version;
 #[cfg(test)]
+mod yaml_axios_axios_node_to_number;
+#[cfg(test)]
 mod yaml_gyulyvgc_sniffnet_version;
 #[cfg(test)]
 mod yaml_jekyll_jekyll_true_to_false;
@@ -1070,5 +1092,7 @@ mod yaml_mastodon_mastodon_delete_one_pair;
 mod yaml_mastodon_mastodon_remove_one_translation;
 #[cfg(test)]
 mod yaml_mastodon_mastodon_remove_translation;
+#[cfg(test)]
+mod yaml_mongodb_mongo_add_two_block_sequence_items;
 #[cfg(test)]
 mod yaml_puppeteer_puppeteer_false_to_true;

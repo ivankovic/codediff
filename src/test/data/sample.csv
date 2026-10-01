@@ -47,7 +47,7 @@ C,nginx-nginx.git,7677d5646aeb761b8b9da5af3eb10c008aae3f90,src/event/ngx_event_o
 C,nginx-nginx.git,90f1b5fd08e9aca01d568d6653da772980033e43,src/os/win32/ngx_win32_config.h,c-nginx-nginx-add-preproc-two-lines,stratified,PROMOTED,,100-300
 C,ollama-ollama.git,1a19df1f3a39481dfe686c8f1041f91531a04ada,llama/llama.cpp/common/json-schema-to-grammar.h,c-ollama-ollama-change-imports,stratified,PROMOTED,,10-30
 C,openssl-openssl.git,2ea6e785f526f88f913cc6f49372aae9dc54bc63,crypto/pkcs7/pk7_doit.c,c-openssl-openssl-big-multi-map-change,stratified,PROMOTED,,1000-3000
-C,openssl-openssl.git,2fab90bb5e1937f1c2125eab144f7f6c39e70087,crypto/pkcs12/p12_key.c,,stratified,SAMPLED,,100-300
+C,openssl-openssl.git,2fab90bb5e1937f1c2125eab144f7f6c39e70087,crypto/pkcs12/p12_key.c,c-openssl-openssl-whitespace-only-2,stratified,PROMOTED,,100-300
 C,openssl-openssl.git,2fab90bb5e1937f1c2125eab144f7f6c39e70087,crypto/ui/ui_null.c,c-openssl-openssl-whitepsace-only,stratified,PROMOTED,,10-30
 C,openssl-openssl.git,2fab90bb5e1937f1c2125eab144f7f6c39e70087,providers/common/der/der_rsa_sig.c,c-openssl-openssl-format-only-change,stratified,PROMOTED,,30-100
 C,openssl-openssl.git,2fab90bb5e1937f1c2125eab144f7f6c39e70087,providers/common/der/der_sm2_key.c,c-openssl-openssl-whitespace-only,stratified,PROMOTED,,10-30
@@ -286,7 +286,7 @@ CSharp,Lidarr-Lidarr.git,98a90e2f8f6860253cd8a85434502231c43470f0,src/NzbDrone.C
 CSharp,Lidarr-Lidarr.git,9fc66e9b985a1eabd05f324ac631dfac39d2aebc,src/NzbDrone.Core/MediaFiles/MediaFileService.cs,,stratified,SAMPLED,,100-300
 CSharp,Lidarr-Lidarr.git,a4af75b60cdc531c2280d994a1ef1141bb7c830e,src/Lidarr.Api.V1/Calendar/CalendarController.cs,csharp-lidarr-new-feature,small,PROMOTED,,
 CSharp,Lidarr-Lidarr.git,a52c6f6f41bff9b76a34085aca01a1a709bdf62d,src/NzbDrone.Core.Test/MusicTests/AlbumRepositoryTests/AlbumRepositoryFixture.cs,,stratified,SAMPLED,,100-300
-CSharp,Lidarr-Lidarr.git,aa65dadc4976c9b6d7f8e8920d52c4f85d60dfbb,src/Lidarr.Api.V1/ProviderResource.cs,,stratified,SAMPLED,,30-100
+CSharp,Lidarr-Lidarr.git,aa65dadc4976c9b6d7f8e8920d52c4f85d60dfbb,src/Lidarr.Api.V1/ProviderResource.cs,csharp-lidarr-lidarr-add-two-params,stratified,PROMOTED,,30-100
 CSharp,Lidarr-Lidarr.git,ea9b46e92208bb067a4aa97727bac46980fe2ade,src/NzbDrone.Core/MediaFiles/TrackImport/Aggregation/Aggregators/IAggregateLocalTrack.cs,csharp-lidarr-lidarr-add-method-to-class,stratified,PROMOTED,,0-10
 CSharp,Lidarr-Lidarr.git,fb75b28cb18b4a00db7fbd5fdae2266ac999cc30,src/NzbDrone.Core/HealthCheck/Checks/UpdateCheck.cs,csharp-lidarr-condition-change,small,PROMOTED,,
 CSharp,Radarr-Radarr.git,110a338fb6e5c2581ccdc1b29669368613f08d5c,src/NzbDrone.Core/ImportLists/TMDb/User/TMDbUserRequestGenerator.cs,,stratified,SAMPLED,,30-100
@@ -309,7 +309,7 @@ CSharp,Sonarr-Sonarr.git,2ac139ab4db930b53a55a9194565d21f95b2523b,src/NzbDrone.C
 CSharp,Sonarr-Sonarr.git,309b55fe38b83e9b6d429e2d9d9e7ef8db463516,src/NzbDrone.Core.Test/Languages/LanguageFixture.cs,,stratified,SAMPLED,,100-300
 CSharp,Sonarr-Sonarr.git,309b55fe38b83e9b6d429e2d9d9e7ef8db463516,src/NzbDrone.Core.Test/OrganizerTests/FileNameBuilderTests/FileNameBuilderFixture.cs,csharp-sonarr-sonarr-add-two-attributes,stratified,PROMOTED,,1000-3000
 CSharp,Sonarr-Sonarr.git,33139d4b53c1adad769c7e2b0510e8990c66b84a,src/NzbDrone.Core/Download/Clients/Deluge/Deluge.cs,,stratified,SAMPLED,,300-1000
-CSharp,Sonarr-Sonarr.git,36633b5d08c19158f185c0fa5faabbaec607fcb5,src/NzbDrone.Core/Notifications/Telegram/TelegramSettings.cs,,stratified,SAMPLED,,30-100
+CSharp,Sonarr-Sonarr.git,36633b5d08c19158f185c0fa5faabbaec607fcb5,src/NzbDrone.Core/Notifications/Telegram/TelegramSettings.cs,csharp-sonarr-sonarr-add-field-definition,stratified,PROMOTED,,30-100
 CSharp,Sonarr-Sonarr.git,4e14ce022c94369e7d119af3ae05e00ec29ccea1,src/Sonarr.Api.V3/CustomFormats/CustomFormatController.cs,,stratified,SAMPLED,,100-300
 CSharp,Sonarr-Sonarr.git,4fb89252b527b1a34cc0e1133a2acb765360fa13,src/NzbDrone.Core/Parser/Parser.cs,csharp-sonarr-sonarr-update-regex,stratified,PROMOTED,,1000-3000
 CSharp,Sonarr-Sonarr.git,572bdc979c1717a91e21d1c9a816371428392bfc,src/Sonarr.Api.V3/Profiles/Quality/QualityProfileResource.cs,,stratified,SAMPLED,,100-300
@@ -425,7 +425,7 @@ Go,kubernetes-kubernetes.git,24c1eb237d7a01421831d3cff668bf6fe04589ad,staging/sr
 Go,kubernetes-kubernetes.git,38f536c71349a1dd314713465395e2dd96fc4031,pkg/scheduler/schedule_one.go,,stratified,SAMPLED,,1000-3000
 Go,kubernetes-kubernetes.git,3f094dc228318b89f1fef313543b960e35ca6e3e,staging/src/k8s.io/kubectl/pkg/describe/describe.go,,stratified,SAMPLED,,3000+
 Go,kubernetes-kubernetes.git,4dacffe7934db571a4628a7ce80863169126a0d3,pkg/printers/internalversion/printers_test.go,,stratified,SAMPLED,,3000+
-Go,kubernetes-kubernetes.git,59c9f75133f22ed24e944cf0b8a1a68e1c49af32,pkg/apis/scheduling/fuzzer/fuzzer.go,,stratified,SAMPLED,,30-100
+Go,kubernetes-kubernetes.git,59c9f75133f22ed24e944cf0b8a1a68e1c49af32,pkg/apis/scheduling/fuzzer/fuzzer.go,go-kubernetes-kubernetes-add-element-to-return-slice,stratified,PROMOTED,,30-100
 Go,kubernetes-kubernetes.git,69167c14bd5a582823eec9c361c066780cfa01b0,pkg/kubelet/apis/pods/server_unit_test.go,go-kubernetes-kubernetes-add-unit-test-cases,small,PROMOTED,,
 Go,kubernetes-kubernetes.git,912bf9c4ef50c6cfdf15e6a9a75ab5c032644afb,pkg/scheduler/schedule_one.go,,stratified,SAMPLED,,1000-3000
 Go,kubernetes-kubernetes.git,d80f384b702e4c6630e6f46b2926ab5e45553c97,pkg/scheduler/framework/autoscaler_contract/lister_contract_test.go,,stratified,SAMPLED,,100-300
@@ -433,15 +433,15 @@ Go,nwg-piotr-gopsuinfo,79583337f5fce861adc6b34c3592f9211c96e4f3,gopsuinfo.go,go-
 Go,ollama-ollama.git,0cf7794b16fab8d4561bc5f6379f6d48bd59e101,ml/backend/ggml/ggml/src/ggml-cpu/arch/arm/arm.go,go-ollama-ollama-add-go-build-comment,stratified,PROMOTED,,0-10
 Go,ollama-ollama.git,0dabb4ef6a1aab240a59b6bb4ef82372d335e3a9,parser/parser.go,go-ollama-ollama-surround-block-with-if-and-function-call,small,PROMOTED,,
 Go,ollama-ollama.git,10e51c51771ea8536715876ee6707928712be41e,x/imagegen/mlx/doc.go,go-ollama-ollama-remove-go-build-comment,stratified,PROMOTED,,0-10
-Go,ollama-ollama.git,10e51c51771ea8536715876ee6707928712be41e,x/imagegen/models/zimage/scheduler.go,,stratified,SAMPLED,,100-300
+Go,ollama-ollama.git,10e51c51771ea8536715876ee6707928712be41e,x/imagegen/models/zimage/scheduler.go,go-ollama-ollama-delete-go-build-comment,stratified,PROMOTED,,100-300
 Go,ollama-ollama.git,45f216a9c7e65bd30ab0e2b1b9fdb7cb2ad9436d,ml/backend/ggml/ggml.go,,stratified,SAMPLED,,1000-3000
 Go,ollama-ollama.git,ad6f6a1d29f45a5c7266bcd7edb5671621e86810,llm/server.go,,stratified,SAMPLED,,1000-3000
 Go,ollama-ollama.git,bbbad97686205cfd897a9e4e931889a3598a0652,server/routes_debug_test.go,,stratified,SAMPLED,,300-1000
 Go,ollama-ollama.git,d0cf6c82811c2268a396888347ff95087a618d56,openai/openai.go,,stratified,SAMPLED,,1000-3000
 Go,ollama-ollama.git,d3450dd52efcbca0348e9e8ac42fad6263ec9f91,api/types_test.go,,stratified,SAMPLED,,300-1000
 Go,prometheus-node_exporter,55756f07a17881fc73c680c8332c1e7770869906,collector/textfile.go,go-prometheus-node_exporter-remove-one-comment,full,PROMOTED,,
-Go,prometheus-prometheus.git,026d284c43ada6968ecc243c703aef5b9d9a47e4,cmd/promtool/main.go,,stratified,SAMPLED,,1000-3000
-Go,prometheus-prometheus.git,5e5b14c04b52d3d6f293d95897177a50dbb872b3,tsdb/head_test.go,,stratified,SAMPLED,,3000+
+Go,prometheus-prometheus.git,026d284c43ada6968ecc243c703aef5b9d9a47e4,cmd/promtool/main.go,go-prometheus-prometheus-nil-to-selector-expr,stratified,PROMOTED,,1000-3000
+Go,prometheus-prometheus.git,5e5b14c04b52d3d6f293d95897177a50dbb872b3,tsdb/head_test.go,go-prometheus-prometheus-one-update-in-a-huge-file,stratified,PROMOTED,,3000+
 Go,prometheus-prometheus.git,a919e6d5ef9f058cb7a2b1ed83f13f85c8cb147f,model/labels/regexp.go,,stratified,SAMPLED,,1000-3000
 Go,prometheus-prometheus.git,e14795bbf4fbd1837a9e3428aafb40b4b1dda99d,tsdb/chunks/head_chunks_other.go,go-prometheus-prometheus-remove-copyright-year,stratified,PROMOTED,,10-30
 Go,prometheus-prometheus.git,e14795bbf4fbd1837a9e3428aafb40b4b1dda99d,tsdb/tsdbutil/dir_locker_test.go,go-prometheus-single-comment-change,small,PROMOTED,,
@@ -1601,11 +1601,11 @@ TSX,mui-material-ui.git,6c9e82f975fe9b59815e435094408d8195bbd723,packages/mui-ma
 TSX,mui-material-ui.git,6c9e82f975fe9b59815e435094408d8195bbd723,packages/mui-material/src/Step/Step.spec.tsx,tsx-mui-material-ui-remove-import-4,stratified,PROMOTED,,0-10
 TSX,mui-material-ui.git,8663368c5472de8076993763fa0a52f9ce55fa5d,docs/src/pages/premium-themes/onepirate/modules/views/ProductCategories.tsx,tsx-mui-material-ui-move-colour-to-a-new-attribute,small,PROMOTED,,
 TSX,mui-material-ui.git,a9dab8b74470469e2e0ea46e63aee444bce333eb,packages/mui-joy/src/ModalClose/ModalClose.test.tsx,,stratified,SAMPLED,,100-300
-TSX,mui-material-ui.git,dd57ab76a75f10bfe1d228b80119c03e6643a52a,docs/data/material/components/checkboxes/ControlledCheckbox.tsx,,stratified,SAMPLED,,10-30
+TSX,mui-material-ui.git,dd57ab76a75f10bfe1d228b80119c03e6643a52a,docs/data/material/components/checkboxes/ControlledCheckbox.tsx,tsx-mui-material-ui-add-name-to-pair,stratified,PROMOTED,,10-30
 TSX,mui-material-ui.git,f74d47121cca8b41ea1d8fc636c4c17ab8c89a0c,docs/src/components/customers/CustomersCTA.tsx,tsx-mui-material-ui-move-import,stratified,PROMOTED,,10-30
 TSX,popcorn-official-popcorn-desktop,108e30a11c47fb6bbf3f392349dd37fc3d1dc8dd,apps/desktop/src/routes/splash.test.tsx,tsx-popcorn-official-popcorn-desktop-simple-property-rename,full,PROMOTED,,
 TSX,rektdeckard-departure-mono,f9fd64ba50743f0e3a95b6bef1f8f77bfe4b3630,src/components/cockpit.tsx,tsx-rektdeckard-departure-mono-import-path,full,PROMOTED,,
-TSX,shadcn-ui-ui.git,04432835f91dbe0a3273f50ac829e0a377110e5f,apps/v4/components/announcement.tsx,,stratified,SAMPLED,,10-30
+TSX,shadcn-ui-ui.git,04432835f91dbe0a3273f50ac829e0a377110e5f,apps/v4/components/announcement.tsx,tsx-shadcn-ui-ui-update-release-announcement,stratified,PROMOTED,,10-30
 TSX,shadcn-ui-ui.git,687f09817b614a3450f0f56779edf367082e1e53,apps/v4/registry/bases/base/blocks/preview/cards/contributors.tsx,tsx-shadcn-ui-ui-add-attribute,small,PROMOTED,,
 TSX,shadcn-ui-ui.git,86d9b00084affa7010e6c7c7bd410ec62525caac,apps/v4/registry/new-york-v4/blocks/dashboard-01/components/data-table.tsx,,stratified,SAMPLED,,300-1000
 TSX,shadcn-ui-ui.git,9e6765f4e2300916027160bf020929bf68f8be34,apps/v4/examples/base/ui/radio-group.tsx,tsx-shadcn-ui-ui-real-small-change,small,PROMOTED,,
@@ -1805,7 +1805,7 @@ XML,godotengine-godot.git,e2e1c89723dbea93ac81f0903644575acf3be6f8,doc/classes/E
 XML,godotengine-godot.git,e9ee5798d4e70a0847cb14882a9a8e247b32cfde,doc/classes/FoldableContainer.xml,,stratified,SAMPLED,,100-300
 XML,javacc-javacc,6374549940fd66003924b586474fea798875c5c0,pom.xml,xml-javacc-javacc-version-update,full,PROMOTED,,
 XML,jellyfin-jellyfin.git,0c46431cbb48850fae0e425e95692a1a9bbce427,tests/Jellyfin.LiveTv.Tests/Test Data/LiveTv/Listings/XmlTv/emptycategory.xml,xml-jellyfin-jellyfin-update-attribute-values,stratified,PROMOTED,,0-10
-XML,libreoffice,7d31c9e391cb8997a11ae7b97b7689e00f2427b9,extras/source/autotext/lang/zh-TW/standard/BlockList.xml,,stratified,SAMPLED,,10-30
+XML,libreoffice,7d31c9e391cb8997a11ae7b97b7689e00f2427b9,extras/source/autotext/lang/zh-TW/standard/BlockList.xml,xml-libreoffice-non-latin-string-data-update,stratified,PROMOTED,,10-30
 XML,libreoffice,7d31c9e391cb8997a11ae7b97b7689e00f2427b9,extras/source/autotext/lang/zh-TW/standard/JACL/content.xml,,stratified,SAMPLED,,10-30
 XML,libreoffice,7d31c9e391cb8997a11ae7b97b7689e00f2427b9,extras/source/autotext/lang/zh-TW/standard/Q/Q.xml,xml-libreoffice-unicode,stratified,PROMOTED,,0-10
 XML,libreoffice,9db6bc511b7bddcd844f3eb51b62e3fa89e9bc35,sc/uiconfig/scalc/menubar/menubar.xml,xml-libreoffice-add-one-menu-item,stratified,PROMOTED,,300-1000
@@ -1890,7 +1890,7 @@ YAML,ansible-ansible.git,d21788a9b46da71b3799a5820ff2665527afd570,test/integrati
 YAML,ansible-ansible.git,d37cec2ea8ab84e15ad455583fe5c1317552d276,changelogs/fragments/slurp_noarmor.yml,yaml-ansible-ansible-change-in-string-scalar,stratified,PROMOTED,,0-10
 YAML,ansible-ansible.git,db04499f58fbbedf774c6d249b979e05a11f73ff,changelogs/fragments/ansible-test-nios-container.yml,yaml-ansible-ansible-version,stratified,PROMOTED,,0-10
 YAML,axios-axios.git,7764844686b241f346b5a0462942cf20d9781cd1,.github/workflows/depsreview.yaml,yaml-axios-axios-update-string-value,small,PROMOTED,,
-YAML,axios-axios.git,fbdc1502b18e1bf7ef4c143b1f3503145a8bce91,.travis.yml,,stratified,SAMPLED,,10-30
+YAML,axios-axios.git,fbdc1502b18e1bf7ef4c143b1f3503145a8bce91,.travis.yml,yaml-axios-axios-node-to-number,stratified,PROMOTED,,10-30
 YAML,containers-skopeo,399adc0ef8d632c4093c13457bf88944286bf015,.packit.yaml,yaml-containers-skopeo-remove-one-block-pair,full,PROMOTED,,
 YAML,draios-sysdig,63cdd56353c6953e2323fc2fd10018a8ee1fd627,scripts/driverkit/config/7.3.0+driver/aarch64/ubuntu-aws_6.8.0-1015-aws_16.yaml,yaml-draios-sysdig-const-string-url-change,full,PROMOTED,,
 YAML,draios-sysdig,63cdd56353c6953e2323fc2fd10018a8ee1fd627,scripts/driverkit/config/7.3.0+driver/aarch64/ubuntu-gcp_6.5.0-1024-gcp_26~22.04.1.yaml,yaml-draios-sysdig-string-url-change-3,full,PROMOTED,,
@@ -1925,7 +1925,7 @@ YAML,mongodb-mongo.git,12698957cf8d248e556d438d00659daeda8604d2,buildscripts/res
 YAML,mongodb-mongo.git,5a2600df0190c8f7ceeee6e9283465b568564a9e,etc/evergreen_yml_components/tasks/resmoke/server_divisions/clusters_and_integrations/tasks.yml,,stratified,SAMPLED,,3000+
 YAML,mongodb-mongo.git,93a6cf5d73e237249771e039c832dd69eb925bdd,buildscripts/resmokeconfig/suites/analyze_shard_key_jscore_passthrough.yml,,stratified,SAMPLED,,100-300
 YAML,mongodb-mongo.git,a3fb189c5f3534501c51e38a2aca1fce19121206,buildscripts/resmokeconfig/matrix_suites/generated_suites/aggregation_sharded_collections_query_shape_hash_stability_last_continuous_new_old.yml,,stratified,SAMPLED,,30-100
-YAML,mongodb-mongo.git,cf14dbb8bcf5edf67e079fc1a6d1e610886d4ef9,buildscripts/resmokeconfig/matrix_suites/generated_suites/sharding_execution_control_with_prioritization.yml,,stratified,SAMPLED,,10-30
+YAML,mongodb-mongo.git,cf14dbb8bcf5edf67e079fc1a6d1e610886d4ef9,buildscripts/resmokeconfig/matrix_suites/generated_suites/sharding_execution_control_with_prioritization.yml,yaml-mongodb-mongo-add-two-block-sequence-items,stratified,PROMOTED,,10-30
 YAML,mongodb-mongo.git,fbbe2a017a46ad334731cf2a49bf25e040964b8c,src/mongo/db/query/util/OWNERS.yml,,stratified,SAMPLED,,10-30
 YAML,mozilla-firefox-firefox.git,6869873e06371a6042f423d8484d21de1e5e0bf7,browser/components/urlbar/metrics.yaml,,stratified,SAMPLED,,1000-3000
 YAML,mozilla-firefox-firefox.git,789b46238a6b16fc66df595018681e461f7c9649,mobile/android/android-components/plugins/dependencies/src/main/java/moz.yaml,,stratified,SAMPLED,,30-100
