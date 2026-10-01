@@ -23,13 +23,8 @@ use crate::test::helper::human_mapping::invariants::assert_ground_truth_invarian
 
 #[test]
 fn mapping() -> Result<()> {
-    // One pairing: the human reads the `dataset` field assignment as gone and `setDataset(...)` as
-    // new; APTED reads the two `identifier` leaves (same flat subtree, same text) as one `Update`. A
-    // container-choice disagreement, the statements already matched.
-    test::helper::human_mapping::assert_matches_human_mapping_within_limit(
+    test::helper::human_mapping::assert_matches_human_mapping(
         "java-defects4j-chart-12-multiplepieplot",
-        2,
-        2,
     )
 }
 

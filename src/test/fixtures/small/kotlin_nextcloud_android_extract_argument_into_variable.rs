@@ -25,8 +25,8 @@ fn mapping() -> Result<()> {
     // equally plausible identifier pairings than the human's.
     test::helper::human_mapping::assert_matches_human_mapping_within_limit(
         "kotlin-nextcloud-android-extract-argument-into-variable",
-        3,
-        3,
+        2,
+        2,
     )
 }
 
