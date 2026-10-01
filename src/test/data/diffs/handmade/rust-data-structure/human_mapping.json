@@ -138,213 +138,12 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "struct_item:1"
       ],
       "after_path": [
         "struct_item:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "struct_item:1",
-        "struct:1"
-      ],
-      "after_path": [
-        "struct_item:1",
-        "struct:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "struct_item:1",
-        "type_identifier:1"
-      ],
-      "after_path": [
-        "struct_item:1",
-        "type_identifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "struct_item:1",
-        "field_declaration_list:1"
-      ],
-      "after_path": [
-        "struct_item:1",
-        "field_declaration_list:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "struct_item:1",
-        "field_declaration_list:1",
-        "{:1"
-      ],
-      "after_path": [
-        "struct_item:1",
-        "field_declaration_list:1",
-        "{:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "struct_item:1",
-        "field_declaration_list:1",
-        "field_declaration:1"
-      ],
-      "after_path": [
-        "struct_item:1",
-        "field_declaration_list:1",
-        "field_declaration:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "struct_item:1",
-        "field_declaration_list:1",
-        "field_declaration:1",
-        "field_identifier:1"
-      ],
-      "after_path": [
-        "struct_item:1",
-        "field_declaration_list:1",
-        "field_declaration:1",
-        "field_identifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "struct_item:1",
-        "field_declaration_list:1",
-        "field_declaration:1",
-        "::1"
-      ],
-      "after_path": [
-        "struct_item:1",
-        "field_declaration_list:1",
-        "field_declaration:1",
-        "::1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "struct_item:1",
-        "field_declaration_list:1",
-        "field_declaration:1",
-        "primitive_type:1"
-      ],
-      "after_path": [
-        "struct_item:1",
-        "field_declaration_list:1",
-        "field_declaration:1",
-        "primitive_type:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "struct_item:1",
-        "field_declaration_list:1",
-        ",:1"
-      ],
-      "after_path": [
-        "struct_item:1",
-        "field_declaration_list:1",
-        ",:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "struct_item:1",
-        "field_declaration_list:1",
-        "field_declaration:2"
-      ],
-      "after_path": [
-        "struct_item:1",
-        "field_declaration_list:1",
-        "field_declaration:2"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "struct_item:1",
-        "field_declaration_list:1",
-        "field_declaration:2",
-        "field_identifier:1"
-      ],
-      "after_path": [
-        "struct_item:1",
-        "field_declaration_list:1",
-        "field_declaration:2",
-        "field_identifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "struct_item:1",
-        "field_declaration_list:1",
-        "field_declaration:2",
-        "::1"
-      ],
-      "after_path": [
-        "struct_item:1",
-        "field_declaration_list:1",
-        "field_declaration:2",
-        "::1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "struct_item:1",
-        "field_declaration_list:1",
-        "field_declaration:2",
-        "primitive_type:1"
-      ],
-      "after_path": [
-        "struct_item:1",
-        "field_declaration_list:1",
-        "field_declaration:2",
-        "primitive_type:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "struct_item:1",
-        "field_declaration_list:1",
-        ",:2"
-      ],
-      "after_path": [
-        "struct_item:1",
-        "field_declaration_list:1",
-        ",:2"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "struct_item:1",
-        "field_declaration_list:1",
-        "}:1"
-      ],
-      "after_path": [
-        "struct_item:1",
-        "field_declaration_list:1",
-        "}:1"
       ]
     },
     {
@@ -385,7 +184,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "function_item:1",
         "parameters:1"
@@ -393,32 +192,6 @@
       "after_path": [
         "function_item:1",
         "parameters:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "function_item:1",
-        "parameters:1",
-        "(:1"
-      ],
-      "after_path": [
-        "function_item:1",
-        "parameters:1",
-        "(:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "function_item:1",
-        "parameters:1",
-        "):1"
-      ],
-      "after_path": [
-        "function_item:1",
-        "parameters:1",
-        "):1"
       ]
     },
     {
@@ -1416,7 +1189,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "function_item:1",
         "block:1",
@@ -1430,44 +1203,6 @@
         "expression_statement:1",
         "for_expression:1",
         "reference_expression:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "function_item:1",
-        "block:1",
-        "expression_statement:1",
-        "for_expression:1",
-        "reference_expression:1",
-        "&:1"
-      ],
-      "after_path": [
-        "function_item:1",
-        "block:1",
-        "expression_statement:1",
-        "for_expression:1",
-        "reference_expression:1",
-        "&:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "function_item:1",
-        "block:1",
-        "expression_statement:1",
-        "for_expression:1",
-        "reference_expression:1",
-        "identifier:1"
-      ],
-      "after_path": [
-        "function_item:1",
-        "block:1",
-        "expression_statement:1",
-        "for_expression:1",
-        "reference_expression:1",
-        "identifier:1"
       ]
     },
     {

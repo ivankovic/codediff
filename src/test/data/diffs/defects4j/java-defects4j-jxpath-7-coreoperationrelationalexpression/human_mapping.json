@@ -372,7 +372,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "class_declaration:1",
         "modifiers:1"
@@ -380,32 +380,6 @@
       "after_path": [
         "class_declaration:1",
         "modifiers:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "class_declaration:1",
-        "modifiers:1",
-        "public:1"
-      ],
-      "after_path": [
-        "class_declaration:1",
-        "modifiers:1",
-        "public:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "class_declaration:1",
-        "modifiers:1",
-        "abstract:1"
-      ],
-      "after_path": [
-        "class_declaration:1",
-        "modifiers:1",
-        "abstract:1"
       ]
     },
     {
@@ -431,7 +405,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "class_declaration:1",
         "superclass:1"
@@ -439,32 +413,6 @@
       "after_path": [
         "class_declaration:1",
         "superclass:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "class_declaration:1",
-        "superclass:1",
-        "extends:1"
-      ],
-      "after_path": [
-        "class_declaration:1",
-        "superclass:1",
-        "extends:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "class_declaration:1",
-        "superclass:1",
-        "type_identifier:1"
-      ],
-      "after_path": [
-        "class_declaration:1",
-        "superclass:1",
-        "type_identifier:1"
       ]
     },
     {

@@ -33,7 +33,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "ERROR:1"
       ],
@@ -44,72 +44,6 @@
     {
       "operation": "identical",
       "before_path": [
-        "ERROR:1",
-        "#:1"
-      ],
-      "after_path": [
-        "ERROR:1",
-        "#:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "ERROR:1",
-        "available:1"
-      ],
-      "after_path": [
-        "ERROR:1",
-        "available:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "ERROR:1",
-        "(:1"
-      ],
-      "after_path": [
-        "ERROR:1",
-        "(:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "ERROR:1",
-        "{:1"
-      ],
-      "after_path": [
-        "ERROR:1",
-        "{:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "ERROR:1",
-        "}:1"
-      ],
-      "after_path": [
-        "ERROR:1",
-        "}:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "ERROR:1",
-        "else:1"
-      ],
-      "after_path": [
-        "ERROR:1",
-        "else:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
         "{:1"
       ],
       "after_path": [
@@ -117,60 +51,12 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "property_declaration:1"
       ],
       "after_path": [
         "property_declaration:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "property_declaration:1",
-        "value_binding_pattern:1"
-      ],
-      "after_path": [
-        "property_declaration:1",
-        "value_binding_pattern:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "property_declaration:1",
-        "value_binding_pattern:1",
-        "var:1"
-      ],
-      "after_path": [
-        "property_declaration:1",
-        "value_binding_pattern:1",
-        "var:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "property_declaration:1",
-        "pattern:1"
-      ],
-      "after_path": [
-        "property_declaration:1",
-        "pattern:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "property_declaration:1",
-        "pattern:1",
-        "simple_identifier:1"
-      ],
-      "after_path": [
-        "property_declaration:1",
-        "pattern:1",
-        "simple_identifier:1"
       ]
     }
   ],

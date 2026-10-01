@@ -26,7 +26,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "call:1",
         "argument_list:1"
@@ -34,64 +34,6 @@
       "after_path": [
         "call:1",
         "argument_list:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "call:1",
-        "argument_list:1",
-        "string:1"
-      ],
-      "after_path": [
-        "call:1",
-        "argument_list:1",
-        "string:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "call:1",
-        "argument_list:1",
-        "string:1",
-        "\":1"
-      ],
-      "after_path": [
-        "call:1",
-        "argument_list:1",
-        "string:1",
-        "\":1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "call:1",
-        "argument_list:1",
-        "string:1",
-        "string_content:1"
-      ],
-      "after_path": [
-        "call:1",
-        "argument_list:1",
-        "string:1",
-        "string_content:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "call:1",
-        "argument_list:1",
-        "string:1",
-        "\":2"
-      ],
-      "after_path": [
-        "call:1",
-        "argument_list:1",
-        "string:1",
-        "\":2"
       ]
     },
     {
@@ -132,7 +74,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "call:1",
         "do_block:1",
@@ -144,122 +86,6 @@
         "do_block:1",
         "body_statement:1",
         "call:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "call:1",
-        "do_block:1",
-        "body_statement:1",
-        "call:1",
-        "identifier:1"
-      ],
-      "after_path": [
-        "call:1",
-        "do_block:1",
-        "body_statement:1",
-        "call:1",
-        "identifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "call:1",
-        "do_block:1",
-        "body_statement:1",
-        "call:1",
-        "argument_list:1"
-      ],
-      "after_path": [
-        "call:1",
-        "do_block:1",
-        "body_statement:1",
-        "call:1",
-        "argument_list:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "call:1",
-        "do_block:1",
-        "body_statement:1",
-        "call:1",
-        "argument_list:1",
-        "string:1"
-      ],
-      "after_path": [
-        "call:1",
-        "do_block:1",
-        "body_statement:1",
-        "call:1",
-        "argument_list:1",
-        "string:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "call:1",
-        "do_block:1",
-        "body_statement:1",
-        "call:1",
-        "argument_list:1",
-        "string:1",
-        "\":1"
-      ],
-      "after_path": [
-        "call:1",
-        "do_block:1",
-        "body_statement:1",
-        "call:1",
-        "argument_list:1",
-        "string:1",
-        "\":1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "call:1",
-        "do_block:1",
-        "body_statement:1",
-        "call:1",
-        "argument_list:1",
-        "string:1",
-        "string_content:1"
-      ],
-      "after_path": [
-        "call:1",
-        "do_block:1",
-        "body_statement:1",
-        "call:1",
-        "argument_list:1",
-        "string:1",
-        "string_content:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "call:1",
-        "do_block:1",
-        "body_statement:1",
-        "call:1",
-        "argument_list:1",
-        "string:1",
-        "\":2"
-      ],
-      "after_path": [
-        "call:1",
-        "do_block:1",
-        "body_statement:1",
-        "call:1",
-        "argument_list:1",
-        "string:1",
-        "\":2"
       ]
     },
     {
@@ -504,7 +330,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "call:1",
         "do_block:1",
@@ -522,75 +348,6 @@
         "argument_list:1",
         "string:1",
         "interpolation:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "call:1",
-        "do_block:1",
-        "body_statement:1",
-        "call:3",
-        "argument_list:1",
-        "string:1",
-        "interpolation:1",
-        "#{:1"
-      ],
-      "after_path": [
-        "call:1",
-        "do_block:1",
-        "body_statement:1",
-        "call:3",
-        "argument_list:1",
-        "string:1",
-        "interpolation:1",
-        "#{:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "call:1",
-        "do_block:1",
-        "body_statement:1",
-        "call:3",
-        "argument_list:1",
-        "string:1",
-        "interpolation:1",
-        "constant:1"
-      ],
-      "after_path": [
-        "call:1",
-        "do_block:1",
-        "body_statement:1",
-        "call:3",
-        "argument_list:1",
-        "string:1",
-        "interpolation:1",
-        "constant:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "call:1",
-        "do_block:1",
-        "body_statement:1",
-        "call:3",
-        "argument_list:1",
-        "string:1",
-        "interpolation:1",
-        "}:1"
-      ],
-      "after_path": [
-        "call:1",
-        "do_block:1",
-        "body_statement:1",
-        "call:3",
-        "argument_list:1",
-        "string:1",
-        "interpolation:1",
-        "}:1"
       ]
     },
     {
@@ -636,7 +393,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "call:1",
         "do_block:1",
@@ -648,122 +405,6 @@
         "do_block:1",
         "body_statement:1",
         "call:4"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "call:1",
-        "do_block:1",
-        "body_statement:1",
-        "call:4",
-        "identifier:1"
-      ],
-      "after_path": [
-        "call:1",
-        "do_block:1",
-        "body_statement:1",
-        "call:4",
-        "identifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "call:1",
-        "do_block:1",
-        "body_statement:1",
-        "call:4",
-        "argument_list:1"
-      ],
-      "after_path": [
-        "call:1",
-        "do_block:1",
-        "body_statement:1",
-        "call:4",
-        "argument_list:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "call:1",
-        "do_block:1",
-        "body_statement:1",
-        "call:4",
-        "argument_list:1",
-        "string:1"
-      ],
-      "after_path": [
-        "call:1",
-        "do_block:1",
-        "body_statement:1",
-        "call:4",
-        "argument_list:1",
-        "string:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "call:1",
-        "do_block:1",
-        "body_statement:1",
-        "call:4",
-        "argument_list:1",
-        "string:1",
-        "\":1"
-      ],
-      "after_path": [
-        "call:1",
-        "do_block:1",
-        "body_statement:1",
-        "call:4",
-        "argument_list:1",
-        "string:1",
-        "\":1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "call:1",
-        "do_block:1",
-        "body_statement:1",
-        "call:4",
-        "argument_list:1",
-        "string:1",
-        "string_content:1"
-      ],
-      "after_path": [
-        "call:1",
-        "do_block:1",
-        "body_statement:1",
-        "call:4",
-        "argument_list:1",
-        "string:1",
-        "string_content:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "call:1",
-        "do_block:1",
-        "body_statement:1",
-        "call:4",
-        "argument_list:1",
-        "string:1",
-        "\":2"
-      ],
-      "after_path": [
-        "call:1",
-        "do_block:1",
-        "body_statement:1",
-        "call:4",
-        "argument_list:1",
-        "string:1",
-        "\":2"
       ]
     },
     {
@@ -967,7 +608,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "call:1",
         "do_block:1",
@@ -979,122 +620,6 @@
         "do_block:1",
         "body_statement:1",
         "call:6"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "call:1",
-        "do_block:1",
-        "body_statement:1",
-        "call:6",
-        "identifier:1"
-      ],
-      "after_path": [
-        "call:1",
-        "do_block:1",
-        "body_statement:1",
-        "call:6",
-        "identifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "call:1",
-        "do_block:1",
-        "body_statement:1",
-        "call:6",
-        "argument_list:1"
-      ],
-      "after_path": [
-        "call:1",
-        "do_block:1",
-        "body_statement:1",
-        "call:6",
-        "argument_list:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "call:1",
-        "do_block:1",
-        "body_statement:1",
-        "call:6",
-        "argument_list:1",
-        "string:1"
-      ],
-      "after_path": [
-        "call:1",
-        "do_block:1",
-        "body_statement:1",
-        "call:6",
-        "argument_list:1",
-        "string:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "call:1",
-        "do_block:1",
-        "body_statement:1",
-        "call:6",
-        "argument_list:1",
-        "string:1",
-        "\":1"
-      ],
-      "after_path": [
-        "call:1",
-        "do_block:1",
-        "body_statement:1",
-        "call:6",
-        "argument_list:1",
-        "string:1",
-        "\":1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "call:1",
-        "do_block:1",
-        "body_statement:1",
-        "call:6",
-        "argument_list:1",
-        "string:1",
-        "string_content:1"
-      ],
-      "after_path": [
-        "call:1",
-        "do_block:1",
-        "body_statement:1",
-        "call:6",
-        "argument_list:1",
-        "string:1",
-        "string_content:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "call:1",
-        "do_block:1",
-        "body_statement:1",
-        "call:6",
-        "argument_list:1",
-        "string:1",
-        "\":2"
-      ],
-      "after_path": [
-        "call:1",
-        "do_block:1",
-        "body_statement:1",
-        "call:6",
-        "argument_list:1",
-        "string:1",
-        "\":2"
       ]
     },
     {

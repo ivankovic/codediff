@@ -35,7 +35,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "class:1",
         "scope_resolution:1"
@@ -46,46 +46,7 @@
       ]
     },
     {
-      "operation": "identical",
-      "before_path": [
-        "class:1",
-        "scope_resolution:1",
-        "constant:1"
-      ],
-      "after_path": [
-        "class:1",
-        "scope_resolution:1",
-        "constant:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "class:1",
-        "scope_resolution:1",
-        ":::1"
-      ],
-      "after_path": [
-        "class:1",
-        "scope_resolution:1",
-        ":::1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "class:1",
-        "scope_resolution:1",
-        "constant:2"
-      ],
-      "after_path": [
-        "class:1",
-        "scope_resolution:1",
-        "constant:2"
-      ]
-    },
-    {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "class:1",
         "superclass:1"
@@ -93,77 +54,6 @@
       "after_path": [
         "class:1",
         "superclass:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "class:1",
-        "superclass:1",
-        "<:1"
-      ],
-      "after_path": [
-        "class:1",
-        "superclass:1",
-        "<:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "class:1",
-        "superclass:1",
-        "scope_resolution:1"
-      ],
-      "after_path": [
-        "class:1",
-        "superclass:1",
-        "scope_resolution:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "class:1",
-        "superclass:1",
-        "scope_resolution:1",
-        "constant:1"
-      ],
-      "after_path": [
-        "class:1",
-        "superclass:1",
-        "scope_resolution:1",
-        "constant:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "class:1",
-        "superclass:1",
-        "scope_resolution:1",
-        ":::1"
-      ],
-      "after_path": [
-        "class:1",
-        "superclass:1",
-        "scope_resolution:1",
-        ":::1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "class:1",
-        "superclass:1",
-        "scope_resolution:1",
-        "constant:2"
-      ],
-      "after_path": [
-        "class:1",
-        "superclass:1",
-        "scope_resolution:1",
-        "constant:2"
       ]
     },
     {

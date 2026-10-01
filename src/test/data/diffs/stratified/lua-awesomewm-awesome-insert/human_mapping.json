@@ -6,7 +6,7 @@
       "after_path": []
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "comment:1"
       ],
@@ -15,29 +15,7 @@
       ]
     },
     {
-      "operation": "identical",
-      "before_path": [
-        "comment:1",
-        "--:1"
-      ],
-      "after_path": [
-        "comment:1",
-        "--:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "comment:1",
-        "comment_content:1"
-      ],
-      "after_path": [
-        "comment:1",
-        "comment_content:1"
-      ]
-    },
-    {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "comment:2"
       ],
@@ -46,29 +24,7 @@
       ]
     },
     {
-      "operation": "identical",
-      "before_path": [
-        "comment:2",
-        "--:1"
-      ],
-      "after_path": [
-        "comment:2",
-        "--:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "comment:2",
-        "comment_content:1"
-      ],
-      "after_path": [
-        "comment:2",
-        "comment_content:1"
-      ]
-    },
-    {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "comment:3"
       ],
@@ -77,29 +33,7 @@
       ]
     },
     {
-      "operation": "identical",
-      "before_path": [
-        "comment:3",
-        "--:1"
-      ],
-      "after_path": [
-        "comment:3",
-        "--:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "comment:3",
-        "comment_content:1"
-      ],
-      "after_path": [
-        "comment:3",
-        "comment_content:1"
-      ]
-    },
-    {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "comment:4"
       ],
@@ -108,56 +42,12 @@
       ]
     },
     {
-      "operation": "identical",
-      "before_path": [
-        "comment:4",
-        "--:1"
-      ],
-      "after_path": [
-        "comment:4",
-        "--:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "comment:4",
-        "comment_content:1"
-      ],
-      "after_path": [
-        "comment:4",
-        "comment_content:1"
-      ]
-    },
-    {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "comment:5"
       ],
       "after_path": [
         "comment:5"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "comment:5",
-        "--:1"
-      ],
-      "after_path": [
-        "comment:5",
-        "--:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "comment:5",
-        "comment_content:1"
-      ],
-      "after_path": [
-        "comment:5",
-        "comment_content:1"
       ]
     },
     {
@@ -481,34 +371,12 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "comment:6"
       ],
       "after_path": [
         "comment:6"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "comment:6",
-        "--:1"
-      ],
-      "after_path": [
-        "comment:6",
-        "--:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "comment:6",
-        "comment_content:1"
-      ],
-      "after_path": [
-        "comment:6",
-        "comment_content:1"
       ]
     },
     {
@@ -766,34 +634,12 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "comment:7"
       ],
       "after_path": [
         "comment:7"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "comment:7",
-        "--:1"
-      ],
-      "after_path": [
-        "comment:7",
-        "--:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "comment:7",
-        "comment_content:1"
-      ],
-      "after_path": [
-        "comment:7",
-        "comment_content:1"
       ]
     },
     {
@@ -1472,34 +1318,12 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "comment:8"
       ],
       "after_path": [
         "comment:8"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "comment:8",
-        "--:1"
-      ],
-      "after_path": [
-        "comment:8",
-        "--:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "comment:8",
-        "comment_content:1"
-      ],
-      "after_path": [
-        "comment:8",
-        "comment_content:1"
       ]
     },
     {
@@ -2159,34 +1983,12 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "comment:9"
       ],
       "after_path": [
         "comment:10"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "comment:9",
-        "--:1"
-      ],
-      "after_path": [
-        "comment:10",
-        "--:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "comment:9",
-        "comment_content:1"
-      ],
-      "after_path": [
-        "comment:10",
-        "comment_content:1"
       ]
     },
     {
@@ -2356,34 +2158,12 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "comment:10"
       ],
       "after_path": [
         "comment:11"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "comment:10",
-        "--:1"
-      ],
-      "after_path": [
-        "comment:11",
-        "--:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "comment:10",
-        "comment_content:1"
-      ],
-      "after_path": [
-        "comment:11",
-        "comment_content:1"
       ]
     },
     {
@@ -2553,7 +2333,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "comment:11"
       ],
@@ -2562,56 +2342,12 @@
       ]
     },
     {
-      "operation": "identical",
-      "before_path": [
-        "comment:11",
-        "--:1"
-      ],
-      "after_path": [
-        "comment:12",
-        "--:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "comment:11",
-        "comment_content:1"
-      ],
-      "after_path": [
-        "comment:12",
-        "comment_content:1"
-      ]
-    },
-    {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "comment:12"
       ],
       "after_path": [
         "comment:13"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "comment:12",
-        "--:1"
-      ],
-      "after_path": [
-        "comment:13",
-        "--:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "comment:12",
-        "comment_content:1"
-      ],
-      "after_path": [
-        "comment:13",
-        "comment_content:1"
       ]
     }
   ],

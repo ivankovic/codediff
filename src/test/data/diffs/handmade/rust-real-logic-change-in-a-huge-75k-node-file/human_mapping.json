@@ -6,34 +6,12 @@
       "after_path": []
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "block_comment:1"
       ],
       "after_path": [
         "block_comment:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "block_comment:1",
-        "/*:1"
-      ],
-      "after_path": [
-        "block_comment:1",
-        "/*:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "block_comment:1",
-        "*/:1"
-      ],
-      "after_path": [
-        "block_comment:1",
-        "*/:1"
       ]
     },
     {
@@ -6030,7 +6008,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "const_item:1",
         "reference_type:1"
@@ -6038,32 +6016,6 @@
       "after_path": [
         "const_item:1",
         "reference_type:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "const_item:1",
-        "reference_type:1",
-        "&:1"
-      ],
-      "after_path": [
-        "const_item:1",
-        "reference_type:1",
-        "&:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "const_item:1",
-        "reference_type:1",
-        "primitive_type:1"
-      ],
-      "after_path": [
-        "const_item:1",
-        "reference_type:1",
-        "primitive_type:1"
       ]
     },
     {
@@ -53790,7 +53742,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "line_comment:53",
         "outer_doc_comment_marker:1"
@@ -53798,19 +53750,6 @@
       "after_path": [
         "line_comment:57",
         "outer_doc_comment_marker:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "line_comment:53",
-        "outer_doc_comment_marker:1",
-        "/:1"
-      ],
-      "after_path": [
-        "line_comment:57",
-        "outer_doc_comment_marker:1",
-        "/:1"
       ]
     },
     {
@@ -54076,7 +54015,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "function_item:14",
         "parameters:1"
@@ -54084,32 +54023,6 @@
       "after_path": [
         "function_item:14",
         "parameters:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "function_item:14",
-        "parameters:1",
-        "(:1"
-      ],
-      "after_path": [
-        "function_item:14",
-        "parameters:1",
-        "(:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "function_item:14",
-        "parameters:1",
-        "):1"
-      ],
-      "after_path": [
-        "function_item:14",
-        "parameters:1",
-        "):1"
       ]
     },
     {

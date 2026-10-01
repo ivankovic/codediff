@@ -12,34 +12,12 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "package_clause:1"
       ],
       "after_path": [
         "package_clause:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "package_clause:1",
-        "package:1"
-      ],
-      "after_path": [
-        "package_clause:1",
-        "package:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "package_clause:1",
-        "package_identifier:1"
-      ],
-      "after_path": [
-        "package_clause:1",
-        "package_identifier:1"
       ]
     },
     {
@@ -61,92 +39,12 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "import_declaration:1"
       ],
       "after_path": [
         "import_declaration:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "import_declaration:1",
-        "import:1"
-      ],
-      "after_path": [
-        "import_declaration:1",
-        "import:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "import_declaration:1",
-        "import_spec:1"
-      ],
-      "after_path": [
-        "import_declaration:1",
-        "import_spec:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "import_declaration:1",
-        "import_spec:1",
-        "interpreted_string_literal:1"
-      ],
-      "after_path": [
-        "import_declaration:1",
-        "import_spec:1",
-        "interpreted_string_literal:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "import_declaration:1",
-        "import_spec:1",
-        "interpreted_string_literal:1",
-        "\":1"
-      ],
-      "after_path": [
-        "import_declaration:1",
-        "import_spec:1",
-        "interpreted_string_literal:1",
-        "\":1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "import_declaration:1",
-        "import_spec:1",
-        "interpreted_string_literal:1",
-        "interpreted_string_literal_content:1"
-      ],
-      "after_path": [
-        "import_declaration:1",
-        "import_spec:1",
-        "interpreted_string_literal:1",
-        "interpreted_string_literal_content:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "import_declaration:1",
-        "import_spec:1",
-        "interpreted_string_literal:1",
-        "\":2"
-      ],
-      "after_path": [
-        "import_declaration:1",
-        "import_spec:1",
-        "interpreted_string_literal:1",
-        "\":2"
       ]
     }
   ],

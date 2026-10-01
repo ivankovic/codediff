@@ -24,45 +24,12 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "variable_assignment:1"
       ],
       "after_path": [
         "variable_assignment:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "variable_assignment:1",
-        "variable_name:1"
-      ],
-      "after_path": [
-        "variable_assignment:1",
-        "variable_name:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "variable_assignment:1",
-        "=:1"
-      ],
-      "after_path": [
-        "variable_assignment:1",
-        "=:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "variable_assignment:1",
-        "raw_string:1"
-      ],
-      "after_path": [
-        "variable_assignment:1",
-        "raw_string:1"
       ]
     },
     {

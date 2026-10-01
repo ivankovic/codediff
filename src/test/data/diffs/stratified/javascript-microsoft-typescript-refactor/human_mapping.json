@@ -44,7 +44,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "export_statement:1",
         "ERROR:1"
@@ -52,19 +52,6 @@
       "after_path": [
         "export_statement:1",
         "ERROR:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "export_statement:1",
-        "ERROR:1",
-        "identifier:1"
-      ],
-      "after_path": [
-        "export_statement:1",
-        "ERROR:1",
-        "identifier:1"
       ]
     },
     {
@@ -576,23 +563,12 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "empty_statement:1"
       ],
       "after_path": [
         "empty_statement:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "empty_statement:1",
-        ";:1"
-      ],
-      "after_path": [
-        "empty_statement:1",
-        ";:1"
       ]
     },
     {
@@ -1068,23 +1044,12 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "empty_statement:2"
       ],
       "after_path": [
         "empty_statement:2"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "empty_statement:2",
-        ";:1"
-      ],
-      "after_path": [
-        "empty_statement:2",
-        ";:1"
       ]
     },
     {
@@ -1960,7 +1925,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "expression_statement:1",
         "call_expression:1",
@@ -1974,23 +1939,7 @@
       ]
     },
     {
-      "operation": "identical",
-      "before_path": [
-        "expression_statement:1",
-        "call_expression:1",
-        "arguments:1",
-        "function_expression:1",
-        "statement_block:1",
-        "empty_statement:1",
-        ";:1"
-      ],
-      "after_path": [
-        "empty_statement:3",
-        ";:1"
-      ]
-    },
-    {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "expression_statement:1",
         "call_expression:1",
@@ -2001,22 +1950,6 @@
       ],
       "after_path": [
         "empty_statement:4"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "expression_statement:1",
-        "call_expression:1",
-        "arguments:1",
-        "function_expression:1",
-        "statement_block:1",
-        "empty_statement:2",
-        ";:1"
-      ],
-      "after_path": [
-        "empty_statement:4",
-        ";:1"
       ]
     },
     {

@@ -33,119 +33,12 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "attribute:1"
       ],
       "after_path": [
         "attribute:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "attribute:1",
-        "@:1"
-      ],
-      "after_path": [
-        "attribute:1",
-        "@:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "attribute:1",
-        "user_type:1"
-      ],
-      "after_path": [
-        "attribute:1",
-        "user_type:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "attribute:1",
-        "user_type:1",
-        "type_identifier:1"
-      ],
-      "after_path": [
-        "attribute:1",
-        "user_type:1",
-        "type_identifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "attribute:1",
-        "(:1"
-      ],
-      "after_path": [
-        "attribute:1",
-        "(:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "attribute:1",
-        "line_string_literal:1"
-      ],
-      "after_path": [
-        "attribute:1",
-        "line_string_literal:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "attribute:1",
-        "line_string_literal:1",
-        "\":1"
-      ],
-      "after_path": [
-        "attribute:1",
-        "line_string_literal:1",
-        "\":1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "attribute:1",
-        "line_string_literal:1",
-        "line_str_text:1"
-      ],
-      "after_path": [
-        "attribute:1",
-        "line_string_literal:1",
-        "line_str_text:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "attribute:1",
-        "line_string_literal:1",
-        "\":2"
-      ],
-      "after_path": [
-        "attribute:1",
-        "line_string_literal:1",
-        "\":2"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "attribute:1",
-        "):1"
-      ],
-      "after_path": [
-        "attribute:1",
-        "):1"
       ]
     },
     {
@@ -176,23 +69,12 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "ERROR:1"
       ],
       "after_path": [
         "ERROR:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "ERROR:1",
-        "simple_identifier:1"
-      ],
-      "after_path": [
-        "ERROR:1",
-        "simple_identifier:1"
       ]
     },
     {
@@ -223,23 +105,12 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "ERROR:2"
       ],
       "after_path": [
         "ERROR:2"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "ERROR:2",
-        "(:1"
-      ],
-      "after_path": [
-        "ERROR:2",
-        "(:1"
       ]
     }
   ],

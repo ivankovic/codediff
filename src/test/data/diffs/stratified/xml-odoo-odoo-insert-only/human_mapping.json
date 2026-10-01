@@ -6,192 +6,12 @@
       "after_path": []
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "prolog:1"
       ],
       "after_path": [
         "prolog:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "prolog:1",
-        "XMLDecl:1"
-      ],
-      "after_path": [
-        "prolog:1",
-        "XMLDecl:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "prolog:1",
-        "XMLDecl:1",
-        "<?:1"
-      ],
-      "after_path": [
-        "prolog:1",
-        "XMLDecl:1",
-        "<?:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "prolog:1",
-        "XMLDecl:1",
-        "xml:1"
-      ],
-      "after_path": [
-        "prolog:1",
-        "XMLDecl:1",
-        "xml:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "prolog:1",
-        "XMLDecl:1",
-        "version:1"
-      ],
-      "after_path": [
-        "prolog:1",
-        "XMLDecl:1",
-        "version:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "prolog:1",
-        "XMLDecl:1",
-        "=:1"
-      ],
-      "after_path": [
-        "prolog:1",
-        "XMLDecl:1",
-        "=:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "prolog:1",
-        "XMLDecl:1",
-        "\":1"
-      ],
-      "after_path": [
-        "prolog:1",
-        "XMLDecl:1",
-        "\":1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "prolog:1",
-        "XMLDecl:1",
-        "VersionNum:1"
-      ],
-      "after_path": [
-        "prolog:1",
-        "XMLDecl:1",
-        "VersionNum:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "prolog:1",
-        "XMLDecl:1",
-        "\":2"
-      ],
-      "after_path": [
-        "prolog:1",
-        "XMLDecl:1",
-        "\":2"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "prolog:1",
-        "XMLDecl:1",
-        "encoding:1"
-      ],
-      "after_path": [
-        "prolog:1",
-        "XMLDecl:1",
-        "encoding:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "prolog:1",
-        "XMLDecl:1",
-        "=:2"
-      ],
-      "after_path": [
-        "prolog:1",
-        "XMLDecl:1",
-        "=:2"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "prolog:1",
-        "XMLDecl:1",
-        "\":3"
-      ],
-      "after_path": [
-        "prolog:1",
-        "XMLDecl:1",
-        "\":3"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "prolog:1",
-        "XMLDecl:1",
-        "EncName:1"
-      ],
-      "after_path": [
-        "prolog:1",
-        "XMLDecl:1",
-        "EncName:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "prolog:1",
-        "XMLDecl:1",
-        "\":4"
-      ],
-      "after_path": [
-        "prolog:1",
-        "XMLDecl:1",
-        "\":4"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "prolog:1",
-        "XMLDecl:1",
-        "?>:1"
-      ],
-      "after_path": [
-        "prolog:1",
-        "XMLDecl:1",
-        "?>:1"
       ]
     },
     {
@@ -981,7 +801,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "element:1",
         "content:1",
@@ -993,57 +813,6 @@
         "content:1",
         "element:1",
         "ETag:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "element:1",
-        "content:1",
-        "element:1",
-        "ETag:1",
-        "</:1"
-      ],
-      "after_path": [
-        "element:1",
-        "content:1",
-        "element:1",
-        "ETag:1",
-        "</:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "element:1",
-        "content:1",
-        "element:1",
-        "ETag:1",
-        "Name:1"
-      ],
-      "after_path": [
-        "element:1",
-        "content:1",
-        "element:1",
-        "ETag:1",
-        "Name:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "element:1",
-        "content:1",
-        "element:1",
-        "ETag:1",
-        ">:1"
-      ],
-      "after_path": [
-        "element:1",
-        "content:1",
-        "element:1",
-        "ETag:1",
-        ">:1"
       ]
     },
     {
@@ -1060,7 +829,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "element:1",
         "ETag:1"
@@ -1068,45 +837,6 @@
       "after_path": [
         "element:1",
         "ETag:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "element:1",
-        "ETag:1",
-        "</:1"
-      ],
-      "after_path": [
-        "element:1",
-        "ETag:1",
-        "</:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "element:1",
-        "ETag:1",
-        "Name:1"
-      ],
-      "after_path": [
-        "element:1",
-        "ETag:1",
-        "Name:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "element:1",
-        "ETag:1",
-        ">:1"
-      ],
-      "after_path": [
-        "element:1",
-        "ETag:1",
-        ">:1"
       ]
     }
   ],

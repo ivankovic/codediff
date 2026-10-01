@@ -24,7 +24,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "ERROR:1"
       ],
@@ -33,191 +33,12 @@
       ]
     },
     {
-      "operation": "identical",
-      "before_path": [
-        "ERROR:1",
-        "func:1"
-      ],
-      "after_path": [
-        "ERROR:1",
-        "func:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "ERROR:1",
-        "simple_identifier:1"
-      ],
-      "after_path": [
-        "ERROR:1",
-        "simple_identifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "ERROR:1",
-        "(:1"
-      ],
-      "after_path": [
-        "ERROR:1",
-        "(:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "ERROR:1",
-        "=:1"
-      ],
-      "after_path": [
-        "ERROR:1",
-        "=:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "ERROR:1",
-        "integer_literal:1"
-      ],
-      "after_path": [
-        "ERROR:1",
-        "integer_literal:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "ERROR:1",
-        "as_operator:1"
-      ],
-      "after_path": [
-        "ERROR:1",
-        "as_operator:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "ERROR:1",
-        "as_operator:1",
-        "as:1"
-      ],
-      "after_path": [
-        "ERROR:1",
-        "as_operator:1",
-        "as:1"
-      ]
-    },
-    {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "bitwise_operation:1"
       ],
       "after_path": [
         "bitwise_operation:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "bitwise_operation:1",
-        "regex_literal:1"
-      ],
-      "after_path": [
-        "bitwise_operation:1",
-        "regex_literal:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "bitwise_operation:1",
-        "regex_literal:1",
-        "#:1"
-      ],
-      "after_path": [
-        "bitwise_operation:1",
-        "regex_literal:1",
-        "#:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "bitwise_operation:1",
-        "^:1"
-      ],
-      "after_path": [
-        "bitwise_operation:1",
-        "^:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "bitwise_operation:1",
-        "bitwise_operation:1"
-      ],
-      "after_path": [
-        "bitwise_operation:1",
-        "bitwise_operation:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "bitwise_operation:1",
-        "bitwise_operation:1",
-        "simple_identifier:1"
-      ],
-      "after_path": [
-        "bitwise_operation:1",
-        "bitwise_operation:1",
-        "simple_identifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "bitwise_operation:1",
-        "bitwise_operation:1",
-        "^:1"
-      ],
-      "after_path": [
-        "bitwise_operation:1",
-        "bitwise_operation:1",
-        "^:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "bitwise_operation:1",
-        "bitwise_operation:1",
-        "regex_literal:1"
-      ],
-      "after_path": [
-        "bitwise_operation:1",
-        "bitwise_operation:1",
-        "regex_literal:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "bitwise_operation:1",
-        "bitwise_operation:1",
-        "regex_literal:1",
-        "#:1"
-      ],
-      "after_path": [
-        "bitwise_operation:1",
-        "bitwise_operation:1",
-        "regex_literal:1",
-        "#:1"
       ]
     }
   ]

@@ -6,34 +6,12 @@
       "after_path": []
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "preproc_call:1"
       ],
       "after_path": [
         "preproc_call:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "preproc_call:1",
-        "preproc_directive:1"
-      ],
-      "after_path": [
-        "preproc_call:1",
-        "preproc_directive:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "preproc_call:1",
-        "preproc_arg:1"
-      ],
-      "after_path": [
-        "preproc_call:1",
-        "preproc_arg:1"
       ]
     },
     {
@@ -43,7 +21,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "preproc_include:1"
       ],
@@ -52,145 +30,12 @@
       ]
     },
     {
-      "operation": "identical",
-      "before_path": [
-        "preproc_include:1",
-        "#include:1"
-      ],
-      "after_path": [
-        "preproc_include:2",
-        "#include:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "preproc_include:1",
-        "string_literal:1"
-      ],
-      "after_path": [
-        "preproc_include:2",
-        "string_literal:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "preproc_include:1",
-        "string_literal:1",
-        "\":1"
-      ],
-      "after_path": [
-        "preproc_include:2",
-        "string_literal:1",
-        "\":1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "preproc_include:1",
-        "string_literal:1",
-        "string_content:1"
-      ],
-      "after_path": [
-        "preproc_include:2",
-        "string_literal:1",
-        "string_content:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "preproc_include:1",
-        "string_literal:1",
-        "\":2"
-      ],
-      "after_path": [
-        "preproc_include:2",
-        "string_literal:1",
-        "\":2"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "preproc_include:1",
-        "comment:1"
-      ],
-      "after_path": [
-        "preproc_include:2",
-        "comment:1"
-      ]
-    },
-    {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "preproc_include:2"
       ],
       "after_path": [
         "preproc_include:3"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "preproc_include:2",
-        "#include:1"
-      ],
-      "after_path": [
-        "preproc_include:3",
-        "#include:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "preproc_include:2",
-        "string_literal:1"
-      ],
-      "after_path": [
-        "preproc_include:3",
-        "string_literal:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "preproc_include:2",
-        "string_literal:1",
-        "\":1"
-      ],
-      "after_path": [
-        "preproc_include:3",
-        "string_literal:1",
-        "\":1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "preproc_include:2",
-        "string_literal:1",
-        "string_content:1"
-      ],
-      "after_path": [
-        "preproc_include:3",
-        "string_literal:1",
-        "string_content:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "preproc_include:2",
-        "string_literal:1",
-        "\":2"
-      ],
-      "after_path": [
-        "preproc_include:3",
-        "string_literal:1",
-        "\":2"
       ]
     }
   ],

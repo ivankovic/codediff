@@ -6,45 +6,12 @@
       "after_path": []
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "variable_assignment:1"
       ],
       "after_path": [
         "variable_assignment:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "variable_assignment:1",
-        "variable_name:1"
-      ],
-      "after_path": [
-        "variable_assignment:1",
-        "variable_name:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "variable_assignment:1",
-        "=:1"
-      ],
-      "after_path": [
-        "variable_assignment:1",
-        "=:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "variable_assignment:1",
-        "word:1"
-      ],
-      "after_path": [
-        "variable_assignment:1",
-        "word:1"
       ]
     },
     {
@@ -90,7 +57,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "variable_assignment:3"
       ],
@@ -99,117 +66,12 @@
       ]
     },
     {
-      "operation": "identical",
-      "before_path": [
-        "variable_assignment:3",
-        "variable_name:1"
-      ],
-      "after_path": [
-        "variable_assignment:3",
-        "variable_name:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "variable_assignment:3",
-        "=:1"
-      ],
-      "after_path": [
-        "variable_assignment:3",
-        "=:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "variable_assignment:3",
-        "word:1"
-      ],
-      "after_path": [
-        "variable_assignment:3",
-        "word:1"
-      ]
-    },
-    {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "variable_assignment:4"
       ],
       "after_path": [
         "variable_assignment:4"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "variable_assignment:4",
-        "variable_name:1"
-      ],
-      "after_path": [
-        "variable_assignment:4",
-        "variable_name:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "variable_assignment:4",
-        "=:1"
-      ],
-      "after_path": [
-        "variable_assignment:4",
-        "=:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "variable_assignment:4",
-        "string:1"
-      ],
-      "after_path": [
-        "variable_assignment:4",
-        "string:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "variable_assignment:4",
-        "string:1",
-        "\":1"
-      ],
-      "after_path": [
-        "variable_assignment:4",
-        "string:1",
-        "\":1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "variable_assignment:4",
-        "string:1",
-        "string_content:1"
-      ],
-      "after_path": [
-        "variable_assignment:4",
-        "string:1",
-        "string_content:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "variable_assignment:4",
-        "string:1",
-        "\":2"
-      ],
-      "after_path": [
-        "variable_assignment:4",
-        "string:1",
-        "\":2"
       ]
     }
   ],
