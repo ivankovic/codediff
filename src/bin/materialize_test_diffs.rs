@@ -237,8 +237,8 @@ fn resolve_target(
     output_dir: &Path,
     base_name: &str,
     ext: &str,
-    before: &str,
-    after: &str,
+    before: &[u8],
+    after: &[u8],
 ) -> Result<Resolution> {
     for attempt in 1..1000 {
         let name = if attempt == 1 {
@@ -253,10 +253,9 @@ fn resolve_target(
 
         let before_path = dir.join(format!("before.{ext}.test"));
         let after_path = dir.join(format!("after.{ext}.test"));
-        if let (Ok(existing_before), Ok(existing_after)) = (
-            fs::read_to_string(&before_path),
-            fs::read_to_string(&after_path),
-        ) && existing_before == before
+        if let (Ok(existing_before), Ok(existing_after)) =
+            (fs::read(&before_path), fs::read(&after_path))
+            && existing_before == before
             && existing_after == after
         {
             return Ok(Resolution::AlreadyPresent(dir));
@@ -335,8 +334,18 @@ fn materialize_row(row: &Row, repo_roots: &[PathBuf], output_dir: &Path) -> Resu
     let tree = commit.tree()?;
 
     let path = Path::new(&row.path);
-    let before = blob_text(&repo, &parent_tree, path)?;
-    let after = blob_text(&repo, &tree, path)?;
+    // A picture is copied byte for byte; code must be text, since every tool reads it as such.
+    let (before, after) = if omnidiff::diff::picture::is_picture_path(path) {
+        (
+            omnidiff::stats::git::blob_bytes(&repo, &parent_tree, path)?,
+            omnidiff::stats::git::blob_bytes(&repo, &tree, path)?,
+        )
+    } else {
+        (
+            blob_text(&repo, &parent_tree, path)?.into_bytes(),
+            blob_text(&repo, &tree, path)?.into_bytes(),
+        )
+    };
 
     let ext = path
         .extension()

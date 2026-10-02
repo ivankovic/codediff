@@ -52,6 +52,43 @@ pub const THRESHOLD: f64 = 0.1;
 /// Changed pixels this close (in both directions) belong to one region.
 pub const REGION_GAP: u32 = 2;
 
+/// The share of pixels above which a change reads as a different picture rather than an edit of
+/// the same one ([`Verdict::Replaced`]). A first guess, which the picture fixtures measure.
+pub const REPLACED_SHARE: f64 = 0.5;
+
+/// What happened to a picture, in one word: the question a picture fixture's human verdict
+/// answers, and the engine's answer to it ([`PictureDiff::verdict`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Verdict {
+    /// The same picture, edited: something in it changed.
+    ContentChange,
+    /// Nothing a reader would see changed: re-encoded, re-compressed, or only metadata.
+    NoVisibleChange,
+    /// Scaled or re-cropped to a different size.
+    Resized,
+    /// A different picture altogether.
+    Replaced,
+}
+
+impl Verdict {
+    pub const ALL: [Verdict; 4] = [
+        Verdict::ContentChange,
+        Verdict::NoVisibleChange,
+        Verdict::Resized,
+        Verdict::Replaced,
+    ];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Verdict::ContentChange => "content change",
+            Verdict::NoVisibleChange => "no visible change",
+            Verdict::Resized => "resized",
+            Verdict::Replaced => "replaced",
+        }
+    }
+}
+
 /// True if `path` names a raster picture by its extension.
 pub fn is_picture_path(path: &std::path::Path) -> bool {
     let path = match path.extension() {
@@ -134,6 +171,24 @@ pub struct PictureDiff {
 }
 
 impl PictureDiff {
+    /// The engine's verdict: resized for a size change, no visible change when no region
+    /// changed, replaced when more than [`REPLACED_SHARE`] of the pixels did, and content change
+    /// otherwise - also for an added or deleted picture, which the fixtures do not hold.
+    pub fn verdict(&self) -> Verdict {
+        match &self.comparison {
+            Comparison::Resized => Verdict::Resized,
+            Comparison::Pixels { regions, .. } if regions.is_empty() => Verdict::NoVisibleChange,
+            Comparison::Pixels {
+                changed_pixels,
+                total_pixels,
+                ..
+            } if *changed_pixels as f64 > REPLACED_SHARE * *total_pixels as f64 => {
+                Verdict::Replaced
+            }
+            Comparison::Pixels { .. } | Comparison::OneSided => Verdict::ContentChange,
+        }
+    }
+
     /// True if a reader would see a difference: a side added or deleted, a size, format or color
     /// change, or changed pixels.
     pub fn differs(&self) -> bool {
@@ -417,6 +472,24 @@ mod tests {
             "one side is not a picture"
         );
         assert!(!is_picture_pair(b"", b""));
+    }
+
+    #[test]
+    fn the_engine_verdict_follows_the_comparison() {
+        let small = png(&filled(10, 10, [255; 4]));
+        let mut dotted = filled(10, 10, [255; 4]);
+        dotted.put_pixel(3, 3, image::Rgba([0, 0, 0, 255]));
+        let verdict = |a: &[u8], b: &[u8]| diff(a, b).expect("diffs").verdict();
+        assert_eq!(verdict(&small, &small), Verdict::NoVisibleChange);
+        assert_eq!(verdict(&small, &png(&dotted)), Verdict::ContentChange);
+        assert_eq!(
+            verdict(&small, &png(&filled(10, 10, [0, 0, 0, 255]))),
+            Verdict::Replaced
+        );
+        assert_eq!(
+            verdict(&small, &png(&filled(5, 10, [255; 4]))),
+            Verdict::Resized
+        );
     }
 
     #[test]

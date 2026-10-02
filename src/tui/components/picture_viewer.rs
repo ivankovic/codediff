@@ -134,12 +134,25 @@ pub struct PictureViewer {
     swipe_percent: u16,
     picker: Picker,
     shown: Option<(Built, Panes)>,
+    /// For a human recording a verdict (`human_solver`): nothing the engine decided is shown - no
+    /// outlined regions, no difference view, no "how much changed" - only the two pictures and
+    /// what their files say they are.
+    annotating: bool,
 }
 
 impl PictureViewer {
     /// The view of `before` and `after` if they are a picture pair that decodes; `None` otherwise,
     /// and the caller reports them as any other binary pair.
     pub fn open(before: &Path, after: &Path, picker: Picker) -> Option<Self> {
+        Self::open_with(before, after, picker, false)
+    }
+
+    /// [`Self::open`] for annotation: see [`Self::annotating`](#structfield.annotating).
+    pub fn open_for_annotation(before: &Path, after: &Path, picker: Picker) -> Option<Self> {
+        Self::open_with(before, after, picker, true)
+    }
+
+    fn open_with(before: &Path, after: &Path, picker: Picker, annotating: bool) -> Option<Self> {
         let read = |path: &Path| std::fs::read(path).ok();
         let (before_bytes, after_bytes) = (read(before)?, read(after)?);
         if !picture::is_picture_pair(&before_bytes, &after_bytes) {
@@ -171,6 +184,7 @@ impl PictureViewer {
                 picker
             },
             shown: None,
+            annotating,
         })
     }
 
@@ -189,7 +203,12 @@ impl PictureViewer {
     /// divider. False for any other key, which the viewer leaves to the rest of the app.
     pub fn handle_key(&mut self, code: KeyCode) -> bool {
         match code {
-            KeyCode::Char('t') => self.mode = self.mode.next(),
+            KeyCode::Char('t') => {
+                self.mode = self.mode.next();
+                if self.annotating && self.mode == PictureMode::Difference {
+                    self.mode = self.mode.next();
+                }
+            }
             KeyCode::Char('h') | KeyCode::Left if self.mode == PictureMode::Swipe => {
                 self.swipe_percent = self.swipe_percent.saturating_sub(5);
             }
@@ -201,8 +220,24 @@ impl PictureViewer {
         true
     }
 
-    /// One line for the status bar: what each side is, how much changed, and the view.
+    /// One line for the status bar: what each side is, how much changed, and the view. Without
+    /// "how much changed" when annotating.
     pub fn status(&self) -> String {
+        if self.annotating {
+            let side = |info: &Option<picture::PictureInfo>| match info {
+                Some(info) => format!(
+                    "{} {}x{} {}, {} bytes",
+                    info.format, info.width, info.height, info.color, info.bytes
+                ),
+                None => "nothing".to_string(),
+            };
+            return format!(
+                "{} -> {} · view: {} (t)",
+                side(&self.diff.before),
+                side(&self.diff.after),
+                self.mode.label()
+            );
+        }
         let side = |info: &Option<picture::PictureInfo>| match info {
             Some(info) => format!(
                 "{} {}x{} {}",
@@ -310,7 +345,7 @@ impl PictureViewer {
     /// One `(title, picture)` per pane of `built.mode`; `None` for a side that has no picture.
     fn composites(&self, built: Built) -> Vec<(String, Option<RgbaImage>)> {
         let regions: &[Region] = match &self.diff.comparison {
-            Comparison::Pixels { regions, .. } => regions,
+            Comparison::Pixels { regions, .. } if !self.annotating => regions,
             _ => &[],
         };
         let outlined = |pixels: &Option<RgbaImage>, color: [u8; 3]| {
@@ -619,6 +654,22 @@ mod tests {
             "{}",
             panes.len()
         );
+    }
+
+    #[test]
+    fn annotating_shows_nothing_the_engine_decided() {
+        let dir = tempfile::tempdir().expect("dir");
+        let (a, b) = pair(&dir);
+        let mut viewer =
+            PictureViewer::open_for_annotation(&a, &b, Picker::halfblocks()).expect("a pair");
+        assert!(!viewer.status().contains("changed"), "{}", viewer.status());
+        let panes = viewer.composites(built(PictureMode::SideBySide));
+        let [(_, Some(before)), _] = &panes[..] else {
+            panic!("two panes")
+        };
+        assert_eq!(before.get_pixel(5, 1).0, [255, 255, 255, 255], "no outline");
+        viewer.handle_key(KeyCode::Char('t'));
+        assert_eq!(viewer.mode(), PictureMode::Blend, "difference is skipped");
     }
 
     #[test]

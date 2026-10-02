@@ -53,6 +53,7 @@ mod events;
 mod flatten;
 mod keylog;
 mod navigate;
+mod pictures;
 mod render;
 mod state;
 mod stubs;

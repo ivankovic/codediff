@@ -41,13 +41,17 @@
 //! implementation, false once fixed), and is the only justification a clamp gets.
 //! `the_clamped_stubs_explain_their_limits` enforces that every clamped `mapping()` has one.
 
-// One `#[cfg(test)] mod <name>;` per fixture, per dataset (see `test::helper::DIFF_DATASETS`).
+// One `#[cfg(test)] mod <name>;` per fixture, per dataset (see `test::helper::DIFF_DATASETS`), and
+// `pictures` for the picture fixtures (see `test::helper::human_picture`), whose stubs assert a
+// verdict rather than the four tests above.
 #[cfg(test)]
 mod defects4j;
 #[cfg(test)]
 mod full;
 #[cfg(test)]
 mod handmade;
+#[cfg(test)]
+mod pictures;
 #[cfg(test)]
 mod small;
 #[cfg(test)]

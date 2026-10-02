@@ -22,11 +22,18 @@
 //!
 //! `--stratified` samples per (language, [`omnidiff::stats::sampling::LOC_BUCKETS`] bucket), and
 //! `--count` then means per bucket - unlike `sample_code_pairs --count`, a per-language total.
+//!
+//! `--pictures` samples picture pairs instead (see `sample_pictures`), for the picture fixtures
+//! under `src/test/data/pictures/`: tagged dataset "pictures", promoted by `human_solver`'s picture
+//! session with a verdict. The first draw, 2026-10-02:
+//! `sample_test_diffs --pictures --repos-dir /var/tmp/research/full/repositories
+//! --max-commits-per-repo 50 --total 250 --seed 20261002`, then `materialize_test_diffs`.
 use anyhow::{Result, bail};
 use clap::Parser;
 use git2::Delta;
 use rand::SeedableRng;
 use rand::rngs::StdRng;
+use rand::seq::SliceRandom;
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -83,6 +90,17 @@ struct Args {
     /// count) as well as language; `--count` becomes a target per (language, bucket).
     #[arg(long, default_value_t = false)]
     stratified: bool,
+
+    /// Sample picture pairs instead of code (see `sample_pictures`): rows tagged dataset
+    /// "pictures", the format in the `language` column and `<size>-<same|resized>` as the bucket.
+    /// `--total` replaces `--count`, and `--max-commits-per-repo` should be the census window, 50.
+    #[arg(long, default_value_t = false)]
+    pictures: bool,
+
+    /// Under `--pictures`: how many picture pairs the dataset should hold, spread evenly over the
+    /// strata that occur. Existing picture rows count towards it.
+    #[arg(long, default_value_t = 250)]
+    total: usize,
 }
 
 /// A pointer to a (before, after) code pair in a repository checkout.
@@ -209,6 +227,9 @@ fn capacity_key(language: &str, bucket: Option<&str>, stratified: bool) -> Capac
 fn main() -> Result<()> {
     let args = Args::parse();
     let output = args.output.clone().unwrap_or_else(default_output_path);
+    if args.pictures {
+        return sample_pictures(&args, &output);
+    }
     let dataset = resolve_dataset(&args)?;
 
     let existing_rows = read_existing_rows(&output)?;
@@ -366,6 +387,190 @@ fn sample_repository(
     })
 }
 
+/// The dataset picture rows are tagged with, and promoted into (`src/test/data/pictures/`).
+const PICTURE_DATASET: &str = "pictures";
+
+/// How many pairs one repository may contribute to one stratum: a handful of repositories hold
+/// most picture changes (the change census), and without a cap they would be most of the sample.
+const PICTURES_PER_REPOSITORY_PER_STRATUM: usize = 2;
+
+/// The size half of a picture stratum, by the larger side's pixel count.
+fn picture_size_bucket(pixels: u64) -> &'static str {
+    match pixels {
+        0..=4_096 => "icon",
+        4_097..=65_536 => "small",
+        65_537..=1_048_576 => "medium",
+        _ => "large",
+    }
+}
+
+/// A picture side the sample can hold: a picture by its bytes (which also drops Git LFS pointers,
+/// text files named `.png`), within the size limits, and its format and dimensions read from the
+/// header without decoding the pixels.
+fn picture_side(repo: &git2::Repository, oid: git2::Oid) -> Option<(String, u32, u32)> {
+    let blob = repo.find_blob(oid).ok()?;
+    let bytes = blob.content();
+    if bytes.len() < MIN_BYTES
+        || bytes.len() > MAX_BYTES
+        || !omnidiff::diff::picture::is_picture(bytes)
+    {
+        return None;
+    }
+    let reader = image::ImageReader::new(std::io::Cursor::new(bytes))
+        .with_guessed_format()
+        .ok()?;
+    let format = format!("{:?}", reader.format()?).to_uppercase();
+    let (width, height) = reader.into_dimensions().ok()?;
+    Some((format, width, height))
+}
+
+/// `--pictures`: tops `output`'s picture rows up to `--total` pairs. Every in-place picture
+/// modification of the last `--max-commits-per-repo` commits is a candidate; each repository
+/// offers at most [`PICTURES_PER_REPOSITORY_PER_STRATUM`] per stratum (format x size bucket x
+/// same size or resized), a pair already seen elsewhere (the same two blobs) is offered once, and
+/// the shortfall is split evenly over the strata that have candidates, a stratum with fewer giving
+/// its share to the rest.
+fn sample_pictures(args: &Args, output: &Path) -> Result<()> {
+    let existing_rows = read_existing_rows(output)?;
+    let existing_pictures = existing_rows
+        .iter()
+        .filter(|row| row.dataset == PICTURE_DATASET)
+        .count();
+    let shortfall = args.total.saturating_sub(existing_pictures);
+    let existing_keys: HashSet<SampleKey> = existing_rows
+        .iter()
+        .map(|row| (row.repository.clone(), row.commit.clone(), row.path.clone()))
+        .collect();
+
+    let repo_paths = find_git_repositories(&args.repos_dir)?;
+    println!(
+        "Found {} repositories; {shortfall} picture pairs to sample",
+        repo_paths.len()
+    );
+    let mut rng = match args.seed {
+        Some(seed) => StdRng::seed_from_u64(seed),
+        None => StdRng::from_rng(&mut rand::rng()),
+    };
+
+    let mut seen_pairs: HashSet<(git2::Oid, git2::Oid)> = HashSet::new();
+    let mut strata: HashMap<CapacityKey, Reservoir<Row>> = HashMap::new();
+    for_each_repository(&repo_paths, |repo_path, repository_name| {
+        let mut local: HashMap<CapacityKey, Reservoir<Row>> = HashMap::new();
+        walk_single_parent_commit_diffs(
+            repo_path,
+            args.max_commits_per_repo,
+            false,
+            |repo, id, delta| {
+                if delta.status() != Delta::Modified
+                    || delta.old_file().id() == delta.new_file().id()
+                {
+                    return Ok(());
+                }
+                let Some(path) = delta.new_file().path() else {
+                    return Ok(());
+                };
+                if anomalous_paths::is_anomalous(path)
+                    || !omnidiff::diff::picture::is_picture_path(path)
+                {
+                    return Ok(());
+                }
+                let path = path.to_string_lossy().into_owned();
+                if existing_keys.contains(&(
+                    repository_name.to_string(),
+                    id.to_string(),
+                    path.clone(),
+                )) {
+                    return Ok(());
+                }
+                let (Some(before), Some(after)) = (
+                    picture_side(repo, delta.old_file().id()),
+                    picture_side(repo, delta.new_file().id()),
+                ) else {
+                    return Ok(());
+                };
+                if !seen_pairs.insert((delta.old_file().id(), delta.new_file().id())) {
+                    return Ok(());
+                }
+                let pixels = |(_, w, h): &(String, u32, u32)| u64::from(*w) * u64::from(*h);
+                let shape = if (before.1, before.2) == (after.1, after.2) {
+                    "same"
+                } else {
+                    "resized"
+                };
+                let bucket = format!(
+                    "{}-{shape}",
+                    picture_size_bucket(pixels(&before).max(pixels(&after)))
+                );
+                let row = Row {
+                    language: after.0.clone(),
+                    repository: repository_name.to_string(),
+                    commit: id.to_string(),
+                    path,
+                    promoted_to: String::new(),
+                    dataset: PICTURE_DATASET.to_string(),
+                    status: "SAMPLED".to_string(),
+                    comment: String::new(),
+                    size_bucket: Some(bucket.clone()),
+                };
+                local.entry((after.0, Some(bucket))).or_default().offer(
+                    row,
+                    PICTURES_PER_REPOSITORY_PER_STRATUM,
+                    &mut rng,
+                );
+                Ok(())
+            },
+        )?;
+        for (key, reservoir) in local {
+            let stratum = strata.entry(key).or_default();
+            for row in reservoir.items {
+                stratum.offer(row, shortfall, &mut rng);
+            }
+        }
+        Ok(())
+    });
+
+    let available: Vec<(CapacityKey, usize)> = strata
+        .iter()
+        .map(|(key, reservoir)| (key.clone(), reservoir.items.len()))
+        .collect();
+    let quotas = even_quotas(&available, shortfall);
+    let mut picked = HashMap::new();
+    for (key, mut reservoir) in strata {
+        let quota = quotas.get(&key).copied().unwrap_or(0);
+        reservoir.items.shuffle(&mut rng);
+        reservoir.items.truncate(quota);
+        picked.insert(key, reservoir);
+    }
+    for ((format, bucket), quota) in {
+        let mut sorted: Vec<_> = quotas.iter().collect();
+        sorted.sort();
+        sorted
+    } {
+        println!("  {format} {}: {quota}", bucket.as_deref().unwrap_or(""));
+    }
+    let added: usize = picked.values().map(|r| r.items.len()).sum();
+    write_csv(output, existing_rows, picked)?;
+    println!("Added {added} picture pairs to {output:?}");
+    Ok(())
+}
+
+/// Splits `total` over strata as evenly as their `available` counts allow: each gets an equal
+/// share, a stratum with fewer takes what it has, and the remainder is shared out again.
+fn even_quotas(available: &[(CapacityKey, usize)], total: usize) -> HashMap<CapacityKey, usize> {
+    let mut quotas: HashMap<CapacityKey, usize> = HashMap::new();
+    let mut open: Vec<&(CapacityKey, usize)> = available.iter().filter(|(_, n)| *n > 0).collect();
+    open.sort_by_key(|(_, n)| *n);
+    let mut left = total;
+    while !open.is_empty() && left > 0 {
+        let share = left.div_ceil(open.len());
+        let (key, have) = open.remove(0);
+        let take = (*have).min(share).min(left);
+        quotas.insert(key.clone(), take);
+        left -= take;
+    }
+    quotas
+}
+
 fn write_csv(
     path: &Path,
     existing_rows: Vec<Row>,
@@ -419,6 +624,26 @@ fn write_csv(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn picture_quotas_are_even_and_a_short_stratum_gives_its_share_away() {
+        let key = |name: &str| (name.to_string(), Some("small-same".to_string()));
+        let quotas = even_quotas(&[(key("PNG"), 100), (key("GIF"), 3), (key("ICO"), 100)], 21);
+        assert_eq!(quotas[&key("GIF")], 3);
+        assert_eq!(quotas[&key("PNG")] + quotas[&key("ICO")], 18);
+        assert_eq!(quotas[&key("PNG")], 9);
+        // Never more than there is, even when the total asks for more.
+        let quotas = even_quotas(&[(key("PNG"), 2)], 10);
+        assert_eq!(quotas[&key("PNG")], 2);
+    }
+
+    #[test]
+    fn picture_sizes_bucket_by_pixel_count() {
+        assert_eq!(picture_size_bucket(16 * 16), "icon");
+        assert_eq!(picture_size_bucket(200 * 120), "small");
+        assert_eq!(picture_size_bucket(800 * 600), "medium");
+        assert_eq!(picture_size_bucket(4000 * 3000), "large");
+    }
     use omnidiff::stats::sampling::LOC_BUCKETS;
     use omnidiff::test::helper;
 
@@ -583,6 +808,8 @@ mod tests {
             max_commits_per_repo: 1,
             dataset: dataset.map(str::to_string),
             stratified,
+            pictures: false,
+            total: 0,
         }
     }
 

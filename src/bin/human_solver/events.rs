@@ -168,7 +168,23 @@ pub(crate) fn run_event_loop(
     loop {
         // The session borrows `before`/`after` immutably, so its cached `FrameState` can live for
         // the whole session; only this loop reassigns them, between sessions.
-        let end = run_case_session(terminal, app, &before, &after)?;
+        let mut end = run_case_session(terminal, app, &before, &after)?;
+        // A picture sample has no trees: it gets its own session, which hands back whatever is
+        // opened from it. The tree session's case stays loaded underneath.
+        while let SessionEnd::Open(OpenTarget::Sample(name)) = &end
+            && crate::pictures::is_picture_sample(name)
+        {
+            let name = name.clone();
+            end = match crate::pictures::run_picture_session(terminal, app, &name) {
+                Ok(end) => end,
+                // A picture the decoder cannot read (some multi-size ICOs): said, and the tree
+                // session resumes as it was.
+                Err(err) => {
+                    app.status = Some(format!("Cannot open picture sample '{name}': {err:#}"));
+                    run_case_session(terminal, app, &before, &after)?
+                }
+            };
+        }
         // Before the switch, so the memory names the case being left; on quit it is the last.
         remember_session(app);
         match end {
@@ -1342,40 +1358,7 @@ pub(crate) fn handle_tree_independent_key(
             None
         }
         KeyCode::Char('O') => {
-            match list_sample_rows() {
-                Ok(rows) if !rows.is_empty() => {
-                    // One external `diff` per sample: scan only the unmeasured ones, in parallel.
-                    let missing: Vec<String> = rows
-                        .iter()
-                        .map(|row| row.name.clone())
-                        .filter(|name| !app.sample_diff_sizes.contains_key(name))
-                        .collect();
-                    if !missing.is_empty() {
-                        app.sample_diff_sizes.extend(scan_corpus(&missing, |name| {
-                            Some(sample_diff_line_count(name))
-                        }));
-                    }
-                    let rows: Vec<SampleRow> = rows
-                        .into_iter()
-                        .map(|mut row| {
-                            row.size = app
-                                .sample_diff_sizes
-                                .get(&row.name)
-                                .copied()
-                                .unwrap_or_default();
-                            row
-                        })
-                        .collect();
-                    let view = app.sample_view.clone();
-                    app.modal = Some(open_sample_picker_modal(rows, &app.name, view));
-                }
-                Ok(_) => {
-                    app.status = Some("No samples found in src/test/data/samples".to_string());
-                }
-                Err(err) => {
-                    app.status = Some(format!("Error listing samples: {:#}", err));
-                }
-            }
+            open_sample_picker(app);
             None
         }
         KeyCode::Char('C') => {
@@ -2964,10 +2947,49 @@ fn handle_text_view(
     None
 }
 
+/// Opens the `O` picker over every sample (picture samples included), measuring the ones not yet
+/// measured. Shared by the tree session and `pictures::run_picture_session`.
+pub(crate) fn open_sample_picker(app: &mut App) {
+    match list_sample_rows() {
+        Ok(rows) if !rows.is_empty() => {
+            // One external `diff` per sample: scan only the unmeasured ones, in parallel.
+            let missing: Vec<String> = rows
+                .iter()
+                .map(|row| row.name.clone())
+                .filter(|name| !app.sample_diff_sizes.contains_key(name))
+                .collect();
+            if !missing.is_empty() {
+                app.sample_diff_sizes.extend(scan_corpus(&missing, |name| {
+                    Some(sample_diff_line_count(name))
+                }));
+            }
+            let rows: Vec<SampleRow> = rows
+                .into_iter()
+                .map(|mut row| {
+                    row.size = app
+                        .sample_diff_sizes
+                        .get(&row.name)
+                        .copied()
+                        .unwrap_or_default();
+                    row
+                })
+                .collect();
+            let view = app.sample_view.clone();
+            app.modal = Some(open_sample_picker_modal(rows, &app.name, view));
+        }
+        Ok(_) => {
+            app.status = Some("No samples found in src/test/data/samples".to_string());
+        }
+        Err(err) => {
+            app.status = Some(format!("Error listing samples: {:#}", err));
+        }
+    }
+}
+
 /// `handle_modal_key`'s `Modal::OpenSamplePicker` arm. Deliberately parallel to
 /// `handle_open_diff_picker`: the same table over a different corpus (see `SampleColumn` on why
 /// the types are not shared).
-fn handle_open_sample_picker(
+pub(crate) fn handle_open_sample_picker(
     app: &mut App,
     code: KeyCode,
     rows: Vec<SampleRow>,

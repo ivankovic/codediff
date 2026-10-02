@@ -11186,3 +11186,39 @@ fn t_opens_the_text_view_on_the_selected_nodes_with_the_focused_side_first() {
     assert_eq!(state.cursor[0], (1, 4), "alpha");
     assert_eq!(state.cursor[1], (2, 4), "beta");
 }
+
+// ---- the picture session -----------------------------------------------------------------------
+
+#[test]
+fn a_picture_stub_asserts_the_verdict_or_pins_the_engines_mismatch() {
+    use omnidiff::test::helper::human_picture::Verdict;
+    let agreeing = pictures::stub_contents("png-x-a-b-c", None);
+    assert!(
+        agreeing.contains("fn verdict() -> Result<()>"),
+        "{agreeing}"
+    );
+    assert!(
+        agreeing.contains("assert_matches_human_verdict(\"png-x-a-b-c\")"),
+        "{agreeing}"
+    );
+    let pinned = pictures::stub_contents("png-x-a-b-c", Some(Verdict::Replaced));
+    assert!(
+        pinned.contains("Recorded as found, not examined."),
+        "{pinned}"
+    );
+    assert!(
+        pinned.contains("human_picture::Verdict::Replaced"),
+        "{pinned}"
+    );
+}
+
+#[test]
+fn a_picture_pair_is_found_by_its_before_and_after_files() {
+    let dir = tempfile::tempdir().unwrap();
+    assert!(pictures::pair_paths(dir.path()).is_none());
+    fs::write(dir.path().join("before.png.test"), b"x").unwrap();
+    fs::write(dir.path().join("after.png.test"), b"y").unwrap();
+    fs::write(dir.path().join("README.md"), b"z").unwrap();
+    let (before, after) = pictures::pair_paths(dir.path()).unwrap();
+    assert!(before.ends_with("before.png.test") && after.ends_with("after.png.test"));
+}
