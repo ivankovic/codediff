@@ -199,6 +199,26 @@ impl PictureViewer {
         self.mode
     }
 
+    /// The engine's verdict on the pair (see [`PictureDiff::verdict`]).
+    pub fn verdict(&self) -> picture::Verdict {
+        self.diff.verdict()
+    }
+
+    /// Whether the annotation mode hides what the engine decided.
+    pub fn annotating(&self) -> bool {
+        self.annotating
+    }
+
+    /// Switches the annotation mode on or off: off shows the outlined regions, the difference
+    /// view and "how much changed" again. Leaving the difference view when it is switched on.
+    pub fn set_annotating(&mut self, annotating: bool) {
+        self.annotating = annotating;
+        if annotating && self.mode == PictureMode::Difference {
+            self.mode = PictureMode::SideBySide;
+        }
+        self.shown = None;
+    }
+
     /// Handles a picture view key: `t` cycles the view, `h`/`l` or the arrows move the swipe
     /// divider. False for any other key, which the viewer leaves to the rest of the app.
     pub fn handle_key(&mut self, code: KeyCode) -> bool {
@@ -670,6 +690,19 @@ mod tests {
         assert_eq!(before.get_pixel(5, 1).0, [255, 255, 255, 255], "no outline");
         viewer.handle_key(KeyCode::Char('t'));
         assert_eq!(viewer.mode(), PictureMode::Blend, "difference is skipped");
+
+        // Switched off, the engine's view is back: outlines and the change summary.
+        viewer.set_annotating(false);
+        assert!(viewer.status().contains("changed"), "{}", viewer.status());
+        let panes = viewer.composites(built(PictureMode::SideBySide));
+        let [(_, Some(before)), _] = &panes[..] else {
+            panic!("two panes")
+        };
+        assert_eq!(before.get_pixel(5, 1).0, [200, 0, 0, 255], "outlined again");
+        // And on again, the difference view is left.
+        viewer.mode = PictureMode::Difference;
+        viewer.set_annotating(true);
+        assert_eq!(viewer.mode(), PictureMode::SideBySide);
     }
 
     #[test]

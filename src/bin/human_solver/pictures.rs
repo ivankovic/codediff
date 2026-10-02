@@ -21,8 +21,9 @@
 //!
 //! What the human records is a verdict (`test::helper::human_picture`), keys `1`-`4`. The pictures
 //! are shown through `PictureViewer` in its annotation mode - side by side, blend and swipe, the
-//! files' own metadata, and nothing the engine decided - so the verdict stays the human's. `s`
-//! promotes the sample to `src/test/data/pictures/<name>/` with its verdict and a `verdict()` stub,
+//! files' own metadata, and nothing the engine decided - so the verdict stays the human's. `e`
+//! shows the engine's view on request (its verdict, outlined regions, the difference view) and
+//! hides it again; each sample starts with it hidden. `s` promotes the sample to `src/test/data/pictures/<name>/` with its verdict and a `verdict()` stub,
 //! or, once promoted, saves a changed verdict; `x` rejects it with a reason; `O` opens another
 //! sample, and the tree session takes back over for a code one.
 //!
@@ -218,6 +219,18 @@ pub(crate) fn run_picture_session(
                     session.reject_input = Some(String::new());
                 }
             }
+            KeyCode::Char('e') => {
+                let show = session.viewer.annotating();
+                session.viewer.set_annotating(!show);
+                session.status = if show {
+                    format!(
+                        "omnidiff says: {} (e hides it)",
+                        session.viewer.verdict().label()
+                    )
+                } else {
+                    "omnidiff's view hidden".to_string()
+                };
+            }
             KeyCode::Char('O') => open_sample_picker(app),
             KeyCode::Char('q') => {
                 if session.verdict != session.saved && !quit_armed {
@@ -263,7 +276,15 @@ fn draw(frame: &mut ratatui::Frame, session: &mut PictureSession, app: &App) {
         ])),
         rows[0],
     );
-    frame.render_widget(Paragraph::new(session.viewer.status()), rows[1]);
+    let status = if session.viewer.annotating() {
+        Line::from(session.viewer.status())
+    } else {
+        Line::from(vec![
+            format!("omnidiff: {}", session.viewer.verdict().label()).cyan(),
+            format!(" · {}", session.viewer.status()).into(),
+        ])
+    };
+    frame.render_widget(Paragraph::new(status), rows[1]);
 
     let mut choices: Vec<Span> = vec!["Verdict: ".into()];
     for (index, verdict) in Verdict::ALL.iter().enumerate() {
@@ -278,6 +299,7 @@ fn draw(frame: &mut ratatui::Frame, session: &mut PictureSession, app: &App) {
     if session.verdict.is_some() && session.verdict != session.saved {
         choices.push("(unsaved)".yellow());
     }
+
     frame.render_widget(Paragraph::new(Line::from(choices)), rows[2]);
 
     // The pictures are drawn as they look: no theme to follow, only the two outline colors the
@@ -292,7 +314,8 @@ fn draw(frame: &mut ratatui::Frame, session: &mut PictureSession, app: &App) {
     frame.render_widget(Paragraph::new(prompt), rows[4]);
     frame.render_widget(
         Paragraph::new(
-            "1-4 verdict  s promote/save  x reject  t view  h/l swipe  O samples  q quit".dim(),
+            "1-4 verdict  s promote/save  x reject  e omnidiff's view  t view  h/l swipe  O samples  q quit"
+                .dim(),
         ),
         rows[5],
     );
@@ -469,5 +492,19 @@ mod tests {
             !screen.contains("changed"),
             "no engine verdict on screen: {screen}"
         );
+
+        session.viewer.set_annotating(false);
+        terminal
+            .draw(|frame| draw(frame, &mut session, &app))
+            .unwrap();
+        let screen: String = terminal
+            .backend()
+            .buffer()
+            .content()
+            .iter()
+            .map(|cell| cell.symbol())
+            .collect();
+        assert!(screen.contains("omnidiff: content change"), "{screen}");
+        assert!(screen.contains("of pixels changed"), "{screen}");
     }
 }
