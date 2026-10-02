@@ -23,6 +23,8 @@ release does: a minor bump may change the JSON output or the library API, a patc
   `.storyboard`, `.xaml`, `.resx`, `.xsd`/`.xsl`, `.xlf`, `.kml`, `.gpx` and more (see the README's
   language list). A file under one of these names whose content is not markup is still diffed as
   plain text.
+- Building OmniDiff needs Rust 1.90 or later (was 1.88): the picture view's graphics library
+  depends on it.
 
 ## [0.2.0] - 2026-10-01
 

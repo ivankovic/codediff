@@ -19,7 +19,7 @@
 name = "omnidiff"
 version = "0.2.0"
 edition = "2024"
-rust-version = "1.88"
+rust-version = "1.90"
 description = "Fast, robust, syntax-aware code diffing using tree-sitter ASTs"
 license = "AGPL-3.0-or-later"
 repository = "https://github.com/ivankovic/omnidiff"

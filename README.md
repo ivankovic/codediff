@@ -37,7 +37,7 @@ cargo install --locked omnidiff
 ```
 
 This command builds OmniDiff from source, with the dependency versions it was tested with. You
-need a C compiler on `PATH` and a Rust toolchain, rustc 1.88 or later. The build compiles every tree-sitter grammar from C.
+need a C compiler on `PATH` and a Rust toolchain, rustc 1.90 or later. The build compiles every tree-sitter grammar from C.
 The first `cargo install` takes a few minutes, because of this and the `lto = "fat"` release
 profile.
 
