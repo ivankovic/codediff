@@ -91,6 +91,8 @@ c-openssl-openssl-add-import,full,2078,0,0,0,1,0
 c-openssl-openssl-add-import,minimal,2078,0,0,0,1,0
 c-openssl-openssl-add-two-clang-comments,full,163,0,0,0,1,0
 c-openssl-openssl-add-two-clang-comments,minimal,163,0,0,0,1,0
+c-openssl-openssl-big-multi-map-change,full,74869,499,278,435,2,1
+c-openssl-openssl-big-multi-map-change,minimal,74869,886,629,260,2,1
 c-openssl-openssl-copyright,full,157402,0,0,0,1,0
 c-openssl-openssl-copyright,minimal,157402,0,0,0,1,0
 c-openssl-openssl-format-only-change,full,5729,641,641,0,2,0
@@ -157,6 +159,8 @@ cpp-fix-segfault,full,781,0,0,0,1,0
 cpp-fix-segfault,minimal,781,0,0,0,1,0
 cpp-godot-small-bugfix,full,41354,85,83,49,2,0
 cpp-godot-small-bugfix,minimal,41354,228,213,33,2,0
+cpp-godotengine-godot-add-function,full,581670,17,17,0,1,0
+cpp-godotengine-godot-add-function,minimal,581670,0,0,0,1,0
 cpp-godotengine-godot-add-include,full,5771,0,0,0,1,0
 cpp-godotengine-godot-add-include,minimal,5771,0,0,0,1,0
 cpp-godotengine-godot-add-one-include,full,840888,0,0,0,1,0
@@ -191,6 +195,8 @@ cpp-libreoffice-add-imports-and-function-param,full,3286,86,86,0,2,0
 cpp-libreoffice-add-imports-and-function-param,minimal,3286,83,83,0,2,0
 cpp-libreoffice-delete-function,full,7138,0,0,0,2,0
 cpp-libreoffice-delete-function,minimal,7138,2,2,0,2,0
+cpp-libreoffice-fraction-type-to-double,full,114156,32,4,32,2,0
+cpp-libreoffice-fraction-type-to-double,minimal,114156,28,0,28,2,0
 cpp-libreoffice-remove-two-wrapping-functions,full,82352,5,2,4,2,0
 cpp-libreoffice-remove-two-wrapping-functions,minimal,82352,4,2,4,2,0
 cpp-libreoffice-warn-to-info,full,274066,0,0,0,2,0
@@ -215,6 +221,8 @@ cpp-mongodb-mongo-add-function-and-2-call-sites,full,10746,0,0,0,2,1
 cpp-mongodb-mongo-add-function-and-2-call-sites,minimal,10746,4,4,0,2,1
 cpp-mongodb-mongo-use-auto,full,17310,0,0,0,1,0
 cpp-mongodb-mongo-use-auto,minimal,17310,0,0,0,1,0
+cpp-mozilla-firefox-firefox-block-to-default,full,19812,0,0,0,2,0
+cpp-mozilla-firefox-firefox-block-to-default,minimal,19812,12,12,0,2,0
 cpp-mozilla-firefox-firefox-delete-leading-comment,full,4282,0,0,0,1,0
 cpp-mozilla-firefox-firefox-delete-leading-comment,minimal,4282,0,0,0,1,0
 cpp-mozilla-firefox-firefox-pure-move,full,245702,8,8,0,2,0
@@ -231,6 +239,8 @@ cpp-nzbgetcom-nzbget-add-include,full,192,0,0,0,1,0
 cpp-nzbgetcom-nzbget-add-include,minimal,192,0,0,0,1,0
 cpp-nzbgetcom-nzbget-update-string-const,full,18122,1,1,0,2,0
 cpp-nzbgetcom-nzbget-update-string-const,minimal,18122,0,0,0,2,0
+cpp-ollama-ollama-delete-if-else-branch,full,7563,80,80,0,1,0
+cpp-ollama-ollama-delete-if-else-branch,minimal,7563,0,0,0,1,0
 cpp-ollama-ollama-update-commit-hash,full,338,0,0,0,1,0
 cpp-ollama-ollama-update-commit-hash,minimal,338,0,0,0,1,0
 cpp-ollama-ollama-update-commit-hash-2,full,338,2,2,0,1,0
@@ -291,6 +301,8 @@ csharp-lidarr-lidarr-add-import-and-func,full,1733,0,0,0,2,0
 csharp-lidarr-lidarr-add-import-and-func,minimal,1733,0,0,0,2,0
 csharp-lidarr-lidarr-add-method-to-class,full,363,0,0,0,2,0
 csharp-lidarr-lidarr-add-method-to-class,minimal,363,0,0,0,2,0
+csharp-lidarr-lidarr-add-two-params,full,5440,0,0,0,1,0
+csharp-lidarr-lidarr-add-two-params,minimal,5440,0,0,0,1,0
 csharp-radarr-add-object-instance,full,17166,0,0,0,2,0
 csharp-radarr-add-object-instance,minimal,17166,0,0,0,2,0
 csharp-radarr-radarr-add-base-class,full,1335,0,0,0,1,0
@@ -313,6 +325,8 @@ csharp-sonarr-sonarr-add-attribute,full,295,0,0,0,2,0
 csharp-sonarr-sonarr-add-attribute,minimal,295,0,0,0,2,0
 csharp-sonarr-sonarr-add-attribute-2,full,297,0,0,0,2,0
 csharp-sonarr-sonarr-add-attribute-2,minimal,297,0,0,0,2,0
+csharp-sonarr-sonarr-add-field-definition,full,5992,0,0,0,2,0
+csharp-sonarr-sonarr-add-field-definition,minimal,5992,0,0,0,2,0
 csharp-sonarr-sonarr-add-func,full,1435,0,0,0,2,0
 csharp-sonarr-sonarr-add-func,minimal,1435,0,0,0,2,0
 csharp-sonarr-sonarr-add-import-and-annotation,full,404,0,0,0,2,0
@@ -421,14 +435,22 @@ go-jesseduffield-lazygit-change-undo-key,full,105836,0,0,0,1,0
 go-jesseduffield-lazygit-change-undo-key,minimal,105836,0,0,0,1,0
 go-junegunn-fzf-real-small-change,full,433,3,3,0,2,0
 go-junegunn-fzf-real-small-change,minimal,433,2,2,0,2,0
+go-kubernetes-kubernetes-add-element-to-return-slice,full,2496,0,0,0,2,0
+go-kubernetes-kubernetes-add-element-to-return-slice,minimal,2496,0,0,0,2,0
 go-lazygit-add-to-if-condition,full,24047,0,0,0,1,0
 go-lazygit-add-to-if-condition,minimal,24047,0,0,0,1,0
 go-lazygit-switch-to-strings,full,1443,59,41,58,2,0
 go-lazygit-switch-to-strings,minimal,1443,37,28,48,2,0
 go-ollama-ollama-add-go-build-comment,full,338,0,0,0,1,0
 go-ollama-ollama-add-go-build-comment,minimal,338,0,0,0,1,0
+go-ollama-ollama-delete-go-build-comment,full,9294,0,0,0,1,0
+go-ollama-ollama-delete-go-build-comment,minimal,9294,0,0,0,1,0
 go-ollama-ollama-remove-go-build-comment,full,401,0,0,0,1,0
 go-ollama-ollama-remove-go-build-comment,minimal,401,0,0,0,1,0
+go-prometheus-prometheus-nil-to-selector-expr,full,107304,0,0,0,1,0
+go-prometheus-prometheus-nil-to-selector-expr,minimal,107304,0,0,0,1,0
+go-prometheus-prometheus-one-update-in-a-huge-file,full,517780,0,0,0,2,0
+go-prometheus-prometheus-one-update-in-a-huge-file,minimal,517780,0,0,0,2,0
 go-prometheus-prometheus-remove-copyright-year,full,2011,1,1,0,2,0
 go-prometheus-prometheus-remove-copyright-year,minimal,2011,0,0,0,2,0
 html-apache-echarts-delete-one-script-tag,full,35023,0,0,0,2,0
@@ -1713,6 +1735,8 @@ tsx-microsoft-typescript-libpath-to-lib,full,625,4,4,0,2,0
 tsx-microsoft-typescript-libpath-to-lib,minimal,625,2,2,0,2,0
 tsx-mui-material-ui-add-attribute,full,464,0,0,0,1,0
 tsx-mui-material-ui-add-attribute,minimal,464,0,0,0,1,0
+tsx-mui-material-ui-add-name-to-pair,full,909,17,31,23,2,1
+tsx-mui-material-ui-add-name-to-pair,minimal,909,74,19,59,2,1
 tsx-mui-material-ui-add-to-empty-block,full,104,29,6,28,2,0
 tsx-mui-material-ui-add-to-empty-block,minimal,104,21,0,21,2,0
 tsx-mui-material-ui-delete-only,full,662,0,0,0,1,0
@@ -1731,6 +1755,8 @@ tsx-mui-material-ui-remove-one-import,full,2910,0,0,0,1,0
 tsx-mui-material-ui-remove-one-import,minimal,2910,0,0,0,1,0
 tsx-shadcn-ui-ui-order-of-class-names,full,1116,36,36,0,2,0
 tsx-shadcn-ui-ui-order-of-class-names,minimal,1116,36,36,0,2,0
+tsx-shadcn-ui-ui-update-release-announcement,full,849,129,129,0,1,0
+tsx-shadcn-ui-ui-update-release-announcement,minimal,849,93,93,0,1,0
 typescript-add-error-handling,full,410,8,8,0,2,0
 typescript-add-error-handling,minimal,410,0,0,0,2,0
 typescript-add-generics,full,655,28,4,24,2,1
@@ -1827,6 +1853,8 @@ xml-jellyfin-jellyfin-update-attribute-values,full,394,88,88,0,2,0
 xml-jellyfin-jellyfin-update-attribute-values,minimal,394,0,0,0,2,0
 xml-libreoffice-add-one-menu-item,full,72049,23,10,33,2,0
 xml-libreoffice-add-one-menu-item,minimal,72049,23,0,23,2,0
+xml-libreoffice-non-latin-string-data-update,full,6600,4,4,0,1,0
+xml-libreoffice-non-latin-string-data-update,minimal,6600,4,4,0,1,0
 xml-libreoffice-unicode,full,1140,18,18,0,1,0
 xml-libreoffice-unicode,minimal,1140,18,18,0,1,0
 xml-microsoft-terminal-add-one-element,full,2878,40,2,38,2,0
@@ -1861,6 +1889,8 @@ yaml-ansible-ansible-rename-string-scalar,full,260,0,0,0,1,0
 yaml-ansible-ansible-rename-string-scalar,minimal,260,0,0,0,1,0
 yaml-ansible-ansible-version,full,166,0,0,0,1,0
 yaml-ansible-ansible-version,minimal,166,0,0,0,1,0
+yaml-axios-axios-node-to-number,full,1072,6,0,6,1,0
+yaml-axios-axios-node-to-number,minimal,1072,6,0,6,1,0
 yaml-gyulyvgc-sniffnet-version,full,341,23,23,0,2,0
 yaml-gyulyvgc-sniffnet-version,minimal,341,0,0,0,2,0
 yaml-jekyll-jekyll-true-to-false,full,321,0,0,0,1,0
@@ -1873,5 +1903,7 @@ yaml-mastodon-mastodon-remove-translation,full,178590,0,0,0,2,0
 yaml-mastodon-mastodon-remove-translation,minimal,178590,0,0,0,2,0
 yaml-mastodon-remove-one-pair,full,71698,0,0,0,2,0
 yaml-mastodon-remove-one-pair,minimal,71698,0,0,0,2,0
+yaml-mongodb-mongo-add-two-block-sequence-items,full,1920,0,0,0,2,0
+yaml-mongodb-mongo-add-two-block-sequence-items,minimal,1920,0,0,0,2,0
 yaml-puppeteer-puppeteer-false-to-true,full,597,0,0,0,1,0
 yaml-puppeteer-puppeteer-false-to-true,minimal,597,0,0,0,1,0
