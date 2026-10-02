@@ -283,7 +283,7 @@ plain text, line by line, so nothing is refused.
 | TSX | `.tsx` |
 | TypeScript | `.ts`, `.mts`, `.cts` |
 | Vimscript | `.vim` |
-| XML | `.xml`, `.xht`, `.xhtml` |
+| XML | `.xml`, `.xht`, `.xhtml`, `.svg`, `.glif`, `.plist`, `.ui`, `.qrc`, `.glade`, `.xib`, `.storyboard`, `.xaml`, `.vcxproj`, `.filters`, `.csproj`, `.fsproj`, `.vbproj`, `.props`, `.targets`, `.nuspec`, `.resx`, `.wxs`, `.iml`, `.manifest`, `.config`, `.policy`, `.xsd`, `.xsl`, `.xslt`, `.xlf`, `.xliff`, `.kml`, `.gpx`, `.rss`, `.atom`, `.graphml`, `.dae` |
 | YAML | `.yaml`, `.yml` |
 
 Recognised by extension but diffed as plain text, since no grammar is compiled in: Bazel (`.bazel`), Dart (`.dart`), Emacs Lisp (`.el`), Markdown (`.md`, `.markdown`), Protocol Buffers (`.proto`), SQL (`.sql`).
