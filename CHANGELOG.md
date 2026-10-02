@@ -4,6 +4,16 @@ All notable changes to OmniDiff (named CodeDiff up to v0.1.1). The format follow
 and the version numbers follow [Semantic Versioning](https://semver.org/) as far as a 0.x
 release does: a minor bump may change the JSON output or the library API, a patch bump does not.
 
+## [Unreleased]
+
+### Changed
+
+- XML formats with an extension of their own are diffed with the XML grammar instead of line by
+  line: `.svg`, `.plist`, Qt `.ui`/`.qrc`, MSBuild `.vcxproj`/`.csproj`/`.props`/`.targets`, `.xib`,
+  `.storyboard`, `.xaml`, `.resx`, `.xsd`/`.xsl`, `.xlf`, `.kml`, `.gpx` and more (see the README's
+  language list). A file under one of these names whose content is not markup is still diffed as
+  plain text.
+
 ## [0.2.0] - 2026-10-01
 
 **CodeDiff is now OmniDiff.** The old name is a registered trademark, so everything was renamed.
