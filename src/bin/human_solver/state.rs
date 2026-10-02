@@ -2010,6 +2010,11 @@ pub(crate) struct App {
     /// Every case's `description.md`, loaded on the first `o` since it is displayed, not just
     /// filtered on. Cases with no note are absent.
     pub(crate) diff_comments: Option<std::collections::HashMap<String, String>>,
+    /// Every picture fixture with the human's verdict (`None` before one is recorded), re-read on
+    /// each `o`: the picker lists pictures beside the code cases, and a row is a picture exactly
+    /// when its name is here.
+    pub(crate) picture_verdicts:
+        std::collections::HashMap<String, Option<omnidiff::test::helper::human_picture::Verdict>>,
     /// What the `t` view paints (see `TextOverlay`), cycled by `o`.
     pub(crate) text_overlay: TextOverlay,
     /// omnidiff's text ranges per side, computed on first use and dropped on case change.
@@ -2073,6 +2078,7 @@ impl App {
             diff_sizes: None,
             diff_text_painted: None,
             diff_comments: None,
+            picture_verdicts: std::collections::HashMap::new(),
             text_solution,
             text_overlay: TextOverlay::default(),
             algo_text_spans: None,

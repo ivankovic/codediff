@@ -23,9 +23,14 @@
 //! are shown through `PictureViewer` in its annotation mode - side by side, blend and swipe, the
 //! files' own metadata, and nothing the engine decided - so the verdict stays the human's. `e`
 //! shows the engine's view on request (its verdict, outlined regions, the difference view) and
-//! hides it again; each sample starts with it hidden. `s` promotes the sample to `src/test/data/pictures/<name>/` with its verdict and a `verdict()` stub,
-//! or, once promoted, saves a changed verdict; `x` rejects it with a reason; `O` opens another
-//! sample, and the tree session takes back over for a code one.
+//! hides it again; each sample starts with it hidden. `s` promotes the sample to
+//! `src/test/data/pictures/<name>/` with its verdict and a `verdict()` stub, or, once promoted,
+//! saves a changed verdict; `x` rejects it with a reason.
+//!
+//! A picture fixture is opened from `o`, which lists them beside the code cases (dataset
+//! `pictures`): its verdict is changed and saved the same way, and there is nothing to promote or
+//! reject. `o` and `O` work here as in the tree session, which takes back over for a code case or
+//! sample.
 //!
 //! The terminal is asked once which graphics protocol it speaks, on the first picture session:
 //! this binary reads keys synchronously, so the answer cannot be lost to an event reader.
@@ -49,20 +54,58 @@ use ratatui::widgets::Paragraph;
 use ratatui_image::picker::Picker;
 
 use crate::events::{
-    SessionEnd, handle_open_sample_picker, open_sample_picker, reject_sample, update_sample_csv,
+    SessionEnd, handle_open_diff_picker, handle_open_sample_picker, open_diff_picker,
+    open_sample_picker, reject_sample, update_sample_csv,
 };
-use crate::render::render_open_sample_picker;
-use crate::state::{App, Modal};
+use crate::render::{render_open_diff_picker, render_open_sample_picker};
+use crate::state::{App, Modal, OpenTarget};
 use crate::stubs::{LICENSE_HEADER, fixtures_dir, insert_mod_declaration, module_name};
-use crate::{SampleSource, promoted_case_name, samples_root, source_json_for_sample};
+use crate::{
+    DiffPickerData, SampleSource, promoted_case_name, samples_root, source_json_for_sample,
+};
 
 /// Where promoted picture samples go, and the stub module that lists them.
-const PICTURE_DATASET: &str = "pictures";
+pub(crate) const PICTURE_DATASET: &str = "pictures";
 
 /// True if sample `name` is a pair of pictures: its `before.<ext>.test` names a picture format.
 pub(crate) fn is_picture_sample(name: &str) -> bool {
     pair_paths(&samples_root().join(name))
         .is_some_and(|(before, _)| omnidiff::diff::picture::is_picture_path(&before))
+}
+
+/// True if `name` is a picture fixture: a directory of `src/test/data/pictures/` holding a pair.
+fn is_picture_fixture(name: &str) -> bool {
+    pair_paths(&human_picture::pictures_root().join(name))
+        .is_some_and(|(before, _)| omnidiff::diff::picture::is_picture_path(&before))
+}
+
+/// What a picture session judges.
+pub(crate) enum PictureCase {
+    /// A picture sample, from `O`.
+    Sample(String),
+    /// A picture fixture, from `o`.
+    Fixture(String),
+}
+
+impl PictureCase {
+    /// The picture case `end` opens, if it opens one rather than a code case or sample.
+    pub(crate) fn opened_by(end: &SessionEnd) -> Option<PictureCase> {
+        match end {
+            SessionEnd::Open(OpenTarget::Sample(name)) if is_picture_sample(name) => {
+                Some(PictureCase::Sample(name.clone()))
+            }
+            SessionEnd::Open(OpenTarget::Diffs(name)) if is_picture_fixture(name) => {
+                Some(PictureCase::Fixture(name.clone()))
+            }
+            _ => None,
+        }
+    }
+
+    pub(crate) fn name(&self) -> &str {
+        match self {
+            PictureCase::Sample(name) | PictureCase::Fixture(name) => name,
+        }
+    }
 }
 
 /// `dir`'s `before.<ext>.test` and `after.<ext>.test`.
@@ -92,50 +135,85 @@ fn picker() -> Picker {
         .clone()
 }
 
+/// Where the pair being judged lives, and so what `s` and `x` do.
+enum Origin {
+    /// A sample, and the picture fixture it was promoted to once it is.
+    Sample {
+        source: SampleSource,
+        promoted: Option<String>,
+    },
+    /// A picture fixture opened from `o`.
+    Fixture(String),
+}
+
+impl Origin {
+    /// The picture fixture a verdict is saved into, once there is one.
+    fn fixture(&self) -> Option<&str> {
+        match self {
+            Origin::Sample { promoted, .. } => promoted.as_deref(),
+            Origin::Fixture(fixture) => Some(fixture),
+        }
+    }
+}
+
 struct PictureSession {
     name: String,
-    source: SampleSource,
-    /// The picture fixture this sample was promoted to, if it was.
-    promoted: Option<String>,
+    origin: Origin,
+    /// The picture's path in its repository, for the title line.
+    path: String,
     viewer: PictureViewer,
     verdict: Option<Verdict>,
     /// The verdict on disk, to warn before quitting with an unsaved one.
     saved: Option<Verdict>,
     /// A rejection reason being typed, after `x`.
     reject_input: Option<String>,
+    /// `q` was pressed with an unsaved verdict, and was warned about it: another `q` quits.
+    quit_armed: bool,
     status: String,
 }
 
-/// Runs the picture session for sample `name` until the human quits or opens something else.
+/// Runs the picture session for `case` until the human quits or opens something else.
 pub(crate) fn run_picture_session(
     terminal: &mut Terminal<CrosstermBackend<Stdout>>,
     app: &mut App,
-    name: &str,
+    case: &PictureCase,
 ) -> Result<SessionEnd> {
-    let dir = samples_root().join(name);
-    let source = source_json_for_sample(name)
-        .with_context(|| format!("{dir:?} has no readable source.json"))?;
+    let (dir, origin) = match case {
+        PictureCase::Sample(name) => {
+            let dir = samples_root().join(name);
+            let source = source_json_for_sample(name)
+                .with_context(|| format!("{dir:?} has no readable source.json"))?;
+            let promoted = promoted_case_name(&source);
+            (dir, Origin::Sample { source, promoted })
+        }
+        PictureCase::Fixture(name) => (
+            human_picture::pictures_root().join(name),
+            Origin::Fixture(name.clone()),
+        ),
+    };
+    let path = match &origin {
+        Origin::Sample { source, .. } => source.path.clone(),
+        Origin::Fixture(_) => readme_file(&dir).unwrap_or_default(),
+    };
     let (before, after) =
         pair_paths(&dir).with_context(|| format!("{dir:?} has no before/after pair"))?;
     let viewer = PictureViewer::open_for_annotation(&before, &after, picker())
         .with_context(|| format!("{dir:?} is not a pair of pictures that decode"))?;
-    let promoted = promoted_case_name(&source);
-    let saved = promoted
-        .as_deref()
+    let saved = origin
+        .fixture()
         .and_then(|fixture| human_picture::load(fixture).ok())
         .map(|picture| picture.verdict);
     let mut session = PictureSession {
-        name: name.to_string(),
-        source,
-        promoted,
+        name: case.name().to_string(),
+        origin,
+        path,
         viewer,
         verdict: saved,
         saved,
         reject_input: None,
-        status: "1-4 records a verdict; s promotes or saves it".to_string(),
+        quit_armed: false,
+        status: "1-4 records a verdict; s saves it".to_string(),
     };
-    let mut quit_armed = false;
-
     loop {
         terminal.draw(|frame| draw(frame, &mut session, app))?;
         if !event::poll(Duration::from_millis(250))? {
@@ -161,94 +239,116 @@ pub(crate) fn run_picture_session(
             log.record(&session.name, mode, &text, false);
         }
 
-        // The `O` picker, while open, takes every key.
-        if let Some(Modal::OpenSamplePicker {
+        if let Some(end) = handle_key(&mut session, app, key.code) {
+            return Ok(end);
+        }
+    }
+}
+
+/// One key of the picture session; `Some` when it ends the session.
+fn handle_key(session: &mut PictureSession, app: &mut App, code: KeyCode) -> Option<SessionEnd> {
+    // The `o` and `O` pickers, while open, take every key. Any other modal is the tree
+    // session's and has no place here.
+    let picked = match app.modal.take() {
+        Some(Modal::OpenDiffPicker {
+            options,
+            selected,
+            view,
+            name_input,
+        }) => Some(without_unsaved(app, |app| {
+            handle_open_diff_picker(app, code, options, selected, view, name_input)
+        })),
+        Some(Modal::OpenSamplePicker {
             rows,
             selected,
             view,
             name_input,
-        }) = app.modal.take()
-        {
-            if let Some(target) =
-                handle_open_sample_picker(app, key.code, rows, selected, view, name_input)
-            {
-                return Ok(SessionEnd::Open(target));
-            }
-            continue;
-        }
+        }) => Some(without_unsaved(app, |app| {
+            handle_open_sample_picker(app, code, rows, selected, view, name_input)
+        })),
+        _ => None,
+    };
+    if let Some(target) = picked {
+        return target.map(SessionEnd::Open);
+    }
 
-        if let Some(mut reason) = session.reject_input.take() {
-            match key.code {
-                KeyCode::Enter => {
-                    session.status = match reject(&session, &reason) {
-                        Ok(message) => message,
-                        Err(err) => format!("{err:#}"),
-                    };
-                }
-                KeyCode::Esc => session.status = "Rejection cancelled".to_string(),
-                KeyCode::Backspace => {
-                    reason.pop();
-                    session.reject_input = Some(reason);
-                }
-                KeyCode::Char(c) => {
-                    reason.push(c);
-                    session.reject_input = Some(reason);
-                }
-                _ => session.reject_input = Some(reason),
-            }
-            continue;
-        }
-
-        let quitting = matches!(key.code, KeyCode::Char('q'));
-        match key.code {
-            KeyCode::Char(digit @ '1'..='4') => {
-                let verdict = Verdict::ALL[digit as usize - '1' as usize];
-                session.verdict = Some(verdict);
-                session.status = format!("Verdict: {} (s to save)", verdict.label());
-            }
-            KeyCode::Char('s') => {
-                session.status = match save(&mut session) {
+    if let Some(mut reason) = session.reject_input.take() {
+        match code {
+            KeyCode::Enter => {
+                session.status = match reject(session, &reason) {
                     Ok(message) => message,
                     Err(err) => format!("{err:#}"),
                 };
             }
-            KeyCode::Char('x') => {
-                if session.promoted.is_some() {
-                    session.status = "A promoted sample cannot be rejected".to_string();
-                } else {
-                    session.reject_input = Some(String::new());
-                }
+            KeyCode::Esc => session.status = "Rejection cancelled".to_string(),
+            KeyCode::Backspace => {
+                reason.pop();
+                session.reject_input = Some(reason);
             }
-            KeyCode::Char('e') => {
-                let show = session.viewer.annotating();
-                session.viewer.set_annotating(!show);
-                session.status = if show {
-                    format!(
-                        "omnidiff says: {} (e hides it)",
-                        session.viewer.verdict().label()
-                    )
-                } else {
-                    "omnidiff's view hidden".to_string()
-                };
+            KeyCode::Char(c) => {
+                reason.push(c);
+                session.reject_input = Some(reason);
             }
-            KeyCode::Char('O') => open_sample_picker(app),
-            KeyCode::Char('q') => {
-                if session.verdict != session.saved && !quit_armed {
-                    session.status =
-                        "The verdict is not saved: s saves it, q again quits anyway".to_string();
-                    quit_armed = true;
-                } else {
-                    return Ok(SessionEnd::Quit);
-                }
+            _ => session.reject_input = Some(reason),
+        }
+        return None;
+    }
+
+    let quitting = matches!(code, KeyCode::Char('q'));
+    match code {
+        KeyCode::Char(digit @ '1'..='4') => {
+            let verdict = Verdict::ALL[digit as usize - '1' as usize];
+            session.verdict = Some(verdict);
+            session.status = format!("Verdict: {} (s to save)", verdict.label());
+        }
+        KeyCode::Char('s') => {
+            session.status = match save(session) {
+                Ok(message) => message,
+                Err(err) => format!("{err:#}"),
+            };
+        }
+        KeyCode::Char('x') => match &session.origin {
+            Origin::Sample { promoted: None, .. } => {
+                session.reject_input = Some(String::new());
             }
-            code => {
-                session.viewer.handle_key(code);
+            Origin::Sample { .. } => {
+                session.status = "A promoted sample cannot be rejected".to_string();
+            }
+            Origin::Fixture(_) => {
+                session.status = "A fixture cannot be rejected".to_string();
+            }
+        },
+        KeyCode::Char('e') => {
+            let show = session.viewer.annotating();
+            session.viewer.set_annotating(!show);
+            session.status = if show {
+                format!(
+                    "omnidiff says: {} (e hides it)",
+                    session.viewer.verdict().label()
+                )
+            } else {
+                "omnidiff's view hidden".to_string()
+            };
+        }
+        KeyCode::Char('o') => open_diff_picker(app, &session.name),
+        KeyCode::Char('O') => open_sample_picker(app, &session.name),
+        KeyCode::Char('q') => {
+            if session.verdict != session.saved && !session.quit_armed {
+                session.status =
+                    "The verdict is not saved: s saves it, q again quits anyway".to_string();
+                session.quit_armed = true;
+            } else {
+                return Some(SessionEnd::Quit);
             }
         }
-        if !quitting {
-            quit_armed = false;
+        code => {
+            session.viewer.handle_key(code);
         }
     }
+    if !quitting {
+        session.quit_armed = false;
+    }
+    None
 }
 
 fn draw(frame: &mut ratatui::Frame, session: &mut PictureSession, app: &App) {
@@ -265,14 +365,18 @@ fn draw(frame: &mut ratatui::Frame, session: &mut PictureSession, app: &App) {
         ])
         .split(area);
 
-    let state = match &session.promoted {
-        Some(fixture) => format!("promoted to {fixture}"),
-        None => "sample".to_string(),
+    let state = match &session.origin {
+        Origin::Sample {
+            promoted: Some(fixture),
+            ..
+        } => format!("promoted to {fixture}"),
+        Origin::Sample { promoted: None, .. } => "sample".to_string(),
+        Origin::Fixture(_) => "fixture".to_string(),
     };
     frame.render_widget(
         Paragraph::new(Line::from(vec![
             session.name.as_str().bold(),
-            format!("  ({state}, {})", session.source.path).dim(),
+            format!("  ({state}, {})", session.path).dim(),
         ])),
         rows[0],
     );
@@ -312,45 +416,90 @@ fn draw(frame: &mut ratatui::Frame, session: &mut PictureSession, app: &App) {
         None => session.status.clone(),
     };
     frame.render_widget(Paragraph::new(prompt), rows[4]);
+    let keys = match session.origin {
+        Origin::Fixture(_) => "1-4 verdict  s save",
+        Origin::Sample { .. } => "1-4 verdict  s promote/save  x reject",
+    };
     frame.render_widget(
         Paragraph::new(
-            "1-4 verdict  s promote/save  x reject  e omnidiff's view  t view  h/l swipe  O samples  q quit"
+            format!("{keys}  e omnidiff's view  t view  h/l swipe  o cases  O samples  q quit")
                 .dim(),
         ),
         rows[5],
     );
 
-    if let Some(Modal::OpenSamplePicker {
-        rows,
-        selected,
-        view,
-        name_input,
-    }) = &app.modal
-    {
-        render_open_sample_picker(frame, area, rows, *selected, view, name_input.as_deref());
+    match &app.modal {
+        Some(Modal::OpenDiffPicker {
+            options,
+            selected,
+            view,
+            name_input,
+        }) => render_open_diff_picker(
+            frame,
+            area,
+            options,
+            *selected,
+            view,
+            name_input.as_deref(),
+            DiffPickerData::from_app(app),
+            app.diff_comments.as_ref(),
+        ),
+        Some(Modal::OpenSamplePicker {
+            rows,
+            selected,
+            view,
+            name_input,
+        }) => render_open_sample_picker(frame, area, rows, *selected, view, name_input.as_deref()),
+        _ => {}
     }
 }
 
+/// Runs a picker's key handler as if the tree session's case had nothing unsaved. The pickers
+/// would otherwise ask whether to discard it, in a modal this session cannot show; and the question
+/// was already answered, by the picker that opened this session.
+fn without_unsaved<T>(app: &mut App, handle: impl FnOnce(&mut App) -> T) -> T {
+    let dirty = std::mem::replace(&mut app.dirty, false);
+    let result = handle(app);
+    app.dirty = dirty;
+    result
+}
+
+/// The `File` line of a picture fixture's README: the picture's path in its repository.
+fn readme_file(dir: &Path) -> Option<String> {
+    let readme = fs::read_to_string(dir.join("README.md")).ok()?;
+    readme.lines().find_map(|line| {
+        let file = line.strip_prefix("- **File:** `")?;
+        Some(file.strip_suffix('`')?.to_string())
+    })
+}
+
 /// Promotes the sample to a picture fixture with the current verdict, or saves a changed verdict
-/// into the fixture it was promoted to. Either way the fixture's stub is rewritten to match what
+/// into the fixture it was promoted to or opened as. Either way the fixture's stub is rewritten to match what
 /// the engine says now.
 fn save(session: &mut PictureSession) -> Result<String> {
     let Some(verdict) = session.verdict else {
         bail!("No verdict yet: 1-4 records one");
     };
     let picture = HumanPicture { verdict };
-    let fixture = match &session.promoted {
-        Some(fixture) => {
+    let fixture = match &mut session.origin {
+        Origin::Fixture(fixture)
+        | Origin::Sample {
+            promoted: Some(fixture),
+            ..
+        } => {
             human_picture::save(fixture, &picture)?;
             fixture.clone()
         }
-        None => {
+        Origin::Sample {
+            source,
+            promoted: promoted @ None,
+        } => {
             let fixture = session.name.clone();
             promote(&session.name, &fixture, &picture)?;
-            if !update_sample_csv(&session.source, &fixture)? {
+            if !update_sample_csv(source, &fixture)? {
                 bail!("promoted to '{fixture}', but its sample.csv row was not found");
             }
-            session.promoted = Some(fixture.clone());
+            *promoted = Some(fixture.clone());
             fixture
         }
     };
@@ -418,11 +567,14 @@ pub(crate) fn stub_contents(fixture: &str, mismatch: Option<Verdict>) -> String 
 }
 
 fn reject(session: &PictureSession, reason: &str) -> Result<String> {
+    let Origin::Sample { source, .. } = &session.origin else {
+        bail!("A fixture cannot be rejected");
+    };
     let reason = reason.trim();
     if reason.is_empty() {
         bail!("Rejection reason cannot be empty");
     }
-    match reject_sample(&session.source, reason)? {
+    match reject_sample(source, reason)? {
         true => Ok(format!("Rejected '{}': {reason}", session.name)),
         false => bail!("source row not found in sample.csv; not updated"),
     }
@@ -434,23 +586,31 @@ mod tests {
     use crate::state::CaseOrigin;
     use omnidiff::test::helper::human_mapping::HumanMapping;
 
-    #[test]
-    fn the_session_shows_the_verdicts_and_nothing_the_engine_decided() {
-        let dir = tempfile::tempdir().unwrap();
+    /// A session over a generated pair in `dir`: white 8x4 pictures, one pixel apart.
+    fn session_over(dir: &Path, name: &str, origin: Origin, path: &str) -> PictureSession {
         let mut after = image::RgbaImage::from_pixel(8, 4, image::Rgba([255, 255, 255, 255]));
         let before = after.clone();
         after.put_pixel(1, 1, image::Rgba([0, 0, 0, 255]));
-        let (a, b) = (
-            dir.path().join("before.png.test"),
-            dir.path().join("after.png.test"),
-        );
+        let (a, b) = (dir.join("before.png.test"), dir.join("after.png.test"));
         before
             .save_with_format(&a, image::ImageFormat::Png)
             .unwrap();
         after.save_with_format(&b, image::ImageFormat::Png).unwrap();
+        PictureSession {
+            name: name.to_string(),
+            origin,
+            path: path.to_string(),
+            viewer: PictureViewer::open_for_annotation(&a, &b, Picker::halfblocks()).unwrap(),
+            verdict: None,
+            saved: None,
+            reject_input: None,
+            quit_armed: false,
+            status: String::new(),
+        }
+    }
 
-        let mut session = PictureSession {
-            name: "png-x-repo-1234abcd-logo".to_string(),
+    fn sample_origin() -> Origin {
+        Origin::Sample {
             source: SampleSource {
                 language: "PNG".to_string(),
                 repository: "repo".to_string(),
@@ -459,52 +619,190 @@ mod tests {
                 dataset: PICTURE_DATASET.to_string(),
             },
             promoted: None,
-            viewer: PictureViewer::open_for_annotation(&a, &b, Picker::halfblocks()).unwrap(),
-            verdict: Some(Verdict::ContentChange),
-            saved: None,
-            reject_input: None,
-            status: String::new(),
-        };
-        let app = App::new(
+        }
+    }
+
+    fn test_app() -> App {
+        App::new(
             "x".to_string(),
             CaseOrigin::Diffs,
             0,
             0,
             HumanMapping::default(),
-        );
-        let mut terminal = Terminal::new(ratatui::backend::TestBackend::new(100, 16)).unwrap();
+        )
+    }
+
+    fn screen(session: &mut PictureSession, app: &App, width: u16) -> String {
+        let mut terminal = Terminal::new(ratatui::backend::TestBackend::new(width, 16)).unwrap();
+        terminal.draw(|frame| draw(frame, session, app)).unwrap();
         terminal
-            .draw(|frame| draw(frame, &mut session, &app))
-            .unwrap();
-        let screen: String = terminal
             .backend()
             .buffer()
             .content()
             .iter()
             .map(|cell| cell.symbol())
-            .collect();
-        assert!(screen.contains("png-x-repo-1234abcd-logo"), "{screen}");
-        assert!(screen.contains("PNG 8x4 RGBA8"), "{screen}");
-        assert!(screen.contains("1 content change"), "{screen}");
-        assert!(screen.contains("4 replaced"), "{screen}");
-        assert!(screen.contains("(unsaved)"), "{screen}");
+            .collect()
+    }
+
+    /// The bug this guards: `o` fell through to the viewer, which ignores it, so the only way back
+    /// to a code case was `O` or a restart.
+    #[test]
+    fn o_opens_the_case_picker_and_esc_hands_the_keys_back() {
+        // A real fixture, so the picker has its row to put the cursor on.
+        let fixture = crate::list_dir_names(&human_picture::pictures_root())
+            .unwrap()
+            .pop()
+            .expect("at least one picture fixture");
+        let dir = tempfile::tempdir().unwrap();
+        let mut session = session_over(
+            dir.path(),
+            &fixture,
+            Origin::Fixture(fixture.clone()),
+            "logo.png",
+        );
+        let mut app = test_app();
+
+        assert!(handle_key(&mut session, &mut app, KeyCode::Char('o')).is_none());
+        let Some(Modal::OpenDiffPicker {
+            options, selected, ..
+        }) = &app.modal
+        else {
+            panic!("o must open the case picker, got {:?}", app.modal);
+        };
+        let visible =
+            crate::visible_diff_options(options, &app.diff_view, DiffPickerData::from_app(&app));
+        assert_eq!(
+            visible[*selected], fixture,
+            "the cursor starts on the picture being judged, not the tree session's case"
+        );
         assert!(
-            !screen.contains("changed"),
-            "no engine verdict on screen: {screen}"
+            options
+                .iter()
+                .any(|(_, dataset)| *dataset == PICTURE_DATASET),
+            "the picture fixtures are listed"
+        );
+        assert!(
+            options
+                .iter()
+                .any(|(_, dataset)| *dataset != PICTURE_DATASET),
+            "and so are the code cases"
+        );
+        assert!(
+            screen(&mut session, &app, 160).contains("Open diff ["),
+            "the picker is drawn over the pictures"
+        );
+
+        assert!(handle_key(&mut session, &mut app, KeyCode::Esc).is_none());
+        assert!(app.modal.is_none());
+        handle_key(&mut session, &mut app, KeyCode::Char('3'));
+        assert_eq!(
+            session.verdict,
+            Some(Verdict::ALL[2]),
+            "with the picker closed, keys reach the session again"
+        );
+    }
+
+    /// The tree case left behind was already answered for by the picker that opened this session;
+    /// asking again would raise a modal this session cannot show.
+    #[test]
+    fn enter_in_the_case_picker_opens_the_case_over_an_unsaved_tree_case() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut session = session_over(
+            dir.path(),
+            "png-x-repo-1234abcd-logo",
+            sample_origin(),
+            "assets/logo.png",
+        );
+        let mut app = test_app();
+        app.dirty = true;
+        app.modal = Some(Modal::OpenDiffPicker {
+            options: vec![("png-a".to_string(), PICTURE_DATASET)],
+            selected: 0,
+            view: Default::default(),
+            name_input: None,
+        });
+
+        let end = handle_key(&mut session, &mut app, KeyCode::Enter);
+        assert!(
+            matches!(&end, Some(SessionEnd::Open(OpenTarget::Diffs(name))) if name == "png-a"),
+            "Enter opens the selected case"
+        );
+        assert!(app.dirty, "the tree session's own flag is left as it was");
+    }
+
+    #[test]
+    fn opened_by_sends_picture_fixtures_to_the_picture_session_and_code_cases_back() {
+        let fixture = crate::list_dir_names(&human_picture::pictures_root())
+            .unwrap()
+            .into_iter()
+            .next()
+            .expect("at least one picture fixture");
+        let code = crate::list_available_cases().unwrap()[0].0.clone();
+
+        let open = |name: &str| SessionEnd::Open(OpenTarget::Diffs(name.to_string()));
+        assert!(matches!(
+            PictureCase::opened_by(&open(&fixture)),
+            Some(PictureCase::Fixture(name)) if name == fixture
+        ));
+        assert!(PictureCase::opened_by(&open(&code)).is_none());
+        assert!(PictureCase::opened_by(&SessionEnd::Quit).is_none());
+    }
+
+    #[test]
+    fn a_fixture_shows_its_repository_path_and_has_nothing_to_promote_or_reject() {
+        let fixture = "bmp-x-talamus-solarize-12x29-psf-8a856fdb-solarize-12x29";
+        let path = readme_file(&human_picture::pictures_root().join(fixture));
+        assert_eq!(path.as_deref(), Some("Solarize.12x29.bmp"));
+
+        let dir = tempfile::tempdir().unwrap();
+        let mut session = session_over(
+            dir.path(),
+            fixture,
+            Origin::Fixture(fixture.to_string()),
+            &path.unwrap(),
+        );
+        let mut app = test_app();
+        let text = screen(&mut session, &app, 160);
+        assert!(text.contains("(fixture, Solarize.12x29.bmp)"), "{text}");
+        assert!(text.contains("1-4 verdict  s save  e"), "{text}");
+        assert!(!text.contains("reject"), "{text}");
+
+        handle_key(&mut session, &mut app, KeyCode::Char('x'));
+        assert!(session.reject_input.is_none());
+        assert_eq!(session.status, "A fixture cannot be rejected");
+    }
+
+    #[test]
+    fn the_session_shows_the_verdicts_and_nothing_the_engine_decided() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut session = session_over(
+            dir.path(),
+            "png-x-repo-1234abcd-logo",
+            sample_origin(),
+            "assets/logo.png",
+        );
+        session.verdict = Some(Verdict::ContentChange);
+        let app = test_app();
+        let screen_text = screen(&mut session, &app, 100);
+        assert!(
+            screen_text.contains("png-x-repo-1234abcd-logo"),
+            "{screen_text}"
+        );
+        assert!(screen_text.contains("PNG 8x4 RGBA8"), "{screen_text}");
+        assert!(screen_text.contains("1 content change"), "{screen_text}");
+        assert!(screen_text.contains("4 replaced"), "{screen_text}");
+        assert!(screen_text.contains("(unsaved)"), "{screen_text}");
+        assert!(
+            !screen_text.contains("changed"),
+            "no engine verdict on screen: {screen_text}"
         );
 
         session.viewer.set_annotating(false);
-        terminal
-            .draw(|frame| draw(frame, &mut session, &app))
-            .unwrap();
-        let screen: String = terminal
-            .backend()
-            .buffer()
-            .content()
-            .iter()
-            .map(|cell| cell.symbol())
-            .collect();
-        assert!(screen.contains("omnidiff: content change"), "{screen}");
-        assert!(screen.contains("of pixels changed"), "{screen}");
+        let screen_text = screen(&mut session, &app, 100);
+        assert!(
+            screen_text.contains("omnidiff: content change"),
+            "{screen_text}"
+        );
+        assert!(screen_text.contains("of pixels changed"), "{screen_text}");
     }
 }

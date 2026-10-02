@@ -4526,14 +4526,177 @@ fn the_cmpl_and_unmarked_filters_select_the_same_rows() {
 }
 
 #[test]
-fn next_dataset_filter_cycles_through_diff_datasets_and_back_to_all() {
+fn next_dataset_filter_cycles_through_diff_datasets_then_pictures_and_back_to_all() {
     // Walks every entry, so a new dataset needs no edit here.
     let mut current = None;
     for &dataset in DIFF_DATASETS {
         current = next_dataset_filter(current);
         assert_eq!(current, Some(dataset));
     }
+    current = next_dataset_filter(current);
+    assert_eq!(current, Some(pictures::PICTURE_DATASET));
     assert_eq!(next_dataset_filter(current), None);
+}
+
+/// The picker's rows for the picture tests: one code case, and two pictures, one with a verdict.
+fn mixed_picker_options() -> Vec<(String, &'static str)> {
+    vec![
+        ("alpha".to_string(), "handmade"),
+        ("png-a".to_string(), pictures::PICTURE_DATASET),
+        ("png-b".to_string(), pictures::PICTURE_DATASET),
+    ]
+}
+
+fn mixed_picture_verdicts() -> std::collections::HashMap<String, Option<human_picture::Verdict>> {
+    std::collections::HashMap::from([
+        ("png-a".to_string(), Some(human_picture::Verdict::Resized)),
+        ("png-b".to_string(), None),
+    ])
+}
+
+/// A picture is complete once its verdict is recorded; the code case still goes by its unmarked
+/// nodes.
+#[test]
+fn the_cmpl_filter_reads_a_pictures_verdict() {
+    let options = mixed_picker_options();
+    let unmarked = std::collections::HashMap::from([("alpha".to_string(), 4)]);
+    let verdicts = mixed_picture_verdicts();
+    let data = DiffPickerData {
+        unmarked: Some(&unmarked),
+        pictures: Some(&verdicts),
+        ..DiffPickerData::default()
+    };
+
+    assert_eq!(
+        visible_diff_options(
+            &options,
+            &flag_view(DiffColumn::Cmpl, FlagFilter::Yes),
+            data
+        ),
+        vec!["alpha", "png-b"]
+    );
+    assert_eq!(
+        visible_diff_options(&options, &flag_view(DiffColumn::Cmpl, FlagFilter::No), data),
+        vec!["png-a"]
+    );
+    assert_eq!(
+        visible_diff_options(
+            &options,
+            &flag_view(DiffColumn::Unmarked, FlagFilter::No),
+            data
+        ),
+        vec!["png-a", "png-b"],
+        "a picture has no unmarked count, so the Unmarked filter keeps it either way"
+    );
+}
+
+/// Sorting by `Verdict` gathers pictures by verdict; rows without one (code, or a picture not yet
+/// judged) sort last, as unknowns do in every column.
+#[test]
+fn the_verdict_column_sorts_judged_pictures_first() {
+    let mut options = mixed_picker_options();
+    options.push(("png-c".to_string(), pictures::PICTURE_DATASET));
+    let mut verdicts = mixed_picture_verdicts();
+    verdicts.insert(
+        "png-c".to_string(),
+        Some(human_picture::Verdict::ContentChange),
+    );
+    let data = DiffPickerData {
+        pictures: Some(&verdicts),
+        ..DiffPickerData::default()
+    };
+
+    assert_eq!(
+        visible_diff_options(&options, &sort_view(DiffColumn::Verdict), data),
+        vec!["png-c", "png-a", "alpha", "png-b"]
+    );
+}
+
+/// `f` on `Verdict` filters nothing and says so, rather than doing nothing silently.
+#[test]
+fn open_diff_picker_f_on_the_verdict_column_explains_it_only_sorts() {
+    let view = DiffPickerView {
+        column: DiffColumn::Verdict,
+        ..DiffPickerView::default()
+    };
+    let app = press_in_diff_picker(mixed_picker_options(), view, &[KeyCode::Char('f')]);
+    assert_eq!(picker_view(&app).filters, DiffFilters::default());
+    assert_eq!(
+        app.status.as_deref(),
+        Some("Verdict has no filter: s sorts by it")
+    );
+}
+
+#[test]
+fn render_open_diff_picker_shows_a_pictures_verdict_and_dashes_for_what_only_code_has() {
+    let backend = ratatui::backend::TestBackend::new(160, 14);
+    let mut terminal = Terminal::new(backend).unwrap();
+    let area = Rect::new(0, 0, 160, 14);
+    let verdicts = mixed_picture_verdicts();
+    let modal = Modal::OpenDiffPicker {
+        options: mixed_picker_options(),
+        selected: 0,
+        view: DiffPickerView::default(),
+        name_input: None,
+    };
+
+    terminal
+        .draw(|f| {
+            render_modal(
+                f,
+                area,
+                &modal,
+                "alpha",
+                None,
+                "",
+                "",
+                &HumanMapping::default(),
+                "Minimal",
+                TextOverlay::Human,
+                None,
+                DiffPickerData {
+                    pictures: Some(&verdicts),
+                    ..DiffPickerData::default()
+                },
+                None,
+            )
+        })
+        .unwrap();
+
+    let text = rendered_text(&terminal);
+    // The buffer is one long line: split it into the terminal's rows.
+    let rows: Vec<String> = text
+        .chars()
+        .collect::<Vec<_>>()
+        .chunks(160)
+        .map(|chunk| chunk.iter().collect())
+        .collect();
+    let row = |name: &str| -> &String {
+        rows.iter()
+            .find(|line| line.contains(name))
+            .unwrap_or_else(|| panic!("no row for {name}: {text}"))
+    };
+    assert!(text.contains("Verdict"), "the Verdict header: {text}");
+    assert!(row("png-a").contains("pictures"), "{}", row("png-a"));
+    assert!(
+        row("png-a").contains("✓"),
+        "a verdict completes it: {}",
+        row("png-a")
+    );
+    assert!(row("png-a").contains("resized"), "{}", row("png-a"));
+    assert!(row("png-a").contains('–'), "{}", row("png-a"));
+    assert!(!row("png-a").contains('?'), "{}", row("png-a"));
+    assert!(
+        row("png-b").contains("•"),
+        "no verdict yet: {}",
+        row("png-b")
+    );
+    assert!(
+        row("alpha").contains('?'),
+        "code columns not scanned: {}",
+        row("alpha")
+    );
+    assert!(!row("alpha").contains('–'), "{}", row("alpha"));
 }
 
 #[test]
@@ -4646,7 +4809,7 @@ fn open_diff_picker_h_and_l_move_the_column_cursor_and_clamp_at_the_ends() {
     );
     assert_eq!(
         picker_view(&app).column,
-        DiffColumn::Size,
+        DiffColumn::Verdict,
         "l must clamp at the last column, not wrap round to Name"
     );
 

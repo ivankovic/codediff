@@ -1467,33 +1467,31 @@ pub(crate) fn render_open_diff_picker(
                 Style::default()
             };
             let noted = comments.is_some_and(|map| map.contains_key(name));
-            let unmarked = data.unmarked_of(name);
-            let complete_mark = match unmarked {
-                Some(0) => "✓",
-                Some(_) => "•",
+            let complete_mark = match data.incomplete_of(name) {
+                Some(false) => "✓",
+                Some(true) => "•",
                 None => "?",
             };
-            let unmarked_cell = match unmarked {
-                Some(count) => count.to_string(),
+            // A picture has no mapping, painting or text diff to measure: `–`, not `?`, which
+            // would read as "not scanned yet".
+            let picture = data.is_picture(name);
+            let measured = |value: Option<String>| match value {
+                _ if picture => "–".to_string(),
+                Some(value) => value,
                 None => "?".to_string(),
             };
-            let painted_mark = match data.painted_of(name) {
-                Some(true) => "✓",
-                Some(false) => "•",
-                None => "?",
-            };
-            let disagree_cell = match data.disagreement_of(name) {
-                Some(bytes) => bytes.to_string(),
-                None => "?".to_string(),
-            };
-            let invariant_cell = match data.invariants_of(name) {
-                Some(count) => count.to_string(),
-                None => "?".to_string(),
-            };
-            let size_cell = match data.size_of(name) {
-                Some(lines) => lines.to_string(),
-                None => "?".to_string(),
-            };
+            let unmarked_cell = measured(data.unmarked_of(name).map(|count| count.to_string()));
+            let painted_mark = measured(
+                data.painted_of(name)
+                    .map(|painted| if painted { "✓" } else { "•" }.to_string()),
+            );
+            let disagree_cell = measured(data.disagreement_of(name).map(|bytes| bytes.to_string()));
+            let invariant_cell = measured(data.invariants_of(name).map(|count| count.to_string()));
+            let size_cell = measured(data.size_of(name).map(|lines| lines.to_string()));
+            let verdict_cell = data
+                .verdict_of(name)
+                .map(|verdict| verdict.label())
+                .unwrap_or_default();
             Row::new(vec![
                 Cell::from(if noted {
                     format!("* {name}")
@@ -1507,6 +1505,7 @@ pub(crate) fn render_open_diff_picker(
                 Cell::from(disagree_cell),
                 Cell::from(invariant_cell),
                 Cell::from(size_cell),
+                Cell::from(verdict_cell),
             ])
             .style(style)
         })
@@ -1571,6 +1570,7 @@ pub(crate) fn render_open_diff_picker(
             Constraint::Length(10),
             Constraint::Length(11),
             Constraint::Length(7),
+            Constraint::Length(17),
         ],
     )
     .header(header)

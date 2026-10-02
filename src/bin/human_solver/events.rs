@@ -169,18 +169,15 @@ pub(crate) fn run_event_loop(
         // The session borrows `before`/`after` immutably, so its cached `FrameState` can live for
         // the whole session; only this loop reassigns them, between sessions.
         let mut end = run_case_session(terminal, app, &before, &after)?;
-        // A picture sample has no trees: it gets its own session, which hands back whatever is
-        // opened from it. The tree session's case stays loaded underneath.
-        while let SessionEnd::Open(OpenTarget::Sample(name)) = &end
-            && crate::pictures::is_picture_sample(name)
-        {
-            let name = name.clone();
-            end = match crate::pictures::run_picture_session(terminal, app, &name) {
+        // A picture sample or fixture has no trees: it gets its own session, which hands back
+        // whatever is opened from it. The tree session's case stays loaded underneath.
+        while let Some(case) = crate::pictures::PictureCase::opened_by(&end) {
+            end = match crate::pictures::run_picture_session(terminal, app, &case) {
                 Ok(end) => end,
                 // A picture the decoder cannot read (some multi-size ICOs): said, and the tree
                 // session resumes as it was.
                 Err(err) => {
-                    app.status = Some(format!("Cannot open picture sample '{name}': {err:#}"));
+                    app.status = Some(format!("Cannot open picture '{}': {err:#}", case.name()));
                     run_case_session(terminal, app, &before, &after)?
                 }
             };
@@ -1334,31 +1331,13 @@ pub(crate) fn handle_tree_independent_key(
             None
         }
         KeyCode::Char('o') => {
-            // Eager, unlike the other per-case maps: notes are displayed, not just sorted by.
-            if app.diff_comments.is_none() {
-                app.diff_comments = Some(compute_diff_comments());
-            }
-            match list_available_cases() {
-                Ok(options) if !options.is_empty() => {
-                    let modal = open_diff_picker_modal(
-                        options,
-                        &app.name,
-                        app.diff_view.clone(),
-                        DiffPickerData::from_app(app),
-                    );
-                    app.modal = Some(modal);
-                }
-                Ok(_) => {
-                    app.status = Some("No test cases found in src/test/data/diffs".to_string());
-                }
-                Err(err) => {
-                    app.status = Some(format!("Error listing cases: {:#}", err));
-                }
-            }
+            let current = app.name.clone();
+            open_diff_picker(app, &current);
             None
         }
         KeyCode::Char('O') => {
-            open_sample_picker(app);
+            let current = app.name.clone();
+            open_sample_picker(app, &current);
             None
         }
         KeyCode::Char('C') => {
@@ -2947,9 +2926,38 @@ fn handle_text_view(
     None
 }
 
-/// Opens the `O` picker over every sample (picture samples included), measuring the ones not yet
-/// measured. Shared by the tree session and `pictures::run_picture_session`.
-pub(crate) fn open_sample_picker(app: &mut App) {
+/// Opens the `o` picker over every case and picture fixture, on `current`'s row if it is listed.
+/// Shared by the tree session and `pictures::run_picture_session`.
+pub(crate) fn open_diff_picker(app: &mut App, current: &str) {
+    // Eager, unlike the other per-case maps: notes are displayed, not just sorted by.
+    if app.diff_comments.is_none() {
+        app.diff_comments = Some(compute_diff_comments());
+    }
+    // Re-read every time: the picture session saves verdicts behind the picker's back.
+    app.picture_verdicts = read_picture_verdicts();
+    match list_picker_cases() {
+        Ok(options) if !options.is_empty() => {
+            let modal = open_diff_picker_modal(
+                options,
+                current,
+                app.diff_view.clone(),
+                DiffPickerData::from_app(app),
+            );
+            app.modal = Some(modal);
+        }
+        Ok(_) => {
+            app.status = Some("No test cases found in src/test/data/diffs".to_string());
+        }
+        Err(err) => {
+            app.status = Some(format!("Error listing cases: {:#}", err));
+        }
+    }
+}
+
+/// Opens the `O` picker over every sample (picture samples included), on `current`'s row if it is
+/// listed, measuring the samples not yet measured. Shared by the tree session and
+/// `pictures::run_picture_session`.
+pub(crate) fn open_sample_picker(app: &mut App, current: &str) {
     match list_sample_rows() {
         Ok(rows) if !rows.is_empty() => {
             // One external `diff` per sample: scan only the unmeasured ones, in parallel.
@@ -2975,7 +2983,7 @@ pub(crate) fn open_sample_picker(app: &mut App) {
                 })
                 .collect();
             let view = app.sample_view.clone();
-            app.modal = Some(open_sample_picker_modal(rows, &app.name, view));
+            app.modal = Some(open_sample_picker_modal(rows, current, view));
         }
         Ok(_) => {
             app.status = Some("No samples found in src/test/data/samples".to_string());
@@ -3151,7 +3159,7 @@ pub(crate) fn handle_open_sample_picker(
 }
 
 /// `handle_modal_key`'s `Modal::OpenDiffPicker` arm.
-fn handle_open_diff_picker(
+pub(crate) fn handle_open_diff_picker(
     app: &mut App,
     code: KeyCode,
     options: Vec<(String, &'static str)>,
@@ -3273,6 +3281,8 @@ fn handle_open_diff_picker(
                 view.filters.dataset = next_dataset_filter(view.filters.dataset);
             } else if let Some(flag) = view.filters.flag_mut(view.column) {
                 *flag = flag.next();
+            } else if view.column == DiffColumn::Verdict {
+                app.status = Some("Verdict has no filter: s sorts by it".to_string());
             }
             app.diff_view = view.clone();
             let modal = open_diff_picker_modal(
