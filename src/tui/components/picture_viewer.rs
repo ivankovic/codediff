@@ -46,13 +46,28 @@ use ratatui::{
 };
 use ratatui_image::{
     Resize, StatefulImage,
-    picker::{Picker, ProtocolType},
+    picker::{Picker, ProtocolType, cap_parser::QueryStdioOptions},
     protocol::StatefulProtocol,
 };
 
 /// What pictures are shown over: transparency is compared as over white (`diff::picture`), and
 /// half blocks would draw it black. Also what pads a scaled picture to whole cells.
 const BACKDROP: Rgba<u8> = Rgba([255, 255, 255, 255]);
+
+/// Asks the terminal which graphics protocol it speaks; `None` if the query fails. Reads the answer
+/// from stdin, so it must run before anything else reads input.
+///
+/// Kitty is also asked whether it takes zlib-compressed pictures (`o=z`), and gets them if so. A
+/// picture is sent scaled to its pane, so an icon arrives as megabytes of repeated pixels: through
+/// tmux or ssh that transfer was most of the wait for every frame, and deflated it is a few
+/// percent of the size.
+pub fn query_graphics() -> Option<Picker> {
+    Picker::from_query_stdio_with_options(QueryStdioOptions {
+        kitty_compression: true,
+        ..QueryStdioOptions::default()
+    })
+    .ok()
+}
 
 /// The four ways a picture pair is shown, in the order `t` steps through them.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -91,8 +106,9 @@ pub struct PictureColors {
     pub update: [u8; 3],
 }
 
-/// The swipe divider: dark, because pictures are shown over white.
-const DIVIDER: [u8; 3] = [48, 48, 48];
+/// The swipe divider: deep pink, which few pictures are and which shows on the white backdrop.
+/// Twice an outline's width (`Built::outline`), so it reads as a handle rather than an edge.
+const DIVIDER: [u8; 3] = [255, 20, 147];
 
 impl PictureColors {
     /// From theme colors; a color that is not RGB (a named or indexed one) falls back to a vivid
@@ -425,7 +441,7 @@ impl PictureViewer {
                     &before_at_after_size(),
                     after,
                     built.swipe_percent,
-                    built.outline,
+                    built.outline * 2,
                     DIVIDER,
                 )),
             )],
@@ -636,7 +652,8 @@ mod tests {
             [255, 255, 255, 255],
             "before: no block yet"
         );
-        assert_eq!(swiped.get_pixel(16, 3).0, [48, 48, 48, 255], "the divider");
+        let [r, g, b] = DIVIDER;
+        assert_eq!(swiped.get_pixel(16, 3).0, [r, g, b, 255], "the divider");
 
         viewer.mode = PictureMode::Blend;
         let panes = viewer.composites(built(PictureMode::Blend));

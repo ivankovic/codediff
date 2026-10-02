@@ -328,7 +328,7 @@ impl App {
         // stream reads it, and only when the pair on the command line is a picture pair: no
         // other startup waits for the answer. Pictures opened later are drawn in half blocks.
         if let Some(viewer) = self.picture_viewer.as_mut()
-            && let Ok(picker) = ratatui_image::picker::Picker::from_query_stdio()
+            && let Some(picker) = crate::tui::components::picture_viewer::query_graphics()
         {
             viewer.set_picker(picker.clone());
             self.graphics = Some(picker);

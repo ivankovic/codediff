@@ -44,7 +44,7 @@ use std::time::Duration;
 use anyhow::{Context, Result, bail};
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use omnidiff::test::helper::human_picture::{self, HumanPicture, Verdict};
-use omnidiff::tui::components::picture_viewer::{PictureColors, PictureViewer};
+use omnidiff::tui::components::picture_viewer::{self, PictureColors, PictureViewer};
 use ratatui::Terminal;
 use ratatui::backend::CrosstermBackend;
 use ratatui::layout::{Constraint, Direction, Layout};
@@ -131,7 +131,7 @@ pub(crate) fn pair_paths(dir: &Path) -> Option<(PathBuf, PathBuf)> {
 fn picker() -> Picker {
     static PICKER: OnceLock<Picker> = OnceLock::new();
     PICKER
-        .get_or_init(|| Picker::from_query_stdio().unwrap_or_else(|_| Picker::halfblocks()))
+        .get_or_init(|| picture_viewer::query_graphics().unwrap_or_else(Picker::halfblocks))
         .clone()
 }
 
