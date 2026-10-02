@@ -55,7 +55,7 @@ RESEARCH_DIR = /var/tmp/research/$(MODE)/
 .PHONY: build require-full-corpus clean clean-db fetch file-stats-report measure-file-stats reclassify-tips measure-commit-stats \
 	debug-stats analyze tiny small full sample-pairs sample-pairs-all measure-pairs \
 	measure-code-pair-diffs pairs-diff-report measure-sampled matching-reasons-report \
-	shapes-report measure-edit-shape ambiguity-report rendering-report measure-tools-timing \
+	shapes-report measure-edit-shape measure-change-census ambiguity-report rendering-report measure-tools-timing \
 	measure-tools-accuracy timing-report install-bdiff install-srcdiff apted-budget-report measure-apted-budget \
 	paper-variables introductory-paper introductory-paper-empirical fetch-external \
 	measure-astdiff-oracle measure-astdiff-oracle-human measure-robustness-fixtures
@@ -313,6 +313,13 @@ shapes-report:
 # by commit_stats.rs.
 measure-edit-shape:
 	uv run ./analysis/edit_shape_stats.py --repositories $(REPOSITORIES_DIR) --max-commits $(EDIT_SHAPE_COMMITS)
+
+# What a diff tool is asked about: every file changed in the same window as measure-edit-shape,
+# by extension or name and by `code::tip` category, binary files included. Counts repositories as
+# well as changes, because a few repositories dominate the volume. See analysis/change_census.py.
+measure-change-census:
+	cd .. && cargo build --release --features stats --bin classify_paths
+	uv run ./analysis/change_census.py --repositories $(REPOSITORIES_DIR) --max-commits $(EDIT_SHAPE_COMMITS)
 
 # Ground-truth ambiguity over the human-authored mappings: how often a real-world change admits no
 # unique correct AST mapping, i.e. how often the annotator recorded a multi-map group. This is the

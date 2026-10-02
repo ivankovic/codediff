@@ -314,6 +314,11 @@ path = "src/bin/commit_stats.rs"
 required-features = ["stats"]
 
 [[bin]]
+name = "classify_paths"
+path = "src/bin/classify_paths.rs"
+required-features = ["stats"]
+
+[[bin]]
 name = "materialize_test_diffs"
 path = "src/bin/materialize_test_diffs.rs"
 required-features = ["stats"]

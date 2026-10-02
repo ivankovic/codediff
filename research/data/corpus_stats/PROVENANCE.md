@@ -246,3 +246,36 @@ to 0.9156 because its "within the 99th percentile" cut uses the node p99, which 
 population it is taken over.
 The per-language rows of `code_percentiles.csv` are unchanged: a language's own rows never held a
 no-grammar file, and its generated, failed and empty files stay in them as before.
+
+## The change census, 2026-10-02
+
+`change_census.csv` counts the files a diff tool is asked about: every file changed by the most
+recent 50 non-merge commits of each clone, the same window and the same `numstat_rows` as
+`edit_shape.csv` (shallow-boundary commits skipped, renames attributed to the new path), but with
+binary files kept and counted by git's own verdict (`--numstat` prints `-`). One row per extension
+(or per file name, for files without one), with the `code::tip` category of a representative path
+(`classify_paths`), the changes, the binary changes, the lines changed and how many repositories
+changed such a file at all.
+
+| | |
+|---|---|
+| Date | 2026-10-02 |
+| Command | `make measure-change-census MODE=full` (24 minutes, 8 workers) |
+| Corpus | `/var/tmp/research/full/repositories`, the 2026-09-07 clones |
+| Repositories | **7,444** (`ytdl-org-youtube-dl.git`'s `git log` failed and contributes nothing) |
+| Commits | **247,076** |
+| Changed files | **2,021,166**, of which **184,486 (9.1%)** binary |
+
+What the volume says, and what it does not: by changed files, Code is 43.9%, Data 41.3%,
+Documentation 6.6%, Unknown 5.3% and Configuration 2.9% - but Data is dominated by a few
+repositories. UFO font sources (`.glif`, XML) are 411k changes from 9 repositories; `.woff`/`.woff2`
+web fonts, 43% of all binary changes, come from about 30. Count the `repositories` column, not the
+`changes` one, to say how common a format is. The most widespread binary format is PNG (629
+repositories, 8.4%), then PDF (109), `.gz` (88), GIF (95), JPEG (89), ICO (81) and TTF (81); images
+are 39% of binary changes. The most widespread text formats OmniDiff diffs only line by line were
+Markdown (65.3% of repositories), `.txt` (36.3%), TOML (13.7%), reStructuredText (10.5%) and gettext
+`.po` (4.9%), and the XML formats not then mapped to the XML grammar (`.svg` 263 repositories, Qt
+`.ui` 163, `.vcxproj` 139, `.plist` 75; 563k changes together).
+
+`code::tip` counts JSON, XML and YAML as Code, because OmniDiff has grammars for them; the paper's
+"two thirds of all files are code" (files at rest, above) is the same convention.
