@@ -215,7 +215,7 @@ jobs:
 
       # --no-fail-fast: a platform-specific failure is rarely alone, and one run that lists them
       # all beats one push per failure.
-      - run: cargo nextest run --release --no-fail-fast -E 'not test(/^test::fixtures::/)'
+      - run: cargo nextest run --cargo-profile ci --no-fail-fast -E 'not test(/^test::fixtures::/)'
 
   # Cargo.toml's `rust-version` is a promise to `cargo install` users on an older toolchain, and
   # only a build on exactly that toolchain keeps it: a dependency bump can raise the real floor
@@ -284,7 +284,7 @@ jobs:
       - uses: taiki-e/install-action@nextest
 
       - name: Build
-        run: cargo build --release --features "${{ matrix.features }}"
+        run: cargo build --profile ci --features "${{ matrix.features }}"
 
       # nextest: one process per test, so src/test/helper.rs's fixture caches are freed after each
       # (see CONTRIBUTING.md). The src/test/fixtures/ tests touch nothing feature-gated, so each job
@@ -292,10 +292,10 @@ jobs:
       # each once. test() matches names without the crate prefix: ^omnidiff::test::fixtures::
       # matches nothing and CI stays green - check `cargo nextest list -E '<expr>'` before editing.
       - name: Test (what this feature set changes)
-        run: cargo nextest run --release --features "${{ matrix.features }}"
+        run: cargo nextest run --cargo-profile ci --features "${{ matrix.features }}"
           -E 'not test(/^test::fixtures::/)'
 
       - name: Test (one third of the fixture corpus)
-        run: cargo nextest run --release --features "${{ matrix.features }}"
+        run: cargo nextest run --cargo-profile ci --features "${{ matrix.features }}"
           -E 'test(/^test::fixtures::/)'
           --partition count:${{ matrix.shard }}/3

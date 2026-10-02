@@ -63,7 +63,7 @@ test: test-mapping-site-js test-viewer-js test-showcase-js test-python test-rust
 
 # The Rust suite alone, every feature on.
 test-rust:
-	cargo nextest run --release --all-features
+	cargo nextest run --cargo-profile ci --all-features
 
 # The unit tests of research/analysis/ and scripts/, in research/'s uv environment.
 test-python:
@@ -111,7 +111,7 @@ benchmark-quality:
 # Regenerates the checked-in src/test/data/diffs.csv fixture inventory; re-run after changing
 # fixtures or their ground truths.
 diff-inventory:
-	cargo run --release --features $(FEATURES) --bin diff_inventory
+	cargo run --profile ci --features $(FEATURES) --bin diff_inventory
 
 # Records the README's assets/diff-vs-omnidiff.gif from the showcase bake, painted by the viewer's
 # own model.js, so it cannot drift from the product. Committed, so it resolves on crates.io; re-run
@@ -223,11 +223,11 @@ check-quality:
 # moves it legitimately, so re-run update-painting-attribution and name the ground truth that changed.
 # A move with no such change is a regression.
 check-painting-attribution:
-	PAINTING_ATTRIBUTION_CHECK=1 cargo test --release --lib --features test-fixtures \
+	PAINTING_ATTRIBUTION_CHECK=1 cargo test --profile ci --lib --features test-fixtures \
 		painting_failure_census -- --ignored --nocapture
 
 update-painting-attribution:
-	cargo test --release --lib --features test-fixtures \
+	cargo test --profile ci --lib --features test-fixtures \
 		painting_failure_census -- --ignored --nocapture
 
 # Rewrites both baselines; never done by `deploy`. A test pins the accuracy columns to the

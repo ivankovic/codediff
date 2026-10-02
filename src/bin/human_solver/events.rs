@@ -179,7 +179,8 @@ pub(crate) fn run_event_loop(
                     let after_root_id = starting_cursor_id(&new_after);
                     before = Arc::new(new_before);
                     after = Arc::new(new_after);
-                    app.mapping = human_mapping::load(&name).unwrap_or_default();
+                    app.mapping =
+                        human_mapping::load_with(&name, &before, &after).unwrap_or_default();
                     app.name = name;
                     app.origin = CaseOrigin::Diffs;
                     app.before = PanelState::new(before_root_id);

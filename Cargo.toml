@@ -58,6 +58,16 @@ pkg-fmt = "zip"
 lto = "fat"
 codegen-units = 1
 
+# CI's and `make test`'s builds: optimized, because the fixture corpus is too slow unoptimized, but
+# without the fat-LTO, single-codegen-unit link that every one of the ~25 test binaries pays under
+# `release`. Measured 2026-10-02 on `nextest --features stats`: cold build 324 s -> 168 s, rebuild
+# after touching the crate 241 s -> 76 s, fixture tests 92 s either way. Thin LTO was slower than
+# fat (383 s / 322 s). Release artifacts and the timed benchmark keep `release`.
+[profile.ci]
+inherits = "release"
+lto = false
+codegen-units = 16
+
 # cargo-deb metadata for the unofficial .deb; see packaging/README.md.
 [package.metadata.deb]
 maintainer = "Marko Ivankovic <marko@ivankovic.me>"
