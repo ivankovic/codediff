@@ -40,6 +40,21 @@
 //! If either side is binary, `main.rs` answers with `binary_diff_json` instead: the same object
 //! with `"binary": true`, empty `hunks` and no `summary`. `binary` is omitted for text diffs.
 //!
+//! A binary pair that is a picture pair (`diff::picture`) also carries `picture`: each side's
+//! `format`, `width`, `height`, `color` and `bytes` (`null` for an added or deleted picture), and a
+//! `comparison` whose `kind` is `pixels` (with `changed_pixels`, `total_pixels` and `regions`, each
+//! `{x, y, width, height, changed_pixels}` in pixel coordinates, largest first), `resized` or
+//! `one_sided`:
+//!
+//! ```json
+//! "picture": {
+//!   "before": { "format": "PNG", "width": 200, "height": 120, "color": "RGBA8", "bytes": 671 },
+//!   "after":  { "format": "PNG", "width": 200, "height": 120, "color": "RGBA8", "bytes": 981 },
+//!   "comparison": { "kind": "pixels", "changed_pixels": 1723, "total_pixels": 24000,
+//!                   "regions": [ { "x": 20, "y": 20, "width": 41, "height": 41, "changed_pixels": 1681 } ] }
+//! }
+//! ```
+//!
 //! Each side's `hunks` are ranges in that side's own file. Rows and columns are 0-indexed.
 //!
 //! **Columns are byte offsets within their row**, as tree-sitter reports them. Neovim takes them
@@ -170,6 +185,10 @@ struct JsonDiff {
     /// look like identical files.
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     binary: bool,
+    /// For a binary pair that is a picture pair: what each side is and what changed (see
+    /// `diff::picture`). Absent otherwise.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    picture: Option<crate::diff::picture::PictureDiff>,
 }
 
 /// Re-parses `contents` for `nearest_reference_line`; not on a hot path, so the redundant parse
@@ -226,13 +245,18 @@ fn build_diff(data: &DiffSessionData, large_residual: bool) -> JsonDiff {
         large_residual,
         summary,
         binary: false,
+        picture: None,
     }
 }
 
 /// The `--mode json` answer when a side is binary: the usual shape with `binary` set, no hunks
 /// and no `summary`. `language` is still filled in, since it describes the file, not the diff.
 /// Returns the text so `main.rs` keeps the single print site.
-pub fn binary_diff_json(before: &Path, after: &Path) -> Result<String> {
+pub fn binary_diff_json(
+    before: &Path,
+    after: &Path,
+    picture: Option<&crate::diff::picture::PictureDiff>,
+) -> Result<String> {
     let side = |path: &Path| JsonSide {
         path: path.to_path_buf(),
         language: language_for_path(path).map(|lang| stable_name(lang).to_string()),
@@ -244,6 +268,7 @@ pub fn binary_diff_json(before: &Path, after: &Path) -> Result<String> {
         large_residual: false,
         summary: None,
         binary: true,
+        picture: picture.cloned(),
     };
     Ok(serde_json::to_string_pretty(&diff)?)
 }
@@ -452,13 +477,53 @@ mod tests {
 
     #[test]
     fn binary_diff_json_keeps_language_but_has_no_hunks_or_summary() -> Result<()> {
-        let json: serde_json::Value =
-            serde_json::from_str(&binary_diff_json(Path::new("a.rs"), Path::new("b.png"))?)?;
+        let json: serde_json::Value = serde_json::from_str(&binary_diff_json(
+            Path::new("a.rs"),
+            Path::new("b.png"),
+            None,
+        )?)?;
         assert_eq!(json["binary"], true);
         assert_eq!(json["before"]["language"], "Rust");
         assert!(json["before"]["hunks"].as_array().unwrap().is_empty());
         assert!(json["after"]["hunks"].as_array().unwrap().is_empty());
         assert!(json.get("summary").is_none(), "{json}");
+        Ok(())
+    }
+
+    #[test]
+    fn a_picture_pair_carries_what_changed_and_where() -> Result<()> {
+        use crate::diff::picture::{Comparison, PictureDiff, PictureInfo, Region};
+        let side = PictureInfo {
+            format: "PNG".to_string(),
+            width: 20,
+            height: 10,
+            color: "RGBA8".to_string(),
+            bytes: 100,
+        };
+        let picture = PictureDiff {
+            before: Some(side.clone()),
+            after: Some(side),
+            comparison: Comparison::Pixels {
+                changed_pixels: 12,
+                total_pixels: 200,
+                regions: vec![Region {
+                    x: 6,
+                    y: 2,
+                    width: 4,
+                    height: 3,
+                    changed_pixels: 12,
+                }],
+            },
+        };
+        let json: serde_json::Value = serde_json::from_str(&binary_diff_json(
+            Path::new("a.png"),
+            Path::new("b.png"),
+            Some(&picture),
+        )?)?;
+        assert_eq!(json["binary"], true);
+        assert_eq!(json["picture"]["before"]["width"], 20);
+        assert_eq!(json["picture"]["comparison"]["kind"], "pixels");
+        assert_eq!(json["picture"]["comparison"]["regions"][0]["height"], 3);
         Ok(())
     }
 

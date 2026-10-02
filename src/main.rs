@@ -24,7 +24,7 @@ use clap::{Parser, Subcommand};
 
 use omnidiff::tui;
 use omnidiff::tui::positional::{
-    binary_notice, invoked_as_git_external_diff, resolve_before_after,
+    binary_notice, invoked_as_git_external_diff, picture_notice, resolve_before_after,
 };
 
 mod configure_prompt;
@@ -314,19 +314,36 @@ fn exit_code_for(differed: bool, want_exit_code: bool, invoked_as_git_external_d
     }
 }
 
+/// True if `before` and `after` are a picture pair (see `diff::picture::is_picture_pair`).
+fn is_picture_pair(before: &std::path::Path, after: &std::path::Path) -> Result<bool> {
+    Ok(omnidiff::diff::picture::is_picture_pair(
+        &std::fs::read(before)?,
+        &std::fs::read(after)?,
+    ))
+}
+
 /// Reports a pair with at least one binary side (the other may be git's empty `/dev/null`), in
 /// every mode. It must succeed: a UTF-8 decode error would exit 2, and under `GIT_EXTERNAL_DIFF`
 /// git then abandons every remaining file in the diff.
 fn run_binary(args: &Args, before: &std::path::Path, after: &std::path::Path) -> Result<i32> {
-    let differed = std::fs::read(before)? != std::fs::read(after)?;
+    let (before_bytes, after_bytes) = (std::fs::read(before)?, std::fs::read(after)?);
+    let differed = before_bytes != after_bytes;
+    // A picture that does not decode is reported as any other binary, never as an error.
+    let picture = omnidiff::diff::picture::is_picture_pair(&before_bytes, &after_bytes)
+        .then(|| omnidiff::diff::picture::diff(&before_bytes, &after_bytes).ok())
+        .flatten();
     if should_run_json(args) {
         // Still a JSON object of the usual shape (flagged `binary`, no hunks): prose would break
         // every `--mode json` consumer.
-        let mut json = tui::json_output::binary_diff_json(before, after)?;
+        let mut json = tui::json_output::binary_diff_json(before, after, picture.as_ref())?;
         json.push('\n');
         tui::headless::write_stdout(&json)?;
     } else {
-        tui::headless::write_stdout(&binary_notice(&args.paths, before, after, differed))?;
+        let notice = match &picture {
+            Some(picture) => picture_notice(&args.paths, before, after, picture),
+            None => binary_notice(&args.paths, before, after, differed),
+        };
+        tui::headless::write_stdout(&notice)?;
     }
     Ok(exit_code_for(
         differed,
@@ -407,7 +424,11 @@ async fn run() -> Result<i32> {
     if let Some((before, after)) = before_after.as_ref() {
         let either_is_binary =
             omnidiff::code::is_binary_file(before)? || omnidiff::code::is_binary_file(after)?;
-        if either_is_binary {
+        // A picture pair the TUI would show goes on to the TUI's picture view; every other binary
+        // pair, and any picture pair headless or as JSON, is answered here.
+        let tui =
+            !should_run_json(&args) && !should_run_headless(&args, std::io::stdout().is_terminal());
+        if either_is_binary && !(tui && is_picture_pair(before, after)?) {
             return run_binary(&args, before, after);
         }
     }
@@ -793,6 +814,79 @@ mod tests {
         assert_eq!(
             binary_notice(&paths, &before, &after, false),
             "Binary files a.pdf and b.pdf are identical\n"
+        );
+    }
+
+    fn picture_diff(
+        comparison: omnidiff::diff::picture::Comparison,
+    ) -> omnidiff::diff::picture::PictureDiff {
+        let side = |width| omnidiff::diff::picture::PictureInfo {
+            format: "PNG".to_string(),
+            width,
+            height: 10,
+            color: "RGBA8".to_string(),
+            bytes: 100,
+        };
+        omnidiff::diff::picture::PictureDiff {
+            before: Some(side(20)),
+            after: Some(side(20)),
+            comparison,
+        }
+    }
+
+    #[test]
+    fn the_picture_notice_says_how_much_changed_and_where_under_gits_name() {
+        use omnidiff::diff::picture::{Comparison, Region};
+        let paths = vec![
+            PathBuf::from("assets/logo.png"),
+            PathBuf::from("/tmp/git-blob-AAAA/logo.png"),
+            PathBuf::from("abc123"),
+            PathBuf::from("100644"),
+            PathBuf::from("/tmp/git-blob-BBBB/logo.png"),
+            PathBuf::from("def456"),
+            PathBuf::from("100644"),
+        ];
+        let (before, after) = resolve_before_after(&paths).unwrap().unwrap();
+        let region = Region {
+            x: 6,
+            y: 2,
+            width: 4,
+            height: 3,
+            changed_pixels: 12,
+        };
+        let diff = picture_diff(Comparison::Pixels {
+            changed_pixels: 12,
+            total_pixels: 200,
+            regions: vec![region],
+        });
+        assert_eq!(
+            picture_notice(&paths, &before, &after, &diff),
+            "Picture assets/logo.png: PNG 20x10 RGBA8, 100 bytes -> PNG 20x10 RGBA8, 100 bytes\n  \
+             6.00% of pixels changed (12 of 200), in 1 region:\n    4x3 at (6, 2)\n"
+        );
+    }
+
+    #[test]
+    fn the_picture_notice_says_when_nothing_visible_changed_or_the_size_did() {
+        use omnidiff::diff::picture::Comparison;
+        let paths = vec![PathBuf::from("a.png"), PathBuf::from("b.png")];
+        let (before, after) = resolve_before_after(&paths).unwrap().unwrap();
+        let unchanged = picture_diff(Comparison::Pixels {
+            changed_pixels: 0,
+            total_pixels: 200,
+            regions: Vec::new(),
+        });
+        assert!(
+            picture_notice(&paths, &before, &after, &unchanged).ends_with("  no pixel changed\n")
+        );
+        let resized = picture_notice(&paths, &before, &after, &picture_diff(Comparison::Resized));
+        assert!(
+            resized.starts_with("Pictures a.png and b.png: "),
+            "{resized}"
+        );
+        assert!(
+            resized.ends_with("  resized, so not compared pixel by pixel\n"),
+            "{resized}"
         );
     }
 

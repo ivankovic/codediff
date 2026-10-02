@@ -43,6 +43,7 @@ use crate::tui::components::{
     file_dialog::FileDialog,
     help_modal::HelpModal,
     line_prompt::LinePrompt,
+    picture_viewer::{PictureColors, PictureViewer},
     render_options_dialog::RenderOptionsDialog,
     review_dialog::ReviewDialog,
     search_modal::SearchModal,
@@ -176,6 +177,10 @@ pub struct App {
     /// Render options from the command line (`--minimal`, `--full`, ...), used instead of the
     /// saved ones for this run and not saved. `None` without such a flag.
     render_options_override: Option<RenderOptions>,
+    /// The view of a picture pair, shown instead of the diff viewer while it is `Some`.
+    picture_viewer: Option<PictureViewer>,
+    /// The terminal's graphics protocol, once asked (see `run`); half blocks until then.
+    graphics: Option<ratatui_image::picker::Picker>,
 }
 
 /// A free function so it can be tested without reaching `App::suspend`, which would stop the test
@@ -281,6 +286,8 @@ impl App {
             plain_text_fallback: false,
             should_exit: false,
             render_options_override: None,
+            picture_viewer: None,
+            graphics: None,
         })
     }
 
@@ -317,6 +324,15 @@ impl App {
         // Terminal-native selection stays available through the terminal's modifier (Shift-drag).
         ui.mouse = true;
         ui.enter()?;
+        // The terminal answers a graphics query on stdin, so it is asked now, before the event
+        // stream reads it, and only when the pair on the command line is a picture pair: no
+        // other startup waits for the answer. Pictures opened later are drawn in half blocks.
+        if let Some(viewer) = self.picture_viewer.as_mut()
+            && let Some(picker) = crate::tui::components::picture_viewer::query_graphics()
+        {
+            viewer.set_picker(picker.clone());
+            self.graphics = Some(picker);
+        }
 
         self.diff_viewer
             .register_action_handler(self.action_tx.clone())?;
@@ -389,6 +405,15 @@ impl App {
                     self.restore_after_reload = None;
                     self.screen = AppScreen::Viewer;
                     self.diff_started_at = None;
+                    action_tx.send(Action::Render)?;
+                    globally_handled = true;
+                }
+                code if self.screen == AppScreen::Viewer
+                    && self
+                        .picture_viewer
+                        .as_mut()
+                        .is_some_and(|viewer| viewer.handle_key(code)) =>
+                {
                     action_tx.send(Action::Render)?;
                     globally_handled = true;
                 }
@@ -592,6 +617,10 @@ impl App {
         self.review_position = Some(position);
         match workspace.materialize(&root, &target) {
             Ok((before, after)) => {
+                self.picture_viewer = None;
+                if self.open_picture_pair(&before, &after) {
+                    return Ok(());
+                }
                 // Named by its repository path; the temp path says nothing the reader can use.
                 if Self::unshowable(&before)
                     .or_else(|| Self::unshowable(&after))
@@ -889,8 +918,41 @@ impl App {
         }
     }
 
+    /// Shows `before` and `after` as a picture pair if they are one; false, and nothing changed,
+    /// if not.
+    fn open_picture_pair(&mut self, before: &Path, after: &Path) -> bool {
+        let picker = self
+            .graphics
+            .clone()
+            .unwrap_or_else(ratatui_image::picker::Picker::halfblocks);
+        match PictureViewer::open(before, after, picker) {
+            Some(viewer) => {
+                self.picture_viewer = Some(viewer);
+                self.last_error = None;
+                self.before_path = Some(before.to_path_buf());
+                self.after_path = Some(after.to_path_buf());
+                true
+            }
+            None => false,
+        }
+    }
+
     fn select_file_for_panel(&mut self, panel: Panel, path: PathBuf) -> Result<()> {
         self.review_position = None;
+        self.picture_viewer = None;
+        // A picture is not shown as text; once both sides are pictures, the pair is shown as one.
+        if is_picture_file(&path) {
+            match panel {
+                Panel::Before => self.before_path = Some(path),
+                Panel::After => self.after_path = Some(path),
+            }
+            if let (Some(before), Some(after)) = (self.before_path.clone(), self.after_path.clone())
+                && !self.open_picture_pair(&before, &after)
+            {
+                self.last_error = Self::unshowable(&before).or_else(|| Self::unshowable(&after));
+            }
+            return Ok(());
+        }
         if let Some(problem) = Self::unshowable(&path) {
             self.last_error = Some(problem);
             return Ok(());
@@ -1067,6 +1129,9 @@ impl App {
             self.syntax_theme = Some(name);
         }
         self.diff_viewer.init(area)?;
+        if self.open_picture_pair(before, after) {
+            return Ok(());
+        }
         // As every caller of `start_diff` does; without a current pair, the recent-pairs prompt
         // draws over the panels.
         self.before_path = Some(before.to_path_buf());
@@ -1083,7 +1148,7 @@ impl App {
     /// user who has not pressed `?` learns that keybindings exist.
     pub(crate) fn draw_viewer(&mut self, frame: &mut ratatui::Frame, area: Rect) -> Result<()> {
         let mut constraints = Vec::with_capacity(4);
-        if self.diff_summary.is_some() {
+        if self.diff_summary.is_some() || self.picture_viewer.is_some() {
             constraints.push(Constraint::Length(1));
         }
         constraints.push(Constraint::Min(1));
@@ -1097,13 +1162,28 @@ impl App {
             .split(area);
 
         let mut next = 0;
-        if let Some(summary) = self.diff_summary {
-            frame.render_widget(status_bar_paragraph(summary), layout[next]);
+        if let Some(viewer) = self.picture_viewer.as_mut() {
+            let palette = self.diff_viewer.overlay_theme().palette();
+            // The title colors, not the tints the text panels use as backgrounds: an outline must
+            // stand out on a picture.
+            let colors = PictureColors::from_theme(
+                palette.before_title_fg,
+                palette.after_title_fg,
+                palette.search_bg,
+            );
+            frame.render_widget(Paragraph::new(viewer.status()), layout[next]);
+            next += 1;
+            viewer.draw(frame, layout[next], colors);
+            next += 1;
+        } else {
+            if let Some(summary) = self.diff_summary {
+                frame.render_widget(status_bar_paragraph(summary), layout[next]);
+                next += 1;
+            }
+            self.diff_viewer.draw(frame, layout[next])?;
+            self.draw_recent_pairs(frame, layout[next]);
             next += 1;
         }
-        self.diff_viewer.draw(frame, layout[next])?;
-        self.draw_recent_pairs(frame, layout[next]);
-        next += 1;
         if let Some(message) = &self.last_error {
             frame.render_widget(
                 Paragraph::new(message.as_str()).style(Style::new().fg(Color::Red)),
@@ -1590,6 +1670,11 @@ fn panic_message(panic: &Box<dyn std::any::Any + Send>) -> String {
     }
 }
 
+/// True if `path` holds a picture, by its bytes (see [`crate::diff::picture::is_picture`]).
+fn is_picture_file(path: &Path) -> bool {
+    std::fs::read(path).is_ok_and(|bytes| crate::diff::picture::is_picture(&bytes))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1861,6 +1946,68 @@ mod tests {
             app.action_rx.try_recv(),
             Ok(Action::StartDiff(_, _))
         ));
+        Ok(())
+    }
+
+    /// Two 6x4 PNGs in `dir`, the second with one pixel changed.
+    fn picture_pair(dir: &tempfile::TempDir) -> (PathBuf, PathBuf) {
+        let before = image::RgbaImage::from_pixel(6, 4, image::Rgba([255, 255, 255, 255]));
+        let mut after = before.clone();
+        after.put_pixel(2, 1, image::Rgba([0, 0, 0, 255]));
+        let (a, b) = (dir.path().join("a.png"), dir.path().join("b.png"));
+        before.save(&a).expect("writes");
+        after.save(&b).expect("writes");
+        (a, b)
+    }
+
+    #[test]
+    fn a_picture_pair_opens_the_picture_view_not_a_binary_banner() -> Result<()> {
+        let dir = tempfile::tempdir()?;
+        let (before, after) = picture_pair(&dir);
+        let mut app = App::new(4.0, 60.0)?;
+        app.open_files(before, after)?;
+        assert!(app.last_error.is_none(), "{:?}", app.last_error);
+
+        let backend = ratatui::backend::TestBackend::new(100, 20);
+        let mut terminal = ratatui::Terminal::new(backend)?;
+        terminal.draw(|f| {
+            let area = f.area();
+            app.draw_viewer(f, area).unwrap();
+        })?;
+        let screen = rendered_text(&terminal);
+        assert!(
+            screen.contains("PNG 6x4 RGBA8 -> PNG 6x4 RGBA8"),
+            "{screen}"
+        );
+        assert!(screen.contains("in 1 region"), "{screen}");
+        assert!(screen.contains("view: side by side"), "{screen}");
+
+        let area = terminal.get_frame().area();
+        app.handle_event(
+            Event::Key(crossterm::event::KeyEvent::new(
+                KeyCode::Char('t'),
+                crossterm::event::KeyModifiers::NONE,
+            )),
+            area,
+        )?;
+        terminal.draw(|f| {
+            let area = f.area();
+            app.draw_viewer(f, area).unwrap();
+        })?;
+        assert!(rendered_text(&terminal).contains("view: difference"));
+        Ok(())
+    }
+
+    #[test]
+    fn a_picture_against_a_text_file_is_still_a_binary_banner() -> Result<()> {
+        let dir = tempfile::tempdir()?;
+        let (picture, _) = picture_pair(&dir);
+        let text = dir.path().join("a.txt");
+        std::fs::write(&text, "text\n")?;
+        let mut app = App::new(4.0, 60.0)?;
+        app.select_file_for_panel(Panel::Before, picture)?;
+        app.select_file_for_panel(Panel::After, text)?;
+        assert!(app.picture_viewer.is_none());
         Ok(())
     }
 

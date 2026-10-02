@@ -135,7 +135,8 @@ mod tests {
             .join("fixtures");
         let mut orphaned = Vec::new();
         let mut datasets_seen = 0usize;
-        for dataset in helper::DIFF_DATASETS {
+        // The picture fixtures' stubs too, though their data is not a `DIFF_DATASETS` dataset.
+        for dataset in helper::DIFF_DATASETS.iter().copied().chain(["pictures"]) {
             let dir = fixtures.join(dataset);
             if !dir.exists() {
                 continue;

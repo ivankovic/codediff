@@ -66,6 +66,14 @@ Files and diffing
   ]/[              Next/previous file of the set the reviewed file came from
   Esc              While a diff is computing: cancel it and keep the previous result
 
+Pictures
+  t                For a pair of pictures (PNG, JPEG, GIF, WebP, BMP, ICO, TIFF): cycle the
+                   view - side by side with the changed regions outlined, difference
+                   (changed pixels over the faded after picture), blend, swipe. Drawn as
+                   pixels where the terminal speaks kitty, sixel or iTerm2 graphics, in
+                   half blocks elsewhere
+  h/l, Left/Right  In the swipe view: move the divider between before and after
+
 Appearance
   c                Open the theme editor: a Theme dropdown, a syntax-highlighting
                    dropdown, and one editable color per diff operation, the cursor

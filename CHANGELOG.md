@@ -6,6 +6,16 @@ release does: a minor bump may change the JSON output or the library API, a patc
 
 ## [Unreleased]
 
+### Added
+
+- Pictures (PNG, JPEG, GIF, WebP, BMP, ICO, TIFF) are diffed instead of reported as "Binary file
+  differs": what each side is (format, size, color type), how much of it changed and where, as
+  rectangles of changed pixels. Pixels compare perceptually, so re-encoding noise is not a change.
+  Headless and `git diff` print this as a short report and `--mode json` adds a `picture` object.
+  The TUI shows the two pictures with the changed regions outlined, and `t` cycles to a
+  difference, blend and swipe view; it draws real pixels where the terminal speaks the kitty,
+  sixel or iTerm2 graphics protocol and Unicode half blocks everywhere else.
+
 ### Changed
 
 - XML formats with an extension of their own are diffed with the XML grammar instead of line by
@@ -13,6 +23,8 @@ release does: a minor bump may change the JSON output or the library API, a patc
   `.storyboard`, `.xaml`, `.resx`, `.xsd`/`.xsl`, `.xlf`, `.kml`, `.gpx` and more (see the README's
   language list). A file under one of these names whose content is not markup is still diffed as
   plain text.
+- Building OmniDiff needs Rust 1.90 or later (was 1.88): the picture view's graphics library
+  depends on it.
 
 ## [0.2.0] - 2026-10-01
 

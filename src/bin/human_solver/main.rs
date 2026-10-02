@@ -53,6 +53,7 @@ mod events;
 mod flatten;
 mod keylog;
 mod navigate;
+mod pictures;
 mod render;
 mod state;
 mod stubs;
@@ -81,6 +82,7 @@ use omnidiff::test::helper::human_mapping::{
     NamedTextMapping, NodeStatus, disagreement_is_move_only, is_inherited_removed, path_refs,
     rebuild_caches_for_mapping, status_after, status_before, text_mapping_disagreements,
 };
+use omnidiff::test::helper::human_picture;
 use omnidiff::test::helper::{
     DIFF_DATASETS, code_pair_from_dir, code_pair_from_dir_without_metadata, diffs_case_dir,
     node_for_path, path_for_node, precompute_paths, read_note, write_note,
@@ -415,6 +417,32 @@ fn list_available_cases() -> Result<Vec<(String, &'static str)>> {
     Ok(names)
 }
 
+/// What the `o` picker lists: every case of [`list_available_cases`], then every picture fixture
+/// (dataset `pictures`), sorted by name. Only the picker sees the pictures: the corpus scans,
+/// `load_case` and `{`/`}` read their names as code.
+fn list_picker_cases() -> Result<Vec<(String, &'static str)>> {
+    let mut names = list_available_cases()?;
+    for name in list_dir_names(&human_picture::pictures_root())? {
+        names.push((name, pictures::PICTURE_DATASET));
+    }
+    names.sort_by(|a, b| a.0.cmp(&b.0));
+    Ok(names)
+}
+
+/// Every picture fixture's recorded verdict, `None` where there is none yet (`App::picture_verdicts`).
+fn read_picture_verdicts() -> HashMap<String, Option<human_picture::Verdict>> {
+    list_dir_names(&human_picture::pictures_root())
+        .unwrap_or_default()
+        .into_iter()
+        .map(|name| {
+            let verdict = human_picture::load(&name)
+                .ok()
+                .map(|picture| picture.verdict);
+            (name, verdict)
+        })
+        .collect()
+}
+
 /// The case names the `o` picker shows, in order: `options` narrowed by every filter in `view`
 /// (ANDed; an unknown value survives either direction, see `FlagFilter::keeps`), sorted by
 /// `view.sort` with the name as an always-ascending tiebreak, so the order is total. Unknown values
@@ -434,11 +462,7 @@ fn visible_diff_options(
                 .as_ref()
                 .is_none_or(|needle| name.to_lowercase().contains(needle))
         })
-        .filter(|(name, _)| {
-            filters
-                .cmpl
-                .keeps(data.unmarked_of(name).map(|count| count > 0))
-        })
+        .filter(|(name, _)| filters.cmpl.keeps(data.incomplete_of(name)))
         .filter(|(name, _)| {
             filters
                 .unmarked
@@ -475,8 +499,9 @@ fn visible_diff_options(
         let primary = match view.sort.column {
             DiffColumn::Name => std::cmp::Ordering::Equal,
             DiffColumn::Dataset => dataset_of(a).cmp(dataset_of(b)),
-            DiffColumn::Cmpl => bool_rank(data.unmarked_of(a).map(|count| count > 0))
-                .cmp(&bool_rank(data.unmarked_of(b).map(|count| count > 0))),
+            DiffColumn::Cmpl => {
+                bool_rank(data.incomplete_of(a)).cmp(&bool_rank(data.incomplete_of(b)))
+            }
             DiffColumn::Unmarked => {
                 sort_rank(data.unmarked_of(a)).cmp(&sort_rank(data.unmarked_of(b)))
             }
@@ -488,6 +513,9 @@ fn visible_diff_options(
                 sort_rank(data.invariants_of(a)).cmp(&sort_rank(data.invariants_of(b)))
             }
             DiffColumn::Size => sort_rank(data.size_of(a)).cmp(&sort_rank(data.size_of(b))),
+            DiffColumn::Verdict => {
+                sort_rank(data.verdict_rank(a)).cmp(&sort_rank(data.verdict_rank(b)))
+            }
         };
         let primary = if view.sort.descending {
             primary.reverse()
@@ -582,7 +610,7 @@ impl From<DiffFiltersRecord> for DiffFilters {
             name: record.name.filter(|name| !name.is_empty()),
             dataset: record
                 .dataset
-                .and_then(|name| DIFF_DATASETS.iter().copied().find(|d| *d == name)),
+                .and_then(|name| picker_datasets().find(|d| *d == name)),
             cmpl: record.cmpl,
             unmarked: record.unmarked,
             paint: record.paint,
@@ -839,15 +867,19 @@ where
     result
 }
 
-/// The `o` picker's next dataset filter: `DIFF_DATASETS` in order, then back to "all" (`None`).
+/// The datasets the `o` picker lists: `DIFF_DATASETS`, then the picture fixtures.
+fn picker_datasets() -> impl Iterator<Item = &'static str> {
+    DIFF_DATASETS
+        .iter()
+        .copied()
+        .chain([pictures::PICTURE_DATASET])
+}
+
+/// The `o` picker's next dataset filter: `picker_datasets` in order, then back to "all" (`None`).
 fn next_dataset_filter(current: Option<&'static str>) -> Option<&'static str> {
     match current {
-        None => Some(DIFF_DATASETS[0]),
-        Some(current) => DIFF_DATASETS
-            .iter()
-            .position(|d| *d == current)
-            .and_then(|i| DIFF_DATASETS.get(i + 1))
-            .copied(),
+        None => picker_datasets().next(),
+        Some(current) => picker_datasets().skip_while(|d| *d != current).nth(1),
     }
 }
 
@@ -959,7 +991,8 @@ fn ensure_diff_column_data(app: &mut App, column: DiffColumn) {
                 app.diff_sizes = Some(compute_diff_sizes());
             }
         }
-        DiffColumn::Name | DiffColumn::Dataset => {}
+        // Read on every `o` (`read_picture_verdicts`): a few hundred small files.
+        DiffColumn::Name | DiffColumn::Dataset | DiffColumn::Verdict => {}
     }
 }
 
@@ -1467,11 +1500,14 @@ enum DiffColumn {
     Invariant,
     /// Changed lines of the case's `diff -u`, the same measure as the `O` picker's `Size`.
     Size,
+    /// A picture fixture's human verdict; blank for code. Never the engine's, so the listing does
+    /// not hint at its answer.
+    Verdict,
 }
 
 impl DiffColumn {
     /// Left-to-right order, shared by the header, cursor movement and `render_open_diff_picker`.
-    const ALL: [DiffColumn; 8] = [
+    const ALL: [DiffColumn; 9] = [
         DiffColumn::Name,
         DiffColumn::Dataset,
         DiffColumn::Cmpl,
@@ -1480,6 +1516,7 @@ impl DiffColumn {
         DiffColumn::Disagree,
         DiffColumn::Invariant,
         DiffColumn::Size,
+        DiffColumn::Verdict,
     ];
 
     fn index(self) -> usize {
@@ -1509,10 +1546,12 @@ impl DiffColumn {
             DiffColumn::Disagree => "Disagree",
             DiffColumn::Invariant => "Invariant",
             DiffColumn::Size => "Size",
+            DiffColumn::Verdict => "Verdict",
         }
     }
 
-    /// The (`Yes`, `No`) labels of this column's `FlagFilter`; `None` for `Name` and `Dataset`.
+    /// The (`Yes`, `No`) labels of this column's `FlagFilter`; `None` for `Name`, `Dataset` and
+    /// `Verdict`, which sorts but does not filter.
     fn flag_labels(self) -> Option<(&'static str, &'static str)> {
         match self {
             DiffColumn::Cmpl => Some(("incomplete only", "complete only")),
@@ -1522,7 +1561,7 @@ impl DiffColumn {
             DiffColumn::Invariant => Some(("breaks invariants", "invariants hold")),
             // An empty diff is a broken fixture; "No" finds them.
             DiffColumn::Size => Some(("has changed lines", "empty diffs only")),
-            DiffColumn::Name | DiffColumn::Dataset => None,
+            DiffColumn::Name | DiffColumn::Dataset | DiffColumn::Verdict => None,
         }
     }
 }
@@ -1564,7 +1603,7 @@ struct DiffFilters {
     /// Case-insensitive name substring, stored lowercased. Never `Some("")`, which would read as
     /// on while filtering nothing.
     name: Option<String>,
-    /// Which of `DIFF_DATASETS` to show; `None` is all.
+    /// Which of `picker_datasets` to show; `None` is all.
     dataset: Option<&'static str>,
     cmpl: FlagFilter,
     unmarked: FlagFilter,
@@ -1599,7 +1638,7 @@ impl DiffFilters {
             DiffColumn::Disagree => Some(&mut self.disagree),
             DiffColumn::Invariant => Some(&mut self.invariant),
             DiffColumn::Size => Some(&mut self.size),
-            DiffColumn::Name | DiffColumn::Dataset => None,
+            DiffColumn::Name | DiffColumn::Dataset | DiffColumn::Verdict => None,
         }
     }
 
@@ -1611,7 +1650,7 @@ impl DiffFilters {
             DiffColumn::Disagree => self.disagree,
             DiffColumn::Invariant => self.invariant,
             DiffColumn::Size => self.size,
-            DiffColumn::Name | DiffColumn::Dataset => FlagFilter::Off,
+            DiffColumn::Name | DiffColumn::Dataset | DiffColumn::Verdict => FlagFilter::Off,
         }
     }
 
@@ -1706,6 +1745,8 @@ struct DiffPickerData<'a> {
     disagreement: Option<&'a HashMap<String, usize>>,
     invariants: Option<&'a HashMap<String, usize>>,
     sizes: Option<&'a HashMap<String, usize>>,
+    /// `App::picture_verdicts`: which rows are pictures, and their verdicts.
+    pictures: Option<&'a HashMap<String, Option<human_picture::Verdict>>>,
 }
 
 impl<'a> DiffPickerData<'a> {
@@ -1716,7 +1757,36 @@ impl<'a> DiffPickerData<'a> {
             disagreement: app.diff_disagreement.as_ref(),
             invariants: app.diff_invariants.as_ref(),
             sizes: app.diff_sizes.as_ref(),
+            pictures: Some(&app.picture_verdicts),
         }
+    }
+
+    fn is_picture(&self, name: &str) -> bool {
+        self.pictures.is_some_and(|map| map.contains_key(name))
+    }
+
+    fn verdict_of(&self, name: &str) -> Option<human_picture::Verdict> {
+        self.pictures
+            .and_then(|map| map.get(name))
+            .copied()
+            .flatten()
+    }
+
+    /// `verdict_of` as its place in `Verdict::ALL`, the order the `Verdict` column sorts in.
+    fn verdict_rank(&self, name: &str) -> Option<usize> {
+        let verdict = self.verdict_of(name)?;
+        human_picture::Verdict::ALL
+            .iter()
+            .position(|candidate| *candidate == verdict)
+    }
+
+    /// The `Cmpl` column, `true` while work is left: unmarked nodes for a code case, no verdict
+    /// for a picture.
+    fn incomplete_of(&self, name: &str) -> Option<bool> {
+        if self.is_picture(name) {
+            return Some(self.verdict_of(name).is_none());
+        }
+        self.unmarked_of(name).map(|count| count > 0)
     }
 
     fn size_of(&self, name: &str) -> Option<usize> {

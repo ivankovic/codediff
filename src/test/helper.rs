@@ -16,6 +16,7 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 pub mod human_mapping;
+pub mod human_picture;
 
 use anyhow::{Context, Result, bail};
 #[cfg(feature = "stats")]
