@@ -21,5 +21,5 @@ use crate::test::helper::human_picture;
 
 #[test]
 fn verdict() -> Result<()> {
-    human_picture::assert_matches_human_verdict("ico-x-kikoplayproject-kikoplay-9f13361b-kikoplay")
+    human_picture::assert_matches_human_verdict("png-x-07th-mod-ponscripter-fork-97e597d6-default")
 }

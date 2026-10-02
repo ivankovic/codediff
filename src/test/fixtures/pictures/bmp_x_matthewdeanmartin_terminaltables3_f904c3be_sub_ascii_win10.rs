@@ -21,9 +21,7 @@ use crate::test::helper::human_picture;
 
 #[test]
 fn verdict() -> Result<()> {
-    // Recorded as found, not examined.
-    human_picture::assert_known_verdict_mismatch(
+    human_picture::assert_matches_human_verdict(
         "bmp-x-matthewdeanmartin-terminaltables3-f904c3be-sub_ascii_win10",
-        human_picture::Verdict::Resized,
     )
 }

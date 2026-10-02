@@ -21,9 +21,5 @@ use crate::test::helper::human_picture;
 
 #[test]
 fn verdict() -> Result<()> {
-    // Recorded as found, not examined.
-    human_picture::assert_known_verdict_mismatch(
-        "ico-x-07th-mod-ponscripter-fork-97e597d6-default",
-        human_picture::Verdict::Replaced,
-    )
+    human_picture::assert_matches_human_verdict("ico-x-07th-mod-ponscripter-fork-97e597d6-default")
 }

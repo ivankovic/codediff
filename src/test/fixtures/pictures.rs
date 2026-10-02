@@ -23,6 +23,8 @@ mod bmp_x_matthewdeanmartin_terminaltables3_f904c3be_sub_ascii_win10;
 #[cfg(test)]
 mod bmp_x_matthewdeanmartin_terminaltables3_f904c3be_sub_ascii_winxp;
 #[cfg(test)]
+mod bmp_x_talamus_solarize_12x29_psf_8a856fdb_solarize_12x29;
+#[cfg(test)]
 mod ico_x_07th_mod_ponscripter_fork_97e597d6_default;
 #[cfg(test)]
 mod ico_x_alemart_surgescript_dc35e1aa_surgescript;
@@ -50,3 +52,5 @@ mod ico_x_solarus_games_solarus_quest_editor_2f98d597_solarus_quest_editor;
 mod ico_x_syncplay_syncplay_8d60c8b4_icon;
 #[cfg(test)]
 mod ico_x_woeusb_woeusb_ng_ceea6719_icon;
+#[cfg(test)]
+mod png_x_07th_mod_ponscripter_fork_97e597d6_default;

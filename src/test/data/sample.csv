@@ -1,7 +1,7 @@
 language,repository,commit,path,promoted_to,dataset,status,comment,size_bucket
 BMP,matthewdeanmartin-terminaltables3,f904c3becc62d27fbf027b1dcb0d0cb4f54a7ede,tests/test_all_tables_e2e/sub_ascii_win10.bmp,bmp-x-matthewdeanmartin-terminaltables3-f904c3be-sub_ascii_win10,pictures,PROMOTED,,small-resized
 BMP,matthewdeanmartin-terminaltables3,f904c3becc62d27fbf027b1dcb0d0cb4f54a7ede,tests/test_all_tables_e2e/sub_ascii_winxp.bmp,bmp-x-matthewdeanmartin-terminaltables3-f904c3be-sub_ascii_winxp,pictures,PROMOTED,,small-resized
-BMP,talamus-solarize-12x29-psf,8a856fdb22bc633fdba490b339ea97ef16b700ac,Solarize.12x29.bmp,,pictures,SAMPLED,,medium-same
+BMP,talamus-solarize-12x29-psf,8a856fdb22bc633fdba490b339ea97ef16b700ac,Solarize.12x29.bmp,bmp-x-talamus-solarize-12x29-psf-8a856fdb-solarize-12x29,pictures,PROMOTED,,medium-same
 C,FFmpeg-FFmpeg.git,1d16161a8bb897a2a6f20bfcad0486e966b3f086,libswscale/ops.h,c-ffmpeg-added-typedef-to-enum,small,PROMOTED,,
 C,FFmpeg-FFmpeg.git,3783b8f5e1a3ee6f046fa6d3b763f19a6cba8fb3,libavcodec/mjpegdec.c,c-ffmpeg-ffmpeg-parse-error-but-workable,stratified,PROMOTED,,3000+
 C,FFmpeg-FFmpeg.git,619839ac16a41d6562c30afd29ac9a7ea8304d39,libavformat/tee.c,c-ffmpeg-ffmpeg-rename-two-identifiers,stratified,PROMOTED,,300-1000
@@ -1125,7 +1125,7 @@ PHP,symfony-finder,6de263e5868b9a137602dd1e33e4d48bfae99c49,Finder.php,php-symfo
 PHP,theseer-DirectoryScanner,60314853589d97c1aa294eac5b6ec56ef4758c17,tests/directoryscanner.test.php,php-theseer-directoryscanner-add-two-test-cases-and-reformat-file,full,PROMOTED,,
 PHP,zetacomponents-Base,f07067c240b61510cc7b1d7bd437168c6c1bf2d7,src/init.php,php-zetacomponents-base-whitespace-only-change,full,PROMOTED,,
 PHP,zetacomponents-ConsoleTools,2730724f7563599d78079ce0a3825179e9a240d4,src/input/help_generators/standard.php,php-zetacomponents-consoletools-file-with-parse-errors-and-a-few-deletions,full,PROMOTED,,
-PNG,07th-mod-ponscripter-fork,97e597d699d5a89b426d2f170ff9efcb8896f4a8,src/resources/default.png,,pictures,SAMPLED,,icon-same
+PNG,07th-mod-ponscripter-fork,97e597d699d5a89b426d2f170ff9efcb8896f4a8,src/resources/default.png,png-x-07th-mod-ponscripter-fork-97e597d6-default,pictures,PROMOTED,,icon-same
 PNG,Autodesk-AutomaticComponentToolkit,ba20316d9a3e42cb23a0de70b33351130147ab30,Documentation/images/element_global.png,,pictures,SAMPLED,,medium-resized
 PNG,Blosc-python-blosc,4f7f07d822e2b5aaea5090ac6408757e5dd37e5a,doc/_static/speed-blosc-codecs.png,,pictures,SAMPLED,,medium-same
 PNG,Gnucash-gnucash-docs,2d831f10ff3e30d9eae887239c935b049e43323d,zh/guide/figures/accts_DefaultExpenseAccounts.png,,pictures,SAMPLED,,large-same

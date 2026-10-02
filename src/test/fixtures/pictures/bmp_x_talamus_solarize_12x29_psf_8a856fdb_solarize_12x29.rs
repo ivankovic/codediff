@@ -21,5 +21,7 @@ use crate::test::helper::human_picture;
 
 #[test]
 fn verdict() -> Result<()> {
-    human_picture::assert_matches_human_verdict("ico-x-kikoplayproject-kikoplay-9f13361b-kikoplay")
+    human_picture::assert_matches_human_verdict(
+        "bmp-x-talamus-solarize-12x29-psf-8a856fdb-solarize-12x29",
+    )
 }
