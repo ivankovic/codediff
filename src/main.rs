@@ -314,6 +314,14 @@ fn exit_code_for(differed: bool, want_exit_code: bool, invoked_as_git_external_d
     }
 }
 
+/// True if `before` and `after` are a picture pair (see `diff::picture::is_picture_pair`).
+fn is_picture_pair(before: &std::path::Path, after: &std::path::Path) -> Result<bool> {
+    Ok(omnidiff::diff::picture::is_picture_pair(
+        &std::fs::read(before)?,
+        &std::fs::read(after)?,
+    ))
+}
+
 /// Reports a pair with at least one binary side (the other may be git's empty `/dev/null`), in
 /// every mode. It must succeed: a UTF-8 decode error would exit 2, and under `GIT_EXTERNAL_DIFF`
 /// git then abandons every remaining file in the diff.
@@ -416,7 +424,11 @@ async fn run() -> Result<i32> {
     if let Some((before, after)) = before_after.as_ref() {
         let either_is_binary =
             omnidiff::code::is_binary_file(before)? || omnidiff::code::is_binary_file(after)?;
-        if either_is_binary {
+        // A picture pair the TUI would show goes on to the TUI's picture view; every other binary
+        // pair, and any picture pair headless or as JSON, is answered here.
+        let tui =
+            !should_run_json(&args) && !should_run_headless(&args, std::io::stdout().is_terminal());
+        if either_is_binary && !(tui && is_picture_pair(before, after)?) {
             return run_binary(&args, before, after);
         }
     }
