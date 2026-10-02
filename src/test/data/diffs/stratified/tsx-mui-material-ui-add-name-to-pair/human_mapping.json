@@ -1,0 +1,1078 @@
+{
+  "entries": [
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [],
+      "after_path": []
+    },
+    {
+      "operation": "identical_with_children",
+      "before_path": [
+        "import_statement:1"
+      ],
+      "after_path": [
+        "import_statement:1"
+      ]
+    },
+    {
+      "operation": "identical_with_children",
+      "before_path": [
+        "import_statement:2"
+      ],
+      "after_path": [
+        "import_statement:2"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "export_statement:1"
+      ],
+      "after_path": [
+        "export_statement:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "export_statement:1",
+        "export:1"
+      ],
+      "after_path": [
+        "export_statement:1",
+        "export:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "export_statement:1",
+        "default:1"
+      ],
+      "after_path": [
+        "export_statement:1",
+        "default:1"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "export_statement:1",
+        "function_declaration:1"
+      ],
+      "after_path": [
+        "export_statement:1",
+        "function_declaration:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "export_statement:1",
+        "function_declaration:1",
+        "function:1"
+      ],
+      "after_path": [
+        "export_statement:1",
+        "function_declaration:1",
+        "function:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "export_statement:1",
+        "function_declaration:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "export_statement:1",
+        "function_declaration:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical_with_children",
+      "before_path": [
+        "export_statement:1",
+        "function_declaration:1",
+        "formal_parameters:1"
+      ],
+      "after_path": [
+        "export_statement:1",
+        "function_declaration:1",
+        "formal_parameters:1"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "export_statement:1",
+        "function_declaration:1",
+        "statement_block:1"
+      ],
+      "after_path": [
+        "export_statement:1",
+        "function_declaration:1",
+        "statement_block:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "export_statement:1",
+        "function_declaration:1",
+        "statement_block:1",
+        "{:1"
+      ],
+      "after_path": [
+        "export_statement:1",
+        "function_declaration:1",
+        "statement_block:1",
+        "{:1"
+      ]
+    },
+    {
+      "operation": "identical_with_children",
+      "before_path": [
+        "export_statement:1",
+        "function_declaration:1",
+        "statement_block:1",
+        "lexical_declaration:1"
+      ],
+      "after_path": [
+        "export_statement:1",
+        "function_declaration:1",
+        "statement_block:1",
+        "lexical_declaration:1"
+      ]
+    },
+    {
+      "operation": "identical_with_children",
+      "before_path": [
+        "export_statement:1",
+        "function_declaration:1",
+        "statement_block:1",
+        "lexical_declaration:2"
+      ],
+      "after_path": [
+        "export_statement:1",
+        "function_declaration:1",
+        "statement_block:1",
+        "lexical_declaration:2"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "export_statement:1",
+        "function_declaration:1",
+        "statement_block:1",
+        "return_statement:1"
+      ],
+      "after_path": [
+        "export_statement:1",
+        "function_declaration:1",
+        "statement_block:1",
+        "return_statement:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "export_statement:1",
+        "function_declaration:1",
+        "statement_block:1",
+        "return_statement:1",
+        "return:1"
+      ],
+      "after_path": [
+        "export_statement:1",
+        "function_declaration:1",
+        "statement_block:1",
+        "return_statement:1",
+        "return:1"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "export_statement:1",
+        "function_declaration:1",
+        "statement_block:1",
+        "return_statement:1",
+        "parenthesized_expression:1"
+      ],
+      "after_path": [
+        "export_statement:1",
+        "function_declaration:1",
+        "statement_block:1",
+        "return_statement:1",
+        "parenthesized_expression:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "export_statement:1",
+        "function_declaration:1",
+        "statement_block:1",
+        "return_statement:1",
+        "parenthesized_expression:1",
+        "(:1"
+      ],
+      "after_path": [
+        "export_statement:1",
+        "function_declaration:1",
+        "statement_block:1",
+        "return_statement:1",
+        "parenthesized_expression:1",
+        "(:1"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "export_statement:1",
+        "function_declaration:1",
+        "statement_block:1",
+        "return_statement:1",
+        "parenthesized_expression:1",
+        "jsx_self_closing_element:1"
+      ],
+      "after_path": [
+        "export_statement:1",
+        "function_declaration:1",
+        "statement_block:1",
+        "return_statement:1",
+        "parenthesized_expression:1",
+        "jsx_self_closing_element:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "export_statement:1",
+        "function_declaration:1",
+        "statement_block:1",
+        "return_statement:1",
+        "parenthesized_expression:1",
+        "jsx_self_closing_element:1",
+        "<:1"
+      ],
+      "after_path": [
+        "export_statement:1",
+        "function_declaration:1",
+        "statement_block:1",
+        "return_statement:1",
+        "parenthesized_expression:1",
+        "jsx_self_closing_element:1",
+        "<:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "export_statement:1",
+        "function_declaration:1",
+        "statement_block:1",
+        "return_statement:1",
+        "parenthesized_expression:1",
+        "jsx_self_closing_element:1",
+        "identifier:1"
+      ],
+      "after_path": [
+        "export_statement:1",
+        "function_declaration:1",
+        "statement_block:1",
+        "return_statement:1",
+        "parenthesized_expression:1",
+        "jsx_self_closing_element:1",
+        "identifier:1"
+      ]
+    },
+    {
+      "operation": "identical_with_children",
+      "before_path": [
+        "export_statement:1",
+        "function_declaration:1",
+        "statement_block:1",
+        "return_statement:1",
+        "parenthesized_expression:1",
+        "jsx_self_closing_element:1",
+        "jsx_attribute:1"
+      ],
+      "after_path": [
+        "export_statement:1",
+        "function_declaration:1",
+        "statement_block:1",
+        "return_statement:1",
+        "parenthesized_expression:1",
+        "jsx_self_closing_element:1",
+        "jsx_attribute:1"
+      ]
+    },
+    {
+      "operation": "identical_with_children",
+      "before_path": [
+        "export_statement:1",
+        "function_declaration:1",
+        "statement_block:1",
+        "return_statement:1",
+        "parenthesized_expression:1",
+        "jsx_self_closing_element:1",
+        "jsx_attribute:2"
+      ],
+      "after_path": [
+        "export_statement:1",
+        "function_declaration:1",
+        "statement_block:1",
+        "return_statement:1",
+        "parenthesized_expression:1",
+        "jsx_self_closing_element:1",
+        "jsx_attribute:2"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "export_statement:1",
+        "function_declaration:1",
+        "statement_block:1",
+        "return_statement:1",
+        "parenthesized_expression:1",
+        "jsx_self_closing_element:1",
+        "jsx_attribute:3"
+      ],
+      "after_path": [
+        "export_statement:1",
+        "function_declaration:1",
+        "statement_block:1",
+        "return_statement:1",
+        "parenthesized_expression:1",
+        "jsx_self_closing_element:1",
+        "jsx_attribute:3"
+      ]
+    },
+    {
+      "operation": "update",
+      "before_path": [
+        "export_statement:1",
+        "function_declaration:1",
+        "statement_block:1",
+        "return_statement:1",
+        "parenthesized_expression:1",
+        "jsx_self_closing_element:1",
+        "jsx_attribute:3",
+        "property_identifier:1"
+      ],
+      "after_path": [
+        "export_statement:1",
+        "function_declaration:1",
+        "statement_block:1",
+        "return_statement:1",
+        "parenthesized_expression:1",
+        "jsx_self_closing_element:1",
+        "jsx_attribute:3",
+        "property_identifier:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "export_statement:1",
+        "function_declaration:1",
+        "statement_block:1",
+        "return_statement:1",
+        "parenthesized_expression:1",
+        "jsx_self_closing_element:1",
+        "jsx_attribute:3",
+        "=:1"
+      ],
+      "after_path": [
+        "export_statement:1",
+        "function_declaration:1",
+        "statement_block:1",
+        "return_statement:1",
+        "parenthesized_expression:1",
+        "jsx_self_closing_element:1",
+        "jsx_attribute:3",
+        "=:1"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "export_statement:1",
+        "function_declaration:1",
+        "statement_block:1",
+        "return_statement:1",
+        "parenthesized_expression:1",
+        "jsx_self_closing_element:1",
+        "jsx_attribute:3",
+        "jsx_expression:1"
+      ],
+      "after_path": [
+        "export_statement:1",
+        "function_declaration:1",
+        "statement_block:1",
+        "return_statement:1",
+        "parenthesized_expression:1",
+        "jsx_self_closing_element:1",
+        "jsx_attribute:3",
+        "jsx_expression:1"
+      ]
+    },
+    {
+      "operation": "identical_with_children",
+      "before_path": [
+        "export_statement:1",
+        "function_declaration:1",
+        "statement_block:1",
+        "return_statement:1",
+        "parenthesized_expression:1",
+        "jsx_self_closing_element:1",
+        "jsx_attribute:3",
+        "jsx_expression:1",
+        "object:1",
+        "pair:1"
+      ],
+      "after_path": [
+        "export_statement:1",
+        "function_declaration:1",
+        "statement_block:1",
+        "return_statement:1",
+        "parenthesized_expression:1",
+        "jsx_self_closing_element:1",
+        "jsx_attribute:3",
+        "jsx_expression:1",
+        "object:1",
+        "pair:1",
+        "object:1",
+        "pair:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "export_statement:1",
+        "function_declaration:1",
+        "statement_block:1",
+        "return_statement:1",
+        "parenthesized_expression:1",
+        "jsx_self_closing_element:1",
+        "jsx_attribute:3",
+        "jsx_expression:1",
+        "object:1",
+        "pair:1",
+        "property_identifier:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "export_statement:1",
+        "function_declaration:1",
+        "statement_block:1",
+        "return_statement:1",
+        "parenthesized_expression:1",
+        "jsx_self_closing_element:1",
+        "jsx_attribute:3",
+        "jsx_expression:1",
+        "object:1",
+        "pair:1",
+        "::1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "export_statement:1",
+        "function_declaration:1",
+        "statement_block:1",
+        "return_statement:1",
+        "parenthesized_expression:1",
+        "jsx_self_closing_element:1",
+        "/>:1"
+      ],
+      "after_path": [
+        "export_statement:1",
+        "function_declaration:1",
+        "statement_block:1",
+        "return_statement:1",
+        "parenthesized_expression:1",
+        "jsx_self_closing_element:1",
+        "/>:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "export_statement:1",
+        "function_declaration:1",
+        "statement_block:1",
+        "return_statement:1",
+        "parenthesized_expression:1",
+        "):1"
+      ],
+      "after_path": [
+        "export_statement:1",
+        "function_declaration:1",
+        "statement_block:1",
+        "return_statement:1",
+        "parenthesized_expression:1",
+        "):1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "export_statement:1",
+        "function_declaration:1",
+        "statement_block:1",
+        "return_statement:1",
+        ";:1"
+      ],
+      "after_path": [
+        "export_statement:1",
+        "function_declaration:1",
+        "statement_block:1",
+        "return_statement:1",
+        ";:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "export_statement:1",
+        "function_declaration:1",
+        "statement_block:1",
+        "}:1"
+      ],
+      "after_path": [
+        "export_statement:1",
+        "function_declaration:1",
+        "statement_block:1",
+        "}:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "export_statement:1",
+        "function_declaration:1",
+        "statement_block:1",
+        "return_statement:1",
+        "parenthesized_expression:1",
+        "jsx_self_closing_element:1",
+        "jsx_attribute:3",
+        "jsx_expression:1",
+        "object:1",
+        ",:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "export_statement:1",
+        "function_declaration:1",
+        "statement_block:1",
+        "return_statement:1",
+        "parenthesized_expression:1",
+        "jsx_self_closing_element:1",
+        "jsx_attribute:3",
+        "jsx_expression:1",
+        "{:1"
+      ],
+      "after_path": [
+        "export_statement:1",
+        "function_declaration:1",
+        "statement_block:1",
+        "return_statement:1",
+        "parenthesized_expression:1",
+        "jsx_self_closing_element:1",
+        "jsx_attribute:3",
+        "jsx_expression:1",
+        "{:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "export_statement:1",
+        "function_declaration:1",
+        "statement_block:1",
+        "return_statement:1",
+        "parenthesized_expression:1",
+        "jsx_self_closing_element:1",
+        "jsx_attribute:3",
+        "jsx_expression:1",
+        "object:1",
+        "{:1"
+      ],
+      "after_path": [
+        "export_statement:1",
+        "function_declaration:1",
+        "statement_block:1",
+        "return_statement:1",
+        "parenthesized_expression:1",
+        "jsx_self_closing_element:1",
+        "jsx_attribute:3",
+        "jsx_expression:1",
+        "object:1",
+        "{:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "export_statement:1",
+        "function_declaration:1",
+        "statement_block:1",
+        "return_statement:1",
+        "parenthesized_expression:1",
+        "jsx_self_closing_element:1",
+        "jsx_attribute:3",
+        "jsx_expression:1",
+        "object:1",
+        "}:1"
+      ],
+      "after_path": [
+        "export_statement:1",
+        "function_declaration:1",
+        "statement_block:1",
+        "return_statement:1",
+        "parenthesized_expression:1",
+        "jsx_self_closing_element:1",
+        "jsx_attribute:3",
+        "jsx_expression:1",
+        "object:1",
+        "}:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "export_statement:1",
+        "function_declaration:1",
+        "statement_block:1",
+        "return_statement:1",
+        "parenthesized_expression:1",
+        "jsx_self_closing_element:1",
+        "jsx_attribute:3",
+        "jsx_expression:1",
+        "}:1"
+      ],
+      "after_path": [
+        "export_statement:1",
+        "function_declaration:1",
+        "statement_block:1",
+        "return_statement:1",
+        "parenthesized_expression:1",
+        "jsx_self_closing_element:1",
+        "jsx_attribute:3",
+        "jsx_expression:1",
+        "}:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "export_statement:1",
+        "function_declaration:1",
+        "statement_block:1",
+        "return_statement:1",
+        "parenthesized_expression:1",
+        "jsx_self_closing_element:1",
+        "jsx_attribute:3",
+        "jsx_expression:1",
+        "object:1",
+        "pair:1",
+        "object:1",
+        "}:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "export_statement:1",
+        "function_declaration:1",
+        "statement_block:1",
+        "return_statement:1",
+        "parenthesized_expression:1",
+        "jsx_self_closing_element:1",
+        "jsx_attribute:3",
+        "jsx_expression:1",
+        "object:1",
+        "pair:1",
+        "object:1",
+        "{:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "export_statement:1",
+        "function_declaration:1",
+        "statement_block:1",
+        "return_statement:1",
+        "parenthesized_expression:1",
+        "jsx_self_closing_element:1",
+        "jsx_attribute:3",
+        "jsx_expression:1",
+        "object:1",
+        "pair:1",
+        "object:1"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [
+        "export_statement:1",
+        "function_declaration:1",
+        "statement_block:1",
+        "return_statement:1",
+        "parenthesized_expression:1",
+        "jsx_self_closing_element:1",
+        "jsx_attribute:3",
+        "jsx_expression:1",
+        "object:1"
+      ],
+      "after_path": [
+        "export_statement:1",
+        "function_declaration:1",
+        "statement_block:1",
+        "return_statement:1",
+        "parenthesized_expression:1",
+        "jsx_self_closing_element:1",
+        "jsx_attribute:3",
+        "jsx_expression:1",
+        "object:1"
+      ]
+    },
+    {
+      "operation": "insert",
+      "after_path": [
+        "export_statement:1",
+        "function_declaration:1",
+        "statement_block:1",
+        "return_statement:1",
+        "parenthesized_expression:1",
+        "jsx_self_closing_element:1",
+        "jsx_attribute:3",
+        "jsx_expression:1",
+        "object:1",
+        "pair:1"
+      ]
+    }
+  ],
+  "text_mappings": [
+    {
+      "name": "Minimal",
+      "entries": [
+        {
+          "operation": "Match",
+          "before": [
+            {
+              "start_row": 14,
+              "start_column": 6,
+              "end_row": 14,
+              "end_column": 16
+            }
+          ],
+          "after": [
+            {
+              "start_row": 14,
+              "start_column": 6,
+              "end_row": 14,
+              "end_column": 15
+            }
+          ]
+        },
+        {
+          "operation": "Match",
+          "before": [
+            {
+              "start_row": 14,
+              "start_column": 16,
+              "end_row": 14,
+              "end_column": 19
+            }
+          ],
+          "after": [
+            {
+              "start_row": 14,
+              "start_column": 15,
+              "end_row": 14,
+              "end_column": 18
+            }
+          ]
+        },
+        {
+          "operation": "Match",
+          "before": [
+            {
+              "start_row": 14,
+              "start_column": 47,
+              "end_row": 14,
+              "end_column": 49
+            }
+          ],
+          "after": [
+            {
+              "start_row": 16,
+              "start_column": 6,
+              "end_row": 16,
+              "end_column": 8
+            }
+          ]
+        },
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 15,
+              "start_column": 8,
+              "end_row": 15,
+              "end_column": 16
+            }
+          ]
+        },
+        {
+          "operation": "Match",
+          "before": [
+            {
+              "start_row": 14,
+              "start_column": 20,
+              "end_row": 14,
+              "end_column": 46
+            }
+          ],
+          "after": [
+            {
+              "start_row": 15,
+              "start_column": 17,
+              "end_row": 15,
+              "end_column": 43
+            }
+          ]
+        },
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 15,
+              "start_column": 44,
+              "end_row": 15,
+              "end_column": 45
+            }
+          ]
+        },
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 15,
+              "start_column": 45,
+              "end_row": 15,
+              "end_column": 46
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Full",
+      "entries": [
+        {
+          "operation": "Match",
+          "before": [
+            {
+              "start_row": 14,
+              "start_column": 6,
+              "end_row": 14,
+              "end_column": 16
+            }
+          ],
+          "after": [
+            {
+              "start_row": 14,
+              "start_column": 6,
+              "end_row": 14,
+              "end_column": 15
+            }
+          ]
+        },
+        {
+          "operation": "Match",
+          "before": [
+            {
+              "start_row": 14,
+              "start_column": 16,
+              "end_row": 14,
+              "end_column": 19
+            }
+          ],
+          "after": [
+            {
+              "start_row": 14,
+              "start_column": 15,
+              "end_row": 14,
+              "end_column": 18
+            }
+          ]
+        },
+        {
+          "operation": "Match",
+          "before": [
+            {
+              "start_row": 14,
+              "start_column": 47,
+              "end_row": 14,
+              "end_column": 49
+            }
+          ],
+          "after": [
+            {
+              "start_row": 16,
+              "start_column": 6,
+              "end_row": 16,
+              "end_column": 8
+            }
+          ]
+        },
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 15,
+              "start_column": 8,
+              "end_row": 15,
+              "end_column": 16
+            }
+          ]
+        },
+        {
+          "operation": "Match",
+          "before": [
+            {
+              "start_row": 14,
+              "start_column": 20,
+              "end_row": 14,
+              "end_column": 46
+            }
+          ],
+          "after": [
+            {
+              "start_row": 15,
+              "start_column": 17,
+              "end_row": 15,
+              "end_column": 43
+            }
+          ]
+        },
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 15,
+              "start_column": 44,
+              "end_row": 15,
+              "end_column": 45
+            }
+          ]
+        },
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 15,
+              "start_column": 45,
+              "end_row": 15,
+              "end_column": 46
+            }
+          ]
+        },
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 15,
+              "start_column": 0,
+              "end_row": 15,
+              "end_column": 8
+            }
+          ]
+        },
+        {
+          "operation": "Match",
+          "before": [
+            {
+              "start_row": 14,
+              "start_column": 19,
+              "end_row": 14,
+              "end_column": 20
+            }
+          ],
+          "after": [
+            {
+              "start_row": 15,
+              "start_column": 16,
+              "end_row": 15,
+              "end_column": 17
+            }
+          ]
+        },
+        {
+          "operation": "Match",
+          "before": [
+            {
+              "start_row": 14,
+              "start_column": 46,
+              "end_row": 14,
+              "end_column": 47
+            }
+          ],
+          "after": [
+            {
+              "start_row": 15,
+              "start_column": 43,
+              "end_row": 15,
+              "end_column": 44
+            }
+          ]
+        },
+        {
+          "operation": "Match",
+          "before": [
+            {
+              "start_row": 14,
+              "start_column": 0,
+              "end_row": 14,
+              "end_column": 6
+            }
+          ],
+          "after": [
+            {
+              "start_row": 14,
+              "start_column": 0,
+              "end_row": 14,
+              "end_column": 6
+            }
+          ]
+        },
+        {
+          "operation": "Insert",
+          "after": [
+            {
+              "start_row": 16,
+              "start_column": 0,
+              "end_row": 16,
+              "end_column": 6
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

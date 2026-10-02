@@ -1,0 +1,357 @@
+{
+  "entries": [
+    {
+      "operation": "delete",
+      "before_path": [
+        "comment:1"
+      ]
+    },
+    {
+      "operation": "match_but_not_identical",
+      "before_path": [],
+      "after_path": []
+    },
+    {
+      "operation": "identical_with_children",
+      "before_path": [
+        "package_clause:1"
+      ],
+      "after_path": [
+        "package_clause:1"
+      ]
+    },
+    {
+      "operation": "identical_with_children",
+      "before_path": [
+        "import_declaration:1"
+      ],
+      "after_path": [
+        "import_declaration:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "comment:2"
+      ],
+      "after_path": [
+        "comment:1"
+      ]
+    },
+    {
+      "operation": "identical_with_children",
+      "before_path": [
+        "type_declaration:1"
+      ],
+      "after_path": [
+        "type_declaration:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "comment:3"
+      ],
+      "after_path": [
+        "comment:2"
+      ]
+    },
+    {
+      "operation": "identical_with_children",
+      "before_path": [
+        "function_declaration:1"
+      ],
+      "after_path": [
+        "function_declaration:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "comment:4"
+      ],
+      "after_path": [
+        "comment:3"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "comment:5"
+      ],
+      "after_path": [
+        "comment:4"
+      ]
+    },
+    {
+      "operation": "identical_with_children",
+      "before_path": [
+        "type_declaration:2"
+      ],
+      "after_path": [
+        "type_declaration:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "comment:6"
+      ],
+      "after_path": [
+        "comment:5"
+      ]
+    },
+    {
+      "operation": "identical_with_children",
+      "before_path": [
+        "function_declaration:2"
+      ],
+      "after_path": [
+        "function_declaration:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "comment:7"
+      ],
+      "after_path": [
+        "comment:6"
+      ]
+    },
+    {
+      "operation": "identical_with_children",
+      "before_path": [
+        "method_declaration:1"
+      ],
+      "after_path": [
+        "method_declaration:1"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "comment:8"
+      ],
+      "after_path": [
+        "comment:7"
+      ]
+    },
+    {
+      "operation": "identical_with_children",
+      "before_path": [
+        "method_declaration:2"
+      ],
+      "after_path": [
+        "method_declaration:2"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "comment:9"
+      ],
+      "after_path": [
+        "comment:8"
+      ]
+    },
+    {
+      "operation": "identical_with_children",
+      "before_path": [
+        "method_declaration:3"
+      ],
+      "after_path": [
+        "method_declaration:3"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "comment:10"
+      ],
+      "after_path": [
+        "comment:9"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "comment:11"
+      ],
+      "after_path": [
+        "comment:10"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "comment:12"
+      ],
+      "after_path": [
+        "comment:11"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "comment:13"
+      ],
+      "after_path": [
+        "comment:12"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "comment:14"
+      ],
+      "after_path": [
+        "comment:13"
+      ]
+    },
+    {
+      "operation": "identical_with_children",
+      "before_path": [
+        "method_declaration:4"
+      ],
+      "after_path": [
+        "method_declaration:4"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "comment:15"
+      ],
+      "after_path": [
+        "comment:14"
+      ]
+    },
+    {
+      "operation": "identical_with_children",
+      "before_path": [
+        "method_declaration:5"
+      ],
+      "after_path": [
+        "method_declaration:5"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "comment:16"
+      ],
+      "after_path": [
+        "comment:15"
+      ]
+    },
+    {
+      "operation": "identical_with_children",
+      "before_path": [
+        "method_declaration:6"
+      ],
+      "after_path": [
+        "method_declaration:6"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "comment:17"
+      ],
+      "after_path": [
+        "comment:16"
+      ]
+    },
+    {
+      "operation": "identical_with_children",
+      "before_path": [
+        "method_declaration:7"
+      ],
+      "after_path": [
+        "method_declaration:7"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "comment:18"
+      ],
+      "after_path": [
+        "comment:17"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "comment:19"
+      ],
+      "after_path": [
+        "comment:18"
+      ]
+    },
+    {
+      "operation": "identical_with_children",
+      "before_path": [
+        "method_declaration:8"
+      ],
+      "after_path": [
+        "method_declaration:8"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "comment:20"
+      ],
+      "after_path": [
+        "comment:19"
+      ]
+    },
+    {
+      "operation": "identical_with_children",
+      "before_path": [
+        "method_declaration:9"
+      ],
+      "after_path": [
+        "method_declaration:9"
+      ]
+    },
+    {
+      "operation": "identical",
+      "before_path": [
+        "comment:21"
+      ],
+      "after_path": [
+        "comment:20"
+      ]
+    },
+    {
+      "operation": "identical_with_children",
+      "before_path": [
+        "function_declaration:3"
+      ],
+      "after_path": [
+        "function_declaration:3"
+      ]
+    }
+  ],
+  "text_mappings": [
+    {
+      "name": "Only one solution",
+      "entries": [
+        {
+          "operation": "Delete",
+          "before": [
+            {
+              "start_row": 0,
+              "start_column": 0,
+              "end_row": 0,
+              "end_column": 14
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
