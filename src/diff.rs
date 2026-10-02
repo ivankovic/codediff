@@ -53,6 +53,7 @@ pub mod cost;
 pub(crate) mod grouped_greedy_matcher;
 pub(crate) mod hash_tree_matching;
 pub mod nodes;
+pub mod picture;
 pub(crate) mod solve_bottom_up_propagation;
 pub(crate) mod solve_greedy_anchor_blocks;
 pub(crate) mod solve_hash_descent;

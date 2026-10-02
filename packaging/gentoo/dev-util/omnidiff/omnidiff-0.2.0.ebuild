@@ -16,6 +16,7 @@ CRATES="
 	approx@0.5.1
 	atomic@0.6.1
 	autocfg@1.5.1
+	base64-simd@0.8.0
 	base64@0.22.1
 	base64@0.23.1
 	bincode@1.3.3
@@ -25,10 +26,13 @@ CRATES="
 	bit-vec@0.8.0
 	bitflags@1.3.2
 	bitflags@2.13.2
+	bitvec@1.1.1
 	block-buffer@0.10.4
 	bumpalo@3.20.3
 	by_address@1.2.1
 	bytemuck@1.25.2
+	bytemuck_derive@1.12.1
+	byteorder-lite@0.1.0
 	bytes@1.12.1
 	castaway@0.2.4
 	cc@1.4.7
@@ -41,6 +45,7 @@ CRATES="
 	clap_derive@4.6.7
 	clap_lex@1.1.1
 	clap_mangen@0.3.3
+	color_quant@1.1.0
 	colorchoice@1.0.5
 	compact_str@0.9.1
 	confy@2.0.0
@@ -54,6 +59,7 @@ CRATES="
 	crossterm@0.28.1
 	crossterm@0.29.0
 	crossterm_winapi@0.9.1
+	crunchy@0.2.4
 	crypto-common@0.1.7
 	csscolorparser@0.6.2
 	csv-core@0.1.13
@@ -77,6 +83,8 @@ CRATES="
 	fancy-regex@0.11.0
 	fancy-regex@0.16.2
 	fastrand@2.5.0
+	fax@0.2.7
+	fdeflate@0.3.7
 	filedescriptor@0.8.3
 	find-msvc-tools@0.1.13
 	finl_unicode@1.5.0
@@ -84,6 +92,7 @@ CRATES="
 	flate2@1.1.10
 	fnv@1.0.7
 	foldhash@0.2.0
+	funty@2.0.0
 	futures-channel@0.3.34
 	futures-core@0.3.34
 	futures-executor@0.3.34
@@ -94,9 +103,12 @@ CRATES="
 	futures-util@0.3.34
 	futures@0.3.34
 	generic-array@0.14.7
+	getrandom@0.2.17
 	getrandom@0.3.4
 	getrandom@0.4.3
+	gif@0.14.2
 	git2@0.21.0
+	half@2.7.1
 	hashbrown@0.16.1
 	hashbrown@0.17.1
 	hashlink@0.12.2
@@ -104,7 +116,10 @@ CRATES="
 	hermit-abi@0.5.3
 	hex@0.4.3
 	home@0.5.12
+	icy_sixel@0.5.1
 	ident_case@1.0.1
+	image-webp@0.2.4
+	image@0.25.10
 	indexmap@2.14.2
 	indoc@2.0.7
 	instability@0.3.14
@@ -138,8 +153,10 @@ CRATES="
 	metrohash@1.0.7
 	mimalloc@0.1.52
 	minimal-lexical@0.2.1
+	miniz_oxide@0.8.9
 	miniz_oxide@0.9.1
 	mio@1.2.3
+	moxcms@0.8.1
 	nix@0.29.0
 	nom@7.1.3
 	nu-ansi-term@0.50.3
@@ -154,6 +171,8 @@ CRATES="
 	onig@6.5.3
 	onig_sys@69.9.3
 	ordered-float@4.6.0
+	ordered-float@5.4.0
+	outref@0.5.2
 	palette@0.7.7
 	palette_derive@0.7.7
 	palette_math@0.7.7
@@ -171,19 +190,28 @@ CRATES="
 	pin-project-lite@0.2.17
 	pkg-config@0.3.34
 	plist@1.10.1
+	png@0.18.1
 	portable-atomic@1.15.0
 	powerfmt@0.2.0
+	ppv-lite86@0.2.21
 	proc-macro2@1.0.107
+	pxfm@0.1.30
+	quantette@0.6.0
+	quick-error@2.0.1
 	quick-xml@0.42.0
 	quote@1.0.47
 	r-efi@5.3.0
 	r-efi@6.0.0
+	radium@0.7.0
 	rand@0.10.3
 	rand@0.8.8
+	rand_chacha@0.3.1
 	rand_core@0.10.1
 	rand_core@0.6.4
+	rand_xoshiro@0.8.1
 	ratatui-core@0.1.2
 	ratatui-crossterm@0.1.2
+	ratatui-image@11.1.0
 	ratatui-macros@0.7.2
 	ratatui-termina@0.1.0
 	ratatui-termion@0.1.2
@@ -191,6 +219,8 @@ CRATES="
 	ratatui-widgets@0.3.2
 	ratatui@0.30.2
 	redox_syscall@0.5.18
+	ref-cast-impl@1.0.27
+	ref-cast@1.0.27
 	regex-automata@0.4.18
 	regex-syntax@0.8.11
 	regex@1.13.1
@@ -203,8 +233,10 @@ CRATES="
 	rustix@1.1.5
 	rustversion@1.0.23
 	ryu@1.0.23
+	safe_arch@1.2.0
 	same-file@1.0.6
 	scopeguard@1.2.0
+	self_cell@1.3.0
 	semver@1.0.28
 	serde@1.0.229
 	serde_core@1.0.229
@@ -232,6 +264,7 @@ CRATES="
 	syn@2.0.119
 	syn@3.0.6
 	syntect@5.3.0
+	tap@1.0.1
 	tempfile@3.27.0
 	termina@0.3.3
 	terminfo@0.9.0
@@ -243,6 +276,7 @@ CRATES="
 	thiserror@1.0.69
 	thiserror@2.0.21
 	thread_local@1.1.10
+	tiff@0.11.3
 	time-core@0.1.9
 	time-macros@0.2.32
 	time@0.3.55
@@ -295,6 +329,7 @@ CRATES="
 	valuable@0.1.1
 	vcpkg@0.2.15
 	version_check@0.9.5
+	vsimd@0.8.0
 	vtparse@0.6.2
 	walkdir@2.5.0
 	wasi@0.11.1+wasi-snapshot-preview1
@@ -303,20 +338,28 @@ CRATES="
 	wasm-bindgen-macro@0.2.128
 	wasm-bindgen-shared@0.2.128
 	wasm-bindgen@0.2.128
+	weezl@0.1.12
 	wezterm-bidi@0.2.3
 	wezterm-blob-leases@0.1.1
 	wezterm-color-types@0.3.0
 	wezterm-dynamic-derive@0.1.1
 	wezterm-dynamic@0.2.1
 	wezterm-input-types@0.1.0
+	wide@1.7.1
 	winapi-i686-pc-windows-gnu@0.4.0
 	winapi-util@0.1.11
 	winapi-x86_64-pc-windows-gnu@0.4.0
 	winapi@0.3.9
+	windows-core@0.58.0
+	windows-implement@0.58.0
+	windows-interface@0.58.0
 	windows-link@0.2.1
+	windows-result@0.2.0
+	windows-strings@0.1.0
 	windows-sys@0.59.0
 	windows-sys@0.61.2
 	windows-targets@0.52.6
+	windows@0.58.0
 	windows_aarch64_gnullvm@0.52.6
 	windows_aarch64_msvc@0.52.6
 	windows_i686_gnu@0.52.6
@@ -328,9 +371,14 @@ CRATES="
 	winnow@0.7.15
 	winnow@1.0.4
 	wit-bindgen@0.57.1
+	wyz@0.5.1
 	yaml-rust@0.4.5
+	zerocopy-derive@0.8.59
+	zerocopy@0.8.59
 	zlib-rs@0.6.8
 	zmij@1.0.23
+	zune-core@0.5.3
+	zune-jpeg@0.5.15
 "
 
 RUST_MIN_VER="1.88.0"

@@ -51,6 +51,69 @@ pub fn invoked_as_git_external_diff(paths: &[PathBuf]) -> bool {
     matches!(paths.len(), 7 | 9)
 }
 
+/// The headless report of a picture pair (see [`crate::diff::picture`]), named the way
+/// [`binary_notice`] names a pair: what each side is, then how much changed and where. Lists the
+/// ten largest regions.
+pub fn picture_notice(
+    paths: &[PathBuf],
+    before: &Path,
+    after: &Path,
+    diff: &crate::diff::picture::PictureDiff,
+) -> String {
+    use crate::diff::picture::{Comparison, PictureInfo};
+    const LISTED_REGIONS: usize = 10;
+
+    let name = if invoked_as_git_external_diff(paths) {
+        format!("Picture {}", paths[0].display())
+    } else {
+        format!("Pictures {} and {}", before.display(), after.display())
+    };
+    let side = |info: &Option<PictureInfo>| match info {
+        Some(info) => format!(
+            "{} {}x{} {}, {} bytes",
+            info.format, info.width, info.height, info.color, info.bytes
+        ),
+        None => "nothing".to_string(),
+    };
+    let mut out = format!("{name}: {} -> {}\n", side(&diff.before), side(&diff.after));
+    match &diff.comparison {
+        Comparison::OneSided => {}
+        Comparison::Resized => out.push_str("  resized, so not compared pixel by pixel\n"),
+        Comparison::Pixels { regions, .. } if regions.is_empty() => {
+            out.push_str("  no pixel changed\n");
+        }
+        Comparison::Pixels {
+            changed_pixels,
+            total_pixels,
+            regions,
+        } => {
+            let share = 100.0 * *changed_pixels as f64 / (*total_pixels).max(1) as f64;
+            let noun = if regions.len() == 1 {
+                "region"
+            } else {
+                "regions"
+            };
+            out.push_str(&format!(
+                "  {share:.2}% of pixels changed ({changed_pixels} of {total_pixels}), in {} {noun}:\n",
+                regions.len()
+            ));
+            for region in regions.iter().take(LISTED_REGIONS) {
+                out.push_str(&format!(
+                    "    {}x{} at ({}, {})\n",
+                    region.width, region.height, region.x, region.y
+                ));
+            }
+            if regions.len() > LISTED_REGIONS {
+                out.push_str(&format!(
+                    "    ... {} more\n",
+                    regions.len() - LISTED_REGIONS
+                ));
+            }
+        }
+    }
+    out
+}
+
 /// The one-line stand-in for a binary diff, worded like git's. Under `GIT_EXTERNAL_DIFF` both
 /// sides are temp blobs, so it names git's repo-relative `path` once instead. `differed` is a
 /// byte comparison: a direct invocation may pass identical files.

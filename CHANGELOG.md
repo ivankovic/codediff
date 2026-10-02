@@ -4,6 +4,18 @@ All notable changes to OmniDiff (named CodeDiff up to v0.1.1). The format follow
 and the version numbers follow [Semantic Versioning](https://semver.org/) as far as a 0.x
 release does: a minor bump may change the JSON output or the library API, a patch bump does not.
 
+## [Unreleased]
+
+### Added
+
+- Pictures (PNG, JPEG, GIF, WebP, BMP, ICO, TIFF) are diffed instead of reported as "Binary file
+  differs": what each side is (format, size, color type), how much of it changed and where, as
+  rectangles of changed pixels. Pixels compare perceptually, so re-encoding noise is not a change.
+  Headless and `git diff` print this as a short report and `--mode json` adds a `picture` object.
+  The TUI shows the two pictures with the changed regions outlined, and `t` cycles to a
+  difference, blend and swipe view; it draws real pixels where the terminal speaks the kitty,
+  sixel or iTerm2 graphics protocol and Unicode half blocks everywhere else.
+
 ## [0.2.0] - 2026-10-01
 
 **CodeDiff is now OmniDiff.** The old name is a registered trademark, so everything was renamed.
