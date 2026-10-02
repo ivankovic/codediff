@@ -927,7 +927,8 @@ fn sample_diff_line_count_is_nonzero_for_a_real_sample_on_disk() {
     let Ok(names) = list_dir_names(&samples_root()) else {
         return;
     };
-    let Some(name) = names.first() else {
+    // A picture sample's pair is binary, and has no lines to count.
+    let Some(name) = names.iter().find(|name| !pictures::is_picture_sample(name)) else {
         return;
     };
     assert!(
