@@ -25,7 +25,7 @@
 //! statistics read exactly the files classified as Code or Configuration.
 
 use crate::code::Type;
-use crate::code::language::language_for_extension;
+use crate::code::language::{XML_FORMAT_EXTENSIONS, language_for_extension};
 
 /// Returns the type from path. If possible, the subtype is added as the string value to the enums
 /// gross Code/Config/Data categorization.
@@ -48,7 +48,8 @@ pub fn type_from_path(path: &std::path::Path) -> Option<Type> {
 ///
 /// If possible, the subtype is added as the string value to the enums gross Code/Config/Data categorization.
 pub fn type_from_extension(ext: &str) -> Option<Type> {
-    if language_for_extension(ext).is_some() {
+    // An XML format is diffed with the XML grammar but filed by what it holds, below.
+    if language_for_extension(ext).is_some() && !XML_FORMAT_EXTENSIONS.contains(&ext) {
         return Some(Type::Code(String::from("Uncategorized")));
     }
 
@@ -391,6 +392,20 @@ mod tests {
         );
         // A digit followed by anything that is not a subsection tag is not a man page.
         assert!(type_from_extension("3D").is_none());
+    }
+
+    #[test]
+    fn xml_formats_keep_the_category_of_what_they_hold() {
+        // Diffed with the XML grammar since 2026-10-02, filed as before: the corpus figures and
+        // the change census must not move because the grammar did.
+        assert_eq!(type_from_extension("svg"), Some(Type::Data("Image".into())));
+        for ext in crate::code::language::XML_FORMAT_EXTENSIONS {
+            assert_ne!(
+                type_from_extension(ext),
+                Some(Type::Code("Uncategorized".into())),
+                ".{ext} is an XML format, not code"
+            );
+        }
     }
 
     #[test]
