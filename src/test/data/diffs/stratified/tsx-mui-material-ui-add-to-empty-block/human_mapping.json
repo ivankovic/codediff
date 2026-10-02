@@ -67,7 +67,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "expression_statement:1",
         "call_expression:1",
@@ -79,57 +79,6 @@
         "call_expression:1",
         "arguments:1",
         "string:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "expression_statement:1",
-        "call_expression:1",
-        "arguments:1",
-        "string:1",
-        "':1"
-      ],
-      "after_path": [
-        "expression_statement:1",
-        "call_expression:1",
-        "arguments:1",
-        "string:1",
-        "':1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "expression_statement:1",
-        "call_expression:1",
-        "arguments:1",
-        "string:1",
-        "string_fragment:1"
-      ],
-      "after_path": [
-        "expression_statement:1",
-        "call_expression:1",
-        "arguments:1",
-        "string:1",
-        "string_fragment:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "expression_statement:1",
-        "call_expression:1",
-        "arguments:1",
-        "string:1",
-        "':2"
-      ],
-      "after_path": [
-        "expression_statement:1",
-        "call_expression:1",
-        "arguments:1",
-        "string:1",
-        "':2"
       ]
     },
     {
@@ -163,7 +112,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "expression_statement:1",
         "call_expression:1",
@@ -177,44 +126,6 @@
         "arguments:1",
         "arrow_function:1",
         "formal_parameters:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "expression_statement:1",
-        "call_expression:1",
-        "arguments:1",
-        "arrow_function:1",
-        "formal_parameters:1",
-        "(:1"
-      ],
-      "after_path": [
-        "expression_statement:1",
-        "call_expression:1",
-        "arguments:1",
-        "arrow_function:1",
-        "formal_parameters:1",
-        "(:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "expression_statement:1",
-        "call_expression:1",
-        "arguments:1",
-        "arrow_function:1",
-        "formal_parameters:1",
-        "):1"
-      ],
-      "after_path": [
-        "expression_statement:1",
-        "call_expression:1",
-        "arguments:1",
-        "arrow_function:1",
-        "formal_parameters:1",
-        "):1"
       ]
     },
     {

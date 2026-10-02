@@ -46,7 +46,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "preproc_ifdef:1",
         "preproc_def:1"
@@ -60,32 +60,6 @@
       "operation": "identical",
       "before_path": [
         "preproc_ifdef:1",
-        "preproc_def:1",
-        "#define:1"
-      ],
-      "after_path": [
-        "preproc_ifdef:1",
-        "preproc_def:1",
-        "#define:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "preproc_ifdef:1",
-        "preproc_def:1",
-        "identifier:1"
-      ],
-      "after_path": [
-        "preproc_ifdef:1",
-        "preproc_def:1",
-        "identifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "preproc_ifdef:1",
         "comment:1"
       ],
       "after_path": [
@@ -94,7 +68,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "preproc_ifdef:1",
         "preproc_include:1"
@@ -102,90 +76,6 @@
       "after_path": [
         "preproc_ifdef:1",
         "preproc_include:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "preproc_ifdef:1",
-        "preproc_include:1",
-        "#include:1"
-      ],
-      "after_path": [
-        "preproc_ifdef:1",
-        "preproc_include:1",
-        "#include:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "preproc_ifdef:1",
-        "preproc_include:1",
-        "string_literal:1"
-      ],
-      "after_path": [
-        "preproc_ifdef:1",
-        "preproc_include:1",
-        "string_literal:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "preproc_ifdef:1",
-        "preproc_include:1",
-        "string_literal:1",
-        "\":1"
-      ],
-      "after_path": [
-        "preproc_ifdef:1",
-        "preproc_include:1",
-        "string_literal:1",
-        "\":1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "preproc_ifdef:1",
-        "preproc_include:1",
-        "string_literal:1",
-        "string_content:1"
-      ],
-      "after_path": [
-        "preproc_ifdef:1",
-        "preproc_include:1",
-        "string_literal:1",
-        "string_content:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "preproc_ifdef:1",
-        "preproc_include:1",
-        "string_literal:1",
-        "\":2"
-      ],
-      "after_path": [
-        "preproc_ifdef:1",
-        "preproc_include:1",
-        "string_literal:1",
-        "\":2"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "preproc_ifdef:1",
-        "preproc_include:1",
-        "comment:1"
-      ],
-      "after_path": [
-        "preproc_ifdef:1",
-        "preproc_include:1",
-        "comment:1"
       ]
     },
     {
@@ -1641,7 +1531,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "preproc_ifdef:1",
         "declaration:2",
@@ -1655,44 +1545,6 @@
         "function_declarator:1",
         "parameter_list:1",
         "parameter_declaration:6"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "preproc_ifdef:1",
-        "declaration:2",
-        "function_declarator:1",
-        "parameter_list:1",
-        "parameter_declaration:5",
-        "primitive_type:1"
-      ],
-      "after_path": [
-        "preproc_ifdef:1",
-        "declaration:2",
-        "function_declarator:1",
-        "parameter_list:1",
-        "parameter_declaration:6",
-        "primitive_type:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "preproc_ifdef:1",
-        "declaration:2",
-        "function_declarator:1",
-        "parameter_list:1",
-        "parameter_declaration:5",
-        "identifier:1"
-      ],
-      "after_path": [
-        "preproc_ifdef:1",
-        "declaration:2",
-        "function_declarator:1",
-        "parameter_list:1",
-        "parameter_declaration:6",
-        "identifier:1"
       ]
     },
     {

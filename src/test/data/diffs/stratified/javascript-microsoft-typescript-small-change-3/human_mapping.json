@@ -997,7 +997,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "expression_statement:2",
         "call_expression:1",
@@ -1007,51 +1007,6 @@
         "expression_statement:2",
         "call_expression:1",
         "member_expression:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "expression_statement:2",
-        "call_expression:1",
-        "member_expression:1",
-        "identifier:1"
-      ],
-      "after_path": [
-        "expression_statement:2",
-        "call_expression:1",
-        "member_expression:1",
-        "identifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "expression_statement:2",
-        "call_expression:1",
-        "member_expression:1",
-        ".:1"
-      ],
-      "after_path": [
-        "expression_statement:2",
-        "call_expression:1",
-        "member_expression:1",
-        ".:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "expression_statement:2",
-        "call_expression:1",
-        "member_expression:1",
-        "property_identifier:1"
-      ],
-      "after_path": [
-        "expression_statement:2",
-        "call_expression:1",
-        "member_expression:1",
-        "property_identifier:1"
       ]
     },
     {

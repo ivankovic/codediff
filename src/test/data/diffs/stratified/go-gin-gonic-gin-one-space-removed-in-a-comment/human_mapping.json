@@ -51,7 +51,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "package_clause:1"
       ],
@@ -60,140 +60,12 @@
       ]
     },
     {
-      "operation": "identical",
-      "before_path": [
-        "package_clause:1",
-        "package:1"
-      ],
-      "after_path": [
-        "package_clause:1",
-        "package:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "package_clause:1",
-        "package_identifier:1"
-      ],
-      "after_path": [
-        "package_clause:1",
-        "package_identifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "type_declaration:1"
       ],
       "after_path": [
         "type_declaration:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "type_declaration:1",
-        "type:1"
-      ],
-      "after_path": [
-        "type_declaration:1",
-        "type:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "type_declaration:1",
-        "type_alias:1"
-      ],
-      "after_path": [
-        "type_declaration:1",
-        "type_alias:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "type_declaration:1",
-        "type_alias:1",
-        "type_identifier:1"
-      ],
-      "after_path": [
-        "type_declaration:1",
-        "type_alias:1",
-        "type_identifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "type_declaration:1",
-        "type_alias:1",
-        "=:1"
-      ],
-      "after_path": [
-        "type_declaration:1",
-        "type_alias:1",
-        "=:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "type_declaration:1",
-        "type_alias:1",
-        "interface_type:1"
-      ],
-      "after_path": [
-        "type_declaration:1",
-        "type_alias:1",
-        "interface_type:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "type_declaration:1",
-        "type_alias:1",
-        "interface_type:1",
-        "interface:1"
-      ],
-      "after_path": [
-        "type_declaration:1",
-        "type_alias:1",
-        "interface_type:1",
-        "interface:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "type_declaration:1",
-        "type_alias:1",
-        "interface_type:1",
-        "{:1"
-      ],
-      "after_path": [
-        "type_declaration:1",
-        "type_alias:1",
-        "interface_type:1",
-        "{:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "type_declaration:1",
-        "type_alias:1",
-        "interface_type:1",
-        "}:1"
-      ],
-      "after_path": [
-        "type_declaration:1",
-        "type_alias:1",
-        "interface_type:1",
-        "}:1"
       ]
     }
   ],

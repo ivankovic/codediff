@@ -12,7 +12,7 @@
       "after_path": []
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "mod_item:1"
       ],
@@ -21,64 +21,7 @@
       ]
     },
     {
-      "operation": "identical",
-      "before_path": [
-        "mod_item:1",
-        "visibility_modifier:1"
-      ],
-      "after_path": [
-        "mod_item:1",
-        "visibility_modifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "mod_item:1",
-        "visibility_modifier:1",
-        "pub:1"
-      ],
-      "after_path": [
-        "mod_item:1",
-        "visibility_modifier:1",
-        "pub:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "mod_item:1",
-        "mod:1"
-      ],
-      "after_path": [
-        "mod_item:1",
-        "mod:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "mod_item:1",
-        "identifier:1"
-      ],
-      "after_path": [
-        "mod_item:1",
-        "identifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "mod_item:1",
-        ";:1"
-      ],
-      "after_path": [
-        "mod_item:1",
-        ";:1"
-      ]
-    },
-    {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "mod_item:2"
       ],
@@ -87,64 +30,7 @@
       ]
     },
     {
-      "operation": "identical",
-      "before_path": [
-        "mod_item:2",
-        "visibility_modifier:1"
-      ],
-      "after_path": [
-        "mod_item:2",
-        "visibility_modifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "mod_item:2",
-        "visibility_modifier:1",
-        "pub:1"
-      ],
-      "after_path": [
-        "mod_item:2",
-        "visibility_modifier:1",
-        "pub:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "mod_item:2",
-        "mod:1"
-      ],
-      "after_path": [
-        "mod_item:2",
-        "mod:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "mod_item:2",
-        "identifier:1"
-      ],
-      "after_path": [
-        "mod_item:2",
-        "identifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "mod_item:2",
-        ";:1"
-      ],
-      "after_path": [
-        "mod_item:2",
-        ";:1"
-      ]
-    },
-    {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "mod_item:3"
       ],
@@ -153,64 +39,7 @@
       ]
     },
     {
-      "operation": "identical",
-      "before_path": [
-        "mod_item:3",
-        "visibility_modifier:1"
-      ],
-      "after_path": [
-        "mod_item:3",
-        "visibility_modifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "mod_item:3",
-        "visibility_modifier:1",
-        "pub:1"
-      ],
-      "after_path": [
-        "mod_item:3",
-        "visibility_modifier:1",
-        "pub:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "mod_item:3",
-        "mod:1"
-      ],
-      "after_path": [
-        "mod_item:3",
-        "mod:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "mod_item:3",
-        "identifier:1"
-      ],
-      "after_path": [
-        "mod_item:3",
-        "identifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "mod_item:3",
-        ";:1"
-      ],
-      "after_path": [
-        "mod_item:3",
-        ";:1"
-      ]
-    },
-    {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "mod_item:4"
       ],
@@ -219,126 +48,12 @@
       ]
     },
     {
-      "operation": "identical",
-      "before_path": [
-        "mod_item:4",
-        "visibility_modifier:1"
-      ],
-      "after_path": [
-        "mod_item:4",
-        "visibility_modifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "mod_item:4",
-        "visibility_modifier:1",
-        "pub:1"
-      ],
-      "after_path": [
-        "mod_item:4",
-        "visibility_modifier:1",
-        "pub:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "mod_item:4",
-        "mod:1"
-      ],
-      "after_path": [
-        "mod_item:4",
-        "mod:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "mod_item:4",
-        "identifier:1"
-      ],
-      "after_path": [
-        "mod_item:4",
-        "identifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "mod_item:4",
-        ";:1"
-      ],
-      "after_path": [
-        "mod_item:4",
-        ";:1"
-      ]
-    },
-    {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "mod_item:5"
       ],
       "after_path": [
         "mod_item:6"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "mod_item:5",
-        "visibility_modifier:1"
-      ],
-      "after_path": [
-        "mod_item:6",
-        "visibility_modifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "mod_item:5",
-        "visibility_modifier:1",
-        "pub:1"
-      ],
-      "after_path": [
-        "mod_item:6",
-        "visibility_modifier:1",
-        "pub:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "mod_item:5",
-        "mod:1"
-      ],
-      "after_path": [
-        "mod_item:6",
-        "mod:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "mod_item:5",
-        "identifier:1"
-      ],
-      "after_path": [
-        "mod_item:6",
-        "identifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "mod_item:5",
-        ";:1"
-      ],
-      "after_path": [
-        "mod_item:6",
-        ";:1"
       ]
     }
   ],

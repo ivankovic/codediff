@@ -24,73 +24,12 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "preproc_include:1"
       ],
       "after_path": [
         "preproc_include:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "preproc_include:1",
-        "#include:1"
-      ],
-      "after_path": [
-        "preproc_include:1",
-        "#include:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "preproc_include:1",
-        "string_literal:1"
-      ],
-      "after_path": [
-        "preproc_include:1",
-        "string_literal:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "preproc_include:1",
-        "string_literal:1",
-        "\":1"
-      ],
-      "after_path": [
-        "preproc_include:1",
-        "string_literal:1",
-        "\":1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "preproc_include:1",
-        "string_literal:1",
-        "string_content:1"
-      ],
-      "after_path": [
-        "preproc_include:1",
-        "string_literal:1",
-        "string_content:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "preproc_include:1",
-        "string_literal:1",
-        "\":2"
-      ],
-      "after_path": [
-        "preproc_include:1",
-        "string_literal:1",
-        "\":2"
       ]
     },
     {

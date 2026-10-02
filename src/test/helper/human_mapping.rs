@@ -22,14 +22,25 @@
 //!
 //! Nodes are identified by *path* (see [`super::path_for_node`]), not node id: ids are not stable
 //! across the separate parses that write and later check a mapping.
+//!
+//! **On disk, a whole identical subtree is one entry.** Every node gets an entry, and almost all of
+//! them are `identical` under an `identical` parent: one entry per unchanged node made the corpus
+//! 3.6 GB of JSON for 104 MB of code, which every checkout wrote and every grading run parsed. The
+//! file therefore has one form the in-memory [`HumanOperation`] does not: `identical_with_children`,
+//! a pair whose subtrees match node for node. [`load`] expands it into one `Identical` entry per
+//! node pair, in pre-order, with the paths [`super::path_for_node`] gives them - exactly the entries
+//! the file held before the form existed - so nothing past `load` knows it exists. [`save`] collapses
+//! every run of entries that is exactly such an expansion, and keeps the entries as they are when
+//! re-expanding would not reproduce them, so the round trip is lossless by construction. Expanding
+//! needs both trees, which is why [`load_with`] takes the parsed pair and [`load`] parses it.
 use anyhow::{Context, Result, bail, ensure};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
-use tree_sitter::Node;
+use tree_sitter::{Node, Tree};
 
-use crate::code::ASTMetadata;
+use crate::code::{ASTMetadata, Code};
 use crate::diff::cost::operation_cost;
 use crate::diff::{ASTDiff, ASTMapping, ASTMappingOperation, ASTMappingReason, NodeCache};
 use crate::test::helper::{PathCache, path_for_node};
@@ -824,7 +835,7 @@ pub fn compare_painting_with_diff(
     after: &crate::code::Code,
     diff: &PaintingDiff,
 ) -> Result<PaintingComparison> {
-    let mapping = load(name)?;
+    let mapping = load_with(name, before, after)?;
     let candidates = paintings_for_mode(&mapping, options)?;
 
     let ours = omnidiff_painting_labels(diff, before, after, options);
@@ -943,14 +954,27 @@ pub fn mapping_path(name: &str) -> PathBuf {
         .join("human_mapping.json")
 }
 
-/// Loads the human mapping for a given test case name.
+/// Loads the human mapping for a given test case name, parsing its code pair when the file holds a
+/// collapsed subtree (see the module doc). [`load_with`] skips that parse.
 pub fn load(name: &str) -> Result<HumanMapping> {
-    let path = mapping_path(name);
-    let contents = fs::read_to_string(&path)
-        .with_context(|| format!("reading human mapping at {:?}", path))?;
-    let mapping: HumanMapping = serde_json::from_str(&contents)
-        .with_context(|| format!("parsing human mapping at {:?}", path))?;
-    Ok(mapping)
+    let stored = read_stored(name)?;
+    if !stored.has_subtrees() {
+        return stored.expand(None);
+    }
+    let dir = super::diffs_case_dir(name)
+        .with_context(|| format!("no fixture directory for '{name}' to expand its mapping in"))?;
+    let (before, after) = super::code_pair_from_dir_without_metadata(&dir)?
+        .with_context(|| format!("no before/after pair in {dir:?} to expand its mapping in"))?;
+    stored
+        .expand(trees_of(&before, &after))
+        .with_context(|| format!("expanding the human mapping of '{name}'"))
+}
+
+/// [`load`] against an already-parsed `before`/`after` pair of the fixture.
+pub fn load_with(name: &str, before: &Code, after: &Code) -> Result<HumanMapping> {
+    read_stored(name)?
+        .expand(trees_of(before, after))
+        .with_context(|| format!("expanding the human mapping of '{name}'"))
 }
 
 /// Saves the human mapping for a given test case name, overwriting any existing file.
@@ -959,9 +983,305 @@ pub fn save(name: &str, mapping: &HumanMapping) -> Result<()> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
     }
-    let json = serde_json::to_string_pretty(mapping)?;
+    let json = file_json(name, mapping)?;
     fs::write(&path, json).with_context(|| format!("writing human mapping to {:?}", path))?;
     Ok(())
+}
+
+/// What [`save`] writes for `mapping`: collapsed against the fixture's code pair when it has one
+/// that parses, the entries as they are otherwise.
+pub fn file_json(name: &str, mapping: &HumanMapping) -> Result<String> {
+    let code = match super::diffs_case_dir(name) {
+        Some(dir) => super::code_pair_from_dir_without_metadata(&dir)?,
+        None => None,
+    };
+    let trees = code
+        .as_ref()
+        .and_then(|(before, after)| trees_of(before, after));
+    Ok(serde_json::to_string_pretty(&StoredMapping::collapse(
+        mapping, trees,
+    ))?)
+}
+
+fn read_stored(name: &str) -> Result<StoredMapping> {
+    let path = mapping_path(name);
+    let contents = fs::read_to_string(&path)
+        .with_context(|| format!("reading human mapping at {:?}", path))?;
+    serde_json::from_str(&contents).with_context(|| format!("parsing human mapping at {:?}", path))
+}
+
+fn trees_of<'t>(before: &'t Code, after: &'t Code) -> Option<(&'t Tree, &'t Tree)> {
+    Some((before.ast.as_ref()?, after.ast.as_ref()?))
+}
+
+/// [`HumanOperation`] as the file spells it: the same operations plus `identical_with_children`,
+/// which exists only on disk (see the module doc).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum StoredOperation {
+    Identical,
+    Update,
+    MatchButNotIdentical,
+    Delete,
+    DeleteWithChildren,
+    Insert,
+    InsertWithChildren,
+    /// The pair and every pair of their descendants, position for position, are `Identical`.
+    IdenticalWithChildren,
+}
+
+impl From<HumanOperation> for StoredOperation {
+    fn from(operation: HumanOperation) -> Self {
+        match operation {
+            HumanOperation::Identical => Self::Identical,
+            HumanOperation::Update => Self::Update,
+            HumanOperation::MatchButNotIdentical => Self::MatchButNotIdentical,
+            HumanOperation::Delete => Self::Delete,
+            HumanOperation::DeleteWithChildren => Self::DeleteWithChildren,
+            HumanOperation::Insert => Self::Insert,
+            HumanOperation::InsertWithChildren => Self::InsertWithChildren,
+        }
+    }
+}
+
+impl StoredOperation {
+    /// `None` for the form that expands into several entries.
+    fn in_memory(self) -> Option<HumanOperation> {
+        Some(match self {
+            Self::Identical => HumanOperation::Identical,
+            Self::Update => HumanOperation::Update,
+            Self::MatchButNotIdentical => HumanOperation::MatchButNotIdentical,
+            Self::Delete => HumanOperation::Delete,
+            Self::DeleteWithChildren => HumanOperation::DeleteWithChildren,
+            Self::Insert => HumanOperation::Insert,
+            Self::InsertWithChildren => HumanOperation::InsertWithChildren,
+            Self::IdenticalWithChildren => return None,
+        })
+    }
+}
+
+/// [`HumanMappingEntry`] as the file holds it.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct StoredEntry {
+    operation: StoredOperation,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    before_path: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    after_path: Option<Vec<String>>,
+}
+
+/// [`HumanMapping`] as the file holds it.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct StoredMapping {
+    entries: Vec<StoredEntry>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    groups: Vec<MultiMapGroup>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    text_mappings: Vec<NamedTextMapping>,
+}
+
+impl StoredMapping {
+    fn has_subtrees(&self) -> bool {
+        self.entries
+            .iter()
+            .any(|entry| entry.operation == StoredOperation::IdenticalWithChildren)
+    }
+
+    /// The in-memory mapping. `trees` is needed only if [`Self::has_subtrees`].
+    fn expand(self, trees: Option<(&Tree, &Tree)>) -> Result<HumanMapping> {
+        let mut entries = Vec::with_capacity(self.entries.len());
+        let mut before_cache = PathCache::new();
+        let mut after_cache = PathCache::new();
+        for entry in self.entries {
+            if let Some(operation) = entry.operation.in_memory() {
+                entries.push(HumanMappingEntry {
+                    operation,
+                    before_path: entry.before_path,
+                    after_path: entry.after_path,
+                });
+                continue;
+            }
+            let (Some(before_path), Some(after_path)) = (entry.before_path, entry.after_path)
+            else {
+                bail!("an identical_with_children entry needs both paths");
+            };
+            let Some((before_tree, after_tree)) = trees else {
+                bail!("identical_with_children at {before_path:?} needs both sides parsed");
+            };
+            let before = before_cache.resolve(before_tree.root_node(), &path_refs(&before_path))?;
+            let after = after_cache.resolve(after_tree.root_node(), &path_refs(&after_path))?;
+            walk_identical_subtree(before, after, before_path, after_path, |before, after| {
+                entries.push(HumanMappingEntry {
+                    operation: HumanOperation::Identical,
+                    before_path: Some(before),
+                    after_path: Some(after),
+                });
+                true
+            })?;
+        }
+        Ok(HumanMapping {
+            entries,
+            groups: self.groups,
+            text_mappings: self.text_mappings,
+        })
+    }
+
+    /// The file form of `mapping`: each run of `Identical` entries that is exactly what one entry
+    /// would expand into (see [`walk_identical_subtree`]) becomes that one entry. Without trees, or
+    /// should the result not expand back to `mapping`'s entries, the entries are kept as they are.
+    fn collapse(mapping: &HumanMapping, trees: Option<(&Tree, &Tree)>) -> Self {
+        let as_is = || Self {
+            entries: mapping.entries.iter().map(StoredEntry::from).collect(),
+            groups: mapping.groups.clone(),
+            text_mappings: mapping.text_mappings.clone(),
+        };
+        let Some((before_tree, after_tree)) = trees else {
+            return as_is();
+        };
+        let mut before_cache = PathCache::new();
+        let mut after_cache = PathCache::new();
+        let entries = &mapping.entries;
+        let mut stored = Vec::new();
+        let mut i = 0;
+        while i < entries.len() {
+            let run = identical_run(
+                entries,
+                i,
+                (before_tree, &mut before_cache),
+                (after_tree, &mut after_cache),
+            );
+            let mut entry = StoredEntry::from(&entries[i]);
+            if run > 1 {
+                entry.operation = StoredOperation::IdenticalWithChildren;
+            }
+            stored.push(entry);
+            i += run.max(1);
+        }
+        let collapsed = Self {
+            entries: stored,
+            groups: mapping.groups.clone(),
+            text_mappings: mapping.text_mappings.clone(),
+        };
+        let round_trips = collapsed
+            .clone()
+            .expand(trees)
+            .is_ok_and(|expanded| same_entries(&expanded.entries, entries));
+        if round_trips { collapsed } else { as_is() }
+    }
+}
+
+impl From<&HumanMappingEntry> for StoredEntry {
+    fn from(entry: &HumanMappingEntry) -> Self {
+        Self {
+            operation: entry.operation.into(),
+            before_path: entry.before_path.clone(),
+            after_path: entry.after_path.clone(),
+        }
+    }
+}
+
+fn same_entries(a: &[HumanMappingEntry], b: &[HumanMappingEntry]) -> bool {
+    a.len() == b.len()
+        && a.iter().zip(b).all(|(x, y)| {
+            x.operation == y.operation
+                && x.before_path == y.before_path
+                && x.after_path == y.after_path
+        })
+}
+
+/// How many entries from `start` on are exactly the expansion of `entries[start]` as an
+/// `identical_with_children` pair: 0 when it is not an `Identical` pair of nodes with children, or
+/// when the entries that follow are not that subtree, node for node and in pre-order.
+fn identical_run<'t>(
+    entries: &[HumanMappingEntry],
+    start: usize,
+    (before_tree, before_cache): (&'t Tree, &mut PathCache<'t>),
+    (after_tree, after_cache): (&'t Tree, &mut PathCache<'t>),
+) -> usize {
+    let entry = &entries[start];
+    let (HumanOperation::Identical, Some(before_path), Some(after_path)) =
+        (entry.operation, &entry.before_path, &entry.after_path)
+    else {
+        return 0;
+    };
+    let (Ok(before), Ok(after)) = (
+        before_cache.resolve(before_tree.root_node(), &path_refs(before_path)),
+        after_cache.resolve(after_tree.root_node(), &path_refs(after_path)),
+    ) else {
+        return 0;
+    };
+    if before.child_count() == 0 {
+        return 0;
+    }
+    let mut next = start;
+    let complete = walk_identical_subtree(
+        before,
+        after,
+        before_path.clone(),
+        after_path.clone(),
+        |before, after| {
+            let matches = entries.get(next).is_some_and(|entry| {
+                entry.operation == HumanOperation::Identical
+                    && entry.before_path.as_ref() == Some(&before)
+                    && entry.after_path.as_ref() == Some(&after)
+            });
+            next += 1;
+            matches
+        },
+    );
+    if complete.unwrap_or(false) {
+        next - start
+    } else {
+        0
+    }
+}
+
+/// Calls `visit` with the paths of `before`/`after` and of every pair of their descendants, in
+/// pre-order, child paths built the way [`super::path_for_node`] builds them. Stops early, returning
+/// `Ok(false)`, when `visit` returns false; errs when the two subtrees differ in shape or kind,
+/// which an identical pair cannot.
+fn walk_identical_subtree(
+    before: Node,
+    after: Node,
+    before_path: Vec<String>,
+    after_path: Vec<String>,
+    mut visit: impl FnMut(Vec<String>, Vec<String>) -> bool,
+) -> Result<bool> {
+    let mut stack = vec![(before, after, before_path, after_path)];
+    while let Some((before, after, before_path, after_path)) = stack.pop() {
+        ensure!(
+            before.child_count() == after.child_count(),
+            "identical subtrees at {before_path:?} / {after_path:?} have different child counts"
+        );
+        let mut occurrences: HashMap<&str, usize> = HashMap::new();
+        let mut before_cursor = before.walk();
+        let mut after_cursor = after.walk();
+        let mut children = Vec::with_capacity(before.child_count());
+        for (b, a) in before
+            .children(&mut before_cursor)
+            .zip(after.children(&mut after_cursor))
+        {
+            ensure!(
+                b.kind() == a.kind(),
+                "identical subtrees at {before_path:?} / {after_path:?} differ in kind: {} / {}",
+                b.kind(),
+                a.kind()
+            );
+            let occurrence = occurrences.entry(b.kind()).or_insert(0);
+            *occurrence += 1;
+            let segment = format!("{}:{}", b.kind(), occurrence);
+            let mut b_path = before_path.clone();
+            b_path.push(segment.clone());
+            let mut a_path = after_path.clone();
+            a_path.push(segment);
+            children.push((b, a, b_path, a_path));
+        }
+        if !visit(before_path, after_path) {
+            return Ok(false);
+        }
+        stack.extend(children.into_iter().rev());
+    }
+    Ok(true)
 }
 
 /// `pub` for `human_solver`, a separate crate.
@@ -1540,7 +1860,7 @@ pub fn human_mapping_cost_for(
     before: &crate::code::Code,
     after: &crate::code::Code,
 ) -> Result<u64> {
-    let mapping = load(name)?;
+    let mapping = load_with(name, before, after)?;
     let before_ast = before.ast.as_ref().context("Before code has no AST")?;
     let after_ast = after.ast.as_ref().context("After code has no AST")?;
     let before_metadata = crate::code::metadata::metadata_of(before);
@@ -1568,7 +1888,7 @@ pub fn as_ast_diff(
     before: &crate::code::Code,
     after: &crate::code::Code,
 ) -> Result<ASTDiff> {
-    let mapping = load(name)?;
+    let mapping = load_with(name, before, after)?;
     as_ast_diff_for_mapping(&mapping, before, after)
 }
 
@@ -2424,7 +2744,7 @@ pub fn graded_node_count_for(
     before: &crate::code::Code,
     after: &crate::code::Code,
 ) -> Result<usize> {
-    let mapping = load(name)?;
+    let mapping = load_with(name, before, after)?;
     let before_ast = before.ast.as_ref().context("Before code has no AST")?;
     let after_ast = after.ast.as_ref().context("After code has no AST")?;
     let before_metadata = crate::code::metadata::metadata_of(before);
@@ -2509,7 +2829,7 @@ pub fn nm_floor_for(
     before: &crate::code::Code,
     after: &crate::code::Code,
 ) -> Result<NmFloor> {
-    nm_floor(&load(name)?, before, after)
+    nm_floor(&load_with(name, before, after)?, before, after)
 }
 
 /// Reduces one side's `TextOperation`s to "touched or not", the only signal a line-only tool
@@ -2744,7 +3064,7 @@ pub fn human_touched_lines_for<'code>(
     before: &'code crate::code::Code,
     after: &'code crate::code::Code,
 ) -> Result<(Vec<bool>, Vec<bool>, NodeCache<'code>)> {
-    let mapping = load(name)?;
+    let mapping = load_with(name, before, after)?;
     human_touched_lines_for_mapping(&mapping, before, after)
 }
 
@@ -2755,7 +3075,7 @@ pub fn line_mismatches_for(
     before: &crate::code::Code,
     after: &crate::code::Code,
 ) -> Result<LineMismatches> {
-    let mapping = load(name)?;
+    let mapping = load_with(name, before, after)?;
     line_mismatches_for_mapping(&mapping, before, after)
 }
 
@@ -2829,7 +3149,16 @@ pub fn compute_mismatches_detailed_for_with_config(
     let diff = crate::diff::diff_code_with_config(before, after, config);
     let diff_ast = diff.ast.context("Diff has no AST")?;
     let node_cache = NodeCache::build(before, after);
-    compute_mismatches_detailed_with_diff(name, before, after, &diff_ast, &node_cache, config)
+    let mapping = load_with(name, before, after)?;
+    compute_mismatches_detailed_with_diff(
+        name,
+        before,
+        after,
+        &diff_ast,
+        &node_cache,
+        config,
+        &mapping,
+    )
 }
 
 /// [`compute_mismatches_detailed_for_with_config`]'s body over an already computed diff, so
@@ -2841,8 +3170,8 @@ fn compute_mismatches_detailed_with_diff(
     diff_ast: &ASTDiff,
     node_cache: &NodeCache,
     config: &crate::diff::HeuristicConfig,
+    mapping: &HumanMapping,
 ) -> Result<Vec<Mismatch>> {
-    let mapping = load(name)?;
     let language = before.metadata.language.unwrap_or_default();
     // Determinism check sampled - see `compute_mismatches`. Neither check is about one node, so
     // both use the `(0, Side::Before)` sentinel.
@@ -2923,9 +3252,32 @@ pub fn compute_visible_mismatches_for_with_config(
     let diff = crate::diff::diff_code_with_config(before, after, config);
     let diff_ast = diff.ast.context("Diff has no AST")?;
     let node_cache = NodeCache::build(before, after);
+    let mapping = load_with(name, before, after)?;
+    visible_mismatches_with(
+        name,
+        before,
+        after,
+        &diff_ast,
+        &node_cache,
+        config,
+        &mapping,
+    )
+}
 
-    let mismatches =
-        compute_mismatches_detailed_with_diff(name, before, after, &diff_ast, &node_cache, config)?;
+/// [`compute_visible_mismatches_for_with_config`] over an already computed diff and loaded mapping,
+/// for a caller that needs both for more than this (the benchmark).
+pub fn visible_mismatches_with(
+    name: &str,
+    before: &crate::code::Code,
+    after: &crate::code::Code,
+    diff_ast: &ASTDiff,
+    node_cache: &NodeCache,
+    config: &crate::diff::HeuristicConfig,
+    mapping: &HumanMapping,
+) -> Result<VisibleMismatches> {
+    let mismatches = compute_mismatches_detailed_with_diff(
+        name, before, after, diff_ast, node_cache, config, mapping,
+    )?;
     let before_visible = crate::diff::nodes::structurally_visible_node_ids(before);
     let after_visible = crate::diff::nodes::structurally_visible_node_ids(after);
 
@@ -3537,16 +3889,130 @@ mod tests {
         Ok(())
     }
 
+    /// The fixture's code pair, parsed the way [`load`] parses it.
+    fn code_pair(name: &str) -> Result<(Code, Code)> {
+        let dir = crate::test::helper::diffs_case_dir(name).context("fixture dir")?;
+        crate::test::helper::code_pair_from_dir_without_metadata(&dir)?.context("code pair")
+    }
+
+    fn compact(mapping: &HumanMapping) -> String {
+        serde_json::to_string(mapping).expect("serializes")
+    }
+
+    #[test]
+    fn a_collapsed_mapping_expands_back_to_the_same_entries() -> Result<()> {
+        let mapping = load("rust-add-if")?;
+        let (before, after) = code_pair("rust-add-if")?;
+        let stored = StoredMapping::collapse(&mapping, trees_of(&before, &after));
+        assert!(
+            stored.has_subtrees(),
+            "rust-add-if keeps whole identical subtrees"
+        );
+        assert!(stored.entries.len() < mapping.entries.len());
+        let expanded = stored.expand(trees_of(&before, &after))?;
+        assert_eq!(compact(&expanded), compact(&mapping));
+        Ok(())
+    }
+
+    #[test]
+    fn a_subtree_with_one_changed_descendant_is_not_collapsed_at_its_root() -> Result<()> {
+        let mut mapping = load("rust-add-if")?;
+        let (before, after) = code_pair("rust-add-if")?;
+        // The first `Identical` pair with children, and a leaf entry somewhere below it.
+        let stored = StoredMapping::collapse(&mapping, trees_of(&before, &after));
+        let root = stored
+            .entries
+            .iter()
+            .find(|entry| entry.operation == StoredOperation::IdenticalWithChildren)
+            .context("a collapsed subtree")?
+            .clone();
+        let root_path = root.before_path.clone().context("before path")?;
+        let below = mapping
+            .entries
+            .iter()
+            .rposition(|entry| {
+                entry.before_path.as_ref().is_some_and(|path| {
+                    path.len() > root_path.len() && path.starts_with(&root_path)
+                })
+            })
+            .context("a descendant entry")?;
+        mapping.entries[below].operation = HumanOperation::Update;
+
+        let stored = StoredMapping::collapse(&mapping, trees_of(&before, &after));
+        assert!(!stored.entries.iter().any(|entry| {
+            entry.operation == StoredOperation::IdenticalWithChildren
+                && entry.before_path.as_ref() == Some(&root_path)
+        }));
+        let expanded = stored.expand(trees_of(&before, &after))?;
+        assert_eq!(compact(&expanded), compact(&mapping));
+        Ok(())
+    }
+
+    #[test]
+    fn without_trees_the_entries_are_written_as_they_are() -> Result<()> {
+        let mapping = load("rust-add-if")?;
+        let stored = StoredMapping::collapse(&mapping, None);
+        assert!(!stored.has_subtrees());
+        assert_eq!(compact(&stored.expand(None)?), compact(&mapping));
+        Ok(())
+    }
+
+    #[test]
+    fn a_collapsed_subtree_without_trees_is_an_error_not_a_silent_loss() {
+        let stored: StoredMapping = serde_json::from_str(
+            r#"{"entries": [{"operation": "identical_with_children", "before_path": [], "after_path": []}]}"#,
+        )
+        .expect("parses");
+        assert!(stored.expand(None).is_err());
+    }
+
+    /// ONE-OFF TOOL, idempotent: rewrites every fixture's `human_mapping.json` in the collapsed
+    /// form, refusing any file whose rewrite would not load back to exactly the mapping it held.
+    ///
+    /// `cargo test --release --lib --features test-fixtures rewrite_every_mapping_collapsed --
+    /// --ignored --nocapture`
+    #[test]
+    #[ignore]
+    fn rewrite_every_mapping_collapsed() -> Result<()> {
+        let (mut rewritten, mut before_bytes, mut after_bytes) = (0usize, 0usize, 0usize);
+        for (name, _dir) in crate::test::helper::handmade_test_case_dirs()? {
+            let path = mapping_path(&name);
+            if !path.exists() {
+                continue;
+            }
+            let original = fs::read_to_string(&path)?;
+            let mapping = load(&name)?;
+            let json = file_json(&name, &mapping)?;
+            fs::write(&path, &json)?;
+            let reloaded = load(&name)?;
+            if compact(&reloaded) != compact(&mapping) {
+                fs::write(&path, &original)?;
+                bail!(
+                    "{name}: the collapsed file does not load back to the same mapping; restored"
+                );
+            }
+            rewritten += 1;
+            before_bytes += original.len();
+            after_bytes += json.len();
+        }
+        println!(
+            "{rewritten} mappings rewritten: {:.1} MB -> {:.1} MB",
+            before_bytes as f64 / 1e6,
+            after_bytes as f64 / 1e6
+        );
+        Ok(())
+    }
+
     #[test]
     fn resaving_an_existing_fixture_produces_byte_identical_json() -> Result<()> {
-        // A real fixture re-serialized the way `save()` does.
+        // A real fixture loaded and re-serialized the way `save()` does.
         let original = fs::read_to_string(mapping_path("rust-add-if"))?;
-        let mapping: HumanMapping = serde_json::from_str(&original)?;
+        let mapping = load("rust-add-if")?;
         assert!(
             mapping.groups.is_empty(),
             "fixture assumption broken: rust-add-if unexpectedly has groups already"
         );
-        let resaved = serde_json::to_string_pretty(&mapping)?;
+        let resaved = file_json("rust-add-if", &mapping)?;
         // A Windows checkout with git's default autocrlf reads the fixture back with CRLF; the
         // serialization is what this test measures, not git's line-ending translation.
         let original = original.replace("\r\n", "\n");

@@ -991,7 +991,7 @@ fn diff_case_unmarked_count(name: &str) -> Option<usize> {
     let dir = diffs_case_dir(name)?;
     // Without metadata: the count never diffs, and metadata is most of the load.
     let (before, after) = code_pair_from_dir_without_metadata(&dir).ok().flatten()?;
-    let mapping = human_mapping::load(name).unwrap_or_default();
+    let mapping = human_mapping::load_with(name, &before, &after).unwrap_or_default();
     let (Some(before_tree), Some(after_tree)) = (before.ast.as_ref(), after.ast.as_ref()) else {
         return Some(0);
     };
@@ -1062,7 +1062,7 @@ fn compute_diff_text_painted() -> std::collections::HashMap<String, bool> {
 fn diff_case_disagreement_bytes(name: &str) -> Option<usize> {
     let dir = diffs_case_dir(name)?;
     let (before, after) = code_pair_from_dir(&dir).ok().flatten()?;
-    let mapping = human_mapping::load(name).ok()?;
+    let mapping = human_mapping::load_with(name, &before, &after).ok()?;
     let check = text_mapping_disagreements(&mapping, &before, &after)
         .ok()
         .flatten()?;
@@ -2163,7 +2163,7 @@ fn main() -> Result<()> {
     let before_root_id = starting_cursor_id(&before);
     let after_root_id = starting_cursor_id(&after);
 
-    let mapping = human_mapping::load(&name).unwrap_or_default();
+    let mapping = human_mapping::load_with(&name, &before, &after).unwrap_or_default();
 
     let mut app = App::new(
         name,

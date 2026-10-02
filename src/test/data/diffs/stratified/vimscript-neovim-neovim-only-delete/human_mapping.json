@@ -71,7 +71,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "if_statement:1",
         "call_expression:1"
@@ -79,58 +79,6 @@
       "after_path": [
         "if_statement:1",
         "call_expression:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "if_statement:1",
-        "call_expression:1",
-        "identifier:1"
-      ],
-      "after_path": [
-        "if_statement:1",
-        "call_expression:1",
-        "identifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "if_statement:1",
-        "call_expression:1",
-        "(:1"
-      ],
-      "after_path": [
-        "if_statement:1",
-        "call_expression:1",
-        "(:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "if_statement:1",
-        "call_expression:1",
-        "string_literal:1"
-      ],
-      "after_path": [
-        "if_statement:1",
-        "call_expression:1",
-        "string_literal:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "if_statement:1",
-        "call_expression:1",
-        "):1"
-      ],
-      "after_path": [
-        "if_statement:1",
-        "call_expression:1",
-        "):1"
       ]
     },
     {
@@ -184,82 +132,12 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "let_statement:1"
       ],
       "after_path": [
         "let_statement:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "let_statement:1",
-        "let:1"
-      ],
-      "after_path": [
-        "let_statement:1",
-        "let:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "let_statement:1",
-        "scoped_identifier:1"
-      ],
-      "after_path": [
-        "let_statement:1",
-        "scoped_identifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "let_statement:1",
-        "scoped_identifier:1",
-        "scope:1"
-      ],
-      "after_path": [
-        "let_statement:1",
-        "scoped_identifier:1",
-        "scope:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "let_statement:1",
-        "scoped_identifier:1",
-        "identifier:1"
-      ],
-      "after_path": [
-        "let_statement:1",
-        "scoped_identifier:1",
-        "identifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "let_statement:1",
-        "=:1"
-      ],
-      "after_path": [
-        "let_statement:1",
-        "=:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "let_statement:1",
-        "integer_literal:1"
-      ],
-      "after_path": [
-        "let_statement:1",
-        "integer_literal:1"
       ]
     },
     {

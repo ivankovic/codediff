@@ -205,7 +205,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "class:1",
         "body_statement:1",
@@ -215,115 +215,6 @@
         "class:1",
         "body_statement:1",
         "class:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "class:1",
-        "body_statement:1",
-        "class:1",
-        "class:1"
-      ],
-      "after_path": [
-        "class:1",
-        "body_statement:1",
-        "class:1",
-        "class:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "class:1",
-        "body_statement:1",
-        "class:1",
-        "constant:1"
-      ],
-      "after_path": [
-        "class:1",
-        "body_statement:1",
-        "class:1",
-        "constant:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "class:1",
-        "body_statement:1",
-        "class:1",
-        "superclass:1"
-      ],
-      "after_path": [
-        "class:1",
-        "body_statement:1",
-        "class:1",
-        "superclass:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "class:1",
-        "body_statement:1",
-        "class:1",
-        "superclass:1",
-        "<:1"
-      ],
-      "after_path": [
-        "class:1",
-        "body_statement:1",
-        "class:1",
-        "superclass:1",
-        "<:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "class:1",
-        "body_statement:1",
-        "class:1",
-        "superclass:1",
-        "constant:1"
-      ],
-      "after_path": [
-        "class:1",
-        "body_statement:1",
-        "class:1",
-        "superclass:1",
-        "constant:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "class:1",
-        "body_statement:1",
-        "class:1",
-        ";:1"
-      ],
-      "after_path": [
-        "class:1",
-        "body_statement:1",
-        "class:1",
-        ";:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "class:1",
-        "body_statement:1",
-        "class:1",
-        "end:1"
-      ],
-      "after_path": [
-        "class:1",
-        "body_statement:1",
-        "class:1",
-        "end:1"
       ]
     },
     {
@@ -828,7 +719,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "class:1",
         "body_statement:1",
@@ -843,27 +734,6 @@
         "method:1",
         "body_statement:1",
         "unless_modifier:1",
-        "return:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "class:1",
-        "body_statement:1",
-        "method:1",
-        "body_statement:1",
-        "unless_modifier:1",
-        "return:1",
-        "return:1"
-      ],
-      "after_path": [
-        "class:1",
-        "body_statement:1",
-        "method:1",
-        "body_statement:1",
-        "unless_modifier:1",
-        "return:1",
         "return:1"
       ]
     },
@@ -906,7 +776,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "class:1",
         "body_statement:1",
@@ -924,75 +794,6 @@
         "unless_modifier:1",
         "binary:1",
         "call:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "class:1",
-        "body_statement:1",
-        "method:1",
-        "body_statement:1",
-        "unless_modifier:1",
-        "binary:1",
-        "call:1",
-        "identifier:1"
-      ],
-      "after_path": [
-        "class:1",
-        "body_statement:1",
-        "method:1",
-        "body_statement:1",
-        "unless_modifier:1",
-        "binary:1",
-        "call:1",
-        "identifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "class:1",
-        "body_statement:1",
-        "method:1",
-        "body_statement:1",
-        "unless_modifier:1",
-        "binary:1",
-        "call:1",
-        ".:1"
-      ],
-      "after_path": [
-        "class:1",
-        "body_statement:1",
-        "method:1",
-        "body_statement:1",
-        "unless_modifier:1",
-        "binary:1",
-        "call:1",
-        ".:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "class:1",
-        "body_statement:1",
-        "method:1",
-        "body_statement:1",
-        "unless_modifier:1",
-        "binary:1",
-        "call:1",
-        "identifier:2"
-      ],
-      "after_path": [
-        "class:1",
-        "body_statement:1",
-        "method:1",
-        "body_statement:1",
-        "unless_modifier:1",
-        "binary:1",
-        "call:1",
-        "identifier:2"
       ]
     },
     {
@@ -3730,7 +3531,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "class:1",
         "body_statement:1",
@@ -3740,66 +3541,6 @@
         "class:1",
         "body_statement:1",
         "method:2"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "class:1",
-        "body_statement:1",
-        "method:2",
-        "def:1"
-      ],
-      "after_path": [
-        "class:1",
-        "body_statement:1",
-        "method:2",
-        "def:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "class:1",
-        "body_statement:1",
-        "method:2",
-        "identifier:1"
-      ],
-      "after_path": [
-        "class:1",
-        "body_statement:1",
-        "method:2",
-        "identifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "class:1",
-        "body_statement:1",
-        "method:2",
-        ";:1"
-      ],
-      "after_path": [
-        "class:1",
-        "body_statement:1",
-        "method:2",
-        ";:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "class:1",
-        "body_statement:1",
-        "method:2",
-        "end:1"
-      ],
-      "after_path": [
-        "class:1",
-        "body_statement:1",
-        "method:2",
-        "end:1"
       ]
     },
     {

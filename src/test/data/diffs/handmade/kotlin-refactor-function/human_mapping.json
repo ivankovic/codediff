@@ -255,7 +255,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "function_declaration:3",
         "function_value_parameters:1"
@@ -263,32 +263,6 @@
       "after_path": [
         "function_declaration:1",
         "function_value_parameters:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "function_declaration:3",
-        "function_value_parameters:1",
-        "(:1"
-      ],
-      "after_path": [
-        "function_declaration:1",
-        "function_value_parameters:1",
-        "(:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "function_declaration:3",
-        "function_value_parameters:1",
-        "):1"
-      ],
-      "after_path": [
-        "function_declaration:1",
-        "function_value_parameters:1",
-        "):1"
       ]
     },
     {
@@ -1563,7 +1537,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "function_declaration:1",
         "user_type:1"
@@ -1576,22 +1550,7 @@
       ]
     },
     {
-      "operation": "identical",
-      "before_path": [
-        "function_declaration:1",
-        "user_type:1",
-        "identifier:1"
-      ],
-      "after_path": [
-        "class_declaration:1",
-        "class_body:1",
-        "function_declaration:1",
-        "user_type:1",
-        "identifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "function_declaration:1",
         "function_body:1",
@@ -1605,63 +1564,6 @@
         "function_declaration:1",
         "function_body:1",
         "binary_expression:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "function_declaration:1",
-        "function_body:1",
-        "block:1",
-        "return_expression:1",
-        "binary_expression:1",
-        "identifier:1"
-      ],
-      "after_path": [
-        "class_declaration:1",
-        "class_body:1",
-        "function_declaration:1",
-        "function_body:1",
-        "binary_expression:1",
-        "identifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "function_declaration:1",
-        "function_body:1",
-        "block:1",
-        "return_expression:1",
-        "binary_expression:1",
-        "*:1"
-      ],
-      "after_path": [
-        "class_declaration:1",
-        "class_body:1",
-        "function_declaration:1",
-        "function_body:1",
-        "binary_expression:1",
-        "*:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "function_declaration:1",
-        "function_body:1",
-        "block:1",
-        "return_expression:1",
-        "binary_expression:1",
-        "identifier:2"
-      ],
-      "after_path": [
-        "class_declaration:1",
-        "class_body:1",
-        "function_declaration:1",
-        "function_body:1",
-        "binary_expression:1",
-        "identifier:2"
       ]
     },
     {
@@ -1817,7 +1719,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "function_declaration:2",
         "user_type:1"
@@ -1827,21 +1729,6 @@
         "class_body:1",
         "function_declaration:2",
         "user_type:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "function_declaration:2",
-        "user_type:1",
-        "identifier:1"
-      ],
-      "after_path": [
-        "class_declaration:1",
-        "class_body:1",
-        "function_declaration:2",
-        "user_type:1",
-        "identifier:1"
       ]
     },
     {

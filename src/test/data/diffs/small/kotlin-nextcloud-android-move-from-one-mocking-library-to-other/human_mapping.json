@@ -3812,7 +3812,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "class_declaration:1",
         "class_body:1",
@@ -3824,40 +3824,6 @@
         "class_body:1",
         "function_declaration:2",
         "function_value_parameters:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "class_declaration:1",
-        "class_body:1",
-        "function_declaration:2",
-        "function_value_parameters:1",
-        "(:1"
-      ],
-      "after_path": [
-        "class_declaration:1",
-        "class_body:1",
-        "function_declaration:2",
-        "function_value_parameters:1",
-        "(:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "class_declaration:1",
-        "class_body:1",
-        "function_declaration:2",
-        "function_value_parameters:1",
-        "):1"
-      ],
-      "after_path": [
-        "class_declaration:1",
-        "class_body:1",
-        "function_declaration:2",
-        "function_value_parameters:1",
-        "):1"
       ]
     },
     {
@@ -5722,7 +5688,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "class_declaration:1",
         "class_body:1",
@@ -5740,100 +5706,6 @@
         "block:1",
         "call_expression:3",
         "value_arguments:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "class_declaration:1",
-        "class_body:1",
-        "function_declaration:2",
-        "function_body:1",
-        "block:1",
-        "call_expression:3",
-        "value_arguments:1",
-        "(:1"
-      ],
-      "after_path": [
-        "class_declaration:1",
-        "class_body:1",
-        "function_declaration:2",
-        "function_body:1",
-        "block:1",
-        "call_expression:3",
-        "value_arguments:1",
-        "(:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "class_declaration:1",
-        "class_body:1",
-        "function_declaration:2",
-        "function_body:1",
-        "block:1",
-        "call_expression:3",
-        "value_arguments:1",
-        "value_argument:1"
-      ],
-      "after_path": [
-        "class_declaration:1",
-        "class_body:1",
-        "function_declaration:2",
-        "function_body:1",
-        "block:1",
-        "call_expression:3",
-        "value_arguments:1",
-        "value_argument:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "class_declaration:1",
-        "class_body:1",
-        "function_declaration:2",
-        "function_body:1",
-        "block:1",
-        "call_expression:3",
-        "value_arguments:1",
-        "value_argument:1",
-        "identifier:1"
-      ],
-      "after_path": [
-        "class_declaration:1",
-        "class_body:1",
-        "function_declaration:2",
-        "function_body:1",
-        "block:1",
-        "call_expression:3",
-        "value_arguments:1",
-        "value_argument:1",
-        "identifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "class_declaration:1",
-        "class_body:1",
-        "function_declaration:2",
-        "function_body:1",
-        "block:1",
-        "call_expression:3",
-        "value_arguments:1",
-        "):1"
-      ],
-      "after_path": [
-        "class_declaration:1",
-        "class_body:1",
-        "function_declaration:2",
-        "function_body:1",
-        "block:1",
-        "call_expression:3",
-        "value_arguments:1",
-        "):1"
       ]
     },
     {
@@ -6546,7 +6418,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "class_declaration:1",
         "class_body:1",
@@ -6558,40 +6430,6 @@
         "class_body:1",
         "function_declaration:3",
         "function_value_parameters:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "class_declaration:1",
-        "class_body:1",
-        "function_declaration:3",
-        "function_value_parameters:1",
-        "(:1"
-      ],
-      "after_path": [
-        "class_declaration:1",
-        "class_body:1",
-        "function_declaration:3",
-        "function_value_parameters:1",
-        "(:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "class_declaration:1",
-        "class_body:1",
-        "function_declaration:3",
-        "function_value_parameters:1",
-        "):1"
-      ],
-      "after_path": [
-        "class_declaration:1",
-        "class_body:1",
-        "function_declaration:3",
-        "function_value_parameters:1",
-        "):1"
       ]
     },
     {

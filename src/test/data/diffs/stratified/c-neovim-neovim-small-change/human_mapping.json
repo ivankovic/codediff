@@ -6,34 +6,12 @@
       "after_path": []
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "preproc_call:1"
       ],
       "after_path": [
         "preproc_call:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "preproc_call:1",
-        "preproc_directive:1"
-      ],
-      "after_path": [
-        "preproc_call:1",
-        "preproc_directive:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "preproc_call:1",
-        "preproc_arg:1"
-      ],
-      "after_path": [
-        "preproc_call:1",
-        "preproc_arg:1"
       ]
     },
     {
@@ -193,7 +171,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "declaration:1",
         "storage_class_specifier:1"
@@ -201,19 +179,6 @@
       "after_path": [
         "declaration:1",
         "storage_class_specifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "declaration:1",
-        "storage_class_specifier:1",
-        "extern:1"
-      ],
-      "after_path": [
-        "declaration:1",
-        "storage_class_specifier:1",
-        "extern:1"
       ]
     },
     {
@@ -236,7 +201,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "declaration:1",
         "pointer_declarator:1"
@@ -244,32 +209,6 @@
       "after_path": [
         "declaration:1",
         "pointer_declarator:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "declaration:1",
-        "pointer_declarator:1",
-        "*:1"
-      ],
-      "after_path": [
-        "declaration:1",
-        "pointer_declarator:1",
-        "*:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "declaration:1",
-        "pointer_declarator:1",
-        "identifier:1"
-      ],
-      "after_path": [
-        "declaration:1",
-        "pointer_declarator:1",
-        "identifier:1"
       ]
     },
     {
@@ -300,7 +239,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "declaration:2",
         "storage_class_specifier:1"
@@ -308,19 +247,6 @@
       "after_path": [
         "declaration:2",
         "storage_class_specifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "declaration:2",
-        "storage_class_specifier:1",
-        "extern:1"
-      ],
-      "after_path": [
-        "declaration:2",
-        "storage_class_specifier:1",
-        "extern:1"
       ]
     },
     {
@@ -343,7 +269,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "declaration:2",
         "pointer_declarator:1"
@@ -351,32 +277,6 @@
       "after_path": [
         "declaration:2",
         "pointer_declarator:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "declaration:2",
-        "pointer_declarator:1",
-        "*:1"
-      ],
-      "after_path": [
-        "declaration:2",
-        "pointer_declarator:1",
-        "*:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "declaration:2",
-        "pointer_declarator:1",
-        "identifier:1"
-      ],
-      "after_path": [
-        "declaration:2",
-        "pointer_declarator:1",
-        "identifier:1"
       ]
     },
     {

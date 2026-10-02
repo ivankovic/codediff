@@ -9270,7 +9270,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "object:1",
         "pair:4",
@@ -9284,189 +9284,6 @@
         "array:1",
         "object:1",
         "pair:3"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "object:1",
-        "pair:4",
-        "array:1",
-        "object:1",
-        "pair:3",
-        "string:1"
-      ],
-      "after_path": [
-        "object:1",
-        "pair:4",
-        "array:1",
-        "object:1",
-        "pair:3",
-        "string:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "object:1",
-        "pair:4",
-        "array:1",
-        "object:1",
-        "pair:3",
-        "string:1",
-        "\":1"
-      ],
-      "after_path": [
-        "object:1",
-        "pair:4",
-        "array:1",
-        "object:1",
-        "pair:3",
-        "string:1",
-        "\":1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "object:1",
-        "pair:4",
-        "array:1",
-        "object:1",
-        "pair:3",
-        "string:1",
-        "string_content:1"
-      ],
-      "after_path": [
-        "object:1",
-        "pair:4",
-        "array:1",
-        "object:1",
-        "pair:3",
-        "string:1",
-        "string_content:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "object:1",
-        "pair:4",
-        "array:1",
-        "object:1",
-        "pair:3",
-        "string:1",
-        "\":2"
-      ],
-      "after_path": [
-        "object:1",
-        "pair:4",
-        "array:1",
-        "object:1",
-        "pair:3",
-        "string:1",
-        "\":2"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "object:1",
-        "pair:4",
-        "array:1",
-        "object:1",
-        "pair:3",
-        "::1"
-      ],
-      "after_path": [
-        "object:1",
-        "pair:4",
-        "array:1",
-        "object:1",
-        "pair:3",
-        "::1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "object:1",
-        "pair:4",
-        "array:1",
-        "object:1",
-        "pair:3",
-        "string:2"
-      ],
-      "after_path": [
-        "object:1",
-        "pair:4",
-        "array:1",
-        "object:1",
-        "pair:3",
-        "string:2"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "object:1",
-        "pair:4",
-        "array:1",
-        "object:1",
-        "pair:3",
-        "string:2",
-        "\":1"
-      ],
-      "after_path": [
-        "object:1",
-        "pair:4",
-        "array:1",
-        "object:1",
-        "pair:3",
-        "string:2",
-        "\":1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "object:1",
-        "pair:4",
-        "array:1",
-        "object:1",
-        "pair:3",
-        "string:2",
-        "string_content:1"
-      ],
-      "after_path": [
-        "object:1",
-        "pair:4",
-        "array:1",
-        "object:1",
-        "pair:3",
-        "string:2",
-        "string_content:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "object:1",
-        "pair:4",
-        "array:1",
-        "object:1",
-        "pair:3",
-        "string:2",
-        "\":2"
-      ],
-      "after_path": [
-        "object:1",
-        "pair:4",
-        "array:1",
-        "object:1",
-        "pair:3",
-        "string:2",
-        "\":2"
       ]
     },
     {
@@ -9513,7 +9330,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "object:1",
         "pair:5"
@@ -9521,135 +9338,6 @@
       "after_path": [
         "object:1",
         "pair:5"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "object:1",
-        "pair:5",
-        "string:1"
-      ],
-      "after_path": [
-        "object:1",
-        "pair:5",
-        "string:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "object:1",
-        "pair:5",
-        "string:1",
-        "\":1"
-      ],
-      "after_path": [
-        "object:1",
-        "pair:5",
-        "string:1",
-        "\":1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "object:1",
-        "pair:5",
-        "string:1",
-        "string_content:1"
-      ],
-      "after_path": [
-        "object:1",
-        "pair:5",
-        "string:1",
-        "string_content:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "object:1",
-        "pair:5",
-        "string:1",
-        "\":2"
-      ],
-      "after_path": [
-        "object:1",
-        "pair:5",
-        "string:1",
-        "\":2"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "object:1",
-        "pair:5",
-        "::1"
-      ],
-      "after_path": [
-        "object:1",
-        "pair:5",
-        "::1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "object:1",
-        "pair:5",
-        "string:2"
-      ],
-      "after_path": [
-        "object:1",
-        "pair:5",
-        "string:2"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "object:1",
-        "pair:5",
-        "string:2",
-        "\":1"
-      ],
-      "after_path": [
-        "object:1",
-        "pair:5",
-        "string:2",
-        "\":1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "object:1",
-        "pair:5",
-        "string:2",
-        "string_content:1"
-      ],
-      "after_path": [
-        "object:1",
-        "pair:5",
-        "string:2",
-        "string_content:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "object:1",
-        "pair:5",
-        "string:2",
-        "\":2"
-      ],
-      "after_path": [
-        "object:1",
-        "pair:5",
-        "string:2",
-        "\":2"
       ]
     },
     {
@@ -9689,7 +9377,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "object:1",
         "pair:1"
@@ -9697,135 +9385,6 @@
       "after_path": [
         "object:1",
         "pair:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "object:1",
-        "pair:1",
-        "string:1"
-      ],
-      "after_path": [
-        "object:1",
-        "pair:1",
-        "string:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "object:1",
-        "pair:1",
-        "string:1",
-        "\":1"
-      ],
-      "after_path": [
-        "object:1",
-        "pair:1",
-        "string:1",
-        "\":1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "object:1",
-        "pair:1",
-        "string:1",
-        "string_content:1"
-      ],
-      "after_path": [
-        "object:1",
-        "pair:1",
-        "string:1",
-        "string_content:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "object:1",
-        "pair:1",
-        "string:1",
-        "\":2"
-      ],
-      "after_path": [
-        "object:1",
-        "pair:1",
-        "string:1",
-        "\":2"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "object:1",
-        "pair:1",
-        "::1"
-      ],
-      "after_path": [
-        "object:1",
-        "pair:1",
-        "::1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "object:1",
-        "pair:1",
-        "string:2"
-      ],
-      "after_path": [
-        "object:1",
-        "pair:1",
-        "string:2"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "object:1",
-        "pair:1",
-        "string:2",
-        "\":1"
-      ],
-      "after_path": [
-        "object:1",
-        "pair:1",
-        "string:2",
-        "\":1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "object:1",
-        "pair:1",
-        "string:2",
-        "string_content:1"
-      ],
-      "after_path": [
-        "object:1",
-        "pair:1",
-        "string:2",
-        "string_content:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "object:1",
-        "pair:1",
-        "string:2",
-        "\":2"
-      ],
-      "after_path": [
-        "object:1",
-        "pair:1",
-        "string:2",
-        "\":2"
       ]
     },
     {
@@ -9840,7 +9399,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "object:1",
         "pair:2"
@@ -9848,135 +9407,6 @@
       "after_path": [
         "object:1",
         "pair:2"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "object:1",
-        "pair:2",
-        "string:1"
-      ],
-      "after_path": [
-        "object:1",
-        "pair:2",
-        "string:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "object:1",
-        "pair:2",
-        "string:1",
-        "\":1"
-      ],
-      "after_path": [
-        "object:1",
-        "pair:2",
-        "string:1",
-        "\":1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "object:1",
-        "pair:2",
-        "string:1",
-        "string_content:1"
-      ],
-      "after_path": [
-        "object:1",
-        "pair:2",
-        "string:1",
-        "string_content:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "object:1",
-        "pair:2",
-        "string:1",
-        "\":2"
-      ],
-      "after_path": [
-        "object:1",
-        "pair:2",
-        "string:1",
-        "\":2"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "object:1",
-        "pair:2",
-        "::1"
-      ],
-      "after_path": [
-        "object:1",
-        "pair:2",
-        "::1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "object:1",
-        "pair:2",
-        "string:2"
-      ],
-      "after_path": [
-        "object:1",
-        "pair:2",
-        "string:2"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "object:1",
-        "pair:2",
-        "string:2",
-        "\":1"
-      ],
-      "after_path": [
-        "object:1",
-        "pair:2",
-        "string:2",
-        "\":1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "object:1",
-        "pair:2",
-        "string:2",
-        "string_content:1"
-      ],
-      "after_path": [
-        "object:1",
-        "pair:2",
-        "string:2",
-        "string_content:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "object:1",
-        "pair:2",
-        "string:2",
-        "\":2"
-      ],
-      "after_path": [
-        "object:1",
-        "pair:2",
-        "string:2",
-        "\":2"
       ]
     },
     {
@@ -9991,7 +9421,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "object:1",
         "pair:3"
@@ -9999,186 +9429,6 @@
       "after_path": [
         "object:1",
         "pair:3"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "object:1",
-        "pair:3",
-        "string:1"
-      ],
-      "after_path": [
-        "object:1",
-        "pair:3",
-        "string:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "object:1",
-        "pair:3",
-        "string:1",
-        "\":1"
-      ],
-      "after_path": [
-        "object:1",
-        "pair:3",
-        "string:1",
-        "\":1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "object:1",
-        "pair:3",
-        "string:1",
-        "string_content:1"
-      ],
-      "after_path": [
-        "object:1",
-        "pair:3",
-        "string:1",
-        "string_content:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "object:1",
-        "pair:3",
-        "string:1",
-        "\":2"
-      ],
-      "after_path": [
-        "object:1",
-        "pair:3",
-        "string:1",
-        "\":2"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "object:1",
-        "pair:3",
-        "::1"
-      ],
-      "after_path": [
-        "object:1",
-        "pair:3",
-        "::1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "object:1",
-        "pair:3",
-        "array:1"
-      ],
-      "after_path": [
-        "object:1",
-        "pair:3",
-        "array:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "object:1",
-        "pair:3",
-        "array:1",
-        "[:1"
-      ],
-      "after_path": [
-        "object:1",
-        "pair:3",
-        "array:1",
-        "[:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "object:1",
-        "pair:3",
-        "array:1",
-        "string:1"
-      ],
-      "after_path": [
-        "object:1",
-        "pair:3",
-        "array:1",
-        "string:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "object:1",
-        "pair:3",
-        "array:1",
-        "string:1",
-        "\":1"
-      ],
-      "after_path": [
-        "object:1",
-        "pair:3",
-        "array:1",
-        "string:1",
-        "\":1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "object:1",
-        "pair:3",
-        "array:1",
-        "string:1",
-        "string_content:1"
-      ],
-      "after_path": [
-        "object:1",
-        "pair:3",
-        "array:1",
-        "string:1",
-        "string_content:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "object:1",
-        "pair:3",
-        "array:1",
-        "string:1",
-        "\":2"
-      ],
-      "after_path": [
-        "object:1",
-        "pair:3",
-        "array:1",
-        "string:1",
-        "\":2"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "object:1",
-        "pair:3",
-        "array:1",
-        "]:1"
-      ],
-      "after_path": [
-        "object:1",
-        "pair:3",
-        "array:1",
-        "]:1"
       ]
     },
     {
@@ -10204,7 +9454,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "object:1",
         "pair:4",
@@ -10214,51 +9464,6 @@
         "object:1",
         "pair:4",
         "string:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "object:1",
-        "pair:4",
-        "string:1",
-        "\":1"
-      ],
-      "after_path": [
-        "object:1",
-        "pair:4",
-        "string:1",
-        "\":1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "object:1",
-        "pair:4",
-        "string:1",
-        "string_content:1"
-      ],
-      "after_path": [
-        "object:1",
-        "pair:4",
-        "string:1",
-        "string_content:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "object:1",
-        "pair:4",
-        "string:1",
-        "\":2"
-      ],
-      "after_path": [
-        "object:1",
-        "pair:4",
-        "string:1",
-        "\":2"
       ]
     },
     {
@@ -10335,7 +9540,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "object:1",
         "pair:4",
@@ -10349,189 +9554,6 @@
         "array:1",
         "object:1",
         "pair:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "object:1",
-        "pair:4",
-        "array:1",
-        "object:1",
-        "pair:1",
-        "string:1"
-      ],
-      "after_path": [
-        "object:1",
-        "pair:4",
-        "array:1",
-        "object:1",
-        "pair:1",
-        "string:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "object:1",
-        "pair:4",
-        "array:1",
-        "object:1",
-        "pair:1",
-        "string:1",
-        "\":1"
-      ],
-      "after_path": [
-        "object:1",
-        "pair:4",
-        "array:1",
-        "object:1",
-        "pair:1",
-        "string:1",
-        "\":1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "object:1",
-        "pair:4",
-        "array:1",
-        "object:1",
-        "pair:1",
-        "string:1",
-        "string_content:1"
-      ],
-      "after_path": [
-        "object:1",
-        "pair:4",
-        "array:1",
-        "object:1",
-        "pair:1",
-        "string:1",
-        "string_content:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "object:1",
-        "pair:4",
-        "array:1",
-        "object:1",
-        "pair:1",
-        "string:1",
-        "\":2"
-      ],
-      "after_path": [
-        "object:1",
-        "pair:4",
-        "array:1",
-        "object:1",
-        "pair:1",
-        "string:1",
-        "\":2"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "object:1",
-        "pair:4",
-        "array:1",
-        "object:1",
-        "pair:1",
-        "::1"
-      ],
-      "after_path": [
-        "object:1",
-        "pair:4",
-        "array:1",
-        "object:1",
-        "pair:1",
-        "::1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "object:1",
-        "pair:4",
-        "array:1",
-        "object:1",
-        "pair:1",
-        "string:2"
-      ],
-      "after_path": [
-        "object:1",
-        "pair:4",
-        "array:1",
-        "object:1",
-        "pair:1",
-        "string:2"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "object:1",
-        "pair:4",
-        "array:1",
-        "object:1",
-        "pair:1",
-        "string:2",
-        "\":1"
-      ],
-      "after_path": [
-        "object:1",
-        "pair:4",
-        "array:1",
-        "object:1",
-        "pair:1",
-        "string:2",
-        "\":1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "object:1",
-        "pair:4",
-        "array:1",
-        "object:1",
-        "pair:1",
-        "string:2",
-        "string_content:1"
-      ],
-      "after_path": [
-        "object:1",
-        "pair:4",
-        "array:1",
-        "object:1",
-        "pair:1",
-        "string:2",
-        "string_content:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "object:1",
-        "pair:4",
-        "array:1",
-        "object:1",
-        "pair:1",
-        "string:2",
-        "\":2"
-      ],
-      "after_path": [
-        "object:1",
-        "pair:4",
-        "array:1",
-        "object:1",
-        "pair:1",
-        "string:2",
-        "\":2"
       ]
     },
     {
@@ -10569,7 +9591,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "object:1",
         "pair:4",
@@ -10585,69 +9607,6 @@
         "object:1",
         "pair:2",
         "string:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "object:1",
-        "pair:4",
-        "array:1",
-        "object:1",
-        "pair:2",
-        "string:1",
-        "\":1"
-      ],
-      "after_path": [
-        "object:1",
-        "pair:4",
-        "array:1",
-        "object:1",
-        "pair:2",
-        "string:1",
-        "\":1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "object:1",
-        "pair:4",
-        "array:1",
-        "object:1",
-        "pair:2",
-        "string:1",
-        "string_content:1"
-      ],
-      "after_path": [
-        "object:1",
-        "pair:4",
-        "array:1",
-        "object:1",
-        "pair:2",
-        "string:1",
-        "string_content:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "object:1",
-        "pair:4",
-        "array:1",
-        "object:1",
-        "pair:2",
-        "string:1",
-        "\":2"
-      ],
-      "after_path": [
-        "object:1",
-        "pair:4",
-        "array:1",
-        "object:1",
-        "pair:2",
-        "string:1",
-        "\":2"
       ]
     },
     {

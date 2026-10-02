@@ -999,32 +999,51 @@ fn painting_failure_census() -> Result<()> {
     let mut single_painting: HashSet<String> = HashSet::new();
     let (mut unpainted, mut no_tree, mut errors) = (0usize, 0usize, Vec::new());
 
-    for name in &names {
-        let Ok(pair) = crate::test::helper::handmade_test_code_pair(name) else {
-            continue;
+    // One fixture's share of every tally above, so the fixtures can be measured in parallel and
+    // merged in name order: the artifact is the same as a serial pass's.
+    #[derive(Default)]
+    struct FixtureCensus {
+        runs: Vec<(&'static str, Run)>,
+        rows: Vec<[String; 8]>,
+        totals: BTreeMap<&'static str, [usize; 4]>,
+        measured: bool,
+        violating: bool,
+        single_painting: bool,
+        unpainted: bool,
+        no_tree: bool,
+        error: Option<String>,
+    }
+    let census_of = |name: &String| -> Result<FixtureCensus> {
+        let mut census = FixtureCensus::default();
+        // Parsed here and dropped with the census, not kept in `handmade_test_code_pair`'s
+        // process-wide cache: eight workers fill that with the whole corpus (19 GB).
+        let Some(Ok(Some(pair))) = crate::test::helper::diffs_case_dir(name)
+            .map(|dir| crate::test::helper::code_pair_from_dir(&dir))
+        else {
+            return Ok(census);
         };
-        let (before, after) = &*pair;
-        let Ok(mapping) = load(name) else {
-            continue;
+        let (before, after) = (&pair.0, &pair.1);
+        let Ok(mapping) = load_with(name, before, after) else {
+            return Ok(census);
         };
         if mapping.text_mappings.is_empty() {
-            unpainted += 1;
-            continue;
+            census.unpainted = true;
+            return Ok(census);
         }
         if before.ast.is_none() || after.ast.is_none() {
             // The plain-text fallback has no tree to classify against. Counted, not measured.
-            no_tree += 1;
-            continue;
+            census.no_tree = true;
+            return Ok(census);
         }
         let real_diff = crate::diff::diff_code(before, after);
         let Some(real_ast) = real_diff.ast.as_ref() else {
-            continue;
+            return Ok(census);
         };
         let mut human_ast = match as_ast_diff_for_mapping(&mapping, before, after) {
             Ok(diff) => diff,
             Err(e) => {
-                errors.push(format!("{name}: human mapping -> ASTDiff: {e:#}"));
-                continue;
+                census.error = Some(format!("{name}: human mapping -> ASTDiff: {e:#}"));
+                return Ok(census);
             }
         };
         // The human format records no `ASTMappingReason`, but `identical_or_move` reads one to
@@ -1043,14 +1062,14 @@ fn painting_failure_census() -> Result<()> {
         let contents = [&before.contents, &after.contents];
 
         if mapping.text_mappings.len() == 1 {
-            single_painting.insert(name.clone());
+            census.single_painting = true;
         }
         if crate::test::helper::human_mapping::invariants::ground_truth_invariant_violations_for(
             &mapping, before, after,
         )
         .is_ok_and(|violations| !violations.is_empty())
         {
-            violating.insert(name.clone());
+            census.violating = true;
         }
 
         for (preset, options) in [
@@ -1116,7 +1135,7 @@ fn painting_failure_census() -> Result<()> {
             }
             let Some((theirs, _)) = best else { continue };
 
-            measured.insert(name.clone());
+            census.measured = true;
             let per_fixture = {
                 let mut counts = [0usize; 3];
                 for (index, side) in (0..2).flat_map(|side| [(0usize, side), (1usize, side)]) {
@@ -1135,7 +1154,7 @@ fn painting_failure_census() -> Result<()> {
                 }
                 counts
             };
-            rows.push([
+            census.rows.push([
                 name.clone(),
                 preset.to_string(),
                 (before.contents.len() + after.contents.len()).to_string(),
@@ -1143,9 +1162,9 @@ fn painting_failure_census() -> Result<()> {
                 per_fixture[1].to_string(),
                 per_fixture[2].to_string(),
                 mapping.text_mappings.len().to_string(),
-                usize::from(violating.contains(name)).to_string(),
+                usize::from(census.violating).to_string(),
             ]);
-            let entry = totals.entry(preset).or_insert([0; 4]);
+            let entry = census.totals.entry(preset).or_insert([0; 4]);
             entry[3] += before.contents.len() + after.contents.len();
             for (real, ideal) in ours[0].iter().zip(&ours[1]) {
                 entry[2] += real
@@ -1159,7 +1178,7 @@ fn painting_failure_census() -> Result<()> {
             {
                 for side in 0..2 {
                     let (ours, theirs) = (&ours[index][side], &theirs[side]);
-                    totals.get_mut(preset).unwrap()[index] += ours
+                    census.totals.get_mut(preset).unwrap()[index] += ours
                         .iter()
                         .zip(theirs)
                         .filter(|(ours, theirs)| ours != theirs)
@@ -1202,7 +1221,7 @@ fn painting_failure_census() -> Result<()> {
                                 )
                             })
                             .unwrap_or_else(|| ("unmapped".to_string(), String::new()));
-                        runs.push((
+                        census.runs.push((
                             stream,
                             Run {
                                 fixture: name.clone(),
@@ -1232,6 +1251,54 @@ fn painting_failure_census() -> Result<()> {
                 }
             }
         }
+        Ok(census)
+    };
+
+    let next = std::sync::atomic::AtomicUsize::new(0);
+    let results: Vec<std::sync::Mutex<Option<Result<FixtureCensus>>>> =
+        names.iter().map(|_| std::sync::Mutex::new(None)).collect();
+    let threads = std::thread::available_parallelism().map_or(1, |n| n.get());
+    std::thread::scope(|scope| {
+        for _ in 0..threads {
+            std::thread::Builder::new()
+                // As deep as the diff recurses; `tui::app::DIFF_COMPUTE_STACK_SIZE` is the same.
+                .stack_size(256 * 1024 * 1024)
+                .spawn_scoped(scope, || {
+                    loop {
+                        let i = next.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                        let Some(name) = names.get(i) else { break };
+                        let census = census_of(name);
+                        *results[i].lock().expect("no worker panics holding it") = Some(census);
+                    }
+                })
+                .expect("spawn census worker");
+        }
+    });
+    for (name, result) in names.iter().zip(results) {
+        let census = result
+            .into_inner()
+            .expect("no worker panics holding it")
+            .expect("every fixture measured")?;
+        runs.extend(census.runs);
+        rows.extend(census.rows);
+        for (preset, counts) in census.totals {
+            let entry = totals.entry(preset).or_insert([0; 4]);
+            for (total, count) in entry.iter_mut().zip(counts) {
+                *total += count;
+            }
+        }
+        if census.measured {
+            measured.insert(name.clone());
+        }
+        if census.violating {
+            violating.insert(name.clone());
+        }
+        if census.single_painting {
+            single_painting.insert(name.clone());
+        }
+        unpainted += usize::from(census.unpainted);
+        no_tree += usize::from(census.no_tree);
+        errors.extend(census.error);
     }
 
     // ---- the artifact ----------------------------------------------------------------------

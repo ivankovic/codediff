@@ -12,69 +12,12 @@
       "after_path": []
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "mod_item:2"
       ],
       "after_path": [
         "mod_item:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "mod_item:2",
-        "visibility_modifier:1"
-      ],
-      "after_path": [
-        "mod_item:1",
-        "visibility_modifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "mod_item:2",
-        "visibility_modifier:1",
-        "pub:1"
-      ],
-      "after_path": [
-        "mod_item:1",
-        "visibility_modifier:1",
-        "pub:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "mod_item:2",
-        "mod:1"
-      ],
-      "after_path": [
-        "mod_item:1",
-        "mod:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "mod_item:2",
-        "identifier:1"
-      ],
-      "after_path": [
-        "mod_item:1",
-        "identifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "mod_item:2",
-        ";:1"
-      ],
-      "after_path": [
-        "mod_item:1",
-        ";:1"
       ]
     }
   ],

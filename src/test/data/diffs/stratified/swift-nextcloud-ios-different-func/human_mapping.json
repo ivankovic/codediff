@@ -33,47 +33,12 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "import_declaration:1"
       ],
       "after_path": [
         "import_declaration:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "import_declaration:1",
-        "import:1"
-      ],
-      "after_path": [
-        "import_declaration:1",
-        "import:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "import_declaration:1",
-        "identifier:1"
-      ],
-      "after_path": [
-        "import_declaration:1",
-        "identifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "import_declaration:1",
-        "identifier:1",
-        "simple_identifier:1"
-      ],
-      "after_path": [
-        "import_declaration:1",
-        "identifier:1",
-        "simple_identifier:1"
       ]
     },
     {
@@ -119,7 +84,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "class_declaration:1",
         "inheritance_specifier:1"
@@ -127,34 +92,6 @@
       "after_path": [
         "class_declaration:1",
         "inheritance_specifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "class_declaration:1",
-        "inheritance_specifier:1",
-        "user_type:1"
-      ],
-      "after_path": [
-        "class_declaration:1",
-        "inheritance_specifier:1",
-        "user_type:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "class_declaration:1",
-        "inheritance_specifier:1",
-        "user_type:1",
-        "type_identifier:1"
-      ],
-      "after_path": [
-        "class_declaration:1",
-        "inheritance_specifier:1",
-        "user_type:1",
-        "type_identifier:1"
       ]
     },
     {
@@ -195,7 +132,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "class_declaration:1",
         "class_body:1",
@@ -207,42 +144,6 @@
         "class_body:1",
         "function_declaration:1",
         "modifiers:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "class_declaration:1",
-        "class_body:1",
-        "function_declaration:1",
-        "modifiers:1",
-        "member_modifier:1"
-      ],
-      "after_path": [
-        "class_declaration:1",
-        "class_body:1",
-        "function_declaration:1",
-        "modifiers:1",
-        "member_modifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "class_declaration:1",
-        "class_body:1",
-        "function_declaration:1",
-        "modifiers:1",
-        "member_modifier:1",
-        "override:1"
-      ],
-      "after_path": [
-        "class_declaration:1",
-        "class_body:1",
-        "function_declaration:1",
-        "modifiers:1",
-        "member_modifier:1",
-        "override:1"
       ]
     },
     {
@@ -336,7 +237,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "class_declaration:1",
         "class_body:1",
@@ -351,79 +252,7 @@
       ]
     },
     {
-      "operation": "identical",
-      "before_path": [
-        "class_declaration:1",
-        "class_body:1",
-        "function_declaration:1",
-        "optional_type:1",
-        "user_type:1"
-      ],
-      "after_path": [
-        "class_declaration:1",
-        "class_body:1",
-        "function_declaration:1",
-        "optional_type:1",
-        "user_type:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "class_declaration:1",
-        "class_body:1",
-        "function_declaration:1",
-        "optional_type:1",
-        "user_type:1",
-        "type_identifier:1"
-      ],
-      "after_path": [
-        "class_declaration:1",
-        "class_body:1",
-        "function_declaration:1",
-        "optional_type:1",
-        "user_type:1",
-        "type_identifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "class_declaration:1",
-        "class_body:1",
-        "function_declaration:1",
-        "optional_type:1",
-        "?:1"
-      ],
-      "after_path": [
-        "class_declaration:1",
-        "class_body:1",
-        "function_declaration:1",
-        "optional_type:1",
-        "?:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "class_declaration:1",
-        "class_body:1",
-        "function_declaration:1",
-        "optional_type:1",
-        "?:1",
-        "?:1"
-      ],
-      "after_path": [
-        "class_declaration:1",
-        "class_body:1",
-        "function_declaration:1",
-        "optional_type:1",
-        "?:1",
-        "?:1"
-      ]
-    },
-    {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "class_declaration:1",
         "class_body:1",
@@ -435,118 +264,6 @@
         "class_body:1",
         "function_declaration:1",
         "function_body:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "class_declaration:1",
-        "class_body:1",
-        "function_declaration:1",
-        "function_body:1",
-        "{:1"
-      ],
-      "after_path": [
-        "class_declaration:1",
-        "class_body:1",
-        "function_declaration:1",
-        "function_body:1",
-        "{:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "class_declaration:1",
-        "class_body:1",
-        "function_declaration:1",
-        "function_body:1",
-        "statements:1"
-      ],
-      "after_path": [
-        "class_declaration:1",
-        "class_body:1",
-        "function_declaration:1",
-        "function_body:1",
-        "statements:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "class_declaration:1",
-        "class_body:1",
-        "function_declaration:1",
-        "function_body:1",
-        "statements:1",
-        "control_transfer_statement:1"
-      ],
-      "after_path": [
-        "class_declaration:1",
-        "class_body:1",
-        "function_declaration:1",
-        "function_body:1",
-        "statements:1",
-        "control_transfer_statement:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "class_declaration:1",
-        "class_body:1",
-        "function_declaration:1",
-        "function_body:1",
-        "statements:1",
-        "control_transfer_statement:1",
-        "return:1"
-      ],
-      "after_path": [
-        "class_declaration:1",
-        "class_body:1",
-        "function_declaration:1",
-        "function_body:1",
-        "statements:1",
-        "control_transfer_statement:1",
-        "return:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "class_declaration:1",
-        "class_body:1",
-        "function_declaration:1",
-        "function_body:1",
-        "statements:1",
-        "control_transfer_statement:1",
-        "nil:1"
-      ],
-      "after_path": [
-        "class_declaration:1",
-        "class_body:1",
-        "function_declaration:1",
-        "function_body:1",
-        "statements:1",
-        "control_transfer_statement:1",
-        "nil:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "class_declaration:1",
-        "class_body:1",
-        "function_declaration:1",
-        "function_body:1",
-        "}:1"
-      ],
-      "after_path": [
-        "class_declaration:1",
-        "class_body:1",
-        "function_declaration:1",
-        "function_body:1",
-        "}:1"
       ]
     },
     {

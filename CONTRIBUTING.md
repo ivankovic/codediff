@@ -222,7 +222,7 @@ documented there.
 
 ### Build, test, quality
 
-* `test` - `cargo nextest run --release --all-features`, plus `test-mapping-site-js`,
+* `test` - `cargo nextest run --cargo-profile ci --all-features`, plus `test-mapping-site-js`,
   `test-viewer-js` and `test-showcase-js` (plain-Node tests of the human-mapping site's and the
   showcase's vanilla JS, which cargo's suite cannot cover - see the root Makefile) and
   `test-python` (`pytest` over the research and script helpers, in `research/`'s uv environment).
@@ -307,8 +307,8 @@ Every push and pull request runs (see `.github/workflows/ci.yml`):
 * `cargo fmt --check`
 * `cargo clippy --tests -- -D warnings`, once each for the three Cargo feature configs (default,
   `test-fixtures`, `stats` - see Cargo.toml's `[features]`)
-* `cargo build --release` + `cargo nextest run --release`, once each for the same three feature
-  configs; the fixture-corpus tests, which no feature changes, run once, split three ways across
+* `cargo build` + `cargo nextest run` under the `ci` profile, once each for the same three
+  feature configs; the fixture-corpus tests, which no feature changes, run once, split three ways across
   those jobs
 * `cargo audit` (checks Cargo.lock against the RustSec advisory database)
 * The vanilla-JS tests of the `human_mapping` site, the showcase viewer and the showcase shim

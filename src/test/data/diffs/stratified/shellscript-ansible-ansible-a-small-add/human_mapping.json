@@ -39,7 +39,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "command:1",
         "variable_assignment:1"
@@ -50,46 +50,7 @@
       ]
     },
     {
-      "operation": "identical",
-      "before_path": [
-        "command:1",
-        "variable_assignment:1",
-        "variable_name:1"
-      ],
-      "after_path": [
-        "command:2",
-        "variable_assignment:1",
-        "variable_name:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "command:1",
-        "variable_assignment:1",
-        "=:1"
-      ],
-      "after_path": [
-        "command:2",
-        "variable_assignment:1",
-        "=:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "command:1",
-        "variable_assignment:1",
-        "number:1"
-      ],
-      "after_path": [
-        "command:2",
-        "variable_assignment:1",
-        "number:1"
-      ]
-    },
-    {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "command:1",
         "command_name:1"
@@ -97,19 +58,6 @@
       "after_path": [
         "command:2",
         "command_name:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "command:1",
-        "command_name:1",
-        "word:1"
-      ],
-      "after_path": [
-        "command:2",
-        "command_name:1",
-        "word:1"
       ]
     },
     {
@@ -131,7 +79,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "command:1",
         "process_substitution:1"
@@ -145,122 +93,6 @@
       "operation": "identical",
       "before_path": [
         "command:1",
-        "process_substitution:1",
-        "<(:1"
-      ],
-      "after_path": [
-        "command:2",
-        "process_substitution:1",
-        "<(:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "command:1",
-        "process_substitution:1",
-        "command:1"
-      ],
-      "after_path": [
-        "command:2",
-        "process_substitution:1",
-        "command:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "command:1",
-        "process_substitution:1",
-        "command:1",
-        "command_name:1"
-      ],
-      "after_path": [
-        "command:2",
-        "process_substitution:1",
-        "command:1",
-        "command_name:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "command:1",
-        "process_substitution:1",
-        "command:1",
-        "command_name:1",
-        "word:1"
-      ],
-      "after_path": [
-        "command:2",
-        "process_substitution:1",
-        "command:1",
-        "command_name:1",
-        "word:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "command:1",
-        "process_substitution:1",
-        "command:1",
-        "word:1"
-      ],
-      "after_path": [
-        "command:2",
-        "process_substitution:1",
-        "command:1",
-        "word:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "command:1",
-        "process_substitution:1",
-        "command:1",
-        "word:2"
-      ],
-      "after_path": [
-        "command:2",
-        "process_substitution:1",
-        "command:1",
-        "word:2"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "command:1",
-        "process_substitution:1",
-        "command:1",
-        "word:3"
-      ],
-      "after_path": [
-        "command:2",
-        "process_substitution:1",
-        "command:1",
-        "word:3"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "command:1",
-        "process_substitution:1",
-        "):1"
-      ],
-      "after_path": [
-        "command:2",
-        "process_substitution:1",
-        "):1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "command:1",
         "word:2"
       ],
       "after_path": [
@@ -269,234 +101,12 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "pipeline:1"
       ],
       "after_path": [
         "pipeline:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "pipeline:1",
-        "redirected_statement:1"
-      ],
-      "after_path": [
-        "pipeline:1",
-        "redirected_statement:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "pipeline:1",
-        "redirected_statement:1",
-        "command:1"
-      ],
-      "after_path": [
-        "pipeline:1",
-        "redirected_statement:1",
-        "command:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "pipeline:1",
-        "redirected_statement:1",
-        "command:1",
-        "command_name:1"
-      ],
-      "after_path": [
-        "pipeline:1",
-        "redirected_statement:1",
-        "command:1",
-        "command_name:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "pipeline:1",
-        "redirected_statement:1",
-        "command:1",
-        "command_name:1",
-        "word:1"
-      ],
-      "after_path": [
-        "pipeline:1",
-        "redirected_statement:1",
-        "command:1",
-        "command_name:1",
-        "word:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "pipeline:1",
-        "redirected_statement:1",
-        "command:1",
-        "word:1"
-      ],
-      "after_path": [
-        "pipeline:1",
-        "redirected_statement:1",
-        "command:1",
-        "word:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "pipeline:1",
-        "redirected_statement:1",
-        "command:1",
-        "word:2"
-      ],
-      "after_path": [
-        "pipeline:1",
-        "redirected_statement:1",
-        "command:1",
-        "word:2"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "pipeline:1",
-        "redirected_statement:1",
-        "command:1",
-        "word:3"
-      ],
-      "after_path": [
-        "pipeline:1",
-        "redirected_statement:1",
-        "command:1",
-        "word:3"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "pipeline:1",
-        "redirected_statement:1",
-        "file_redirect:1"
-      ],
-      "after_path": [
-        "pipeline:1",
-        "redirected_statement:1",
-        "file_redirect:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "pipeline:1",
-        "redirected_statement:1",
-        "file_redirect:1",
-        "file_descriptor:1"
-      ],
-      "after_path": [
-        "pipeline:1",
-        "redirected_statement:1",
-        "file_redirect:1",
-        "file_descriptor:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "pipeline:1",
-        "redirected_statement:1",
-        "file_redirect:1",
-        ">&:1"
-      ],
-      "after_path": [
-        "pipeline:1",
-        "redirected_statement:1",
-        "file_redirect:1",
-        ">&:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "pipeline:1",
-        "redirected_statement:1",
-        "file_redirect:1",
-        "number:1"
-      ],
-      "after_path": [
-        "pipeline:1",
-        "redirected_statement:1",
-        "file_redirect:1",
-        "number:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "pipeline:1",
-        "|:1"
-      ],
-      "after_path": [
-        "pipeline:1",
-        "|:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "pipeline:1",
-        "command:1"
-      ],
-      "after_path": [
-        "pipeline:1",
-        "command:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "pipeline:1",
-        "command:1",
-        "command_name:1"
-      ],
-      "after_path": [
-        "pipeline:1",
-        "command:1",
-        "command_name:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "pipeline:1",
-        "command:1",
-        "command_name:1",
-        "word:1"
-      ],
-      "after_path": [
-        "pipeline:1",
-        "command:1",
-        "command_name:1",
-        "word:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "pipeline:1",
-        "command:1",
-        "raw_string:1"
-      ],
-      "after_path": [
-        "pipeline:1",
-        "command:1",
-        "raw_string:1"
       ]
     }
   ],

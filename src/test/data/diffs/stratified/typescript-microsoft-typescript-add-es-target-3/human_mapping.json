@@ -30,7 +30,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "variable_declaration:1"
       ],
@@ -39,124 +39,7 @@
       ]
     },
     {
-      "operation": "identical",
-      "before_path": [
-        "variable_declaration:1",
-        "var:1"
-      ],
-      "after_path": [
-        "variable_declaration:1",
-        "var:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "variable_declaration:1",
-        "variable_declarator:1"
-      ],
-      "after_path": [
-        "variable_declaration:1",
-        "variable_declarator:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "variable_declaration:1",
-        "variable_declarator:1",
-        "identifier:1"
-      ],
-      "after_path": [
-        "variable_declaration:1",
-        "variable_declarator:1",
-        "identifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "variable_declaration:1",
-        "variable_declarator:1",
-        "=:1"
-      ],
-      "after_path": [
-        "variable_declaration:1",
-        "variable_declarator:1",
-        "=:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "variable_declaration:1",
-        "variable_declarator:1",
-        "string:1"
-      ],
-      "after_path": [
-        "variable_declaration:1",
-        "variable_declarator:1",
-        "string:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "variable_declaration:1",
-        "variable_declarator:1",
-        "string:1",
-        "\":1"
-      ],
-      "after_path": [
-        "variable_declaration:1",
-        "variable_declarator:1",
-        "string:1",
-        "\":1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "variable_declaration:1",
-        "variable_declarator:1",
-        "string:1",
-        "string_fragment:1"
-      ],
-      "after_path": [
-        "variable_declaration:1",
-        "variable_declarator:1",
-        "string:1",
-        "string_fragment:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "variable_declaration:1",
-        "variable_declarator:1",
-        "string:1",
-        "\":2"
-      ],
-      "after_path": [
-        "variable_declaration:1",
-        "variable_declarator:1",
-        "string:1",
-        "\":2"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "variable_declaration:1",
-        ";:1"
-      ],
-      "after_path": [
-        "variable_declaration:1",
-        ";:1"
-      ]
-    },
-    {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "ERROR:1"
       ],
@@ -165,100 +48,12 @@
       ]
     },
     {
-      "operation": "identical",
-      "before_path": [
-        "ERROR:1",
-        "import:1"
-      ],
-      "after_path": [
-        "ERROR:1",
-        "import:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "ERROR:1",
-        "identifier:1"
-      ],
-      "after_path": [
-        "ERROR:1",
-        "identifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "ERROR:1",
-        "=:1"
-      ],
-      "after_path": [
-        "ERROR:1",
-        "=:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "ERROR:1",
-        "require:1"
-      ],
-      "after_path": [
-        "ERROR:1",
-        "require:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "ERROR:1",
-        "(:1"
-      ],
-      "after_path": [
-        "ERROR:1",
-        "(:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "ERROR:1",
-        "identifier:2"
-      ],
-      "after_path": [
-        "ERROR:1",
-        "identifier:2"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "ERROR:1",
-        "):1"
-      ],
-      "after_path": [
-        "ERROR:1",
-        "):1"
-      ]
-    },
-    {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "empty_statement:1"
       ],
       "after_path": [
         "empty_statement:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "empty_statement:1",
-        ";:1"
-      ],
-      "after_path": [
-        "empty_statement:1",
-        ";:1"
       ]
     },
     {

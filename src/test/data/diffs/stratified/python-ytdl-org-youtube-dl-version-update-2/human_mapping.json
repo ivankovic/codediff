@@ -6,69 +6,12 @@
       "after_path": []
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "future_import_statement:1"
       ],
       "after_path": [
         "future_import_statement:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "future_import_statement:1",
-        "from:1"
-      ],
-      "after_path": [
-        "future_import_statement:1",
-        "from:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "future_import_statement:1",
-        "__future__:1"
-      ],
-      "after_path": [
-        "future_import_statement:1",
-        "__future__:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "future_import_statement:1",
-        "import:1"
-      ],
-      "after_path": [
-        "future_import_statement:1",
-        "import:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "future_import_statement:1",
-        "dotted_name:1"
-      ],
-      "after_path": [
-        "future_import_statement:1",
-        "dotted_name:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "future_import_statement:1",
-        "dotted_name:1",
-        "identifier:1"
-      ],
-      "after_path": [
-        "future_import_statement:1",
-        "dotted_name:1",
-        "identifier:1"
       ]
     },
     {

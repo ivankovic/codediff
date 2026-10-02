@@ -98,7 +98,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "if_statement:1",
         "call_expression:1"
@@ -106,58 +106,6 @@
       "after_path": [
         "if_statement:1",
         "call_expression:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "if_statement:1",
-        "call_expression:1",
-        "identifier:1"
-      ],
-      "after_path": [
-        "if_statement:1",
-        "call_expression:1",
-        "identifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "if_statement:1",
-        "call_expression:1",
-        "(:1"
-      ],
-      "after_path": [
-        "if_statement:1",
-        "call_expression:1",
-        "(:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "if_statement:1",
-        "call_expression:1",
-        "string_literal:1"
-      ],
-      "after_path": [
-        "if_statement:1",
-        "call_expression:1",
-        "string_literal:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "if_statement:1",
-        "call_expression:1",
-        "):1"
-      ],
-      "after_path": [
-        "if_statement:1",
-        "call_expression:1",
-        "):1"
       ]
     },
     {
@@ -414,7 +362,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "syntax_statement:1"
       ],
@@ -423,78 +371,12 @@
       ]
     },
     {
-      "operation": "identical",
-      "before_path": [
-        "syntax_statement:1",
-        "syntax:1"
-      ],
-      "after_path": [
-        "syntax_statement:1",
-        "syntax:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "syntax_statement:1",
-        "case:1"
-      ],
-      "after_path": [
-        "syntax_statement:1",
-        "case:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "syntax_statement:1",
-        "match:1"
-      ],
-      "after_path": [
-        "syntax_statement:1",
-        "match:1"
-      ]
-    },
-    {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "syntax_statement:2"
       ],
       "after_path": [
         "syntax_statement:2"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "syntax_statement:2",
-        "syntax:1"
-      ],
-      "after_path": [
-        "syntax_statement:2",
-        "syntax:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "syntax_statement:2",
-        "iskeyword:1"
-      ],
-      "after_path": [
-        "syntax_statement:2",
-        "iskeyword:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "syntax_statement:2",
-        "value:1"
-      ],
-      "after_path": [
-        "syntax_statement:2",
-        "value:1"
       ]
     },
     {
@@ -7360,45 +7242,12 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "syntax_statement:22"
       ],
       "after_path": [
         "syntax_statement:23"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "syntax_statement:22",
-        "syntax:1"
-      ],
-      "after_path": [
-        "syntax_statement:23",
-        "syntax:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "syntax_statement:22",
-        "case:1"
-      ],
-      "after_path": [
-        "syntax_statement:23",
-        "case:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "syntax_statement:22",
-        "ignore:1"
-      ],
-      "after_path": [
-        "syntax_statement:23",
-        "ignore:1"
       ]
     },
     {
@@ -12551,7 +12400,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "syntax_statement:38",
         "syntax_argument:2",
@@ -12563,23 +12412,6 @@
         "syntax_argument:2",
         "pattern:1",
         "pattern_multi:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "syntax_statement:38",
-        "syntax_argument:2",
-        "pattern:1",
-        "pattern_multi:2",
-        "*:1"
-      ],
-      "after_path": [
-        "syntax_statement:43",
-        "syntax_argument:2",
-        "pattern:1",
-        "pattern_multi:1",
-        "*:1"
       ]
     },
     {
@@ -12980,7 +12812,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "highlight_statement:1"
       ],
@@ -12989,62 +12821,7 @@
       ]
     },
     {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:1",
-        "highlight:1"
-      ],
-      "after_path": [
-        "highlight_statement:1",
-        "highlight:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:1",
-        "default:1"
-      ],
-      "after_path": [
-        "highlight_statement:1",
-        "default:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:1",
-        "link:1"
-      ],
-      "after_path": [
-        "highlight_statement:1",
-        "link:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:1",
-        "hl_group:1"
-      ],
-      "after_path": [
-        "highlight_statement:1",
-        "hl_group:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:1",
-        "hl_group:2"
-      ],
-      "after_path": [
-        "highlight_statement:1",
-        "hl_group:2"
-      ]
-    },
-    {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "highlight_statement:2"
       ],
@@ -13053,62 +12830,7 @@
       ]
     },
     {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:2",
-        "highlight:1"
-      ],
-      "after_path": [
-        "highlight_statement:2",
-        "highlight:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:2",
-        "default:1"
-      ],
-      "after_path": [
-        "highlight_statement:2",
-        "default:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:2",
-        "link:1"
-      ],
-      "after_path": [
-        "highlight_statement:2",
-        "link:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:2",
-        "hl_group:1"
-      ],
-      "after_path": [
-        "highlight_statement:2",
-        "hl_group:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:2",
-        "hl_group:2"
-      ],
-      "after_path": [
-        "highlight_statement:2",
-        "hl_group:2"
-      ]
-    },
-    {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "highlight_statement:3"
       ],
@@ -13117,62 +12839,7 @@
       ]
     },
     {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:3",
-        "highlight:1"
-      ],
-      "after_path": [
-        "highlight_statement:3",
-        "highlight:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:3",
-        "default:1"
-      ],
-      "after_path": [
-        "highlight_statement:3",
-        "default:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:3",
-        "link:1"
-      ],
-      "after_path": [
-        "highlight_statement:3",
-        "link:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:3",
-        "hl_group:1"
-      ],
-      "after_path": [
-        "highlight_statement:3",
-        "hl_group:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:3",
-        "hl_group:2"
-      ],
-      "after_path": [
-        "highlight_statement:3",
-        "hl_group:2"
-      ]
-    },
-    {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "highlight_statement:4"
       ],
@@ -13181,62 +12848,7 @@
       ]
     },
     {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:4",
-        "highlight:1"
-      ],
-      "after_path": [
-        "highlight_statement:4",
-        "highlight:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:4",
-        "default:1"
-      ],
-      "after_path": [
-        "highlight_statement:4",
-        "default:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:4",
-        "link:1"
-      ],
-      "after_path": [
-        "highlight_statement:4",
-        "link:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:4",
-        "hl_group:1"
-      ],
-      "after_path": [
-        "highlight_statement:4",
-        "hl_group:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:4",
-        "hl_group:2"
-      ],
-      "after_path": [
-        "highlight_statement:4",
-        "hl_group:2"
-      ]
-    },
-    {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "highlight_statement:5"
       ],
@@ -13245,62 +12857,7 @@
       ]
     },
     {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:5",
-        "highlight:1"
-      ],
-      "after_path": [
-        "highlight_statement:5",
-        "highlight:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:5",
-        "default:1"
-      ],
-      "after_path": [
-        "highlight_statement:5",
-        "default:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:5",
-        "link:1"
-      ],
-      "after_path": [
-        "highlight_statement:5",
-        "link:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:5",
-        "hl_group:1"
-      ],
-      "after_path": [
-        "highlight_statement:5",
-        "hl_group:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:5",
-        "hl_group:2"
-      ],
-      "after_path": [
-        "highlight_statement:5",
-        "hl_group:2"
-      ]
-    },
-    {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "highlight_statement:6"
       ],
@@ -13309,62 +12866,7 @@
       ]
     },
     {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:6",
-        "highlight:1"
-      ],
-      "after_path": [
-        "highlight_statement:6",
-        "highlight:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:6",
-        "default:1"
-      ],
-      "after_path": [
-        "highlight_statement:6",
-        "default:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:6",
-        "link:1"
-      ],
-      "after_path": [
-        "highlight_statement:6",
-        "link:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:6",
-        "hl_group:1"
-      ],
-      "after_path": [
-        "highlight_statement:6",
-        "hl_group:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:6",
-        "hl_group:2"
-      ],
-      "after_path": [
-        "highlight_statement:6",
-        "hl_group:2"
-      ]
-    },
-    {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "highlight_statement:7"
       ],
@@ -13373,62 +12875,7 @@
       ]
     },
     {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:7",
-        "highlight:1"
-      ],
-      "after_path": [
-        "highlight_statement:7",
-        "highlight:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:7",
-        "default:1"
-      ],
-      "after_path": [
-        "highlight_statement:7",
-        "default:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:7",
-        "link:1"
-      ],
-      "after_path": [
-        "highlight_statement:7",
-        "link:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:7",
-        "hl_group:1"
-      ],
-      "after_path": [
-        "highlight_statement:7",
-        "hl_group:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:7",
-        "hl_group:2"
-      ],
-      "after_path": [
-        "highlight_statement:7",
-        "hl_group:2"
-      ]
-    },
-    {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "highlight_statement:8"
       ],
@@ -13437,62 +12884,7 @@
       ]
     },
     {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:8",
-        "highlight:1"
-      ],
-      "after_path": [
-        "highlight_statement:8",
-        "highlight:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:8",
-        "default:1"
-      ],
-      "after_path": [
-        "highlight_statement:8",
-        "default:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:8",
-        "link:1"
-      ],
-      "after_path": [
-        "highlight_statement:8",
-        "link:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:8",
-        "hl_group:1"
-      ],
-      "after_path": [
-        "highlight_statement:8",
-        "hl_group:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:8",
-        "hl_group:2"
-      ],
-      "after_path": [
-        "highlight_statement:8",
-        "hl_group:2"
-      ]
-    },
-    {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "highlight_statement:9"
       ],
@@ -13501,62 +12893,7 @@
       ]
     },
     {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:9",
-        "highlight:1"
-      ],
-      "after_path": [
-        "highlight_statement:9",
-        "highlight:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:9",
-        "default:1"
-      ],
-      "after_path": [
-        "highlight_statement:9",
-        "default:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:9",
-        "link:1"
-      ],
-      "after_path": [
-        "highlight_statement:9",
-        "link:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:9",
-        "hl_group:1"
-      ],
-      "after_path": [
-        "highlight_statement:9",
-        "hl_group:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:9",
-        "hl_group:2"
-      ],
-      "after_path": [
-        "highlight_statement:9",
-        "hl_group:2"
-      ]
-    },
-    {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "highlight_statement:10"
       ],
@@ -13565,62 +12902,7 @@
       ]
     },
     {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:10",
-        "highlight:1"
-      ],
-      "after_path": [
-        "highlight_statement:10",
-        "highlight:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:10",
-        "default:1"
-      ],
-      "after_path": [
-        "highlight_statement:10",
-        "default:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:10",
-        "link:1"
-      ],
-      "after_path": [
-        "highlight_statement:10",
-        "link:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:10",
-        "hl_group:1"
-      ],
-      "after_path": [
-        "highlight_statement:10",
-        "hl_group:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:10",
-        "hl_group:2"
-      ],
-      "after_path": [
-        "highlight_statement:10",
-        "hl_group:2"
-      ]
-    },
-    {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "highlight_statement:11"
       ],
@@ -13629,122 +12911,12 @@
       ]
     },
     {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:11",
-        "highlight:1"
-      ],
-      "after_path": [
-        "highlight_statement:11",
-        "highlight:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:11",
-        "default:1"
-      ],
-      "after_path": [
-        "highlight_statement:11",
-        "default:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:11",
-        "link:1"
-      ],
-      "after_path": [
-        "highlight_statement:11",
-        "link:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:11",
-        "hl_group:1"
-      ],
-      "after_path": [
-        "highlight_statement:11",
-        "hl_group:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:11",
-        "hl_group:2"
-      ],
-      "after_path": [
-        "highlight_statement:11",
-        "hl_group:2"
-      ]
-    },
-    {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "highlight_statement:12"
       ],
       "after_path": [
         "highlight_statement:12"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:12",
-        "highlight:1"
-      ],
-      "after_path": [
-        "highlight_statement:12",
-        "highlight:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:12",
-        "default:1"
-      ],
-      "after_path": [
-        "highlight_statement:12",
-        "default:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:12",
-        "link:1"
-      ],
-      "after_path": [
-        "highlight_statement:12",
-        "link:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:12",
-        "hl_group:1"
-      ],
-      "after_path": [
-        "highlight_statement:12",
-        "hl_group:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:12",
-        "hl_group:2"
-      ],
-      "after_path": [
-        "highlight_statement:12",
-        "hl_group:2"
       ]
     },
     {
@@ -13760,7 +12932,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "highlight_statement:13"
       ],
@@ -13769,62 +12941,7 @@
       ]
     },
     {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:13",
-        "highlight:1"
-      ],
-      "after_path": [
-        "highlight_statement:15",
-        "highlight:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:13",
-        "default:1"
-      ],
-      "after_path": [
-        "highlight_statement:15",
-        "default:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:13",
-        "link:1"
-      ],
-      "after_path": [
-        "highlight_statement:15",
-        "link:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:13",
-        "hl_group:1"
-      ],
-      "after_path": [
-        "highlight_statement:15",
-        "hl_group:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:13",
-        "hl_group:2"
-      ],
-      "after_path": [
-        "highlight_statement:15",
-        "hl_group:2"
-      ]
-    },
-    {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "highlight_statement:14"
       ],
@@ -13833,62 +12950,7 @@
       ]
     },
     {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:14",
-        "highlight:1"
-      ],
-      "after_path": [
-        "highlight_statement:16",
-        "highlight:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:14",
-        "default:1"
-      ],
-      "after_path": [
-        "highlight_statement:16",
-        "default:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:14",
-        "link:1"
-      ],
-      "after_path": [
-        "highlight_statement:16",
-        "link:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:14",
-        "hl_group:1"
-      ],
-      "after_path": [
-        "highlight_statement:16",
-        "hl_group:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:14",
-        "hl_group:2"
-      ],
-      "after_path": [
-        "highlight_statement:16",
-        "hl_group:2"
-      ]
-    },
-    {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "highlight_statement:15"
       ],
@@ -13897,62 +12959,7 @@
       ]
     },
     {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:15",
-        "highlight:1"
-      ],
-      "after_path": [
-        "highlight_statement:17",
-        "highlight:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:15",
-        "default:1"
-      ],
-      "after_path": [
-        "highlight_statement:17",
-        "default:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:15",
-        "link:1"
-      ],
-      "after_path": [
-        "highlight_statement:17",
-        "link:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:15",
-        "hl_group:1"
-      ],
-      "after_path": [
-        "highlight_statement:17",
-        "hl_group:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:15",
-        "hl_group:2"
-      ],
-      "after_path": [
-        "highlight_statement:17",
-        "hl_group:2"
-      ]
-    },
-    {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "highlight_statement:16"
       ],
@@ -13961,62 +12968,7 @@
       ]
     },
     {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:16",
-        "highlight:1"
-      ],
-      "after_path": [
-        "highlight_statement:18",
-        "highlight:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:16",
-        "default:1"
-      ],
-      "after_path": [
-        "highlight_statement:18",
-        "default:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:16",
-        "link:1"
-      ],
-      "after_path": [
-        "highlight_statement:18",
-        "link:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:16",
-        "hl_group:1"
-      ],
-      "after_path": [
-        "highlight_statement:18",
-        "hl_group:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:16",
-        "hl_group:2"
-      ],
-      "after_path": [
-        "highlight_statement:18",
-        "hl_group:2"
-      ]
-    },
-    {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "highlight_statement:17"
       ],
@@ -14025,62 +12977,7 @@
       ]
     },
     {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:17",
-        "highlight:1"
-      ],
-      "after_path": [
-        "highlight_statement:19",
-        "highlight:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:17",
-        "default:1"
-      ],
-      "after_path": [
-        "highlight_statement:19",
-        "default:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:17",
-        "link:1"
-      ],
-      "after_path": [
-        "highlight_statement:19",
-        "link:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:17",
-        "hl_group:1"
-      ],
-      "after_path": [
-        "highlight_statement:19",
-        "hl_group:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:17",
-        "hl_group:2"
-      ],
-      "after_path": [
-        "highlight_statement:19",
-        "hl_group:2"
-      ]
-    },
-    {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "highlight_statement:18"
       ],
@@ -14089,62 +12986,7 @@
       ]
     },
     {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:18",
-        "highlight:1"
-      ],
-      "after_path": [
-        "highlight_statement:20",
-        "highlight:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:18",
-        "default:1"
-      ],
-      "after_path": [
-        "highlight_statement:20",
-        "default:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:18",
-        "link:1"
-      ],
-      "after_path": [
-        "highlight_statement:20",
-        "link:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:18",
-        "hl_group:1"
-      ],
-      "after_path": [
-        "highlight_statement:20",
-        "hl_group:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:18",
-        "hl_group:2"
-      ],
-      "after_path": [
-        "highlight_statement:20",
-        "hl_group:2"
-      ]
-    },
-    {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "highlight_statement:19"
       ],
@@ -14153,62 +12995,7 @@
       ]
     },
     {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:19",
-        "highlight:1"
-      ],
-      "after_path": [
-        "highlight_statement:21",
-        "highlight:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:19",
-        "default:1"
-      ],
-      "after_path": [
-        "highlight_statement:21",
-        "default:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:19",
-        "link:1"
-      ],
-      "after_path": [
-        "highlight_statement:21",
-        "link:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:19",
-        "hl_group:1"
-      ],
-      "after_path": [
-        "highlight_statement:21",
-        "hl_group:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:19",
-        "hl_group:2"
-      ],
-      "after_path": [
-        "highlight_statement:21",
-        "hl_group:2"
-      ]
-    },
-    {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "highlight_statement:20"
       ],
@@ -14217,62 +13004,7 @@
       ]
     },
     {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:20",
-        "highlight:1"
-      ],
-      "after_path": [
-        "highlight_statement:22",
-        "highlight:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:20",
-        "default:1"
-      ],
-      "after_path": [
-        "highlight_statement:22",
-        "default:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:20",
-        "link:1"
-      ],
-      "after_path": [
-        "highlight_statement:22",
-        "link:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:20",
-        "hl_group:1"
-      ],
-      "after_path": [
-        "highlight_statement:22",
-        "hl_group:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:20",
-        "hl_group:2"
-      ],
-      "after_path": [
-        "highlight_statement:22",
-        "hl_group:2"
-      ]
-    },
-    {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "highlight_statement:21"
       ],
@@ -14281,122 +13013,12 @@
       ]
     },
     {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:21",
-        "highlight:1"
-      ],
-      "after_path": [
-        "highlight_statement:23",
-        "highlight:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:21",
-        "default:1"
-      ],
-      "after_path": [
-        "highlight_statement:23",
-        "default:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:21",
-        "link:1"
-      ],
-      "after_path": [
-        "highlight_statement:23",
-        "link:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:21",
-        "hl_group:1"
-      ],
-      "after_path": [
-        "highlight_statement:23",
-        "hl_group:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:21",
-        "hl_group:2"
-      ],
-      "after_path": [
-        "highlight_statement:23",
-        "hl_group:2"
-      ]
-    },
-    {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "highlight_statement:22"
       ],
       "after_path": [
         "highlight_statement:24"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:22",
-        "highlight:1"
-      ],
-      "after_path": [
-        "highlight_statement:24",
-        "highlight:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:22",
-        "default:1"
-      ],
-      "after_path": [
-        "highlight_statement:24",
-        "default:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:22",
-        "link:1"
-      ],
-      "after_path": [
-        "highlight_statement:24",
-        "link:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:22",
-        "hl_group:1"
-      ],
-      "after_path": [
-        "highlight_statement:24",
-        "hl_group:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "highlight_statement:22",
-        "hl_group:2"
-      ],
-      "after_path": [
-        "highlight_statement:24",
-        "hl_group:2"
       ]
     },
     {

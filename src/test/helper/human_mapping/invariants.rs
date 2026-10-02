@@ -91,8 +91,8 @@ use anyhow::Result;
 use tree_sitter::Node;
 
 use super::{
-    Caches, HumanTextSpan, MarkKind, NamedTextMapping, NodeStatus, TextLabel, label_bytes, load,
-    paintings_for_mode, rebuild_caches_for_mapping, status_after, status_before,
+    Caches, HumanTextSpan, MarkKind, NamedTextMapping, NodeStatus, TextLabel, label_bytes,
+    load_with, paintings_for_mode, rebuild_caches_for_mapping, status_after, status_before,
 };
 use crate::code::Code;
 use crate::diff::text::{RenderOptions, WHOLE_TOKENS};
@@ -242,7 +242,7 @@ fn site_on_row(side: usize, row: usize, start_column: usize, end_column: usize) 
 /// Every way `name`'s ground truth contradicts itself, in a stable order. Empty is a pass.
 pub fn ground_truth_invariant_violations(name: &str) -> Result<Vec<GroundTruthViolation>> {
     let (before, after) = &*crate::test::helper::handmade_test_code_pair(name)?;
-    ground_truth_invariant_violations_for(&load(name)?, before, after)
+    ground_truth_invariant_violations_for(&load_with(name, before, after)?, before, after)
 }
 
 /// [`ground_truth_invariant_violations`] over an already-loaded mapping and code pair.

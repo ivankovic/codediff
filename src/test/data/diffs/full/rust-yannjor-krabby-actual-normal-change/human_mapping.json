@@ -6,7 +6,7 @@
       "after_path": []
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "mod_item:1"
       ],
@@ -15,40 +15,7 @@
       ]
     },
     {
-      "operation": "identical",
-      "before_path": [
-        "mod_item:1",
-        "mod:1"
-      ],
-      "after_path": [
-        "mod_item:1",
-        "mod:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "mod_item:1",
-        "identifier:1"
-      ],
-      "after_path": [
-        "mod_item:1",
-        "identifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "mod_item:1",
-        ";:1"
-      ],
-      "after_path": [
-        "mod_item:1",
-        ";:1"
-      ]
-    },
-    {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "mod_item:2"
       ],
@@ -57,78 +24,12 @@
       ]
     },
     {
-      "operation": "identical",
-      "before_path": [
-        "mod_item:2",
-        "mod:1"
-      ],
-      "after_path": [
-        "mod_item:2",
-        "mod:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "mod_item:2",
-        "identifier:1"
-      ],
-      "after_path": [
-        "mod_item:2",
-        "identifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "mod_item:2",
-        ";:1"
-      ],
-      "after_path": [
-        "mod_item:2",
-        ";:1"
-      ]
-    },
-    {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "mod_item:3"
       ],
       "after_path": [
         "mod_item:3"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "mod_item:3",
-        "mod:1"
-      ],
-      "after_path": [
-        "mod_item:3",
-        "mod:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "mod_item:3",
-        "identifier:1"
-      ],
-      "after_path": [
-        "mod_item:3",
-        "identifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "mod_item:3",
-        ";:1"
-      ],
-      "after_path": [
-        "mod_item:3",
-        ";:1"
       ]
     },
     {
@@ -2650,157 +2551,12 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "attribute_item:4"
       ],
       "after_path": [
         "attribute_item:6"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "attribute_item:4",
-        "#:1"
-      ],
-      "after_path": [
-        "attribute_item:6",
-        "#:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "attribute_item:4",
-        "[:1"
-      ],
-      "after_path": [
-        "attribute_item:6",
-        "[:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "attribute_item:4",
-        "attribute:1"
-      ],
-      "after_path": [
-        "attribute_item:6",
-        "attribute:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "attribute_item:4",
-        "attribute:1",
-        "identifier:1"
-      ],
-      "after_path": [
-        "attribute_item:6",
-        "attribute:1",
-        "identifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "attribute_item:4",
-        "attribute:1",
-        "token_tree:1"
-      ],
-      "after_path": [
-        "attribute_item:6",
-        "attribute:1",
-        "token_tree:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "attribute_item:4",
-        "attribute:1",
-        "token_tree:1",
-        "(:1"
-      ],
-      "after_path": [
-        "attribute_item:6",
-        "attribute:1",
-        "token_tree:1",
-        "(:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "attribute_item:4",
-        "attribute:1",
-        "token_tree:1",
-        "identifier:1"
-      ],
-      "after_path": [
-        "attribute_item:6",
-        "attribute:1",
-        "token_tree:1",
-        "identifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "attribute_item:4",
-        "attribute:1",
-        "token_tree:1",
-        ",:1"
-      ],
-      "after_path": [
-        "attribute_item:6",
-        "attribute:1",
-        "token_tree:1",
-        ",:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "attribute_item:4",
-        "attribute:1",
-        "token_tree:1",
-        "identifier:2"
-      ],
-      "after_path": [
-        "attribute_item:6",
-        "attribute:1",
-        "token_tree:1",
-        "identifier:2"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "attribute_item:4",
-        "attribute:1",
-        "token_tree:1",
-        "):1"
-      ],
-      "after_path": [
-        "attribute_item:6",
-        "attribute:1",
-        "token_tree:1",
-        "):1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "attribute_item:4",
-        "]:1"
-      ],
-      "after_path": [
-        "attribute_item:6",
-        "]:1"
       ]
     },
     {
@@ -2934,7 +2690,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "struct_item:2",
         "field_declaration_list:1",
@@ -2944,51 +2700,6 @@
         "struct_item:4",
         "field_declaration_list:1",
         "field_declaration:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "struct_item:2",
-        "field_declaration_list:1",
-        "field_declaration:1",
-        "field_identifier:1"
-      ],
-      "after_path": [
-        "struct_item:4",
-        "field_declaration_list:1",
-        "field_declaration:1",
-        "field_identifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "struct_item:2",
-        "field_declaration_list:1",
-        "field_declaration:1",
-        "::1"
-      ],
-      "after_path": [
-        "struct_item:4",
-        "field_declaration_list:1",
-        "field_declaration:1",
-        "::1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "struct_item:2",
-        "field_declaration_list:1",
-        "field_declaration:1",
-        "type_identifier:1"
-      ],
-      "after_path": [
-        "struct_item:4",
-        "field_declaration_list:1",
-        "field_declaration:1",
-        "type_identifier:1"
       ]
     },
     {
@@ -3380,7 +3091,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "struct_item:2",
         "field_declaration_list:1",
@@ -3396,69 +3107,6 @@
         "attribute:1",
         "token_tree:1",
         "string_literal:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "struct_item:2",
-        "field_declaration_list:1",
-        "attribute_item:1",
-        "attribute:1",
-        "token_tree:1",
-        "string_literal:1",
-        "\":1"
-      ],
-      "after_path": [
-        "struct_item:4",
-        "field_declaration_list:1",
-        "attribute_item:1",
-        "attribute:1",
-        "token_tree:1",
-        "string_literal:1",
-        "\":1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "struct_item:2",
-        "field_declaration_list:1",
-        "attribute_item:1",
-        "attribute:1",
-        "token_tree:1",
-        "string_literal:1",
-        "string_content:1"
-      ],
-      "after_path": [
-        "struct_item:4",
-        "field_declaration_list:1",
-        "attribute_item:1",
-        "attribute:1",
-        "token_tree:1",
-        "string_literal:1",
-        "string_content:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "struct_item:2",
-        "field_declaration_list:1",
-        "attribute_item:1",
-        "attribute:1",
-        "token_tree:1",
-        "string_literal:1",
-        "\":2"
-      ],
-      "after_path": [
-        "struct_item:4",
-        "field_declaration_list:1",
-        "attribute_item:1",
-        "attribute:1",
-        "token_tree:1",
-        "string_literal:1",
-        "\":2"
       ]
     },
     {
@@ -3786,157 +3434,12 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "attribute_item:5"
       ],
       "after_path": [
         "attribute_item:7"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "attribute_item:5",
-        "#:1"
-      ],
-      "after_path": [
-        "attribute_item:7",
-        "#:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "attribute_item:5",
-        "[:1"
-      ],
-      "after_path": [
-        "attribute_item:7",
-        "[:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "attribute_item:5",
-        "attribute:1"
-      ],
-      "after_path": [
-        "attribute_item:7",
-        "attribute:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "attribute_item:5",
-        "attribute:1",
-        "identifier:1"
-      ],
-      "after_path": [
-        "attribute_item:7",
-        "attribute:1",
-        "identifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "attribute_item:5",
-        "attribute:1",
-        "token_tree:1"
-      ],
-      "after_path": [
-        "attribute_item:7",
-        "attribute:1",
-        "token_tree:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "attribute_item:5",
-        "attribute:1",
-        "token_tree:1",
-        "(:1"
-      ],
-      "after_path": [
-        "attribute_item:7",
-        "attribute:1",
-        "token_tree:1",
-        "(:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "attribute_item:5",
-        "attribute:1",
-        "token_tree:1",
-        "identifier:1"
-      ],
-      "after_path": [
-        "attribute_item:7",
-        "attribute:1",
-        "token_tree:1",
-        "identifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "attribute_item:5",
-        "attribute:1",
-        "token_tree:1",
-        ",:1"
-      ],
-      "after_path": [
-        "attribute_item:7",
-        "attribute:1",
-        "token_tree:1",
-        ",:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "attribute_item:5",
-        "attribute:1",
-        "token_tree:1",
-        "identifier:2"
-      ],
-      "after_path": [
-        "attribute_item:7",
-        "attribute:1",
-        "token_tree:1",
-        "identifier:2"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "attribute_item:5",
-        "attribute:1",
-        "token_tree:1",
-        "):1"
-      ],
-      "after_path": [
-        "attribute_item:7",
-        "attribute:1",
-        "token_tree:1",
-        "):1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "attribute_item:5",
-        "]:1"
-      ],
-      "after_path": [
-        "attribute_item:7",
-        "]:1"
       ]
     },
     {
@@ -4645,7 +4148,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "struct_item:3",
         "field_declaration_list:1",
@@ -4655,51 +4158,6 @@
         "struct_item:5",
         "field_declaration_list:1",
         "field_declaration:2"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "struct_item:3",
-        "field_declaration_list:1",
-        "field_declaration:5",
-        "field_identifier:1"
-      ],
-      "after_path": [
-        "struct_item:5",
-        "field_declaration_list:1",
-        "field_declaration:2",
-        "field_identifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "struct_item:3",
-        "field_declaration_list:1",
-        "field_declaration:5",
-        "::1"
-      ],
-      "after_path": [
-        "struct_item:5",
-        "field_declaration_list:1",
-        "field_declaration:2",
-        "::1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "struct_item:3",
-        "field_declaration_list:1",
-        "field_declaration:5",
-        "primitive_type:1"
-      ],
-      "after_path": [
-        "struct_item:5",
-        "field_declaration_list:1",
-        "field_declaration:2",
-        "primitive_type:1"
       ]
     },
     {
@@ -4955,7 +4413,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "struct_item:3",
         "field_declaration_list:1",
@@ -4965,51 +4423,6 @@
         "struct_item:5",
         "field_declaration_list:1",
         "field_declaration:3"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "struct_item:3",
-        "field_declaration_list:1",
-        "field_declaration:6",
-        "field_identifier:1"
-      ],
-      "after_path": [
-        "struct_item:5",
-        "field_declaration_list:1",
-        "field_declaration:3",
-        "field_identifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "struct_item:3",
-        "field_declaration_list:1",
-        "field_declaration:6",
-        "::1"
-      ],
-      "after_path": [
-        "struct_item:5",
-        "field_declaration_list:1",
-        "field_declaration:3",
-        "::1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "struct_item:3",
-        "field_declaration_list:1",
-        "field_declaration:6",
-        "primitive_type:1"
-      ],
-      "after_path": [
-        "struct_item:5",
-        "field_declaration_list:1",
-        "field_declaration:3",
-        "primitive_type:1"
       ]
     },
     {
@@ -5265,7 +4678,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "struct_item:3",
         "field_declaration_list:1",
@@ -5275,51 +4688,6 @@
         "struct_item:5",
         "field_declaration_list:1",
         "field_declaration:4"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "struct_item:3",
-        "field_declaration_list:1",
-        "field_declaration:7",
-        "field_identifier:1"
-      ],
-      "after_path": [
-        "struct_item:5",
-        "field_declaration_list:1",
-        "field_declaration:4",
-        "field_identifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "struct_item:3",
-        "field_declaration_list:1",
-        "field_declaration:7",
-        "::1"
-      ],
-      "after_path": [
-        "struct_item:5",
-        "field_declaration_list:1",
-        "field_declaration:4",
-        "::1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "struct_item:3",
-        "field_declaration_list:1",
-        "field_declaration:7",
-        "primitive_type:1"
-      ],
-      "after_path": [
-        "struct_item:5",
-        "field_declaration_list:1",
-        "field_declaration:4",
-        "primitive_type:1"
       ]
     },
     {
@@ -5597,45 +4965,12 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "struct_item:4"
       ],
       "after_path": [
         "struct_item:6"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "struct_item:4",
-        "struct:1"
-      ],
-      "after_path": [
-        "struct_item:6",
-        "struct:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "struct_item:4",
-        "type_identifier:1"
-      ],
-      "after_path": [
-        "struct_item:6",
-        "type_identifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "struct_item:4",
-        ";:1"
-      ],
-      "after_path": [
-        "struct_item:6",
-        ";:1"
       ]
     },
     {
@@ -5712,7 +5047,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "function_item:4",
         "parameters:1"
@@ -5720,32 +5055,6 @@
       "after_path": [
         "function_item:1",
         "parameters:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "function_item:4",
-        "parameters:1",
-        "(:1"
-      ],
-      "after_path": [
-        "function_item:1",
-        "parameters:1",
-        "(:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "function_item:4",
-        "parameters:1",
-        "):1"
-      ],
-      "after_path": [
-        "function_item:1",
-        "parameters:1",
-        "):1"
       ]
     },
     {
@@ -6304,7 +5613,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "function_item:4",
         "block:1",
@@ -6322,75 +5631,6 @@
         "field_expression:1",
         "call_expression:1",
         "scoped_identifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "function_item:4",
-        "block:1",
-        "let_declaration:2",
-        "call_expression:1",
-        "field_expression:1",
-        "call_expression:1",
-        "scoped_identifier:1",
-        "identifier:1"
-      ],
-      "after_path": [
-        "function_item:1",
-        "block:1",
-        "let_declaration:2",
-        "call_expression:1",
-        "field_expression:1",
-        "call_expression:1",
-        "scoped_identifier:1",
-        "identifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "function_item:4",
-        "block:1",
-        "let_declaration:2",
-        "call_expression:1",
-        "field_expression:1",
-        "call_expression:1",
-        "scoped_identifier:1",
-        ":::1"
-      ],
-      "after_path": [
-        "function_item:1",
-        "block:1",
-        "let_declaration:2",
-        "call_expression:1",
-        "field_expression:1",
-        "call_expression:1",
-        "scoped_identifier:1",
-        ":::1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "function_item:4",
-        "block:1",
-        "let_declaration:2",
-        "call_expression:1",
-        "field_expression:1",
-        "call_expression:1",
-        "scoped_identifier:1",
-        "identifier:2"
-      ],
-      "after_path": [
-        "function_item:1",
-        "block:1",
-        "let_declaration:2",
-        "call_expression:1",
-        "field_expression:1",
-        "call_expression:1",
-        "scoped_identifier:1",
-        "identifier:2"
       ]
     },
     {
@@ -7340,7 +6580,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "function_item:4",
         "block:1",
@@ -7354,63 +6594,6 @@
         "expression_statement:1",
         "match_expression:1",
         "field_expression:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "function_item:4",
-        "block:1",
-        "expression_statement:1",
-        "match_expression:1",
-        "field_expression:1",
-        "identifier:1"
-      ],
-      "after_path": [
-        "function_item:1",
-        "block:1",
-        "expression_statement:1",
-        "match_expression:1",
-        "field_expression:1",
-        "identifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "function_item:4",
-        "block:1",
-        "expression_statement:1",
-        "match_expression:1",
-        "field_expression:1",
-        ".:1"
-      ],
-      "after_path": [
-        "function_item:1",
-        "block:1",
-        "expression_statement:1",
-        "match_expression:1",
-        "field_expression:1",
-        ".:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "function_item:4",
-        "block:1",
-        "expression_statement:1",
-        "match_expression:1",
-        "field_expression:1",
-        "field_identifier:1"
-      ],
-      "after_path": [
-        "function_item:1",
-        "block:1",
-        "expression_statement:1",
-        "match_expression:1",
-        "field_expression:1",
-        "field_identifier:1"
       ]
     },
     {
@@ -7503,7 +6686,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "function_item:4",
         "block:1",
@@ -7524,84 +6707,6 @@
         "match_pattern:1",
         "tuple_struct_pattern:1",
         "scoped_identifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "function_item:4",
-        "block:1",
-        "expression_statement:1",
-        "match_expression:1",
-        "match_block:1",
-        "match_arm:1",
-        "match_pattern:1",
-        "scoped_identifier:1",
-        "identifier:1"
-      ],
-      "after_path": [
-        "function_item:1",
-        "block:1",
-        "expression_statement:1",
-        "match_expression:1",
-        "match_block:1",
-        "match_arm:1",
-        "match_pattern:1",
-        "tuple_struct_pattern:1",
-        "scoped_identifier:1",
-        "identifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "function_item:4",
-        "block:1",
-        "expression_statement:1",
-        "match_expression:1",
-        "match_block:1",
-        "match_arm:1",
-        "match_pattern:1",
-        "scoped_identifier:1",
-        ":::1"
-      ],
-      "after_path": [
-        "function_item:1",
-        "block:1",
-        "expression_statement:1",
-        "match_expression:1",
-        "match_block:1",
-        "match_arm:1",
-        "match_pattern:1",
-        "tuple_struct_pattern:1",
-        "scoped_identifier:1",
-        ":::1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "function_item:4",
-        "block:1",
-        "expression_statement:1",
-        "match_expression:1",
-        "match_block:1",
-        "match_arm:1",
-        "match_pattern:1",
-        "scoped_identifier:1",
-        "identifier:2"
-      ],
-      "after_path": [
-        "function_item:1",
-        "block:1",
-        "expression_statement:1",
-        "match_expression:1",
-        "match_block:1",
-        "match_arm:1",
-        "match_pattern:1",
-        "tuple_struct_pattern:1",
-        "scoped_identifier:1",
-        "identifier:2"
       ]
     },
     {
@@ -8352,7 +7457,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "function_item:4",
         "block:1",
@@ -8376,64 +7481,6 @@
         "call_expression:1",
         "arguments:1",
         "reference_expression:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "function_item:4",
-        "block:1",
-        "expression_statement:1",
-        "match_expression:1",
-        "match_block:1",
-        "match_arm:2",
-        "try_expression:1",
-        "call_expression:1",
-        "arguments:1",
-        "reference_expression:1",
-        "&:1"
-      ],
-      "after_path": [
-        "function_item:1",
-        "block:1",
-        "expression_statement:1",
-        "match_expression:1",
-        "match_block:1",
-        "match_arm:2",
-        "try_expression:1",
-        "call_expression:1",
-        "arguments:1",
-        "reference_expression:1",
-        "&:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "function_item:4",
-        "block:1",
-        "expression_statement:1",
-        "match_expression:1",
-        "match_block:1",
-        "match_arm:2",
-        "try_expression:1",
-        "call_expression:1",
-        "arguments:1",
-        "reference_expression:1",
-        "identifier:1"
-      ],
-      "after_path": [
-        "function_item:1",
-        "block:1",
-        "expression_statement:1",
-        "match_expression:1",
-        "match_block:1",
-        "match_arm:2",
-        "try_expression:1",
-        "call_expression:1",
-        "arguments:1",
-        "reference_expression:1",
-        "identifier:1"
       ]
     },
     {
@@ -8619,7 +7666,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "function_item:4",
         "block:1",
@@ -8637,210 +7684,6 @@
         "match_block:1",
         "match_arm:3",
         "match_pattern:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "function_item:4",
-        "block:1",
-        "expression_statement:1",
-        "match_expression:1",
-        "match_block:1",
-        "match_arm:3",
-        "match_pattern:1",
-        "tuple_struct_pattern:1"
-      ],
-      "after_path": [
-        "function_item:1",
-        "block:1",
-        "expression_statement:1",
-        "match_expression:1",
-        "match_block:1",
-        "match_arm:3",
-        "match_pattern:1",
-        "tuple_struct_pattern:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "function_item:4",
-        "block:1",
-        "expression_statement:1",
-        "match_expression:1",
-        "match_block:1",
-        "match_arm:3",
-        "match_pattern:1",
-        "tuple_struct_pattern:1",
-        "scoped_identifier:1"
-      ],
-      "after_path": [
-        "function_item:1",
-        "block:1",
-        "expression_statement:1",
-        "match_expression:1",
-        "match_block:1",
-        "match_arm:3",
-        "match_pattern:1",
-        "tuple_struct_pattern:1",
-        "scoped_identifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "function_item:4",
-        "block:1",
-        "expression_statement:1",
-        "match_expression:1",
-        "match_block:1",
-        "match_arm:3",
-        "match_pattern:1",
-        "tuple_struct_pattern:1",
-        "scoped_identifier:1",
-        "identifier:1"
-      ],
-      "after_path": [
-        "function_item:1",
-        "block:1",
-        "expression_statement:1",
-        "match_expression:1",
-        "match_block:1",
-        "match_arm:3",
-        "match_pattern:1",
-        "tuple_struct_pattern:1",
-        "scoped_identifier:1",
-        "identifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "function_item:4",
-        "block:1",
-        "expression_statement:1",
-        "match_expression:1",
-        "match_block:1",
-        "match_arm:3",
-        "match_pattern:1",
-        "tuple_struct_pattern:1",
-        "scoped_identifier:1",
-        ":::1"
-      ],
-      "after_path": [
-        "function_item:1",
-        "block:1",
-        "expression_statement:1",
-        "match_expression:1",
-        "match_block:1",
-        "match_arm:3",
-        "match_pattern:1",
-        "tuple_struct_pattern:1",
-        "scoped_identifier:1",
-        ":::1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "function_item:4",
-        "block:1",
-        "expression_statement:1",
-        "match_expression:1",
-        "match_block:1",
-        "match_arm:3",
-        "match_pattern:1",
-        "tuple_struct_pattern:1",
-        "scoped_identifier:1",
-        "identifier:2"
-      ],
-      "after_path": [
-        "function_item:1",
-        "block:1",
-        "expression_statement:1",
-        "match_expression:1",
-        "match_block:1",
-        "match_arm:3",
-        "match_pattern:1",
-        "tuple_struct_pattern:1",
-        "scoped_identifier:1",
-        "identifier:2"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "function_item:4",
-        "block:1",
-        "expression_statement:1",
-        "match_expression:1",
-        "match_block:1",
-        "match_arm:3",
-        "match_pattern:1",
-        "tuple_struct_pattern:1",
-        "(:1"
-      ],
-      "after_path": [
-        "function_item:1",
-        "block:1",
-        "expression_statement:1",
-        "match_expression:1",
-        "match_block:1",
-        "match_arm:3",
-        "match_pattern:1",
-        "tuple_struct_pattern:1",
-        "(:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "function_item:4",
-        "block:1",
-        "expression_statement:1",
-        "match_expression:1",
-        "match_block:1",
-        "match_arm:3",
-        "match_pattern:1",
-        "tuple_struct_pattern:1",
-        "identifier:1"
-      ],
-      "after_path": [
-        "function_item:1",
-        "block:1",
-        "expression_statement:1",
-        "match_expression:1",
-        "match_block:1",
-        "match_arm:3",
-        "match_pattern:1",
-        "tuple_struct_pattern:1",
-        "identifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "function_item:4",
-        "block:1",
-        "expression_statement:1",
-        "match_expression:1",
-        "match_block:1",
-        "match_arm:3",
-        "match_pattern:1",
-        "tuple_struct_pattern:1",
-        "):1"
-      ],
-      "after_path": [
-        "function_item:1",
-        "block:1",
-        "expression_statement:1",
-        "match_expression:1",
-        "match_block:1",
-        "match_arm:3",
-        "match_pattern:1",
-        "tuple_struct_pattern:1",
-        "):1"
       ]
     },
     {
@@ -9031,7 +7874,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "function_item:4",
         "block:1",
@@ -9055,64 +7898,6 @@
         "call_expression:1",
         "arguments:1",
         "reference_expression:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "function_item:4",
-        "block:1",
-        "expression_statement:1",
-        "match_expression:1",
-        "match_block:1",
-        "match_arm:3",
-        "try_expression:1",
-        "call_expression:1",
-        "arguments:1",
-        "reference_expression:1",
-        "&:1"
-      ],
-      "after_path": [
-        "function_item:1",
-        "block:1",
-        "expression_statement:1",
-        "match_expression:1",
-        "match_block:1",
-        "match_arm:3",
-        "try_expression:1",
-        "call_expression:1",
-        "arguments:1",
-        "reference_expression:1",
-        "&:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "function_item:4",
-        "block:1",
-        "expression_statement:1",
-        "match_expression:1",
-        "match_block:1",
-        "match_arm:3",
-        "try_expression:1",
-        "call_expression:1",
-        "arguments:1",
-        "reference_expression:1",
-        "identifier:1"
-      ],
-      "after_path": [
-        "function_item:1",
-        "block:1",
-        "expression_statement:1",
-        "match_expression:1",
-        "match_block:1",
-        "match_arm:3",
-        "try_expression:1",
-        "call_expression:1",
-        "arguments:1",
-        "reference_expression:1",
-        "identifier:1"
       ]
     },
     {
@@ -9298,7 +8083,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "function_item:4",
         "block:1",
@@ -9308,125 +8093,6 @@
         "function_item:1",
         "block:1",
         "call_expression:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "function_item:4",
-        "block:1",
-        "call_expression:1",
-        "identifier:1"
-      ],
-      "after_path": [
-        "function_item:1",
-        "block:1",
-        "call_expression:1",
-        "identifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "function_item:4",
-        "block:1",
-        "call_expression:1",
-        "arguments:1"
-      ],
-      "after_path": [
-        "function_item:1",
-        "block:1",
-        "call_expression:1",
-        "arguments:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "function_item:4",
-        "block:1",
-        "call_expression:1",
-        "arguments:1",
-        "(:1"
-      ],
-      "after_path": [
-        "function_item:1",
-        "block:1",
-        "call_expression:1",
-        "arguments:1",
-        "(:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "function_item:4",
-        "block:1",
-        "call_expression:1",
-        "arguments:1",
-        "unit_expression:1"
-      ],
-      "after_path": [
-        "function_item:1",
-        "block:1",
-        "call_expression:1",
-        "arguments:1",
-        "unit_expression:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "function_item:4",
-        "block:1",
-        "call_expression:1",
-        "arguments:1",
-        "unit_expression:1",
-        "(:1"
-      ],
-      "after_path": [
-        "function_item:1",
-        "block:1",
-        "call_expression:1",
-        "arguments:1",
-        "unit_expression:1",
-        "(:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "function_item:4",
-        "block:1",
-        "call_expression:1",
-        "arguments:1",
-        "unit_expression:1",
-        "):1"
-      ],
-      "after_path": [
-        "function_item:1",
-        "block:1",
-        "call_expression:1",
-        "arguments:1",
-        "unit_expression:1",
-        "):1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "function_item:4",
-        "block:1",
-        "call_expression:1",
-        "arguments:1",
-        "):1"
-      ],
-      "after_path": [
-        "function_item:1",
-        "block:1",
-        "call_expression:1",
-        "arguments:1",
-        "):1"
       ]
     },
     {

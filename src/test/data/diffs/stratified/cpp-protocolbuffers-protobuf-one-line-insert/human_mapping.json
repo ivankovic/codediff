@@ -60,7 +60,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "preproc_include:1"
       ],
@@ -69,29 +69,7 @@
       ]
     },
     {
-      "operation": "identical",
-      "before_path": [
-        "preproc_include:1",
-        "#include:1"
-      ],
-      "after_path": [
-        "preproc_include:1",
-        "#include:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "preproc_include:1",
-        "system_lib_string:1"
-      ],
-      "after_path": [
-        "preproc_include:1",
-        "system_lib_string:1"
-      ]
-    },
-    {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "preproc_include:2"
       ],
@@ -100,29 +78,7 @@
       ]
     },
     {
-      "operation": "identical",
-      "before_path": [
-        "preproc_include:2",
-        "#include:1"
-      ],
-      "after_path": [
-        "preproc_include:2",
-        "#include:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "preproc_include:2",
-        "system_lib_string:1"
-      ],
-      "after_path": [
-        "preproc_include:2",
-        "system_lib_string:1"
-      ]
-    },
-    {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "preproc_def:1"
       ],
@@ -131,56 +87,12 @@
       ]
     },
     {
-      "operation": "identical",
-      "before_path": [
-        "preproc_def:1",
-        "#define:1"
-      ],
-      "after_path": [
-        "preproc_def:1",
-        "#define:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "preproc_def:1",
-        "identifier:1"
-      ],
-      "after_path": [
-        "preproc_def:1",
-        "identifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "preproc_include:3"
       ],
       "after_path": [
         "preproc_include:3"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "preproc_include:3",
-        "#include:1"
-      ],
-      "after_path": [
-        "preproc_include:3",
-        "#include:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "preproc_include:3",
-        "system_lib_string:1"
-      ],
-      "after_path": [
-        "preproc_include:3",
-        "system_lib_string:1"
       ]
     },
     {
@@ -68124,7 +68036,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "namespace_definition:1",
         "declaration_list:1",
@@ -68152,72 +68064,6 @@
         "compound_statement:1",
         "for_statement:1",
         "update_expression:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "namespace_definition:1",
-        "declaration_list:1",
-        "namespace_definition:1",
-        "declaration_list:1",
-        "namespace_definition:1",
-        "declaration_list:1",
-        "namespace_definition:1",
-        "declaration_list:1",
-        "function_definition:3",
-        "compound_statement:1",
-        "for_statement:1",
-        "update_expression:1",
-        "++:1"
-      ],
-      "after_path": [
-        "namespace_definition:1",
-        "declaration_list:1",
-        "namespace_definition:1",
-        "declaration_list:1",
-        "namespace_definition:1",
-        "declaration_list:1",
-        "namespace_definition:1",
-        "declaration_list:1",
-        "function_definition:3",
-        "compound_statement:1",
-        "for_statement:1",
-        "update_expression:1",
-        "++:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "namespace_definition:1",
-        "declaration_list:1",
-        "namespace_definition:1",
-        "declaration_list:1",
-        "namespace_definition:1",
-        "declaration_list:1",
-        "namespace_definition:1",
-        "declaration_list:1",
-        "function_definition:3",
-        "compound_statement:1",
-        "for_statement:1",
-        "update_expression:1",
-        "identifier:1"
-      ],
-      "after_path": [
-        "namespace_definition:1",
-        "declaration_list:1",
-        "namespace_definition:1",
-        "declaration_list:1",
-        "namespace_definition:1",
-        "declaration_list:1",
-        "namespace_definition:1",
-        "declaration_list:1",
-        "function_definition:3",
-        "compound_statement:1",
-        "for_statement:1",
-        "update_expression:1",
-        "identifier:1"
       ]
     },
     {

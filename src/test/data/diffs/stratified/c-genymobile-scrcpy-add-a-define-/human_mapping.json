@@ -6,7 +6,7 @@
       "after_path": []
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "preproc_def:1"
       ],
@@ -15,40 +15,7 @@
       ]
     },
     {
-      "operation": "identical",
-      "before_path": [
-        "preproc_def:1",
-        "#define:1"
-      ],
-      "after_path": [
-        "preproc_def:1",
-        "#define:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "preproc_def:1",
-        "identifier:1"
-      ],
-      "after_path": [
-        "preproc_def:1",
-        "identifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "preproc_def:1",
-        "preproc_arg:1"
-      ],
-      "after_path": [
-        "preproc_def:1",
-        "preproc_arg:1"
-      ]
-    },
-    {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "preproc_def:2"
       ],
@@ -57,40 +24,7 @@
       ]
     },
     {
-      "operation": "identical",
-      "before_path": [
-        "preproc_def:2",
-        "#define:1"
-      ],
-      "after_path": [
-        "preproc_def:2",
-        "#define:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "preproc_def:2",
-        "identifier:1"
-      ],
-      "after_path": [
-        "preproc_def:2",
-        "identifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "preproc_def:2",
-        "preproc_arg:1"
-      ],
-      "after_path": [
-        "preproc_def:2",
-        "preproc_arg:1"
-      ]
-    },
-    {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "preproc_def:3"
       ],
@@ -99,40 +33,7 @@
       ]
     },
     {
-      "operation": "identical",
-      "before_path": [
-        "preproc_def:3",
-        "#define:1"
-      ],
-      "after_path": [
-        "preproc_def:3",
-        "#define:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "preproc_def:3",
-        "identifier:1"
-      ],
-      "after_path": [
-        "preproc_def:3",
-        "identifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "preproc_def:3",
-        "preproc_arg:1"
-      ],
-      "after_path": [
-        "preproc_def:3",
-        "preproc_arg:1"
-      ]
-    },
-    {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "preproc_def:4"
       ],
@@ -141,40 +42,7 @@
       ]
     },
     {
-      "operation": "identical",
-      "before_path": [
-        "preproc_def:4",
-        "#define:1"
-      ],
-      "after_path": [
-        "preproc_def:4",
-        "#define:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "preproc_def:4",
-        "identifier:1"
-      ],
-      "after_path": [
-        "preproc_def:4",
-        "identifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "preproc_def:4",
-        "preproc_arg:1"
-      ],
-      "after_path": [
-        "preproc_def:4",
-        "preproc_arg:1"
-      ]
-    },
-    {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "preproc_def:5"
       ],
@@ -183,40 +51,7 @@
       ]
     },
     {
-      "operation": "identical",
-      "before_path": [
-        "preproc_def:5",
-        "#define:1"
-      ],
-      "after_path": [
-        "preproc_def:5",
-        "#define:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "preproc_def:5",
-        "identifier:1"
-      ],
-      "after_path": [
-        "preproc_def:5",
-        "identifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "preproc_def:5",
-        "preproc_arg:1"
-      ],
-      "after_path": [
-        "preproc_def:5",
-        "preproc_arg:1"
-      ]
-    },
-    {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "preproc_def:6"
       ],
@@ -225,40 +60,7 @@
       ]
     },
     {
-      "operation": "identical",
-      "before_path": [
-        "preproc_def:6",
-        "#define:1"
-      ],
-      "after_path": [
-        "preproc_def:6",
-        "#define:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "preproc_def:6",
-        "identifier:1"
-      ],
-      "after_path": [
-        "preproc_def:6",
-        "identifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "preproc_def:6",
-        "preproc_arg:1"
-      ],
-      "after_path": [
-        "preproc_def:6",
-        "preproc_arg:1"
-      ]
-    },
-    {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "preproc_def:7"
       ],
@@ -267,78 +69,12 @@
       ]
     },
     {
-      "operation": "identical",
-      "before_path": [
-        "preproc_def:7",
-        "#define:1"
-      ],
-      "after_path": [
-        "preproc_def:7",
-        "#define:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "preproc_def:7",
-        "identifier:1"
-      ],
-      "after_path": [
-        "preproc_def:7",
-        "identifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "preproc_def:7",
-        "preproc_arg:1"
-      ],
-      "after_path": [
-        "preproc_def:7",
-        "preproc_arg:1"
-      ]
-    },
-    {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "preproc_def:8"
       ],
       "after_path": [
         "preproc_def:8"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "preproc_def:8",
-        "#define:1"
-      ],
-      "after_path": [
-        "preproc_def:8",
-        "#define:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "preproc_def:8",
-        "identifier:1"
-      ],
-      "after_path": [
-        "preproc_def:8",
-        "identifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "preproc_def:8",
-        "preproc_arg:1"
-      ],
-      "after_path": [
-        "preproc_def:8",
-        "preproc_arg:1"
       ]
     },
     {

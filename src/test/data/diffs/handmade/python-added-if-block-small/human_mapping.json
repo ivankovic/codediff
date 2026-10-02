@@ -26,7 +26,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "if_statement:1",
         "comparison_operator:1"
@@ -34,90 +34,6 @@
       "after_path": [
         "if_statement:1",
         "comparison_operator:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "if_statement:1",
-        "comparison_operator:1",
-        "identifier:1"
-      ],
-      "after_path": [
-        "if_statement:1",
-        "comparison_operator:1",
-        "identifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "if_statement:1",
-        "comparison_operator:1",
-        "==:1"
-      ],
-      "after_path": [
-        "if_statement:1",
-        "comparison_operator:1",
-        "==:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "if_statement:1",
-        "comparison_operator:1",
-        "string:1"
-      ],
-      "after_path": [
-        "if_statement:1",
-        "comparison_operator:1",
-        "string:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "if_statement:1",
-        "comparison_operator:1",
-        "string:1",
-        "string_start:1"
-      ],
-      "after_path": [
-        "if_statement:1",
-        "comparison_operator:1",
-        "string:1",
-        "string_start:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "if_statement:1",
-        "comparison_operator:1",
-        "string:1",
-        "string_content:1"
-      ],
-      "after_path": [
-        "if_statement:1",
-        "comparison_operator:1",
-        "string:1",
-        "string_content:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "if_statement:1",
-        "comparison_operator:1",
-        "string:1",
-        "string_end:1"
-      ],
-      "after_path": [
-        "if_statement:1",
-        "comparison_operator:1",
-        "string:1",
-        "string_end:1"
       ]
     },
     {

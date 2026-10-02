@@ -6,117 +6,12 @@
       "after_path": []
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "import_from_statement:1"
       ],
       "after_path": [
         "import_from_statement:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "import_from_statement:1",
-        "from:1"
-      ],
-      "after_path": [
-        "import_from_statement:1",
-        "from:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "import_from_statement:1",
-        "dotted_name:1"
-      ],
-      "after_path": [
-        "import_from_statement:1",
-        "dotted_name:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "import_from_statement:1",
-        "dotted_name:1",
-        "identifier:1"
-      ],
-      "after_path": [
-        "import_from_statement:1",
-        "dotted_name:1",
-        "identifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "import_from_statement:1",
-        "import:1"
-      ],
-      "after_path": [
-        "import_from_statement:1",
-        "import:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "import_from_statement:1",
-        "dotted_name:2"
-      ],
-      "after_path": [
-        "import_from_statement:1",
-        "dotted_name:2"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "import_from_statement:1",
-        "dotted_name:2",
-        "identifier:1"
-      ],
-      "after_path": [
-        "import_from_statement:1",
-        "dotted_name:2",
-        "identifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "import_from_statement:1",
-        ",:1"
-      ],
-      "after_path": [
-        "import_from_statement:1",
-        ",:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "import_from_statement:1",
-        "dotted_name:3"
-      ],
-      "after_path": [
-        "import_from_statement:1",
-        "dotted_name:3"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "import_from_statement:1",
-        "dotted_name:3",
-        "identifier:1"
-      ],
-      "after_path": [
-        "import_from_statement:1",
-        "dotted_name:3",
-        "identifier:1"
       ]
     },
     {
@@ -369,7 +264,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "class_definition:1",
         "block:1",
@@ -379,91 +274,6 @@
         "class_definition:1",
         "block:1",
         "expression_statement:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "class_definition:1",
-        "block:1",
-        "expression_statement:1",
-        "assignment:1"
-      ],
-      "after_path": [
-        "class_definition:1",
-        "block:1",
-        "expression_statement:1",
-        "assignment:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "class_definition:1",
-        "block:1",
-        "expression_statement:1",
-        "assignment:1",
-        "identifier:1"
-      ],
-      "after_path": [
-        "class_definition:1",
-        "block:1",
-        "expression_statement:1",
-        "assignment:1",
-        "identifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "class_definition:1",
-        "block:1",
-        "expression_statement:1",
-        "assignment:1",
-        "::1"
-      ],
-      "after_path": [
-        "class_definition:1",
-        "block:1",
-        "expression_statement:1",
-        "assignment:1",
-        "::1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "class_definition:1",
-        "block:1",
-        "expression_statement:1",
-        "assignment:1",
-        "type:1"
-      ],
-      "after_path": [
-        "class_definition:1",
-        "block:1",
-        "expression_statement:1",
-        "assignment:1",
-        "type:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "class_definition:1",
-        "block:1",
-        "expression_statement:1",
-        "assignment:1",
-        "type:1",
-        "identifier:1"
-      ],
-      "after_path": [
-        "class_definition:1",
-        "block:1",
-        "expression_statement:1",
-        "assignment:1",
-        "type:1",
-        "identifier:1"
       ]
     },
     {
@@ -1010,7 +820,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "class_definition:1",
         "block:1",
@@ -1022,40 +832,6 @@
         "block:1",
         "decorated_definition:2",
         "decorator:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "class_definition:1",
-        "block:1",
-        "decorated_definition:2",
-        "decorator:1",
-        "@:1"
-      ],
-      "after_path": [
-        "class_definition:1",
-        "block:1",
-        "decorated_definition:2",
-        "decorator:1",
-        "@:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "class_definition:1",
-        "block:1",
-        "decorated_definition:2",
-        "decorator:1",
-        "identifier:1"
-      ],
-      "after_path": [
-        "class_definition:1",
-        "block:1",
-        "decorated_definition:2",
-        "decorator:1",
-        "identifier:1"
       ]
     },
     {
@@ -1493,7 +1269,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "class_definition:1",
         "block:1",
@@ -1516,48 +1292,6 @@
       "before_path": [
         "class_definition:1",
         "block:1",
-        "decorated_definition:2",
-        "function_definition:1",
-        "block:1",
-        "raise_statement:1",
-        "raise:1"
-      ],
-      "after_path": [
-        "class_definition:1",
-        "block:1",
-        "decorated_definition:2",
-        "function_definition:1",
-        "block:1",
-        "raise_statement:1",
-        "raise:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "class_definition:1",
-        "block:1",
-        "decorated_definition:2",
-        "function_definition:1",
-        "block:1",
-        "raise_statement:1",
-        "identifier:1"
-      ],
-      "after_path": [
-        "class_definition:1",
-        "block:1",
-        "decorated_definition:2",
-        "function_definition:1",
-        "block:1",
-        "raise_statement:1",
-        "identifier:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "class_definition:1",
-        "block:1",
         "decorated_definition:3"
       ],
       "after_path": [
@@ -1567,7 +1301,7 @@
       ]
     },
     {
-      "operation": "identical",
+      "operation": "identical_with_children",
       "before_path": [
         "class_definition:1",
         "block:1",
@@ -1579,40 +1313,6 @@
         "block:1",
         "decorated_definition:3",
         "decorator:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "class_definition:1",
-        "block:1",
-        "decorated_definition:3",
-        "decorator:1",
-        "@:1"
-      ],
-      "after_path": [
-        "class_definition:1",
-        "block:1",
-        "decorated_definition:3",
-        "decorator:1",
-        "@:1"
-      ]
-    },
-    {
-      "operation": "identical",
-      "before_path": [
-        "class_definition:1",
-        "block:1",
-        "decorated_definition:3",
-        "decorator:1",
-        "identifier:1"
-      ],
-      "after_path": [
-        "class_definition:1",
-        "block:1",
-        "decorated_definition:3",
-        "decorator:1",
-        "identifier:1"
       ]
     },
     {
