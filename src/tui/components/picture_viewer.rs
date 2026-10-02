@@ -119,6 +119,9 @@ struct Built {
     colors: PictureColors,
 }
 
+/// Each pane's title and picture, encoded for the terminal; `None` for a side with no picture.
+type Panes = Vec<(String, Option<StatefulProtocol>)>;
+
 pub struct PictureViewer {
     before_name: String,
     after_name: String,
@@ -130,7 +133,7 @@ pub struct PictureViewer {
     mode: PictureMode,
     swipe_percent: u16,
     picker: Picker,
-    shown: Option<(Built, Vec<(String, Option<StatefulProtocol>)>)>,
+    shown: Option<(Built, Panes)>,
 }
 
 impl PictureViewer {

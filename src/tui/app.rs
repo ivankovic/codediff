@@ -1670,6 +1670,11 @@ fn panic_message(panic: &Box<dyn std::any::Any + Send>) -> String {
     }
 }
 
+/// True if `path` holds a picture, by its bytes (see [`crate::diff::picture::is_picture`]).
+fn is_picture_file(path: &Path) -> bool {
+    std::fs::read(path).is_ok_and(|bytes| crate::diff::picture::is_picture(&bytes))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -3266,9 +3271,4 @@ mod tests {
         assert_eq!(display_safe("a\r\nb\rc\n"), "a\r\nb c\n");
         assert_eq!(display_safe("trailing\r"), "trailing ");
     }
-}
-
-/// True if `path` holds a picture, by its bytes (see [`crate::diff::picture::is_picture`]).
-fn is_picture_file(path: &Path) -> bool {
-    std::fs::read(path).is_ok_and(|bytes| crate::diff::picture::is_picture(&bytes))
 }
