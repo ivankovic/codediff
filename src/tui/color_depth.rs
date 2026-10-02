@@ -21,6 +21,11 @@
 //! not approximate `ESC[48;2;R;G;Bm`: macOS Terminal.app reads the channels as SGR codes of their
 //! own, so a `0` channel is a reset and `#ff0000` comes out black. Such terminals get the nearest
 //! xterm-256 color instead, substituted in the finished frame so no renderer has to know.
+//!
+//! Except a picture drawn with the kitty graphics protocol: each of its cells is a placeholder
+//! character whose foreground is the image's id, not a color (`ratatui-image` writes it as
+//! `Color::Rgb`). Fitted, the id names no image and the terminal draws nothing, so those cells
+//! are left as they are.
 
 use std::collections::HashMap;
 
@@ -71,12 +76,18 @@ impl ColorDepth {
         let mut fitted: HashMap<Color, Color> = fit_palette(palette).into_iter().collect();
         let mut fit = |color: Color| *fitted.entry(color).or_insert_with(|| to_indexed(color));
         for cell in &mut buffer.content {
+            if cell.symbol().contains(KITTY_PLACEHOLDER) {
+                continue;
+            }
             cell.fg = fit(cell.fg);
             cell.bg = fit(cell.bg);
             cell.underline_color = fit(cell.underline_color);
         }
     }
 }
+
+/// The character every cell of a kitty-protocol picture starts with (kitty's Unicode placeholder).
+const KITTY_PLACEHOLDER: char = '\u{10EEEE}';
 
 /// The palette's backgrounds as `(rgb, indexed)`, each different from the ones before it. Fitted
 /// one by one, two nearby bands can land on the same cube color (Solarized Light's insert and
@@ -330,6 +341,20 @@ mod tests {
 
         ColorDepth::Indexed256.fit(&mut buffer, &palette);
         assert_eq!(buffer.content[0].bg, Color::Indexed(196));
+        assert_eq!(buffer.content[1].fg, Color::Indexed(21));
+    }
+
+    /// A kitty picture's foreground is its image id: fitted, the picture vanishes.
+    #[test]
+    fn fitting_a_frame_leaves_a_kitty_pictures_image_id_alone() {
+        let mut buffer = Buffer::empty(ratatui::layout::Rect::new(0, 0, 2, 1));
+        buffer.content[0]
+            .set_symbol("\u{10EEEE}\u{305}\u{305}")
+            .set_fg(Color::Rgb(0xAA, 0xBB, 0xCC));
+        buffer.content[1].set_fg(Color::Rgb(0, 0, 255));
+
+        ColorDepth::Indexed256.fit(&mut buffer, &OverlayTheme::default().palette());
+        assert_eq!(buffer.content[0].fg, Color::Rgb(0xAA, 0xBB, 0xCC));
         assert_eq!(buffer.content[1].fg, Color::Indexed(21));
     }
 }
