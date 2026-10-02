@@ -45,6 +45,12 @@ the introductory paper's corpus-shape figure, drawn by `analysis/distributions_r
 AST node-kind distribution per language, and size/LOC-changed statistics for the sampled Rust
 pairs. Written by `analysis/file_stats.py` and `analysis/code_pair_diff_stats.py`.
 
+`change_census.csv` is *what* real-world commits change, over the same 50-commit window: one row per
+extension (or file name) with its `code::tip` category, how many changes, how many of those binary,
+lines changed, and how many repositories changed such a file (`make measure-change-census
+MODE=<mode>`, `analysis/change_census.py`). The repositories column is the one to read: a handful of
+repositories dominate the change counts.
+
 `edit_shape.csv` is how big a real-world *edit* is, per language, over the most recent 50 commits
 of each repository (`make measure-edit-shape MODE=<mode>`, `analysis/edit_shape_stats.py`) - the source of
 the paper's edit-size numbers. Per-language rows only: the per-edit population is ~435k modifications
