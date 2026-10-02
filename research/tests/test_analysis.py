@@ -20,10 +20,12 @@ test-python` from the repository root (or `uv run pytest` from research/)."""
 
 import json
 import re
+import subprocess
 
 import _common
 import apted_only_report
 import benchmark_other_report
+import change_census
 import ci_local
 import coverage_report
 import coverage_sets
@@ -144,6 +146,49 @@ def test_pct_is_zero_where_the_total_is_zero():
 )
 def test_percentile_by_nearest_rank(values, q, expected):
     assert edit_shape_stats.percentile(values, q) == expected
+
+
+def test_change_census_keys_by_extension_or_by_name():
+    assert change_census.key_of("assets/Logo.PNG") == ".png"
+    assert change_census.key_of("dist/app.min.js") == ".min.js"
+    assert change_census.key_of("src/Makefile") == "makefile"
+    assert change_census.key_of(".gitignore") == ".gitignore"
+    assert change_census.key_of("doc/foo.tar.gz") == ".gz"
+
+
+def _git(repo, *args):
+    subprocess.run(
+        ["git", "-c", "user.name=t", "-c", "user.email=t@t", "-C", str(repo), *args],
+        check=True,
+        capture_output=True,
+    )
+
+
+def test_change_census_counts_binary_files_and_skips_the_shallow_boundary(tmp_path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(repo, "init", "-q")
+    (repo / "a.txt").write_text("one\n")
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-q", "-m", "boundary")
+    (repo / "a.txt").write_text("one\ntwo\n")
+    (repo / "logo.png").write_bytes(b"\x89PNG\r\n\x1a\n\x00\x00")
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-q", "-m", "edit")
+    boundary = subprocess.run(
+        ["git", "-C", str(repo), "rev-list", "--max-parents=0", "HEAD"],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.strip()
+    (repo / ".git" / "shallow").write_text(boundary + "\n")
+
+    changes, binary, lines, sample, commits = change_census.census_of(str(repo), 50)
+    assert commits == 1
+    assert changes == {".txt": 1, ".png": 1}
+    assert binary == {".png": 1}
+    assert lines == {".txt": 1}
+    assert sample[".png"] == "logo.png"
 
 
 def test_shallow_boundary_commits_reads_the_graft_points(tmp_path):

@@ -16,6 +16,14 @@ release does: a minor bump may change the JSON output or the library API, a patc
   difference, blend and swipe view; it draws real pixels where the terminal speaks the kitty,
   sixel or iTerm2 graphics protocol and Unicode half blocks everywhere else.
 
+### Changed
+
+- XML formats with an extension of their own are diffed with the XML grammar instead of line by
+  line: `.svg`, `.plist`, Qt `.ui`/`.qrc`, MSBuild `.vcxproj`/`.csproj`/`.props`/`.targets`, `.xib`,
+  `.storyboard`, `.xaml`, `.resx`, `.xsd`/`.xsl`, `.xlf`, `.kml`, `.gpx` and more (see the README's
+  language list). A file under one of these names whose content is not markup is still diffed as
+  plain text.
+
 ## [0.2.0] - 2026-10-01
 
 **CodeDiff is now OmniDiff.** The old name is a registered trademark, so everything was renamed.
