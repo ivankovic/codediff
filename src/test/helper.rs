@@ -654,8 +654,10 @@ pub fn sample_provenance() -> Result<HashMap<String, SampleProvenance>> {
 }
 
 /// Clone URL for each [`SampleProvenance::repository`] slug, from `list_of_repositories.csv`,
-/// found by deriving the slug from every clone URL (the slug cannot be split back). A slug that
-/// does not resolve is absent. Every listed host serves `<clone url>/commit/<sha>`.
+/// found by deriving every row's clone-directory name the way `research/sampling/dataset.sh` does
+/// (see [`repository_slug`]; the slug cannot be split back). A slug that does not resolve is
+/// absent. Every listed host serves `<clone url>/commit/<sha>`, `git.libreoffice.org` as a
+/// redirect to its Gitiles commit page.
 #[cfg(feature = "test-fixtures")]
 pub fn repository_urls() -> Result<HashMap<String, String>> {
     let path =
@@ -672,18 +674,24 @@ pub fn repository_urls() -> Result<HashMap<String, String>> {
             continue;
         };
         let url = url.trim().trim_end_matches('/');
-        if let Some(slug) = repository_slug(url) {
+        let name = record.get("name").map(String::as_str).unwrap_or_default();
+        if let Some(slug) = repository_slug(url, name) {
             out.entry(slug).or_insert_with(|| url.to_string());
         }
     }
     Ok(out)
 }
 
-/// The clone-directory slug for a clone URL: everything after the host, `.git` dropped, `/`
-/// replaced by `-`. `None` for a URL with nothing after the host.
-fn repository_slug(url: &str) -> Option<String> {
+/// The clone-directory slug `research/sampling/dataset.sh` gives a row of the repository list: on
+/// GitHub, GitLab and Codeberg everything after the host, `.git` dropped, `/` replaced by `-`;
+/// on any other host the row's `name` (LibreOffice's `git.libreoffice.org/core` is cloned as
+/// `libreoffice`). `None` for a forge URL with nothing after the host, or no name.
+fn repository_slug(url: &str, name: &str) -> Option<String> {
     let after_scheme = url.split_once("://").map(|(_, rest)| rest).unwrap_or(url);
-    let (_host, path) = after_scheme.split_once('/')?;
+    let (host, path) = after_scheme.split_once('/')?;
+    if !matches!(host, "github.com" | "gitlab.com" | "codeberg.org") {
+        return (!name.is_empty()).then(|| name.to_string());
+    }
     let path = path.trim_matches('/');
     if path.is_empty() {
         return None;
@@ -1072,23 +1080,32 @@ mod tests {
     #[test]
     fn repository_slug_matches_the_clone_directory_name_sample_csv_records() {
         assert_eq!(
-            repository_slug("https://github.com/awslabs/aws-c-common").as_deref(),
+            repository_slug("https://github.com/awslabs/aws-c-common", "any").as_deref(),
             Some("awslabs-aws-c-common")
         );
         assert_eq!(
-            repository_slug("https://gitlab.com/gitlab-org/gitlab-runner").as_deref(),
+            repository_slug("https://gitlab.com/gitlab-org/gitlab-runner", "any").as_deref(),
             Some("gitlab-org-gitlab-runner")
         );
         assert_eq!(
-            repository_slug("https://codeberg.org/dnkl/foot.git").as_deref(),
+            repository_slug("https://codeberg.org/dnkl/foot.git", "any").as_deref(),
             Some("dnkl-foot")
         );
         // Why the slug is derived from URLs rather than split: the owner contains a dash.
         assert_eq!(
-            repository_slug("https://github.com/Ondsel-Development/OndselSolver").as_deref(),
+            repository_slug("https://github.com/Ondsel-Development/OndselSolver", "any").as_deref(),
             Some("Ondsel-Development-OndselSolver")
         );
-        assert_eq!(repository_slug("https://git.libreoffice.org"), None);
+        assert_eq!(repository_slug("https://github.com", "any"), None);
+        // Off the three forges, `dataset.sh` clones into the row's name, not the URL's path.
+        assert_eq!(
+            repository_slug("https://git.libreoffice.org/core", "libreoffice").as_deref(),
+            Some("libreoffice")
+        );
+        assert_eq!(
+            repository_slug("https://git.libreoffice.org/core", ""),
+            None
+        );
     }
 
     #[test]
