@@ -357,9 +357,21 @@ mod css_wordpress_wordpress_remove_webkit_prefix;
 #[cfg(test)]
 mod css_wordpress_wordpress_rename_attribute;
 #[cfg(test)]
+mod go_caddyserver_caddy_add_only;
+#[cfg(test)]
 mod go_caddyserver_caddy_multiple_solutions_interesting_case;
 #[cfg(test)]
+mod go_cockroachdb_cockroach_add_function;
+#[cfg(test)]
+mod go_cockroachdb_cockroach_add_only;
+#[cfg(test)]
 mod go_fatedier_frp_build_comment_insert_only;
+#[cfg(test)]
+mod go_fatedier_frp_delete_and_update;
+#[cfg(test)]
+mod go_fatedier_frp_pure_delete;
+#[cfg(test)]
+mod go_gin_gonic_gin_enclose_with_var;
 #[cfg(test)]
 mod go_gin_gonic_gin_one_space_removed_in_a_comment;
 #[cfg(test)]
@@ -383,15 +395,21 @@ mod go_gin_gonic_gin_whitespace_in_comment;
 #[cfg(test)]
 mod go_gohugoio_hugo_add_and_upadate_list_items;
 #[cfg(test)]
+mod go_gohugoio_hugo_for_loop_change;
+#[cfg(test)]
 mod go_gohugoio_hugo_update_and_add_list_items;
 #[cfg(test)]
 mod go_gohugoio_hugo_update_and_add_some_values;
 #[cfg(test)]
 mod go_gohugoio_hugo_version;
 #[cfg(test)]
+mod go_golang_go_add_an_if;
+#[cfg(test)]
 mod go_golang_go_add_one_line;
 #[cfg(test)]
 mod go_golang_go_update_copyright_year;
+#[cfg(test)]
+mod go_grafana_grafana_interesting_how_escapes_impact_string_parsing;
 #[cfg(test)]
 mod go_grafana_grafana_real_small_change_with_a_move;
 #[cfg(test)]
@@ -401,11 +419,25 @@ mod go_jesseduffield_lazygit_add_two_lines;
 #[cfg(test)]
 mod go_jesseduffield_lazygit_change_undo_key;
 #[cfg(test)]
+mod go_jesseduffield_lazygit_nice_small_change;
+#[cfg(test)]
+mod go_jesseduffield_lazygit_remove_if_that_is_a_version_guard;
+#[cfg(test)]
+mod go_jesseduffield_lazygit_update_in_ast_delete_in_comment;
+#[cfg(test)]
 mod go_junegunn_fzf_real_small_change;
+#[cfg(test)]
+mod go_kubernetes_kubernetes_add_a_functio;
 #[cfg(test)]
 mod go_kubernetes_kubernetes_add_element_to_return_slice;
 #[cfg(test)]
+mod go_kubernetes_kubernetes_add_only;
+#[cfg(test)]
+mod go_kubernetes_kubernetes_int_to_string;
+#[cfg(test)]
 mod go_ollama_ollama_add_go_build_comment;
+#[cfg(test)]
+mod go_ollama_ollama_delete_a_param;
 #[cfg(test)]
 mod go_ollama_ollama_delete_go_build_comment;
 #[cfg(test)]
@@ -482,6 +514,8 @@ mod java_genymobile_scrcpy_char_to_string_bugfix;
 mod java_genymobile_scrcpy_only_insert;
 #[cfg(test)]
 mod java_genymobile_scrcpy_whitespace_only;
+#[cfg(test)]
+mod java_genymobile_scrcpy_whitespace_only_2;
 #[cfg(test)]
 mod java_nextcloud_android_add_one_line;
 #[cfg(test)]
